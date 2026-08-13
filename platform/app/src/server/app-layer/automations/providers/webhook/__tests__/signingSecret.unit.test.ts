@@ -27,7 +27,7 @@ const BASE = {
   url: "https://example.com/hook",
   method: "POST" as const,
   bodyTemplate: null,
-  bodyFormat: "json" as const,
+  contentType: "application/json",
   headers: {},
 };
 

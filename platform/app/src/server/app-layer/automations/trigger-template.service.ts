@@ -1,7 +1,4 @@
-import {
-  type WebhookBodyFormat,
-  webhookContentTypeFor,
-} from "@langwatch/automations/providers/webhook";
+import { DEFAULT_WEBHOOK_CONTENT_TYPE } from "@langwatch/automations/providers/webhook";
 import {
   defaultsForSourceKind,
   type TemplateSourceKind,
@@ -216,10 +213,10 @@ export interface TestFireWebhookDestination {
    *  configured secret does. */
   signingSecrets?: readonly string[];
   bodyTemplate: string | null;
-  /** What the body is, and so what Content-Type the test fire carries. Absent
-   *  means JSON, so a draft saved before the field existed test-fires exactly
-   *  as it did. */
-  bodyFormat?: WebhookBodyFormat;
+  /** The Content-Type the test fire announces, which also decides the body's
+   *  treatment (JSON checked, anything else verbatim). Absent means JSON, so
+   *  a draft saved before the field existed test-fires exactly as it did. */
+  contentType?: string;
 }
 
 export interface TestFireTriggerInput {
@@ -373,11 +370,12 @@ export async function testFireTrigger(
     }
     const { url, method, headers, signingSecrets, bodyTemplate } =
       input.webhookDestination;
-    const bodyFormat = input.webhookDestination.bodyFormat ?? "json";
+    const contentType =
+      input.webhookDestination.contentType ?? DEFAULT_WEBHOOK_CONTENT_TYPE;
     const rendered = await renderWebhookBody({
       template: bodyTemplate,
       context,
-      format: bodyFormat,
+      contentType,
       defaultBody: defaults.webhookBody,
     });
     // Actually sends through the full SSRF-fenced sender so the author sees a
@@ -389,7 +387,7 @@ export async function testFireTrigger(
       headers,
       signingSecrets,
       body: rendered.body,
-      contentType: webhookContentTypeFor(bodyFormat),
+      contentType,
       triggerName: trigger.name,
     });
     return {

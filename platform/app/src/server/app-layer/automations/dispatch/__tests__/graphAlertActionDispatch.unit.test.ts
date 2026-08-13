@@ -774,12 +774,12 @@ describe("dispatchGraphAlertAction", () => {
       expect(call.url).toBe("https://example.com/hook");
       const body = JSON.parse(call.body) as { event: string };
       expect(body.event).toBe("alert.fired");
-      // A row saved before body formats existed states none, and still sends
+      // A row saved before content types existed states none, and still sends
       // JSON, announced as JSON.
       expect(call.contentType).toBe("application/json");
     });
 
-    describe("when the alert's body format is plain text", () => {
+    describe("when the alert declares a plain-text Content-Type", () => {
       /** @scenario "A plain-text body is sent exactly as it renders" */
       it("sends the rendered template verbatim, announced as text", async () => {
         const { deps, sendWebhook } = makeDeps();
@@ -792,7 +792,7 @@ describe("dispatchGraphAlertAction", () => {
               actionParams: {
                 url: "https://example.com/hook",
                 method: "POST",
-                bodyFormat: "text",
+                contentType: "text/plain; charset=utf-8",
                 bodyTemplate: "ALERT {{ trigger.name }}",
               },
             }),

@@ -1,4 +1,7 @@
-import type { WebhookBodyFormat } from "../providers/webhook";
+import {
+  DEFAULT_WEBHOOK_CONTENT_TYPE,
+  isJsonWebhookContentType,
+} from "../providers/webhook";
 import { DEFAULT_WEBHOOK_BODY_TEMPLATE } from "./defaults";
 import { renderLiquid } from "./engine";
 import { errorMessage } from "./renderWithFallback";
@@ -9,11 +12,11 @@ import type {
 } from "./templateContext";
 
 export interface RenderedWebhookBody {
-  /** The string to send: valid JSON for a `json` body, the render output
-   *  verbatim for a `text` one. */
+  /** The string to send: valid JSON for a JSON content type, the render
+   *  output verbatim for any other. */
   body: string;
   /** True when the framework default was used (custom null, threw, or
-   *  unparseable). Always false for a `text` body, which has no default. */
+   *  unparseable). Always false for a non-JSON body, which has no default. */
   usedDefault: boolean;
   missingVariables: string[];
   errors: string[];
@@ -37,14 +40,15 @@ async function renderJsonBody({
 }
 
 /**
- * A plain-text body: whatever the template rendered, byte for byte.
+ * A non-JSON body: whatever the template rendered, byte for byte.
  *
  * There is no parse to validate against and no framework default to fall back
- * to — a JSON envelope is exactly what an endpoint that asked for text cannot
- * read, and re-sending the unrendered template would post `{{ trigger.name }}`
- * as if it were content. A render failure therefore degrades to an EMPTY body,
- * carrying the same diagnostics the JSON path records, so the author sees what
- * broke and the receiver sees nothing it has to guess at.
+ * to — a JSON envelope is exactly what an endpoint that asked for another type
+ * cannot read, and re-sending the unrendered template would post
+ * `{{ trigger.name }}` as if it were content. A render failure therefore
+ * degrades to an EMPTY body, carrying the same diagnostics the JSON path
+ * records, so the author sees what broke and the receiver sees nothing it has
+ * to guess at.
  */
 async function renderTextBody({
   template,
@@ -78,34 +82,37 @@ async function renderTextBody({
  * Renders a webhook automation's body (ADR-040 §2) — the same Liquid engine and
  * contexts Slack/email render against.
  *
- * A `json` body keeps the Block Kit fall-back discipline: the output must
- * `JSON.parse`, and a render throw or parse failure on the customer's template
- * falls back to the framework default body, with the error captured for the
- * operator. If even the default fails (it shouldn't — it is ours), a minimal
- * static envelope is sent rather than nothing, so a delivery is never silently
- * dropped over a template.
+ * A JSON content type keeps the Block Kit fall-back discipline: the output
+ * must `JSON.parse`, and a render throw or parse failure on the customer's
+ * template falls back to the framework default body, with the error captured
+ * for the operator. If even the default fails (it shouldn't — it is ours), a
+ * minimal static envelope is sent rather than nothing, so a delivery is never
+ * silently dropped over a template.
  *
- * A `text` body has no shape to validate and no default to fall back to; see
- * {@link renderTextBody}.
+ * Any other content type has no shape to validate and no default to fall back
+ * to; see {@link renderTextBody}.
  */
 export async function renderWebhookBody({
   template,
   context,
-  format = "json",
+  contentType = DEFAULT_WEBHOOK_CONTENT_TYPE,
   defaultBody = DEFAULT_WEBHOOK_BODY_TEMPLATE,
 }: {
   /** The customer's Liquid template, or null for the framework default. */
   template: string | null;
   context: TemplateContext | GraphAlertTemplateContext | ReportTemplateContext;
-  /** What the body is (`actionParams.bodyFormat`). Absent means JSON. */
-  format?: WebhookBodyFormat;
+  /** The declared `Content-Type` (`actionParams.contentType`). Absent means
+   *  JSON. */
+  contentType?: string;
   /** Per-source default override (`defaultsForSourceKind(...).webhookBody`).
    *  Only a JSON body has one. */
   defaultBody?: string;
 }): Promise<RenderedWebhookBody> {
   const ctx = context as unknown as Record<string, unknown>;
 
-  if (format === "text") return renderTextBody({ template, context: ctx });
+  if (!isJsonWebhookContentType(contentType)) {
+    return renderTextBody({ template, context: ctx });
+  }
 
   // `customMissing` captures the missing-variable diagnostics from the
   // customer's own render, so a JSON.parse failure below still surfaces the

@@ -5,27 +5,37 @@ import type { PreviewEnvelope, SharedDef } from "./types";
 export const WEBHOOK_METHODS = ["POST", "PUT", "PATCH"] as const;
 
 /**
- * What the rendered body IS, which decides both how it is rendered and the
- * `Content-Type` the request carries: `json` renders Liquid into JSON and
- * re-serializes it (the original and still the default), `text` sends whatever
- * the template rendered, byte for byte, for endpoints that speak anything else
- * — plain prose, a form encoding, XML, a line-oriented log format.
+ * The `Content-Type` a delivery announces, and with it how the body is
+ * treated: a JSON type renders Liquid into JSON and re-serializes it (the
+ * original and still the default), any other type sends whatever the template
+ * rendered, byte for byte — plain prose, a form encoding, XML, a
+ * line-oriented log format. One field decides both, so the announced type and
+ * the body's treatment can never disagree. It has its own field (and
+ * `content-type` stays reserved among the custom header rows) because custom
+ * header values are secrets — encrypted at rest and never echoed back — and
+ * the declared type must survive a round-trip into the editor.
  */
-export const WEBHOOK_BODY_FORMATS = ["json", "text"] as const;
-export const webhookBodyFormatSchema = z.enum(WEBHOOK_BODY_FORMATS);
-export type WebhookBodyFormat = z.infer<typeof webhookBodyFormatSchema>;
+export const DEFAULT_WEBHOOK_CONTENT_TYPE = "application/json";
 
-/**
- * The `Content-Type` a delivery carries, derived from its body format so the
- * two can never disagree. Customers cannot set it — `content-type` is a
- * reserved header (see {@link isReservedWebhookHeader}).
- *
- * Only the text type states a charset: JSON is UTF-8 by definition (RFC 8259),
- * while `text/plain` without one is read as US-ASCII by a strict receiver, so
- * an unstated charset is how an accented character arrives as mojibake.
- */
-export function webhookContentTypeFor(format: WebhookBodyFormat): string {
-  return format === "text" ? "text/plain; charset=utf-8" : "application/json";
+/** JSON semantics — the parse check, the re-serialize, the framework default
+ *  fallback — key off the declared type: `application/json` and any `+json`
+ *  structured suffix (RFC 6839). Everything else is sent as it renders. */
+export function isJsonWebhookContentType(contentType: string): boolean {
+  const media = (contentType.split(";")[0] ?? "").trim().toLowerCase();
+  return media === "application/json" || media.endsWith("+json");
+}
+
+/** RFC 7231 media type: `type/subtype`, optionally followed by parameters
+ *  (`; charset=utf-8`). Parameters are not inspected, only allowed. */
+const MEDIA_TYPE_RX =
+  /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+\/[!#$%&'*+\-.^_`|~0-9A-Za-z]+(\s*;\s*\S[^\r\n]*)?$/;
+
+/** The author-facing sentence when a Content-Type is not a media type, or
+ *  null when it is admissible. The client form and the schema both use it. */
+export function validateWebhookContentType(value: string): string | null {
+  return MEDIA_TYPE_RX.test(value.trim())
+    ? null
+    : "Enter a media type, like application/json or text/plain.";
 }
 
 /**
@@ -173,15 +183,24 @@ export const webhookActionParamsSchema = z.object({
     .record(z.string(), z.string())
     .default({})
     .transform(sanitizeWebhookHeaders),
-  /** Liquid body source. NULL = the framework default envelope for a `json`
-   *  body, and an empty body for a `text` one — plain text has no envelope
-   *  worth guessing at. Stored inside `actionParams` (not a Trigger template
-   *  column) — ADR-040 §1. */
+  /** Liquid body source. NULL = the framework default envelope for a JSON
+   *  content type, and an empty body for any other — a non-JSON endpoint has
+   *  no envelope worth guessing at. Stored inside `actionParams` (not a
+   *  Trigger template column) — ADR-040 §1. */
   bodyTemplate: z.string().nullable().default(null),
-  /** What the rendered body is, and so what `Content-Type` it is sent as.
-   *  Absent means `json`, which is what every webhook automation was before
-   *  the field existed. */
-  bodyFormat: webhookBodyFormatSchema.default("json"),
+  /** The `Content-Type` the delivery announces (see
+   *  {@link DEFAULT_WEBHOOK_CONTENT_TYPE} above for how it also decides the
+   *  body's treatment). Absent or empty means JSON, which is what every
+   *  webhook automation was before the field existed. */
+  contentType: z
+    .string()
+    .trim()
+    .default(DEFAULT_WEBHOOK_CONTENT_TYPE)
+    .transform((value) => (value === "" ? DEFAULT_WEBHOOK_CONTENT_TYPE : value))
+    .superRefine((value, ctx) => {
+      const problem = validateWebhookContentType(value);
+      if (problem) ctx.addIssue({ code: "custom", message: problem });
+    }),
   /**
    * Optional HMAC signing secret (ADR-040 §3). NULL means unsigned, which is
    * what every webhook automation was until this existed: one signing scheme
@@ -216,9 +235,9 @@ const def: SharedDef = {
   category: "notify",
   label: "Webhook",
   description:
-    "Send a JSON or plain-text body to your own endpoint when a trace matches.",
+    "Send a request with a body you shape to your own endpoint when a trace matches.",
   alertDescription:
-    "Send a JSON or plain-text body to your own endpoint when it fires.",
+    "Send a request with a body you shape to your own endpoint when it fires.",
   actionParamsSchema: webhookActionParamsSchema,
 };
 

@@ -515,46 +515,55 @@ function bodyTextbox() {
   return within(screen.getByTestId("webhook-body-editor")).getByRole("textbox");
 }
 
-describe("webhookClient body format", () => {
+describe("webhookClient Content-Type", () => {
   afterEach(() => cleanup());
 
+  const contentTypeInput = () => screen.getByTestId("webhook-content-type");
+
   describe("given a fresh webhook draft", () => {
-    it("starts on JSON, so a new automation behaves as every existing one does", () => {
+    /** @scenario "Content-Type is a fixed header row that defaults to JSON" */
+    it("leads the headers with a fixed Content-Type row set to JSON", () => {
+      renderForm();
+
+      expect(contentTypeInput()).toHaveValue("application/json");
+      // The name cell is fixed — the row is always there and cannot be
+      // removed, so the delivery always announces something.
+      expect(screen.getByDisplayValue("Content-Type")).toBeDisabled();
+
       const params = webhookClient.toActionParams(
         webhookClient.initialSlice(),
       ) as WebhookActionParams;
+      expect(params.contentType).toBe("application/json");
+    });
 
-      expect(params.bodyFormat).toBe("json");
+    it("rejects a value that is not a media type, where it is typed", () => {
+      renderForm();
+
+      fireEvent.change(contentTypeInput(), { target: { value: "banana" } });
+
+      expect(screen.getByText(/media type/i)).toBeInTheDocument();
     });
   });
 
-  describe("when the author picks plain text", () => {
-    it("sends the format on toActionParams", async () => {
-      const user = userEvent.setup();
+  describe("when the author declares a non-JSON Content-Type", () => {
+    /** @scenario "The editor and preview follow the declared Content-Type" */
+    it("sends it on toActionParams and stops treating the body as JSON", () => {
       const onChangeSpy = vi.fn();
       renderForm({ onChangeSpy });
 
-      await user.click(screen.getByText("Plain text"));
+      // JSON first: the editor is seeded with the framework envelope.
+      expect(bodyTextbox()).toHaveValue(DEFAULT_WEBHOOK_BODY_TEMPLATE);
+
+      fireEvent.change(contentTypeInput(), {
+        target: { value: "text/plain" },
+      });
 
       const params = webhookClient.toActionParams(
         onChangeSpy.mock.calls.at(-1)![0],
       ) as WebhookActionParams;
-      expect(params.bodyFormat).toBe("text");
-    });
-
-    it("stops seeding the editor with the JSON envelope", () => {
-      renderForm({
-        initial: { ...webhookClient.initialSlice(), bodyFormat: "text" },
-      });
-
+      expect(params.contentType).toBe("text/plain");
+      // A non-JSON body has no framework envelope to seed or reset to.
       expect(bodyTextbox()).toHaveValue("");
-    });
-
-    it("drops the default-body affordances, which plain text does not have", () => {
-      renderForm({
-        initial: { ...webhookClient.initialSlice(), bodyFormat: "text" },
-      });
-
       expect(screen.queryByText("Using default")).not.toBeInTheDocument();
       expect(
         screen.queryByRole("button", { name: /reset to default/i }),
@@ -563,16 +572,16 @@ describe("webhookClient body format", () => {
   });
 
   describe("given a saved trigger row", () => {
-    it("reads the stored format back", () => {
+    it("reads the stored Content-Type back", () => {
       const slice = webhookClient.fromTriggerRow(
         savedRowWith({
           url: "https://example.com/hooks",
-          bodyFormat: "text",
+          contentType: "text/plain; charset=utf-8",
           bodyTemplate: "hello",
         }),
       );
 
-      expect(slice.bodyFormat).toBe("text");
+      expect(slice.contentType).toBe("text/plain; charset=utf-8");
     });
 
     it("reads a row saved before the field existed as JSON", () => {
@@ -580,7 +589,7 @@ describe("webhookClient body format", () => {
         savedRowWith({ url: "https://example.com/hooks", bodyTemplate: null }),
       );
 
-      expect(slice.bodyFormat).toBe("json");
+      expect(slice.contentType).toBe("application/json");
     });
   });
 });

@@ -1,8 +1,9 @@
 Feature: Webhook (generic HTTP) automation action
   Automations can deliver to a customer-supplied HTTP endpoint (ADR-040):
   on a trace match or a graph alert, LangWatch renders a Liquid body — JSON
-  or any other text format — and sends it to the configured URL over an
-  SSRF-fenced HTTP client. Every project has the channel.
+  by default, any media type via the Content-Type header — and sends it to
+  the configured URL over an SSRF-fenced HTTP client. Every project has the
+  channel.
 
   Rule: Authoring a webhook automation
 
@@ -30,11 +31,17 @@ Feature: Webhook (generic HTTP) automation action
       Given a user enters an https URL with port 8443
       Then the authoring form rejects it, explaining only the default https port is allowed
 
-  Rule: The body may be any text format
+  Rule: The Content-Type header decides how the body is treated
+
+    The declared Content-Type is one decision doing all the work: it is the
+    header the delivery announces, it decides whether the body is checked as
+    JSON or sent verbatim, and the authoring surface adapts its editor and
+    preview to it. Nothing is forced — an endpoint that wants XML gets XML,
+    announced as XML.
 
     @unit
     Scenario: A JSON body is checked and sent as JSON
-      Given a webhook automation whose body format is JSON
+      Given a webhook automation with the default Content-Type of application/json
       When the automation fires
       Then the endpoint receives valid JSON at the configured URL
       And the request is announced as application/json
@@ -48,24 +55,38 @@ Feature: Webhook (generic HTTP) automation action
 
     @unit
     Scenario: A plain-text body is sent exactly as it renders
-      Given a webhook automation whose body format is plain text
+      Given a webhook automation whose Content-Type is set to text/plain
       When the automation fires
       Then the endpoint receives the rendered template byte for byte
-      And the request is announced as text/plain in UTF-8
+      And the request is announced with the Content-Type the author declared
 
     @unit
     Scenario: A plain-text body that fails to render sends nothing
-      Given a plain-text body whose template cannot render
+      Given a non-JSON body whose template cannot render
       When the automation fires
       Then the endpoint receives an empty body, not a JSON envelope it cannot read
       And the author is shown what broke, as they are for a JSON body
 
     @unit
-    Scenario: An automation saved before formats existed still sends JSON
-      Given a webhook automation saved without stating a body format
+    Scenario: An automation saved before content types existed still sends JSON
+      Given a webhook automation saved without stating a Content-Type
       When it is fired
       Then it renders the JSON envelope and announces it as application/json,
         exactly as it did before the field existed
+
+    @integration
+    Scenario: Content-Type is a fixed header row that defaults to JSON
+      Given a user picks the Webhook delivery
+      Then the headers editor leads with a Content-Type row already set to application/json
+      And the row cannot be removed, only edited
+      And a value that is not a media type is rejected where it is typed
+
+    @integration
+    Scenario: The editor and preview follow the declared Content-Type
+      Given a webhook automation on the default JSON content type
+      Then the body editor speaks JSON and the preview is highlighted as JSON
+      When the author changes the Content-Type to text/plain
+      Then the body editor and preview stop treating the body as JSON
 
   Rule: Header values are secrets
 

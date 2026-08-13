@@ -151,7 +151,7 @@ describe("renderWebhookBody", () => {
       const rendered = await renderWebhookBody({
         template: "Trigger {{ trigger.name }} matched  {{ digest.count }}\n",
         context: makeContext(),
-        format: "text",
+        contentType: "text/plain; charset=utf-8",
       });
 
       expect(rendered.body).toBe("Trigger High latency matched  1\n");
@@ -175,7 +175,7 @@ describe("renderWebhookBody", () => {
             }),
           ],
         }),
-        format: "text",
+        contentType: "text/plain; charset=utf-8",
       });
 
       expect(rendered.body).toBe(JSON_BREAKOUT);
@@ -185,7 +185,7 @@ describe("renderWebhookBody", () => {
       const rendered = await renderWebhookBody({
         template: "value: {{ trigger.nmae }}",
         context: makeContext(),
-        format: "text",
+        contentType: "text/plain; charset=utf-8",
       });
 
       expect(rendered.missingVariables.length).toBeGreaterThan(0);
@@ -197,7 +197,7 @@ describe("renderWebhookBody", () => {
         const rendered = await renderWebhookBody({
           template: null,
           context: makeContext(),
-          format: "text",
+          contentType: "text/plain; charset=utf-8",
         });
 
         expect(rendered.body).toBe("");
@@ -212,7 +212,7 @@ describe("renderWebhookBody", () => {
         const rendered = await renderWebhookBody({
           template: "{% unknown_tag %}",
           context: makeContext(),
-          format: "text",
+          contentType: "text/plain; charset=utf-8",
         });
 
         expect(rendered.body).toBe("");

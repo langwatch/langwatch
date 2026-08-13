@@ -6,10 +6,7 @@ import {
 } from "@langwatch/automations/cadences";
 import { EMAIL_RX } from "@langwatch/automations/providers/email";
 import type { SlackActionParams } from "@langwatch/automations/providers/slack";
-import {
-  WEBHOOK_HEADER_VALUE_KEPT,
-  webhookBodyFormatSchema,
-} from "@langwatch/automations/providers/webhook";
+import { WEBHOOK_HEADER_VALUE_KEPT } from "@langwatch/automations/providers/webhook";
 import { HandledError } from "@langwatch/handled-error";
 import { generate as ksuid } from "@langwatch/ksuid";
 import { TRPCError } from "@trpc/server";
@@ -138,7 +135,7 @@ const actionParamsSchema = z.object({
   method: z.enum(["POST", "PUT", "PATCH"]).optional(),
   headers: z.record(z.string(), z.string()).optional(),
   bodyTemplate: z.string().nullable().optional(),
-  bodyFormat: webhookBodyFormatSchema.optional(),
+  contentType: z.string().optional(),
 });
 
 type TRPCErrorCode = ConstructorParameters<typeof TRPCError>[0]["code"];
@@ -827,7 +824,12 @@ export const automationRouter = createTRPCRouter({
             method: z.enum(["POST", "PUT", "PATCH"]).default("POST"),
             headers: z.record(z.string(), z.string()).default({}),
             bodyTemplate: z.string().nullable().default(null),
-            bodyFormat: webhookBodyFormatSchema.default("json"),
+            // Stripped of CR/LF so a typed value can never smuggle a second
+            // header; the save path's provider schema validates the shape.
+            contentType: z
+              .string()
+              .default("application/json")
+              .transform((v) => v.replace(/[\r\n\0]+/g, " ").trim()),
           })
           .nullable()
           .default(null),

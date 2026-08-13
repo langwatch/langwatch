@@ -1,4 +1,4 @@
-import { webhookContentTypeFor } from "@langwatch/automations/providers/webhook";
+import { DEFAULT_WEBHOOK_CONTENT_TYPE } from "@langwatch/automations/providers/webhook";
 import { ALERT_TRIGGER_DEFAULTS } from "@langwatch/automations/templating/defaults";
 import { renderTriggerEmail } from "@langwatch/automations/templating/renderEmail";
 import {
@@ -576,11 +576,11 @@ export async function dispatchGraphAlertAction({
         renderErrors: [],
       };
     }
-    const bodyFormat = params.bodyFormat ?? "json";
+    const contentType = params.contentType ?? DEFAULT_WEBHOOK_CONTENT_TYPE;
     const rendered = await renderWebhookBody({
       template: params.bodyTemplate ?? null,
       context,
-      format: bodyFormat,
+      contentType,
       defaultBody: defaults.webhookBody,
     });
     if (rendered.errors.length > 0) {
@@ -610,7 +610,7 @@ export async function dispatchGraphAlertAction({
       headers: decryptWebhookHeaders(params),
       signingSecrets: decryptWebhookSigningSecrets(params),
       body: rendered.body,
-      contentType: webhookContentTypeFor(bodyFormat),
+      contentType,
       triggerName: trigger.name,
     });
     await recordRecipientSent(urlHash);

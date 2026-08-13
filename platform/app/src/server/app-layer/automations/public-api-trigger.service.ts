@@ -6,6 +6,7 @@ import {
   type SlackActionParams,
   slackDeliveryMethodOf,
 } from "@langwatch/automations/providers/slack";
+import { DEFAULT_WEBHOOK_CONTENT_TYPE } from "@langwatch/automations/providers/webhook";
 import type { AlertType, Prisma, Trigger } from "@prisma/client";
 import { TriggerAction, TriggerKind } from "@prisma/client";
 import { nanoid } from "nanoid";
@@ -761,7 +762,7 @@ export class PublicApiTriggerService {
         method: stored.method ?? "POST",
         headers: decryptWebhookHeaders(stored),
         bodyTemplate: stored.bodyTemplate ?? null,
-        bodyFormat: stored.bodyFormat ?? "json",
+        contentType: stored.contentType ?? DEFAULT_WEBHOOK_CONTENT_TYPE,
         signingSecrets: decryptWebhookSigningSecrets(stored),
       },
     };

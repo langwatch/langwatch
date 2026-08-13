@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  isJsonWebhookContentType,
   sanitizeWebhookHeaders,
+  validateWebhookContentType,
   validateWebhookUrlShape,
   WEBHOOK_HEADER_VALUE_KEPT,
   webhookActionParamsSchema,
-  webhookContentTypeFor,
 } from "../webhook";
 
 describe("validateWebhookUrlShape", () => {
@@ -119,13 +120,13 @@ describe("webhookActionParamsSchema", () => {
         method: "PUT",
         headers: { Authorization: "Bearer x" },
         bodyTemplate: "{}",
-        bodyFormat: "json",
+        contentType: "application/json",
       });
     });
   });
 
   describe("when fields are omitted", () => {
-    it("defaults method, headers, bodyTemplate, and bodyFormat", () => {
+    it("defaults method, headers, bodyTemplate, and contentType", () => {
       const parsed = webhookActionParamsSchema.parse({
         url: "https://example.com/hook",
       });
@@ -134,29 +135,46 @@ describe("webhookActionParamsSchema", () => {
       expect(parsed.bodyTemplate).toBeNull();
       // Every automation saved before the field existed sent JSON, so the
       // absent value has to keep meaning exactly that.
-      expect(parsed.bodyFormat).toBe("json");
+      expect(parsed.contentType).toBe("application/json");
     });
   });
 
-  describe("when the config asks for a plain-text body", () => {
-    it("keeps the format through a parse round-trip", () => {
+  describe("when the config declares its own Content-Type", () => {
+    it("keeps it through a parse round-trip", () => {
       const parsed = webhookActionParamsSchema.parse({
         url: "https://example.com/hook",
-        bodyFormat: "text",
+        contentType: "text/plain; charset=utf-8",
         bodyTemplate: "Alert: {{ trigger.name }}",
       });
 
-      expect(parsed.bodyFormat).toBe("text");
-      expect(webhookActionParamsSchema.parse(parsed).bodyFormat).toBe("text");
+      expect(parsed.contentType).toBe("text/plain; charset=utf-8");
+      expect(webhookActionParamsSchema.parse(parsed).contentType).toBe(
+        "text/plain; charset=utf-8",
+      );
     });
 
-    it("refuses a format nothing knows how to send", () => {
+    it("treats an empty value as the JSON default", () => {
+      const parsed = webhookActionParamsSchema.parse({
+        url: "https://example.com/hook",
+        contentType: "  ",
+      });
+      expect(parsed.contentType).toBe("application/json");
+    });
+
+    it("refuses a value that is not a media type", () => {
       expect(() =>
         webhookActionParamsSchema.parse({
           url: "https://example.com/hook",
-          bodyFormat: "xml",
+          contentType: "not a media type",
         }),
       ).toThrow();
+      // A CR/LF can never survive into a header value.
+      expect(
+        webhookActionParamsSchema.safeParse({
+          url: "https://example.com/hook",
+          contentType: "text/plain\r\nX-Injected: evil",
+        }).success,
+      ).toBe(false);
     });
   });
 
@@ -173,19 +191,45 @@ describe("webhookActionParamsSchema", () => {
   });
 });
 
-describe("webhookContentTypeFor", () => {
-  describe("when the body is JSON", () => {
-    it("announces it as application/json", () => {
-      expect(webhookContentTypeFor("json")).toBe("application/json");
+describe("isJsonWebhookContentType", () => {
+  describe("when the type is JSON or a +json structured suffix", () => {
+    it("gets the checked JSON treatment", () => {
+      expect(isJsonWebhookContentType("application/json")).toBe(true);
+      expect(isJsonWebhookContentType("application/json; charset=utf-8")).toBe(
+        true,
+      );
+      expect(isJsonWebhookContentType("Application/JSON")).toBe(true);
+      expect(isJsonWebhookContentType("application/problem+json")).toBe(true);
     });
   });
 
-  describe("when the body is plain text", () => {
-    // text/plain with no charset is read as US-ASCII by a strict receiver, so
-    // the charset is what keeps an accented character from arriving as
-    // mojibake. JSON needs no such statement — it is UTF-8 by definition.
-    it("announces it as text/plain in UTF-8", () => {
-      expect(webhookContentTypeFor("text")).toBe("text/plain; charset=utf-8");
+  describe("when the type is anything else", () => {
+    it("sends the render verbatim", () => {
+      expect(isJsonWebhookContentType("text/plain")).toBe(false);
+      expect(isJsonWebhookContentType("application/xml")).toBe(false);
+      expect(isJsonWebhookContentType("text/plain; charset=utf-8")).toBe(false);
+    });
+  });
+});
+
+describe("validateWebhookContentType", () => {
+  describe("when the value is a media type", () => {
+    it("accepts it, parameters included", () => {
+      expect(validateWebhookContentType("application/json")).toBeNull();
+      expect(
+        validateWebhookContentType("text/plain; charset=utf-8"),
+      ).toBeNull();
+      expect(validateWebhookContentType("application/soap+xml")).toBeNull();
+    });
+  });
+
+  describe("when the value is not a media type", () => {
+    it("names what is expected", () => {
+      expect(validateWebhookContentType("json")).toMatch(/media type/);
+      expect(validateWebhookContentType("")).toMatch(/media type/);
+      expect(validateWebhookContentType("a/b\r\nX-Evil: 1")).toMatch(
+        /media type/,
+      );
     });
   });
 });

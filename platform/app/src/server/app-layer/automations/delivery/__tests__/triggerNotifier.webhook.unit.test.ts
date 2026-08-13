@@ -22,7 +22,7 @@ import { liveTriggerNotifier } from "../triggerNotifier";
 /**
  * The test fire's wire contract, driven through the REAL notifier.
  *
- * The service derives a Content-Type from the automation's body format, and
+ * The service carries the automation's declared Content-Type, and
  * every layer between it and the socket has to carry it. A test asserting the
  * service's own call would have passed while the notifier silently dropped the
  * property and announced a plain-text body as JSON — so this drives
@@ -65,11 +65,11 @@ beforeEach(() => {
 });
 
 describe("webhook test fire", () => {
-  describe("given the automation's body format is plain text", () => {
+  describe("given the automation declares a plain-text Content-Type", () => {
     it("posts the rendered text announced as text/plain in UTF-8", async () => {
       await testFire({
         ...destination,
-        bodyFormat: "text",
+        contentType: "text/plain; charset=utf-8",
         bodyTemplate: "ALERT {{ trigger.name }}",
       });
 
@@ -78,11 +78,11 @@ describe("webhook test fire", () => {
     });
   });
 
-  describe("given the automation's body format is JSON", () => {
+  describe("given the automation keeps the JSON Content-Type", () => {
     it("posts the rendered envelope announced as application/json", async () => {
       await testFire({
         ...destination,
-        bodyFormat: "json",
+        contentType: "application/json",
         bodyTemplate: null,
       });
 
@@ -93,8 +93,8 @@ describe("webhook test fire", () => {
     });
   });
 
-  describe("given an automation saved before body formats existed", () => {
-    /** @scenario "An automation saved before formats existed still sends JSON" */
+  describe("given an automation saved before content types existed", () => {
+    /** @scenario "An automation saved before content types existed still sends JSON" */
     it("posts JSON, announced exactly as it always was", async () => {
       await testFire({ ...destination, bodyTemplate: null });
 
@@ -110,7 +110,7 @@ describe("webhook test fire", () => {
     it("posts the rendered body to the configured URL with a test-fire marker", async () => {
       await testFire({
         ...destination,
-        bodyFormat: "text",
+        contentType: "text/plain; charset=utf-8",
         bodyTemplate: "ALERT {{ trigger.name }}",
       });
 

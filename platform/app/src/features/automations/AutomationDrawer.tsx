@@ -750,7 +750,7 @@ export function AutomationDrawer({
           const rendered = await renderWebhookBody({
             template: slice.template.value.trim() ? slice.template.value : null,
             context: previewContext,
-            format: slice.bodyFormat,
+            contentType: slice.contentType,
             defaultBody: previewDefaults.webhookBody,
           });
           if (token === previewToken.current) {

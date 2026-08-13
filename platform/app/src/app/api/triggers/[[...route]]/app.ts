@@ -145,17 +145,17 @@ const webhookActionParamsWireSchema = z
       .optional()
       .describe(
         "A Liquid template for the body. Absent sends the standard " +
-          "LangWatch envelope for a `json` body, and an empty body for a " +
-          "`text` one.",
+          "LangWatch envelope for a JSON content type, and an empty body " +
+          "for any other.",
       ),
-    bodyFormat: z
-      .enum(["json", "text"])
+    contentType: z
+      .string()
       .optional()
       .describe(
-        "What the body is, and so the `Content-Type` the delivery carries: " +
-          "`json` is checked and re-serialised and sends `application/json`, " +
-          "`text` sends the rendered template verbatim as " +
-          "`text/plain; charset=utf-8`. Absent means `json`.",
+        "The `Content-Type` the delivery announces, which also decides how " +
+          "the body is treated: `application/json` (and any `+json` type) " +
+          "is checked and re-serialised; any other media type sends the " +
+          "rendered template verbatim. Absent means `application/json`.",
       ),
     signingSecret: z
       .string()
@@ -169,7 +169,7 @@ const webhookActionParamsWireSchema = z
   })
   .passthrough()
   .describe(
-    "Delivery to a customer endpoint over HTTP, as JSON or as plain text.",
+    "Delivery to a customer endpoint over HTTP, with a body in any media type.",
   );
 
 const datasetActionParamsWireSchema = z
