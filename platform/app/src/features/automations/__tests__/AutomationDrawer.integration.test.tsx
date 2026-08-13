@@ -2,7 +2,6 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { TriggerAction } from "@prisma/client";
 import {
   cleanup,
   fireEvent,
@@ -14,6 +13,7 @@ import {
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { toaster } from "~/components/ui/toaster";
+import { TriggerAction } from "~/generated/prisma/client";
 import type { FilterParam } from "~/hooks/useFilterParams";
 import type { FilterField } from "~/server/filters/types";
 import { AutomationDrawer } from "../AutomationDrawer";
