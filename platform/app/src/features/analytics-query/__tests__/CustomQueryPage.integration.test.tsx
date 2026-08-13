@@ -129,7 +129,9 @@ beforeEach(() => {
 function copyFor(payload: unknown) {
   const copy = explainHandledError(readHandledError(payload)!);
   if (!copy.isRegistered) {
-    throw new Error("the code is not in the registry — the copy below is the fallback, not the registered words");
+    throw new Error(
+      "the code is not in the registry — the copy below is the fallback, not the registered words",
+    );
   }
   return copy;
 }
