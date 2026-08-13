@@ -1,18 +1,10 @@
-import { Field, HStack, Input, Text, Textarea, VStack } from "@chakra-ui/react";
+import { Field, Input, Text, Textarea, VStack } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useRef } from "react";
-import {
-  type Control,
-  Controller,
-  type FieldErrors,
-  type UseFormReturn,
-  useForm,
-} from "react-hook-form";
+import { Controller, type UseFormReturn, useForm } from "react-hook-form";
 import { z } from "zod";
-import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { scenarioParameterDefinitionsSchema } from "~/server/scenarios/parameters";
 import { CriteriaInput } from "./ui/CriteriaInput";
-import { ParameterDefinitionsInput } from "./ui/ParameterDefinitionsInput";
 import { SectionHeader } from "./ui/SectionHeader";
 
 /**
@@ -69,8 +61,6 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
     reset,
     formState: { errors },
   } = form;
-
-  const { parametersError, parameterRowErrors } = readParameterErrors(errors);
 
   // Expose form to parent
   useEffect(() => {
@@ -135,12 +125,6 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
           )}
         />
       </VStack>
-
-      <ParametersSection
-        control={control}
-        error={parametersError}
-        rowErrors={parameterRowErrors}
-      />
     </VStack>
   );
 }
@@ -184,75 +168,4 @@ function useResetOnDefaultsChange({
       }
     }
   }, [defaultValues, reset]);
-}
-
-function ParametersSection({
-  control,
-  error,
-  rowErrors,
-}: {
-  control: Control<ScenarioFormData>;
-  error: string | undefined;
-  rowErrors: (string | undefined)[];
-}) {
-  return (
-    <VStack align="stretch" gap={3}>
-      <HStack gap={0}>
-        <SectionHeader>Parameters</SectionHeader>
-        <FieldInfoTooltip
-          description='Named values a run supplies, so the same scenario can run against another account, tenant or region. The situation, the criteria and the target read them as "params.NAME", and whoever starts the run can override any default.'
-          testId="scenario-parameters-info"
-        />
-      </HStack>
-      <Field.Root invalid={!!error}>
-        <Controller
-          name="parameters"
-          control={control}
-          render={({ field }) => (
-            <ParameterDefinitionsInput
-              value={field.value}
-              onChange={field.onChange}
-              rowErrors={rowErrors}
-            />
-          )}
-        />
-        <Field.ErrorText>{error}</Field.ErrorText>
-      </Field.Root>
-    </VStack>
-  );
-}
-
-/**
- * Validation messages for the parameters field.
- *
- * The schema reports a bad name or a duplicate against the row that carries it
- * and the twenty-parameter cap against the array itself, so both are read back
- * separately: a row message sits under its row, the array message under the
- * section.
- */
-function readParameterErrors(errors: FieldErrors<ScenarioFormData>): {
-  parametersError: string | undefined;
-  parameterRowErrors: (string | undefined)[];
-} {
-  const parameters: unknown = errors.parameters;
-  const rows = Array.isArray(parameters) ? (parameters as unknown[]) : [];
-  return {
-    parametersError:
-      messageOf(parameters) ??
-      messageOf((parameters as { root?: unknown } | undefined)?.root),
-    parameterRowErrors: rows.map((row) => {
-      const fields = (row ?? {}) as Record<string, unknown>;
-      return (
-        messageOf(fields.name) ??
-        messageOf(fields.description) ??
-        messageOf(fields.defaultValue)
-      );
-    }),
-  };
-}
-
-function messageOf(error: unknown): string | undefined {
-  if (!error || typeof error !== "object") return undefined;
-  const message = (error as { message?: unknown }).message;
-  return typeof message === "string" ? message : undefined;
 }

@@ -113,7 +113,7 @@ describe("SerializedHttpAgentAdapter secret references", () => {
   });
 
   describe("given a secret value that is itself Liquid template syntax", () => {
-    /** @scenario "A resolved secret value is never read as template source" */
+    /** @scenario "A secret reference in the url resolves to the project secret value" */
     it("sends the value verbatim without letting it close a fence", async () => {
       const adapter = new SerializedHttpAgentAdapter({
         config: config({
@@ -135,7 +135,7 @@ describe("SerializedHttpAgentAdapter secret references", () => {
   });
 
   describe("given one secret value that contains another", () => {
-    /** @scenario "A failure message shows no resolved secret value" */
+    /** @scenario "A resolved secret value is scrubbed from error messages" */
     it("redacts the longer value whole rather than leaving its tail", async () => {
       const adapter = new SerializedHttpAgentAdapter({
         config: config({
