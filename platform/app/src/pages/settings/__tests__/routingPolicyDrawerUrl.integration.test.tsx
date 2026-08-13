@@ -41,7 +41,10 @@ const { mockOpenDrawer, mockCloseDrawer, policies, organization } = vi.hoisted(
         modelProviderIds: ["mp-openai"],
         modelAliases: { complex: "anthropic/claude-opus-4-5" },
         defaultModel: "openai/gpt-5-mini",
-        policyRules: { tools: { deny: ["^shell_.*"], allow: null } },
+        policyRules: { tools: { deny: ["^shell_.*"], allow: null } } as Record<
+          string,
+          { deny: string[]; allow: string[] | null }
+        >,
         scopes: [{ scopeType: "ORGANIZATION", scopeId: "org-1" }],
       },
     ],
@@ -139,6 +142,10 @@ import { RoutingPoliciesPage } from "../routing-policies";
 const renderWithChakra = (ui: React.ReactElement) =>
   render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);
 
+/** The Restrictions accordion trigger, whose aria-expanded is the real state. */
+const restrictionsTrigger = () =>
+  screen.getByText("Restrictions").closest("button");
+
 describe("given the routing policies page", () => {
   beforeEach(() => vi.clearAllMocks());
   afterEach(cleanup);
@@ -198,14 +205,32 @@ describe("given a shared link that carries a policy", () => {
   // The rules arrive with the form reset that follows the policy query, which
   // is after the first render. An uncontrolled accordion would still be closed
   // over them, which is the footgun collapsing is meant to avoid.
+  //
+  // Asserts the expansion state, not the presence of the content: Chakra keeps
+  // a closed accordion's content mounted, so querying for the rule text passes
+  // just as happily when the section is shut.
   it("opens Restrictions for a policy that already has rules", async () => {
     renderWithChakra(<RoutingPolicyDrawer policyId="rp-1" />);
 
     await screen.findByText("Edit routing policy");
     await waitFor(() => {
-      expect(screen.getByText("1 rule")).toBeInTheDocument();
+      expect(restrictionsTrigger()).toHaveAttribute("aria-expanded", "true");
     });
+    expect(screen.getByText("1 rule")).toBeInTheDocument();
     expect(screen.getByDisplayValue("^shell_.*")).toBeInTheDocument();
+  });
+
+  it("leaves Restrictions closed for a policy with no rules", async () => {
+    policies[0]!.policyRules = {};
+    try {
+      renderWithChakra(<RoutingPolicyDrawer policyId="rp-1" />);
+      await screen.findByText("Edit routing policy");
+      expect(restrictionsTrigger()).toHaveAttribute("aria-expanded", "false");
+    } finally {
+      policies[0]!.policyRules = {
+        tools: { deny: ["^shell_.*"], allow: null },
+      };
+    }
   });
 
   it("offers no Cancel button, because the drawer's close already cancels", async () => {

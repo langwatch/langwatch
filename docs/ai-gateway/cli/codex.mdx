@@ -128,11 +128,12 @@ The combination that's been most-tested with Codex on v1:
 - VK fallback chain: `openai-primary → anthropic-fallback`.
 - VK `models_allowed: ["gpt-5-mini", "gpt-5", "gpt-4o", "claude-haiku-4-5-20251001"]`.
 
-  A chain that spans two providers carries the resolved model name to the next
-  one. Anthropic does not serve `gpt-5-mini`, so a failover for that model
-  answers 404, which is itself fallback-eligible and moves the request along
-  the chain. To make a model reachable on both providers, map its name on the
-  routing policy, or point a [model tier](/ai-gateway/model-aliases) at each
-  provider's own equivalent and have Codex ask for the tier.
+  A chain that spans two providers only fails over for models both of them
+  serve. The gateway skips a credential that cannot serve the resolved model
+  rather than dialing it, so a request for `gpt-5-mini` never reaches the
+  Anthropic slot: that model has one attempt, and an OpenAI outage surfaces to
+  Codex. Give a model failover by mapping its name on the routing policy, or by
+  pointing a [model tier](/ai-gateway/model-aliases) at each provider's own
+  equivalent and having Codex ask for the tier.
 - Personal-access VK bound to the engineer.
 - Monthly `principal` budget with `warn` at 80%, `block` at 100%.

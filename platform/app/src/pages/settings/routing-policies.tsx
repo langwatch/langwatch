@@ -125,8 +125,9 @@ export function RoutingPoliciesPage() {
 }
 
 /**
- * A scope with the display name resolved. Separate from ScopeTriadEntry, whose
- * `name` is optional, because everything downstream of the resolver renders it.
+ * A scope carrying the display name it resolved to. ScopeTriadEntry is the id
+ * pair alone; everything downstream of the resolver renders the name, so it
+ * belongs in the type rather than arriving as an untyped extra property.
  */
 type NamedScope = ScopeTriadEntry & { name: string | undefined };
 
