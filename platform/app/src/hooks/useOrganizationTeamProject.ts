@@ -453,11 +453,9 @@ export const useOrganizationTeamProject = (
     // slug: `project` also resolves from the persisted selectedProjectSlug on
     // non-project routes (e.g. /me), and marking "project" there would clobber
     // MyLayout's "personal" and wrongly bounce `/` back to the project.
-    if (
-      project &&
-      typeof router.query.project === "string" &&
-      lastVisitedHomeKind !== "project"
-    ) {
+    // `projectSlugFromUrl` (not raw `router.query.project`) so reserved slugs
+    // like /messages or /datasets don't count as project visits either.
+    if (project && !!projectSlugFromUrl && lastVisitedHomeKind !== "project") {
       // Guarded like the setters above: every unguarded write dispatches a
       // storage event that setStates all mounted subscribers, which can cascade
       // past React's nested-update limit during route transitions.
