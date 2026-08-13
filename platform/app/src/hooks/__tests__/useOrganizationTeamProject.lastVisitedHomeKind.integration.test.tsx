@@ -114,8 +114,9 @@ describe("useOrganizationTeamProject lastVisitedHomeKind marker", () => {
     );
     setItemSpy = vi.spyOn(Storage.prototype, "setItem");
     markerWrites = () =>
-      setItemSpy.mock.calls.filter(([key]) => key === "lastVisitedHomeKind")
-        .length;
+      setItemSpy.mock.calls.filter(
+        ([key]: [string, string]) => key === "lastVisitedHomeKind",
+      ).length;
   });
 
   afterEach(() => {
@@ -131,10 +132,7 @@ describe("useOrganizationTeamProject lastVisitedHomeKind marker", () => {
       mockRouter.asPath = "/acme-app/traces";
     });
 
-    /**
-     * @scenario A first project visit marks the home preference, and the
-     * cascade it triggers converges: one write, one broadcast, done.
-     */
+    /** @scenario A first project visit writes the home marker exactly once */
     it("writes the marker once and the fan-out reaches subscribers exactly once", () => {
       const probeRenders = { count: 0 };
       const probe = renderMarkerProbe(probeRenders);
