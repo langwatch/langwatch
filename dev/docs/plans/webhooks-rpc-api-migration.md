@@ -1,8 +1,46 @@
 # Plan: replace `/api/webhooks/v1` with an RPC-named family on `@langwatch/api`
 
-**Branch:** `feat/webhooks-rpc-api`
-**Status:** planned, not started
+**Branch:** `worktree-webhooks-rpc-plan`
+**Status:** IMPLEMENTED — [PR #6949](https://github.com/langwatch/langwatch/pull/6949), ADR-094
 **Verified against:** `origin/main` @ `5ad9b57f89`, 2026-08-13
+
+> ## What the build changed about this plan
+>
+> Kept as written; these are the corrections worth carrying forward.
+>
+> **Two silent-failure traps the plan did not predict.**
+> 1. `hono-openapi` treats ANY dotted path as a static file and drops it, so the
+>    family generated **zero** OpenAPI paths with nothing thrown. Needs
+>    `excludeStaticFile: false` per family (`[[...route]]/openapi.ts`).
+> 2. `guard()` returns the policy *and* its enforcement chain, so
+>    `{ ...guard(p), middleware: [mine] }` disarms RBAC and the plan gate while
+>    the registry still reports the route guarded. `guard(permission, extra)`
+>    now makes composition the only spelling.
+>
+> **Three plan claims that were wrong.**
+> - *"Webhooks is the first family that needs extra middleware."* It is not —
+>   `withIdempotency` is a wrapper, not middleware, so it stayed in the handler.
+>   The `guard` hardening landed anyway, as a latent trap.
+> - *"The per-request `Error("ClickHouse is not configured")` is a defect to
+>   fix."* It is correct as-is: CLAUDE.md says an infra failure the caller
+>   cannot act on stays a plain `Error`.
+> - *"Re-point the two `roll-secret` / `test` exemptions."* They had to be
+>   **deleted** — both now take a body — and two new ones added for the
+>   genuinely argument-free `endpoints.list` and `eventTypes.list`.
+>
+> **The gate needed more care than "use the factory".** Webhooks admits on the
+> `webhookEndpointsEnabled` FLAG, not the Enterprise tier; `requireEnterprisePlanRest`
+> gained an `entitlement` option so the 402 did not silently start refusing every
+> Pro or Custom contract that bought the feature.
+>
+> **A contract regression the plan missed.** Six mistakes answer
+> `webhook_endpoint_invalid`, and the framework publishes the code as the
+> message — so *which rule you broke* had to move to `meta.reason` + `tips`.
+>
+> **Consumers were bigger than estimated.** Regenerating the Python client
+> rewrites ~940 files of pre-existing drift; it is its own commit so review can
+> skip it, since `models/__init__.py` indexes every module and a partial apply
+> leaves the package broken.
 
 ---
 
