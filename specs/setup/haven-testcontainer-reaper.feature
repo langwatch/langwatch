@@ -30,10 +30,25 @@ Feature: Leaked test containers are reaped
     Then that container keeps running
 
   @unit
-  Scenario: Only containers a test library marked as its own are candidates
-    Given the managed ClickHouse and observability containers are running
+  Scenario: A container still running is judged by the longer grace period
+    Given a reused test container that is still running
+    And its creation time predates the short grace period
     When the daemon runs its background hygiene
-    Then neither is ever considered for removal
+    Then it is only removed once it is older than the running grace period
+    And a live test run never loses its server to a birthday rule
+
+  @unit
+  Scenario: The test library's own reaper container is never touched
+    Given the test library's reaper (Ryuk) is running alongside its containers
+    When the daemon runs its background hygiene
+    Then the reaper container is never a removal candidate
+
+  @unit
+  Scenario: Only containers a test library marked as its own are candidates
+    Given containers not labelled by a testcontainers library are running
+    When the daemon runs its background hygiene
+    Then the sweep only ever lists containers carrying the testcontainers label
+    And haven's own managed containers never carry it
 
   @unit
   Scenario: The operator can disable the sweep

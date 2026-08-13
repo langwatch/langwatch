@@ -40,12 +40,14 @@ export const TEST_CLICKHOUSE_IMAGE = "clickhouse/clickhouse-server:25.10.2.65";
  * dedicated server, and the noisy self-telemetry tables off. A stock container
  * idles at whole cores writing metric logs and scheduling merges it will never
  * need. `system.query_log` stays on — trace-list's ClickHouse repository
- * integration test asserts against it.
+ * integration test asserts against it. The 1 GiB memory ceiling is a backstop
+ * against a runaway query, comfortably above any suite's working set; the idle
+ * win comes from the caches, logs and pools, not the cap.
  */
 export const TEST_CLICKHOUSE_TUNING = {
   target: "/etc/clickhouse-server/config.d/zz-langwatch-test-tuning.xml",
   content: `<clickhouse>
-    <max_server_memory_usage>805306368</max_server_memory_usage>
+    <max_server_memory_usage>1073741824</max_server_memory_usage>
     <mark_cache_size>67108864</mark_cache_size>
     <uncompressed_cache_size>0</uncompressed_cache_size>
     <mmap_cache_size>0</mmap_cache_size>
@@ -74,6 +76,18 @@ export const TEST_CLICKHOUSE_TUNING = {
     <query_metric_log remove="1"/>
 </clickhouse>
 `,
+};
+
+/**
+ * Label stamped on every tuned test container. Reuse (`withReuse`) matches an
+ * existing container by hashing its create options, and copied file content is
+ * applied after create — outside the hash — so without a discriminator a
+ * pre-tuning container would be reused as-is and silently never get the
+ * tuning. Labels are part of the create options, so bumping this value forces
+ * new containers whenever the tuning content changes.
+ */
+export const TEST_CLICKHOUSE_TUNING_LABEL = {
+  "langwatch.test.clickhouse-tuning": "v1",
 };
 
 export interface TestClickHouseEndpoint {
@@ -158,6 +172,7 @@ async function startContainerEndpoints({
           .withLabels({
             "langwatch.test": "true",
             [`langwatch.test.${suite}`]: name,
+            ...TEST_CLICKHOUSE_TUNING_LABEL,
           })
           .withReuse()
           .withCopyContentToContainer([TEST_CLICKHOUSE_TUNING])

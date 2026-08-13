@@ -17,10 +17,15 @@ type Config struct {
 	// haven itself tracked (via the activity clock) are ever touched, and the
 	// protected main database is always kept.
 	DBIdleTTL time.Duration
-	// TestContainerTTL is how old a testcontainers-labeled container must be
-	// before the daemon reaps it as leaked (0 disables the sweep). Fresh ones are
-	// left alone — a live test run may still be using them.
-	TestContainerTTL         time.Duration
+	// TestContainerTTL is how old a stopped testcontainers-labeled container
+	// must be before the daemon reaps it as leaked (0 disables the sweep
+	// entirely). Fresh ones are left alone — a live test run may still be
+	// using them.
+	TestContainerTTL time.Duration
+	// RunningTestContainerTTL is the same rule for containers still running,
+	// whose age says nothing about current use (reused containers keep their
+	// original creation time across runs). Clamped to at least TestContainerTTL.
+	RunningTestContainerTTL  time.Duration
 	HeartbeatEvery           time.Duration // launcher heartbeat cadence
 	DaemonArgv               []string      // how to (re)launch `haven daemon`
 	IsAgent                  bool          // token-free plain output for AI drivers (no color/TUI)

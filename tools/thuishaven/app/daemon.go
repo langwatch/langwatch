@@ -389,14 +389,20 @@ func (o *Orchestrator) pruneIdleDatabases(ctx context.Context) {
 // reapTestContainers removes containers a testcontainers run left behind —
 // the library's own reaper (Ryuk) dies with the run that started it, so an
 // interrupted integration test leaves its ClickHouse/Redis running in the
-// shared VM until something else sweeps them. Fresh containers are left alone:
-// only ones older than TestContainerTTL can no longer belong to a live run.
+// shared VM until something else sweeps them. Stopped containers get the short
+// TTL; running ones a much longer one, because a running container may still
+// be serving a live run whatever its birthday says (withReuse keeps the
+// original CreatedAt across runs). The running TTL never undercuts the stopped
+// one, so a single misconfigured knob cannot make live containers the more
+// eagerly reaped kind.
 func (o *Orchestrator) reapTestContainers(ctx context.Context) {
-	if o.janitor == nil || o.cfg.TestContainerTTL <= 0 {
+	ttl := o.cfg.TestContainerTTL
+	if o.janitor == nil || ttl <= 0 {
 		return
 	}
-	cutoff := o.sys.Now().Add(-o.cfg.TestContainerTTL)
-	names, err := o.janitor.ReapTestContainers(ctx, cutoff)
+	runningTTL := max(o.cfg.RunningTestContainerTTL, ttl)
+	now := o.sys.Now()
+	names, err := o.janitor.ReapTestContainers(ctx, now.Add(-ttl), now.Add(-runningTTL))
 	if err != nil {
 		o.log.Warn("test-container sweep failed", zap.Error(err))
 		return

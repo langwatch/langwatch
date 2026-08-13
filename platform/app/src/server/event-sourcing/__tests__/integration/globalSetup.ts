@@ -16,6 +16,7 @@ import {
   nativeClickHouseBaseUrl,
   TEST_CLICKHOUSE_IMAGE,
   TEST_CLICKHOUSE_TUNING,
+  TEST_CLICKHOUSE_TUNING_LABEL,
 } from "~/test-utils/clickhouseTestEndpoints";
 import { shardSawFailure } from "~/test-utils/shardFailureReporter";
 
@@ -299,7 +300,7 @@ export async function setup(): Promise<void> {
   const storagePolicyConfigPath = createStoragePolicyConfigFile();
 
   clickHouseContainer = await new ClickHouseContainer(TEST_CLICKHOUSE_IMAGE)
-    .withLabels(CONTAINER_LABELS)
+    .withLabels({ ...CONTAINER_LABELS, ...TEST_CLICKHOUSE_TUNING_LABEL })
     .withReuse()
     .withCopyFilesToContainer([
       {

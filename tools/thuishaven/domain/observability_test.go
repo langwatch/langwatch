@@ -110,10 +110,14 @@ func TestDefaultObservabilityLimitsStayWithinTheirBounds(t *testing.T) {
 		t.Errorf("32-core machine: CPUs = %v, want the ceiling of 2.5", big.CPUs)
 	}
 
-	// A seventh of the machine in between.
-	mid := DefaultObservabilityLimits(14*gib, 8)
-	if mid.MemoryMB != 2048 {
-		t.Errorf("14 GiB machine: MemoryMB = %d, want 2048 (a seventh)", mid.MemoryMB)
+	// A seventh of the machine in between, with the CPU divisor between its
+	// floor and ceiling.
+	mid := DefaultObservabilityLimits(16*gib, 8)
+	if want := 16 * 1024 / 7; mid.MemoryMB != want {
+		t.Errorf("16 GiB machine: MemoryMB = %d, want %d (a seventh)", mid.MemoryMB, want)
+	}
+	if mid.CPUs != 2 {
+		t.Errorf("8-core machine: CPUs = %v, want 2 (a quarter)", mid.CPUs)
 	}
 }
 
