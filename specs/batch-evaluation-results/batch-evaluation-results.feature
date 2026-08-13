@@ -92,7 +92,7 @@ Feature: Batch Evaluation Results Visualization
     Given a target execution failed with an error longer than two lines
     When I click on the error cell
     Then the error expands into an overlay showing the full message
-    And I can dismiss the expanded view by clicking outside
+    And I can dismiss the expanded view by clicking outside or by pressing Escape
 
   @unimplemented
   Scenario: Expand long target output
@@ -101,7 +101,7 @@ Feature: Batch Evaluation Results Visualization
     Then a fade overlay appears at the bottom of the cell
     When I click on the cell
     Then the output expands to show the full content
-    And I can dismiss the expanded view by clicking outside
+    And I can dismiss the expanded view by clicking outside or by pressing Escape
 
   # ============================================================================
   # Evaluator Results Display
@@ -272,6 +272,17 @@ Feature: Batch Evaluation Results Visualization
     And the CSV contains target output columns
     And the CSV contains cost and duration columns
     And the CSV contains evaluator result columns (score, passed, details)
+
+  # A comparison grades no single target, so it has no per-target column to ride
+  # in. Without a block of its own the export silently loses the verdict, and
+  # the reader sees every candidate's output with no record of which one won.
+  @unit
+  Scenario: CSV contains the comparison verdict
+    Given the evaluation ran a comparison over several targets
+    When I export to CSV
+    Then each comparison has a winner, candidates and reasoning column
+    And the winner column names the winning target, or reads tie
+    And a row the judge did not call leaves those columns empty
 
   @unimplemented
   Scenario: CSV handles special characters

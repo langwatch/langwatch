@@ -147,6 +147,10 @@ jobs:
               - '.github/workflows/langwatch-app-ci.yml'
               - '.github/.release-please-manifest.json'
               - '.github/scripts/**'
+              # Composite actions are covered by ci-scripts-test through the
+              # scripts they call, so an edit that only touches an action.yml
+              # has to reach the gate too.
+              - '.github/actions/**'
             # The parity scanner binds @scenario annotations from test files
             # across many roots, not just specs/ and platform/app/. This list MUST
             # cover every root the scanner reads (DEFAULT_TEST_ROOTS,
@@ -1062,6 +1066,9 @@ jobs:
 
       - name: Test start-clickhouse-with-storage-policy.sh
         run: bash .github/scripts/__tests__/start-clickhouse-with-storage-policy.test.sh
+
+      - name: Test start-boxd-ssh-agent.sh
+        run: bash .github/scripts/__tests__/start-boxd-ssh-agent.test.sh
 
   ci-self-test:
     needs: changes

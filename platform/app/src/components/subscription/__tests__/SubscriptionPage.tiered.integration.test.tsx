@@ -14,7 +14,10 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ENTERPRISE_PLAN_FEATURES } from "../billing-plans";
+import {
+  ENTERPRISE_PLAN_FEATURES,
+  WEBHOOK_FEATURE_LABEL,
+} from "../billing-plans";
 import { SubscriptionPage } from "../SubscriptionPage";
 import {
   createMockPlan,
@@ -459,6 +462,57 @@ describe("<SubscriptionPage/>", () => {
       expect(
         within(features).queryByText("200,000 events included"),
       ).not.toBeInTheDocument();
+    });
+
+    /** @scenario A licensed enterprise plan is not asked to contact sales about upgrading */
+    it("offers no way to contact sales about upgrading", async () => {
+      renderSubscriptionPage();
+
+      await screen.findByTestId("current-plan-block");
+
+      expect(
+        screen.queryByTestId("contact-sales-button"),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when the enterprise license withholds webhook endpoints", () => {
+    beforeEach(() => {
+      setMockOrganization({
+        id: "test-org-id",
+        name: "Test Org",
+        pricingModel: "TIERED",
+      });
+      mockGetActivePlan.mockReturnValue({
+        data: createMockPlan({
+          planSource: "license",
+          type: "ENTERPRISE",
+          name: "Enterprise",
+          free: false,
+          maxMembers: 10000,
+          maxMembersLite: 10000,
+          maxMessagesPerMonth: 10_000_000_000,
+          webhookEndpointsEnabled: false,
+        }),
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+    });
+
+    /** @scenario A capability the contract withholds is not advertised as included */
+    it("leaves the withheld capability off the list and keeps the rest", async () => {
+      renderSubscriptionPage();
+
+      const features = await screen.findByTestId("current-plan-features-grid");
+
+      expect(
+        within(features).queryByText(WEBHOOK_FEATURE_LABEL),
+      ).not.toBeInTheDocument();
+      for (const label of ENTERPRISE_PLAN_FEATURES.filter(
+        (feature) => feature !== WEBHOOK_FEATURE_LABEL,
+      )) {
+        expect(within(features).getByText(label)).toBeInTheDocument();
+      }
     });
   });
 

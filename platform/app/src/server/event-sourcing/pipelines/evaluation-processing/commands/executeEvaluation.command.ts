@@ -36,6 +36,7 @@ import type {
   EvaluationProcessingEvent,
   EvaluationReportedEvent,
 } from "../schemas/events";
+import { verdictPassedOf, verdictScoreOf } from "../verdictGate";
 
 const logger = createLogger(
   "langwatch:evaluation-processing:execute-evaluation",
@@ -563,9 +564,15 @@ export class ExecuteEvaluationCommand
         tenantId,
         {
           status: result.status,
-          score: result.score,
-          passed: result.passed,
-          label: result.label,
+          // The service's happy-path mapping gates verdicts, but its error
+          // paths spread the raw evaluator result and override status
+          // (`{ ...result, status: "error" }`), so a stray verdict can reach
+          // this emit. Gate here too — the command boundary is the last
+          // producer-side chance to keep an errored run's verdict out of
+          // evaluation_runs (#6833).
+          score: verdictScoreOf(result) ?? undefined,
+          passed: verdictPassedOf(result) ?? undefined,
+          label: result.status === "processed" ? result.label : undefined,
           details: isError ? undefined : result.details,
           error: errorField,
           errorDetails: result.errorDetails ?? null,

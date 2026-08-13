@@ -1,12 +1,21 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
 
 import type { PrismaClient } from "@prisma/client";
+import type { Workflow } from "~/optimization_studio/types/dsl";
 import {
   type AgentComponentConfig,
   type AgentCopyRow,
   AgentRepository,
   type AgentType,
+  type CreateAgentInput,
+  type TypedAgent,
+  type UpdateAgentInput,
 } from "./agent.repository";
+import {
+  type AgentWithFields,
+  linkedWorkflowId,
+  resolveAgentFields,
+} from "./agent-fields";
 import { AgentNotFoundError } from "./errors";
 
 /**
@@ -30,10 +39,19 @@ export class AgentService {
   }
 
   /**
-   * Gets an agent by ID and projectId.
+   * Gets an agent by ID and projectId, with the fields it reads and produces.
    */
-  get getById() {
-    return this.repository.findById.bind(this.repository);
+  async getById(input: {
+    id: string;
+    projectId: string;
+  }): Promise<AgentWithFields | null> {
+    const agent = await this.repository.findById(input);
+    if (!agent) return null;
+    const [enriched] = await this.withFields({
+      agents: [agent],
+      projectId: input.projectId,
+    });
+    return enriched ?? null;
   }
 
   /**
@@ -44,24 +62,80 @@ export class AgentService {
   }
 
   /**
-   * Gets all agents for a project.
+   * Gets all agents for a project, with the fields each reads and produces.
    */
-  get getAll() {
-    return this.repository.findAll.bind(this.repository);
+  async getAll(input: { projectId: string }): Promise<AgentWithFields[]> {
+    const agents = await this.repository.findAll(input);
+    return this.withFields({ agents, projectId: input.projectId });
+  }
+
+  /**
+   * Attach each agent's input and output fields.
+   *
+   * Every workflow agent in the batch is resolved with one query rather than
+   * one per agent: the agent list drawer loads a whole project's agents at
+   * once, and a project with fifty workflow agents would otherwise fan out
+   * into fifty workflow lookups on every open.
+   */
+  private async withFields({
+    agents,
+    projectId,
+  }: {
+    agents: TypedAgent[];
+    projectId: string;
+  }): Promise<AgentWithFields[]> {
+    const workflowIds = agents.flatMap((agent) =>
+      agent.type === "workflow" ? [linkedWorkflowId(agent)] : [],
+    );
+    const presentIds = workflowIds.filter((id): id is string => !!id);
+
+    const dslByWorkflowId = new Map<string, Workflow>();
+    if (presentIds.length > 0) {
+      const workflows = await this.prisma.workflow.findMany({
+        where: { id: { in: presentIds }, projectId, archivedAt: null },
+        include: { currentVersion: true },
+      });
+      for (const workflow of workflows) {
+        const dsl = workflow.currentVersion?.dsl;
+        if (dsl) dslByWorkflowId.set(workflow.id, dsl as unknown as Workflow);
+      }
+    }
+
+    return agents.map((agent) => {
+      const workflowId = linkedWorkflowId(agent);
+      return {
+        ...agent,
+        ...resolveAgentFields({
+          type: agent.type,
+          config: agent.config,
+          dsl: workflowId ? dslByWorkflowId.get(workflowId) : undefined,
+        }),
+      };
+    });
   }
 
   /**
    * Creates a new agent.
    */
-  get create() {
-    return this.repository.create.bind(this.repository);
+  async create(input: CreateAgentInput): Promise<AgentWithFields> {
+    const agent = await this.repository.create(input);
+    const [enriched] = await this.withFields({
+      agents: [agent],
+      projectId: input.projectId,
+    });
+    return enriched!;
   }
 
   /**
    * Updates an existing agent.
    */
-  get update() {
-    return this.repository.update.bind(this.repository);
+  async update(input: UpdateAgentInput): Promise<AgentWithFields> {
+    const agent = await this.repository.update(input);
+    const [enriched] = await this.withFields({
+      agents: [agent],
+      projectId: input.projectId,
+    });
+    return enriched!;
   }
 
   /**

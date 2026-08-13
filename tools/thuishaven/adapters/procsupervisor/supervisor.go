@@ -51,6 +51,16 @@ func (s Supervisor) RunOnce(ctx context.Context, name, dir, shell string, env []
 	return err
 }
 
+// WaitReady blocks until url answers non-5xx, logging under name so the wait is
+// visible in the same stream as the lanes. It is the same probe that gates a
+// child on its dependency, exposed for callers that are not a child themselves:
+// the play sandbox's seed ingest, which has to reach the stack it just started.
+func (s Supervisor) WaitReady(ctx context.Context, name, url string) bool {
+	c := proc{name: name, color: "90", isPlain: s.isPlain}
+	waitForReady(ctx, url, c.logln)
+	return ctx.Err() == nil
+}
+
 // RunOnceBounded is RunOnce plus a reaper: a background poll kills the whole
 // process group (the child owns its own group via Setpgid, same as every other
 // supervised child) if its total RSS or wall-clock time crosses limits. Reaping

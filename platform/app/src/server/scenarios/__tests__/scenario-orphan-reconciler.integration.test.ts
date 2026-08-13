@@ -1,6 +1,6 @@
+import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { ClickHouseClient } from "@clickhouse/client";
 
 import {
   startTestContainers,
@@ -244,9 +244,9 @@ describe("findQueuedRunCandidates (integration)", () => {
 
       it("excludes a run that recovered to a terminal status", async () => {
         const candidates = await candidatesForTenant();
-        expect(
-          candidates.some((c) => c.scenarioRunId === ID.recovered),
-        ).toBe(false);
+        expect(candidates.some((c) => c.scenarioRunId === ID.recovered)).toBe(
+          false,
+        );
       });
 
       it("excludes a QUEUED run newer than the orphan cutoff", async () => {
@@ -258,9 +258,9 @@ describe("findQueuedRunCandidates (integration)", () => {
 
       it("excludes an old run whose latest status is not QUEUED", async () => {
         const candidates = await candidatesForTenant();
-        expect(
-          candidates.some((c) => c.scenarioRunId === ID.terminalOld),
-        ).toBe(false);
+        expect(candidates.some((c) => c.scenarioRunId === ID.terminalOld)).toBe(
+          false,
+        );
       });
 
       it("excludes a QUEUED run outside the lookback window", async () => {

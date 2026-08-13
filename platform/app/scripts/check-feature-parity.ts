@@ -79,6 +79,10 @@ const DEFAULT_TEST_ROOTS: string[] = [
   // assistant's rules are tested here (and nowhere else), so scenarios about
   // what an instruction teaches can only bind from this root.
   "skills/_tests",
+  // CI guards run under `node --test` from the workflow that uses them, not
+  // vitest, and their tests live beside them. Without this root, a scenario
+  // describing what a guard refuses could only ever be @unimplemented.
+  ".github/scripts",
 ];
 
 /**
@@ -410,7 +414,6 @@ const LEGACY_INERT: string[] = [
   "specs/experiments-v3/runner-configuration.feature",
   "specs/experiments-v3/table-display.feature",
   "specs/experiments-v3/undo-redo.feature",
-  "specs/experiments/comparison.feature",
   "specs/features/agent-cli.feature",
   "specs/features/analytics-cli.feature",
   "specs/features/annotation-cli.feature",
@@ -455,7 +458,6 @@ const LEGACY_INERT: string[] = [
   "specs/langy/langy-composer-feedback-and-cards.feature",
   "specs/langy/langy-context-awareness.feature",
   "specs/langy/langy-conversation-title.feature",
-  "specs/langy/langy-deploy-hardening.feature",
   "specs/langy/langy-derived-cards.feature",
   "specs/langy/langy-dogfood-scenarios.feature",
   "specs/langy/langy-empty-state-suggestions.feature",
@@ -508,7 +510,6 @@ const LEGACY_INERT: string[] = [
   "specs/monitors/workflow-evaluator-mappings.feature",
   "specs/navigation/child-drawer-nesting.feature",
   "specs/navigation/home-navigation.feature",
-  "specs/navigation/shared-section-navigation-layout.feature",
   "specs/nlp-go/dataset-block.feature",
   "specs/nlp-go/http-block.feature",
   "specs/nlp-go/proxy.feature",
