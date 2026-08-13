@@ -36,8 +36,10 @@ import { createTestApp } from "../../app-layer/presets";
 
 const { warn } = vi.hoisted(() => ({ warn: vi.fn() }));
 
-// Both create persistent handles (Prisma pool, Redis socket) that keep vitest
-// from closing after the suite passes — the same reason index.test.ts mocks it.
+// A real Prisma client opens a connection pool that keeps vitest from closing
+// after the suite passes — the same reason index.test.ts mocks it. No Redis
+// mock is needed alongside it: `secondaryStorage` never constructs a client,
+// it reads whatever the App is holding.
 vi.mock("~/server/db", () => ({ prisma: {} }));
 
 // The module under test decides WHETHER to configure secondary storage from

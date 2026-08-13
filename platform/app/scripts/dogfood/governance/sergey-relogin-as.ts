@@ -127,17 +127,13 @@ async function main() {
 
   // This script boots no App, so it owns the connection it needs — built
   // through the sanctioned service rather than by constructing ioredis here
-  // (ADR-093), and closed as soon as the lookup is done.
+  // (ADR-093). It is closed by the `redis.quit()` at the end of main(),
+  // which is also what keeps the process from hanging on an open socket.
   const redis = new RedisConnectionService().connectStandalone({
     url: process.env.REDIS_URL ?? "redis://localhost:6379",
   });
   if (!redis) throw new Error("REDIS_URL did not resolve to a connection");
-  let deviceCode: string | null = null;
-  try {
-    deviceCode = await redis.get(`lwcli:device:usercode:${userCode}`);
-  } finally {
-    redis.disconnect();
-  }
+  const deviceCode = await redis.get(`lwcli:device:usercode:${userCode}`);
   if (!deviceCode) {
     child.kill();
     throw new Error(`no device_code for user_code ${userCode}`);

@@ -86,23 +86,30 @@ const SKIP_DIRECTORIES = new Set([
   "dist",
   ".next",
   ".next-saas",
+  ".turbo",
+  ".vite",
+  ".cache",
+  ".git",
   "coverage",
 ]);
 
+/**
+ * This list is the ONLY thing that keeps a directory out of the scan.
+ *
+ * There is deliberately no `name.startsWith(".")` rule here. One used to be,
+ * and it was a second exclusion nobody had to write down — a hidden directory
+ * holding real source would have been skipped in silence, which is the same
+ * class of hole as the named-trees walk this test exists to close. The dot
+ * directories above are named because they are build artifacts and a VCS
+ * store; anything else hidden gets scanned like any other directory.
+ */
 function shouldDescend(entry: fs.Dirent): boolean {
-  return (
-    entry.isDirectory() &&
-    !entry.name.startsWith(".") &&
-    !SKIP_DIRECTORIES.has(entry.name)
-  );
+  return entry.isDirectory() && !SKIP_DIRECTORIES.has(entry.name);
 }
 
+/** Extension alone decides, for the same reason `shouldDescend` names its skips. */
 function isSourceFile(entry: fs.Dirent): boolean {
-  return (
-    entry.isFile() &&
-    !entry.name.startsWith(".") &&
-    SOURCE_EXTENSIONS.has(path.extname(entry.name))
-  );
+  return entry.isFile() && SOURCE_EXTENSIONS.has(path.extname(entry.name));
 }
 
 function* walkSourceFiles(root: string): Generator<string> {
@@ -324,9 +331,13 @@ describe("Redis ownership", () => {
         );
       }
 
-      // A concrete non-TypeScript module, so the extension set cannot quietly
-      // shrink back to the TypeScript four.
+      // Concrete non-TypeScript modules, so the extension set cannot quietly
+      // shrink back to the TypeScript four. Both spellings that actually occur
+      // in the tree are anchored; `.js` and `.jsx` have no instance to point
+      // at today, and asserting them against `SOURCE_EXTENSIONS` itself would
+      // only check the constant against a copy of itself.
       expect(scanned.has("platform/app/src/env.mjs")).toBe(true);
+      expect(scanned.has("platform/app/src/noop-css.cjs")).toBe(true);
 
       // And the exclusions still hold, or the scan is reading dependencies.
       for (const file of scanned) {
