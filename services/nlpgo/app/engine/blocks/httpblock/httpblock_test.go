@@ -317,8 +317,12 @@ func TestExecute_RedactsCredentialResponseHeaders(t *testing.T) {
 		// Convention says these are request headers. An upstream can send them
 		// anyway, and Go hands us whatever arrived.
 		w.Header().Set("Authorization", "Bearer super-secret-echo")
+		w.Header().Set("X-Authorization", "super-secret-variant")
+		w.Header().Set("X-Auth", "super-secret-short")
 		w.Header().Set("X-Amz-Security-Token", "super-secret-sts")
 		w.Header().Set("X-Api-Key", "super-secret-key")
+		// A challenge names the scheme and realm rather than handing out access.
+		w.Header().Set("WWW-Authenticate", `Bearer realm="agents"`)
 		_, _ = io.WriteString(w, `{"result":"pong"}`)
 	}))
 	defer srv.Close()
@@ -334,18 +338,21 @@ func TestExecute_RedactsCredentialResponseHeaders(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, name := range []string{
-		"Set-Cookie", "Authorization", "X-Amz-Security-Token", "X-Api-Key",
+		"Set-Cookie", "Authorization", "X-Authorization", "X-Auth",
+		"X-Amz-Security-Token", "X-Api-Key",
 	} {
 		assert.Equal(t, "[REDACTED]", res.ResponseHeaders[name],
 			"%s hands out access rather than describing it", name)
 	}
 
 	// Half the value of reporting headers at all is the ones an author came to
-	// read, and neither a version nor an idempotency key is a credential.
+	// read, and none of these is a credential.
 	assert.Equal(t, "req-42", res.ResponseHeaders["X-Request-Id"])
 	assert.Equal(t, "2026-08-01", res.ResponseHeaders["X-Api-Version"])
 	assert.Equal(t, "req-42", res.ResponseHeaders["X-Idempotency-Key"])
 	assert.Equal(t, "application/json", res.ResponseHeaders["Content-Type"])
+	assert.Equal(t, `Bearer realm="agents"`, res.ResponseHeaders["Www-Authenticate"],
+		"a 401 is undebuggable without the challenge that caused it")
 
 	for name, value := range res.ResponseHeaders {
 		assert.NotContains(t, value, "secret", "header %q leaked a credential", name)

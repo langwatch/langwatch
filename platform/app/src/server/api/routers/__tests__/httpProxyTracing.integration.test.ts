@@ -435,6 +435,8 @@ describe("HTTP Proxy Tracing", () => {
         headers: [
           { key: "X-API-Key", value: "sk-live-must-not-be-stored" },
           { key: "X-Session-Token", value: "also-a-credential" },
+          { key: "X-Authorization", value: "another-credential" },
+          { key: "X-Auth", value: "a-short-credential" },
           { key: "Cookie", value: "session=abc123" },
           { key: "X-Api-Version", value: "2026-08-01" },
           { key: "X-Idempotency-Key", value: "req-42" },
@@ -447,14 +449,21 @@ describe("HTTP Proxy Tracing", () => {
         unknown
       >;
       const headers = inputValue.headers as Record<string, string>;
-      expect(headers["X-API-Key"]).toBe("[REDACTED]");
-      expect(headers["X-Session-Token"]).toBe("[REDACTED]");
-      expect(headers.Cookie).toBe("[REDACTED]");
+      for (const name of [
+        "X-API-Key",
+        "X-Session-Token",
+        "X-Authorization",
+        "X-Auth",
+        "Cookie",
+      ]) {
+        expect(headers[name]).toBe("[REDACTED]");
+      }
       // Not everything with "key" or "api" in the name is a secret, and a trace
       // that hides the version an author sent is a trace that cannot debug it.
       expect(headers["X-Api-Version"]).toBe("2026-08-01");
       expect(headers["X-Idempotency-Key"]).toBe("req-42");
       expect(JSON.stringify(getTraceJob())).not.toContain("sk-live");
+      expect(JSON.stringify(getTraceJob())).not.toContain("credential");
     });
   });
 

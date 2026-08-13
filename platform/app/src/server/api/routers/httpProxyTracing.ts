@@ -38,32 +38,33 @@ type TraceTestContext = {
  * where it should end up. Names are kept either way, so the trace still shows
  * which headers the request carried.
  */
-const CREDENTIAL_HEADER_NAMES = new Set(["proxy-authorization", "cookie"]);
-
-/**
- * Whole words only, so `X-Api-Version` and `X-Idempotency-Key` keep their
- * values while `X-Api-Key` and `X-Auth-Token` lose theirs.
- */
 const CREDENTIAL_HEADER_WORD =
-  /(^|[-_])(api[-_]?key|token|secret|password|credential)s?([-_]|$)/i;
+  /(^|[-_])(authorization|auth|cookie2?|api[-_]?key|token|secret|password|credential)s?([-_]|$)/i;
 
 const REDACTED = "[REDACTED]";
-
-const isCredentialHeader = (lowerName: string): boolean =>
-  CREDENTIAL_HEADER_NAMES.has(lowerName) ||
-  CREDENTIAL_HEADER_WORD.test(lowerName);
 
 /**
  * Sanitizes request headers for trace storage by redacting credential values.
  *
- * `Authorization` keeps its scheme, since "the Bearer token was wrong" and "no
- * credential was sent at all" are different bugs and the trace should be able
- * to tell them apart.
+ * Whole words, so `X-Auth-Token` and `X-Amz-Security-Token` lose their values
+ * while `X-Api-Version`, `X-Idempotency-Key` and `WWW-Authenticate` keep
+ * theirs: half the value of recording headers is the ones somebody came to
+ * read. `Authorization` keeps its scheme, since "the Bearer token was wrong"
+ * and "no credential was sent at all" are different bugs and the trace should
+ * be able to tell them apart.
+ *
+ * Erring towards redaction: a header whose name reads like a credential is
+ * treated as one, because the cost of hiding an obscure version string is a
+ * question, and the cost of storing a live token is an incident.
  */
-export function sanitizeHeadersForTrace(
-  headers: Record<string, string>,
-  customAuthHeaderName?: string,
-): Record<string, string> {
+export function sanitizeHeadersForTrace({
+  headers,
+  customAuthHeaderName,
+}: {
+  headers: Record<string, string>;
+  /** The header the agent's api_key auth is configured to send under. */
+  customAuthHeaderName?: string;
+}): Record<string, string> {
   const sanitized = { ...headers };
   const customLower = customAuthHeaderName?.toLowerCase();
 
@@ -76,7 +77,7 @@ export function sanitizeHeadersForTrace(
       continue;
     }
 
-    if (lower === customLower || isCredentialHeader(lower)) {
+    if (lower === customLower || CREDENTIAL_HEADER_WORD.test(lower)) {
       sanitized[key] = REDACTED;
     }
   }
@@ -173,10 +174,10 @@ export async function createAgentTestTrace({
   const traceId = providedTraceId ?? generated.traceId;
   const spanId = providedSpanId ?? generated.spanId;
 
-  const sanitizedHeaders = sanitizeHeadersForTrace(
-    requestHeaders,
+  const sanitizedHeaders = sanitizeHeadersForTrace({
+    headers: requestHeaders,
     customAuthHeaderName,
-  );
+  });
 
   const inputValue = {
     url: testContext.url,

@@ -307,5 +307,26 @@ describe("HTTP agent test button", () => {
       expect(result.success).toBe(false);
       expect(result.error).toBeUndefined();
     });
+
+    it("ignores a state change belonging to another component", async () => {
+      mockPostEvent.mockImplementation(
+        async ({ onEvent }: { onEvent: (event: unknown) => void }) => {
+          onEvent({
+            type: "component_state_change",
+            payload: {
+              component_id: "some_other_node",
+              execution_state: { status: "success", outputs: { output: "hi" } },
+            },
+          });
+        },
+      );
+
+      const result = await caller.httpProxy.execute(testRequest);
+
+      // Reading another node's outputs would report a success this agent never
+      // had, which is the one wrong answer worse than no answer.
+      expect(result.success).toBe(false);
+      expect(result.response).toBeUndefined();
+    });
   });
 });
