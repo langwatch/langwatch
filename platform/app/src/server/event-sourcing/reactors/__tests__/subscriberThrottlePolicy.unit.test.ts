@@ -9,19 +9,74 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
-import { createGovernanceKpisSyncReactor } from "@ee/governance/reactors/governanceKpisSync.reactor";
-import { createGovernanceOcsfEventsSyncReactor } from "@ee/governance/reactors/governanceOcsfEventsSync.reactor";
-import { createPullRequestMappingReactor } from "../../pipelines/coding-agent-processing/reactors/pullRequestMapping.reactor";
-import { createProjectMetadataReactor } from "../../pipelines/trace-processing/reactors/projectMetadata.reactor";
-import { createSpanStorageBroadcastReactor } from "../../pipelines/trace-processing/reactors/spanStorageBroadcast.reactor";
-import { createTraceUpdateBroadcastReactor } from "../../pipelines/trace-processing/reactors/traceUpdateBroadcast.reactor";
-import { createBillingMeterDispatchReactor } from "../../projections/global/billingMeterDispatch.reactor";
+import {
+  createGovernanceKpisSyncHandler,
+  GOVERNANCE_KPIS_SYNC_WINDOW_MS,
+  isGovernanceKpiTrace,
+} from "@ee/governance/subscribers/governanceKpisSync.subscriber";
+import {
+  createGovernanceOcsfEventsSyncHandler,
+  GOVERNANCE_OCSF_EVENTS_SYNC_WINDOW_MS,
+  isGovernanceOcsfTrace,
+} from "@ee/governance/subscribers/governanceOcsfEventsSync.subscriber";
+import {
+  type CodingAgentProcessingPipelineDeps,
+  createCodingAgentProcessingPipeline,
+} from "../../pipelines/coding-agent-processing/pipeline";
+import { createPullRequestMappingHandler } from "../../pipelines/coding-agent-processing/subscribers/pullRequestMapping.subscriber";
+import { buildTraceDeps } from "../../pipelines/trace-processing/__tests__/support/traceProcessingFixtures";
+import { createTraceProcessingPipeline } from "../../pipelines/trace-processing/pipeline";
+import { createBillingMeterDispatchSubscriber } from "../../projections/global/billingMeterDispatch.subscriber";
 import type { ReactorDefinition } from "../reactor.types";
+import { throttledWindow } from "../throttleWindow";
 
 const anyDeps = {} as never;
 
 /** The policy only ever reads `options`, so the generic parameters do not matter. */
 type AnyReactor = ReactorDefinition<never, never>;
+
+/**
+ * The registrations under test come off the REAL pipelines — the throttle now
+ * lives on the pipeline declaration, so reading it anywhere else would pin a
+ * copy rather than the policy.
+ */
+const tracePipeline = createTraceProcessingPipeline(
+  buildTraceDeps({
+    governanceKpisSync: {
+      fold: "traceSummary",
+      when: isGovernanceKpiTrace,
+      ...throttledWindow({
+        makeId: (e) => `${e.tenantId}:${e.aggregateId}`,
+        windowMs: GOVERNANCE_KPIS_SYNC_WINDOW_MS,
+      }),
+      handler: createGovernanceKpisSyncHandler(anyDeps),
+    },
+    governanceOcsfEventsSync: {
+      fold: "traceSummary",
+      when: isGovernanceOcsfTrace,
+      ...throttledWindow({
+        makeId: (e) => `${e.tenantId}:${e.aggregateId}`,
+        windowMs: GOVERNANCE_OCSF_EVENTS_SYNC_WINDOW_MS,
+      }),
+      handler: createGovernanceOcsfEventsSyncHandler(anyDeps),
+    },
+  }),
+);
+
+const codingAgentStore = {} as never;
+const codingAgentPipeline = createCodingAgentProcessingPipeline({
+  codingAgentSessionStore: codingAgentStore,
+  codingAgentTraceSessionAppendStore: codingAgentStore,
+  sessionMetricSeriesAppendStore: codingAgentStore,
+  codingAgentSessionEventsAppendStore: codingAgentStore,
+  pullRequestMappingHandler: createPullRequestMappingHandler({
+    requestBranchMapping: async () => {},
+  }),
+} as unknown as CodingAgentProcessingPipelineDeps);
+
+function traceRegistration(name: string): AnyReactor {
+  return tracePipeline.foldReactors.get(name)!.definition as AnyReactor;
+}
 
 /**
  * Every reactor that holds events in a window, with the window it must use and
@@ -49,10 +104,7 @@ const windowed = [
     // Level-triggered: it tells a connected client the trace moved, so
     // swallowing the last event leaves that client on the previous state.
     survivesDispatch: false,
-    reactor: createTraceUpdateBroadcastReactor({
-      broadcast: anyDeps,
-      hasRedis: true,
-    }) as unknown as AnyReactor,
+    reactor: traceRegistration("traceUpdateBroadcast"),
   },
   {
     name: "projectMetadata",
@@ -62,9 +114,7 @@ const windowed = [
     // Rebuilt from the fold's running state, so the final event is the one
     // that decides the row.
     survivesDispatch: false,
-    reactor: createProjectMetadataReactor({
-      projects: anyDeps,
-    }) as unknown as AnyReactor,
+    reactor: traceRegistration("projectMetadata"),
   },
   {
     name: "governanceKpisSync",
@@ -73,7 +123,7 @@ const windowed = [
     dedupTtlMs: 30_000,
     // Same: the last contribution to an hour bucket is what makes it correct.
     survivesDispatch: false,
-    reactor: createGovernanceKpisSyncReactor(anyDeps) as unknown as AnyReactor,
+    reactor: traceRegistration("governanceKpisSync"),
   },
   {
     name: "governanceOcsfEventsSync",
@@ -83,9 +133,7 @@ const windowed = [
     // The sync writes what the fold currently holds, so a dropped last event
     // is a row that never ships.
     survivesDispatch: false,
-    reactor: createGovernanceOcsfEventsSyncReactor(
-      anyDeps,
-    ) as unknown as AnyReactor,
+    reactor: traceRegistration("governanceOcsfEventsSync"),
   },
   {
     name: "pullRequestMapping",
@@ -102,9 +150,9 @@ const windowed = [
     // the identical question inside thirty seconds, which the mapping
     // service's own bookkeeping would have refused one layer down.
     survivesDispatch: true,
-    reactor: createPullRequestMappingReactor({
-      requestBranchMapping: async () => {},
-    }) as unknown as AnyReactor,
+    reactor: codingAgentPipeline.foldReactors.get(
+      "pullRequestMapping",
+    )!.definition as AnyReactor,
   },
 ] as const satisfies readonly {
   name: string;
@@ -114,7 +162,7 @@ const windowed = [
   reactor: AnyReactor;
 }[];
 
-describe("reactor throttle policy", () => {
+describe("subscriber throttle policy", () => {
   describe.each(windowed)("given the $name reactor", ({
     reactor,
     windowMs,
@@ -176,10 +224,9 @@ describe("reactor throttle policy", () => {
     // Deliberately excluded. Read the comment on the reactor before adding a
     // window here — the reason is specific, not incidental.
     it("leaves spanStorageBroadcast firing immediately, because nothing polls behind it while a trace is open", () => {
-      const reactor = createSpanStorageBroadcastReactor({
-        broadcast: anyDeps,
-        hasRedis: true,
-      });
+      const reactor = tracePipeline.mapReactors.get(
+        "spanStorageBroadcast",
+      )!.definition;
 
       expect(reactor.options?.delay ?? 0).toBe(0);
     });
@@ -187,7 +234,7 @@ describe("reactor throttle policy", () => {
     it("leaves billingMeterDispatch firing immediately, because its handler reads the clock rather than the event", () => {
       // Holding a trigger moves the billing-month and grace-period decision
       // with it, so a delay can turn a late report into a missing one.
-      const reactor = createBillingMeterDispatchReactor({
+      const reactor = createBillingMeterDispatchSubscriber({
         getDispatch: () => async () => {},
       });
 
@@ -200,7 +247,7 @@ describe("reactor throttle policy", () => {
       // and that month's first report skipped. Post-dispatch suppression is
       // opt-in, and this reactor must never opt in while the handler decides
       // its billing month from the clock.
-      const reactor = createBillingMeterDispatchReactor({
+      const reactor = createBillingMeterDispatchSubscriber({
         getDispatch: () => async () => {},
       });
 

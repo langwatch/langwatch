@@ -6,7 +6,6 @@ import {
 } from "../../../../../utils/posthogErrorCapture";
 import type { ProjectService } from "../../../../app-layer/projects/project.service";
 import type { SubscriberSpec } from "../../../pipeline/processManagerDefinition";
-import { CIO_REACTOR_DEBOUNCE_TTL_MS } from "../../trace-processing/reactors/customerIoTraceSync.reactor";
 import { SIMULATION_RUN_EVENT_TYPES } from "../schemas/constants";
 import type {
   SimulationProcessingEvent,
@@ -17,6 +16,13 @@ import { isSimulationRunFinishedEvent } from "../schemas/events";
 const logger = createLogger(
   "langwatch:simulation-processing:customer-io-simulation-sync-subscriber",
 );
+
+/**
+ * Debounce for per-org CRM milestone updates. Lived on the trace-processing
+ * Customer.io reactor until the reactor retirement (ADR-094) deleted it; the
+ * five-minute window is the CRM contract, not a queue tunable.
+ */
+export const CIO_SYNC_DEBOUNCE_TTL_MS = 300_000;
 
 export interface CustomerIoSimulationSyncSubscriberDeps {
   projects: ProjectService;
@@ -51,7 +57,7 @@ export function createCustomerIoSimulationSyncSubscriber(
     fold: "simulationRunState",
     events: [SIMULATION_RUN_EVENT_TYPES.FINISHED],
     dedupId: (event) => `cio-sim-sync-${event.tenantId}`,
-    ttl: CIO_REACTOR_DEBOUNCE_TTL_MS,
+    ttl: CIO_SYNC_DEBOUNCE_TTL_MS,
 
     async handler(event: SimulationProcessingEvent): Promise<void> {
       // Only sync on terminal events
