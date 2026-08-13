@@ -11,8 +11,8 @@
  * @see specs/analytics/governed-sql-saved-charts.feature
  */
 
-import type { PrismaClient } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 
 const isEnabled = vi.fn();
 

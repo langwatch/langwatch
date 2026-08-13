@@ -6,6 +6,13 @@ on:
       - published
   workflow_dispatch:
 
+# A publish run drains — see publish-docker-app. This one holds id-token:write
+# for npm provenance, and a cancel between `npm publish` and the provenance
+# exchange is not something a later run can repair.
+concurrency:
+  group: mcp-javascript-cd-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   id-token: write
   contents: read

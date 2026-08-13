@@ -176,12 +176,20 @@ describe("mapToPlanInfo", () => {
   });
 
   /** @scenario A licensed webhook entitlement survives the PlanInfo mapping */
-  it("carries webhookEndpointsEnabled into PlanInfo, defaulting false when absent", () => {
+  it("carries webhookEndpointsEnabled into PlanInfo, leaving an omitted one to the tier", () => {
     const withFlag = mapToPlanInfo(
       createLicenseData({ webhookEndpointsEnabled: true }),
     );
     expect(withFlag.webhookEndpointsEnabled).toBe(true);
+
+    const explicitlyOff = mapToPlanInfo(
+      createLicenseData({ webhookEndpointsEnabled: false }),
+    );
+    expect(explicitlyOff.webhookEndpointsEnabled).toBe(false);
+
+    // Omitted stays omitted through the mapping. The plan's tier answers it at
+    // resolution, which is what entitles a license signed before the flag.
     const withoutFlag = mapToPlanInfo(createLicenseData({}));
-    expect(withoutFlag.webhookEndpointsEnabled).toBe(false);
+    expect(withoutFlag.webhookEndpointsEnabled).toBeUndefined();
   });
 });

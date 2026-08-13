@@ -161,3 +161,38 @@ Feature: GroupQueue pending counter ground-truth reconcile
     Given a group listed in a lifecycle index whose jobs have all gone
     When reconciles keep running
     Then the sweep still backs off to its interval
+
+  # The reconcile is single-flighted, so on any given cycle only one instance
+  # measures a drift. An instance reporting the drift it computed itself
+  # therefore reports zero for every queue it did not win, and no instance ever
+  # reports the true total. The measurement is shared, so the signal has to be.
+  @integration
+  Scenario: An instance that measured nothing reports the drift another instance measured
+    Given one instance has reconciled a queue and measured a drift
+    When a second instance that won no marker reports its drift
+    Then it reports the same drift as the instance that measured it
+
+  @integration
+  Scenario: Drift is summed across queues whichever instance measured each one
+    Given two queues whose drifts were measured by different instances
+    When either instance reports its drift
+    Then it reports the total across both queues
+
+  # A queue that has never reconciled has no figure to read. It cannot
+  # contribute to the total, but it must not take the rest of the total with it
+  # either: one silent queue would otherwise report the whole fleet as clean.
+  @integration
+  Scenario: A queue with no published drift does not suppress the queues that have one
+    Given one queue with a published drift and another that has never reconciled
+    When drift is reported
+    Then the total is the drift of the queue that published one
+
+  # A published drift describes the count that was published with it. Letting
+  # the two land separately would allow a pass to write the counter, lose the
+  # marker, and still announce a drift for a count it never landed.
+  @unit
+  Scenario: A pass that loses the marker publishes neither the count nor the drift
+    Given a reconcile pass that is overtaken before its write
+    When it goes to publish
+    Then neither the counter nor the drift is written
+

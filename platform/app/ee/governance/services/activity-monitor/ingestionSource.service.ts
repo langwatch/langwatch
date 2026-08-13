@@ -29,9 +29,13 @@ import {
   ValidationError,
 } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import type { IngestionSource, Prisma, PrismaClient } from "@prisma/client";
 import { createHash, randomBytes } from "crypto";
 import { env } from "~/env.mjs";
+import type {
+  IngestionSource,
+  Prisma,
+  PrismaClient,
+} from "~/generated/prisma/client";
 import { isEnterpriseTier } from "~/server/api/enterprise";
 import { getApp } from "~/server/app-layer/app";
 import { encryptParserConfigCredentials } from "./ingestionCredentials";

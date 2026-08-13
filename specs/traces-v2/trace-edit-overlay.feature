@@ -317,6 +317,18 @@ Feature: Correcting a trace without rewriting it
       And an evaluator being set up on the same trace reads the conversation as
       it was captured
 
+    # The AI-readable column spells the whole trace out span by span, from a read
+    # of its own. Left uncorrected it is the one column that puts back what every
+    # other column leaves out, and a deleted span reaches the dataset through it.
+    @integration
+    Scenario: The AI-readable column is read the way the rest of the mapping is
+      Given a corrected trace being mapped into a dataset
+      When the mapping fills its AI-readable column
+      Then the column spells out the corrected trace, without the spans the
+      correction deleted
+      And an evaluator being set up on the same trace still gets every span the
+      trace captured
+
     @unit
     Scenario: A page of traces fetches its corrections in one read
       Given several corrected traces read together

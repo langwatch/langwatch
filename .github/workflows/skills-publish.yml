@@ -12,6 +12,12 @@ on:
       - 'skills/version.txt'
   workflow_dispatch:
 
+# Fires on merges to main, so a burst of merges starts overlapping publishes of
+# the same skills. Serialize; the second run republishes from the newer tree.
+concurrency:
+  group: skills-publish-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   publish:
     runs-on: ubuntu-latest

@@ -23,6 +23,7 @@ import {
 } from "./ApiKeyAttribute";
 import { AttributeValue } from "./AttributeValue";
 import { AnchorCommentButton } from "./anchoredComments/AnchorCommentButton";
+import { sameAttributeValue } from "./attributeValueEquality";
 import { PinnedAwareJsonView } from "./JsonHighlight";
 import { SegmentedToggle } from "./SegmentedToggle";
 
@@ -256,6 +257,43 @@ interface AttributeTableProps {
 interface AttributeCorrection {
   /** The captured value rendered for the tooltip, or null when it is new. */
   original: string | null;
+  /**
+   * The correction takes this attribute away. The row is still listed, struck
+   * through: a row that simply stopped existing reads as one the trace never
+   * carried, and the removal is the whole of what the correction did here.
+   */
+  removed?: boolean;
+}
+
+/**
+ * How one row differs from what the trace captured, or null when it says the
+ * same thing. A key the correction took away is marked removed rather than
+ * dropped; one the capture never had at all was added, unless it is a leaf of a
+ * value the capture held as one string.
+ */
+function correctionForKey({
+  key,
+  capturedFlat,
+  correctedFlat,
+  removedKeys,
+}: {
+  key: string;
+  capturedFlat: Record<string, unknown>;
+  correctedFlat: Record<string, unknown>;
+  removedKeys: Record<string, unknown>;
+}): AttributeCorrection | null {
+  if (key in removedKeys) {
+    return { original: formatValue(capturedFlat[key]), removed: true };
+  }
+  if (key in capturedFlat) {
+    return sameAttributeValue(capturedFlat[key], correctedFlat[key])
+      ? null
+      : { original: formatValue(capturedFlat[key]) };
+  }
+  const ancestor = capturedAncestorKey({ key, capturedFlat });
+  return ancestor === null
+    ? { original: null }
+    : { original: formatValue(capturedFlat[ancestor]) };
 }
 
 /**
@@ -488,10 +526,34 @@ function RestrictionMarker({ visibleTo, canSee }: AttributeRestriction) {
 function CorrectionMarker({
   attrKey,
   original,
+  removed,
 }: {
   attrKey: string;
   original: string | null;
+  removed?: boolean;
 }) {
+  if (removed) {
+    return (
+      <Tooltip content="Removed by an edit" positioning={{ placement: "top" }}>
+        <Text
+          as="span"
+          textStyle="2xs"
+          fontWeight="semibold"
+          color="red.fg"
+          bg="red.subtle"
+          borderWidth="1px"
+          borderColor="red.muted"
+          borderRadius="sm"
+          paddingX={1.5}
+          flexShrink={0}
+          cursor="help"
+          aria-label={`${attrKey}, removed by an edit`}
+        >
+          Removed
+        </Text>
+      </Tooltip>
+    );
+  }
   const label =
     original === null
       ? `${attrKey}, added by an edit`
@@ -744,12 +806,21 @@ function RowValueCell({
     <HStack flex={1} minWidth={0} gap={1.5}>
       {restriction ? <RestrictionMarker {...restriction} /> : null}
       {correction ? (
-        <CorrectionMarker attrKey={attrKey} original={correction.original} />
+        <CorrectionMarker
+          attrKey={attrKey}
+          original={correction.original}
+          removed={correction.removed}
+        />
       ) : null}
       {editing ? (
         <EditableValueCell attrKey={attrKey} value={value} editing={editing} />
       ) : (
-        <Box flex={1} minWidth={0}>
+        <Box
+          flex={1}
+          minWidth={0}
+          textDecoration={correction?.removed ? "line-through" : undefined}
+          color={correction?.removed ? "fg.subtle" : undefined}
+        >
           {isApiKeyIdRow(attrKey, value) ? (
             <ApiKeyAttributeValue apiKeyId={value} />
           ) : (
@@ -939,6 +1010,7 @@ function rowMarkersFor({
 function AttrSection({
   title,
   attributes,
+  jsonAttributes,
   viewMode,
   source,
   labelWidth,
@@ -953,6 +1025,12 @@ function AttrSection({
 }: {
   title: string;
   attributes: Record<string, unknown>;
+  /**
+   * What the JSON view quotes, when that is not the rows listed. A removal is a
+   * row the flat view strikes through; JSON has nowhere to draw that, so it
+   * quotes the attributes as the correction left them.
+   */
+  jsonAttributes?: Record<string, unknown>;
   viewMode: AttrViewMode;
   source: PinnedAttributeSource;
   labelWidth: number;
@@ -980,6 +1058,10 @@ function AttrSection({
   const { pins, isPinned, togglePin } = usePinnedAttributes(project?.id);
 
   const flat = useMemo(() => flattenAttributes(attributes), [attributes]);
+  const jsonFlat = useMemo(
+    () => (jsonAttributes ? flattenAttributes(jsonAttributes) : flat),
+    [jsonAttributes, flat],
+  );
   const leading = useMemo(() => new Set(leadingKeys ?? []), [leadingKeys]);
   const pinnedKeys = useMemo(
     () => new Set(pins.filter((p) => p.source === source).map((p) => p.key)),
@@ -1064,7 +1146,7 @@ function AttrSection({
           overflow="auto"
         >
           <PinnedAwareJsonView
-            content={JSON.stringify(buildNestedObject(flat), null, 2)}
+            content={JSON.stringify(buildNestedObject(jsonFlat), null, 2)}
             pinnedKeys={pinnedKeys}
           />
         </Box>
@@ -1228,11 +1310,23 @@ export function AttributeTable({
     [baselineFlat],
   );
 
-  const flatAttrs = useMemo(() => {
+  // Keys the capture had that the correction does not. They keep their captured
+  // value so the struck-through row still shows what is being taken away.
+  const removedKeys = useMemo(() => {
+    if (!correctedFrom) return {};
+    const corrected = flattenAttributes(attributes);
+    const captured = flattenAttributes(correctedFrom);
+    return Object.fromEntries(
+      Object.entries(captured).filter(([key]) => !(key in corrected)),
+    );
+  }, [attributes, correctedFrom]);
+
+  // What the span carries once the correction is applied, which is what copying
+  // and the JSON view quote: an attribute the correction took away must not
+  // travel back out as one the span still has.
+  const correctedFlat = useMemo(() => {
     const flat = flattenAttributes(attributes);
-    // Attributes the correction adds are rows in their own right; ones it
-    // removes keep their captured value so the struck-through row still shows
-    // what is being taken away.
+    // Attributes the correction adds are rows in their own right.
     for (const [key, value] of Object.entries(editing?.edits ?? {})) {
       if (value === null) continue;
       flat[key] = value;
@@ -1241,6 +1335,19 @@ export function AttributeTable({
     // `span_id` attribute (vanishingly unlikely) still wins via the spread.
     return spanId ? { [SPAN_ID_KEY]: spanId, ...flat } : flat;
   }, [attributes, spanId, editing?.edits]);
+
+  // The rows the table lists: everything the corrected span carries, plus the
+  // keys it took away. Those keep their captured value so the struck-through
+  // row still shows what is being taken away, and a correction that re-adds one
+  // under a different value still reads as that value. Rows sort by key, so
+  // where a row goes in makes no difference to where it lands.
+  const flatAttrs = useMemo(() => {
+    const removedRows = Object.entries(removedKeys).filter(
+      ([key]) => !(key in correctedFlat),
+    );
+    if (removedRows.length === 0) return correctedFlat;
+    return { ...correctedFlat, ...Object.fromEntries(removedRows) };
+  }, [correctedFlat, removedKeys]);
   const flatResAttrs = useMemo(
     () =>
       resourceAttributes ? flattenAttributes(resourceAttributes) : undefined,
@@ -1248,32 +1355,32 @@ export function AttributeTable({
   );
 
   // A row is marked when the correction gave it a different value than the one
-  // captured, or added it outright. The comparison is per row, on the rendered
-  // value, which is what the reader is looking at: a correction may replace a
-  // whole attribute record and leave most of it saying exactly what it said.
+  // captured, or added it outright. The comparison is per row: a correction may
+  // replace a whole attribute record and leave most of it saying exactly what it
+  // said. It compares what the values mean rather than how they are written, so
+  // a row that came back re-serialised does not read as one someone edited.
   const correctionFor = useMemo(() => {
     if (!correctedFrom) return undefined;
     const capturedFlat = flattenAttributes(correctedFrom);
-    return (key: string): AttributeCorrection | null => {
-      if (key in capturedFlat) {
-        const captured = formatValue(capturedFlat[key]);
-        return captured === formatValue(flatAttrs[key])
-          ? null
-          : { original: captured };
-      }
-      // A correction that turned a value the trace recorded as one string into
-      // a structure gives every leaf under it a row the capture never had.
-      // Those rows correct the value above them rather than adding anything.
-      const ancestor = capturedAncestorKey({ key, capturedFlat });
-      return ancestor === null
-        ? { original: null }
-        : { original: formatValue(capturedFlat[ancestor]) };
-    };
-  }, [correctedFrom, flatAttrs]);
+    return (key: string): AttributeCorrection | null =>
+      correctionForKey({
+        key,
+        capturedFlat,
+        correctedFlat: flatAttrs,
+        removedKeys,
+      });
+  }, [correctedFrom, flatAttrs, removedKeys]);
 
   const filterAttrs = useMemo(
     () => filterAttributesBySearch(flatAttrs, searchTerm),
     [flatAttrs, searchTerm],
+  );
+  const filterCorrectedAttrs = useMemo(
+    () =>
+      flatAttrs === correctedFlat
+        ? filterAttrs
+        : filterAttributesBySearch(correctedFlat, searchTerm),
+    [flatAttrs, correctedFlat, filterAttrs, searchTerm],
   );
   const allAttributeKeys = useMemo(
     () => new Set(Object.keys(flatAttrs)),
@@ -1294,13 +1401,13 @@ export function AttributeTable({
 
   const copyPayload = useMemo(() => {
     const root: Record<string, unknown> = {
-      ...buildNestedObject(filterAttrs),
+      ...buildNestedObject(filterCorrectedAttrs),
     };
     if (filterResAttrs) {
       root.resource = buildNestedObject(filterResAttrs);
     }
     return JSON.stringify(root, null, 2);
-  }, [filterAttrs, filterResAttrs]);
+  }, [filterCorrectedAttrs, filterResAttrs]);
 
   return (
     <Box>
@@ -1328,6 +1435,7 @@ export function AttributeTable({
       <AttrSection
         title={spanAttrTitle}
         attributes={filterAttrs}
+        jsonAttributes={filterCorrectedAttrs}
         viewMode={effectiveViewMode}
         source="attribute"
         labelWidth={labelWidth}

@@ -26,10 +26,10 @@
     "sdks/go": {
       "release-type": "go",
       "package-name": "langwatch-go",
-      "prerelease": true,
-      "component": "sdk-go",
+      "prerelease": false,
+      "component": "sdks/go",
       "include-component-in-tag": true,
-      "tag-separator": "@",
+      "tag-separator": "/",
       "changelog-sections": [
         {
           "type": "feat",

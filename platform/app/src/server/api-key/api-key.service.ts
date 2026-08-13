@@ -1,7 +1,7 @@
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import type { ApiKey, PrismaClient } from "@prisma/client";
-import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
+import type { ApiKey, PrismaClient } from "~/generated/prisma/client";
+import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import type { Permission } from "~/server/api/rbac";
 import {
   MalformedCustomRolePermissionsError,

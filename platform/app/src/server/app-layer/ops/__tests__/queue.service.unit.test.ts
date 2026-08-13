@@ -72,6 +72,7 @@ function createMockRepo(
       .fn()
       .mockResolvedValue({ groupsDrained: 0, jobsDrained: 0 }),
     reconcileTotalPending: vi.fn().mockResolvedValue(null),
+    readPublishedPendingDrift: vi.fn().mockResolvedValue(0),
     ...overrides,
   };
 }

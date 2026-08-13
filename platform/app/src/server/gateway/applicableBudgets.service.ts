@@ -11,7 +11,7 @@
  * Spend comes from the same rollup the budgets page reads, so a limit and
  * its "spent so far" agree wherever they are shown.
  */
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 
 import type {
   BudgetSpendTarget,

@@ -48,7 +48,7 @@ function BudgetDetailPage() {
     { organizationId: organization?.id ?? "", id: budgetId },
     { enabled: !!organization?.id && !!budgetId },
   );
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const archiveMutation = api.gatewayBudgets.archive.useMutation({
     onSuccess: async () => {
       if (organization?.id) {

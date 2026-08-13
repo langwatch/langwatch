@@ -2,6 +2,31 @@
 # Branch protection requires `langwatch-app-complete`. Upstream jobs
 # skip when paths don't match, and `alls-green` reports the final
 # consolidated status — no per-step `if:` guards needed.
+#
+# LEAN CHECKOUT
+# Every checkout below excludes the repository's marketing media: docs/media,
+# docs/images and assets/. Together they are 165 MB of .gif and .mp4 — a
+# single 26 MB mp4, gifs of 20/16/10 MB — against 81 MB for platform/, the
+# thing we actually build. Naming a sparse-checkout makes actions/checkout
+# fetch with `--filter=blob:none`, so those blobs never cross the wire at
+# all. Measured on a depth-1 clone: 180 MB -> 42 MB of .git, 490 MB ->
+# 188 MB on disk.
+#
+# It excludes the MEDIA, not docs/ wholesale, and that distinction is load
+# bearing. error-remediation.unit.test.ts resolves ../../../../../../docs and
+# asserts every remediation link maps to a real .mdx, so dropping all of
+# docs/ fails three test-unit shards. The .mdx tree is ~10 MB of the 138;
+# the media is the other 128, and nothing in CI reads it.
+#
+# That is per checkout, and this workflow runs a dozen of them. It also
+# compresses the tail, which is what actually sets wall clock: in run
+# 31396568900 the six integration shards spent 9s, 9s, 10s, 19s, 151s and
+# 185s in checkout, and the job totals tracked it (599s vs 891s).
+#
+# Non-cone mode is deliberate. Cone mode only accepts an include list, so
+# every new top-level directory would silently go missing from CI until
+# someone noticed; the negation form says what we are dropping and lets
+# everything else through by default.
 name: langwatch-app-ci
 
 on:
@@ -111,9 +136,21 @@ jobs:
               - 'pnpm-workspace.yaml'
               - 'package.json'
               - '.npmrc'
+              # NOTE: 'charts/**' is deliberately NOT listed. Integration suites
+              # do render the chart and assert on the output, so a chart-only
+              # edit can break a test under platform/app/ without touching a file
+              # there — but this one flag gates nine jobs (typecheck, every unit
+              # and integration shard, e2e), so adding it would run the entire
+              # app suite for a comment change in values.yaml. That trade is a
+              # repo-wide cost decision, not part of this change; tracked
+              # separately.
               - '.github/workflows/langwatch-app-ci.yml'
               - '.github/.release-please-manifest.json'
               - '.github/scripts/**'
+              # Composite actions are covered by ci-scripts-test through the
+              # scripts they call, so an edit that only touches an action.yml
+              # has to reach the gate too.
+              - '.github/actions/**'
             # The parity scanner binds @scenario annotations from test files
             # across many roots, not just specs/ and platform/app/. This list MUST
             # cover every root the scanner reads (DEFAULT_TEST_ROOTS,
@@ -130,10 +167,12 @@ jobs:
               - 'platform/app/**'
               - 'packages/**'
               - 'skills/**'
+              - 'plugins/**'
               - 'tools/**'
               - 'mcp/typescript/**'
               - 'sdks/typescript/**'
               - 'sdks/python/**'
+              - 'sdks/go/**'
               - 'services/**'
               - 'pkg/**'
               - 'services/langevals/**'
@@ -149,6 +188,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
+          sparse-checkout: |
+            /*
+            !/docs/media/
+            !/docs/images/
+            !/assets/
+          sparse-checkout-cone-mode: false
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
@@ -214,6 +261,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
+          sparse-checkout: |
+            /*
+            !/docs/media/
+            !/docs/images/
+            !/assets/
+          sparse-checkout-cone-mode: false
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
@@ -380,6 +435,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
+          sparse-checkout: |
+            /*
+            !/docs/media/
+            !/docs/images/
+            !/assets/
+          sparse-checkout-cone-mode: false
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
@@ -447,6 +510,18 @@ jobs:
           done
           exit 1
 
+      # The chart-rendering integration tests shell out to `helm template`, and
+      # skip themselves when helm or the chart dependencies are missing. That
+      # honesty is only honest if CI actually supplies both — otherwise the
+      # suite reports "skipped", the job exits 0, and every guard it contains
+      # is silently unenforced. REQUIRE_HELM_TESTS below turns a skip here into
+      # a failure, so this setup can never quietly rot.
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
+      - name: Add chart dependency repositories
+        run: |
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo add langwatch https://langwatch.github.io/langwatch
+
       - name: Run integration tests (shard ${{ matrix.shard }}/4)
         id: integration-tests
         working-directory: platform/app
@@ -459,6 +534,9 @@ jobs:
         # worker (execArgv is not), so it raises the heap where it's needed.
         env:
           NODE_OPTIONS: --max-old-space-size=8192
+          # Fail loudly if the helm-backed suites cannot run here, rather than
+          # skipping into a green job.
+          REQUIRE_HELM_TESTS: "1"
         run: |
           # shardFailureReporter feeds the globalSetup hard-floor so a wedged
           # shard that already printed failures exits 1, not a masked 0.
@@ -527,6 +605,16 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+          # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
+          # `--no-renames` is not ours to set here, so keep in mind that a PR
+          # which does touch docs/ will lazily fetch just those blobs when the
+          # diff below reads them — correct, and rare.
+          sparse-checkout: |
+            /*
+            !/docs/media/
+            !/docs/images/
+            !/assets/
+          sparse-checkout-cone-mode: false
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
@@ -718,8 +806,18 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+          # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
+          # `--no-renames` is not ours to set here, so keep in mind that a PR
+          # which does touch docs/ will lazily fetch just those blobs when the
+          # diff below reads them — correct, and rare.
+          sparse-checkout: |
+            /*
+            !/docs/media/
+            !/docs/images/
+            !/assets/
+          sparse-checkout-cone-mode: false
 
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v5
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12"
 
@@ -759,6 +857,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
+          sparse-checkout: |
+            /*
+            !/docs/media/
+            !/docs/images/
+            !/assets/
+          sparse-checkout-cone-mode: false
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
@@ -785,6 +891,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
+          sparse-checkout: |
+            /*
+            !/docs/media/
+            !/docs/images/
+            !/assets/
+          sparse-checkout-cone-mode: false
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
@@ -823,6 +937,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
+          sparse-checkout: |
+            /*
+            !/docs/media/
+            !/docs/images/
+            !/assets/
+          sparse-checkout-cone-mode: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
@@ -931,12 +1053,23 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
+          sparse-checkout: |
+            /*
+            !/docs/media/
+            !/docs/images/
+            !/assets/
+          sparse-checkout-cone-mode: false
 
       - name: Test extract-failures.sh
         run: bash .github/scripts/__tests__/extract-failures.test.sh
 
       - name: Test start-clickhouse-with-storage-policy.sh
         run: bash .github/scripts/__tests__/start-clickhouse-with-storage-policy.test.sh
+
+      - name: Test start-boxd-ssh-agent.sh
+        run: bash .github/scripts/__tests__/start-boxd-ssh-agent.test.sh
 
   ci-self-test:
     needs: changes
@@ -945,6 +1078,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
+          sparse-checkout: |
+            /*
+            !/docs/media/
+            !/docs/images/
+            !/assets/
+          sparse-checkout-cone-mode: false
 
       - uses: ./.github/actions/setup-pnpm-node
         with:

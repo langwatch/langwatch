@@ -1,9 +1,9 @@
 import { createLogger } from "@langwatch/observability";
-import type { Scenario } from "@prisma/client";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
+import type { Scenario } from "~/generated/prisma/client";
 import { requires, type SecuredApp } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { prisma } from "~/server/db";

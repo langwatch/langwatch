@@ -1382,7 +1382,6 @@ export const tracesV2Router = createTRPCRouter({
       const emitter = getApp().broadcast.getTenantEmitter(projectId);
       try {
         for await (const eventArgs of on(emitter, "discover_updated", {
-          // @ts-expect-error - signal is not typed
           signal: opts.signal,
         })) {
           yield eventArgs[0];

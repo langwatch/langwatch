@@ -543,6 +543,35 @@ describe("processCommandBatch", () => {
       });
     });
 
+    // The single path gates cleanup behind `events.length > 0`. A handler that
+    // legitimately returns nothing for one payload — a malformed exemplar, say
+    // — must not have its cleanup run off the back of a batch-mate's append,
+    // or a resource is released for a command that never became durable.
+    describe("when one command in the batch produces no events", () => {
+      it("runs cleanup only for the commands that contributed events", async () => {
+        const cleanupAfterStore = vi.fn().mockResolvedValue(undefined);
+        const handler = {
+          handle: vi.fn(async (command: any) =>
+            command.aggregateId === "agg-1"
+              ? []
+              : [eventWithKey(`k-${command.aggregateId}`)],
+          ),
+          cleanupAfterStore,
+        };
+        const params = createDefaultBatchParams({
+          payloads: [payloadFor(0), payloadFor(1), payloadFor(2)],
+          handler,
+          storeEventsFn: vi.fn().mockResolvedValue(undefined),
+        });
+
+        await processCommandBatch(params);
+
+        expect(
+          cleanupAfterStore.mock.calls.map(([command]) => command.aggregateId),
+        ).toEqual(["agg-0", "agg-2"]);
+      });
+    });
+
     describe("when one command's cleanup rejects", () => {
       /** @contract 'a cleanup failure must never roll back durable events' */
       it("still resolves, stores once, and runs the remaining cleanups", async () => {

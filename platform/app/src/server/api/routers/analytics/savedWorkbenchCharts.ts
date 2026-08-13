@@ -20,8 +20,8 @@
  * @see specs/analytics/governed-sql-saved-charts.feature
  */
 
-import type { PrismaClient } from "@prisma/client";
 import { z } from "zod";
+import type { PrismaClient } from "~/generated/prisma/client";
 
 import { GovernedSqlNotEnabledError } from "~/server/analytics/governed-sql/errors";
 import { SavedWorkbenchChartService } from "~/server/analytics/saved-workbench-charts/savedWorkbenchChart.service";

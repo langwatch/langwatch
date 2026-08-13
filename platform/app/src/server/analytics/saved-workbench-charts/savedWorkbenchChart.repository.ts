@@ -15,7 +15,11 @@
  * @see specs/analytics/governed-sql-saved-charts.feature
  */
 
-import type { CustomGraph, Prisma, PrismaClient } from "@prisma/client";
+import type {
+  CustomGraph,
+  Prisma,
+  PrismaClient,
+} from "~/generated/prisma/client";
 
 import { WORKBENCH_SQL_CHART_KIND } from "./workbenchChartDefinition";
 
