@@ -255,6 +255,9 @@ export const organizationRouter = createTRPCRouter({
           if (isDemo || !canUpdateProject) {
             project.apiKey = "";
           }
+          // The governed SQL key is a control-plane secret: no client surface
+          // reads it, so unlike the base key it is sent to no one at all.
+          project.governedSqlKey = "";
         }
       }
       for (const organization of organizations) {
