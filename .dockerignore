@@ -22,10 +22,6 @@
 !**/.env.example
 **/.venv
 
-langwatch_nlp/.venv
-langwatch_nlp/.pytest_cache
-langwatch_nlp/.ipynb_checkpoints
-
 dist
 sdks/python/dist
 sdks/python/.ipynb_checkpoints
