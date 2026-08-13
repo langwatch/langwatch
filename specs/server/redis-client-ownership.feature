@@ -181,8 +181,9 @@ Feature: Redis is an owned client, never a module singleton
     Scenario: The source guard scans every directory under platform/app
       Given the platform source tree
       When the ownership guard walks source files
-      Then it includes files from scripts, e2e, vendor, and specs
-      And only an explicit allowlist of directories is excluded
+      Then it includes files from scripts and e2e
+      And vendor and specs are not excluded from the walk
+      And only an explicit allowlist of directories and dot-prefixed directories are excluded
       And the allowlist contains exactly node_modules, dist, .next, .next-saas, coverage, and public
 
     @unit

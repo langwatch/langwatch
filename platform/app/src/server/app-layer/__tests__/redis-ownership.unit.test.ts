@@ -75,9 +75,10 @@ const STANDALONE_SCRIPT_ALLOWLIST = new Set([
 /**
  * Directories under `platform/app` that are never source code.
  *
- * This is an ALLOWLIST of exclusions — anything NOT listed here IS scanned.
- * Adding a directory to dodge the guard requires updating the snapshot
- * assertion below, which is the point.
+ * This is an ALLOWLIST of exclusions — anything NOT listed here and not
+ * dot-prefixed (`.git`, `.next`, etc.) IS scanned. Adding a directory to
+ * dodge the guard requires updating the snapshot assertion below, which is
+ * the point.
  */
 const SKIP_DIRECTORIES = new Set([
   "node_modules",
@@ -327,22 +328,23 @@ describe("Redis ownership", () => {
       const files = allSourceFiles();
       const relFiles = files.map(relative);
 
-      // Files from directories that the old walker missed must now appear.
-      expect(relFiles.some((f) => f.startsWith("platform/app/scripts/"))).toBe(
-        true,
-      );
-      // The specs directory is also scanned (feature files are not source, but
-      // .ts helpers inside specs/ are).
-      const hasSpecsOrE2eOrVendor = relFiles.some(
-        (f) =>
-          f.startsWith("platform/app/e2e/") ||
-          f.startsWith("platform/app/vendor/") ||
-          f.startsWith("platform/app/specs/"),
-      );
-      expect(hasSpecsOrE2eOrVendor).toBe(true);
+      // Directories that the old walker missed and that contain source files
+      // must now appear. (vendor/ and specs/ are also walked but contain no
+      // files matching SOURCE_EXTENSIONS, so they produce no results.)
+      for (const directory of ["scripts", "e2e"]) {
+        expect(
+          relFiles.some((f) => f.startsWith(`platform/app/${directory}/`)),
+          `expected files from platform/app/${directory}/`,
+        ).toBe(true);
+      }
+
+      // vendor/ and specs/ are NOT in SKIP_DIRECTORIES — the walker enters
+      // them — but they contain no source files today.
+      expect(SKIP_DIRECTORIES.has("vendor")).toBe(false);
+      expect(SKIP_DIRECTORIES.has("specs")).toBe(false);
     });
 
-    /** @scenario The allowlist contains exactly the expected directories */
+    /** Part of @scenario The source guard scans every directory under platform/app */
     it("excludes only the pinned allowlist of directories", () => {
       expect([...SKIP_DIRECTORIES].sort()).toEqual([
         ".next",
