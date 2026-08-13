@@ -4,6 +4,9 @@ import type { DraftCadence } from "./registry";
 
 interface Props {
   row: LayoutRow;
+  /** The highlighted option in the list points here as its description, so
+   *  this pane is read out with the option a screen reader lands on. */
+  id: string;
   /** Set when applying this layout also moves the automation to the other
    *  cadence, so the author reads the consequence before they pick it. */
   switchesCadenceTo?: DraftCadence;
@@ -15,11 +18,12 @@ function cadenceSwitchNote(target: DraftCadence): string {
     : "Picking this layout sends one message per matching trace, on the Immediate cadence.";
 }
 
-export function TemplateLayoutDetail({ row, switchesCadenceTo }: Props) {
+export function TemplateLayoutDetail({ row, id, switchesCadenceTo }: Props) {
   const { option, locked, isDefault } = row;
   const { Wireframe } = option;
   return (
     <Stack
+      id={id}
       data-testid="layout-preview"
       gap={3}
       align="stretch"
@@ -30,7 +34,9 @@ export function TemplateLayoutDetail({ row, switchesCadenceTo }: Props) {
       padding={3}
     >
       <HStack gap={2}>
-        <Text textStyle="md">{option.emoji}</Text>
+        <Text textStyle="md" aria-hidden>
+          {option.emoji}
+        </Text>
         <Text textStyle="sm" fontWeight="medium">
           {option.displayName}
         </Text>

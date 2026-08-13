@@ -67,6 +67,9 @@ function StatefulPicker({
   const [currentSource, setCurrentSource] = useState("");
   return (
     <>
+      {/* The draft's live cadence, so a test can watch a cross-cadence pick
+          drive it the way the form owner's `setNotificationCadence` does. */}
+      <p data-testid="draft-cadence">{cadence}</p>
       {exposeExternalCadenceControl ? (
         <button
           type="button"
@@ -135,7 +138,26 @@ describe("SlackBlockKitTemplatePicker", () => {
     });
 
     /** @scenario "The layout list previews the layout the author lands on" */
-    it("opens the preview on the default layout", () => {
+    it("previews the layout the automation already uses, not the default one", () => {
+      // Deliberately NOT the default (that is "Compact notice"): a preview
+      // that only ever opened on the default would pass a test written
+      // against a pristine draft while showing an editing author the wrong
+      // layout.
+      const oneLiner = templateOptionsFor({
+        cadence: "immediate",
+        kind: "trace",
+      }).find((option) => option.id === "trace_alert_one_liner");
+      renderPicker({ currentSource: oneLiner!.source });
+
+      expect(preview().getByText("One-liner")).toBeInTheDocument();
+      expect(preview().queryByText("Compact notice")).not.toBeInTheDocument();
+      // What one message contains, what the layout is for, and its structure.
+      expect(preview().getByText(oneLiner!.deliveryNote)).toBeInTheDocument();
+      expect(preview().getByText(oneLiner!.tagline)).toBeInTheDocument();
+      expect(preview().getByText(/capital of France/i)).toBeInTheDocument();
+    });
+
+    it("falls back to the default layout while the draft is pristine", () => {
       renderPicker();
 
       expect(preview().getByText("Compact notice")).toBeInTheDocument();
@@ -216,9 +238,15 @@ describe("SlackBlockKitTemplatePicker", () => {
   });
 
   describe("given a webhook connection", () => {
-    it("lists a layout that needs a Slack app but refuses to apply it", () => {
+    /** @scenario "A layout that needs a Slack app connection is previewed but cannot be picked" */
+    it("previews a layout that needs a Slack app but refuses to apply it", () => {
       const onSelect = vi.fn();
-      renderPicker({ deliveryMethod: "webhook", onSelect });
+      const onSelectOtherCadence = vi.fn();
+      renderPicker({
+        deliveryMethod: "webhook",
+        onSelect,
+        onSelectOtherCadence,
+      });
 
       // "Eval failure banner" leads with a gated `alert` block.
       const gated = layout(/eval failure banner/i);
@@ -226,19 +254,12 @@ describe("SlackBlockKitTemplatePicker", () => {
 
       fireEvent.click(gated);
 
-      expect(onSelect).not.toHaveBeenCalled();
-    });
-
-    /** @scenario "A layout that needs a Slack app connection is previewed but cannot be picked" */
-    it("still previews that layout, with the connection it needs", () => {
-      renderPicker({ deliveryMethod: "webhook" });
-
-      fireEvent.click(layout(/eval failure banner/i));
-
       expect(preview().getByText("Eval failure banner")).toBeInTheDocument();
       expect(
         preview().getByText("Needs a Slack app connection"),
       ).toBeInTheDocument();
+      expect(onSelect).not.toHaveBeenCalled();
+      expect(onSelectOtherCadence).not.toHaveBeenCalled();
     });
 
     it("keeps a layout that needs no Slack app applicable", () => {
@@ -307,7 +328,7 @@ describe("SlackBlockKitTemplatePicker", () => {
 
   describe("when a cross-cadence layout is picked", () => {
     /** @scenario "Cross-cadence layout picking keeps list order" */
-    it("keeps the list order instead of regrouping around the new cadence", async () => {
+    it("switches the draft's cadence but keeps the list order", async () => {
       const user = userEvent.setup();
       render(<StatefulPicker onPick={vi.fn()} />, { wrapper: Wrapper });
 
@@ -316,11 +337,15 @@ describe("SlackBlockKitTemplatePicker", () => {
       // compare against after.
       const orderBefore = layoutOrder();
       expect(orderBefore[0]).toBe("trace_alert_compact");
+      expect(screen.getByTestId("draft-cadence")).toHaveTextContent(
+        "immediate",
+      );
 
       await user.click(layout(/digest — compact/i));
 
-      // The cadence switched (the picker now renders against "digest"), but
-      // the list the author is looking at must not have reordered.
+      // The pick moved the draft onto the layout's own cadence...
+      expect(screen.getByTestId("draft-cadence")).toHaveTextContent("digest");
+      // ...and the list the author is looking at must not have reordered.
       expect(layoutOrder()).toEqual(orderBefore);
     });
 

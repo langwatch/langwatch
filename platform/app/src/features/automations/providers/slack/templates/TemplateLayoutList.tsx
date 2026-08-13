@@ -7,6 +7,11 @@ import type { SlackBlockKitTemplateId } from "./registry";
 interface Props {
   groups: LayoutGroup[];
   highlightedId: SlackBlockKitTemplateId | undefined;
+  /** The preview pane this list drives. The highlighted option points at it
+   *  as its description, so what moved into the pane — the delivery note, the
+   *  tagline, the connection a layout needs — is read out with the option a
+   *  screen reader lands on, rather than being announced to nobody. */
+  previewId: string;
   onHighlight: (id: SlackBlockKitTemplateId) => void;
   onApply: (row: LayoutRow) => void;
 }
@@ -32,6 +37,7 @@ function nextIdFor({
 export function TemplateLayoutList({
   groups,
   highlightedId,
+  previewId,
   onHighlight,
   onApply,
 }: Props) {
@@ -58,6 +64,7 @@ export function TemplateLayoutList({
       ref={listRef}
       role="listbox"
       aria-label="Message layout"
+      aria-controls={previewId}
       gap={3}
       align="stretch"
       onKeyDown={handleKeyDown}
@@ -67,6 +74,7 @@ export function TemplateLayoutList({
           key={group.cadence}
           group={group}
           highlightedId={highlightedId}
+          previewId={previewId}
           onHighlight={onHighlight}
           onApply={onApply}
         />
@@ -78,6 +86,7 @@ export function TemplateLayoutList({
 function GroupSection({
   group,
   highlightedId,
+  previewId,
   onHighlight,
   onApply,
 }: Omit<Props, "groups"> & { group: LayoutGroup }) {
@@ -106,6 +115,7 @@ function GroupSection({
           key={row.option.id}
           row={row}
           isHighlighted={row.option.id === highlightedId}
+          previewId={previewId}
           onHighlight={onHighlight}
           onApply={onApply}
         />
@@ -117,21 +127,24 @@ function GroupSection({
 function LayoutOption({
   row,
   isHighlighted,
+  previewId,
   onHighlight,
   onApply,
 }: {
   row: LayoutRow;
   isHighlighted: boolean;
+  previewId: string;
   onHighlight: (id: SlackBlockKitTemplateId) => void;
   onApply: (row: LayoutRow) => void;
 }) {
-  const { option, locked, isDefault, isSelected } = row;
+  const { option, locked, isSelected } = row;
   return (
     <chakra.button
       type="button"
       role="option"
       aria-selected={isSelected}
       aria-disabled={locked ? true : undefined}
+      aria-describedby={isHighlighted ? previewId : undefined}
       data-layout-id={option.id}
       tabIndex={isHighlighted ? 0 : -1}
       textAlign="left"
@@ -151,35 +164,42 @@ function LayoutOption({
         if (!locked) onApply(row);
       }}
     >
-      <HStack gap={2}>
-        <SelectionDot isSelected={isSelected} />
-        <Text textStyle="xs" opacity={locked ? 0.6 : 1}>
-          {option.emoji}
-        </Text>
-        <Text
-          textStyle="xs"
-          flex="1"
-          lineClamp={1}
-          color={locked ? "fg.muted" : "fg"}
-          fontWeight={isSelected ? "medium" : "normal"}
-        >
-          {option.displayName}
-        </Text>
-        {locked ? (
-          <>
-            <Text srOnly>{GATED_NOTE}</Text>
-            <Box color="fg.muted" flexShrink={0} aria-hidden>
-              <Lock size={11} />
-            </Box>
-          </>
-        ) : null}
-        {isDefault ? (
-          <Badge size="xs" variant="subtle" colorPalette="orange">
-            Default
-          </Badge>
-        ) : null}
-      </HStack>
+      <OptionLabel row={row} />
     </chakra.button>
+  );
+}
+
+function OptionLabel({ row }: { row: LayoutRow }) {
+  const { option, locked, isDefault, isSelected } = row;
+  return (
+    <HStack gap={2}>
+      <SelectionDot isSelected={isSelected} />
+      <Text textStyle="xs" opacity={locked ? 0.6 : 1} aria-hidden>
+        {option.emoji}
+      </Text>
+      <Text
+        textStyle="xs"
+        flex="1"
+        lineClamp={1}
+        color={locked ? "fg.muted" : "fg"}
+        fontWeight={isSelected ? "medium" : "normal"}
+      >
+        {option.displayName}
+      </Text>
+      {locked ? (
+        <>
+          <Text srOnly>{GATED_NOTE}</Text>
+          <Box color="fg.muted" flexShrink={0} aria-hidden>
+            <Lock size={11} />
+          </Box>
+        </>
+      ) : null}
+      {isDefault ? (
+        <Badge size="xs" variant="subtle" colorPalette="orange">
+          Default
+        </Badge>
+      ) : null}
+    </HStack>
   );
 }
 

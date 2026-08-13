@@ -1,6 +1,6 @@
 import { Box, Flex, Stack, Text } from "@chakra-ui/react";
 import type { SlackDeliveryMethod } from "@langwatch/automations/providers/slack";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   buildLayoutGroups,
   type LayoutRow,
@@ -87,6 +87,7 @@ export function SlackBlockKitTemplatePicker({
   // `handleApply` itself is about to cause, so the effect below can tell "I
   // changed it" apart from "it changed elsewhere" and only resync for the
   // latter.
+  const previewId = useId();
   const [groupingCadence, setGroupingCadence] = useState<DraftCadence>(cadence);
   const selfInitiatedRef = useRef<DraftCadence | null>(null);
   useEffect(() => {
@@ -152,6 +153,7 @@ export function SlackBlockKitTemplatePicker({
           <TemplateLayoutList
             groups={groups}
             highlightedId={highlighted?.option.id}
+            previewId={previewId}
             onHighlight={setHighlightedId}
             onApply={handleApply}
           />
@@ -160,6 +162,7 @@ export function SlackBlockKitTemplatePicker({
           {highlighted ? (
             <TemplateLayoutDetail
               row={highlighted}
+              id={previewId}
               switchesCadenceTo={
                 highlighted.fromOtherCadence
                   ? otherCadenceOf(groupingCadence)
