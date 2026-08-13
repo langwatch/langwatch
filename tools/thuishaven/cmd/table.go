@@ -179,7 +179,6 @@ var removed = map[string]string{
 	"cleanup":       "haven clean",
 	"prune":         "haven clean",
 	"moron":         "haven git",
-	"setup":         "nothing — `haven up` bootstraps the machine itself (portless install, CA trust, proxy)",
 }
 
 // table is the whole CLI surface, in help order.
@@ -386,6 +385,35 @@ var table = []commandSpec{
 		run: runClean,
 	},
 	{
+		name:    "run",
+		summary: "run a command under a machine-wide heavy slot, so parallel test runs can't take the machine",
+		args:    "--sh <command>",
+		flags: []flagSpec{
+			{long: "--sh", takesValue: true, value: "<command>", summary: "the command line to run, as one argument — quoted so operators stay inside the slot"},
+			{long: "--class", takesValue: true, value: "heavy", summary: "which slot pool to take (only \"heavy\" today)"},
+			// NOT --agent: that already means plain, token-free output everywhere
+			// else in this CLI, and ADR-064 rule 2 is one meaning per flag.
+			{long: "--agent-id", takesValue: true, value: "<id>", summary: "the sub-agent this run belongs to — picks the shorter wait ceiling its prompt cache needs"},
+			{long: "--workers", takesValue: true, value: "<n>", summary: "run this narrowed to n test workers, the width the gate admitted it at"},
+		},
+		run: runHeavy,
+	},
+	{
+		name:    "setup",
+		summary: "install optional integrations into this checkout (interactive; nothing is assumed)",
+		args:    "[feature…]",
+		maxArgs: -1,
+		flags: []flagSpec{
+			{long: "--list", summary: "what can be installed, and what each one does"},
+		},
+		run: runSetup,
+	},
+	{
+		name:    "gate",
+		summary: "answer a Claude Code PreToolUse hook on stdin (install it with `haven setup gate-hook`)",
+		run:     runGate,
+	},
+	{
 		name:    "typecheck",
 		summary: "pnpm typecheck under a machine-wide RAM slot (args forwarded)",
 		args:    "[args…]",
@@ -489,6 +517,10 @@ func editDistanceAtMost(a, b string, max int) bool {
 
 // commandsHelp renders the COMMANDS section of help from the table, so a
 // command cannot exist without being documented.
+// It lists names and one-line summaries only. Flags live in `haven help
+// <command>`, because the top-level help is what you read when you have
+// forgotten a command's NAME — a wall of every flag on every command buries
+// exactly the line you came for.
 func commandsHelp() string {
 	var b strings.Builder
 	for _, spec := range table {
@@ -499,17 +531,56 @@ func commandsHelp() string {
 		if spec.args != "" {
 			left += " " + spec.args
 		}
-		b.WriteString(fmt.Sprintf("    %-14s %s\n", left, spec.summary))
+		b.WriteString(fmt.Sprintf("    %-16s %s\n", left, spec.summary))
+	}
+	return b.String()
+}
+
+// commandHelp renders one command in full: what it is for, how it is called,
+// and every flag it takes.
+func commandHelp(name string) (string, bool) {
+	for _, spec := range table {
+		if spec.name == name && !spec.hidden {
+			return renderCommandHelp(spec), true
+		}
+	}
+	return "", false
+}
+
+func renderCommandHelp(spec commandSpec) string {
+	var b strings.Builder
+	usage := "    haven " + spec.name
+	if spec.args != "" {
+		usage += " " + spec.args
+	}
+	fmt.Fprintf(&b, "%s\n\n%s\n", spec.summary, usage)
+	if len(spec.flags) > 0 {
+		b.WriteString("\nFLAGS\n")
 		for _, f := range spec.flags {
-			name := f.long
-			if f.short != "" {
-				name = f.short + "/" + f.long
-			}
-			if f.takesValue {
-				name += " " + f.value
-			}
-			b.WriteString(fmt.Sprintf("    %-14s   %s: %s\n", "", name, f.summary))
+			fmt.Fprintf(&b, "    %-22s %s\n", helpFlagLabel(f), f.summary)
 		}
 	}
 	return b.String()
+}
+
+func helpFlagLabel(f flagSpec) string {
+	label := f.long
+	if f.short != "" {
+		label = f.short + "/" + f.long
+	}
+	if f.takesValue {
+		label += " " + f.value
+	}
+	return label
+}
+
+// commandNames lists every visible command, for the "unknown topic" pointer.
+func commandNames() []string {
+	var names []string
+	for _, spec := range table {
+		if !spec.hidden {
+			names = append(names, spec.name)
+		}
+	}
+	return names
 }
