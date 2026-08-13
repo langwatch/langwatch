@@ -80,6 +80,7 @@ describe("persistSlackActionParams", () => {
     });
   });
 
+  /** @scenario "Editing a bot automation without re-entering the token" */
   it("keeps the stored ciphertext when the token is left blank on edit", () => {
     expect(
       persistSlackActionParams({
@@ -89,6 +90,7 @@ describe("persistSlackActionParams", () => {
     ).toBe("enc(xoxb-old)");
   });
 
+  /** @scenario "The bot token is protected at rest" */
   it("routes the token through encrypt() before persisting (never raw)", () => {
     // The fake cipher wraps as enc(…); a raw token would be stored verbatim.
     // The real no-plaintext guarantee is AES in encryption.ts — here we assert
@@ -106,6 +108,7 @@ describe("persistSlackActionParams", () => {
 });
 
 describe("redactSlackActionParams", () => {
+  /** @scenario "The bot token is protected at rest" */
   it("replaces the ciphertext with a set flag", () => {
     expect(
       redactSlackActionParams({

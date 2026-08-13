@@ -121,6 +121,19 @@ describe("Feature: automations over the public API express what the dashboard ex
       }),
     );
 
+  const slackWebhookAutomation = async (name: string) =>
+    created(
+      await createTrigger({
+        name,
+        action: TriggerAction.SEND_SLACK_MESSAGE,
+        actionParams: {
+          slackDelivery: "webhook",
+          slackWebhook: "https://hooks.slack.com/services/T000/B000/xyz",
+        },
+        filters: CONDITION,
+      }),
+    );
+
   const storedRow = (id: string) =>
     prisma.trigger.findUniqueOrThrow({
       where: { id, projectId: projectId() },
@@ -567,6 +580,32 @@ describe("Feature: automations over the public API express what the dashboard ex
           channel: "email",
           recipients: ["someone@example.com"],
         }),
+      );
+    });
+
+    // The bot branch used to be entered on "is there a token?", which was
+    // survivable while the only token lived on the row. Since ADR-093 §5 a
+    // token resolves for every row in a project with a Slack integration, so a
+    // webhook automation would have been test-fired through the Web API — a
+    // surface it does not use and a credential it has nothing to do with.
+    it("test-fires a webhook Slack automation through its webhook, never the bot API", async () => {
+      const createdAutomation = await slackWebhookAutomation(
+        `Slack webhook ${ns}`,
+      );
+
+      const response = await post(
+        `/api/triggers/${createdAutomation.id}/test-fire`,
+      );
+
+      expect(response.status).toBe(200);
+      expect(testFire).toHaveBeenCalledWith(
+        expect.objectContaining({
+          channel: "slack",
+          webhook: "https://hooks.slack.com/services/T000/B000/xyz",
+        }),
+      );
+      expect(testFire).not.toHaveBeenCalledWith(
+        expect.objectContaining({ botDestination: expect.anything() }),
       );
     });
 

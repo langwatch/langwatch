@@ -1168,26 +1168,30 @@ describe("guardProjectId — SlackIntegration", () => {
   });
 
   describe("when a read names no tenant at all", () => {
-    it("throws rather than walking every workspace connection", async () => {
+    it("is refused by the scope guard, not by some later failure", async () => {
       await expect(
         runGuard({
           model: "SlackIntegration",
           action: "findMany",
           args: {},
         }),
-      ).rejects.toThrow();
+      ).rejects.toThrow(
+        "The findMany action on the SlackIntegration model requires a row id, organizationId, or scope predicate in the where clause.",
+      );
     });
   });
 
   describe("when a create omits the organization anchor", () => {
-    it("throws rather than storing an unanchored row", async () => {
+    it("is refused by the anchor guard, not by some later failure", async () => {
       await expect(
         runGuard({
           model: "SlackIntegration",
           action: "create",
           args: { data: { ...projectScope, botTokenEncrypted: "enc" } },
         }),
-      ).rejects.toThrow();
+      ).rejects.toThrow(
+        "The create action on the SlackIntegration model create requires an organizationId in the data payload.",
+      );
     });
   });
 });

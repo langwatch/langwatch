@@ -58,6 +58,7 @@ describe("buildLayoutGroups", () => {
       expect(rowFor(inOtherGroup, "digest_inline_rich")?.isDefault).toBe(false);
     });
 
+    /** @scenario "The richer templates are offered only for a bot connection" */
     it("locks a layout that leads with a gated block, on a webhook only", () => {
       const onWebhook = build({ deliveryMethod: "webhook" });
       const onBot = build({ deliveryMethod: "bot" });

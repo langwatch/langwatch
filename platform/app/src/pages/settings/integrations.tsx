@@ -38,7 +38,9 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { GitHub } from "react-feather";
 import { FaSlack } from "react-icons/fa";
+import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { ScopeChipPicker } from "~/components/settings/ScopeChipPicker";
+import { confirmSwitchAllToProjectIntegration } from "~/features/automations/logic/slackLegacyTokenCopy";
 import { SLACK_APP_MANIFEST } from "~/features/automations/providers/slack/slackAppManifest";
 import { describeError } from "~/features/errors";
 import { useAvailableScopes } from "~/hooks/useAvailableScopes";
@@ -390,6 +392,7 @@ function SlackProjectConnection({
         projectId={projectId}
         count={census.data?.count ?? 0}
         canSwitch={connected && canManage}
+        workspaceName={status.data?.slackTeamName ?? null}
         onSwitched={refresh}
       />
       <SlackTokenForm
@@ -415,15 +418,19 @@ function SlackLegacyTokenCensus({
   projectId,
   count,
   canSwitch,
+  workspaceName,
   onSwitched,
 }: {
   projectId: string;
   count: number;
   canSwitch: boolean;
+  workspaceName: string | null;
   onSwitched: () => void;
 }) {
+  const [confirming, setConfirming] = useState(false);
   const switchAll = api.slackIntegration.switchToIntegration.useMutation({
     onSuccess: ({ cleared, failed }) => {
+      setConfirming(false);
       onSwitched();
       toaster.create({
         type: failed > 0 ? "warning" : "success",
@@ -446,6 +453,11 @@ function SlackLegacyTokenCensus({
           fallbackTitle: "Couldn't switch those automations",
         }),
       }),
+  });
+
+  const confirmation = confirmSwitchAllToProjectIntegration({
+    count,
+    workspaceName,
   });
 
   if (count === 0) return null;
@@ -474,12 +486,22 @@ function SlackLegacyTokenCensus({
             variant="outline"
             alignSelf="flex-start"
             loading={switchAll.isPending}
-            onClick={() => switchAll.mutate({ projectId })}
+            onClick={() => setConfirming(true)}
           >
             Use the project integration
           </Button>
         ) : null}
       </VStack>
+      <ConfirmDialog
+        open={confirming}
+        onOpenChange={setConfirming}
+        title={confirmation.title}
+        message={confirmation.message}
+        confirmLabel={confirmation.confirmLabel}
+        tone="danger"
+        loading={switchAll.isPending}
+        onConfirm={() => switchAll.mutate({ projectId })}
+      />
     </Box>
   );
 }

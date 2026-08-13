@@ -15,8 +15,14 @@
 -- auth.test returned when the token was saved, so the settings card can name the
 -- connected workspace without touching the secret.
 --
--- The datasource runs relationMode="prisma", so the organization and project
--- relations carry no SQL foreign key here; cleanup is emulated by the client.
+-- There is no foreign key here and no cascade, deliberately: scopeId is
+-- polymorphic (it holds a Project.id today and a Team.id or Organization.id
+-- once the enum grows), so there is no single column a key could point at.
+-- RetentionPolicy, DataPrivacyPolicy and CustomLLMModelCost carry the same
+-- shape for the same reason. Projects are archived rather than deleted in the
+-- product — no code path hard-deletes one — so a row cannot be orphaned by
+-- ordinary use; a hard delete performed outside the product has to clear this
+-- row's scope pair too, or the stored ciphertext outlives what it belonged to.
 
 -- CreateEnum
 CREATE TYPE "SlackIntegrationScopeType" AS ENUM ('PROJECT');
@@ -24,7 +30,7 @@ CREATE TYPE "SlackIntegrationScopeType" AS ENUM ('PROJECT');
 -- CreateTable
 CREATE TABLE "SlackIntegration" (
     "id" TEXT NOT NULL,
-    "scopeType" "SlackIntegrationScopeType" NOT NULL DEFAULT 'PROJECT',
+    "scopeType" "SlackIntegrationScopeType" NOT NULL,
     "scopeId" TEXT NOT NULL,
     "organizationId" TEXT NOT NULL,
     "botTokenEncrypted" TEXT NOT NULL,

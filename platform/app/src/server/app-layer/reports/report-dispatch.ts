@@ -300,9 +300,17 @@ export async function dispatchScheduledReport({
       const slackParams = (trigger.actionParams ?? {}) as SlackActionParams;
       if (slackDeliveryMethodOf(slackParams) === "bot") {
         // ADR-093 §5: the report's own token wins; the project's Slack
-        // integration serves the rest. A report with neither delivers nothing
-        // and records no fire — the same "unusable bot connection" outcome
-        // this branch has always had, now reached for a named reason.
+        // integration serves the rest.
+        //
+        // A report with neither delivers nothing and records no fire, which is
+        // the same outcome every other unusable configuration on this path has
+        // (no recipients, no webhook, no channel) — report dispatch has no
+        // delivery-failure surface at all: `recordFire` writes a TriggerSent
+        // row, and a row there means "it sent", so a failure cannot honestly go
+        // in it. The named cause therefore reaches an operator through the log
+        // and a customer through the composer, which refuses to pretend Slack
+        // is connected while authoring. Giving reports a delivery log of their
+        // own is a product gap, not something to improvise here.
         const ownToken = decryptSlackBotToken(slackParams);
         const resolved: ResolvedSlackToken | null = deps.resolveSlackToken
           ? await deps.resolveSlackToken({

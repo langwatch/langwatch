@@ -23,6 +23,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ConfigFormCtx } from "~/features/automations/providers/types";
 
 vi.mock("@monaco-editor/react", () => ({ default: () => null }));
+/** Whether the caller holds `project:update` at this project — the permission
+ *  the switch-to-integration write needs, so the affordance is gated on it. */
+const canManageProject: { current: boolean } = { current: true };
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+  useOrganizationTeamProject: () => ({
+    project: { id: "project-1", slug: "project-1", name: "Project" },
+    organization: { id: "org-1", name: "Org" },
+    team: { id: "team-1", slug: "team-1", name: "Team" },
+    hasPermission: () => canManageProject.current,
+  }),
+}));
 vi.mock("~/components/ui/color-mode", () => ({
   useColorMode: () => ({ colorMode: "light" }),
 }));
@@ -55,6 +66,9 @@ const NO_CHANNELS: { id: string; name: string }[] = [];
 const projectIntegration: {
   current: { connected: boolean; slackTeamName: string | null };
 } = { current: { connected: false, slackTeamName: null } };
+/** The integration status query still in flight. While it is, the composer must
+ *  not claim Slack is unconnected — that is a guess rendered as a statement. */
+const integrationPending: { current: boolean } = { current: false };
 /** Every "switch this automation onto the project integration" call. */
 const switchCalls: { projectId: string; automationIds?: string[] }[] = [];
 
@@ -67,7 +81,10 @@ vi.mock("~/utils/api", () => ({
     }),
     slackIntegration: {
       getStatus: {
-        useQuery: () => ({ data: projectIntegration.current }),
+        useQuery: () => ({
+          data: projectIntegration.current,
+          isLoading: integrationPending.current,
+        }),
       },
       switchToIntegration: {
         useMutation: () => ({
@@ -331,7 +348,24 @@ describe("SlackConfigForm delivery method", () => {
   afterEach(() => {
     cleanup();
     projectIntegration.current = { connected: false, slackTeamName: null };
+    integrationPending.current = false;
+    canManageProject.current = true;
     switchCalls.length = 0;
+  });
+
+  // A guess rendered as a statement is the failure here: telling an author with
+  // Slack connected that it is not, and taking the channel picker away while
+  // saying it, for as long as the query is in flight.
+  describe("given a fresh draft whose integration status has not landed yet", () => {
+    it("waits instead of claiming Slack is not connected", () => {
+      integrationPending.current = true;
+      renderForm();
+
+      expect(screen.getByTestId("slack-state-loading")).toBeInTheDocument();
+      expect(
+        screen.queryByText(/slack isn.t connected for this project/i),
+      ).not.toBeInTheDocument();
+    });
   });
 
   describe("given a fresh draft in a project with Slack connected", () => {
@@ -363,16 +397,25 @@ describe("SlackConfigForm delivery method", () => {
 
   describe("given a fresh draft in a project with no Slack integration", () => {
     /** @scenario "The composer can tell the three token states apart" */
-    it("points at connecting Slack for the project instead of asking for a token", () => {
+    it("reads as needing Slack connected, and asks for no token", () => {
       renderForm();
 
       expect(
         screen.getByText(/slack isn.t connected for this project/i),
       ).toBeInTheDocument();
+      expect(screen.queryByPlaceholderText(/xoxb-/i)).not.toBeInTheDocument();
+      expect(
+        screen.queryByPlaceholderText(/#alerts or c0123/i),
+      ).not.toBeInTheDocument();
+    });
+
+    /** @scenario "The author is guided to connect Slack for the project" */
+    it("points at the project's integration settings", () => {
+      renderForm();
+
       expect(
         screen.getByRole("link", { name: /connect slack for this project/i }),
       ).toHaveAttribute("href", "/settings/integrations");
-      expect(screen.queryByPlaceholderText(/xoxb-/i)).not.toBeInTheDocument();
     });
   });
 
@@ -438,10 +481,33 @@ describe("SlackConfigForm delivery method", () => {
       await user.click(
         screen.getByRole("button", { name: /use the project integration/i }),
       );
+      // The click asks; it does not act. Deleting the only copy of a
+      // credential is not something a stray click gets to do.
+      expect(switchCalls).toEqual([]);
+      await user.click(
+        await screen.findByRole("button", { name: /switch this automation/i }),
+      );
 
       expect(switchCalls).toEqual([
         { projectId: "project-1", automationIds: ["automation-1"] },
       ]);
+    });
+
+    it("offers no switch to an author who cannot change the project", () => {
+      projectIntegration.current = {
+        connected: true,
+        slackTeamName: "Acme HQ",
+      };
+      canManageProject.current = false;
+      renderForm({
+        initial: botSlice({ botTokenAlreadySet: true }),
+        ctx: makeCtx({ automationId: "automation-1" }),
+      });
+
+      expect(screen.getByText(/uses its own slack token/i)).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /use the project integration/i }),
+      ).not.toBeInTheDocument();
     });
 
     it("lets the author select a template that needs a Slack app", () => {
@@ -829,7 +895,9 @@ describe("SlackConfigForm channel picker", () => {
       listedError.current = "no_token";
     });
 
-    /** @scenario "The composer can tell the three token states apart" */
+    // Deliberately unbound: this pins the channel-list hint's copy, not which
+    // token state the composer is in. The three states are asserted where they
+    // are actually rendered and computed, above.
     it("names the missing project integration instead of showing nothing", async () => {
       renderForm({
         initial: botSlice({ channelId: "", botTokenAlreadySet: true }),
@@ -886,6 +954,7 @@ describe("Slack client slice contract", () => {
     });
 
     describe("when the channel is not set", () => {
+      /** @scenario "A bot automation is incomplete without a channel" */
       it("reports the config as incomplete", () => {
         expect(slackClient.isComplete(botSlice({ channelId: "" }))).toBe(false);
       });
@@ -919,6 +988,27 @@ describe("Slack client slice contract", () => {
           }),
         ).toEqual({ allowGatedBlocks: true });
       });
+    });
+  });
+
+  // Token availability is necessary but not sufficient: a webhook strips the
+  // modern blocks whatever credential is behind the project, so the preview
+  // has to strip them too or it promises a chart Slack will drop.
+  describe("given a webhook slice in a project with Slack connected", () => {
+    /** @scenario "The richer templates are offered only for a bot connection" */
+    it("still drops the gated blocks from the preview", () => {
+      const slice: SlackSlice = {
+        ...slackClient.initialSlice(),
+        deliveryMethod: "webhook",
+        isLegacyWebhook: true,
+        webhook: "https://hooks.slack.com/services/T000/B000/xyz",
+      };
+
+      expect(
+        slackClient.previewOptions?.(slice, {
+          projectSlackIntegrationConnected: true,
+        }),
+      ).toEqual({ allowGatedBlocks: false });
     });
 
     describe("when a token is typed", () => {

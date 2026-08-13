@@ -119,7 +119,7 @@ const sectionFromPath = (pathname: string): AutomationSection => {
 };
 
 function AutomationsPage() {
-  const { project } = useOrganizationTeamProject();
+  const { project, hasPermission } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
   const router = useRouter();
   const section = sectionFromPath(router.pathname);
@@ -134,6 +134,20 @@ function AutomationsPage() {
   const [pendingDelete, setPendingDelete] = useState<EnhancedTrigger | null>(
     null,
   );
+
+  // ADR-093 §5: one query for the whole table, not one per row — every row's
+  // legacy-token nudge asks the same question about the same project. Writes
+  // need `project:update`, which the row nudge only offers to a caller that
+  // holds it; the server checks again either way.
+  const slackIntegration = api.slackIntegration.getStatus.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id, refetchOnWindowFocus: false },
+  );
+  const slackWorkspaceName = slackIntegration.data?.connected
+    ? slackIntegration.data.slackTeamName
+    : null;
+  const canSwitchSlackToken =
+    hasPermission("project:update") && !!slackWorkspaceName;
 
   const triggers = api.automation.getTriggers.useQuery(
     {
@@ -986,6 +1000,9 @@ function AutomationsPage() {
                                         <OwnSlackTokenNudge
                                           projectId={project?.id ?? ""}
                                           automationId={trigger.id}
+                                          automationName={trigger.name}
+                                          workspaceName={slackWorkspaceName}
+                                          canSwitch={canSwitchSlackToken}
                                         />
                                       ) : null}
                                     </VStack>

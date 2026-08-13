@@ -2,7 +2,10 @@ import {
   DEFAULT_TRACE_DEBOUNCE_MS,
   type NotificationCadence,
 } from "@langwatch/automations/cadences";
-import type { SlackActionParams } from "@langwatch/automations/providers/slack";
+import {
+  type SlackActionParams,
+  slackDeliveryMethodOf,
+} from "@langwatch/automations/providers/slack";
 import type { AlertType, Prisma, Trigger } from "@prisma/client";
 import { TriggerAction, TriggerKind } from "@prisma/client";
 import { nanoid } from "nanoid";
@@ -688,24 +691,31 @@ export class PublicApiTriggerService {
       "channel" | "recipients" | "webhook" | "botDestination"
     >
   > {
-    const ownToken = decryptSlackBotToken(params as SlackActionParams);
-    const resolved = this.deps.resolveSlackToken
-      ? await this.deps.resolveSlackToken({
-          projectId,
-          actionParams: params as SlackActionParams,
-        })
-      : ownToken
-        ? ({ token: ownToken, source: "automation" } as ResolvedSlackToken)
-        : null;
-    const botToken = resolved?.token ?? null;
-    const channelId = (params.slackChannelId ?? "") as string;
-    if (botToken && channelId) {
-      return {
-        channel: "slack",
-        recipients: [],
-        webhook: null,
-        botDestination: { token: botToken, channel: channelId },
-      };
+    // The stored delivery method decides the surface, exactly as it does at
+    // every dispatch site. Reading it off "is there a token?" was survivable
+    // while the only token lived on the row; with a project integration behind
+    // every row, a token now resolves for a WEBHOOK automation too, and a test
+    // fire would have posted through a surface the automation does not use.
+    if (slackDeliveryMethodOf(params as SlackActionParams) === "bot") {
+      const ownToken = decryptSlackBotToken(params as SlackActionParams);
+      const resolved = this.deps.resolveSlackToken
+        ? await this.deps.resolveSlackToken({
+            projectId,
+            actionParams: params as SlackActionParams,
+          })
+        : ownToken
+          ? ({ token: ownToken, source: "automation" } as ResolvedSlackToken)
+          : null;
+      const botToken = resolved?.token ?? null;
+      const channelId = (params.slackChannelId ?? "") as string;
+      if (botToken && channelId) {
+        return {
+          channel: "slack",
+          recipients: [],
+          webhook: null,
+          botDestination: { token: botToken, channel: channelId },
+        };
+      }
     }
     const webhook = (params.slackWebhook ?? "") as string;
     if (!webhook) {

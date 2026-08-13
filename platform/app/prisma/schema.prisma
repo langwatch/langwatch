@@ -911,9 +911,20 @@ enum SlackIntegrationScopeType {
 /// workspace identity pinned by `auth.test` at save time. Single-scope-per-row
 /// per ADR-021 — inline (scopeType, scopeId) plus the organizationId tenancy
 /// anchor — and the one-per-project decision is the unique constraint.
+///
+/// No relation to Project, and no cascade: `scopeId` is polymorphic by design
+/// (a TEAM or ORGANIZATION row is a future enum value, not a schema change), so
+/// there is no column a foreign key could point at. RetentionPolicy,
+/// DataPrivacyPolicy and CustomLLMModelCost carry the same shape for the same
+/// reason. Projects are archived rather than deleted in the product — no code
+/// path hard-deletes one — so a row cannot be orphaned by ordinary use; a
+/// hard delete outside the product must clear this row's scope pair too, or the
+/// ciphertext outlives what it belonged to.
 model SlackIntegration {
   id                String                    @id @default(nanoid())
-  scopeType         SlackIntegrationScopeType @default(PROJECT)
+  /// No default: the writer names the scope it is writing at. PROJECT being
+  /// the only value today is a fact about now, not an assumption to bake in.
+  scopeType         SlackIntegrationScopeType
   scopeId           String
   organizationId    String
   botTokenEncrypted String

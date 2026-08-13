@@ -7,6 +7,7 @@ import {
   HStack,
   Input,
   Portal,
+  Skeleton,
   Spinner,
   Text,
   useFilter,
@@ -27,6 +28,7 @@ import { filterVariablesForCadence } from "@langwatch/automations/templating/exa
 import { ExternalLink } from "lucide-react";
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { FaSlack } from "react-icons/fa";
+import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { Link } from "~/components/ui/link";
 import { SegmentedControl } from "~/components/ui/segmented-control";
 import { Select } from "~/components/ui/select";
@@ -38,7 +40,9 @@ import {
   FieldHeader,
   LiquidEditor,
 } from "~/features/automations/editors/templateAuthoring";
+import { confirmSwitchToProjectIntegration } from "~/features/automations/logic/slackLegacyTokenCopy";
 import { describeError } from "~/features/errors";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { TestFireButton } from "../TestFireButton";
 import type {
@@ -923,6 +927,20 @@ function SlackConfigForm({
   );
 }
 
+/** Shown while the project's Slack connection is still being read. Deliberately
+ *  not the not-connected state: that would be a guess presented as an answer. */
+function SlackStatusLoading() {
+  return (
+    <VStack align="stretch" gap={3}>
+      <Skeleton height="16px" width="70%" data-testid="slack-state-loading" />
+      <Field.Root>
+        <Field.Label>Channel</Field.Label>
+        <Input placeholder="Loading…" disabled />
+      </Field.Root>
+    </VStack>
+  );
+}
+
 /**
  * Bot-connection destination. Since ADR-093 §5 the composer never asks for a
  * token — Slack is connected once per project and the channel is the only
@@ -948,10 +966,27 @@ function SlackBotFields({
     { projectId },
     { enabled: !!projectId, refetchOnWindowFocus: false },
   );
+  // Null unless a workspace is actually connected — every surface below reads
+  // "which workspace?" and "is there one?" off this single value.
+  const workspaceName = integration.data?.connected
+    ? integration.data.slackTeamName
+    : null;
   const state = slackTokenState({
     slice,
-    projectIntegrationConnected: integration.data?.connected ?? false,
+    projectIntegrationConnected: !!workspaceName,
   });
+
+  // Until the answer lands, "no integration" is a guess, and the guess reads as
+  // a statement: it would tell an author with Slack connected that it is not,
+  // and take the channel picker away while it did. An automation carrying its
+  // own token is the exception — that state is decided by the draft alone, so
+  // it is already known.
+  //
+  // Guarded on `projectId` because the query is disabled without one, and a
+  // disabled query reports as loading forever — which would leave the skeleton
+  // on screen permanently rather than for a moment.
+  const statusLoading = !!projectId && integration.isLoading;
+  if (statusLoading && state !== "own_token") return <SlackStatusLoading />;
 
   return (
     <VStack align="stretch" gap={3}>
@@ -959,15 +994,13 @@ function SlackBotFields({
         <OwnTokenNotice
           projectId={projectId}
           automationId={automationId}
-          projectIntegrationConnected={integration.data?.connected ?? false}
+          workspaceName={workspaceName}
           onSwitched={() =>
             onChange({ ...slice, botToken: "", botTokenAlreadySet: false })
           }
         />
       ) : state === "project_integration" ? (
-        <ConnectedWorkspaceNotice
-          workspaceName={integration.data?.slackTeamName ?? null}
-        />
+        <ConnectedWorkspaceNotice workspaceName={workspaceName} />
       ) : (
         <ConnectSlackNotice />
       )}
@@ -983,28 +1016,42 @@ function SlackBotFields({
   );
 }
 
-/** State one: this automation stores its own token. It keeps delivering with
- *  it — the switch is a decision, never something the project makes for it. */
+/**
+ * State one: this automation stores its own token. It keeps delivering with it
+ * — the switch is a decision, never something the project makes for it, and a
+ * decision that deletes the only copy of a credential gets confirmed rather
+ * than taken on one click.
+ *
+ * The switch is offered only to a caller holding `project:update`; the server
+ * requires it, so showing the button to anyone else is an invitation to a 403.
+ */
 function OwnTokenNotice({
   projectId,
   automationId,
-  projectIntegrationConnected,
+  workspaceName,
   onSwitched,
 }: {
   projectId: string;
   automationId?: string;
-  projectIntegrationConnected: boolean;
+  /** Null when the project has no integration to fall through to. */
+  workspaceName: string | null;
   onSwitched: () => void;
 }) {
+  const [confirming, setConfirming] = useState(false);
+  const { hasPermission } = useOrganizationTeamProject();
   const utils = api.useContext();
   const switchOver = api.slackIntegration.switchToIntegration.useMutation({
     onSuccess: () => {
+      setConfirming(false);
       onSwitched();
       void utils.slackIntegration.getLegacyTokenCensus.invalidate({
         projectId,
       });
     },
   });
+  const confirmation = confirmSwitchToProjectIntegration({ workspaceName });
+  const canSwitch =
+    !!workspaceName && !!automationId && hasPermission("project:update");
 
   return (
     <Box
@@ -1019,8 +1066,8 @@ function OwnTokenNotice({
           Uses its own Slack token
         </Text>
         <Text textStyle="xs" color="fg.muted">
-          {projectIntegrationConnected
-            ? "This automation posts with a token saved on it, not the workspace connected for this project. Switching removes the saved token so it posts with the project's Slack connection instead."
+          {workspaceName
+            ? `This automation posts with a token saved on it, not the ${workspaceName} workspace connected for this project. Switching deletes the saved token so it posts with the project's Slack connection instead.`
             : "This automation posts with a token saved on it. Connect Slack for this project to manage it in one place."}
         </Text>
         {switchOver.isError ? (
@@ -1032,18 +1079,13 @@ function OwnTokenNotice({
           </Text>
         ) : null}
         <HStack gap={3}>
-          {projectIntegrationConnected && automationId ? (
+          {canSwitch ? (
             <Button
               size="xs"
               variant="outline"
               alignSelf="flex-start"
               loading={switchOver.isPending}
-              onClick={() =>
-                switchOver.mutate({
-                  projectId,
-                  automationIds: [automationId],
-                })
-              }
+              onClick={() => setConfirming(true)}
             >
               Use the project integration
             </Button>
@@ -1053,6 +1095,20 @@ function OwnTokenNotice({
           </Link>
         </HStack>
       </VStack>
+      <ConfirmDialog
+        open={confirming}
+        onOpenChange={setConfirming}
+        title={confirmation.title}
+        message={confirmation.message}
+        confirmLabel={confirmation.confirmLabel}
+        tone="danger"
+        loading={switchOver.isPending}
+        onConfirm={() => {
+          if (automationId) {
+            switchOver.mutate({ projectId, automationIds: [automationId] });
+          }
+        }}
+      />
     </Box>
   );
 }

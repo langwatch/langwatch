@@ -13,13 +13,16 @@ import {
   CADENCE_WINDOW_MS,
   type NotificationCadence,
 } from "@langwatch/automations/cadences";
+import { useState } from "react";
 import { HelpCircle, Plus } from "react-feather";
+import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { Tooltip } from "~/components/ui/tooltip";
 import {
   OPERATOR_LABELS,
   TIME_PERIOD_LABELS,
 } from "~/features/automations/logic/draftReducer";
 import { resolveSeriesLabel } from "~/features/automations/logic/seriesOptions";
+import { confirmSwitchToProjectIntegration } from "~/features/automations/logic/slackLegacyTokenCopy";
 import type { TriggerActionParams } from "~/features/automations/logic/triggerActionParams";
 import { describeError } from "~/features/errors";
 import { api, type RouterOutputs } from "~/utils/api";
@@ -34,31 +37,45 @@ type ReportSchedule = RouterOutputs["automation"]["getReportSchedules"][number];
  * (ADR-093 §5). Delivery never retargets such a row on its own, so the only
  * thing that moves it onto the project integration is someone choosing to —
  * which means every unmigrated token has to stay visible where the automation
- * appears. One action, the same one the drawer and the settings card offer:
- * clear the stored credential and let delivery fall through.
+ * appears.
  *
- * Rendered only when the project actually has an integration to fall through
- * to; offering the switch before then would break the automation.
+ * The switch is confirmed, not one click: it deletes the only copy of a
+ * credential the customer can no longer read or retype, and points the
+ * automation at a workspace that may not be the one it posts to today. Same
+ * ConfirmDialog the row's Delete uses, for the same reason.
+ *
+ * `workspaceName` is null when the project has no integration, and `canSwitch`
+ * is false without `project:update` at this project — in either case the
+ * automation is still flagged, but no affordance is offered that would break it
+ * or be refused at the server.
  */
 export function OwnSlackTokenNudge({
   projectId,
   automationId,
+  automationName,
+  workspaceName,
+  canSwitch,
 }: {
   projectId: string;
   automationId: string;
+  automationName: string;
+  workspaceName: string | null;
+  canSwitch: boolean;
 }) {
+  const [confirming, setConfirming] = useState(false);
   const utils = api.useContext();
-  const integration = api.slackIntegration.getStatus.useQuery(
-    { projectId },
-    { enabled: !!projectId, refetchOnWindowFocus: false },
-  );
   const switchOver = api.slackIntegration.switchToIntegration.useMutation({
     onSuccess: () => {
+      setConfirming(false);
       void utils.automation.getTriggers.invalidate({ projectId });
       void utils.slackIntegration.getLegacyTokenCensus.invalidate({
         projectId,
       });
     },
+  });
+  const confirmation = confirmSwitchToProjectIntegration({
+    automationName,
+    workspaceName,
   });
 
   return (
@@ -66,7 +83,7 @@ export function OwnSlackTokenNudge({
       <Text textStyle="xs" color="fg.muted">
         Uses its own Slack token
       </Text>
-      {integration.data?.connected ? (
+      {canSwitch ? (
         <Button
           variant="plain"
           size="xs"
@@ -78,7 +95,7 @@ export function OwnSlackTokenNudge({
           onClick={(event) => {
             // The whole row opens the automation; this action is its own.
             event.stopPropagation();
-            switchOver.mutate({ projectId, automationIds: [automationId] });
+            setConfirming(true);
           }}
         >
           Use the project integration
@@ -92,6 +109,18 @@ export function OwnSlackTokenNudge({
           })}
         </Text>
       ) : null}
+      <ConfirmDialog
+        open={confirming}
+        onOpenChange={setConfirming}
+        title={confirmation.title}
+        message={confirmation.message}
+        confirmLabel={confirmation.confirmLabel}
+        tone="danger"
+        loading={switchOver.isPending}
+        onConfirm={() =>
+          switchOver.mutate({ projectId, automationIds: [automationId] })
+        }
+      />
     </VStack>
   );
 }
