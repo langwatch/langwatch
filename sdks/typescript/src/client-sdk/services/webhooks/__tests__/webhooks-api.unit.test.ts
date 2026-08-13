@@ -141,7 +141,7 @@ describe("WebhooksApiService", () => {
 	});
 
 	describe("update()", () => {
-		it("patches the body the wire takes and sends nothing the caller omitted", async () => {
+		it("posts the body the wire takes and sends nothing the caller omitted", async () => {
 			mockFetch.mockResolvedValueOnce(jsonResponse({ data: endpoint("ep_1") }));
 
 			await new WebhooksApiService().update("ep_1", {
@@ -172,7 +172,7 @@ describe("WebhooksApiService", () => {
 	});
 
 	describe("archive()", () => {
-		it("retires the endpoint with a DELETE and returns nothing", async () => {
+		it("retires the endpoint through endpoints.archive and returns nothing", async () => {
 			mockFetch.mockResolvedValueOnce(
 				jsonResponse({ data: { archived: true } }),
 			);

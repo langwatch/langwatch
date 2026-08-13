@@ -42,13 +42,13 @@ export interface CreateWebhookEndpointInput {
 	enabled_events: string[];
 	/** Envelopes per delivery. The receiver always gets an array. */
 	max_batch_size?: number;
-	/** How long a partial batch waits for company before it is sent. */
+	/** How long a partial batch waits before it is sent anyway, in milliseconds. */
 	max_batch_delay_ms?: number;
 	/** Concurrent in-flight deliveries to this endpoint. */
 	max_in_flight?: number;
 }
 
-/** The PATCH body, exactly as the wire takes it. Omitted fields are left alone. */
+/** The `endpoints.update` body, exactly as the wire takes it. Omitted fields are left alone. */
 export interface UpdateWebhookEndpointInput {
 	url?: string;
 	enabled_events?: string[];

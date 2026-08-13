@@ -46,6 +46,37 @@ export interface ManagementEndpointMeta {
 }
 
 /**
+ * Marks a handler as one of the two `guard()` produces, so the mount callback
+ * can check that the chain which ENFORCES a policy is still attached to the
+ * route that DECLARES one.
+ *
+ * Without this the two halves can be separated silently: `meta.policy` is a
+ * plain property, so `{ ...guard(p), middleware: [mine] }` keeps the
+ * declaration and replaces the enforcement. The route-policy registry — and
+ * `api-endpoint-authorization.integration.test.ts`, which audits the composed
+ * router against that registry — read only the declaration, so both stay green
+ * over an endpoint that authenticates and then admits anyone.
+ */
+const GUARD_ROLE = Symbol("managementGuardRole");
+
+type GuardRole = "permission" | "plan";
+
+function tagged(
+  handler: MiddlewareHandler,
+  role: GuardRole,
+): MiddlewareHandler {
+  return Object.assign(handler, { [GUARD_ROLE]: role });
+}
+
+function rolesOf(middleware: MiddlewareHandler[]): Set<GuardRole> {
+  return new Set(
+    middleware
+      .map((handler) => (handler as { [GUARD_ROLE]?: GuardRole })[GUARD_ROLE])
+      .filter((role): role is GuardRole => role !== undefined),
+  );
+}
+
+/**
  * A versioned management service with org-key auth in throw mode and a
  * policy-registering mount callback. Use the returned `guard(permission)` on
  * EVERY endpoint:
@@ -108,11 +139,14 @@ export function createManagementService({
    * the route-policy registry, and the authorization test that reads it, stay
    * green over an endpoint that authenticates and then admits anyone.
    */
-  const guard = (permission: Permission, extra: MiddlewareHandler[] = []) => ({
+  const guard = (
+    permission: Permission,
+    { extra = [] }: { extra?: MiddlewareHandler[] } = {},
+  ) => ({
     meta: { policy: requires(permission) } satisfies ManagementEndpointMeta,
     middleware: [
-      requireOrgPermissionOrThrow(permission),
-      requireEnterprisePlanRest(feature, { entitlement }),
+      tagged(requireOrgPermissionOrThrow(permission), "permission"),
+      tagged(requireEnterprisePlanRest(feature, { entitlement }), "plan"),
       ...extra,
     ],
   });
@@ -158,6 +192,23 @@ function registerMountedRoute({
         `endpoint config`,
     );
   }
+  // A withdrawn mount answers 410 without reaching the chain, so requiring the
+  // guard handlers on it would fail the build over a route that runs nothing.
+  if (!route.withdrawn) {
+    const roles = rolesOf(route.config?.middleware ?? []);
+    const missing = (["permission", "plan"] as const).filter(
+      (role) => !roles.has(role),
+    );
+    if (missing.length > 0) {
+      throw new Error(
+        `Management endpoint ${route.method.toUpperCase()} ${route.path} ` +
+          `declares an access policy but its middleware chain is missing the ` +
+          `${missing.join(" and ")} check; pass extra middleware as ` +
+          `guard(permission, { extra }) instead of overwriting "middleware"`,
+      );
+    }
+  }
+
   registerRoutePolicy({
     method: route.method,
     path: route.path,

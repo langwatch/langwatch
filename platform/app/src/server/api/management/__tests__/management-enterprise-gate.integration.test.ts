@@ -17,7 +17,15 @@
 
 import { FREE_PLAN } from "@ee/licensing/constants";
 import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { app as organizationApp } from "~/app/api/organization/[[...route]]/app";
 import { app as roleBindingsApp } from "~/app/api/role-bindings/[[...route]]/app";
 import { app as rolesApp } from "~/app/api/roles/[[...route]]/app";
@@ -88,6 +96,18 @@ describe("Feature: Management APIs require an Enterprise plan", () => {
       ],
     });
     viewOnlyToken = memberKey.token;
+  });
+
+  /**
+   * Every test here installs the plan it needs and used to hand the mock back
+   * as its last statement. A reset that trails the assertions is skipped the
+   * moment one of them throws, so the next test ran against whichever plan the
+   * failed test had installed — turning one real failure into a cascade of
+   * unrelated ones and hiding which test actually broke. `afterEach` runs
+   * either way.
+   */
+  afterEach(() => {
+    mockGetActivePlan.mockResolvedValue(ENTERPRISE_TEST_PLAN);
   });
 
   afterAll(async () => {
@@ -184,8 +204,6 @@ describe("Feature: Management APIs require an Enterprise plan", () => {
       const body = await response.json();
       expect(body.code).toBe("insufficient_permissions");
       expect(body.meta.required_permission).toBe("organization:manage");
-
-      mockGetActivePlan.mockResolvedValue(ENTERPRISE_TEST_PLAN);
     });
   });
 
@@ -197,8 +215,6 @@ describe("Feature: Management APIs require an Enterprise plan", () => {
 
       expect(response.status).toBe(401);
       expect((await response.json()).code).toBe("missing_credentials");
-
-      mockGetActivePlan.mockResolvedValue(ENTERPRISE_TEST_PLAN);
     });
   });
 
@@ -234,8 +250,6 @@ describe("Feature: Management APIs require an Enterprise plan", () => {
       expect(body.code).toBe("enterprise_plan_required");
       expect(body.meta.feature).toBe("WEBHOOKS");
       expect(body.tips.length).toBeGreaterThan(0);
-
-      mockGetActivePlan.mockResolvedValue(ENTERPRISE_TEST_PLAN);
     });
 
     it("admits a plan below Enterprise that carries the flag", async () => {
@@ -247,8 +261,6 @@ describe("Feature: Management APIs require an Enterprise plan", () => {
       const response = await webhooksCall();
 
       expect(response.status).toBe(200);
-
-      mockGetActivePlan.mockResolvedValue(ENTERPRISE_TEST_PLAN);
     });
 
     /** @scenario A caller without the permission is refused before the plan is considered */
@@ -275,8 +287,6 @@ describe("Feature: Management APIs require an Enterprise plan", () => {
 
       expect(response.status).toBe(403);
       expect((await response.json()).code).toBe("insufficient_permissions");
-
-      mockGetActivePlan.mockResolvedValue(ENTERPRISE_TEST_PLAN);
     });
   });
 });

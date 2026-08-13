@@ -378,8 +378,12 @@ describe("the shipped suppression lists", () => {
       // carries its version in a header and names operations `resource.verb`
       // (ADR-094), so it has no path segment between the family and the name.
       expect(entry.operation).toMatch(
-        /^(GET|POST|PUT|PATCH|DELETE) \/api\/(gateway\/v1|webhooks)\//,
+        /^(GET|POST|PUT|PATCH|DELETE) \/api\/(gateway\/v1\/|webhooks\/[a-z])/,
       );
+      // `webhooks` alone would also admit the retired `/api/webhooks/v1/...`
+      // spellings, which now 404. A suppression entry naming one would be
+      // excusing an operation that no longer exists.
+      expect(entry.operation).not.toMatch(/\/api\/webhooks\/v1\//);
     }
   });
 

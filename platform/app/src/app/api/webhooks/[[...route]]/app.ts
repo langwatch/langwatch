@@ -263,7 +263,7 @@ const registerEventEndpoints = (v: WebhooksVersion): void => {
         next_cursor: nextCursorSchema,
       }),
       description:
-        "The organization's emitted-events log for the request families: cursor-paged, newest first, filter by type. `from` and `to` bound the created range in epoch milliseconds, are REQUIRED, and `from` must not be later than `to` — a range that ends before it starts is rejected rather than answered with an empty page. They are required because the log is a ranged read over the 13-month spend table and an unbounded walk sorts all of it on every page. Webhooks are push over this log, never the only copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page rather than an error, so a client can probe forward-compatibly.",
+        "The organization's emitted-events log for the request families: cursor-paged, newest first, filter by type. `from` and `to` bound the created range in epoch milliseconds, are REQUIRED, and `from` must not be later than `to` — a range that ends before it starts is rejected rather than answered with an empty page. They are required because this log has no unbounded listing: every read is a bounded range, and narrower ranges answer faster. Webhooks are push over this log, never the only copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page rather than an error, so a client can probe forward-compatibly.",
       docs: {
         operationId: "listWebhookEvents",
         summary: "List emitted events",
@@ -291,12 +291,19 @@ const registerEventEndpoints = (v: WebhooksVersion): void => {
   );
 };
 
+/**
+ * One spelling of "an endpoint service", so a future constructor argument is
+ * added once. Health needs its own instance rather than the provided one:
+ * `provide` hands each key to handlers, not to its siblings.
+ */
+const endpointService = () => new WebhookEndpointService({ prisma });
+
 export const app = service
   .provide({
-    endpoints: () => new WebhookEndpointService({ prisma }),
+    endpoints: endpointService,
     health: () =>
       new WebhookHealthService({
-        endpoints: new WebhookEndpointService({ prisma }),
+        endpoints: endpointService(),
         processStore: new PrismaProcessStore(prisma),
       }),
     /**

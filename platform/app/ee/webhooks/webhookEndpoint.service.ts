@@ -118,12 +118,28 @@ export function decodeDeliveryCursor(
 ): WebhookDeliveryCursor | undefined {
   if (encoded === undefined) return undefined;
 
-  const [firedAtMs, id] = encoded.split("~");
-  const parsedMs = Number(firedAtMs);
-  if (!Number.isInteger(parsedMs) || !id) {
+  const parts = encoded.split("~");
+  if (parts.length !== 2) {
     throw new InvalidWebhookDeliveryCursorError();
   }
-  return { firedAt: new Date(parsedMs), id };
+
+  const [firedAtMs, id] = parts;
+  const parsedMs = Number(firedAtMs);
+  const firedAt = new Date(parsedMs);
+  // `String(parsedMs) !== firedAtMs` is what rejects the non-canonical
+  // spellings `Number` is happy to take — " 12", "1e3", "0x0", "+12". The
+  // `getTime` check catches the in-range integer that is still not a date:
+  // anything past ±8.64e15 parses fine and then constructs an Invalid Date,
+  // which would reach the query as a NaN bound rather than a 422.
+  if (
+    !Number.isInteger(parsedMs) ||
+    String(parsedMs) !== firedAtMs ||
+    !id ||
+    Number.isNaN(firedAt.getTime())
+  ) {
+    throw new InvalidWebhookDeliveryCursorError();
+  }
+  return { firedAt, id };
 }
 
 /**
@@ -159,8 +175,9 @@ export class WebhookEndpointValidationError extends HandledError {
    * `reason` is what makes this refusal actionable, and it has to travel
    * OUTSIDE the message.
    *
-   * Four different rules answer this one code — the scheme, the port, embedded
-   * credentials, a private host — and a caller has to know which one it broke
+   * Six different rules answer this one code — the URL's scheme, its port,
+   * embedded credentials, a private host, the delivery-control bounds and the
+   * event selectors — and a caller has to know which one it broke
    * to fix it. The message used to carry that, and on an API-boundary error it
    * no longer can: the framework publishes the CODE as the message, because a
    * HandledError's message is server copy that may name internals (ADR-045).
@@ -292,6 +309,21 @@ function assertValidEvents(enabledEvents: string[]): void {
     }
   }
 }
+
+/**
+ * How much of a receiver's answer (or a transport error) a test fire keeps.
+ * The same bound applies to what is persisted and what is returned, so the
+ * delivery log and the caller never disagree about what came back.
+ */
+const TEST_FIRE_EXCERPT_LIMIT = 500;
+
+/** What a test fire records about one attempt, minus the identifiers. */
+type TestFireAttempt = {
+  outcome: "success" | "terminal";
+  responseStatus?: number;
+  error?: string;
+  response?: unknown;
+};
 
 /** The single-envelope batch a test fire sends. */
 function testFireBody(now: Date): string {
@@ -637,30 +669,13 @@ export class WebhookEndpointService {
     const endpoint = await this.requireEndpoint(params);
     const signingSecrets = await this.getSigningSecrets(params);
     const dispatchId = `test:${randomUUID()}`;
-
-    const recordAttempt = async (attempt: {
-      outcome: "success" | "terminal";
-      responseStatus?: number;
-      error?: string;
-    }): Promise<void> => {
-      try {
-        await this.recordDeliveryAttempt({
-          organizationId,
-          endpointId,
-          dispatchId,
-          attempt: 1,
-          eventCount: 1,
-          ...attempt,
-        });
-      } catch (logError) {
-        // The test ran; a delivery-log hiccup must not turn the documented
-        // result contract into a failure.
-        logger.warn(
-          { endpointId, error: logError },
-          "test-fire delivery log write failed",
-        );
-      }
-    };
+    const recordAttempt = (attempt: TestFireAttempt): Promise<void> =>
+      this.recordTestFireAttempt({
+        organizationId,
+        endpointId,
+        dispatchId,
+        ...attempt,
+      });
 
     try {
       const result = await sendWebhook({
@@ -677,15 +692,16 @@ export class WebhookEndpointService {
         allowInsecureLocal: allowsInsecureLocalUrls(),
       });
       const delivered = result.status >= 200 && result.status < 300;
+      // One bounded body, persisted and returned. Slicing twice let the
+      // delivery log keep nothing while the caller got the excerpt, so the
+      // log could not answer "what did the receiver actually say".
+      const responseBody = result.body.slice(0, TEST_FIRE_EXCERPT_LIMIT);
       await recordAttempt({
         outcome: delivered ? "success" : "terminal",
         responseStatus: result.status,
+        response: { body: responseBody },
       });
-      return {
-        delivered,
-        responseStatus: result.status,
-        responseBody: result.body.slice(0, 500),
-      };
+      return { delivered, responseStatus: result.status, responseBody };
     } catch (error) {
       // The full message goes to the delivery log for the operator; the
       // returned summary is sanitized so internal dispatch wording and
@@ -693,7 +709,9 @@ export class WebhookEndpointService {
       await recordAttempt({
         outcome: "terminal",
         error:
-          error instanceof Error ? error.message.slice(0, 500) : String(error),
+          error instanceof Error
+            ? error.message.slice(0, TEST_FIRE_EXCERPT_LIMIT)
+            : String(error),
       });
       return {
         delivered: false,
@@ -701,6 +719,33 @@ export class WebhookEndpointService {
         error:
           "The test delivery could not reach the receiver; see the endpoint's delivery log for details.",
       };
+    }
+  }
+
+  /**
+   * The delivery-log write for a test fire. Separate from {@link sendTestFire}
+   * because it owns one rule the caller must not have to remember: the test
+   * ran, so a logging failure is swallowed rather than allowed to turn the
+   * documented result contract into a thrown error.
+   */
+  private async recordTestFireAttempt(
+    attempt: TestFireAttempt & {
+      organizationId: string;
+      endpointId: string;
+      dispatchId: string;
+    },
+  ): Promise<void> {
+    try {
+      await this.recordDeliveryAttempt({
+        ...attempt,
+        attempt: 1,
+        eventCount: 1,
+      });
+    } catch (logError) {
+      logger.warn(
+        { endpointId: attempt.endpointId, error: logError },
+        "test-fire delivery log write failed",
+      );
     }
   }
 

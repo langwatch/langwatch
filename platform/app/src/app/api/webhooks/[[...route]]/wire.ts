@@ -7,7 +7,12 @@
  * convention, not a contract, and `toWireEnum` / `toStoredEnum` translate at
  * this seam in both directions.
  */
-import type { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
+import {
+  WEBHOOK_BATCH_DELAY_BOUNDS_MS,
+  WEBHOOK_IN_FLIGHT_BOUNDS,
+  WEBHOOK_MAX_BATCH_SIZE_BOUNDS,
+  type WebhookEndpointService,
+} from "@ee/webhooks/webhookEndpoint.service";
 import type { WebhookEventsService } from "@ee/webhooks/webhookEvents.service";
 import type { WebhookHealthService } from "@ee/webhooks/webhookHealth.service";
 import { z } from "zod";
@@ -28,10 +33,40 @@ export interface WebhooksFamilyApp {
 
 export const endpointStatusSchema = z.enum(["active", "disabled"]);
 
+/**
+ * The bounds are DESCRIBED here and ENFORCED in the service, deliberately.
+ *
+ * Restating them as zod constraints would split one refusal across two codes:
+ * an out-of-range `max_batch_size` would answer `validation_error` while an
+ * unreachable `url` still answered `webhook_endpoint_invalid`, for what a
+ * caller experiences as the same class of mistake. The service is the single
+ * authority — it is also what the tRPC router and the delivery worker run —
+ * so the only thing missing at this seam was that the numbers never reached
+ * the published document. Interpolating the exported constants fixes that
+ * without moving the rule, and keeps the two from drifting.
+ */
 const deliveryControlsSchema = {
-  max_batch_size: z.number().int().optional(),
-  max_batch_delay_ms: z.number().int().optional(),
-  max_in_flight: z.number().int().optional(),
+  max_batch_size: z
+    .number()
+    .int()
+    .optional()
+    .describe(
+      `Envelopes per delivery. ${WEBHOOK_MAX_BATCH_SIZE_BOUNDS.min}-${WEBHOOK_MAX_BATCH_SIZE_BOUNDS.max}.`,
+    ),
+  max_batch_delay_ms: z
+    .number()
+    .int()
+    .optional()
+    .describe(
+      `How long a partial batch waits before it is sent anyway, in milliseconds. ${WEBHOOK_BATCH_DELAY_BOUNDS_MS.min}-${WEBHOOK_BATCH_DELAY_BOUNDS_MS.max}.`,
+    ),
+  max_in_flight: z
+    .number()
+    .int()
+    .optional()
+    .describe(
+      `Deliveries this endpoint accepts at once. ${WEBHOOK_IN_FLIGHT_BOUNDS.min}-${WEBHOOK_IN_FLIGHT_BOUNDS.max}.`,
+    ),
 };
 
 /** Names one endpoint. The shape every per-endpoint operation starts from. */

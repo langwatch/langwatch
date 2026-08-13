@@ -2515,7 +2515,7 @@ The rule shape, the full matcher and action tables, and the evaluation order liv
 
 ## Webhooks and billing surfaces
 
-Two sibling REST families complete the platform and are documented on their own pages, because they authenticate with an **organization API key** and organization-exclusive permissions rather than the credential used above:
+Two sibling HTTP families complete the platform and are documented on their own pages, because they authenticate with an **organization API key** and organization-exclusive permissions rather than the credential used above:
 
 - `/api/webhooks/*`: endpoint management, secret roll, test fire, delivery log, health, and the emitted-events log. RPC-named — every operation is a POST to a dotted name such as `endpoints.rollSecret`, with its arguments in the body. See [Webhooks](/features/webhooks).
 - `/api/gateway/v1/spend-events`, `/spend-summaries`, `/spend-events/replay`: the billing reconciliation pull surface. See [Billing & spend events](/ai-gateway/billing-events).
@@ -35868,7 +35868,7 @@ An endpoint belongs to your **organization** and carries:
 | Signing secret | Shown **once** at creation. Roll it to get a new one. Every delivery is signed with it. |
 | Delivery controls | `max_batch_size`, `max_batch_delay_ms`, `max_in_flight` (bounds below). |
 
-Manage endpoints under **AI Gateway > Webhooks** (`/settings/gateway/webhooks`) or over REST with an organization API key:
+Manage endpoints under **AI Gateway > Webhooks** (`/settings/gateway/webhooks`) or over the HTTP API with an organization API key:
 
 Every operation is a `POST` to a named operation, and every argument travels in
 the JSON body — including the endpoint id.
@@ -36145,7 +36145,7 @@ After **72 hours of unbroken failures** the endpoint flips to `disabled` with `d
 To recover:
 
 1. Fix the receiver.
-2. Re-enable: `PATCH /endpoints/:id {"status": "active"}`.
+2. Re-enable: `POST /endpoints.update {"id": "<endpoint id>", "status": "active"}`.
 3. Re-enabling does **not** re-send the gap. Replay it explicitly: for spend events, [`POST /api/gateway/v1/spend-events/replay`](/ai-gateway/billing-events#replay) with the gap window and this endpoint's id.
 
 ```mermaid
@@ -36171,7 +36171,7 @@ Three per-endpoint knobs, validated server-side against fixed bounds; out-of-ran
 
 ## Health and the lag number
 
-`GET /endpoints/:id/health`:
+`POST /endpoints.getHealth {"id": "<endpoint id>"}`:
 
 ```json
 {
@@ -36194,7 +36194,7 @@ The headline is **`oldest_undelivered_age_ms`**: the age of the oldest envelope 
 
 ## The delivery log
 
-`GET /endpoints/:id/deliveries` lists recent attempts, newest first: the attempt number, envelope count, outcome, **your endpoint's HTTP status**, latency, and the error text when transport failed. Your receiver's responses are recorded, so debugging a rejecting endpoint starts here rather than in your own logs.
+`POST /endpoints.listDeliveries {"id": "<endpoint id>"}` lists recent attempts, newest first: the attempt number, envelope count, outcome, **your endpoint's HTTP status**, latency, and the error text when transport failed. Your receiver's responses are recorded, so debugging a rejecting endpoint starts here rather than in your own logs.
 
 The list is cursor-paginated on `(fired_at, id)` at 25 rows by default (max 200), and the response carries `next_cursor` when more remain. Cursors rather than offsets because a busy endpoint writes new attempts while you page: an offset walk would show you the same row twice and skip another. Delivery log rows are retained for 30 days.
 
@@ -36202,7 +36202,7 @@ Endpoint deliveries and the [webhooks fired by your automation triggers](#signin
 
 ## Test fire
 
-`POST /endpoints/:id/test` sends one signed `test.ping` envelope through the full delivery path, including SSRF checks and signing, plus an `X-LangWatch-Test-Fire: true` header so your receiver can tell it apart. The route answers `200` whenever the test itself ran; read `data.delivered` and `data.response_status` for what your receiver did. Test fires appear in the delivery log too.
+`POST /endpoints.test {"id": "<endpoint id>"}` sends one signed `test.ping` envelope through the full delivery path, including SSRF checks and signing, plus an `X-LangWatch-Test-Fire: true` header so your receiver can tell it apart. The route answers `200` whenever the test itself ran; read `data.delivered` and `data.response_status` for what your receiver did. Test fires appear in the delivery log too.
 
 ## The events log
 
