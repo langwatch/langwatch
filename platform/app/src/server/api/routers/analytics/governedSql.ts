@@ -24,7 +24,10 @@ import { NotFoundError } from "@langwatch/handled-error";
 import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
 
-import { getGovernedSqlService } from "~/server/analytics/governed-sql";
+import {
+  getGovernedSqlService,
+  MAX_GOVERNED_SQL_LENGTH,
+} from "~/server/analytics/governed-sql";
 import { GovernedSqlNotEnabledError } from "~/server/analytics/governed-sql/errors";
 import { featureFlagService } from "~/server/featureFlag";
 
@@ -64,15 +67,6 @@ const workbenchEnabled = async ({
     organizationId: project?.team.organizationId,
   });
 };
-
-/**
- * Longest statement this router accepts.
- *
- * Mirrors the REST ceiling deliberately: it is a request-shape bound, not a
- * cost one, and a workbench that accepted a statement the API would reject
- * would be teaching its own dialect.
- */
-const MAX_SQL_LENGTH = 50_000;
 
 /**
  * A bound parameter's value. Scalars only — a parameter is a *value*, and
@@ -142,7 +136,7 @@ const query = protectedProcedure
     projectScopeSchema.extend({
       // Deliberately not `.trim()`: the statement the database runs must be the
       // one that was submitted.
-      sql: z.string().min(1).max(MAX_SQL_LENGTH),
+      sql: z.string().min(1).max(MAX_GOVERNED_SQL_LENGTH),
       parameters: z.record(z.string(), parameterValueSchema).optional(),
     }),
   )

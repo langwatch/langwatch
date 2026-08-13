@@ -16,6 +16,7 @@ import { VEGA_LITE_SCHEMA_URL } from "~/features/analytics-query/visualization/v
 import type { CustomGraph } from "~/generated/prisma/client";
 
 import type { Protections } from "../../../traces/protections";
+import { WORKBENCH_SQL_CHART_KIND } from "../../chartKinds";
 import { GovernedSqlService } from "../../governed-sql/governedSql.service";
 import type {
   CreateSavedWorkbenchChartInput,
@@ -23,10 +24,7 @@ import type {
   UpdateSavedWorkbenchChartInput,
 } from "../savedWorkbenchChart.repository";
 import { SavedWorkbenchChartService } from "../savedWorkbenchChart.service";
-import {
-  WORKBENCH_CHART_DEFINITION_VERSION,
-  WORKBENCH_SQL_CHART_KIND,
-} from "../workbenchChartDefinition";
+import { WORKBENCH_CHART_DEFINITION_VERSION } from "../workbenchChartDefinition";
 
 const PROJECT_ID = "project-under-test";
 

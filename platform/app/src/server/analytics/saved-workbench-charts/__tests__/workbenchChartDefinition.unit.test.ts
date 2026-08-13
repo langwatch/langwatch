@@ -9,6 +9,7 @@
 
 import { describe, expect, it } from "vitest";
 
+import { MAX_GOVERNED_SQL_LENGTH } from "../../governed-sql/sqlText";
 import {
   WORKBENCH_CHART_DEFINITION_VERSION,
   workbenchChartDefinitionSchema,
@@ -125,6 +126,84 @@ describe("the saved workbench chart definition", () => {
             sql: "",
           }).success,
         ).toBe(false);
+      });
+    });
+  });
+
+  describe("given a definition bigger than what is stored", () => {
+    describe("when its statement is longer than the ceiling", () => {
+      /** @scenario "A definition larger than the stored ceilings is refused" */
+      it("refuses it as too big, at the ceiling the query endpoints enforce", () => {
+        const overLong = workbenchChartDefinitionSchema.safeParse({
+          version: WORKBENCH_CHART_DEFINITION_VERSION,
+          sql: "x".repeat(MAX_GOVERNED_SQL_LENGTH + 1),
+        });
+
+        expect(overLong.success).toBe(false);
+        expect(overLong.error?.issues).toContainEqual(
+          expect.objectContaining({
+            code: "too_big",
+            maximum: MAX_GOVERNED_SQL_LENGTH,
+            path: ["sql"],
+          }),
+        );
+
+        // A statement exactly at the ceiling is one the query endpoints will
+        // run, so refusing it here would lose a member's work.
+        expect(
+          workbenchChartDefinitionSchema.safeParse({
+            version: WORKBENCH_CHART_DEFINITION_VERSION,
+            sql: "x".repeat(MAX_GOVERNED_SQL_LENGTH),
+          }).success,
+        ).toBe(true);
+      });
+    });
+
+    describe("when it binds more parameters than the ceiling", () => {
+      /** @scenario "A definition larger than the stored ceilings is refused" */
+      it("refuses the count as too big and admits the count at the ceiling", () => {
+        const parametersOfSize = (size: number) =>
+          Object.fromEntries(
+            Array.from({ length: size }, (_, index) => [`p${index}`, index]),
+          );
+
+        const tooMany = workbenchChartDefinitionSchema.safeParse({
+          version: WORKBENCH_CHART_DEFINITION_VERSION,
+          sql: SQL,
+          parameters: parametersOfSize(65),
+        });
+
+        expect(tooMany.success).toBe(false);
+        expect(tooMany.error?.issues).toContainEqual(
+          expect.objectContaining({ code: "too_big", maximum: 64 }),
+        );
+        expect(
+          workbenchChartDefinitionSchema.safeParse({
+            version: WORKBENCH_CHART_DEFINITION_VERSION,
+            sql: SQL,
+            parameters: parametersOfSize(64),
+          }).success,
+        ).toBe(true);
+      });
+    });
+
+    describe("when one parameter's value is longer than the ceiling", () => {
+      /** @scenario "A definition larger than the stored ceilings is refused" */
+      it("refuses the value as too big and names which parameter it was", () => {
+        const oversized = workbenchChartDefinitionSchema.safeParse({
+          version: WORKBENCH_CHART_DEFINITION_VERSION,
+          sql: SQL,
+          parameters: { since: "x".repeat(4_001) },
+        });
+
+        expect(oversized.success).toBe(false);
+        expect(oversized.error?.issues).toContainEqual(
+          expect.objectContaining({
+            code: "too_big",
+            maximum: 4_000,
+            path: ["parameters", "since"],
+          }),
+        );
       });
     });
   });

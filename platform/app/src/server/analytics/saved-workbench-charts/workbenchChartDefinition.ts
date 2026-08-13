@@ -17,17 +17,7 @@
 
 import { z } from "zod";
 
-/**
- * The `CustomGraph.kind` value a saved workbench chart carries.
- *
- * The discriminator is what lets the chart builder and the workbench share one
- * table: each reads only its own kind, so a builder payload is never handed to
- * the parser below and a workbench definition never reaches the builder.
- */
-export const WORKBENCH_SQL_CHART_KIND = "workbench_sql";
-
-/** The `CustomGraph.kind` every row written before the discriminator carries. */
-export const BUILDER_CHART_KIND = "builder";
+import { MAX_GOVERNED_SQL_LENGTH } from "../governed-sql/sqlText";
 
 /**
  * The version this build writes, and the only one it reads.
@@ -38,6 +28,28 @@ export const BUILDER_CHART_KIND = "builder";
 export const WORKBENCH_CHART_DEFINITION_VERSION = 1;
 
 /**
+ * How many parameters one saved chart may bind.
+ *
+ * A storage ceiling, not a statement about what SQL can express: a query the
+ * workbench actually produces binds a handful, and nothing legitimate
+ * approaches this. It is here because the alternative is a `Json` column whose
+ * size is decided by whatever a caller sends.
+ */
+const MAX_PARAMETERS = 64;
+
+/**
+ * Longest a parameter's name, or its value as text, may be.
+ *
+ * The name is bound because a parameter is referenced from the SQL as
+ * `{name:Type}`, so a real one is identifier-shaped and this is orders of
+ * magnitude above any of them. The value is bound because a string scalar is
+ * the one variant with no natural size, and an unbounded one turns a chart into
+ * a place to keep arbitrary text.
+ */
+const MAX_PARAMETER_NAME_LENGTH = 256;
+const MAX_PARAMETER_VALUE_LENGTH = 4_000;
+
+/**
  * A bound parameter's saved value.
  *
  * Deliberately the scalars and nothing else: the governed query endpoint binds
@@ -45,18 +57,45 @@ export const WORKBENCH_CHART_DEFINITION_VERSION = 1;
  * only ever fail when someone opened it.
  */
 const parameterValueSchema = z.union([
-  z.string(),
+  z.string().max(MAX_PARAMETER_VALUE_LENGTH),
   z.number(),
   z.boolean(),
   z.null(),
 ]);
 
+/**
+ * The saved parameter map.
+ *
+ * The count is checked with an explicit issue rather than a message, so a
+ * caller — and a test — reads `too_big` and the maximum instead of parsing
+ * prose.
+ */
+const parametersSchema = z
+  .record(z.string().max(MAX_PARAMETER_NAME_LENGTH), parameterValueSchema)
+  .superRefine((parameters, ctx) => {
+    const count = Object.keys(parameters).length;
+    if (count > MAX_PARAMETERS) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.too_big,
+        type: "set",
+        maximum: MAX_PARAMETERS,
+        inclusive: true,
+      });
+    }
+  })
+  .default({});
+
 export const workbenchChartDefinitionSchema = z.object({
   version: z.literal(WORKBENCH_CHART_DEFINITION_VERSION),
-  /** Exactly as the member submitted it. Never rewritten, here or anywhere. */
-  sql: z.string().min(1),
+  /**
+   * Exactly as the member submitted it. Never rewritten, here or anywhere.
+   *
+   * Bounded by the same constant the query endpoints bound their input with, so
+   * every statement the workbench will run is one it can also save.
+   */
+  sql: z.string().min(1).max(MAX_GOVERNED_SQL_LENGTH),
   /** Values for the parameters the SQL declares, keyed by the declared name. */
-  parameters: z.record(z.string(), parameterValueSchema).default({}),
+  parameters: parametersSchema,
   /**
    * The specification that renders the result, when the member authored one.
    *
