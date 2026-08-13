@@ -14,8 +14,8 @@
  * @see specs/analytics/governed-sql-saved-charts.feature
  */
 
-import type { Project } from "@prisma/client";
 import { describe, expect, it } from "vitest";
+import type { Project } from "~/generated/prisma/client";
 
 import { callerProject } from "../[[...route]]/routeGuards";
 

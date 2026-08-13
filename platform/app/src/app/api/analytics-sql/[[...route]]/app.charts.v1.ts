@@ -29,10 +29,10 @@
  * @see specs/analytics/governed-sql-saved-charts.feature
  */
 
-import type { Project } from "@prisma/client";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
+import type { Project } from "~/generated/prisma/client";
 
 import {
   type SavedWorkbenchChart,

@@ -25,13 +25,6 @@
  * @see ~/server/analytics/saved-workbench-charts — the service under test
  */
 
-import {
-  type Organization,
-  type Project,
-  RoleBindingScopeType,
-  type Team,
-  TeamUserRole,
-} from "@prisma/client";
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -42,9 +35,15 @@ import {
   it,
   vi,
 } from "vitest";
-
 import { projectFactory } from "~/factories/project.factory";
 import { VEGA_LITE_SCHEMA_URL } from "~/features/analytics-query/visualization/vegaLiteSchema";
+import {
+  type Organization,
+  type Project,
+  RoleBindingScopeType,
+  type Team,
+  TeamUserRole,
+} from "~/generated/prisma/client";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";

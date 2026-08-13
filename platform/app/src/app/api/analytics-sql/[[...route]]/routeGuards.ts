@@ -13,7 +13,7 @@
  */
 
 import { NotFoundError } from "@langwatch/handled-error";
-import type { Project } from "@prisma/client";
+import type { Project } from "~/generated/prisma/client";
 
 import { GovernedSqlNotEnabledError } from "~/server/analytics/governed-sql/errors";
 import { prisma } from "~/server/db";
