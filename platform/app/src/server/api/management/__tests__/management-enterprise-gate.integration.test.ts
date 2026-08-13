@@ -3,12 +3,16 @@
  *
  * @see specs/licensing/management-apis-enterprise-gate.feature
  *
- * The plan gate on the four management families built through
+ * The plan gate on the management families built through
  * `createManagementService`: a fully-permissioned credential on a plan below
  * Enterprise is refused with the stable 402 code and upgrade guidance, the
  * same credential passes on Enterprise, and the RBAC denial always beats the
  * plan denial (403 before 402), because "you don't have access" must never be
  * dressed up as "buy a plan".
+ *
+ * Four families gate on the Enterprise TIER. Webhooks gates on a plan FLAG
+ * instead, because that feature is licensable on its own — covered at the
+ * bottom, since the tier families cannot exhibit the way that goes wrong.
  */
 
 import { FREE_PLAN } from "@ee/licensing/constants";
@@ -18,6 +22,7 @@ import { app as organizationApp } from "~/app/api/organization/[[...route]]/app"
 import { app as roleBindingsApp } from "~/app/api/role-bindings/[[...route]]/app";
 import { app as rolesApp } from "~/app/api/roles/[[...route]]/app";
 import { app as scimTokensApp } from "~/app/api/scim-tokens/[[...route]]/app";
+import { app as webhooksApp } from "~/app/api/webhooks/[[...route]]/app";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
@@ -192,6 +197,84 @@ describe("Feature: Management APIs require an Enterprise plan", () => {
 
       expect(response.status).toBe(401);
       expect((await response.json()).code).toBe("missing_credentials");
+
+      mockGetActivePlan.mockResolvedValue(ENTERPRISE_TEST_PLAN);
+    });
+  });
+
+  /**
+   * Webhooks is gated on a plan FLAG rather than on the Enterprise tier, and
+   * the difference is not cosmetic: `webhookEndpointsEnabled` is licensable on
+   * its own, so a Pro or Custom contract can carry it. Gating this family on
+   * the tier the way the other four are gated would 402 every organization
+   * that bought the feature below Enterprise — a silent regression the tier
+   * families cannot exhibit, so it needs its own coverage.
+   */
+  describe("given the webhooks family, which gates on a plan flag", () => {
+    const webhooksCall = (token = seeded.adminToken) =>
+      webhooksApp.request("/api/webhooks/endpoints.list", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+    /** @scenario Without the plan flag the surface refuses politely */
+    it("refuses with 402 when the flag is absent, even on Enterprise", async () => {
+      mockGetActivePlan.mockResolvedValue({
+        ...ENTERPRISE_TEST_PLAN,
+        webhookEndpointsEnabled: false,
+      });
+
+      const response = await webhooksCall();
+
+      expect(response.status).toBe(402);
+      const body = await response.json();
+      expect(body.code).toBe("enterprise_plan_required");
+      expect(body.meta.feature).toBe("WEBHOOKS");
+      expect(body.tips.length).toBeGreaterThan(0);
+
+      mockGetActivePlan.mockResolvedValue(ENTERPRISE_TEST_PLAN);
+    });
+
+    it("admits a plan below Enterprise that carries the flag", async () => {
+      mockGetActivePlan.mockResolvedValue({
+        ...FREE_PLAN,
+        webhookEndpointsEnabled: true,
+      });
+
+      const response = await webhooksCall();
+
+      expect(response.status).toBe(200);
+
+      mockGetActivePlan.mockResolvedValue(ENTERPRISE_TEST_PLAN);
+    });
+
+    /** @scenario A caller without the permission is refused before the plan is considered */
+    it("answers 403 before 402 for a credential missing the permission", async () => {
+      mockGetActivePlan.mockResolvedValue({
+        ...FREE_PLAN,
+        webhookEndpointsEnabled: false,
+      });
+
+      const response = await webhooksApp.request(
+        "/api/webhooks/endpoints.create",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${viewOnlyToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            url: "https://example.com/hooks",
+            enabled_events: ["gateway.request.completed"],
+          }),
+        },
+      );
+
+      expect(response.status).toBe(403);
+      expect((await response.json()).code).toBe("insufficient_permissions");
 
       mockGetActivePlan.mockResolvedValue(ENTERPRISE_TEST_PLAN);
     });
