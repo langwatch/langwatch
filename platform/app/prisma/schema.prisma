@@ -878,10 +878,31 @@ enum WebhookDeliveryOutcome {
 /// or family wildcards ("gateway.*", "*"). Failure-streak columns drive the
 /// 72h auto-disable. Spec: specs/webhooks/webhook-endpoints.feature.
 model WebhookEndpoint {
-  id                      String                @id
-  organizationId          String
-  organization            Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  url                     String
+  id             String       @id
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  /// Where this endpoint delivers. Everything above the last hop is shared:
+  /// same batching, same retry ladder, same delivery log, same signature over
+  /// the same bytes.
+  destinationKind WebhookDestinationKind @default(http)
+  /// The receiver URL. Present on `http` endpoints and null on the others;
+  /// the per-kind shape is pinned by a CHECK constraint Prisma cannot model.
+  url             String?
+  /// The Amazon SQS queue this endpoint delivers to, on `sqs` endpoints. The
+  /// region and the owning account are read off it rather than configured
+  /// separately, so they can never disagree with the queue.
+  sqsQueueUrl     String?
+  /// The role we assume to write to the queue, and the ExternalId that proves
+  /// the request came from us rather than from anyone who learned the role's
+  /// name. The recommended credential mode.
+  sqsRoleArn      String?
+  sqsExternalId   String?
+  /// A static key pair for the queue, encrypted at rest exactly like the
+  /// signing secret. Both halves are present or both are absent: a half-filled
+  /// pair is what the AWS SDK reads as "we have credentials" and stops looking
+  /// with, so the CHECK constraint refuses it.
+  sqsAccessKeyId              String?
+  sqsSecretAccessKeyEncrypted String?
   secretEncrypted         String
   /// The secret this endpoint signed with before the last roll. Deliveries
   /// carry a second `v1=` computed from it until it expires, so a receiver
@@ -913,6 +934,14 @@ model WebhookEndpoint {
   deliveries WebhookEndpointDelivery[]
 
   @@index([organizationId, status])
+}
+
+/// The last hop a webhook endpoint delivers over. Lowercase because these
+/// values are the wire spelling: the same strings appear in the REST DTO,
+/// both SDKs and the CLI.
+enum WebhookDestinationKind {
+  http
+  sqs
 }
 
 enum WebhookEndpointStatus {
