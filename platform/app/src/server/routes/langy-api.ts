@@ -20,12 +20,17 @@
  * The flag is checked AFTER authentication on purpose: an unauthenticated
  * caller learns only that the token is bad, never whether the surface exists.
  *
- * Every refusal is a THROWN `HandledError`, never a hand-built `c.json({...})`
- * — `createServiceApp`'s `onError` owns the wire shape, so this family
- * publishes the same envelope as every other route and a caller keeps the
+ * Every refusal is THROWN, never a hand-built `c.json({...})` —
+ * `createServiceApp`'s `onError` owns the wire shape, so this family publishes
+ * the same envelope as every other route. The credential, authorization,
+ * identity and validation refusals are `HandledError`s, so a caller keeps the
  * `code`, `meta` and remediation `tips` a bespoke `{ message }` would have
- * discarded (ADR-045). The family opts into the `canonical` envelope because
- * it is new: there is no existing consumer parsing the flat legacy shape.
+ * discarded (ADR-045). The dark-surface 404 is the deliberate exception: it
+ * throws the generic `NotFoundError` (an `HttpError`, not a `HandledError`)
+ * precisely so it carries no code and no meta, and is indistinguishable from a
+ * route that was never mounted. The family opts into the `canonical` envelope
+ * because it is new: there is no existing consumer parsing the flat legacy
+ * shape.
  *
  * Create and continue are the same service call — `conversationId` present or
  * absent is the only difference, exactly as the tRPC router does it. This route
