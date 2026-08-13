@@ -105,6 +105,14 @@ function StepRailItem({
       borderRadius="md"
       borderWidth="1px"
       colorPalette="orange"
+      // The rail must not change height when a step gains its first summary
+      // (typing a name would make the whole bar hop): every item reserves the
+      // two-line height up front — 8px of padding twice, a 20px title line
+      // and a 16px summary line — and a summary-less item centers its title
+      // in it instead of sitting on a blank line.
+      minHeight="52px"
+      display="flex"
+      alignItems="center"
       {...railItemChrome({ current, reachable })}
       onClick={reachable ? () => setStep(step) : undefined}
     >
@@ -127,20 +135,11 @@ function StepRailItem({
             </Box>
           ) : null}
         </HStack>
-        {/* Always rendered: the rail must not change height when a step
-            gains its first summary (typing a name would make the whole bar
-            hop), so an empty line holds the second row's space. */}
-        <Text
-          textStyle="2xs"
-          color="fg.muted"
-          lineClamp={1}
-          width="full"
-          aria-hidden={summary ? undefined : true}
-        >
-          {/* The fallback is a non-breaking space — a collapsible one would
-              leave a zero-height line box and reintroduce the hop. */}
-          {summary ?? " "}
-        </Text>
+        {summary ? (
+          <Text textStyle="2xs" color="fg.muted" lineClamp={1} width="full">
+            {summary}
+          </Text>
+        ) : null}
       </VStack>
     </chakra.button>
   );
