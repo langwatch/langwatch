@@ -110,12 +110,13 @@ Feature: GroupQueue poison-group park guard
     And the group is dispatched and processed instead of being parked
 
   @integration
-  Scenario: a worker that cannot publish its own beacon does not enforce the guard
-    Given a worker whose liveness beacon write to Redis fails
+  Scenario: a worker that cannot report itself as running enforces nothing
+    Given a worker that is temporarily unable to report itself as running
     When it claims a group already one death short of the threshold
-    Then it records no claim and parks nothing
+    Then it counts no death and parks no group
     And the group is dispatched and processed normally
-    And the guard resumes for that worker once its beacon lands
+    And the group's death count is left exactly as it was
+    And the guard resumes for that worker once it can report itself again
 
   @integration
   Scenario: a release that never reaches Redis does not park a healthy group

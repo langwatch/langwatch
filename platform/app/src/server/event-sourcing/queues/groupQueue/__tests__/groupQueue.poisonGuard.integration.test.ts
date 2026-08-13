@@ -350,7 +350,7 @@ describe.skipIf(!hasTestcontainers)(
         // re-entered through the beacon write instead of the release. It sits
         // the guard out instead: a real death goes uncounted, which is the
         // cheap direction to be wrong in.
-        /** @scenario a worker that cannot publish its own beacon does not enforce the guard */
+        /** @scenario a worker that cannot report itself as running enforces nothing */
         it("records no claim and parks nothing", async () => {
           vi.spyOn(
             GroupStagingScripts.prototype,
