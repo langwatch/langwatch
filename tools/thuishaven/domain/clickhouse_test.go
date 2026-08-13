@@ -131,9 +131,13 @@ func TestRenderClickHouseConfigBoundsBackgroundWork(t *testing.T) {
 			// Stock thresholds (8 to allow a large merge, 20 to run a mutation)
 			// assume the stock 16-thread pool; kept as-is against a smaller pool
 			// they would silently stop large merges and mutations ever scheduling.
+			// All three must shrink together: the server refuses to boot when
+			// number_of_free_entries_in_pool_to_execute_optimize_entire_partition
+			// (stock 25) exceeds pool*ratio — a sanity check, not a warning.
 			for _, want := range []string{
 				"<number_of_free_entries_in_pool_to_lower_max_size_of_merge>4</number_of_free_entries_in_pool_to_lower_max_size_of_merge>",
 				"<number_of_free_entries_in_pool_to_execute_mutation>4</number_of_free_entries_in_pool_to_execute_mutation>",
+				"<number_of_free_entries_in_pool_to_execute_optimize_entire_partition>4</number_of_free_entries_in_pool_to_execute_optimize_entire_partition>",
 			} {
 				if !strings.Contains(cfg, want) {
 					t.Errorf("missing %q in:\n%s", want, cfg)

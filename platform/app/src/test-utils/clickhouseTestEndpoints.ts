@@ -64,6 +64,7 @@ export const TEST_CLICKHOUSE_TUNING = {
     <merge_tree>
         <number_of_free_entries_in_pool_to_lower_max_size_of_merge>2</number_of_free_entries_in_pool_to_lower_max_size_of_merge>
         <number_of_free_entries_in_pool_to_execute_mutation>2</number_of_free_entries_in_pool_to_execute_mutation>
+        <number_of_free_entries_in_pool_to_execute_optimize_entire_partition>2</number_of_free_entries_in_pool_to_execute_optimize_entire_partition>
     </merge_tree>
     <logger>
         <level>warning</level>
