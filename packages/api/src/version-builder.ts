@@ -101,6 +101,7 @@ export class VersionBuilder<TApp> {
     handler: Handler<TApp, TConfig>,
   ): void {
     assertRpcPath(path);
+    assertRpcConfig(path, config);
     this._register("post", path, config, handler);
   }
 
@@ -142,6 +143,8 @@ export class VersionBuilder<TApp> {
  * name on its own — `endpoints.create` is not `latest`, not `preview`, and not
  * date-shaped, so the reserved-namespace check has nothing to say about it.
  */
+const RPC_PATH_RE = /^\/[a-z][a-zA-Z0-9]*(\.[a-z][a-zA-Z0-9]*)+$/;
+
 function assertRpcPath(path: string): void {
   if (!RPC_PATH_RE.test(path)) {
     throw new Error(
@@ -151,7 +154,26 @@ function assertRpcPath(path: string): void {
   }
 }
 
-const RPC_PATH_RE = /^\/[a-z][a-zA-Z0-9]*(\.[a-z][a-zA-Z0-9]*)+$/;
+/**
+ * The pipeline installs a validator for whichever of `params` / `query` a
+ * config declares, so "every argument travels in the body" holds only while
+ * nothing declares them. Rejecting here makes the sentence above enforceable
+ * rather than aspirational: a dotted path has no `:param` to bind, so a
+ * `params` schema could never match, and a `query` schema would smuggle
+ * arguments back into the URL that the operation name is supposed to own.
+ */
+function assertRpcConfig(path: string, config: EndpointConfig): void {
+  const offending = (["params", "query"] as const).filter(
+    (key) => config[key] !== undefined,
+  );
+
+  if (offending.length > 0) {
+    throw new Error(
+      `RPC endpoint "${path}" declares ${offending.join(" and ")}; RPC ` +
+        `arguments travel in the JSON body, so use "input" instead`,
+    );
+  }
+}
 
 function assertEndpointPath(path: string): void {
   if (path !== "" && !path.startsWith("/")) {

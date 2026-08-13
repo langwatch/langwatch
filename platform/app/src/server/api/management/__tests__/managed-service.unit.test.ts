@@ -187,7 +187,7 @@ describe("createManagementService", () => {
           v.get(
             "/things",
             {
-              ...guard("organization:manage", [ownMiddleware]),
+              ...guard("organization:manage", { extra: [ownMiddleware] }),
               output: z.object({ ok: z.boolean() }),
             },
             async () => ({ ok: true }),
@@ -214,6 +214,45 @@ describe("createManagementService", () => {
         kind: "permission",
         permission: "organization:manage",
       });
+    });
+  });
+
+  /**
+   * Passing `extra` is the safe spelling, but until now nothing MADE it the
+   * only one — the unsafe spelling merely went unwritten. The mount callback
+   * now checks that a route declaring a policy still carries the chain that
+   * enforces it, so the bypass fails the build instead of shipping a route
+   * that authenticates and then admits anyone.
+   */
+  describe("given an endpoint overwrites the guard's middleware", () => {
+    function buildWithOverwrittenMiddleware(): void {
+      const { service, guard } = createManagementService({
+        name: "toy-bypass",
+        basePath: "/api/toy-bypass",
+        feature: "MANAGEMENT_API",
+      });
+      const ownMiddleware: MiddlewareHandler = async (_c, next) => {
+        await next();
+      };
+      service
+        .version(MANAGEMENT_API_VERSION, (v) => {
+          v.get(
+            "/things",
+            {
+              ...guard("organization:manage"),
+              middleware: [ownMiddleware],
+              output: z.object({ ok: z.boolean() }),
+            },
+            async () => ({ ok: true }),
+          );
+        })
+        .build();
+    }
+
+    it("refuses to build", () => {
+      expect(buildWithOverwrittenMiddleware).toThrow(
+        /missing the permission and plan check/,
+      );
     });
   });
 });

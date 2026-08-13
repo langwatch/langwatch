@@ -124,6 +124,7 @@ describe("v.rpc", () => {
             "old",
           ]);
           v.rpc("/things.get", { output: z.string() }, async () => "kept");
+          v.rpc("/things.count", { output: z.number() }, async () => 1);
         })
         .version("2026-09-01", (v) => {
           v.rpc("/things.list", { output: z.array(z.string()) }, async () => [
@@ -135,6 +136,17 @@ describe("v.rpc", () => {
     }
 
     it("forward-copies the untouched RPC into the newer version", async () => {
+      const app = buildTwoVersionService();
+
+      const res = await app.request("/api/things/2026-09-01/things.count", {
+        method: "POST",
+      });
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toBe(1);
+    });
+
+    it("answers gone on the newer version for an RPC it withdrew", async () => {
       const app = buildTwoVersionService();
 
       const res = await app.request("/api/things/2026-09-01/things.get", {
@@ -198,6 +210,52 @@ describe("v.rpc", () => {
      */
     it("does not treat a dotted name as a version namespace", () => {
       expect(register("/latest.list")).not.toThrow();
+    });
+  });
+
+  /**
+   * The pipeline installs a validator for whichever of `params` / `query` a
+   * config declares. Left unchecked, an RPC could take arguments from the URL
+   * — which is the one thing the dotted name is supposed to rule out — and
+   * nothing would have said so.
+   */
+  describe("given an RPC config that declares URL-borne arguments", () => {
+    function registerWith(config: Record<string, unknown>): () => void {
+      return () =>
+        void createService({ name: "things", basePath: "/api/things" })
+          .version("2026-08-07", (v) => {
+            v.rpc(
+              "/things.get",
+              { output: z.string(), ...config },
+              async () => "x",
+            );
+          })
+          .build();
+    }
+
+    it("rejects a query schema", () => {
+      expect(registerWith({ query: z.object({ q: z.string() }) })).toThrow(
+        /declares query/,
+      );
+    });
+
+    it("rejects a params schema", () => {
+      expect(registerWith({ params: z.object({ id: z.string() }) })).toThrow(
+        /declares params/,
+      );
+    });
+
+    it("names both when both are declared", () => {
+      expect(
+        registerWith({
+          params: z.object({ id: z.string() }),
+          query: z.object({ q: z.string() }),
+        }),
+      ).toThrow(/declares params and query/);
+    });
+
+    it("accepts a body-only config", () => {
+      expect(registerWith({ input: z.object({ id: z.string() }) })).not.toThrow();
     });
   });
 });

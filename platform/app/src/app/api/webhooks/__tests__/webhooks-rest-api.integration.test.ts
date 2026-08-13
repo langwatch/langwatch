@@ -195,7 +195,7 @@ describe("Feature: Webhook endpoints management API", () => {
     await expectApiError(res, { status: 401, code: "missing_credentials" });
   });
 
-  describe("canonical error envelope", () => {
+  describe("when a request is refused", () => {
     /** @scenario An unauthenticated request answers the canonical error envelope */
     it("answers an unauthenticated request with it", async () => {
       const res = await app.request("/api/webhooks/eventTypes.list", {
@@ -347,7 +347,7 @@ describe("Feature: Webhook endpoints management API", () => {
     expect(error.tips?.join(" ")).toContain("between 1 and 100");
   });
 
-  describe("the URL admission policy is the one the sender enforces", () => {
+  describe("when a URL is submitted for admission", () => {
     // The endpoints platform used to ask only for https, so a URL the
     // automations trigger drawer refused saved fine as an endpoint. Both now
     // run the shared policy, which is the union of the two.
@@ -411,7 +411,7 @@ describe("Feature: Webhook endpoints management API", () => {
     });
   });
 
-  describe("the test button reaches what real delivery reaches", () => {
+  describe("when the test button fires at a real receiver", () => {
     // Real delivery passed allowInsecureLocal and the test send did not, so on
     // an install running the escape hatch a local endpoint delivered fine while
     // its own test button reported the address blocked. This fires the REAL
@@ -502,16 +502,28 @@ describe("Feature: Webhook endpoints management API", () => {
     });
   });
 
-  it("rejects unknown event selectors with a 400", async () => {
+  /**
+   * Six rules answer `webhook_endpoint_invalid`, so the status alone says
+   * almost nothing: this passed just as well when the handler returned a
+   * generic refusal that had lost the reason and the tip. What the caller
+   * needs is WHICH rule they broke, and that travels in `meta.reason`.
+   */
+  it("rejects unknown event selectors, naming the rule that refused", async () => {
     planHasWebhookEndpoints = true;
     const res = await rpc("endpoints.create", {
       url: "https://example.com/hooks",
       enabled_events: ["gateway.request.imagined"],
     });
-    expect(res.status).toBe(400);
+
+    const body = await expectApiError(res, {
+      status: 400,
+      code: "webhook_endpoint_invalid",
+    });
+    expect(body.meta?.reason).toBe("events");
+    expect(body.tips?.[0]).toContain("gateway.request.imagined");
   });
 
-  it("PATCH status flips enable and disable with the manual reason", async () => {
+  it("flips enable and disable through endpoints.update with the manual reason", async () => {
     planHasWebhookEndpoints = true;
     const createRes = await rpc("endpoints.create", {
       url: "https://example.com/hooks/toggle",
@@ -640,7 +652,7 @@ describe("Feature: Webhook endpoints management API", () => {
     expect(completed).toMatchObject({ family: "gateway", is_emitting: true });
   });
 
-  describe("the events log serves what it says it serves", () => {
+  describe("when the events log is queried", () => {
     /** @scenario An event id the log cannot answer for is a canonical 404 */
     it("404s for an event id that is not in this organization's log", async () => {
       planHasWebhookEndpoints = true;

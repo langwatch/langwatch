@@ -52,7 +52,7 @@ than deferred to the next family.
 **We will name the webhooks management endpoints as RPC calls: a dotted
 `<resource>.<verb>` path, always POST.**
 
-```
+```http
 POST /api/webhooks/endpoints.create
 POST /api/webhooks/endpoints.rollSecret
 POST /api/webhooks/endpoints.listDeliveries
@@ -62,7 +62,7 @@ POST /api/webhooks/eventTypes.list
 The grammar, asserted at registration time by `assertRpcPath` in
 `packages/api/src/version-builder.ts`:
 
-```
+```regexp
 ^/[a-z][a-zA-Z0-9]*(\.[a-z][a-zA-Z0-9]*)+$
 ```
 

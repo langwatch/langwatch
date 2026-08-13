@@ -985,7 +985,12 @@ const presentations = {
     },
   },
   enterprise_plan_required: {
-    title: "This needs the Enterprise plan",
+    // Deliberately does not name a tier. Most features behind this code are
+    // gated on the Enterprise tier, but some are gated on a per-feature
+    // entitlement a Pro or Custom contract can carry — so "you need
+    // Enterprise" is wrong copy for a customer who is on the right tier and
+    // simply has not bought this one thing.
+    title: "This isn't included in your plan",
     describe: () =>
       "Your organization's plan doesn't include this. Talk to your account team about upgrading.",
   },
