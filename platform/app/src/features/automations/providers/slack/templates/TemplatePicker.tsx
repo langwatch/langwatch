@@ -1,26 +1,21 @@
-import {
-  Badge,
-  Box,
-  Collapsible,
-  HStack,
-  SimpleGrid,
-  Stack,
-  Text,
-} from "@chakra-ui/react";
+import { Box, Flex, Stack, Text } from "@chakra-ui/react";
 import type { SlackDeliveryMethod } from "@langwatch/automations/providers/slack";
-import { ChevronDown, ChevronRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import {
+  buildLayoutGroups,
+  type LayoutRow,
+  otherCadenceOf,
+} from "./layoutRows";
 import {
   type DraftCadence,
   pickDefaultSlackBlockKitTemplateId,
   type ReportTemplateSource,
+  type SlackBlockKitTemplateId,
   type SlackBlockKitTemplateKind,
   type SlackBlockKitTemplateOption,
-  templateOptionsFor,
 } from "./registry";
-
-/** Note shown on a template a webhook connection can't render in full. */
-const GATED_NOTE = "Needs a Slack app connection";
+import { TemplateLayoutDetail } from "./TemplateLayoutDetail";
+import { TemplateLayoutList } from "./TemplateLayoutList";
 
 interface Props {
   cadence: DraftCadence;
@@ -49,20 +44,17 @@ interface Props {
 
 function introFor({
   kind,
-  cadence,
   reportSource,
-}: Pick<Props, "kind" | "cadence" | "reportSource">): string {
+}: Pick<Props, "kind" | "reportSource">): string {
   if (kind === "report") {
     return reportSource === "customGraph"
-      ? "Your report sends a graph, so every layout plots it. The thumbnail shows structure, not the final look."
-      : "Your report sends the traces that match, so every layout lists them. The thumbnail shows structure, not the final look.";
+      ? "Your report sends a graph, so every layout plots it. The preview shows structure, not the final look."
+      : "Your report sends the traces that match, so every layout lists them. The preview shows structure, not the final look.";
   }
   if (kind === "graphAlert") {
-    return "Each layout sends one message when the automation fires. The thumbnail shows structure, not the final look.";
+    return "Each layout sends one message when the automation fires. The preview shows structure, not the final look.";
   }
-  return cadence === "digest"
-    ? "Your cadence bundles every trace matched in the window into one digest message. Pick a starting layout — the thumbnail shows structure, not the final look."
-    : "Each matching trace sends its own message. Pick a starting layout — the thumbnail shows structure, not the final look.";
+  return "Pick a starting layout. The preview shows structure, not the final look.";
 }
 
 export function SlackBlockKitTemplatePicker({
@@ -75,26 +67,26 @@ export function SlackBlockKitTemplatePicker({
   onSelect,
   onSelectOtherCadence,
 }: Props) {
-  // The grouping (which layouts sit in the primary grid vs. behind the
-  // "N more layouts" disclosure) is latched to the cadence the picker last
+  // The grouping (which cadence's layouts lead the list, and which follow
+  // under the other heading) is latched to the cadence the picker last
   // settled on. Picking a cross-cadence layout changes the draft's cadence —
   // see `onSelectOtherCadence` below — and that change flows back down as a
   // new `cadence` prop. Deriving the grouping from the live prop on every
-  // render would swap the two groups on every cross-cadence pick: the
-  // disclosure the author just expanded becomes the primary grid and jumps
-  // to the top, and the layout they were looking at moves out from under
-  // them. Selecting still updates the highlight and the draft's cadence —
-  // it just never reshuffles the list AS A RESULT OF THAT PICK.
+  // render would swap the two groups on every cross-cadence pick: the group
+  // the author just scrolled to jumps to the top and the layout they were
+  // looking at moves out from under them. Selecting still updates the
+  // highlight and the draft's cadence — it just never reorders the list AS A
+  // RESULT OF THAT PICK.
   //
   // The picker is opened from the Delivery step, whose cadence control sits
   // beside the channel it belongs to (ADR-093 §4), so the author can change
-  // cadence there while this picker stays mounted. That
-  // external change must still regroup the gallery — `groupingCadence`
-  // exists to survive an in-picker pick, not to pin the picker to whatever
-  // cadence happened to be active when it first mounted. `selfInitiatedRef`
-  // marks the cadence value `onSelectOtherCadence` itself is about to cause,
-  // so the effect below can tell "I changed it" apart from "it changed
-  // elsewhere" and only resync for the latter.
+  // cadence there while this picker stays mounted. That external change must
+  // still regroup the list — `groupingCadence` exists to survive an in-picker
+  // pick, not to pin the picker to whatever cadence happened to be active
+  // when it first mounted. `selfInitiatedRef` marks the cadence value
+  // `handleApply` itself is about to cause, so the effect below can tell "I
+  // changed it" apart from "it changed elsewhere" and only resync for the
+  // latter.
   const [groupingCadence, setGroupingCadence] = useState<DraftCadence>(cadence);
   const selfInitiatedRef = useRef<DraftCadence | null>(null);
   useEffect(() => {
@@ -105,210 +97,78 @@ export function SlackBlockKitTemplatePicker({
     }
     setGroupingCadence(cadence);
   }, [cadence, groupingCadence]);
-  const options = templateOptionsFor({
-    cadence: groupingCadence,
+
+  const groups = buildLayoutGroups({
+    groupingCadence,
     kind,
     reportSource,
+    deliveryMethod,
+    currentSource,
+    defaultId: pickDefaultSlackBlockKitTemplateId({
+      cadence,
+      hasEvaluationFilter,
+      kind,
+      reportSource,
+    }),
   });
-  const otherCadence: DraftCadence =
-    groupingCadence === "digest" ? "immediate" : "digest";
-  const otherOptions = templateOptionsFor({
-    cadence: otherCadence,
-    kind,
-    reportSource,
-  }).filter((opt) => opt.cadenceFit !== "both");
-  const [otherOpen, setOtherOpen] = useState(false);
-  const handleSelectOtherCadence = (option: SlackBlockKitTemplateOption) => {
+  const rows = groups.flatMap((group) => group.rows);
+  const [highlightedId, setHighlightedId] =
+    useState<SlackBlockKitTemplateId | null>(null);
+  // What the preview pane shows: the layout the author last landed on, and
+  // before they have touched anything, the one the draft already uses. A
+  // custom-edited message matches no layout, so the preview opens on the
+  // default instead of on nothing.
+  const highlighted =
+    rows.find((row) => row.option.id === highlightedId) ??
+    rows.find((row) => row.isSelected) ??
+    rows.find((row) => row.isDefault) ??
+    rows[0];
+
+  const handleApply = (row: LayoutRow) => {
+    if (!row.fromOtherCadence) {
+      onSelect(row.option);
+      return;
+    }
+    const target = otherCadenceOf(groupingCadence);
     // A pick that lands on the SAME cadence as the live prop (two
-    // consecutive in-picker picks within the still-open other-cadence
-    // section, comparison-shopping between its layouts) never flips
-    // `cadence`, so the resync effect above never fires and never consumes
-    // the marker. Writing it anyway would leave it stale — a LATER, genuine
-    // external change that happens to land back on this same cadence value
-    // would then be misread as self-initiated and skip its regroup. Only
-    // write the marker when the pick actually changes the live cadence.
-    if (otherCadence !== cadence) selfInitiatedRef.current = otherCadence;
-    onSelectOtherCadence(option);
+    // consecutive picks within the other-cadence group, comparison-shopping
+    // between its layouts) never flips `cadence`, so the resync effect above
+    // never fires and never consumes the marker. Writing it anyway would
+    // leave it stale — a LATER, genuine external change that happens to land
+    // back on this same cadence value would then be misread as self-initiated
+    // and skip its regroup. Only write the marker when the pick actually
+    // changes the live cadence.
+    if (target !== cadence) selfInitiatedRef.current = target;
+    onSelectOtherCadence(row.option);
   };
-  const defaultId = pickDefaultSlackBlockKitTemplateId({
-    cadence,
-    hasEvaluationFilter,
-    kind,
-    reportSource,
-  });
 
   return (
-    <Stack gap={2} align="stretch">
+    <Stack gap={3} align="stretch">
       <Text textStyle="xs" color="fg.muted">
-        {introFor({ kind, cadence, reportSource })}
+        {introFor({ kind, reportSource })}
       </Text>
-      <SimpleGrid
-        columns={{ base: 2, md: Math.min(options.length, 3) }}
-        gap={3}
-        alignItems="stretch"
-      >
-        {options.map((option) => {
-          const isSelected = option.source === currentSource;
-          const isDefault = option.id === defaultId;
-          const locked = deliveryMethod === "webhook" && !!option.gatedBlock;
-          return (
-            <Card
-              key={option.id}
-              option={option}
-              isSelected={isSelected}
-              isDefault={isDefault}
-              locked={locked}
-              lockedNote={GATED_NOTE}
-              onClick={() => onSelect(option)}
+      <Flex gap={4} align="start" wrap="wrap">
+        <Box flex="1 1 190px" minWidth="190px">
+          <TemplateLayoutList
+            groups={groups}
+            highlightedId={highlighted?.option.id}
+            onHighlight={setHighlightedId}
+            onApply={handleApply}
+          />
+        </Box>
+        <Box flex="2 1 280px" minWidth="260px">
+          {highlighted ? (
+            <TemplateLayoutDetail
+              row={highlighted}
+              switchesCadenceTo={
+                highlighted.fromOtherCadence
+                  ? otherCadenceOf(groupingCadence)
+                  : undefined
+              }
             />
-          );
-        })}
-      </SimpleGrid>
-      {/* Alerts have no cadence choice (they always fire immediately), so
-          the cross-cadence layouts section only applies to trace drafts. */}
-      {kind !== "graphAlert" && otherOptions.length > 0 ? (
-        <Collapsible.Root
-          open={otherOpen}
-          onOpenChange={(d) => setOtherOpen(d.open)}
-        >
-          <Collapsible.Trigger asChild>
-            <HStack
-              cursor="pointer"
-              gap={1}
-              color="fg.muted"
-              width="fit-content"
-            >
-              {otherOpen ? (
-                <ChevronDown size={14} />
-              ) : (
-                <ChevronRight size={14} />
-              )}
-              <Text textStyle="xs">
-                {otherCadence === "digest"
-                  ? `${otherOptions.length} more layouts for digest cadences`
-                  : `${otherOptions.length} more layouts for the Immediate cadence`}
-              </Text>
-            </HStack>
-          </Collapsible.Trigger>
-          <Collapsible.Content>
-            <Stack gap={2} align="stretch" pt={2}>
-              <Text textStyle="xs" color="fg.muted">
-                {otherCadence === "digest"
-                  ? "These layouts bundle every match in a window into one message. Picking one switches this automation's cadence to a 5-minute digest — you can adjust the window in the Cadence section."
-                  : "These layouts send one message per matching trace. Picking one switches this automation's cadence to Immediate."}
-              </Text>
-              <SimpleGrid
-                columns={{ base: 2, md: Math.min(otherOptions.length, 3) }}
-                gap={3}
-                alignItems="stretch"
-              >
-                {otherOptions.map((option) => (
-                  <Card
-                    key={option.id}
-                    option={option}
-                    isSelected={option.source === currentSource}
-                    isDefault={false}
-                    locked={deliveryMethod === "webhook" && !!option.gatedBlock}
-                    lockedNote={GATED_NOTE}
-                    onClick={() => handleSelectOtherCadence(option)}
-                  />
-                ))}
-              </SimpleGrid>
-            </Stack>
-          </Collapsible.Content>
-        </Collapsible.Root>
-      ) : null}
+          ) : null}
+        </Box>
+      </Flex>
     </Stack>
-  );
-}
-
-function Card({
-  option,
-  isSelected,
-  isDefault,
-  locked,
-  lockedNote,
-  onClick,
-}: {
-  option: SlackBlockKitTemplateOption;
-  isSelected: boolean;
-  isDefault: boolean;
-  /** Rendered but not selectable — the current connection can't render this
-   *  layout in full. The wireframe still shows so the author can see what it
-   *  would look like once they connect a Slack app. */
-  locked?: boolean;
-  lockedNote?: string;
-  onClick: () => void;
-}) {
-  const { Wireframe } = option;
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={locked}
-      aria-pressed={isSelected}
-      aria-label={`Use ${option.displayName} template`}
-      style={{
-        textAlign: "left",
-        width: "100%",
-        height: "100%",
-        cursor: locked ? "not-allowed" : undefined,
-      }}
-    >
-      <Box
-        height="full"
-        borderWidth={isSelected ? "2px" : "1px"}
-        borderColor={isSelected ? "border.emphasized" : "border"}
-        borderRadius="md"
-        bg="bg.panel/60"
-        padding={3}
-        opacity={locked ? 0.6 : 1}
-        transition="border-color 120ms ease"
-        _hover={locked ? undefined : { borderColor: "border.emphasized" }}
-      >
-        <Stack gap={2} align="stretch" height="full">
-          <HStack gap={2}>
-            <Text textStyle="md">{option.emoji}</Text>
-            <Text textStyle="sm" fontWeight="medium">
-              {option.displayName}
-            </Text>
-            {isDefault ? (
-              <Badge size="sm" colorPalette="orange" variant="subtle">
-                Default
-              </Badge>
-            ) : null}
-          </HStack>
-          <Box
-            borderWidth="1px"
-            borderColor="border.muted"
-            borderRadius="sm"
-            padding={2}
-            bg="bg.subtle"
-            height="120px"
-            overflow="hidden"
-            flexShrink={0}
-          >
-            <Wireframe />
-          </Box>
-          {locked && lockedNote ? (
-            <Badge
-              size="xs"
-              variant="subtle"
-              colorPalette="gray"
-              alignSelf="start"
-            >
-              {lockedNote}
-            </Badge>
-          ) : (
-            <Badge size="xs" variant="surface" alignSelf="start">
-              {option.deliveryNote}
-            </Badge>
-          )}
-          <Text textStyle="xs" color="fg.muted" lineClamp={2}>
-            {option.tagline}
-          </Text>
-        </Stack>
-      </Box>
-    </button>
   );
 }

@@ -2,7 +2,13 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -29,6 +35,15 @@ const renderPicker = (
     />,
     { wrapper: Wrapper },
   );
+
+/** The layouts in the order the list renders them, by registry id. Order is
+ *  what the grouping latch controls, so every latch test reads it. */
+const layoutOrder = () =>
+  screen.getAllByRole("option").map((el) => el.getAttribute("data-layout-id"));
+
+const layout = (name: RegExp) => screen.getByRole("option", { name });
+
+const preview = () => within(screen.getByTestId("layout-preview"));
 
 /** Stands in for the composer's draft: `cadence` flows back down as a live
  *  prop once `onSelectOtherCadence` fires, exactly like the real form owner
@@ -88,25 +103,44 @@ describe("SlackBlockKitTemplatePicker", () => {
   });
 
   describe("given a trace draft on the immediate cadence", () => {
-    it("shows the trace layouts and none of the graph-alert ones", () => {
+    it("lists the trace layouts and none of the graph-alert ones", () => {
       renderPicker();
 
+      expect(layout(/compact notice/i)).toBeInTheDocument();
       expect(
-        screen.getByRole("button", { name: /use compact notice template/i }),
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByRole("button", {
-          name: /use metric — compact template/i,
-        }),
+        screen.queryByRole("option", { name: /metric — compact/i }),
       ).not.toBeInTheDocument();
     });
 
-    it("offers the digest layouts behind the other-cadence disclosure", () => {
+    it("groups the per-trace layouts first and the digest layouts under their own heading", () => {
       renderPicker();
 
       expect(
-        screen.getByText(/more layouts for digest cadences/i),
+        screen.getByRole("group", { name: /one message per trace/i }),
       ).toBeInTheDocument();
+      expect(
+        screen.getByRole("group", { name: /one digest message/i }),
+      ).toBeInTheDocument();
+      expect(layoutOrder()).toEqual([
+        "trace_alert_compact",
+        "trace_alert_one_liner",
+        "eval_failure_detailed",
+        "trace_card_rich",
+        "eval_failure_rich",
+        "digest_compact",
+        "digest_evaluator_rollup",
+        "digest_inline_rich",
+        "digest_table",
+      ]);
+    });
+
+    /** @scenario "The layout list previews the layout the author lands on" */
+    it("opens the preview on the default layout", () => {
+      renderPicker();
+
+      expect(preview().getByText("Compact notice")).toBeInTheDocument();
+      expect(preview().getByText("Default")).toBeInTheDocument();
+      expect(preview().getByText("1 message per trace")).toBeInTheDocument();
     });
   });
 
@@ -120,9 +154,7 @@ describe("SlackBlockKitTemplatePicker", () => {
       renderPicker({ onSelect });
 
       fireEvent.click(
-        screen.getByRole("button", {
-          name: new RegExp(`use ${firstOption!.displayName} template`, "i"),
-        }),
+        layout(new RegExp(firstOption!.displayName.toLowerCase(), "i")),
       );
 
       expect(onSelect).toHaveBeenCalledTimes(1);
@@ -131,136 +163,186 @@ describe("SlackBlockKitTemplatePicker", () => {
         source: firstOption!.source,
       });
     });
+
+    it("marks the layout the automation uses as selected", () => {
+      const [, secondOption] = templateOptionsFor({
+        cadence: "immediate",
+        kind: "trace",
+      });
+      renderPicker({ currentSource: secondOption!.source });
+
+      expect(layout(/one-liner/i)).toHaveAttribute("aria-selected", "true");
+      expect(layout(/compact notice/i)).toHaveAttribute(
+        "aria-selected",
+        "false",
+      );
+    });
+
+    it("marks nothing as selected once the message is customised", () => {
+      renderPicker({ currentSource: "{{ hand written }}" });
+
+      for (const option of screen.getAllByRole("option")) {
+        expect(option).toHaveAttribute("aria-selected", "false");
+      }
+    });
+  });
+
+  describe("when the author moves through the list with the keyboard", () => {
+    it("previews the next layout without applying it", async () => {
+      const user = userEvent.setup();
+      const onSelect = vi.fn();
+      renderPicker({ onSelect });
+
+      await user.tab();
+      await user.keyboard("{ArrowDown}");
+
+      expect(preview().getByText("One-liner")).toBeInTheDocument();
+      expect(onSelect).not.toHaveBeenCalled();
+    });
+
+    it("applies the previewed layout on Enter", async () => {
+      const user = userEvent.setup();
+      const onSelect = vi.fn();
+      renderPicker({ onSelect });
+
+      await user.tab();
+      await user.keyboard("{ArrowDown}{Enter}");
+
+      expect(onSelect).toHaveBeenCalledTimes(1);
+      expect(onSelect.mock.calls[0]![0]).toMatchObject({
+        id: "trace_alert_one_liner",
+      });
+    });
   });
 
   describe("given a webhook connection", () => {
-    it("renders a template that needs a Slack app but blocks selecting it", () => {
+    it("lists a layout that needs a Slack app but refuses to apply it", () => {
       const onSelect = vi.fn();
       renderPicker({ deliveryMethod: "webhook", onSelect });
 
       // "Eval failure banner" leads with a gated `alert` block.
-      const gatedCard = screen.getByRole("button", {
-        name: /use eval failure banner template/i,
-      });
-      expect(gatedCard).toBeDisabled();
-      expect(gatedCard.textContent).toContain("Needs a Slack app connection");
+      const gated = layout(/eval failure banner/i);
+      expect(gated).toHaveAttribute("aria-disabled", "true");
 
-      fireEvent.click(gatedCard);
+      fireEvent.click(gated);
+
       expect(onSelect).not.toHaveBeenCalled();
     });
 
-    it("keeps a non-gated template selectable", () => {
+    /** @scenario "A layout that needs a Slack app connection is previewed but cannot be picked" */
+    it("still previews that layout, with the connection it needs", () => {
       renderPicker({ deliveryMethod: "webhook" });
 
+      fireEvent.click(layout(/eval failure banner/i));
+
+      expect(preview().getByText("Eval failure banner")).toBeInTheDocument();
       expect(
-        screen.getByRole("button", { name: /use compact notice template/i }),
-      ).toBeEnabled();
+        preview().getByText("Needs a Slack app connection"),
+      ).toBeInTheDocument();
+    });
+
+    it("keeps a layout that needs no Slack app applicable", () => {
+      renderPicker({ deliveryMethod: "webhook" });
+
+      expect(layout(/compact notice/i)).not.toHaveAttribute("aria-disabled");
     });
   });
 
   describe("given a bot connection", () => {
-    it("lets the author select a template that needs a Slack app", () => {
+    it("lets the author apply a layout that needs a Slack app", () => {
       const onSelect = vi.fn();
       renderPicker({ deliveryMethod: "bot", onSelect });
 
-      const gatedCard = screen.getByRole("button", {
-        name: /use eval failure banner template/i,
-      });
-      expect(gatedCard).toBeEnabled();
+      const gated = layout(/eval failure banner/i);
+      expect(gated).not.toHaveAttribute("aria-disabled");
 
-      fireEvent.click(gatedCard);
+      fireEvent.click(gated);
+
       expect(onSelect).toHaveBeenCalledTimes(1);
     });
   });
 
   describe("given a graph-alert draft", () => {
-    it("shows only the graph-alert layouts", () => {
+    it("lists only the graph-alert layouts", () => {
       renderPicker({ kind: "graphAlert" });
 
+      expect(layout(/metric — compact/i)).toBeInTheDocument();
+      expect(layout(/metric — detailed/i)).toBeInTheDocument();
+      expect(layout(/one-liner/i)).toBeInTheDocument();
       expect(
-        screen.getByRole("button", { name: /use metric — compact template/i }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: /use metric — detailed template/i }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: /use one-liner template/i }),
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByRole("button", { name: /use compact notice template/i }),
+        screen.queryByRole("option", { name: /compact notice/i }),
       ).not.toBeInTheDocument();
       expect(
-        screen.queryByRole("button", { name: /use digest/i }),
+        screen.queryByRole("option", { name: /digest/i }),
       ).not.toBeInTheDocument();
     });
 
-    it("marks the compact notice as the default", () => {
+    it("marks the compact metric layout as the default", () => {
       renderPicker({ kind: "graphAlert" });
 
-      const compactCard = screen.getByRole("button", {
-        name: /use metric — compact template/i,
-      });
-      expect(compactCard.textContent).toContain("Default");
+      expect(
+        within(layout(/metric — compact/i)).getByText("Default"),
+      ).toBeInTheDocument();
     });
 
-    it("hides the other-cadence disclosure because alerts have no digest layouts", () => {
+    it("shows no cadence groups, because alerts always fire on the spot", () => {
       renderPicker({ kind: "graphAlert" });
 
-      expect(screen.queryByText(/more layouts for/i)).not.toBeInTheDocument();
+      expect(screen.queryAllByRole("group")).toHaveLength(0);
     });
   });
 
-  describe("when a cross-cadence layout is picked from the expanded disclosure", () => {
+  describe("given a report draft", () => {
+    it("lists every layout its source can fill once, without cadence groups", () => {
+      renderPicker({ kind: "report", reportSource: "traceQuery" });
+
+      expect(layoutOrder()).toEqual([
+        "report_table",
+        "report_digest",
+        "report_summary_card",
+      ]);
+      expect(screen.queryAllByRole("group")).toHaveLength(0);
+    });
+  });
+
+  describe("when a cross-cadence layout is picked", () => {
     /** @scenario "Cross-cadence layout picking keeps list order" */
-    it("keeps the primary grid's list order instead of regrouping around the new cadence", async () => {
+    it("keeps the list order instead of regrouping around the new cadence", async () => {
       const user = userEvent.setup();
       render(<StatefulPicker onPick={vi.fn()} />, { wrapper: Wrapper });
 
-      const namesBefore = screen
-        .getAllByRole("button", { name: /^use .+ template$/i })
-        .slice(0, 5)
-        .map((el) => el.getAttribute("aria-label"));
-      // The immediate-cadence layouts render first, in this order, per the
-      // registry — captured before any pick to compare against after.
-      expect(namesBefore).toEqual([
-        "Use Compact notice template",
-        "Use One-liner template",
-        "Use Eval failure detail template",
-        "Use Rich trace card template",
-        "Use Eval failure banner template",
-      ]);
+      // The immediate-cadence layouts lead, in registry order, with the
+      // digest ones under the second heading — captured before any pick to
+      // compare against after.
+      const orderBefore = layoutOrder();
+      expect(orderBefore[0]).toBe("trace_alert_compact");
 
-      await user.click(screen.getByText(/more layouts for digest cadences/i));
-      await user.click(
-        screen.getByRole("button", { name: /use digest — compact template/i }),
-      );
+      await user.click(layout(/digest — compact/i));
 
       // The cadence switched (the picker now renders against "digest"), but
-      // the grid the author is looking at must not have reshuffled: the same
-      // five immediate cards, in the same order, still lead.
-      const namesAfter = screen
-        .getAllByRole("button", { name: /^use .+ template$/i })
-        .slice(0, 5)
-        .map((el) => el.getAttribute("aria-label"));
-      expect(namesAfter).toEqual(namesBefore);
+      // the list the author is looking at must not have reordered.
+      expect(layoutOrder()).toEqual(orderBefore);
+    });
+
+    it("tells the author the cadence the layout switches them to", () => {
+      renderPicker();
+
+      fireEvent.click(layout(/digest — compact/i));
+
+      expect(preview().getByText(/5 minute digest/i)).toBeInTheDocument();
     });
   });
 
   describe("when cadence changes for a reason other than a pick made in this picker", () => {
-    /** @scenario "An external cadence change regroups the gallery; an in-picker pick still does not" */
-    it("regroups the gallery to match, then keeps a subsequent in-picker pick stable", async () => {
+    /** @scenario "An external cadence change reorders the layout list; an in-picker pick still does not" */
+    it("reorders the list to match, then keeps a subsequent in-picker pick stable", async () => {
       const user = userEvent.setup();
       render(<StatefulPicker onPick={vi.fn()} exposeExternalCadenceControl />, {
         wrapper: Wrapper,
       });
 
-      // Mounted on immediate — the digest layouts start behind the
-      // disclosure, not in the primary grid.
-      expect(
-        screen.queryByRole("button", {
-          name: /use digest — compact template/i,
-        }),
-      ).not.toBeInTheDocument();
+      // Mounted on immediate — the per-trace layouts lead.
+      expect(layoutOrder()[0]).toBe("trace_alert_compact");
 
       // The author switches cadence from the Delivery step's own cadence
       // control, not from anything in this picker.
@@ -270,66 +352,38 @@ describe("SlackBlockKitTemplatePicker", () => {
         }),
       );
 
-      // The gallery must track the real cadence — this was never a pick made
+      // The list must track the real cadence — this was never a pick made
       // here, so the mount-time latch must not have suppressed the regroup.
-      expect(
-        screen.getByRole("button", { name: /use digest — compact template/i }),
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByRole("button", { name: /use compact notice template/i }),
-      ).not.toBeInTheDocument();
-
-      const namesAfterExternalChange = screen
-        .getAllByRole("button", { name: /^use .+ template$/i })
-        .slice(0, 4)
-        .map((el) => el.getAttribute("aria-label"));
+      const orderAfterExternalChange = layoutOrder();
+      expect(orderAfterExternalChange[0]).toBe("digest_compact");
 
       // From here, an in-picker cross-cadence pick must still behave exactly
-      // as the sibling test above expects: no reshuffling as a result of the
+      // as the sibling test above expects: no reordering as a result of the
       // pick itself.
-      await user.click(
-        screen.getByText(/more layouts for the immediate cadence/i),
-      );
-      await user.click(
-        screen.getByRole("button", { name: /use compact notice template/i }),
-      );
+      await user.click(layout(/compact notice/i));
 
-      const namesAfterInPickerPick = screen
-        .getAllByRole("button", { name: /^use .+ template$/i })
-        .slice(0, 4)
-        .map((el) => el.getAttribute("aria-label"));
-      expect(namesAfterInPickerPick).toEqual(namesAfterExternalChange);
+      expect(layoutOrder()).toEqual(orderAfterExternalChange);
     });
 
-    it("still regroups after two consecutive in-picker picks land on the same cadence", async () => {
+    it("still reorders after two consecutive in-picker picks land on the same cadence", async () => {
       const user = userEvent.setup();
       render(<StatefulPicker onPick={vi.fn()} exposeExternalCadenceControl />, {
         wrapper: Wrapper,
       });
 
-      // Expand the digest section and pick two different digest layouts in a
-      // row without leaving it — comparison-shopping between the digest
-      // templates the registry offers, which the still-open disclosure
-      // supports. "Digest — inline rich" (unlike "evaluator chart"/"table")
-      // carries no gated block, so it stays clickable on this webhook
-      // connection. The first pick genuinely changes the cadence prop
-      // ("immediate" -> "digest"); the second does not (cadence is already
-      // "digest"), which is exactly the case the marker guard has to survive.
-      await user.click(screen.getByText(/more layouts for digest cadences/i));
-      await user.click(
-        screen.getByRole("button", { name: /use digest — compact template/i }),
-      );
-      await user.click(
-        screen.getByRole("button", {
-          name: /use digest — inline rich template/i,
-        }),
-      );
+      // Pick two different digest layouts in a row — comparison-shopping
+      // between the digest layouts the registry offers. "Digest — inline
+      // rich" (unlike "evaluator chart"/"table") carries no gated block, so
+      // it stays applicable on this webhook connection. The first pick
+      // genuinely changes the cadence prop ("immediate" -> "digest"); the
+      // second does not (cadence is already "digest"), which is exactly the
+      // case the marker guard has to survive.
+      await user.click(layout(/digest — compact/i));
+      await user.click(layout(/digest — inline rich/i));
 
-      // Neither in-picker pick should have regrouped the gallery on its own
-      // — same contract as the sibling test above.
-      expect(
-        screen.getByRole("button", { name: /use compact notice template/i }),
-      ).toBeInTheDocument();
+      // Neither in-picker pick should have reordered the list on its own —
+      // same contract as the sibling test above.
+      expect(layoutOrder()[0]).toBe("trace_alert_compact");
 
       // Now the cadence changes externally, twice: once back to "immediate"
       // (a no-op for the grouping, since it was never anything else) and
@@ -343,23 +397,14 @@ describe("SlackBlockKitTemplatePicker", () => {
       await user.click(externalToggle);
       await user.click(externalToggle);
 
-      // The gallery must reflect the real (digest) cadence now: the digest
-      // layouts lead the PRIMARY grid (the first 4 buttons — digest cadence
-      // has exactly 4 trace templates). The disclosure is still open from
-      // the setup above and now holds the immediate layouts instead, so
-      // "Compact notice" is still somewhere in the document — checked by
-      // POSITION, not presence.
-      const primaryNames = screen
-        .getAllByRole("button", { name: /^use .+ template$/i })
-        .slice(0, 4)
-        .map((el) => el.getAttribute("aria-label"));
-      expect(primaryNames).toEqual(
-        expect.arrayContaining([
-          "Use Digest — compact template",
-          "Use Digest — inline rich template",
-        ]),
-      );
-      expect(primaryNames).not.toContain("Use Compact notice template");
+      // The list must reflect the real (digest) cadence now: the digest
+      // layouts lead it, and the per-trace ones follow under their heading.
+      expect(layoutOrder().slice(0, 4)).toEqual([
+        "digest_compact",
+        "digest_evaluator_rollup",
+        "digest_inline_rich",
+        "digest_table",
+      ]);
     });
   });
 });

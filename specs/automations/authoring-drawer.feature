@@ -362,19 +362,32 @@ Feature: Staged automation authoring drawer
       Then it is posted as Block Kit blocks, not the plain-text default
 
     @integration
-    Scenario: Cross-cadence layout picking keeps list order
-      Given the user has expanded the "more layouts" disclosure in the template gallery
-      When the user picks a layout built for the other cadence
-      Then the automation's cadence switches to match the picked layout
-      And the gallery's list order is unchanged
+    Scenario: The layout list previews the layout the author lands on
+      Given the user is choosing the Slack message layout
+      Then the layout the automation already uses is previewed beside the list
+      And the preview shows its structure, what one message contains, and what it is for
 
     @integration
-    Scenario: An external cadence change regroups the gallery; an in-picker pick still does not
-      Given the template gallery is showing layouts for the automation's current cadence
+    Scenario: A layout that needs a Slack app connection is previewed but cannot be picked
+      Given the notification delivers over an incoming webhook
+      When the user opens a layout that needs a Slack app connection
+      Then the preview says the layout needs a Slack app connection
+      And picking it leaves the automation's layout unchanged
+
+    @integration
+    Scenario: Cross-cadence layout picking keeps list order
+      Given the layout list shows the layouts for both cadences, grouped by what one message contains
+      When the user picks a layout built for the other cadence
+      Then the automation's cadence switches to match the picked layout
+      And the layout list's order is unchanged
+
+    @integration
+    Scenario: An external cadence change reorders the layout list; an in-picker pick still does not
+      Given the layout list leads with the layouts for the automation's current cadence
       When the user changes the cadence from the wizard's Delivery step
-      Then the gallery regroups its primary layouts to match the new cadence
-      When the user then picks a layout built for the other cadence from the gallery
-      Then the gallery's list order is unchanged by that pick
+      Then the layout list leads with the layouts for the new cadence
+      When the user then picks a layout built for the other cadence
+      Then the layout list's order is unchanged by that pick
 
     Scenario: Test fire sends a banner-marked notification before saving
       Given the user has configured a notification with a destination
