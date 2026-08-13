@@ -36,8 +36,7 @@ func TestDispatchCredential_DeploymentMappedProvidersAllGetTheSelfMap(t *testing
 		cred     domain.Credential
 		provider bfschemas.ModelProvider
 		// keyDeployments reads the deployments map back off the vendor key
-		// config this provider is handed. Nil where the gateway sends the
-		// vendor no deployments at all — see the Vertex row.
+		// config this provider is handed.
 		keyDeployments func(t *testing.T, key bfschemas.Key) map[string]string
 	}{
 		{
@@ -70,12 +69,6 @@ func TestDispatchCredential_DeploymentMappedProvidersAllGetTheSelfMap(t *testing
 			},
 		},
 		{
-			// bfschemas.VertexKeyConfig carries a Deployments field, but
-			// credentialToBifrostKey's Vertex arm does not populate it. That
-			// gap predates this change and is outside its scope, so the vendor
-			// half is left unasserted here rather than asserted wrongly. The
-			// credential half below still has to hold: it is the value a fix
-			// to that gap would forward.
 			name: "vertex",
 			cred: domain.Credential{
 				ID:         "cred-vertex",
@@ -83,6 +76,11 @@ func TestDispatchCredential_DeploymentMappedProvidersAllGetTheSelfMap(t *testing
 				Extra:      map[string]string{"project_id": "proj", "region": "us-central1"},
 			},
 			provider: bfschemas.Vertex,
+			keyDeployments: func(t *testing.T, key bfschemas.Key) map[string]string {
+				t.Helper()
+				require.NotNil(t, key.VertexKeyConfig, "vertex must be handed a key config")
+				return key.VertexKeyConfig.Deployments
+			},
 		},
 	}
 
@@ -98,9 +96,6 @@ func TestDispatchCredential_DeploymentMappedProvidersAllGetTheSelfMap(t *testing
 			assert.Equal(t, model, got.DeploymentMap[model],
 				"with no explicit deployment configured, the model id is the deployment name")
 
-			if tc.keyDeployments == nil {
-				return
-			}
 			assert.Equal(t, got.DeploymentMap, tc.keyDeployments(t, credentialToBifrostKey(got, tc.provider)),
 				"the resolved map must reach the vendor key config, not stop at the credential")
 		})

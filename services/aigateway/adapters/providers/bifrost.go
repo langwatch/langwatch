@@ -1154,6 +1154,7 @@ func credentialToBifrostKey(cred domain.Credential, provider bfschemas.ModelProv
 			ProjectNumber:   envVar(cred.Extra["project_number"]),
 			Region:          envVar(cred.Extra["region"]),
 			AuthCredentials: envVar(cred.Extra["auth_credentials"]),
+			Deployments:     cred.DeploymentMap,
 		}
 
 	case bfschemas.VLLM:
