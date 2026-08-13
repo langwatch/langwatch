@@ -18,7 +18,8 @@
  * The services feed CollectedGrants snapshots into decide(); nothing in this
  * package ever reaches for storage itself.
  */
-export { AuthzEngine, scopeChain, scopeOrganizationId } from "./engine";
+export { AuthzEngine } from "./engine";
+export { scopeChain, scopeOrganizationId } from "./scope";
 export type {
   AuthzDecision,
   AuthzDenialReason,
@@ -32,7 +33,7 @@ export type {
   ResourceGrant,
   RoleBindingScopeType,
   TeamUserRole,
-} from "./engine";
+} from "./types";
 export {
   ALL_PERMISSIONS,
   AUTHZ_RESOURCES,

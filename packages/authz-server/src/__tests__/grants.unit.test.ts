@@ -43,7 +43,6 @@ function makeRepository(
     findTeamOrganization: vi.fn().mockResolvedValue({ organizationId: ORG }),
     findProjectLineage: vi.fn().mockResolvedValue(null),
     replaceBinding: vi.fn().mockResolvedValue(undefined),
-    findUserEmail: vi.fn().mockResolvedValue("dave@acme.test"),
     // The real adapter runs the deletes in a transaction and calls prove()
     // with a transaction-bound reader; the stub mirrors that contract - a
     // throw from prove() rejects the whole call, like a rollback.

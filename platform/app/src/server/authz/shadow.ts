@@ -10,11 +10,18 @@
  * mirrors; the services are stateless, so a fresh instance per call costs
  * three allocations and shares nothing.
  *
- * This module must stay free of any storage import for that reason. The two
- * env reads below are the whole of what it needs, and both are functions the
- * shadow service calls per check — runtime.ts imports `demoProjectId` from
- * HERE rather than the reverse, because that is the direction the boundary
- * allows.
+ * The rule that follows is narrower than "no storage", and this module does
+ * construct a repository: nothing here may import the app-wide prisma client
+ * (`~/server/db`) or redis AT MODULE SCOPE, because that is the state whose
+ * module-load side effects reach the browser. A repository CLASS constructed
+ * over a handle the caller already holds carries no such state, so
+ * PrismaAuthzReadRepository below is fine. The boundary is enforced as a
+ * graph, not by review: src/server/__tests__/frontend-boundary.unit.test.ts.
+ *
+ * The two env reads below are the whole of what it needs, and both are
+ * functions the shadow service calls per check — runtime.ts imports
+ * `demoProjectId` from HERE rather than the reverse, because that is the
+ * direction the boundary allows.
  */
 import {
   AuthzCollectorService,
@@ -34,8 +41,11 @@ export function parseShadowRate(): number {
   const raw = process.env.AUTHZ_V2_SHADOW;
   if (!raw) return 0;
   if (raw === "1" || raw === "true") return 1;
-  const parsed = Number.parseFloat(raw);
-  if (Number.isNaN(parsed)) return 0;
+  // Number(), not parseFloat(): parseFloat("1oops") is 1, which would read a
+  // typo as "compare every check". Number() rejects the whole string, and
+  // Number.isFinite also turns "Infinity" away.
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) return 0;
   return Math.min(1, Math.max(0, parsed));
 }
 

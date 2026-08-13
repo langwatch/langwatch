@@ -788,11 +788,18 @@ describe("client-imported vocabulary never reaches server-only state", () => {
     });
   });
 
-  describe("given a client-imported server module that reaches nothing", () => {
+  // The negative half of the self-validation, and it has to name a module the
+  // assertion above does NOT already cover — a client-imported root is
+  // asserted clean up there, so re-asserting one here would only restate it.
+  // The shadow composes a repository per call over the caller's own Prisma
+  // handle, which is exactly the shape the boundary permits and the one a
+  // future `import { prisma } from "~/server/db"` would break.
+  describe("given a server module that composes over a caller-supplied handle", () => {
     it("reports no chain, so a clean root really is clean", () => {
-      expect(
-        chainToServerOnlyState(path.join(SRC, "server/api/rbac.ts")),
-      ).toBeNull();
+      const shadow = path.join(SRC, "server/authz/shadow.ts");
+
+      expect(CLIENT_IMPORTED_SERVER_MODULES).not.toContain(shadow);
+      expect(chainToServerOnlyState(shadow)).toBeNull();
     });
   });
 });

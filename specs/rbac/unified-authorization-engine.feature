@@ -330,7 +330,7 @@ Feature: Unified authorization engine
   # What is bound here is that a grant on a thread node covers the traces
   # beneath it through the parents chain, with no rows of their own.
   @unit
-  Scenario: A shared thread covers its traces and their children
+  Scenario: A shared thread covers the traces beneath it
     Given thread "th1" in project "chatbot" carries a resource grant of "traces:view"
     When a visitor presenting the grant reads a trace whose parent is "th1"
     Then the read is granted through thread "th1"'s single grant

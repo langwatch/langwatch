@@ -265,6 +265,13 @@ export class PrismaAuthzReadRepository implements AuthzReadRepository {
  * whatever role the binding names. "Its own" is the same exclusivity
  * `RoleRepository.isExclusiveToApiKey` uses - every binding on the role
  * belongs to this key, and no legacy assignment holds it.
+ *
+ * The `some` beside the `every` is what makes that exclusivity mean
+ * something. Prisma's `every` is vacuously TRUE over an empty relation, so a
+ * system role with NO bindings at all satisfies `every: { apiKeyId }` for
+ * every key on the platform - the guard would have admitted any key that
+ * named such a role. `some` demands at least one binding to THIS key, which
+ * is the "minted for me" half of the claim.
  */
 function systemRoleGuard(principal: AuthzPrincipalRef) {
   if (principal.type !== "apiKey") {
@@ -274,7 +281,10 @@ function systemRoleGuard(principal: AuthzPrincipalRef) {
     OR: [
       { kind: { not: CUSTOM_ROLE_KIND.SYSTEM_API_KEY } },
       {
-        roleBindings: { every: { apiKeyId: principal.id } },
+        roleBindings: {
+          some: { apiKeyId: principal.id },
+          every: { apiKeyId: principal.id },
+        },
         assignedUsers: { none: {} },
       },
     ],

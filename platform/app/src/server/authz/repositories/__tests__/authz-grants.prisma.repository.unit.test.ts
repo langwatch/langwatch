@@ -1,4 +1,5 @@
 import {
+  type AuthzReadRepository,
   BindingMissingError,
   DuplicateBindingError,
   type RoleBindingWrite,
@@ -229,18 +230,23 @@ describe("PrismaAuthzGrantsRepository", () => {
           return { count };
         });
       const findMany = vi.fn().mockResolvedValue([]);
+      const findUnique = vi.fn(async () => {
+        calls.push("readEmail");
+        return { email: "alice@example.com" };
+      });
       const tx = {
         roleBinding: { deleteMany: deleteMany("bindings", 2), findMany },
         groupMembership: { deleteMany: deleteMany("groups", 1) },
         teamUser: { deleteMany: deleteMany("teamUsers", 0) },
         organizationUser: { deleteMany: deleteMany("orgUser", 1) },
+        user: { findUnique },
         organizationInvite: { deleteMany: deleteMany("invites", 1) },
       };
       const prisma = {
         $transaction: vi.fn(async (run: (t: typeof tx) => unknown) => run(tx)),
       } as unknown as PrismaClient;
 
-      const prove = vi.fn(async (reader) => {
+      const prove = vi.fn(async (reader: AuthzReadRepository) => {
         calls.push("prove");
         // The reader must be bound to THIS transaction, or the re-collect
         // would read the pre-delete world and prove nothing.
@@ -255,19 +261,27 @@ describe("PrismaAuthzGrantsRepository", () => {
         {
           userId: "alice",
           organizationId: "org-1",
-          email: "alice@example.com",
           prove,
         },
       );
 
+      // The address the invite delete matches on is read inside the same
+      // transaction, and before that delete: read outside it, a change
+      // between the read and the delete would leave a live invite behind
+      // that the counts below claim was removed.
       expect(calls).toEqual([
         "bindings",
         "groups",
         "teamUsers",
         "orgUser",
+        "readEmail",
         "invites",
         "prove",
       ]);
+      expect(findUnique).toHaveBeenCalledWith({
+        where: { id: "alice" },
+        select: { email: true },
+      });
       expect(findMany).toHaveBeenCalledTimes(1);
       expect(counts).toEqual({
         bindings: 2,
@@ -289,6 +303,7 @@ describe("PrismaAuthzGrantsRepository", () => {
           organizationUser: {
             deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
           },
+          user: { findUnique: vi.fn().mockResolvedValue(null) },
           organizationInvite: {
             deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
           },
@@ -304,7 +319,6 @@ describe("PrismaAuthzGrantsRepository", () => {
           new PrismaAuthzGrantsRepository(prisma).offboardUser({
             userId: "alice",
             organizationId: "org-1",
-            email: null,
             prove: () => Promise.reject(incomplete),
           }),
         ).rejects.toBe(incomplete);
@@ -322,6 +336,7 @@ describe("PrismaAuthzGrantsRepository", () => {
         organizationUser: {
           deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
         },
+        user: { findUnique: vi.fn().mockResolvedValue({ email: null }) },
         organizationInvite: { deleteMany: inviteDeleteMany },
       };
       const prisma = {
@@ -332,7 +347,6 @@ describe("PrismaAuthzGrantsRepository", () => {
         {
           userId: "alice",
           organizationId: "org-1",
-          email: null,
           prove: () => Promise.resolve(),
         },
       );

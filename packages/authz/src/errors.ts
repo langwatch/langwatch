@@ -1,5 +1,5 @@
 import { HandledError } from "@langwatch/handled-error";
-import type { AuthzDenialReason, AuthzScopeRef } from "./engine";
+import type { AuthzDenialReason, AuthzScopeRef } from "./types";
 
 /**
  * ADR-092 §2 — the one denial error. `denialReason` replaces the legacy

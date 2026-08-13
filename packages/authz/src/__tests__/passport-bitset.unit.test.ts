@@ -55,9 +55,9 @@ describe("authz passports", () => {
     });
   }
 
-  /** Signs an arbitrary body with the same secret — how a forgery would look
-   *  if the signing key itself leaked, which is what the payload guards are
-   *  for. */
+  /** Signs an arbitrary body with the same secret, producing a correctly
+   *  signed but structurally invalid payload — validation after integrity,
+   *  which is what the payload guards are for. */
   function signedToken(body: string): string {
     return `${body}.${createHmac("sha256", secret).update(body).digest("base64url")}`;
   }
@@ -74,6 +74,7 @@ describe("authz passports", () => {
     o: "org-1",
     s: {},
     e: 7,
+    iat: nowSeconds,
     x: nowSeconds + MAX_PASSPORT_TTL_SECONDS,
   };
 
@@ -154,6 +155,22 @@ describe("authz passports", () => {
         reason: "malformed",
       });
     });
+
+    it("fails with malformed when the issuance time is not an integer", () => {
+      const token = tokenCarrying({ ...validPayload, iat: "yesterday" });
+      expect(passports.verify({ token, currentEpoch: 7 })).toEqual({
+        ok: false,
+        reason: "malformed",
+      });
+    });
+
+    it("fails with malformed when the expiry is not an integer", () => {
+      const token = tokenCarrying({ ...validPayload, x: null });
+      expect(passports.verify({ token, currentEpoch: 7 })).toEqual({
+        ok: false,
+        reason: "malformed",
+      });
+    });
   });
 
   describe("when a longer life is asked for than the ceiling allows", () => {
@@ -177,12 +194,26 @@ describe("authz passports", () => {
       });
     });
 
-    it("refuses a forged expiry beyond the ceiling", () => {
-      const token = tokenCarrying({ ...validPayload, x: nowSeconds + 3600 });
+    it("refuses an expiry stretched further past the issuance time", () => {
+      const token = tokenCarrying({
+        ...validPayload,
+        x: validPayload.iat + MAX_PASSPORT_TTL_SECONDS + 1,
+      });
       expect(passports.verify({ token, currentEpoch: 7 })).toEqual({
         ok: false,
         reason: "ttl-exceeded",
       });
+    });
+  });
+
+  describe("when the verifier's clock runs behind the issuer's", () => {
+    it("still accepts a max-TTL passport — the ceiling anchors on iat", () => {
+      const behind = new PassportService({ secret, now: () => now() - 1_000 });
+      const verification = behind.verify({
+        token: mint(7, MAX_PASSPORT_TTL_SECONDS)!,
+        currentEpoch: 7,
+      });
+      expect(verification.ok).toBe(true);
     });
   });
 

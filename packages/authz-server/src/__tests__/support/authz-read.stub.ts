@@ -1,5 +1,13 @@
-import { type Mocked, vi } from "vitest";
+import { type Mock, type Mocked, vi } from "vitest";
 import type { AuthzReadRepository } from "../../authz-read.repository";
+
+/**
+ * Every port method as a mock. Spelled as a mapped type over the interface so
+ * the defaults below are CHECKED against it: a method added to
+ * AuthzReadRepository with no default here fails typecheck, which a cast on
+ * the returned object would have swallowed.
+ */
+type ReaderStub = { [K in keyof AuthzReadRepository]: Mock };
 
 /**
  * A read repository whose every method resolves empty - no membership, no
@@ -10,7 +18,7 @@ import type { AuthzReadRepository } from "../../authz-read.repository";
 export function makeReader(
   overrides: Partial<AuthzReadRepository> = {},
 ): Mocked<AuthzReadRepository> {
-  return {
+  const base: ReaderStub = {
     findOrganizationRole: vi.fn().mockResolvedValue(null),
     findUserBindings: vi.fn().mockResolvedValue([]),
     findGroupBindings: vi.fn().mockResolvedValue([]),
@@ -21,6 +29,6 @@ export function makeReader(
     findShareLinks: vi.fn().mockResolvedValue([]),
     findProjectLineage: vi.fn().mockResolvedValue(null),
     findTeamOrganization: vi.fn().mockResolvedValue(null),
-    ...overrides,
-  } as Mocked<AuthzReadRepository>;
+  };
+  return { ...base, ...overrides } as Mocked<AuthzReadRepository>;
 }

@@ -45,6 +45,12 @@ export type PassportPayload = {
   s: Record<string, string>;
   /** Org authz epoch at mint time. */
   e: number;
+  /**
+   * Unix seconds issuance time. Signed, so it is the anchor the TTL ceiling
+   * is measured from: the token itself says how long a life it claims, and
+   * that claim is checked without consulting either party's clock.
+   */
+  iat: number;
   /** Unix seconds expiry. */
   x: number;
 };
@@ -57,7 +63,7 @@ export type PassportVerification =
         | "malformed"
         | "bad-signature"
         | "expired"
-        /** `x` sits further ahead than mint() can ever place it. */
+        /** `x` sits further past `iat` than mint() can ever place it. */
         | "ttl-exceeded"
         | "stale-epoch"
         | "no-secret";
@@ -94,6 +100,7 @@ export class PassportService {
     const { secret } = this.options;
     if (!secret) return null;
 
+    const issuedAt = Math.floor(this.now() / 1000);
     const payload: PassportPayload = {
       v: PASSPORT_VERSION,
       p: `${principal.type}:${principal.id}`,
@@ -105,9 +112,8 @@ export class PassportService {
         ]),
       ),
       e: epoch,
-      x:
-        Math.floor(this.now() / 1000) +
-        Math.min(ttlSeconds, MAX_PASSPORT_TTL_SECONDS),
+      iat: issuedAt,
+      x: issuedAt + Math.min(ttlSeconds, MAX_PASSPORT_TTL_SECONDS),
     };
 
     const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
@@ -151,13 +157,21 @@ export class PassportService {
     if (payload.v !== PASSPORT_VERSION) {
       return { ok: false, reason: "malformed" };
     }
-    const nowSeconds = Math.floor(this.now() / 1000);
+    // Both timestamps are attacker-supplied until the signature vouches for
+    // them; a non-integer would make every comparison below meaningless
+    // (NaN loses silently), so the shape is checked before the values are.
+    if (!Number.isInteger(payload.iat) || !Number.isInteger(payload.x)) {
+      return { ok: false, reason: "malformed" };
+    }
     // The 60s ceiling is enforced at both ends. mint() clamps it, and a token
-    // claiming a longer life than mint() can issue is refused here — a forged
-    // or replayed `x` never buys more time than the epoch check allows.
-    if (payload.x > nowSeconds + MAX_PASSPORT_TTL_SECONDS) {
+    // claiming a longer life than mint() can issue is refused here. The
+    // ceiling is measured against the token's own signed issuance time, not
+    // against the verifier's clock: a verifier running seconds behind the
+    // issuer would otherwise reject honest max-TTL passports.
+    if (payload.x > payload.iat + MAX_PASSPORT_TTL_SECONDS) {
       return { ok: false, reason: "ttl-exceeded" };
     }
+    const nowSeconds = Math.floor(this.now() / 1000);
     if (nowSeconds >= payload.x) {
       return { ok: false, reason: "expired" };
     }

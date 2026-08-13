@@ -256,12 +256,40 @@ describe("PrismaAuthzReadRepository", () => {
             OR: [
               { kind: { not: "system_api_key" } },
               {
-                roleBindings: { every: { apiKeyId: "key-1" } },
+                roleBindings: {
+                  some: { apiKeyId: "key-1" },
+                  every: { apiKeyId: "key-1" },
+                },
                 assignedUsers: { none: {} },
               },
             ],
           },
           select: { id: true, permissions: true },
+        });
+      });
+
+      describe("when a system role carries no bindings at all", () => {
+        it("excludes it, because `every` alone is vacuously true on an empty relation", async () => {
+          const findMany = vi.fn().mockResolvedValue([]);
+          const prisma = {
+            customRole: { findMany },
+          } as unknown as Prisma.TransactionClient;
+
+          await new PrismaAuthzReadRepository(prisma).findCustomRolePermissions(
+            {
+              organizationId: "org-1",
+              principal: { type: "apiKey", id: "key-1" },
+              customRoleIds: ["orphan-role"],
+            },
+          );
+
+          // A bindingless system role satisfies `every: { apiKeyId }` for
+          // EVERY key on the platform, so `every` on its own let any key
+          // that named such a role collect its permissions. The `some`
+          // clause is the half that requires the role to have been minted
+          // for this key; without it the guard admits the orphan.
+          const branch = findMany.mock.calls[0]?.[0]?.where?.OR?.[1];
+          expect(branch.roleBindings.some).toEqual({ apiKeyId: "key-1" });
         });
       });
     });

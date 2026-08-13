@@ -1,5 +1,5 @@
 import { ALL_PERMISSIONS, type CollectedBinding } from "@langwatch/authz";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthzCollectorService } from "../authz-collector.service";
 import type { AuthzReadRepository } from "../authz-read.repository";
 import { AuthzService, type AuthzServiceOptions } from "../authz.service";
@@ -150,6 +150,16 @@ describe("AuthzService epoch cache", () => {
   });
 
   describe("when an entry outlives the absolute age bound", () => {
+    // The bound is measured off Date.now(), so a fake clock moves the entry
+    // past it instantly - a real sleep would buy the same assertion at the
+    // price of wall clock in every run.
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
     it("recollects even though the epoch never moved", async () => {
       const { reader, collects } = makeMemberReader();
       const authz = makeService({
@@ -163,7 +173,7 @@ describe("AuthzService epoch cache", () => {
         permission: "organization:view",
         scope: orgScope,
       });
-      await new Promise((resolve) => setTimeout(resolve, 60));
+      vi.advanceTimersByTime(60);
       await authz.can({
         principal: alice,
         permission: "organization:view",

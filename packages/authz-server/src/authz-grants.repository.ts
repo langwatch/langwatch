@@ -105,17 +105,20 @@ export interface AuthzGrantsRepository extends ScopeLineageRepository {
     };
     create: RoleBindingWrite;
   }): Promise<void>;
-  findUserEmail(args: { userId: string }): Promise<string | null>;
   /**
    * Delete every grant source for the user in one transaction, call
    * `prove` with a reader bound to that transaction, and commit only if it
    * returns. A throw from `prove` rolls the whole offboarding back
    * (ADR-092 §10 step 7).
+   *
+   * Pending invites are keyed by email rather than by user id, so the
+   * implementation reads the address INSIDE its own transaction: a pre-read
+   * here would let an email change between the read and the deletes leave
+   * an invite behind that the proof cannot see.
    */
   offboardUser(args: {
     userId: string;
     organizationId: string;
-    email: string | null;
     prove: (txReader: AuthzReadRepository) => Promise<void>;
   }): Promise<OffboardCounts>;
   findOwnedApiKeys(args: {

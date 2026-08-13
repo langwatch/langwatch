@@ -1,4 +1,4 @@
-import type { AuthzDecision, AuthzScopeRef } from "./engine";
+import type { AuthzDecision, AuthzScopeRef } from "./types";
 
 /**
  * ADR-092 §7 L3 — the authorization witness: a branded proof that

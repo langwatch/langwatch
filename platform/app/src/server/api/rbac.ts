@@ -1174,8 +1174,22 @@ async function resolveProjectPermissionAny(
   }
 
   // The demo project grants its view permissions to everyone, so one of them
-  // being enough settles the question before anything is read.
-  if (permissions.some((permission) => isDemoProject(projectId, permission))) {
+  // being enough settles the question before anything is read. The comparison
+  // fires BEFORE the return, as in resolveProjectPermission: the engine
+  // carries its own demo-project rule, and an early return here used to hide
+  // the entire demo surface from shadow mode. Only the permission that
+  // matched is shadowed, because that is the only one legacy answered.
+  const demoPermission = permissions.find((permission) =>
+    isDemoProject(projectId, permission),
+  );
+  if (demoPermission !== undefined) {
+    authzShadowFor(ctx.prisma).userPermissionCheck({
+      userId: ctx.session.user.id,
+      permission: demoPermission,
+      legacyAllowed: true,
+      projectId,
+      caller: "trpc.projectAny",
+    });
     return { permitted: true, organizationRole: null };
   }
 

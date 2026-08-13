@@ -76,17 +76,24 @@ describe("GrantsService and resource scopes", () => {
     });
 
     it("names the resource without leaking the stage note into the message", async () => {
-      await expect(
-        makeService().attach({
-          actor: { userId: "admin-1" },
-          who: { type: "user", id: "user-1" },
-          role: { builtin: "MEMBER" },
-          where: traceScope(),
-        }),
-      ).rejects.toMatchObject({
+      const attaching = makeService().attach({
+        actor: { userId: "admin-1" },
+        who: { type: "user", id: "user-1" },
+        role: { builtin: "MEMBER" },
+        where: traceScope(),
+      });
+
+      await expect(attaching).rejects.toMatchObject({
         code: "grant_validation_failed",
         meta: { kind: "trace", resourceId: "trace-1" },
       });
+      // The migration note lives in the source comment, never in the
+      // sentence an admin reads.
+      const rejection = (await attaching.catch(
+        (error: unknown) => error,
+      )) as GrantValidationError;
+      expect(rejection.message).not.toContain("C5");
+      expect(rejection.message).not.toContain("stage");
     });
   });
 });

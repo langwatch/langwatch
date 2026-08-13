@@ -88,7 +88,7 @@ describe("resource-tier grants (ADR-092 §8)", () => {
   describe("given a shared thread and a trace inside it", () => {
     const resourceGrants = [grantOn({ kind: "thread", id: "thread-1" })];
 
-    /** @scenario "A shared thread covers its traces and their children" */
+    /** @scenario "A shared thread covers the traces beneath it" */
     it("covers the trace through its parent link — one grant, no child rows", () => {
       const decision = engine.decide({
         grants: makeGrants(),

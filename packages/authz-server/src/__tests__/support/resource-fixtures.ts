@@ -34,6 +34,7 @@ export const grantOn = (
 
 export function makeGrants({
   bindings = [] as CollectedBinding[],
+  organizationId = ORG,
   organizationRole = null as CollectedGrants["organizationRole"],
   isOrgMember = organizationRole != null,
   legacyTeamMemberships = [] as CollectedGrants["legacyTeamMemberships"],
@@ -42,7 +43,7 @@ export function makeGrants({
 }: Partial<CollectedGrants> = {}): CollectedGrants {
   return {
     principal,
-    organizationId: ORG,
+    organizationId,
     organizationRole,
     isOrgMember,
     bindings,

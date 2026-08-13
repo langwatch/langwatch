@@ -56,12 +56,9 @@ export async function offboardUserFromOrganization({
   userId: string;
   organizationId: string;
 }): Promise<OffboardResult> {
-  const email = await repository.findUserEmail({ userId });
-
   const removed = await repository.offboardUser({
     userId,
     organizationId,
-    email,
     prove: (txReader) =>
       proveNothingResolves({
         collector: collectorFor(txReader),

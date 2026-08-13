@@ -42,9 +42,13 @@ export const RESOURCE_SCOPE_REJECTION =
 
 /** The one not-found shape, used for a missing binding AND for one owned by
  *  another organization: confirming that a foreign binding exists is itself
- *  a leak, so both answers are identical. */
-export function bindingNotFound(bindingId: string): GrantValidationError {
-  return new GrantValidationError("Role binding not found", { bindingId });
+ *  a leak, so both answers are identical. `meta` carries whatever the caller
+ *  actually named - a binding id when it had one, the scope it was writing at
+ *  otherwise - because a fabricated id is worse than a missing field. */
+export function bindingNotFound(
+  meta: Record<string, unknown>,
+): GrantValidationError {
+  return new GrantValidationError("Role binding not found", meta);
 }
 
 /**
@@ -68,7 +72,7 @@ export function rethrowKnownWriteFailure(
     );
   }
   if (error instanceof BindingMissingError) {
-    throw bindingNotFound(bindingId ?? "");
+    throw bindingNotFound({ ...meta, ...(bindingId ? { bindingId } : {}) });
   }
   throw error;
 }
@@ -85,7 +89,7 @@ export async function assertBindingInOrganization({
 }): Promise<void> {
   const binding = await repository.findBinding({ bindingId });
   if (!binding || binding.organizationId !== organizationId) {
-    throw bindingNotFound(bindingId);
+    throw bindingNotFound({ bindingId });
   }
 }
 

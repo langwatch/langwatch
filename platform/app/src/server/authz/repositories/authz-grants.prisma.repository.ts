@@ -190,23 +190,13 @@ export class PrismaAuthzGrantsRepository implements AuthzGrantsRepository {
     }
   }
 
-  async findUserEmail({ userId }: { userId: string }): Promise<string | null> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { email: true },
-    });
-    return user?.email ?? null;
-  }
-
   async offboardUser({
     userId,
     organizationId,
-    email,
     prove,
   }: {
     userId: string;
     organizationId: string;
-    email: string | null;
     prove: (txReader: AuthzReadRepository) => Promise<void>;
   }): Promise<OffboardCounts> {
     return this.prisma.$transaction(async (tx) => {
@@ -222,6 +212,16 @@ export class PrismaAuthzGrantsRepository implements AuthzGrantsRepository {
       const organizationMembership = await tx.organizationUser.deleteMany({
         where: { userId, organizationId },
       });
+      // Pending invites are keyed by email, not by user id, so the address
+      // has to be read to match them. It is read HERE, inside the same
+      // transaction as the delete: an address read before the transaction
+      // could have changed by the time the delete runs, which would leave a
+      // live invite behind that the returned counts claim was removed.
+      const user = await tx.user.findUnique({
+        where: { id: userId },
+        select: { email: true },
+      });
+      const email = user?.email ?? null;
       const pendingInvites = email
         ? await tx.organizationInvite.deleteMany({
             where: { organizationId, email, status: "PENDING" },
