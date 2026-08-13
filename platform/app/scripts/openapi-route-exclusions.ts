@@ -234,4 +234,16 @@ export const UNPUBLISHED = [
     category: "elsewhere",
     why: "AI Governance source receivers, addressed with a per-source ingestion key. Documented today in the governance sources guide rather than the API reference",
   },
+
+  // ── Gap: public, should be documented, not yet ─────────────────────────
+  {
+    match: "POST /api/langy/conversations",
+    category: "gap",
+    why: "the key-authed Langy turn surface ships dark behind release_langy_api_key_turns_enabled, which defaults off, so publishing it now would document an endpoint that answers 404 to everyone reading the reference. Describe the operation and delete this entry when the flag defaults on (#6821)",
+  },
+  {
+    match: "POST /api/langy/conversations/{conversationId}/messages",
+    category: "gap",
+    why: "the continuation half of the same dark surface, unreachable for the same reason and publishable on the same trigger (#6821)",
+  },
 ] as const satisfies readonly Exclusion[];
