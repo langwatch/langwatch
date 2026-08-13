@@ -19,6 +19,7 @@ Project coding conventions. See also `../TESTING_PHILOSOPHY.md`.
 - **logging-and-tracing.md** - Logging infrastructure and context propagation
 - **local-observability.md** - Local LGTM stack (Grafana/Loki/Tempo/Prometheus); querying logs/traces as an agent with `gcx`
 - **dependency-age-gates.md** - Dependency release-age gates and emergency security exceptions
+- **vitest-performance.md** - Vitest pool/isolation settings and the RAM guardrails they protect
 - **typescript.md** - TypeScript patterns
 - **react.md** - React/Next.js patterns
 - **git.md** - Git workflow
