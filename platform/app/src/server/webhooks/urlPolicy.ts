@@ -86,8 +86,15 @@ export function inspectWebhookUrl({
  * slip past the validator's IP-literal check and fail as an unresolvable
  * hostname (a *retryable* error) rather than a terminal block. This closes
  * that gap terminally at the webhook layer without forking `ssrfProtection`.
+ *
+ * Exported because the SHAPE check ({@link inspectWebhookUrl}) does not cover
+ * this: it reads scheme, host presence, port and credentials, all of which
+ * `https://169.254.169.254/latest/meta-data` satisfies. Save-time admission has
+ * to run this too, or an endpoint saves and then fails terminally on its first
+ * delivery — which is exactly what "an endpoint that saves is an endpoint that
+ * can deliver" promises will not happen.
  */
-function privateIpLiteral(url: string): string | null {
+export function privateIpLiteral(url: string): string | null {
   let host: string;
   try {
     host = new URL(url).hostname;
