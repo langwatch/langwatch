@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { PrismaTriggerLatestEvaluationRepository } from "./repositories/trigger-latest-evaluation.prisma.repository";
 import type {
   RecordEvaluationInput,

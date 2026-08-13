@@ -1,5 +1,5 @@
-import { TriggerAction, TriggerKind } from "@prisma/client";
 import { describe, expect, it } from "vitest";
+import { TriggerAction, TriggerKind } from "~/generated/prisma/client";
 import { describeNextFiring, type NextFiringSubject } from "../next-firing";
 
 const NOW = new Date("2026-08-12T12:03:20.000Z");
