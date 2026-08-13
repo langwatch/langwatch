@@ -70,8 +70,13 @@ describe("buildAnthropicAdminPullConfig", () => {
     expect(
       buildAnthropicAdminPullConfig(composer({ ...base, report: "both" })),
     ).toBeNull();
+    // Deliberately `usage`, not the `cost` of `base`: on a cost report the
+    // usage-only gate rejects any width first, so this assertion would pass
+    // with the value check deleted and prove nothing about "2h".
     expect(
-      buildAnthropicAdminPullConfig(composer({ ...base, bucketWidth: "2h" })),
+      buildAnthropicAdminPullConfig(
+        composer({ ...base, report: "usage", bucketWidth: "2h" }),
+      ),
     ).toBeNull();
     expect(
       buildAnthropicAdminPullConfig(
