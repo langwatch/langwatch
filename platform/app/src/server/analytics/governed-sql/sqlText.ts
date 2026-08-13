@@ -17,6 +17,23 @@
  */
 
 /**
+ * Longest statement any governed surface accepts.
+ *
+ * A shape ceiling rather than a cost one — the cost ceilings are pinned
+ * server-side by the settings profile. It exists so that pathological input is
+ * refused before it reaches a parser fed attacker-controlled text, and it sits
+ * far above any query the governed catalog's analytical shapes produce.
+ *
+ * One constant rather than one per surface, because the surfaces are not
+ * independent: a statement the workbench will run has to be one the workbench
+ * can save, and a saved chart has to be one the query endpoint will accept. Two
+ * numbers that agree today are two numbers that can disagree later, and the
+ * failure that produces — a query that runs but cannot be stored — surfaces to
+ * a member as the product losing their work.
+ */
+export const MAX_GOVERNED_SQL_LENGTH = 50_000;
+
+/**
  * Identifier shape both ClickHouse and PostgreSQL accept unquoted.
  *
  * Names come from deployment configuration rather than from a request, so the

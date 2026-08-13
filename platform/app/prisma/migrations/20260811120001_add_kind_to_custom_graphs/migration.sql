@@ -4,9 +4,10 @@
 -- of a builder payload. Sharing the table is what lets a saved workbench chart
 -- inherit dashboard placement, ordering and cascading deletion unchanged.
 --
--- Default to 'builder' so every row that existed before this migration keeps
--- being read by the chart builder, which queries without an explicit kind and
--- therefore lands on this default. Nothing reinterprets an existing row: a
+-- Default to 'builder' so every row that existed before this migration is
+-- labelled as what it already is. That is what lets the chart builder's reads
+-- filter to 'builder' with no backfill, and it is also the value a builder
+-- insert lands on without naming it. Nothing reinterprets an existing row: a
 -- builder payload is never handed to the workbench definition parser.
 ALTER TABLE "CustomGraph"
   ADD COLUMN "kind" TEXT NOT NULL DEFAULT 'builder';

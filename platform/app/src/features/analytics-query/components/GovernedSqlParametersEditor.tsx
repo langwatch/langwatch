@@ -89,6 +89,26 @@ function recordOf(
   return record;
 }
 
+/** Whether the member has put anything in this row's value field. */
+function valueTyped(row: ParameterRow): boolean {
+  return row.kind !== "null" && row.text.trim().length > 0;
+}
+
+/**
+ * What stops a row being sent, or `undefined` when it can be — including a row
+ * still empty, which is not a parameter yet rather than a broken one.
+ *
+ * These are exactly the rows {@link recordOf} drops. Saying so on the row and
+ * holding Run back is what keeps a dropped row from becoming a round-trip that
+ * comes back naming a parameter the member can see they filled in.
+ */
+function rowProblem(row: ParameterRow): string | undefined {
+  if (row.name.trim().length === 0) {
+    return valueTyped(row) ? "Name this parameter." : undefined;
+  }
+  return valueOf(row) === undefined ? "Enter a number." : undefined;
+}
+
 const SELECT_STYLE = {
   borderWidth: "1px",
   borderColor: "border",
@@ -169,7 +189,7 @@ function ParameterRowFields({
   onPatch: (changes: Partial<Omit<ParameterRow, "id">>) => void;
   onRemove: () => void;
 }) {
-  const invalid = row.name.trim().length > 0 && valueOf(row) === undefined;
+  const problem = rowProblem(row);
 
   return (
     <Stack gap={1}>
@@ -205,19 +225,24 @@ function ParameterRowFields({
           <Trash2 size={14} />
         </Button>
       </HStack>
-      {invalid && (
+      {problem && (
         <Text fontSize="12px" color="red.fg">
-          Enter a number.
+          {problem}
         </Text>
       )}
     </Stack>
   );
 }
 
+/** Everything one edit of the form settles, reported together. */
+export interface GovernedSqlParametersChange {
+  readonly parameters: Readonly<Record<string, GovernedSqlParameterValue>>;
+  /** False while any row carries something the form cannot send. */
+  readonly sendable: boolean;
+}
+
 export interface GovernedSqlParametersEditorProps {
-  onChange: (
-    parameters: Readonly<Record<string, GovernedSqlParameterValue>>,
-  ) => void;
+  onChange: (change: GovernedSqlParametersChange) => void;
   /** Names the last submission declared and did not supply. */
   missingParameters: readonly string[];
   /**
@@ -274,7 +299,10 @@ export function GovernedSqlParametersEditor({
   const update = useCallback(
     (next: readonly ParameterRow[]) => {
       setRows(next);
-      onChange(recordOf(next));
+      onChange({
+        parameters: recordOf(next),
+        sendable: next.every((row) => rowProblem(row) === undefined),
+      });
     },
     [onChange],
   );
@@ -298,7 +326,11 @@ export function GovernedSqlParametersEditor({
           size="xs"
           variant="ghost"
           aria-expanded={isOpen}
-          onClick={() => setExpanded((open) => !open)}
+          // Toggles what is on screen, not a flag behind it: while a refusal
+          // holds the form open, tracking `expanded` separately left it in an
+          // arbitrary state that decided whether the form closed when the
+          // refusal cleared.
+          onClick={() => setExpanded(!isOpen)}
         >
           <Box aria-hidden="true" display="flex">
             {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}

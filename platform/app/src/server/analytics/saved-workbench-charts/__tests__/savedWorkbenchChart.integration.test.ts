@@ -11,24 +11,22 @@
  */
 
 import { nanoid } from "nanoid";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
 import { VEGA_LITE_SCHEMA_URL } from "~/features/analytics-query/visualization/vegaLiteSchema";
 import type { Organization, Project, Team } from "~/generated/prisma/client";
+import { PrismaAutomationCustomGraphRepository } from "~/server/app-layer/automations/repositories/custom-graph.prisma.repository";
 import { prisma } from "~/server/db";
 
 import type { Protections } from "../../../traces/protections";
+import { BUILDER_CHART_KIND, WORKBENCH_SQL_CHART_KIND } from "../../chartKinds";
 import { GovernedSqlService } from "../../governed-sql/governedSql.service";
 import { SavedWorkbenchChartRepository } from "../savedWorkbenchChart.repository";
 import {
   type SavedWorkbenchChart,
   SavedWorkbenchChartService,
 } from "../savedWorkbenchChart.service";
-import {
-  BUILDER_CHART_KIND,
-  WORKBENCH_CHART_DEFINITION_VERSION,
-  WORKBENCH_SQL_CHART_KIND,
-} from "../workbenchChartDefinition";
+import { WORKBENCH_CHART_DEFINITION_VERSION } from "../workbenchChartDefinition";
 
 const FULLY_PERMITTED: Protections = {
   canSeeCapturedInput: true,
@@ -82,7 +80,10 @@ describe("saved workbench charts (integration)", () => {
       },
     });
 
-  beforeEach(async () => {
+  // The tenant rows are scaffolding, not subject matter: no test here mutates
+  // the organization, the team or either project, so they are built once and
+  // only the charts are cleared between tests.
+  beforeAll(async () => {
     service = new SavedWorkbenchChartService({
       repository: new SavedWorkbenchChartRepository(prisma),
       governedSql: new GovernedSqlService({
@@ -106,8 +107,13 @@ describe("saved workbench charts (integration)", () => {
   });
 
   afterEach(async () => {
+    await prisma.customGraph.deleteMany({
+      where: { projectId: { in: [project.id, otherProject.id] } },
+    });
+  });
+
+  afterAll(async () => {
     for (const { id } of [project, otherProject]) {
-      await prisma.customGraph.deleteMany({ where: { projectId: id } });
       await prisma.project.delete({ where: { id } });
     }
     await prisma.team.delete({ where: { id: team.id } });
@@ -181,6 +187,51 @@ describe("saved workbench charts (integration)", () => {
         expect(after?.graph).toEqual({
           series: [{ metric: "metadata.trace_id" }],
         });
+      });
+    });
+
+    describe("when a builder read path looks up the saved workbench chart", () => {
+      /** @scenario "A saved workbench chart is not readable as a builder chart" */
+      it("does not find it, and still finds the builder chart beside it", async () => {
+        const saved = await save();
+        const builder = await prisma.customGraph.create({
+          data: {
+            projectId: project.id,
+            name: "A builder chart",
+            graph: { series: [{ metric: "metadata.trace_id" }] },
+          },
+        });
+
+        // A real builder reader against the real database — the automations
+        // repository, which reads a chart to evaluate its series. Asserting the
+        // converse through one of these is what makes the isolation mutual
+        // rather than a property only the workbench's own reads have.
+        const builderReader = new PrismaAutomationCustomGraphRepository(prisma);
+
+        expect(
+          await builderReader.findById({
+            customGraphId: saved.id,
+            projectId: project.id,
+          }),
+        ).toBeNull();
+        expect(
+          await builderReader.existsInProject({
+            customGraphId: saved.id,
+            projectId: project.id,
+          }),
+        ).toBe(false);
+        expect(
+          await builderReader.findAllNamesByIds({
+            customGraphIds: [saved.id, builder.id],
+            projectId: project.id,
+          }),
+        ).toEqual([{ id: builder.id, name: builder.name }]);
+
+        // Refusing to read it is not the same as damaging it.
+        const after = await prisma.customGraph.findFirst({
+          where: { id: saved.id, projectId: project.id },
+        });
+        expect(after?.kind).toBe(WORKBENCH_SQL_CHART_KIND);
       });
     });
   });
