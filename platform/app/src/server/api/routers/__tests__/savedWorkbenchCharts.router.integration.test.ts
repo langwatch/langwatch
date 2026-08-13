@@ -14,11 +14,6 @@
  * @see specs/analytics/governed-sql-saved-charts.feature
  */
 
-import {
-  OrganizationUserRole,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "@prisma/client";
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -29,6 +24,11 @@ import {
   it,
   vi,
 } from "vitest";
+import {
+  OrganizationUserRole,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "~/generated/prisma/client";
 
 const isEnabled = vi.fn();
 
