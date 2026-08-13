@@ -101,6 +101,7 @@ function fakeQuery(): UseGovernedSqlQuery {
     setParameters: (parameters) => {
       draft = { ...draft, parameters };
     },
+    setTimeWindow: vi.fn(),
     runQuery: vi.fn(),
     reload: vi.fn(),
     cancelQuery: vi.fn(),

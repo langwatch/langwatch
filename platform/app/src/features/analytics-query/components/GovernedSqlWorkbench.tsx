@@ -26,7 +26,6 @@ import {
 } from "react";
 
 import { usePeriodSelector } from "~/components/PeriodSelector";
-import { showErrorToast } from "~/features/errors";
 
 import { useGovernedSqlQuery } from "../hooks/useGovernedSqlQuery";
 import { useGovernedSqlSchema } from "../hooks/useGovernedSqlSchema";
