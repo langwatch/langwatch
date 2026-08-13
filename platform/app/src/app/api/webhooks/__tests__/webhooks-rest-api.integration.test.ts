@@ -72,12 +72,14 @@ async function expectApiError(
   res: Response,
   expected: { status: number; code: string },
 ): Promise<ApiErrorBody> {
+  // biome-ignore-start lint/suspicious/noMisplacedAssertion: one refusal shape, asserted whole, for every case that produces it
   expect(res.status).toBe(expected.status);
   const body = (await res.json()) as ApiErrorBody;
   expect(body.code).toBe(expected.code);
   // `type` is the framework's mirror of `code` for the Go envelope's readers,
   // so it must never drift from it.
   expect(body.type).toBe(body.code);
+  // biome-ignore-end lint/suspicious/noMisplacedAssertion: end of the shared refusal assertions
   return body;
 }
 

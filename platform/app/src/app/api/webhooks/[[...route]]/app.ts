@@ -75,7 +75,7 @@ type WebhooksVersion = VersionBuilder<WebhooksFamilyApp>;
 
 // ── endpoint registration ────────────────────────────────────────────────────
 
-const registerEndpointEndpoints = (v: WebhooksVersion): void => {
+const registerEndpointCrud = (v: WebhooksVersion): void => {
   v.rpc(
     "/endpoints.create",
     {
@@ -125,7 +125,9 @@ const registerEndpointEndpoints = (v: WebhooksVersion): void => {
     },
     getEndpoint,
   );
+};
 
+const registerEndpointLifecycle = (v: WebhooksVersion): void => {
   v.rpc(
     "/endpoints.update",
     {
@@ -176,7 +178,9 @@ const registerEndpointEndpoints = (v: WebhooksVersion): void => {
     },
     rollEndpointSecret,
   );
+};
 
+const registerEndpointDelivery = (v: WebhooksVersion): void => {
   v.rpc(
     "/endpoints.test",
     {
@@ -313,7 +317,9 @@ export const app = service
     },
   })
   .version(MANAGEMENT_API_VERSION, (v) => {
-    registerEndpointEndpoints(v);
+    registerEndpointCrud(v);
+    registerEndpointLifecycle(v);
+    registerEndpointDelivery(v);
     registerEventEndpoints(v);
   })
   .build();

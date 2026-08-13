@@ -134,11 +134,15 @@ export class InvalidWebhookDeliveryCursorError extends HandledError {
   declare readonly code: "validation_error";
 
   constructor() {
-    super("validation_error", "The delivery cursor is not one this API issued", {
-      httpStatus: 422,
-      fault: "customer",
-      meta: { target: "input", fields: ["cursor"] },
-    });
+    super(
+      "validation_error",
+      "The delivery cursor is not one this API issued",
+      {
+        httpStatus: 422,
+        fault: "customer",
+        meta: { target: "input", fields: ["cursor"] },
+      },
+    );
   }
 }
 

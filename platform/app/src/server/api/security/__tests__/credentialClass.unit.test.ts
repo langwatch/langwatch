@@ -45,7 +45,7 @@ const SPEC_PATH = join(
  * apps, the rest of the gateway surface is a project app.
  */
 const PUBLIC_SURFACES = [
-  { prefix: "/api/webhooks/v1", scheme: "admin_api_key" },
+  { prefix: "/api/webhooks", scheme: "admin_api_key" },
   { prefix: "/api/gateway/v1/spend-summaries", scheme: "admin_api_key" },
   { prefix: "/api/gateway/v1/spend-events", scheme: "admin_api_key" },
   { prefix: "/api/gateway/v1/end-users", scheme: "admin_api_key" },
@@ -366,16 +366,21 @@ describe("the published API description", () => {
 
     it("gives the spend and webhook routes the organization key", () => {
       // The two spend routes the last dogfood ran a project key at, plus the
-      // webhook collection it registers against.
+      // webhook listing it registers against. Webhooks names its operations
+      // `resource.verb` and answers them all on POST (ADR-094), so the method
+      // it is read under differs from the gateway's.
       for (const path of [
         "/api/gateway/v1/spend-summaries",
         "/api/gateway/v1/spend-events",
-        "/api/webhooks/v1/endpoints",
       ]) {
         expect(document.paths[path]?.get?.security).toEqual([
           { admin_api_key: [] },
         ]);
       }
+
+      expect(
+        document.paths["/api/webhooks/endpoints.list"]?.post?.security,
+      ).toEqual([{ admin_api_key: [] }]);
     });
   });
 });

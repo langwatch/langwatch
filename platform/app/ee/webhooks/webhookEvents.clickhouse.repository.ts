@@ -87,7 +87,7 @@ export interface EmittedEventsPage {
 }
 
 /**
- * The organization's emitted-events log read: GET /api/webhooks/v1/events
+ * The organization's emitted-events log read: POST /api/webhooks/events.list
  * pages the spend records as envelopes, Stripe /v1/events parity, newest
  * first over a (OccurredAt, GatewayRequestId) cursor. Delivery itself
  * consumes the event log through the process manager's transactional inbox
