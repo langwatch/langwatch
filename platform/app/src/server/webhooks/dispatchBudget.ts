@@ -41,7 +41,7 @@ export async function assertDispatchBudget({
   });
   if (limit.allowed) return;
   throw new DispatchError({
-    message: `${label}: project webhook dispatch cap (${WEBHOOK_DISPATCH_HOURLY_CAP}/hour) reached — backing off.`,
+    message: `${label}: webhook dispatch cap (${WEBHOOK_DISPATCH_HOURLY_CAP}/hour) reached — backing off.`,
     retryable: true,
     retryAfterMs: Math.max(0, limit.resetAt - Date.now()),
   });

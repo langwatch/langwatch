@@ -712,6 +712,10 @@ async function dispatchWebhookBatch({
   context: IntentContext;
   startedAt: number;
 }): Promise<WebhookDispatchResult> {
+  // Two reads, run together: the secrets and the destination. The liveness
+  // read above already has the row, but neither of these can be served from
+  // it — both decrypt, and decryption is the service's to do, not this
+  // executor's.
   const [secrets, destination] = await Promise.all([
     deps.endpoints.getSigningSecrets({
       organizationId: payload.organizationId,

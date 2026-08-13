@@ -87,7 +87,7 @@ const egressHost = (): string => {
 
 /** Whether the observed routing matches what the proxy settings asked for. */
 function report(tunnelled: string[]): never {
-  // Ask the mailer's own matcher, not "is NO_PROXY set at all": NO_PROXY=localhost
+  // Ask the shared proxy matcher, not "is NO_PROXY set at all": NO_PROXY=localhost
   // leaves the gateway host proxied, and treating that as a bypass would invert
   // the verdict.
   const host = egressHost();

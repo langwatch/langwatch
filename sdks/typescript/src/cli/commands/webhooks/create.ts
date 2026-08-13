@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import type {
-  CreateWebhookEndpointInput,
+  WebhookDestinationInput,
   WebhookSqsDestinationInput,
 } from "@/client-sdk/services/webhooks/webhooks-api.service";
 import { WebhooksApiService } from "@/client-sdk/services/webhooks/webhooks-api.service";
@@ -14,8 +14,22 @@ export interface CreateWebhookOptions {
   queueUrl?: string;
   roleArn?: string;
   accessKeyId?: string;
-  secretAccessKey?: string;
   events: string;
+}
+
+/**
+ * The queue's secret access key, which is never a flag.
+ *
+ * An argument lands in shell history, in `ps` output for every user on the
+ * box, and in CI command logs. A long-lived AWS secret does not go there, so
+ * it is read from the environment instead and the flag that would have
+ * carried it does not exist.
+ */
+export const SQS_SECRET_ENV = "LANGWATCH_SQS_SECRET_ACCESS_KEY";
+
+export function sqsSecretFromEnv(): string | undefined {
+  const secret = process.env[SQS_SECRET_ENV]?.trim();
+  return secret ? secret : undefined;
 }
 
 /**
@@ -27,7 +41,7 @@ export interface CreateWebhookOptions {
  */
 export function destinationFromOptions(
   options: CreateWebhookOptions,
-): Pick<CreateWebhookEndpointInput, "destination_kind" | "url" | "sqs"> {
+): WebhookDestinationInput {
   if (options.queueUrl) {
     if (options.url) {
       throw new Error(
@@ -36,9 +50,28 @@ export function destinationFromOptions(
     }
     const sqs: WebhookSqsDestinationInput = { queue_url: options.queueUrl };
     if (options.roleArn) sqs.role_arn = options.roleArn;
-    if (options.accessKeyId) sqs.access_key_id = options.accessKeyId;
-    if (options.secretAccessKey) sqs.secret_access_key = options.secretAccessKey;
+    if (options.accessKeyId) {
+      const secret = sqsSecretFromEnv();
+      if (!secret) {
+        throw new Error(
+          `--access-key-id needs its secret in ${SQS_SECRET_ENV}. A secret passed as an argument ends up in shell history, in ps output, and in CI logs.`,
+        );
+      }
+      sqs.access_key_id = options.accessKeyId;
+      sqs.secret_access_key = secret;
+    }
     return { destination_kind: "sqs", sqs };
+  }
+  // A queue flag without --queue-url describes a destination that was never
+  // selected, so it is a mistake rather than something to ignore.
+  const strayQueueFlags = [
+    options.roleArn ? "--role-arn" : "",
+    options.accessKeyId ? "--access-key-id" : "",
+  ].filter(Boolean);
+  if (strayQueueFlags.length > 0) {
+    throw new Error(
+      `${strayQueueFlags.join(" and ")} only applies to an Amazon SQS destination. Pass --queue-url as well.`,
+    );
   }
   if (!options.url) {
     throw new Error("Pass --url for an HTTPS endpoint, or --queue-url for an Amazon SQS queue.");

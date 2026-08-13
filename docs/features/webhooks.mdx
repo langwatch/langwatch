@@ -326,6 +326,7 @@ An endpoint can put each batch on your own Amazon SQS queue instead of POSTing i
 | `X-LangWatch-Signature` | `t=<unix>,v1=<hmac>`, one `v1` per valid secret |
 | `X-LangWatch-Delivery-Id` | Groups the retries of one delivery; never the dedup key |
 | `X-LangWatch-Delivery-Attempt` | 1-based attempt number |
+| `X-LangWatch-Test-Fire` | `"true"`, and present only on a test fire. Absent on every real delivery |
 
 So verification is the same call over the same bytes, and moving an integration from HTTP to a queue does not change your verification code.
 
@@ -371,9 +372,11 @@ On LangWatch Cloud, ask support for the principal to trust; it is a property of 
 
 **Rules the queue itself must satisfy:**
 
-- **Standard queues only.** A `.fifo` queue is refused at save time. Delivery is at-least-once with dedup on the envelope `id`, which is what a standard queue provides; ordering was never promised, and FIFO caps at 300 messages a second.
+- **Standard queues only.** A `.fifo` queue is refused at save time. Delivery is at-least-once and consumers deduplicate on the envelope `id`, which is what a standard queue asks of them; ordering was never part of the contract, and a FIFO queue would add a throughput ceiling for a guarantee nothing here needs.
 - **A canonical Amazon SQS queue URL**, `https://sqs.<region>.amazonaws.com/<account id>/<queue name>`. The region and the owning account are read from it, so they can never disagree with the queue. Anything else is refused.
-- **One batch is one message, capped at 256 KiB** including the attributes. A batch over the cap fails terminally and says so; lower `max_batch_size` so each delivery carries fewer events.
+- **One batch is one message, and we cap it at 256 KiB** including the attributes, which is the size a standard queue accepts without extended-payload storage. A batch over the cap fails terminally and says so; lower `max_batch_size` so each delivery carries fewer events.
+
+**Deduplicate on the envelope `id`.** A standard queue is at-least-once and can redeliver a message on its own, and it has no queue-level deduplication of its own to lean on. `X-LangWatch-Delivery-Id` names the batch delivery, not an event, so deduplicating on it would drop every envelope in the batch but one. The `id` inside each envelope is the idempotency key.
 
 **How to say "retry".** Delete the message only after the batch is durably ingested. Leaving it alone is the retry: it reappears after the visibility timeout, and after your queue's `maxReceiveCount` it lands in your dead letter queue. Set a redrive policy; a message your consumer can never accept belongs somewhere you can look at it.
 

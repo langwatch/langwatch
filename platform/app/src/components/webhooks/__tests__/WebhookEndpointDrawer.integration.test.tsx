@@ -260,13 +260,17 @@ describe("WebhookSecretDialog", () => {
           maxInFlight: 4,
           createdAt: new Date(),
           updatedAt: new Date(),
-        } as never,
+        },
       });
 
       const control = screen.getByTestId("webhook-destination-kind");
+      const options = [...control.querySelectorAll("input")];
+      // Assert the options exist before asserting anything about them: a
+      // for-of over an empty list passes while proving nothing.
+      expect(options).toHaveLength(2);
       // Every option is unavailable, which is what says "not here" rather
       // than letting a click silently do nothing.
-      for (const input of control.querySelectorAll("input")) {
+      for (const input of options) {
         expect(input).toBeDisabled();
       }
       // The queue it already has is the field on screen, prefilled.

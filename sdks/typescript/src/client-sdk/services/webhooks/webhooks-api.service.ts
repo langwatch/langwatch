@@ -73,15 +73,8 @@ export interface WebhookEndpointWithSecret extends WebhookEndpointSummary {
   secret: string;
 }
 
-/** The POST body, exactly as the wire takes it. */
-export interface CreateWebhookEndpointInput {
-  /** Absent means `http`, which is what every endpoint was before there was
-   *  more than one kind. */
-  destination_kind?: WebhookDestinationKind;
-  /** Required for an `http` endpoint. */
-  url?: string;
-  /** Required for an `sqs` endpoint. */
-  sqs?: WebhookSqsDestinationInput;
+/** Everything a create body carries that is not the destination. */
+interface CreateWebhookEndpointBase {
   enabled_events: string[];
   /** Envelopes per delivery. The receiver always gets an array. */
   max_batch_size?: number;
@@ -91,13 +84,36 @@ export interface CreateWebhookEndpointInput {
   max_in_flight?: number;
 }
 
+/**
+ * The POST body, exactly as the wire takes it.
+ *
+ * A destination is one kind and one address, so the two are a union rather
+ * than independent optional fields: the type refuses `{destination_kind:
+ * "sqs"}` with no queue, and `{url, sqs}` together, which is what the server
+ * refuses too. `destination_kind` is optional only on the http branch, where
+ * absent has always meant http.
+ */
+export type WebhookDestinationInput =
+  | { destination_kind?: "http"; url: string; sqs?: never }
+  | { destination_kind: "sqs"; sqs: WebhookSqsDestinationInput; url?: never };
+
+export type CreateWebhookEndpointInput = CreateWebhookEndpointBase &
+  WebhookDestinationInput;
+
 /** The PATCH body, exactly as the wire takes it. Omitted fields are left alone. */
 export interface UpdateWebhookEndpointInput {
   url?: string;
   /** Only the queue's own fields; the destination kind cannot change, because
    *  batches already planned against the old transport are in flight. Create
-   *  a new endpoint and archive this one once it has drained. */
-  sqs?: Partial<WebhookSqsDestinationInput>;
+   *  a new endpoint and archive this one once it has drained. A credential
+   *  field sent as null is CLEARED; omitted keeps what is stored. */
+  sqs?: Partial<{
+    queue_url: string;
+    role_arn: string | null;
+    external_id: string | null;
+    access_key_id: string | null;
+    secret_access_key: string | null;
+  }>;
   enabled_events?: string[];
   status?: "active" | "disabled";
   max_batch_size?: number;

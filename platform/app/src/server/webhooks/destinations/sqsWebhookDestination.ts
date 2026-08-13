@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   type MessageAttributeValue,
   SendMessageCommand,
@@ -77,12 +78,12 @@ export function sqsMessageAttributes({
   batchId,
   attempt,
   signature,
-  testFire = false,
+  isTestFire = false,
 }: {
   batchId: string;
   attempt: number;
   signature: string | null;
-  testFire?: boolean;
+  isTestFire?: boolean;
 }): Record<string, MessageAttributeValue> {
   return {
     [WEBHOOK_DELIVERY_ID_HEADER]: { DataType: "String", StringValue: batchId },
@@ -95,7 +96,7 @@ export function sqsMessageAttributes({
           },
         }
       : {}),
-    ...(testFire
+    ...(isTestFire
       ? { [TEST_FIRE_ATTRIBUTE]: { DataType: "String", StringValue: "true" } }
       : {}),
   };
@@ -248,7 +249,7 @@ function attributesFor(
     batchId: request.batchId,
     attempt: request.attempt,
     signature,
-    ...(request.testFire ? { testFire: true } : {}),
+    ...(request.isTestFire ? { isTestFire: true } : {}),
   });
 }
 
@@ -318,14 +319,12 @@ async function putOnQueue({
       dispatchId: batchId,
       error: `${reason}: ${detail}`.slice(0, ERROR_SNIPPET_CHARS),
     };
-  } finally {
-    client.destroy();
   }
 }
 
 export function sqsWebhookDestination(
   config: SqsDestinationConfig,
-  deps: { createClient?: (queueUrl: string) => SQSClient } = {},
+  deps: { createClient?: (config: SqsDestinationConfig) => SQSClient } = {},
 ): WebhookDestination {
   return {
     kind: "sqs",
@@ -336,7 +335,7 @@ export function sqsWebhookDestination(
       // because a queue send never passes through the HTTP sender that used
       // to own it. Without this line a queue endpoint would be uncapped. A
       // test fire is exempt, exactly as it is on the HTTPS side.
-      if (!request.testFire) {
+      if (!request.isTestFire) {
         await assertDispatchBudget({
           scopeId: request.organizationId,
           label: `Webhook endpoint ${request.endpointId}`,
@@ -351,7 +350,7 @@ export function sqsWebhookDestination(
       if (refusal) return refusal;
 
       return await putOnQueue({
-        client: (deps.createClient ?? createSqsClient(config))(config.queueUrl),
+        client: (deps.createClient ?? sqsClientFor)(config),
         queueUrl: config.queueUrl,
         body: request.body,
         attributes,
@@ -362,33 +361,73 @@ export function sqsWebhookDestination(
 }
 
 /**
- * The client for one endpoint's queue. Region and the dialed host come off
- * the queue URL, so neither can be configured into disagreeing with it, and
- * `maxAttempts: 1` keeps the SDK from retrying underneath the delivery ladder
- * that is already counting attempts.
+ * The client for one endpoint's queue, cached and reused.
+ *
+ * A client per delivery would be two costs on the hot path. An assumed-role
+ * provider caches its STS session INSIDE the provider instance, so a fresh one
+ * per send re-assumes the role on every attempt, which is a round trip per
+ * delivery and a straight line to an STS `ThrottlingException` that our own
+ * ladder then retries by assuming the role again. And a destroyed client tears
+ * down its connection pool, so every delivery pays a TLS handshake, which is
+ * the opposite of what the shared socket-pool cache exists for.
+ *
+ * The key is the queue plus every credential field, so rotating a secret or
+ * swapping a role produces a new client rather than reusing one that
+ * authenticates as the old identity.
  */
-function createSqsClient(config: SqsDestinationConfig) {
-  return (queueUrl: string): SQSClient => {
-    const parsed = parseSqsQueueUrl(queueUrl);
-    return new SQSClient(
-      buildAwsClientConfig({
-        region: parsed?.region,
-        targetHost: sqsHostFor(queueUrl),
-        disableSdkRetries: true,
-        ...(config.roleArn
-          ? {
-              assumeRole: {
-                roleArn: config.roleArn,
-                externalId: config.externalId,
-                sessionName: "langwatch-webhooks",
-              },
-            }
-          : {}),
-        staticCredentials: {
-          accessKeyId: config.accessKeyId,
-          secretAccessKey: config.secretAccessKey,
-        },
-      }),
-    );
-  };
+const clients = new Map<string, SQSClient>();
+
+/** Distinct per queue AND per credential, so a rotation is a different key. */
+function clientCacheKey(config: SqsDestinationConfig): string {
+  return [
+    config.queueUrl,
+    config.roleArn ?? "",
+    config.externalId ?? "",
+    config.accessKeyId ?? "",
+    // The secret decides identity as much as the key id does, and it must not
+    // be readable from a cache key, so it is reduced to a fingerprint.
+    config.secretAccessKey
+      ? createHash("sha256").update(config.secretAccessKey).digest("hex")
+      : "",
+  ].join("\u0000");
+}
+
+export function sqsClientFor(config: SqsDestinationConfig): SQSClient {
+  const key = clientCacheKey(config);
+  const cached = clients.get(key);
+  if (cached) return cached;
+
+  const parsed = parseSqsQueueUrl(config.queueUrl);
+  const client = new SQSClient(
+    buildAwsClientConfig({
+      // Region and the dialed host come off the queue URL, so neither can be
+      // configured into disagreeing with it.
+      region: parsed?.region,
+      targetHost: sqsHostFor(config.queueUrl),
+      // Our delivery ladder is already counting attempts; SDK retries
+      // underneath it would make one recorded attempt several real calls.
+      disableSdkRetries: true,
+      ...(config.roleArn
+        ? {
+            assumeRole: {
+              roleArn: config.roleArn,
+              externalId: config.externalId,
+              sessionName: "langwatch-webhooks",
+            },
+          }
+        : {}),
+      staticCredentials: {
+        accessKeyId: config.accessKeyId,
+        secretAccessKey: config.secretAccessKey,
+      },
+    }),
+  );
+  clients.set(key, client);
+  return client;
+}
+
+/** Drop every cached client. For tests, and for a process winding down. */
+export function resetSqsClientCache(): void {
+  for (const client of clients.values()) client.destroy();
+  clients.clear();
 }

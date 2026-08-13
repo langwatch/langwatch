@@ -8,7 +8,15 @@ import {
   TeamUserRole,
 } from "@prisma/client";
 import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
@@ -745,9 +753,18 @@ describe("Feature: Webhook endpoints REST API", () => {
     });
   });
 
-  describe("destination kinds", () => {
+  describe("when an endpoint names a destination kind", () => {
     const QUEUE_URL =
       "https://sqs.eu-central-1.amazonaws.com/381491922238/lw-test-billing";
+
+    // Restored in a hook, not at the end of a body: an assertion that throws
+    // first would otherwise leave the flag set for every test that follows,
+    // and integration tests here run serially in one worker. The next run of
+    // the refusal case would then pass only by file order, which is a false
+    // pass on the control that keeps one tenant off another tenant's queue.
+    afterEach(() => {
+      delete process.env.WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS;
+    });
 
     const createEndpoint = (body: Record<string, unknown>) =>
       app.request("/api/webhooks/v1/endpoints", {
@@ -773,7 +790,6 @@ describe("Feature: Webhook endpoints REST API", () => {
         code: "webhook_endpoint_invalid",
       });
       expect(error.message).toMatch(/standard queue/i);
-      delete process.env.WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS;
     });
 
     /** @scenario A queue URL outside the canonical Amazon SQS shape is refused */
@@ -789,7 +805,6 @@ describe("Feature: Webhook endpoints REST API", () => {
         status: 400,
         code: "webhook_endpoint_invalid",
       });
-      delete process.env.WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS;
     });
 
     /** @scenario Ambient AWS credentials need the operator opt-in */
@@ -824,10 +839,9 @@ describe("Feature: Webhook endpoints REST API", () => {
       expect(body.data.sqs.credential_mode).toBe("ambient");
       expect(body.data.sqs.region).toBe("eu-central-1");
       expect(body.data.sqs.account_id).toBe("381491922238");
-      delete process.env.WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS;
     });
 
-    /** @scenario Static queue credentials are stored encrypted and never echoed */
+    /** @scenario A queue's secret access key is never readable once saved */
     it("encrypts a static secret at rest and never returns it", async () => {
       planHasWebhookEndpoints = true;
       const res = await createEndpoint({
@@ -860,6 +874,58 @@ describe("Feature: Webhook endpoints REST API", () => {
       expect(row?.sqsSecretAccessKeyEncrypted).not.toContain(
         "an-example-secret-access-key",
       );
+    });
+
+    /** @scenario A queue's secret access key is never readable once saved */
+    it("drops the old mode's credentials when the credential mode changes", async () => {
+      planHasWebhookEndpoints = true;
+      const res = await createEndpoint({
+        destination_kind: "sqs",
+        sqs: {
+          queue_url: QUEUE_URL,
+          access_key_id: "AKIAROTATEME",
+          secret_access_key: "the-key-being-rotated-away",
+        },
+        enabled_events: ["gateway.request.completed"],
+      });
+      expect(res.status).toBe(201);
+      const created = (await res.json()) as { data: { id: string } };
+
+      // Move it onto a role. The key pair is now unreachable through every
+      // read surface, so leaving it encrypted at rest would be a credential
+      // nobody can see and nobody can rotate.
+      const moved = await app.request(
+        `/api/webhooks/v1/endpoints/${created.data.id}`,
+        {
+          method: "PATCH",
+          headers: headers(),
+          body: JSON.stringify({
+            sqs: {
+              role_arn: "arn:aws:iam::381491922238:role/langwatch-producer",
+            },
+          }),
+        },
+      );
+      expect(moved.status).toBe(200);
+      const view = (await moved.json()) as {
+        data: {
+          sqs: { credential_mode: string; access_key_id: string | null };
+        };
+      };
+      expect(view.data.sqs.credential_mode).toBe("assume_role");
+      expect(view.data.sqs.access_key_id).toBeNull();
+
+      const row = await prisma.webhookEndpoint.findFirst({
+        where: { id: created.data.id },
+        select: {
+          sqsAccessKeyId: true,
+          sqsSecretAccessKeyEncrypted: true,
+          sqsRoleArn: true,
+        },
+      });
+      expect(row?.sqsRoleArn).toContain("langwatch-producer");
+      expect(row?.sqsAccessKeyId).toBeNull();
+      expect(row?.sqsSecretAccessKeyEncrypted).toBeNull();
     });
 
     /** @scenario Saving an endpoint names the field its destination kind is missing */
@@ -904,7 +970,7 @@ describe("Feature: Webhook endpoints REST API", () => {
       expect(error.message).toMatch(/cannot be changed/i);
     });
 
-    /** @scenario An HTTP endpoint delivers unchanged through the transport seam */
+    /** @scenario An endpoint saved before destinations existed still delivers over HTTPS */
     it("keeps an endpoint with no destination kind on the HTTPS transport", async () => {
       planHasWebhookEndpoints = true;
       const created = await createEndpoint({

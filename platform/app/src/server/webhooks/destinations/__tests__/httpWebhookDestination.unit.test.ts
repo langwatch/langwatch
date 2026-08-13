@@ -52,7 +52,7 @@ describe("httpWebhookDestination", () => {
   });
 
   describe("given a receiver answer", () => {
-    /** @scenario The HTTP transport classifies exactly as the sender always did */
+    /** @scenario An HTTPS endpoint keeps the retry rules it always had */
     it("treats every 2xx as success", async () => {
       for (const status of [200, 201, 202, 204, 299]) {
         receiverAnswers(status);
@@ -63,7 +63,7 @@ describe("httpWebhookDestination", () => {
       }
     });
 
-    /** @scenario The HTTP transport classifies exactly as the sender always did */
+    /** @scenario An HTTPS endpoint keeps the retry rules it always had */
     it("retries 500, 429 and 408", async () => {
       for (const status of [500, 502, 503, 429, 408]) {
         receiverAnswers(status);
@@ -74,8 +74,8 @@ describe("httpWebhookDestination", () => {
       }
     });
 
-    /** @scenario The HTTP transport classifies exactly as the sender always did */
-    it("retires every other status, redirects included", async () => {
+    /** @scenario An HTTPS endpoint keeps the retry rules it always had */
+    it("marks every other status terminal, redirects included", async () => {
       for (const status of [301, 302, 307, 400, 401, 403, 404, 410, 422]) {
         receiverAnswers(status);
         const result = await httpWebhookDestination({
@@ -85,7 +85,7 @@ describe("httpWebhookDestination", () => {
       }
     });
 
-    /** @scenario The transport answers with a verdict, not a status */
+    /** @scenario An HTTPS endpoint keeps the retry rules it always had */
     it("reports the receiver's status alongside the verdict", async () => {
       receiverAnswers(503, 5_000);
       const result = await httpWebhookDestination({ url: URL_UNDER_TEST }).send(
@@ -127,7 +127,7 @@ describe("httpWebhookDestination", () => {
       receiverAnswers(200);
 
       const result = await httpWebhookDestination({ url: URL_UNDER_TEST }).send(
-        request({ testFire: true }),
+        request({ isTestFire: true }),
       );
 
       expect(result.verdict).toBe("success");

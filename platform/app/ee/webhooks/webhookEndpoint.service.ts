@@ -472,18 +472,50 @@ function assertValidSqsUpdate({
           ? KEPT_SECRET
           : null,
   };
-  assertValidSqsDestination(merged);
+  // One mode at a time. Adding a role to an endpoint that had static keys
+  // would otherwise leave the key pair stored, unused and unreachable through
+  // any read surface, while the view reports assume_role because the role
+  // wins. An unused secret sitting at rest indefinitely is exactly the thing
+  // a credential rotation was meant to remove.
+  const exclusive = withExclusiveCredentials(merged);
+  assertValidSqsDestination(exclusive);
 
-  const stored = storedSqsDestination(merged);
+  const stored = storedSqsDestination(exclusive);
   return {
     ...stored,
     // A caller that did not send a new secret keeps the encrypted one it
     // already had, rather than re-encrypting the placeholder that stood in
     // for it during validation.
     sqsSecretAccessKeyEncrypted:
-      merged.secretAccessKey === KEPT_SECRET
+      exclusive.secretAccessKey === KEPT_SECRET
         ? endpoint.sqsSecretAccessKeyEncrypted
         : stored.sqsSecretAccessKeyEncrypted,
+  };
+}
+
+/**
+ * The credentials of the mode this destination actually selected, and none
+ * of the other mode's.
+ *
+ * `sqsCredentialMode` resolves a role over a key pair, so the role winning is
+ * what makes the key pair dead weight rather than a second way in. Clearing it
+ * here means the row says what the read view says.
+ */
+function withExclusiveCredentials(
+  sqs: SqsDestinationInput,
+): SqsDestinationInput {
+  if (sqs.roleArn) {
+    return { ...sqs, accessKeyId: null, secretAccessKey: null };
+  }
+  if (sqs.accessKeyId) {
+    return { ...sqs, roleArn: null, externalId: null };
+  }
+  return {
+    ...sqs,
+    roleArn: null,
+    externalId: null,
+    accessKeyId: null,
+    secretAccessKey: null,
   };
 }
 

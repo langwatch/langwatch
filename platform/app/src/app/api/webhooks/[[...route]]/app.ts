@@ -5,6 +5,7 @@ import {
 } from "@ee/webhooks/entitlement";
 import { WEBHOOK_EVENT_TYPES } from "@ee/webhooks/eventRegistry";
 import {
+  type SqsDestinationInput,
   WebhookEndpointService,
   type WebhookEndpointView,
 } from "@ee/webhooks/webhookEndpoint.service";
@@ -394,23 +395,35 @@ function sqsFromBody(sqs: {
   };
 }
 
-/** The destination half of a create body, wire spelling to service
- *  spelling. The schema already refused a kind without its own address, so
- *  the fields this reads are the ones that were required. */
+/**
+ * The destination half of a create body, wire spelling to service spelling.
+ *
+ * The schema already refused a kind without its own address, so the queue URL
+ * is present here. That is stated by narrowing the parameter rather than by
+ * casting the result: a cast would go on asserting it after a future
+ * loosening of the refinement, and the row written would carry an empty
+ * queue URL instead of failing the compile.
+ */
 function destinationFromBody(body: {
   destination_kind?: "http" | "sqs";
   url?: string;
   sqs?: { queue_url: string };
-}) {
-  const destinationKind = body.destination_kind ?? "http";
-  return destinationKind === "sqs"
-    ? {
-        destinationKind,
-        sqs: sqsFromBody(body.sqs ?? { queue_url: "" }) as {
-          queueUrl: string;
-        },
-      }
-    : { destinationKind, url: body.url };
+}):
+  | { destinationKind: "http"; url: string | undefined }
+  | { destinationKind: "sqs"; sqs: SqsDestinationInput } {
+  if ((body.destination_kind ?? "http") !== "sqs") {
+    return { destinationKind: "http", url: body.url };
+  }
+  const sqs = body.sqs;
+  if (!sqs?.queue_url) {
+    // Unreachable through the route, whose schema refuses this body. Saying so
+    // out loud beats a cast that would quietly write an empty queue URL.
+    throw new BadRequestError("sqs.queue_url is required for an sqs endpoint");
+  }
+  return {
+    destinationKind: "sqs",
+    sqs: { ...sqsFromBody(sqs), queueUrl: sqs.queue_url },
+  };
 }
 
 /** The single-envelope batch a test fire sends. */
@@ -707,7 +720,7 @@ secured.access(requires("webhookEndpoints:manage")).post(
         batchId: dispatchId,
         attempt: 1,
         signingSecrets: secrets,
-        testFire: true,
+        isTestFire: true,
       });
       const delivered = result.verdict === "success";
       await recordTestFire({

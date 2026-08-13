@@ -10,14 +10,28 @@
  */
 
 /**
- * `https://sqs.<region>.amazonaws.com/<12-digit account>/<queue name>`, and
- * its China partition spelling. Queue names are up to 80 characters of
- * alphanumerics, hyphens and underscores; a FIFO queue adds the `.fifo`
- * suffix, which is matched here so it can be refused with a sentence about
- * FIFO rather than one about the URL being unrecognizable.
+ * Every spelling AWS actually serves a queue URL under:
+ *
+ * - `https://sqs.<region>.amazonaws.com/<account>/<queue>`, the current form;
+ * - `sqs.<region>.amazonaws.com.cn`, the China partitions;
+ * - `sqs-fips.<region>.amazonaws.com`, the FIPS endpoints, which a regulated
+ *   customer is required to use and which the plain pattern would have
+ *   refused as "not an Amazon SQS queue URL";
+ * - `https://<region>.queue.amazonaws.com/<account>/<queue>` and the
+ *   region-less `https://queue.amazonaws.com/...`, the legacy forms that
+ *   older consoles and SDKs still hand out.
+ *
+ * Queue names are up to 80 characters of alphanumerics, hyphens and
+ * underscores; a FIFO queue adds the `.fifo` suffix, which is matched here so
+ * it can be refused with a sentence about FIFO rather than one about the URL
+ * being unrecognizable.
  */
-const SQS_QUEUE_URL_PATTERN =
-  /^https:\/\/sqs\.([a-z0-9-]+)\.amazonaws\.com(?:\.cn)?\/(\d{12})\/([A-Za-z0-9_-]{1,80}(\.fifo)?)$/;
+const SQS_QUEUE_URL_PATTERNS: readonly RegExp[] = [
+  // sqs.<region>.amazonaws.com[.cn] and sqs-fips.<region>.amazonaws.com
+  /^https:\/\/sqs(?:-fips)?\.([a-z0-9-]+)\.amazonaws\.com(?:\.cn)?\/(\d{12})\/([A-Za-z0-9_-]{1,80}(\.fifo)?)$/,
+  // <region>.queue.amazonaws.com[.cn], the legacy regional form
+  /^https:\/\/([a-z0-9-]+)\.queue\.amazonaws\.com(?:\.cn)?\/(\d{12})\/([A-Za-z0-9_-]{1,80}(\.fifo)?)$/,
+];
 
 export interface ParsedSqsQueueUrl {
   queueUrl: string;
@@ -33,7 +47,11 @@ export type SqsQueueUrlInspection =
   | { ok: false; problem: SqsQueueUrlProblem };
 
 export function inspectSqsQueueUrl(queueUrl: string): SqsQueueUrlInspection {
-  const match = SQS_QUEUE_URL_PATTERN.exec(queueUrl.trim());
+  const trimmed = queueUrl.trim();
+  const match = SQS_QUEUE_URL_PATTERNS.reduce<RegExpExecArray | null>(
+    (found, pattern) => found ?? pattern.exec(trimmed),
+    null,
+  );
   if (!match) return { ok: false, problem: "shape" };
 
   const [, region, accountId, queueName, fifoSuffix] = match;
@@ -46,7 +64,7 @@ export function inspectSqsQueueUrl(queueUrl: string): SqsQueueUrlInspection {
   return {
     ok: true,
     parsed: {
-      queueUrl: queueUrl.trim(),
+      queueUrl: trimmed,
       region: region!,
       accountId: accountId!,
       queueName: queueName!,

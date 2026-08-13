@@ -108,28 +108,28 @@ Feature: Webhook endpoints, signed outbound event delivery
     # not know which one it got.
 
     @unit
-    Scenario: The transport answers with a verdict, not a status
-      Given a delivery transport
-      When a batch is handed to it
-      Then it answers success, retryable or terminal
-      And a queue answers with no status at all
-      # The recorder used to re-derive the verdict from an HTTP status. A
-      # queue has no status, so the transport classifies and the recorder
-      # trusts it.
+    Scenario: A queue delivery is recorded with no response status
+      Given an endpoint that delivers to a queue
+      When a batch is accepted by the queue
+      Then the delivery is recorded as successful
+      And it carries the queue's message id and no response status
+      # A status code is one destination's way of answering. Inventing a 200
+      # for a queue would make the delivery log say something that never
+      # happened.
 
     @unit
-    Scenario: The HTTP transport classifies exactly as the sender always did
-      Given the HTTP transport
-      Then a 2xx answer is success
-      And 500, 429 and 408 are retryable
-      And every other status, redirects included, is terminal
+    Scenario: An HTTPS endpoint keeps the retry rules it always had
+      Given an endpoint that delivers over HTTPS
+      Then a 2xx answer is a successful delivery
+      And 500, 429 and 408 are retried along the ladder
+      And every other answer, a redirect included, retires the batch
 
     @integration
-    Scenario: An HTTP endpoint delivers unchanged through the transport seam
-      Given an endpoint with no destination kind stored
+    Scenario: An endpoint saved before destinations existed still delivers over HTTPS
+      Given an endpoint saved with only a receiver URL
       When a batch is delivered
-      Then it is posted exactly as before, to the same URL with the same headers
-      And its delivery log rows are indistinguishable from the ones it recorded before
+      Then it is posted to that URL exactly as it was before
+      And its delivery log reads the same as it always did
 
     @unit
     Scenario: Both destinations answer to the same hourly dispatch cap
@@ -199,10 +199,10 @@ Feature: Webhook endpoints, signed outbound event delivery
       # role can write to.
 
     @integration
-    Scenario: Static queue credentials are stored encrypted and never echoed
+    Scenario: A queue's secret access key is never readable once saved
       When an endpoint is saved with a static access key and secret
-      Then the secret is encrypted at rest
-      And no read of the endpoint returns it
+      Then no read of the endpoint returns the secret
+      And the secret cannot be recovered from anywhere the endpoint is stored
 
     @unit
     Scenario: A missing or forbidden queue is terminal, a throttled one retries

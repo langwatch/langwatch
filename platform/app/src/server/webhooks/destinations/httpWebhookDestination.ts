@@ -39,12 +39,12 @@ export function httpWebhookDestination({
         body: request.body,
         triggerName: request.endpointId,
         contextLabel: `Webhook endpoint ${request.endpointId}${
-          request.testFire ? " (test)" : ""
+          request.isTestFire ? " (test)" : ""
         }`,
         // Endpoints are organization-scoped, so their dispatch cap buckets
         // per organization rather than per project. A test fire passes no
         // scope, which is how it stays exempt.
-        ...(request.testFire
+        ...(request.isTestFire
           ? { testFire: true }
           : { projectId: request.organizationId }),
         eventId: request.batchId,

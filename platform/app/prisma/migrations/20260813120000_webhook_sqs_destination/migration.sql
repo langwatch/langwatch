@@ -1,6 +1,13 @@
 -- Webhook endpoints gain a destination kind: HTTPS as before, or an Amazon
 -- SQS queue.
 --
+-- To roll back: drop the constraint, drop the six columns and the
+-- destinationKind column, restore NOT NULL on "url", and drop the enum type.
+-- Restoring NOT NULL scans the table and FAILS if any sqs endpoint exists, so
+-- a rollback after the feature has been used must delete or convert those rows
+-- first. Written out rather than run: a down migration on this table would
+-- silently discard live endpoint configuration.
+--
 -- Dropping NOT NULL on "url" is a catalog-only change in Postgres: instant,
 -- no table rewrite, and every existing row keeps the URL it has. Existing
 -- rows also take the 'http' default, so the CHECK below is satisfied by the
@@ -30,6 +37,12 @@ ALTER TABLE "WebhookEndpoint"
 -- ELSE false rather than a permissive fallthrough: a third destination kind
 -- must update this constraint, and failing loudly on the first insert is how
 -- that gets noticed.
+-- Added NOT VALID and validated in a second statement. ADD CONSTRAINT alone
+-- takes an ACCESS EXCLUSIVE lock for the whole table scan, which blocks every
+-- read and write on the endpoint table while it runs; NOT VALID takes that
+-- lock only long enough to record the constraint, and VALIDATE then scans
+-- under SHARE UPDATE EXCLUSIVE, which readers and writers pass through. New
+-- rows are checked from the moment the constraint exists either way.
 ALTER TABLE "WebhookEndpoint"
   ADD CONSTRAINT "WebhookEndpoint_destination_shape_check" CHECK (
     CASE "destinationKind"
@@ -47,4 +60,7 @@ ALTER TABLE "WebhookEndpoint"
         AND ("sqsExternalId" IS NULL OR "sqsRoleArn" IS NOT NULL)
       ELSE false
     END
-  );
+  ) NOT VALID;
+
+ALTER TABLE "WebhookEndpoint"
+  VALIDATE CONSTRAINT "WebhookEndpoint_destination_shape_check";

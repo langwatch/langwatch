@@ -63,7 +63,7 @@ export interface WebhookDispatchRequest {
    *  non-suppressibly on the wire (ADR-040 §1) and exempt from the hourly
    *  dispatch cap, which it rides the caller's own per-user limit instead
    *  of. */
-  testFire?: boolean;
+  isTestFire?: boolean;
 }
 
 export interface WebhookDestination {

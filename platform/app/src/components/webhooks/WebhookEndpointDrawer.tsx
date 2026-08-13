@@ -129,7 +129,7 @@ function useDestinationFields(isOpen: boolean, endpoint: EndpointView | null) {
     setAccessKeyId,
     secretAccessKey,
     setSecretAccessKey,
-    addressFilled:
+    isAddressFilled:
       destinationKind === "sqs"
         ? queueUrl.trim().length > 0
         : url.trim().length > 0,
@@ -212,7 +212,7 @@ function useEndpointForm(isOpen: boolean, endpoint: EndpointView | null) {
     toggleType,
     toggleFamily,
     isValid:
-      destination.addressFilled &&
+      destination.isAddressFilled &&
       selected.size > 0 &&
       controlsWithinBounds(maxBatchSize, maxBatchDelayMs, maxInFlight),
     toInput: (): EndpointInput => ({
@@ -286,6 +286,10 @@ function DestinationTextField({
         type={type}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
+        // A browser password manager offering to save or fill an AWS secret
+        // is not a thing anyone wants; it is also how a stale one gets
+        // re-submitted silently.
+        autoComplete={type === "password" ? "off" : undefined}
         data-testid={testId}
       />
     </VStack>

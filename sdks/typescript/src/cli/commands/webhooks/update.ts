@@ -1,4 +1,5 @@
 import { createSpinner } from "../../utils/spinner";
+import { SQS_SECRET_ENV, sqsSecretFromEnv } from "./create";
 import { WebhooksApiService } from "@/client-sdk/services/webhooks/webhooks-api.service";
 import { checkOrgApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
@@ -11,7 +12,6 @@ export const updateWebhookCommand = async (
     queueUrl?: string;
     roleArn?: string;
     accessKeyId?: string;
-    secretAccessKey?: string;
     events?: string;
     maxBatchSize?: string;
     maxBatchDelay?: string;
@@ -19,14 +19,20 @@ export const updateWebhookCommand = async (
   },
 ): Promise<CommandResult | void> => {
   const apiKey = checkOrgApiKey();
+  // The secret is read from the environment, never from an argument: an
+  // argument lands in shell history, in ps output, and in CI logs.
+  const secretAccessKey = sqsSecretFromEnv();
+  if (options.accessKeyId !== undefined && !secretAccessKey) {
+    console.error(
+      `--access-key-id needs its secret in ${SQS_SECRET_ENV}. A secret passed as an argument ends up in shell history, in ps output, and in CI logs.`,
+    );
+    process.exit(1);
+  }
   const sqsFields = {
     ...(options.queueUrl !== undefined ? { queue_url: options.queueUrl } : {}),
     ...(options.roleArn !== undefined ? { role_arn: options.roleArn } : {}),
     ...(options.accessKeyId !== undefined
-      ? { access_key_id: options.accessKeyId }
-      : {}),
-    ...(options.secretAccessKey !== undefined
-      ? { secret_access_key: options.secretAccessKey }
+      ? { access_key_id: options.accessKeyId, secret_access_key: secretAccessKey }
       : {}),
   };
   if (
@@ -83,7 +89,13 @@ export const updateWebhookCommand = async (
       table: () => {
         console.log();
         console.log(`Endpoint:    ${endpoint.id}`);
-        console.log(`URL:         ${endpoint.url}`);
+        // A queue endpoint has no URL, so printing `url` alone would show
+        // "null" right after a successful queue change.
+        console.log(
+          endpoint.destination_kind === "sqs"
+            ? `Queue URL:   ${endpoint.sqs?.queue_url ?? ""}`
+            : `URL:         ${endpoint.url}`,
+        );
         console.log(`Events:      ${endpoint.enabled_events.join(", ")}`);
         console.log(`Delivery:    batch<=${endpoint.max_batch_size}, delay ${endpoint.max_batch_delay_ms}ms, in-flight<=${endpoint.max_in_flight}`);
         console.log();

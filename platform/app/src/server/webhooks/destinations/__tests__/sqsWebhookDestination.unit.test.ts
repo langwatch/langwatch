@@ -10,7 +10,9 @@ import { WEBHOOK_SIGNATURE_HEADER } from "../../signature";
 import { inspectSqsQueueUrl, parseSqsQueueUrl } from "../sqsQueueUrl";
 import {
   classifySqsFailure,
+  resetSqsClientCache,
   SQS_MAX_MESSAGE_BYTES,
+  sqsClientFor,
   sqsMessageAttributes,
   sqsMessageBytes,
   sqsWebhookDestination,
@@ -128,7 +130,7 @@ describe("sqsWebhookDestination", () => {
       expect(attributes["X-LangWatch-Delivery-Attempt"]!.StringValue).toBe("3");
     });
 
-    /** @scenario The transport answers with a verdict, not a status */
+    /** @scenario A queue delivery is recorded with no response status */
     it("answers success with a message id and no status", async () => {
       const { client } = fakeQueue();
       const destination = sqsWebhookDestination(
@@ -230,7 +232,7 @@ describe("sqsWebhookDestination", () => {
         { createClient: () => client as never },
       );
 
-      const result = await destination.send(request({ testFire: true }));
+      const result = await destination.send(request({ isTestFire: true }));
 
       expect(result.verdict).toBe("success");
       expect(sent).toHaveLength(1);
@@ -352,5 +354,71 @@ describe("queue URL admission", () => {
       "https://sqs.cn-north-1.amazonaws.com.cn/381491922238/events",
     );
     expect(parsed?.region).toBe("cn-north-1");
+  });
+
+  it("accepts the FIPS endpoints a regulated customer is required to use", () => {
+    const parsed = parseSqsQueueUrl(
+      "https://sqs-fips.us-east-1.amazonaws.com/381491922238/events",
+    );
+    expect(parsed).toMatchObject({ region: "us-east-1", queueName: "events" });
+  });
+
+  it("accepts the legacy regional spelling older consoles hand out", () => {
+    const parsed = parseSqsQueueUrl(
+      "https://eu-central-1.queue.amazonaws.com/381491922238/events",
+    );
+    expect(parsed).toMatchObject({
+      region: "eu-central-1",
+      accountId: "381491922238",
+    });
+  });
+});
+
+describe("the queue client", () => {
+  afterEach(() => resetSqsClientCache());
+
+  /**
+   * A client per delivery would re-assume the role on every attempt, because
+   * the assumed session is cached inside the provider instance, and would pay
+   * a TLS handshake per delivery on a torn-down connection pool.
+   */
+  it("is reused for the same queue and credentials", () => {
+    const config = {
+      queueUrl: QUEUE_URL,
+      accessKeyId: "AKIA1",
+      secretAccessKey: "s3cr3t",
+    };
+    expect(sqsClientFor(config)).toBe(sqsClientFor({ ...config }));
+  });
+
+  it("is rebuilt when a credential rotates, so it never authenticates as the old identity", () => {
+    const first = sqsClientFor({
+      queueUrl: QUEUE_URL,
+      accessKeyId: "AKIA1",
+      secretAccessKey: "s3cr3t",
+    });
+    const rotated = sqsClientFor({
+      queueUrl: QUEUE_URL,
+      accessKeyId: "AKIA1",
+      secretAccessKey: "rotated",
+    });
+    const otherRole = sqsClientFor({
+      queueUrl: QUEUE_URL,
+      roleArn: "arn:aws:iam::381491922238:role/other",
+    });
+    expect(rotated).not.toBe(first);
+    expect(otherRole).not.toBe(first);
+  });
+
+  it("takes its region from the queue URL rather than a second setting", async () => {
+    const client = sqsClientFor({
+      queueUrl: QUEUE_URL,
+      accessKeyId: "AKIA1",
+      secretAccessKey: "s3cr3t",
+    });
+    await expect(client.config.region()).resolves.toBe("eu-central-1");
+    // The delivery ladder above is already counting attempts, so the SDK must
+    // not add its own underneath it.
+    expect(await client.config.maxAttempts()).toBe(1);
   });
 });

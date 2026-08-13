@@ -2067,8 +2067,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--url <url>", "HTTPS receiver URL")
       .option("--queue-url <url>", "Amazon SQS queue URL to deliver to instead of a receiver URL (standard queues only)")
       .option("--role-arn <arn>", "IAM role to assume to write to the queue; the printed external id goes in its trust policy")
-      .option("--access-key-id <id>", "Static access key id for the queue, as an alternative to a role")
-      .option("--secret-access-key <secret>", "Secret for that access key; stored encrypted and never shown again")
+      .option("--access-key-id <id>", "Static access key id for the queue, as an alternative to a role. Its secret is read from LANGWATCH_SQS_SECRET_ACCESS_KEY, never from an argument")
       .requiredOption("--events <types>", "Comma-separated event types (see: langwatch webhooks event-types)")
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
     async (options: {
@@ -2076,7 +2075,6 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       queueUrl?: string;
       roleArn?: string;
       accessKeyId?: string;
-      secretAccessKey?: string;
       events: string;
     }) => {
       const { createWebhookCommand: impl } = await import("./commands/webhooks/create.js");
@@ -2091,8 +2089,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--url <url>", "New HTTPS receiver URL")
       .option("--queue-url <url>", "New Amazon SQS queue URL (an endpoint keeps the destination kind it was created with)")
       .option("--role-arn <arn>", "New IAM role to assume to write to the queue")
-      .option("--access-key-id <id>", "New static access key id for the queue")
-      .option("--secret-access-key <secret>", "New secret for that access key; stored encrypted and never shown again")
+      .option("--access-key-id <id>", "New static access key id for the queue. Its secret is read from LANGWATCH_SQS_SECRET_ACCESS_KEY, never from an argument")
       .option("--events <types>", "New comma-separated event types (replaces the set)")
       .option("--max-batch-size <n>", "Envelopes per POST, 1-100")
       .option("--max-batch-delay <ms>", "Coalescing window in ms before a partial batch ships, 0-60000")
@@ -2105,7 +2102,6 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         queueUrl?: string;
         roleArn?: string;
         accessKeyId?: string;
-        secretAccessKey?: string;
         events?: string;
         maxBatchSize?: string;
         maxBatchDelay?: string;
