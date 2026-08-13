@@ -23,7 +23,7 @@ This matches what the `openai` Python and TypeScript SDKs, plus the Anthropic SD
 
 `type`, `code`, `message` and `meta` mean the same thing on both LangWatch surfaces, and a client that reads only those four works against either. The surfaces are:
 
-- The **control plane**: the management API, `/api/gateway/v1/*` and `/api/webhooks/v1/*`. You create virtual keys, budgets, cache rules and webhook endpoints here.
+- The **control plane**: the management API, `/api/gateway/v1/*` and `/api/webhooks/*`. You create virtual keys, budgets, cache rules and webhook endpoints here.
 - The **data plane**: the OpenAI-compatible chat surface the gateway serves. Your application's model calls go here.
 
 They differ in exactly two ways, both consequences of the data plane being OpenAI-wire-shaped on purpose:

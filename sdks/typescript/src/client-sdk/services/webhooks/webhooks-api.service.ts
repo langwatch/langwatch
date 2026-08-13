@@ -134,7 +134,11 @@ export class WebhooksApiError extends Error {
 }
 
 /**
- * Client for the org-anchored webhook platform surface (/api/webhooks/v1).
+ * Client for the org-anchored webhook platform surface (/api/webhooks).
+ *
+ * RPC-named per ADR-094: every operation is a POST to a dotted name and every
+ * argument travels in the body, so the method names here map one-to-one onto
+ * the wire operations rather than onto HTTP verbs.
  * Authenticates with an ORGANIZATION API key (sk-lw-*); project keys are
  * rejected by the server. The surface is anchored on the organization alone,
  * so there is no project id to give this client.
@@ -204,7 +208,8 @@ export class WebhooksApiService {
   async list(): Promise<WebhookEndpointSummary[]> {
     const res = await this.request<{ data: WebhookEndpointSummary[] }>(
       "list webhook endpoints",
-      "/api/webhooks/v1/endpoints",
+      "/api/webhooks/endpoints.list",
+      { method: "POST" },
     );
     return res.data;
   }
@@ -212,7 +217,8 @@ export class WebhooksApiService {
   async get(id: string): Promise<WebhookEndpointSummary> {
     const res = await this.request<{ data: WebhookEndpointSummary }>(
       "get webhook endpoint",
-      `/api/webhooks/v1/endpoints/${encodeURIComponent(id)}`,
+      "/api/webhooks/endpoints.get",
+      { method: "POST", body: JSON.stringify({ id }) },
     );
     return res.data;
   }
@@ -228,7 +234,7 @@ export class WebhooksApiService {
   ): Promise<WebhookEndpointWithSecret> {
     const res = await this.request<{ data: WebhookEndpointWithSecret }>(
       "create webhook endpoint",
-      "/api/webhooks/v1/endpoints",
+      "/api/webhooks/endpoints.create",
       {
         method: "POST",
         body: JSON.stringify(input),
@@ -245,8 +251,12 @@ export class WebhooksApiService {
   ): Promise<WebhookEndpointSummary> {
     const res = await this.request<{ data: WebhookEndpointSummary }>(
       "update webhook endpoint",
-      `/api/webhooks/v1/endpoints/${encodeURIComponent(id)}`,
-      { method: "PATCH", body: JSON.stringify(input), ...mutationInit(options) },
+      "/api/webhooks/endpoints.update",
+      {
+        method: "POST",
+        body: JSON.stringify({ id, ...input }),
+        ...mutationInit(options),
+      },
     );
     return res.data;
   }
@@ -264,8 +274,12 @@ export class WebhooksApiService {
   async archive(id: string, options?: MutationOptions): Promise<void> {
     await this.request<unknown>(
       "archive webhook endpoint",
-      `/api/webhooks/v1/endpoints/${encodeURIComponent(id)}`,
-      { method: "DELETE", ...mutationInit(options) },
+      "/api/webhooks/endpoints.archive",
+      {
+        method: "POST",
+        body: JSON.stringify({ id }),
+        ...mutationInit(options),
+      },
     );
   }
 
@@ -275,8 +289,12 @@ export class WebhooksApiService {
   ): Promise<WebhookEndpointWithSecret> {
     const res = await this.request<{ data: WebhookEndpointWithSecret }>(
       "roll webhook endpoint secret",
-      `/api/webhooks/v1/endpoints/${encodeURIComponent(id)}/roll-secret`,
-      { method: "POST", ...mutationInit(options) },
+      "/api/webhooks/endpoints.rollSecret",
+      {
+        method: "POST",
+        body: JSON.stringify({ id }),
+        ...mutationInit(options),
+      },
     );
     return res.data;
   }
@@ -287,8 +305,12 @@ export class WebhooksApiService {
   ): Promise<WebhookTestResult> {
     const res = await this.request<{ data: WebhookTestResult }>(
       "test webhook endpoint",
-      `/api/webhooks/v1/endpoints/${encodeURIComponent(id)}/test`,
-      { method: "POST", ...mutationInit(options) },
+      "/api/webhooks/endpoints.test",
+      {
+        method: "POST",
+        body: JSON.stringify({ id }),
+        ...mutationInit(options),
+      },
     );
     return res.data;
   }
@@ -305,17 +327,17 @@ export class WebhooksApiService {
     id: string,
     options?: { cursor?: string; limit?: number },
   ): Promise<WebhookDeliveryPage> {
-    const params = new URLSearchParams();
-    if (options?.cursor) params.set("cursor", options.cursor);
-    if (options?.limit !== undefined) params.set("limit", String(options.limit));
-    const qs = params.toString() !== "" ? `?${params.toString()}` : "";
     const { data, next_cursor } = await this.request<{
       data: WebhookDeliveryRecord[];
       next_cursor?: string | null;
-    }>(
-      "list webhook deliveries",
-      `/api/webhooks/v1/endpoints/${encodeURIComponent(id)}/deliveries${qs}`,
-    );
+    }>("list webhook deliveries", "/api/webhooks/endpoints.listDeliveries", {
+      method: "POST",
+      body: JSON.stringify({
+        id,
+        ...(options?.cursor !== undefined ? { cursor: options.cursor } : {}),
+        ...(options?.limit !== undefined ? { limit: options.limit } : {}),
+      }),
+    });
     return { data, next_cursor: next_cursor ?? null };
   }
 
@@ -349,7 +371,8 @@ export class WebhooksApiService {
   async health(id: string): Promise<WebhookEndpointHealth> {
     const res = await this.request<{ data: WebhookEndpointHealth }>(
       "read webhook endpoint health",
-      `/api/webhooks/v1/endpoints/${encodeURIComponent(id)}/health`,
+      "/api/webhooks/endpoints.getHealth",
+      { method: "POST", body: JSON.stringify({ id }) },
     );
     return res.data;
   }
@@ -357,7 +380,8 @@ export class WebhooksApiService {
   async eventTypes(): Promise<WebhookEventType[]> {
     const res = await this.request<{ data: WebhookEventType[] }>(
       "list webhook event types",
-      "/api/webhooks/v1/event-types",
+      "/api/webhooks/eventTypes.list",
+      { method: "POST" },
     );
     return res.data;
   }
@@ -377,17 +401,19 @@ export class WebhooksApiService {
     cursor?: string;
     limit?: number;
   }): Promise<EmittedEventsPage> {
-    const params = new URLSearchParams();
-    if (options.type) params.set("type", options.type);
-    params.set("from", String(options.from));
-    params.set("to", String(options.to));
-    if (options.cursor) params.set("cursor", options.cursor);
-    if (options.limit !== undefined) params.set("limit", String(options.limit));
-    const qs = params.toString() !== "" ? `?${params.toString()}` : "";
     const { data, next_cursor } = await this.request<{
       data: EmittedEvent[];
       next_cursor?: string | null;
-    }>("list emitted events", `/api/webhooks/v1/events${qs}`);
+    }>("list emitted events", "/api/webhooks/events.list", {
+      method: "POST",
+      body: JSON.stringify({
+        from: options.from,
+        to: options.to,
+        ...(options.type !== undefined ? { type: options.type } : {}),
+        ...(options.cursor !== undefined ? { cursor: options.cursor } : {}),
+        ...(options.limit !== undefined ? { limit: options.limit } : {}),
+      }),
+    });
     return { data, next_cursor: next_cursor ?? null };
   }
 
@@ -432,7 +458,8 @@ export class WebhooksApiService {
   async getEvent(id: string): Promise<EmittedEvent> {
     const res = await this.request<{ data: EmittedEvent }>(
       "get emitted event",
-      `/api/webhooks/v1/events/${encodeURIComponent(id)}`,
+      "/api/webhooks/events.get",
+      { method: "POST", body: JSON.stringify({ id }) },
     );
     return res.data;
   }

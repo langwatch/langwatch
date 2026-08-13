@@ -74,12 +74,6 @@ const deliveriesPage = (ids: string[], next_cursor: string | null): unknown => (
 /** The url of the nth fetch, in call order. */
 const urlOf = (call: number): string => String(mockFetch.mock.calls[call]![0]);
 
-/** The query string of the nth fetch, in call order. */
-const queryOf = (call: number): string => {
-  const url = urlOf(call);
-  return url.slice(url.indexOf("?") + 1);
-};
-
 /** The nth fetch's RequestInit, in call order. */
 const initOf = (call: number): RequestInit =>
   mockFetch.mock.calls[call]![1] as RequestInit;
@@ -152,8 +146,9 @@ describe("WebhooksApiService", () => {
         max_batch_size: 10,
       });
 
-      expect(initOf(0).method).toBe("PATCH");
+      expect(initOf(0).method).toBe("POST");
       expect(bodyOf(0)).toEqual({
+        id: "ep_1",
         enabled_events: ["gateway.budget.breached"],
         max_batch_size: 10,
       });
@@ -169,7 +164,7 @@ describe("WebhooksApiService", () => {
       });
 
       expect(updated.status).toBe("disabled");
-      expect(bodyOf(0)).toEqual({ status: "disabled" });
+      expect(bodyOf(0)).toEqual({ id: "ep_1", status: "disabled" });
     });
   });
 
@@ -182,10 +177,11 @@ describe("WebhooksApiService", () => {
       const result = await new WebhooksApiService().archive("ep_1");
 
       expect(result).toBeUndefined();
-      expect(initOf(0).method).toBe("DELETE");
+      expect(initOf(0).method).toBe("POST");
       expect(urlOf(0)).toBe(
-        "https://api.langwatch.test/api/webhooks/v1/endpoints/ep_1",
+        "https://api.langwatch.test/api/webhooks/endpoints.archive",
       );
+      expect(bodyOf(0)).toEqual({ id: "ep_1" });
     });
 
     it("raises when the endpoint is not the caller's to archive", async () => {
@@ -226,10 +222,12 @@ describe("WebhooksApiService", () => {
 
       expect(page.data.map((e) => e.id)).toEqual(["evt_a", "evt_b"]);
       expect(page.next_cursor).toBe("cursor-1");
-      const query = new URLSearchParams(queryOf(0));
-      expect(query.get("type")).toBe("gateway.request.completed");
-      expect(query.get("from")).toBe("1750000000000");
-      expect(query.get("limit")).toBe("2");
+      expect(bodyOf(0)).toEqual({
+        type: "gateway.request.completed",
+        from: 1_750_000_000_000,
+        to: 1_750_086_400_000,
+        limit: 2,
+      });
     });
 
     it("reads a server that sends no cursor at all as an exhausted page", async () => {
@@ -270,11 +268,10 @@ describe("WebhooksApiService", () => {
       );
 
       for (const call of [0, 1]) {
-        const query = new URLSearchParams(queryOf(call));
-        expect(query.get("type")).toBe("gateway.request.settled");
-        expect(query.get("limit")).toBe("200");
+        expect(bodyOf(call).type).toBe("gateway.request.settled");
+        expect(bodyOf(call).limit).toBe(200);
       }
-      expect(new URLSearchParams(queryOf(1)).get("cursor")).toBe("cursor-1");
+      expect(bodyOf(1).cursor).toBe("cursor-1");
     });
 
     it("raises rather than looping forever when the cursor chain never ends", async () => {
@@ -298,9 +295,12 @@ describe("WebhooksApiService", () => {
       const event = await new WebhooksApiService().getEvent("evt a/1");
 
       expect(event.id).toBe("evt_a");
+      // The id travels in the body, so a space or a slash in it needs no
+      // percent-encoding and cannot change which route is addressed.
       expect(urlOf(0)).toBe(
-        "https://api.langwatch.test/api/webhooks/v1/events/evt%20a%2F1",
+        "https://api.langwatch.test/api/webhooks/events.get",
       );
+      expect(bodyOf(0)).toEqual({ id: "evt a/1" });
     });
   });
 
@@ -316,7 +316,7 @@ describe("WebhooksApiService", () => {
 
       expect(page.data.map((d) => d.id)).toEqual(["dlv_a", "dlv_b"]);
       expect(page.next_cursor).toBe("cursor-1");
-      expect(new URLSearchParams(queryOf(0)).get("limit")).toBe("2");
+      expect(bodyOf(0)).toEqual({ id: "ep_1", limit: 2 });
     });
 
     it("passes a caller's cursor back verbatim", async () => {
@@ -328,7 +328,7 @@ describe("WebhooksApiService", () => {
         cursor: "1750000000000~dlv_b",
       });
 
-      expect(new URLSearchParams(queryOf(0)).get("cursor")).toBe(
+      expect(bodyOf(0).cursor).toBe(
         "1750000000000~dlv_b",
       );
     });
@@ -348,7 +348,7 @@ describe("WebhooksApiService", () => {
 
       expect(deliveries.map((d) => d.id)).toEqual(["dlv_a", "dlv_b", "dlv_c"]);
       expect(mockFetch).toHaveBeenCalledTimes(2);
-      expect(new URLSearchParams(queryOf(1)).get("cursor")).toBe("cursor-1");
+      expect(bodyOf(1).cursor).toBe("cursor-1");
     });
 
     it("reads a page only when the consumer reaches it", async () => {

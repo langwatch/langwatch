@@ -10,7 +10,7 @@ Webhook endpoints stream LangWatch events to your systems as they happen. You re
 The first consumers are billing integrations: platforms that rebill their own customers ingest [spend events](/ai-gateway/billing-events) through a webhook endpoint. The platform itself is general: every event family delivers through the same endpoints, envelopes, signatures, and retries.
 
 <Note>
-Webhook endpoints are an **Enterprise** feature (the `webhookEndpointsEnabled` plan flag). On other plans the API answers `403` and the settings page shows an upgrade state. Self-hosted enterprise licenses include it.
+Webhook endpoints are an **Enterprise** feature (the `webhookEndpointsEnabled` plan flag). Without it the API answers `402` with `error.code = "enterprise_plan_required"` and the settings page shows an upgrade state. Self-hosted enterprise licenses include it.
 </Note>
 
 ## The model
@@ -27,25 +27,32 @@ An endpoint belongs to your **organization** and carries:
 
 Manage endpoints under **AI Gateway > Webhooks** (`/settings/gateway/webhooks`) or over REST with an organization API key:
 
+Every operation is a `POST` to a named operation, and every argument travels in
+the JSON body — including the endpoint id.
+
 ```
-POST   /api/webhooks/v1/endpoints                    webhookEndpoints:manage
-GET    /api/webhooks/v1/endpoints                    webhookEndpoints:view
-GET    /api/webhooks/v1/endpoints/:id                webhookEndpoints:view
-PATCH  /api/webhooks/v1/endpoints/:id                webhookEndpoints:manage
-DELETE /api/webhooks/v1/endpoints/:id                webhookEndpoints:manage   (archive)
-POST   /api/webhooks/v1/endpoints/:id/roll-secret    webhookEndpoints:manage
-POST   /api/webhooks/v1/endpoints/:id/test           webhookEndpoints:manage
-GET    /api/webhooks/v1/endpoints/:id/deliveries     webhookEndpoints:view
-GET    /api/webhooks/v1/endpoints/:id/health         webhookEndpoints:view
-GET    /api/webhooks/v1/event-types                  webhookEndpoints:view
-GET    /api/webhooks/v1/events                       webhookEndpoints:view
-GET    /api/webhooks/v1/events/:id                   webhookEndpoints:view
+POST /api/webhooks/endpoints.create             webhookEndpoints:manage
+POST /api/webhooks/endpoints.list               webhookEndpoints:view
+POST /api/webhooks/endpoints.get                webhookEndpoints:view
+POST /api/webhooks/endpoints.update             webhookEndpoints:manage
+POST /api/webhooks/endpoints.archive            webhookEndpoints:manage
+POST /api/webhooks/endpoints.rollSecret         webhookEndpoints:manage
+POST /api/webhooks/endpoints.test               webhookEndpoints:manage
+POST /api/webhooks/endpoints.listDeliveries     webhookEndpoints:view
+POST /api/webhooks/endpoints.getHealth          webhookEndpoints:view
+POST /api/webhooks/eventTypes.list              webhookEndpoints:view
+POST /api/webhooks/events.list                  webhookEndpoints:view
+POST /api/webhooks/events.get                   webhookEndpoints:view
 ```
+
+Pin a version by putting it in the path — `/api/webhooks/2026-08-07/endpoints.list`
+— or call `/latest/` for the newest, or the bare path above, which is the one
+the reference documents.
 
 Create an endpoint subscribed to the billing stream:
 
 ```bash
-curl -sS https://app.langwatch.ai/api/webhooks/v1/endpoints \
+curl -sS -X POST https://app.langwatch.ai/api/webhooks/endpoints.create \
   -H "Authorization: Bearer $LANGWATCH_ORG_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -106,7 +113,7 @@ Batches contain up to `max_batch_size` envelopes, possibly of mixed types within
 
 ## Event catalog
 
-`GET /api/webhooks/v1/event-types` returns the live catalog. Types are grouped by family (the first dotted segment), which is also what the settings UI renders as checkbox groups and what the `gateway.*` wildcard matches.
+`POST /api/webhooks/eventTypes.list` returns the live catalog. Types are grouped by family (the first dotted segment), which is also what the settings UI renders as checkbox groups and what the `gateway.*` wildcard matches.
 
 ### Family: `gateway`
 
@@ -360,11 +367,11 @@ Endpoint deliveries and the [webhooks fired by your automation triggers](#signin
 **Do not reconcile billing against this log.** It holds only the request families, it is a delivery-recovery aid rather than the money record, and it carries no retention contract. Reconcile against the spend ledger: [`spend-summaries` and `spend-events`](/ai-gateway/billing-events#reconciliation-two-grains-one-ledger), which include settled rows and keep 13 months.
 </Warning>
 
-`GET /api/webhooks/v1/events?from=&to=&type=&cursor=&limit=` is the organization's emitted-events log: cursor-paged, newest first, filterable by type. Webhooks are push over this log, never the only copy of it, so a consumer that missed deliveries can list what was emitted and recover.
+`POST /api/webhooks/events.list`, with `from`, `to` and optionally `type`, `cursor` and `limit` in the body, is the organization's emitted-events log: cursor-paged, newest first, filterable by type. Webhooks are push over this log, never the only copy of it, so a consumer that missed deliveries can list what was emitted and recover.
 
 `from` and `to` bound the `created` range in unix milliseconds and are **required**, and `from` must be less than or equal to `to`. The log reads the same 13-month spend table the reconciliation pull reads, so an unbounded listing sorts every month the organization has, cold storage included, to serve one page. A read with no range, with only one of the two bounds, or with a range that ends before it starts is rejected with the canonical `400` this surface answers every validation failure with, naming the offending parameter.
 
-`GET /api/webhooks/v1/events/{id}` reads one event back by the `id` its envelope carried. A `404` means the log cannot answer for that id, and deliberately does not say which reason applies.
+`POST /api/webhooks/events.get`, with `{ "id": "..." }`, reads one event back by the `id` its envelope carried. A `404` means the log cannot answer for that id, and deliberately does not say which reason applies.
 
 ### Which families the log holds
 

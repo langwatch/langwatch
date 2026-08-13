@@ -74,7 +74,7 @@ Choices worth making deliberately:
 Your billing ledger is fed by [webhook endpoints](/features/webhooks). Register your receiver once, org-wide, subscribed to the spend stream (and the budget signals if you want them):
 
 ```bash
-curl -sS $LW/api/webhooks/v1/endpoints \
+curl -sS -X POST $LW/api/webhooks/endpoints.create \
   -H "Authorization: Bearer $LANGWATCH_ORG_API_KEY" -H "Content-Type: application/json" \
   -d '{"url": "https://billing.example.com/webhooks/langwatch",
        "enabled_events": ["gateway.request.completed", "gateway.request.settled",

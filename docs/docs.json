@@ -1403,18 +1403,18 @@
             "group": "Webhooks",
             "pages": [
               "api-reference/webhooks/overview",
-              "api-reference/webhooks/list-webhook-endpoints",
-              "api-reference/webhooks/list-subscribable-event-types",
-              "api-reference/webhooks/list-emitted-events",
+              "api-reference/webhooks/archive-a-webhook-endpoint",
               "api-reference/webhooks/create-a-webhook-endpoint",
               "api-reference/webhooks/get-a-webhook-endpoint",
-              "api-reference/webhooks/list-an-endpoint-s-delivery-attempts",
               "api-reference/webhooks/read-an-endpoint-s-delivery-health",
-              "api-reference/webhooks/get-one-emitted-event",
-              "api-reference/webhooks/update-a-webhook-endpoint",
+              "api-reference/webhooks/list-webhook-endpoints",
+              "api-reference/webhooks/list-an-endpoint-s-delivery-attempts",
               "api-reference/webhooks/roll-an-endpoint-s-signing-secret",
               "api-reference/webhooks/send-a-test-event-to-an-endpoint",
-              "api-reference/webhooks/archive-a-webhook-endpoint"
+              "api-reference/webhooks/update-a-webhook-endpoint",
+              "api-reference/webhooks/get-one-emitted-event",
+              "api-reference/webhooks/list-emitted-events",
+              "api-reference/webhooks/list-subscribable-event-types"
             ]
           }
         ]
