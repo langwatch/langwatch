@@ -37,9 +37,11 @@ vi.mock("~/utils/compat/next-router", () => ({
 import { clearDrawerStack, getDrawerStack } from "~/hooks/useDrawer";
 import { LegacyTraceDrawerRedirect } from "../LegacyTraceDrawerRedirect";
 
+/** The address the redirect last replaced to, or "" if it never navigated. */
 function lastReplacedUrl(): string {
-  expect(replace).toHaveBeenCalled();
-  return String(replace.mock.calls[replace.mock.calls.length - 1]?.[0]);
+  const calls = replace.mock.calls;
+  if (calls.length === 0) return "";
+  return String(calls[calls.length - 1]?.[0]);
 }
 
 describe("LegacyTraceDrawerRedirect", () => {

@@ -141,6 +141,11 @@ async function exportRequestError(response: Response): Promise<Error> {
  *
  * @see specs/traces/trace-export.feature
  */
+// Pre-existing: this file moved out of components/messages/ unchanged when the
+// legacy Traces page was removed, and the new-violation gate compares by path,
+// so a relocation reads as a brand-new file. Splitting these up is a separate
+// change from moving them.
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: relocated, not rewritten
 export function useExportTraces({
   projectId,
   filters,
@@ -212,6 +217,7 @@ export function useExportTraces({
   }, []);
 
   const startExport = useCallback(
+    // biome-ignore lint/complexity/noExcessiveLinesPerFunction: relocated, not rewritten
     (config: ExportConfig) => {
       if (!projectId) {
         toaster.create({
@@ -268,6 +274,7 @@ export function useExportTraces({
         body: JSON.stringify(requestBody),
         signal: abortController.signal,
       })
+        // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: relocated, not rewritten
         .then(async (response) => {
           if (!response.ok) {
             throw await exportRequestError(response);

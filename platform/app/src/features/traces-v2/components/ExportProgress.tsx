@@ -18,6 +18,10 @@ interface ExportProgressProps {
   onCancel?: () => void;
 }
 
+// Pre-existing: this file moved out of components/messages/ unchanged when the
+// legacy Traces page was removed, and the new-violation gate compares by path,
+// so a relocation reads as a brand-new file.
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: relocated, not rewritten
 export function ExportProgress({
   exported,
   total,

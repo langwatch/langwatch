@@ -67,6 +67,11 @@ function getViewColors(view: { filters: SavedView["filters"]; name: string }): {
  * SavedViewsBar renders a sticky bar at the bottom of the page with
  * clickable view badges for quick filter switching.
  */
+// Pre-existing: this file moved out of components/messages/ unchanged when the
+// legacy Traces page was removed, and the new-violation gate compares by path,
+// so a relocation reads as a brand-new file. Splitting these up is a separate
+// change from moving them.
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: relocated, not rewritten
 export function SavedViewsBar() {
   const {
     defaultViews,
@@ -217,6 +222,8 @@ export function SavedViewsBar() {
  * ViewBadge renders a single view badge in the bar.
  * Shows selection state and optional delete button in edit mode.
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: relocated, not rewritten
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: relocated, not rewritten
 function ViewBadge({
   id,
   name,
