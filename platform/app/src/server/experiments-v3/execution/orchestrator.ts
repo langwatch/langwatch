@@ -1027,6 +1027,106 @@ export const priceMetrics = async (
   return estimateCost({ llmModelCost, inputTokens, outputTokens });
 };
 
+/** What every evaluator of a cell is dispatched against. */
+type CellEvaluatorContext = {
+  cell: ExecutionCell;
+  projectId: string;
+  workflow: Workflow;
+  targetOutput: Record<string, unknown>;
+  traceId: string;
+  targetNodes: Set<string>;
+  config: ResultMapperConfig;
+  isAborted?: () => Promise<boolean>;
+};
+
+/**
+ * Dispatches one evaluator and yields whatever the engine reports back.
+ *
+ * The engine's events are collected before any of them is yielded, so a
+ * dispatch that throws part-way through emits nothing and the caller reports a
+ * single error cell instead of a half-written result.
+ */
+async function* runOneCellEvaluator({
+  evaluatorId,
+  evaluatorNodeId,
+  cell,
+  projectId,
+  workflow,
+  targetOutput,
+  traceId,
+  targetNodes,
+  config,
+  isAborted,
+}: CellEvaluatorContext & {
+  evaluatorId: string;
+  evaluatorNodeId: string;
+}): AsyncGenerator<EvaluationV3Event> {
+  const evaluatorInputs = buildEvaluatorInputs(cell, evaluatorId, targetOutput);
+
+  const evaluatorEvent = {
+    type: "execute_component" as const,
+    payload: {
+      trace_id: traceId,
+      workflow: {
+        ...workflow,
+        state: { execution: { status: "idle" as const } },
+      },
+      node_id: evaluatorNodeId,
+      inputs: evaluatorInputs,
+      origin: "evaluation",
+    },
+  };
+
+  const evaluatorEvents: StudioServerEvent[] = [];
+  await studioBackendPostEvent({
+    projectId,
+    message: await addEnvs(evaluatorEvent, projectId),
+    isAborted,
+    onEvent: (serverEvent) => {
+      evaluatorEvents.push(serverEvent);
+    },
+  });
+
+  for (const event of evaluatorEvents) {
+    const mappedEvent = mapNlpEvent({
+      event,
+      rowIndex: cell.rowIndex,
+      targetNodes,
+      config,
+      evaluatorInputs,
+    });
+    if (mappedEvent) {
+      yield mappedEvent;
+    }
+  }
+}
+
+/** The error cell an evaluator that could not run reports for itself. */
+const evaluatorErrorResult = ({
+  cell,
+  evaluatorId,
+  error,
+}: {
+  cell: ExecutionCell;
+  evaluatorId: string;
+  error: unknown;
+}): EvaluationV3Event => ({
+  type: "evaluator_result",
+  rowIndex: cell.rowIndex,
+  targetId: cell.targetId,
+  evaluatorId,
+  result: {
+    status: "error",
+    error_type: "EvaluatorError",
+    details:
+      error instanceof Error ? error.message : "Evaluator execution failed",
+    traceback: [],
+    ...(HandledError.isHandled(error)
+      ? { domainError: error.serialize() }
+      : {}),
+  },
+});
+
 /**
  * Dispatches a cell's grading evaluators against the target's output.
  *
@@ -1040,30 +1140,16 @@ export const priceMetrics = async (
  * cell, and the target's own result is already yielded by the time this runs.
  */
 async function* runCellEvaluators({
-  cell,
-  projectId,
-  workflow,
   evaluatorNodeIds,
-  targetOutput,
-  traceId,
-  targetNodes,
-  config,
-  isAborted,
-}: {
-  cell: ExecutionCell;
-  projectId: string;
-  workflow: Workflow;
+  ...context
+}: CellEvaluatorContext & {
   evaluatorNodeIds: Record<string, string>;
-  targetOutput: Record<string, unknown>;
-  traceId: string;
-  targetNodes: Set<string>;
-  config: ResultMapperConfig;
-  isAborted?: () => Promise<boolean>;
 }): AsyncGenerator<EvaluationV3Event> {
+  const { cell, isAborted } = context;
+
   for (const [evaluatorId, evaluatorNodeId] of Object.entries(
     evaluatorNodeIds,
   )) {
-    // Check abort before each evaluator
     if (isAborted && (await isAborted())) {
       logger.debug(
         { cell: cell.rowIndex, evaluatorId },
@@ -1072,57 +1158,8 @@ async function* runCellEvaluators({
       return;
     }
     try {
-      // Build evaluator inputs from target output and dataset
-      const evaluatorInputs = buildEvaluatorInputs(
-        cell,
-        evaluatorId,
-        targetOutput,
-      );
-
-      // Create execute_component event for evaluator
-      const evaluatorEvent = {
-        type: "execute_component" as const,
-        payload: {
-          trace_id: traceId,
-          workflow: {
-            ...workflow,
-            state: { execution: { status: "idle" as const } },
-          },
-          node_id: evaluatorNodeId,
-          inputs: evaluatorInputs,
-          origin: "evaluation",
-        },
-      };
-
-      // Add environment variables
-      const enrichedEvaluatorEvent = await addEnvs(evaluatorEvent, projectId);
-
-      // Execute evaluator
-      const evaluatorEvents: StudioServerEvent[] = [];
-      await studioBackendPostEvent({
-        projectId,
-        message: enrichedEvaluatorEvent,
-        isAborted,
-        onEvent: (serverEvent) => {
-          evaluatorEvents.push(serverEvent);
-        },
-      });
-
-      // Map and yield evaluator events
-      for (const event of evaluatorEvents) {
-        const mappedEvent = mapNlpEvent({
-          event,
-          rowIndex: cell.rowIndex,
-          targetNodes,
-          config,
-          evaluatorInputs,
-        });
-        if (mappedEvent) {
-          yield mappedEvent;
-        }
-      }
+      yield* runOneCellEvaluator({ ...context, evaluatorId, evaluatorNodeId });
     } catch (evalError) {
-      // Yield error for this evaluator but continue with others
       logger.warn(
         {
           error: evalError,
@@ -1132,24 +1169,7 @@ async function* runCellEvaluators({
         },
         "Evaluator execution failed",
       );
-      yield {
-        type: "evaluator_result",
-        rowIndex: cell.rowIndex,
-        targetId: cell.targetId,
-        evaluatorId,
-        result: {
-          status: "error",
-          error_type: "EvaluatorError",
-          details:
-            evalError instanceof Error
-              ? evalError.message
-              : "Evaluator execution failed",
-          traceback: [],
-          ...(HandledError.isHandled(evalError)
-            ? { domainError: evalError.serialize() }
-            : {}),
-        },
-      };
+      yield evaluatorErrorResult({ cell, evaluatorId, error: evalError });
     }
   }
 }

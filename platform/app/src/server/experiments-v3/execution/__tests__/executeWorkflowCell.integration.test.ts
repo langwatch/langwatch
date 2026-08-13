@@ -328,6 +328,7 @@ describe("executeWorkflowCell", () => {
         );
 
         const target = events.find((e) => e.type === "target_result");
+        expect(target).toBeDefined();
         expect(target?.type === "target_result" && target.error).toBe(
           "the http call timed out",
         );
@@ -355,6 +356,7 @@ describe("executeWorkflowCell", () => {
         );
 
         const target = events.find((e) => e.type === "target_result");
+        expect(target).toBeDefined();
         expect(target?.type === "target_result" && target.output).toEqual({
           output: "yes",
           chunks: { a: 1 },
@@ -367,6 +369,7 @@ describe("executeWorkflowCell", () => {
           (e) =>
             e.type === "evaluator_result" && e.evaluatorId === "eval-grading",
         );
+        expect(graded).toBeDefined();
         expect(
           graded?.type === "evaluator_result" && graded.result,
         ).toMatchObject({ status: "error", error_type: "EvaluatorError" });
