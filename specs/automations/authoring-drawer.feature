@@ -294,16 +294,28 @@ Feature: Staged automation authoring drawer
       Then no cadence section is shown
       And the trace-settle wait setting is still available inside the cadence-equivalent surface
 
+    @integration
     Scenario: The cadence section is shown for notification triggers
       Given the user is authoring an email notification
       Then the cadence section is available
-      And it exposes the delivery-cadence dropdown
+      And it asks whether to receive one message per matching trace or batches on a schedule
       And it exposes the trace-settle wait setting
+      And it explains that messages wait for the trace to settle rather than sending instantly
 
+    @integration
     Scenario: Cadence defaults to a 5-minute digest for new notifications
       Given the user is creating a new email automation
       When the cadence section opens
-      Then the cadence is "Every 5 minutes" by default
+      Then "In batches, every 5 minutes" is the pre-picked answer
+
+    # A Slack notification's templates depend on the receive choice, so there
+    # the chooser lives beside the templates it filters (see "The receive
+    # choice decides which layouts are offered") and the cadence section must
+    # not offer a competing second control.
+    @integration
+    Scenario: The receive choice is not duplicated when the channel hosts it
+      Given the user is authoring a Slack notification
+      Then the cadence section offers only the trace-settle wait setting
 
     Scenario: A new notification cannot be saved until the cadence is reviewed
       Given the user is creating a new notification automation
@@ -374,20 +386,16 @@ Feature: Staged automation authoring drawer
       Then the preview says the layout needs a Slack app connection
       And picking it leaves the automation's layout unchanged
 
+    # The receive chooser (one message per matching trace, or batches on a
+    # schedule) sits beside the layout list and is the one cadence control:
+    # the list never offers the other mode's layouts alongside, so picking a
+    # layout can never silently switch the automation's cadence.
     @integration
-    Scenario: Cross-cadence layout picking keeps list order
-      Given the layout list shows the layouts for both cadences, grouped by what one message contains
-      When the user picks a layout built for the other cadence
-      Then the automation's cadence switches to match the picked layout
-      And the layout list's order is unchanged
-
-    @integration
-    Scenario: An external cadence change reorders the layout list; an in-picker pick still does not
-      Given the layout list leads with the layouts for the automation's current cadence
-      When the user changes the cadence from the wizard's Delivery step
-      Then the layout list leads with the layouts for the new cadence
-      When the user then picks a layout built for the other cadence
-      Then the layout list's order is unchanged by that pick
+    Scenario: The receive choice decides which layouts are offered
+      Given a Slack notification set to one message per matching trace
+      Then only the per-trace layouts are listed
+      When the author switches to receiving batches
+      Then only the digest layouts are listed
 
     Scenario: Test fire sends a banner-marked notification before saving
       Given the user has configured a notification with a destination

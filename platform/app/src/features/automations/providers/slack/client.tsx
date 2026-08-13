@@ -32,6 +32,7 @@ import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { Link } from "~/components/ui/link";
 import { SegmentedControl } from "~/components/ui/segmented-control";
 import { Select } from "~/components/ui/select";
+import { ReceiveCadenceField } from "~/features/automations/components/ReceiveCadenceField";
 import { VariableInfoIcon } from "~/features/automations/components/VariableInfoIcon";
 import { LIQUID_JSON_LANGUAGE_ID } from "~/features/automations/editors/liquidMonaco";
 import { SLACK_BLOCK_KIT_JSON_SCHEMA } from "~/features/automations/editors/monacoSchemas";
@@ -766,6 +767,16 @@ function SlackConfigForm({
           </Field.Root>
         </VStack>
       )}
+      {/* The receive choice lives here, beside the layouts it filters — one
+          decision drives both the cadence and which templates are offered
+          (`hostsReceiveChooser`). Only a trace automation has the choice: the
+          server pins alerts and reports to their own timing. */}
+      {ctx.sourceKind === "trace" ? (
+        <ReceiveCadenceField
+          value={ctx.notificationCadence}
+          onChange={ctx.setNotificationCadence}
+        />
+      ) : null}
       <FieldHeader
         label="Message"
         usingDefault={slice.template.usingDefault}
@@ -811,22 +822,6 @@ function SlackConfigForm({
                     template: { value: option.source, usingDefault: false },
                   })
                 }
-                onSelectOtherCadence={(option) => {
-                  // Cross-cadence pick: switch the cadence alongside the template
-                  // so the author doesn't have to round-trip via the Cadence
-                  // section. Both land in the same batch, so the cadence-mismatch
-                  // reset effect above sees a consistent pair and leaves it
-                  // alone.
-                  ctx.setNotificationCadence(
-                    option.cadenceFit === "digest"
-                      ? "5min_digest"
-                      : "immediate",
-                  );
-                  onChange({
-                    ...slice,
-                    template: { value: option.source, usingDefault: false },
-                  });
-                }}
               />
             )
           ) : (
@@ -1242,6 +1237,9 @@ function ReuseSlackWebhook({
 const client: NotifyClientDef<SlackSlice, SlackPreview> = {
   Icon: FaSlack,
   channel: "slack",
+  // The layout gallery depends on the receive choice, so the chooser renders
+  // beside it (in SlackConfigForm) and the cadence facet stands down.
+  hostsReceiveChooser: true,
   initialSlice,
   isComplete,
   summary,

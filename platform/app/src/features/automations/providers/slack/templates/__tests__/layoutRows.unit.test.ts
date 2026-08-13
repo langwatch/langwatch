@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { buildLayoutGroups, otherCadenceOf } from "../layoutRows";
+import { buildLayoutRows } from "../layoutRows";
 import type { SlackBlockKitTemplateId } from "../registry";
 
 const build = (
-  overrides: Partial<Parameters<typeof buildLayoutGroups>[0]> = {},
+  overrides: Partial<Parameters<typeof buildLayoutRows>[0]> = {},
 ) =>
-  buildLayoutGroups({
-    groupingCadence: "immediate",
+  buildLayoutRows({
+    cadence: "immediate",
     kind: "trace",
     deliveryMethod: "webhook",
     currentSource: "",
@@ -14,48 +14,29 @@ const build = (
     ...overrides,
   });
 
-const idsOf = (groups: ReturnType<typeof build>): SlackBlockKitTemplateId[] =>
-  groups.flatMap((group) => group.rows.map((row) => row.option.id));
+const idsOf = (rows: ReturnType<typeof build>): SlackBlockKitTemplateId[] =>
+  rows.map((row) => row.option.id);
 
-const rowFor = (groups: ReturnType<typeof build>, id: string) =>
-  groups.flatMap((group) => group.rows).find((row) => row.option.id === id);
+const rowFor = (rows: ReturnType<typeof build>, id: string) =>
+  rows.find((row) => row.option.id === id);
 
-describe("buildLayoutGroups", () => {
+describe("buildLayoutRows", () => {
   describe("given a trace automation", () => {
-    it("leads with the grouped cadence and follows with the other one", () => {
-      const groups = build({ groupingCadence: "digest" });
+    it("offers only the layouts built for the draft's cadence", () => {
+      const perTrace = build({ cadence: "immediate" });
+      const digest = build({ cadence: "digest" });
 
-      expect(groups.map((group) => group.cadence)).toEqual([
-        "digest",
-        "immediate",
-      ]);
-      expect(groups.map((group) => group.heading)).toEqual([
-        "One digest message",
-        "One message per trace",
-      ]);
+      expect(rowFor(perTrace, "trace_alert_compact")).toBeDefined();
+      expect(rowFor(perTrace, "digest_compact")).toBeUndefined();
+      expect(rowFor(digest, "digest_compact")).toBeDefined();
+      expect(rowFor(digest, "trace_alert_compact")).toBeUndefined();
     });
 
-    it("marks only the layouts of the other cadence as cross-cadence", () => {
-      const groups = build();
+    it("badges the default layout", () => {
+      const rows = build({ defaultId: "trace_alert_compact" });
 
-      expect(rowFor(groups, "trace_alert_compact")?.fromOtherCadence).toBe(
-        false,
-      );
-      expect(rowFor(groups, "digest_compact")?.fromOtherCadence).toBe(true);
-    });
-
-    // The default is computed against the draft's LIVE cadence, so between a
-    // cross-cadence pick and the regroup it can name a layout sitting in the
-    // other group. Badging it there would put "Default" on a layout the
-    // automation is not on the cadence for.
-    it("badges the default only when it sits in the leading group", () => {
-      const inLeadingGroup = build({ defaultId: "trace_alert_compact" });
-      const inOtherGroup = build({ defaultId: "digest_inline_rich" });
-
-      expect(rowFor(inLeadingGroup, "trace_alert_compact")?.isDefault).toBe(
-        true,
-      );
-      expect(rowFor(inOtherGroup, "digest_inline_rich")?.isDefault).toBe(false);
+      expect(rowFor(rows, "trace_alert_compact")?.isDefault).toBe(true);
+      expect(rowFor(rows, "trace_alert_one_liner")?.isDefault).toBe(false);
     });
 
     /** @scenario "The richer templates are offered only for a bot connection" */
@@ -77,30 +58,15 @@ describe("buildLayoutGroups", () => {
 
       expect(rowFor(onPreset, "trace_alert_one_liner")?.isSelected).toBe(true);
       expect(rowFor(onPreset, "trace_alert_compact")?.isSelected).toBe(false);
-      expect(
-        onCustom.flatMap((group) => group.rows).some((row) => row.isSelected),
-      ).toBe(false);
-    });
-  });
-
-  describe("given a graph alert", () => {
-    it("offers one unheaded group, because an alert has no second cadence", () => {
-      const groups = build({ kind: "graphAlert" });
-
-      expect(groups).toHaveLength(1);
-      expect(groups[0]?.heading).toBeUndefined();
+      expect(onCustom.some((row) => row.isSelected)).toBe(false);
     });
   });
 
   describe("given a report", () => {
-    // Every report layout fits both cadences, so a naive other-cadence group
-    // would repeat all of them under a second heading.
-    it("offers each layout once, in one unheaded group", () => {
-      const groups = build({ kind: "report", reportSource: "traceQuery" });
+    it("offers each layout its source can fill exactly once", () => {
+      const rows = build({ kind: "report", reportSource: "traceQuery" });
 
-      expect(groups).toHaveLength(1);
-      expect(groups[0]?.heading).toBeUndefined();
-      expect(idsOf(groups)).toEqual([
+      expect(idsOf(rows)).toEqual([
         "report_table",
         "report_digest",
         "report_summary_card",
@@ -108,29 +74,22 @@ describe("buildLayoutGroups", () => {
     });
   });
 
-  // Keyboard navigation walks the flattened rows and finds the highlighted one
-  // by id, so a repeated id would make Arrow keys jump back to the first copy.
+  // Keyboard navigation walks the rows and finds the highlighted one by id,
+  // so a repeated id would make Arrow keys jump back to the first copy.
   describe("given any draft the picker can render", () => {
-    it("never repeats a layout across the groups", () => {
+    it("never repeats a layout", () => {
       const cases = [
         build(),
-        build({ groupingCadence: "digest" }),
+        build({ cadence: "digest" }),
         build({ kind: "graphAlert" }),
         build({ kind: "report", reportSource: "traceQuery" }),
         build({ kind: "report", reportSource: "customGraph" }),
       ];
 
-      for (const groups of cases) {
-        const ids = idsOf(groups);
+      for (const rows of cases) {
+        const ids = idsOf(rows);
         expect(new Set(ids).size).toBe(ids.length);
       }
     });
-  });
-});
-
-describe("otherCadenceOf", () => {
-  it("pairs the two cadences a trace automation can run on", () => {
-    expect(otherCadenceOf("digest")).toBe("immediate");
-    expect(otherCadenceOf("immediate")).toBe("digest");
   });
 });

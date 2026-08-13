@@ -1,11 +1,11 @@
 import { Badge, Box, chakra, HStack, Stack, Text } from "@chakra-ui/react";
 import { Lock } from "lucide-react";
-import { type KeyboardEvent, useId, useRef } from "react";
-import { GATED_NOTE, type LayoutGroup, type LayoutRow } from "./layoutRows";
+import { type KeyboardEvent, useRef } from "react";
+import { GATED_NOTE, type LayoutRow } from "./layoutRows";
 import type { SlackBlockKitTemplateId } from "./registry";
 
 interface Props {
-  groups: LayoutGroup[];
+  rows: LayoutRow[];
   highlightedId: SlackBlockKitTemplateId | undefined;
   /** The preview pane this list drives. The highlighted option points at it
    *  as its description, so what moved into the pane — the delivery note, the
@@ -35,7 +35,7 @@ function nextIdFor({
 }
 
 export function TemplateLayoutList({
-  groups,
+  rows,
   highlightedId,
   previewId,
   onHighlight,
@@ -43,12 +43,12 @@ export function TemplateLayoutList({
 }: Props) {
   const listRef = useRef<HTMLDivElement>(null);
   // Arrow keys move the preview, they never apply. Applying is Enter, Space or
-  // a click, so walking the list past a layout built for the other cadence
-  // can't switch the automation's cadence behind the author's back.
+  // a click, so walking the list to compare layouts can't change the
+  // automation behind the author's back.
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     const nextId = nextIdFor({
       key: event.key,
-      ids: groups.flatMap((group) => group.rows.map((row) => row.option.id)),
+      ids: rows.map((row) => row.option.id),
       highlightedId,
     });
     if (nextId === undefined) return;
@@ -65,52 +65,11 @@ export function TemplateLayoutList({
       role="listbox"
       aria-label="Message layout"
       aria-controls={previewId}
-      gap={3}
+      gap={1}
       align="stretch"
       onKeyDown={handleKeyDown}
     >
-      {groups.map((group) => (
-        <GroupSection
-          key={group.cadence}
-          group={group}
-          highlightedId={highlightedId}
-          previewId={previewId}
-          onHighlight={onHighlight}
-          onApply={onApply}
-        />
-      ))}
-    </Stack>
-  );
-}
-
-function GroupSection({
-  group,
-  highlightedId,
-  previewId,
-  onHighlight,
-  onApply,
-}: Omit<Props, "groups"> & { group: LayoutGroup }) {
-  const headingId = useId();
-  return (
-    <Stack
-      gap={1}
-      align="stretch"
-      role={group.heading ? "group" : "presentation"}
-      aria-labelledby={group.heading ? headingId : undefined}
-    >
-      {group.heading ? (
-        <Text
-          id={headingId}
-          textStyle="2xs"
-          fontWeight="semibold"
-          color="fg.muted"
-          textTransform="uppercase"
-          letterSpacing="wider"
-        >
-          {group.heading}
-        </Text>
-      ) : null}
-      {group.rows.map((row) => (
+      {rows.map((row) => (
         <LayoutOption
           key={row.option.id}
           row={row}

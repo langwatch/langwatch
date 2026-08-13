@@ -1,24 +1,14 @@
 import { Badge, Box, HStack, Stack, Text } from "@chakra-ui/react";
 import { GATED_NOTE, type LayoutRow } from "./layoutRows";
-import type { DraftCadence } from "./registry";
 
 interface Props {
   row: LayoutRow;
   /** The highlighted option in the list points here as its description, so
    *  this pane is read out with the option a screen reader lands on. */
   id: string;
-  /** Set when applying this layout also moves the automation to the other
-   *  cadence, so the author reads the consequence before they pick it. */
-  switchesCadenceTo?: DraftCadence;
 }
 
-function cadenceSwitchNote(target: DraftCadence): string {
-  return target === "digest"
-    ? "Picking this layout bundles the window's matches into one message, on a 5 minute digest. You can change the window in the Cadence section."
-    : "Picking this layout sends one message per matching trace, on the Immediate cadence.";
-}
-
-export function TemplateLayoutDetail({ row, id, switchesCadenceTo }: Props) {
+export function TemplateLayoutDetail({ row, id }: Props) {
   const { option, locked, isDefault } = row;
   const { Wireframe } = option;
   return (
@@ -69,11 +59,6 @@ export function TemplateLayoutDetail({ row, id, switchesCadenceTo }: Props) {
       <Text textStyle="xs" color="fg.muted">
         {option.tagline}
       </Text>
-      {switchesCadenceTo ? (
-        <Text textStyle="xs" color="fg.muted">
-          {cadenceSwitchNote(switchesCadenceTo)}
-        </Text>
-      ) : null}
     </Stack>
   );
 }

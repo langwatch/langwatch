@@ -1,5 +1,4 @@
 import {
-  Box,
   Field,
   HStack,
   Input,
@@ -7,7 +6,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { CADENCE_LABELS } from "@langwatch/automations/cadences";
+import { CADENCE_CHOICE_LABELS } from "@langwatch/automations/cadences";
 import { useEffect, useState } from "react";
 import {
   GRAPH_ALERT_TIME_PERIODS,
@@ -21,10 +20,11 @@ import {
   TIME_PERIOD_LABELS,
 } from "../logic/draftReducer";
 import { describeCron } from "../logic/reportSchedule";
+import { CLIENT_PROVIDERS } from "../providers/registry";
 import { useAutomationStore } from "../state/automationStore";
 import { useDraft } from "../state/selectors";
-import { CadenceField } from "./CadenceField";
 import { type FacetAccordionProps, FacetSection } from "./FacetSection";
+import { ReceiveCadenceField } from "./ReceiveCadenceField";
 import { ReportScheduleField } from "./ReportScheduleField";
 import { TraceDebounceField } from "./TraceDebounceField";
 
@@ -41,12 +41,12 @@ function cadenceSummary(draft: AutomationDraft): string {
       : "Set a schedule";
   }
   const settle = Math.round(draft.traceDebounceMs / 1000);
-  return `${CADENCE_LABELS[draft.notificationCadence]}, ${settle}s settle`;
+  return `${CADENCE_CHOICE_LABELS[draft.notificationCadence]}, ${settle}s settle window`;
 }
 
 const CADENCE_HELP = {
   trace:
-    "How often notifications go out — one per matching trace, or batched into a digest — plus how long to wait for late spans before evaluating.",
+    "Whether each matching trace sends its own message or matches are batched into one, plus how long a trace must be quiet before it counts as settled and can send.",
   customGraph:
     "What makes it fire: the watched metric crosses this threshold over the chosen window.",
   report: "When it's sent, as a recurring schedule in the timezone you pick.",
@@ -71,6 +71,13 @@ export function CadenceSection({
   title?: string;
 }) {
   const draft = useDraft();
+  const dispatch = useAutomationStore((s) => s.dispatch);
+  // A channel whose templates depend on the receive choice hosts the chooser
+  // itself, beside the templates it filters — rendering it here too would put
+  // two controls for the same decision on one step.
+  const chooserHostedByChannel =
+    draft.action !== null &&
+    CLIENT_PROVIDERS[draft.action].client.hostsReceiveChooser === true;
 
   return (
     <FacetSection
@@ -85,14 +92,15 @@ export function CadenceSection({
       ) : draft.source === "report" ? (
         <ReportCadence isEdit={isEdit} />
       ) : (
-        <HStack align="start" gap={4}>
-          <Box flex="1" minWidth="0">
-            <CadenceField />
-          </Box>
-          <Box flex="1" minWidth="0">
-            <TraceDebounceField />
-          </Box>
-        </HStack>
+        <VStack align="stretch" gap={4}>
+          {chooserHostedByChannel ? null : (
+            <ReceiveCadenceField
+              value={draft.notificationCadence}
+              onChange={(value) => dispatch({ type: "SET_CADENCE", value })}
+            />
+          )}
+          <TraceDebounceField />
+        </VStack>
       )}
     </FacetSection>
   );

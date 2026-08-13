@@ -13,9 +13,6 @@ export const GATED_NOTE = "Needs a Slack app connection";
 
 export interface LayoutRow {
   option: SlackBlockKitTemplateOption;
-  /** Built for the cadence the list is not grouped around. Applying it also
-   *  switches the automation's cadence. */
-  fromOtherCadence: boolean;
   /** Shown, and previewable, but not applicable: the chosen connection can't
    *  render this layout in full. */
   locked: boolean;
@@ -23,80 +20,31 @@ export interface LayoutRow {
   isSelected: boolean;
 }
 
-export interface LayoutGroup {
-  cadence: DraftCadence;
-  /** Only trace automations split by cadence. An alert or a report sends one
-   *  message either way, so their rows carry no heading. */
-  heading?: string;
-  rows: LayoutRow[];
-}
-
-export function otherCadenceOf(cadence: DraftCadence): DraftCadence {
-  return cadence === "digest" ? "immediate" : "digest";
-}
-
-function headingFor({
-  kind,
+/**
+ * The rows the layout list renders: the layouts built for the draft's own
+ * cadence, and nothing else. The receive chooser above the list is the one
+ * cadence control — switching it re-filters the list, so a pick in the list
+ * can never change the automation's cadence behind the author's back.
+ */
+export function buildLayoutRows({
   cadence,
-}: {
-  kind: SlackBlockKitTemplateKind;
-  cadence: DraftCadence;
-}): string | undefined {
-  if (kind !== "trace") return undefined;
-  return cadence === "digest" ? "One digest message" : "One message per trace";
-}
-
-export function buildLayoutGroups({
-  groupingCadence,
   kind,
   reportSource,
   deliveryMethod,
   currentSource,
   defaultId,
 }: {
-  groupingCadence: DraftCadence;
+  cadence: DraftCadence;
   kind: SlackBlockKitTemplateKind;
   reportSource?: ReportTemplateSource;
   deliveryMethod: SlackDeliveryMethod;
   currentSource: string;
   defaultId: SlackBlockKitTemplateId;
-}): LayoutGroup[] {
-  const toRow = ({
+}): LayoutRow[] {
+  return templateOptionsFor({ cadence, kind, reportSource }).map((option) => ({
     option,
-    fromOtherCadence,
-  }: {
-    option: SlackBlockKitTemplateOption;
-    fromOtherCadence: boolean;
-  }): LayoutRow => ({
-    option,
-    fromOtherCadence,
     locked: deliveryMethod === "webhook" && !!option.gatedBlock,
-    isDefault: !fromOtherCadence && option.id === defaultId,
+    isDefault: option.id === defaultId,
     isSelected: option.source === currentSource,
-  });
-  const primary: LayoutGroup = {
-    cadence: groupingCadence,
-    heading: headingFor({ kind, cadence: groupingCadence }),
-    rows: templateOptionsFor({
-      cadence: groupingCadence,
-      kind,
-      reportSource,
-    }).map((option) => toRow({ option, fromOtherCadence: false })),
-  };
-  // Alerts always fire the moment the metric crosses, so there is no second
-  // cadence to offer alongside.
-  if (kind === "graphAlert") return [primary];
-  const other = otherCadenceOf(groupingCadence);
-  const otherRows = templateOptionsFor({ cadence: other, kind, reportSource })
-    .filter((opt) => opt.cadenceFit !== "both")
-    .map((option) => toRow({ option, fromOtherCadence: true }));
-  if (otherRows.length === 0) return [primary];
-  return [
-    primary,
-    {
-      cadence: other,
-      heading: headingFor({ kind, cadence: other }),
-      rows: otherRows,
-    },
-  ];
+  }));
 }

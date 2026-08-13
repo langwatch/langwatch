@@ -219,8 +219,64 @@ const botSlice = (overrides: Partial<SlackSlice> = {}): SlackSlice => ({
   ...overrides,
 });
 
+/** Stateful cadence host: the chooser writes through
+ *  `setNotificationCadence` and the value flows back down as
+ *  `notificationCadence` / `cadenceMode`, the way the draft store wires the
+ *  real form owner. */
+function CadenceHarness() {
+  const [cadence, setCadence] =
+    useState<ConfigFormCtx["notificationCadence"]>("immediate");
+  const [slice, setSlice] = useState<SlackSlice>(slackClient.initialSlice());
+  const Form = slackClient.ConfigForm;
+  return (
+    <Form
+      slice={slice}
+      ctx={makeCtx({
+        notificationCadence: cadence,
+        cadenceMode: cadence === "immediate" ? "immediate" : "digest",
+        setNotificationCadence: setCadence,
+      })}
+      onChange={setSlice}
+    />
+  );
+}
+
 describe("SlackConfigForm authoring tiers", () => {
   afterEach(() => cleanup());
+
+  describe("the receive chooser beside the layouts", () => {
+    /** @scenario "The receive choice decides which layouts are offered" */
+    it("filters the layout list to the chosen mode", async () => {
+      const user = userEvent.setup();
+      render(<CadenceHarness />, { wrapper: Wrapper });
+
+      expect(
+        screen.getByRole("option", { name: /compact notice/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("option", { name: /digest — compact/i }),
+      ).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole("radio", { name: /in batches/i }));
+
+      expect(
+        screen.getByRole("option", { name: /digest — compact/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("option", { name: /compact notice/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("is not offered to a report, whose timing is its schedule", () => {
+      renderForm({
+        ctx: makeCtx({ sourceKind: "report", reportSourceKind: "traceQuery" }),
+      });
+
+      expect(
+        screen.queryByText("How do you want to receive messages?"),
+      ).not.toBeInTheDocument();
+    });
+  });
 
   describe("given a fresh block_kit draft", () => {
     describe("when the form first renders", () => {

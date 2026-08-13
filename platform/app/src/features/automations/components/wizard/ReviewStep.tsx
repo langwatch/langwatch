@@ -1,5 +1,5 @@
 import { Text, VStack } from "@chakra-ui/react";
-import { CADENCE_LABELS } from "@langwatch/automations/cadences";
+import { CADENCE_CHOICE_LABELS } from "@langwatch/automations/cadences";
 import {
   configurationSummary,
   filtersAreSet,
@@ -90,7 +90,8 @@ export function ReviewStep({
       >
         {draft.source === "trace" && isNotifyAction(draft) ? (
           <Text textStyle="xs" color="fg.muted">
-            Sends {CADENCE_LABELS[draft.notificationCadence].toLowerCase()}.
+            Sends{" "}
+            {CADENCE_CHOICE_LABELS[draft.notificationCadence].toLowerCase()}.
           </Text>
         ) : null}
       </ReviewSection>

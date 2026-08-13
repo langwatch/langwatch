@@ -1,11 +1,7 @@
 import { Box, Flex, Stack, Text } from "@chakra-ui/react";
 import type { SlackDeliveryMethod } from "@langwatch/automations/providers/slack";
-import { useEffect, useId, useRef, useState } from "react";
-import {
-  buildLayoutGroups,
-  type LayoutRow,
-  otherCadenceOf,
-} from "./layoutRows";
+import { useId, useState } from "react";
+import { buildLayoutRows, type LayoutRow } from "./layoutRows";
 import {
   type DraftCadence,
   pickDefaultSlackBlockKitTemplateId,
@@ -18,6 +14,9 @@ import { TemplateLayoutDetail } from "./TemplateLayoutDetail";
 import { TemplateLayoutList } from "./TemplateLayoutList";
 
 interface Props {
+  /** The draft's live cadence. The receive chooser above this picker is the
+   *  one cadence control; the list only ever offers the layouts built for
+   *  this value and re-filters when it changes. */
   cadence: DraftCadence;
   /** Trace automations and graph alerts render against different variable
    *  sets, so the picker only offers layouts built for the draft's kind. */
@@ -36,10 +35,6 @@ interface Props {
    *  (if any) matches it. Custom edits highlight nothing. */
   currentSource: string;
   onSelect: (option: SlackBlockKitTemplateOption) => void;
-  /** Picking a layout built for the other cadence. The form owner switches
-   *  the cadence alongside the template so the author doesn't have to make
-   *  the round-trip to the cadence stage. */
-  onSelectOtherCadence: (option: SlackBlockKitTemplateOption) => void;
 }
 
 function introFor({
@@ -65,42 +60,10 @@ export function SlackBlockKitTemplatePicker({
   hasEvaluationFilter,
   currentSource,
   onSelect,
-  onSelectOtherCadence,
 }: Props) {
-  // The grouping (which cadence's layouts lead the list, and which follow
-  // under the other heading) is latched to the cadence the picker last
-  // settled on. Picking a cross-cadence layout changes the draft's cadence —
-  // see `onSelectOtherCadence` below — and that change flows back down as a
-  // new `cadence` prop. Deriving the grouping from the live prop on every
-  // render would swap the two groups on every cross-cadence pick: the group
-  // the author just scrolled to jumps to the top and the layout they were
-  // looking at moves out from under them. Selecting still updates the
-  // highlight and the draft's cadence — it just never reorders the list AS A
-  // RESULT OF THAT PICK.
-  //
-  // The picker is opened from the Delivery step, whose cadence control sits
-  // beside the channel it belongs to (ADR-093 §4), so the author can change
-  // cadence there while this picker stays mounted. That external change must
-  // still regroup the list — `groupingCadence` exists to survive an in-picker
-  // pick, not to pin the picker to whatever cadence happened to be active
-  // when it first mounted. `selfInitiatedRef` marks the cadence value
-  // `handleApply` itself is about to cause, so the effect below can tell "I
-  // changed it" apart from "it changed elsewhere" and only resync for the
-  // latter.
   const previewId = useId();
-  const [groupingCadence, setGroupingCadence] = useState<DraftCadence>(cadence);
-  const selfInitiatedRef = useRef<DraftCadence | null>(null);
-  useEffect(() => {
-    if (cadence === groupingCadence) return;
-    if (selfInitiatedRef.current === cadence) {
-      selfInitiatedRef.current = null;
-      return;
-    }
-    setGroupingCadence(cadence);
-  }, [cadence, groupingCadence]);
-
-  const groups = buildLayoutGroups({
-    groupingCadence,
+  const rows = buildLayoutRows({
+    cadence,
     kind,
     reportSource,
     deliveryMethod,
@@ -112,13 +75,14 @@ export function SlackBlockKitTemplatePicker({
       reportSource,
     }),
   });
-  const rows = groups.flatMap((group) => group.rows);
   const [highlightedId, setHighlightedId] =
     useState<SlackBlockKitTemplateId | null>(null);
   // What the preview pane shows: the layout the author last landed on, and
   // before they have touched anything, the one the draft already uses. A
   // custom-edited message matches no layout, so the preview opens on the
-  // default instead of on nothing.
+  // default instead of on nothing. A cadence switch can drop the layout the
+  // author was looking at from the list entirely — the same chain then lands
+  // the preview back on something that is actually offered.
   const highlighted =
     rows.find((row) => row.option.id === highlightedId) ??
     rows.find((row) => row.isSelected) ??
@@ -126,21 +90,7 @@ export function SlackBlockKitTemplatePicker({
     rows[0];
 
   const handleApply = (row: LayoutRow) => {
-    if (!row.fromOtherCadence) {
-      onSelect(row.option);
-      return;
-    }
-    const target = otherCadenceOf(groupingCadence);
-    // A pick that lands on the SAME cadence as the live prop (two
-    // consecutive picks within the other-cadence group, comparison-shopping
-    // between its layouts) never flips `cadence`, so the resync effect above
-    // never fires and never consumes the marker. Writing it anyway would
-    // leave it stale — a LATER, genuine external change that happens to land
-    // back on this same cadence value would then be misread as self-initiated
-    // and skip its regroup. Only write the marker when the pick actually
-    // changes the live cadence.
-    if (target !== cadence) selfInitiatedRef.current = target;
-    onSelectOtherCadence(row.option);
+    onSelect(row.option);
   };
 
   return (
@@ -151,7 +101,7 @@ export function SlackBlockKitTemplatePicker({
       <Flex gap={4} align="start" wrap="wrap">
         <Box flex="1 1 190px" minWidth="190px">
           <TemplateLayoutList
-            groups={groups}
+            rows={rows}
             highlightedId={highlighted?.option.id}
             previewId={previewId}
             onHighlight={setHighlightedId}
@@ -160,15 +110,7 @@ export function SlackBlockKitTemplatePicker({
         </Box>
         <Box flex="2 1 280px" minWidth="260px">
           {highlighted ? (
-            <TemplateLayoutDetail
-              row={highlighted}
-              id={previewId}
-              switchesCadenceTo={
-                highlighted.fromOtherCadence
-                  ? otherCadenceOf(groupingCadence)
-                  : undefined
-              }
-            />
+            <TemplateLayoutDetail row={highlighted} id={previewId} />
           ) : null}
         </Box>
       </Flex>
