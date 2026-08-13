@@ -246,7 +246,7 @@ registry, and dashboard stay the same.
   leaves its testcontainers (a stray ClickHouse, a Redis) running in the shared
   VM forever — the library's own reaper dies with the run. The daemon removes
   testcontainers-labelled containers older than `HAVEN_TESTCONTAINER_TTL`
-  (default 1h; 0 disables); fresh ones are left alone, and the sweep never
+  (default 10m; 0 disables); fresh ones are left alone, and the sweep never
   boots the VM just to clean it. See
   `specs/setup/haven-testcontainer-reaper.feature`.
 - **Always migrate + seed, fully static identity.** Every `up` migrates *and*

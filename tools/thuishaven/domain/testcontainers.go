@@ -13,10 +13,13 @@ import (
 const TestContainersLabel = "org.testcontainers=true"
 
 // DefaultTestContainerTTL is how old a testcontainer must be before the daemon
-// treats it as leaked. Integration-test runs finish in minutes; an hour means
-// no live run can still be using the container, while a run interrupted today
-// is still cleaned up today rather than found days later.
-const DefaultTestContainerTTL = time.Hour
+// treats it as leaked. Ten minutes (plus the sweep's own up-to-ten-minute
+// cadence) covers a fresh run end to end, and a reused container survives
+// back-to-back iteration — which is all `withReuse` buys once a sweep exists.
+// The window only matters at all in the container fallback mode: the
+// recommended local path is the native mode (LANGWATCH_TEST_CLICKHOUSE_URL),
+// and CI machines run no haven daemon.
+const DefaultTestContainerTTL = 10 * time.Minute
 
 // TestContainer is one candidate from the container runtime's listing.
 type TestContainer struct {

@@ -32,6 +32,50 @@ import {
  */
 export const TEST_CLICKHOUSE_IMAGE = "clickhouse/clickhouse-server:25.10.2.65";
 
+/**
+ * Low-footprint tuning copied into every test container's config.d — the same
+ * shape haven applies to the ClickHouse it manages (tools/thuishaven/
+ * domain/clickhouse.go): a hard memory ceiling, the optional caches zeroed,
+ * background pools sized for a container that serves one test run instead of a
+ * dedicated server, and the noisy self-telemetry tables off. A stock container
+ * idles at whole cores writing metric logs and scheduling merges it will never
+ * need. `system.query_log` stays on — trace-list's ClickHouse repository
+ * integration test asserts against it.
+ */
+export const TEST_CLICKHOUSE_TUNING = {
+  target: "/etc/clickhouse-server/config.d/zz-langwatch-test-tuning.xml",
+  content: `<clickhouse>
+    <max_server_memory_usage>805306368</max_server_memory_usage>
+    <mark_cache_size>67108864</mark_cache_size>
+    <uncompressed_cache_size>0</uncompressed_cache_size>
+    <mmap_cache_size>0</mmap_cache_size>
+    <compiled_expression_cache_size>0</compiled_expression_cache_size>
+    <max_concurrent_queries>16</max_concurrent_queries>
+    <background_pool_size>4</background_pool_size>
+    <background_common_pool_size>2</background_common_pool_size>
+    <background_schedule_pool_size>16</background_schedule_pool_size>
+    <background_buffer_flush_schedule_pool_size>2</background_buffer_flush_schedule_pool_size>
+    <background_fetches_pool_size>2</background_fetches_pool_size>
+    <background_move_pool_size>2</background_move_pool_size>
+    <background_message_broker_schedule_pool_size>2</background_message_broker_schedule_pool_size>
+    <background_distributed_schedule_pool_size>2</background_distributed_schedule_pool_size>
+    <merge_tree>
+        <number_of_free_entries_in_pool_to_lower_max_size_of_merge>2</number_of_free_entries_in_pool_to_lower_max_size_of_merge>
+        <number_of_free_entries_in_pool_to_execute_mutation>2</number_of_free_entries_in_pool_to_execute_mutation>
+    </merge_tree>
+    <logger>
+        <level>warning</level>
+    </logger>
+    <text_log remove="1"/>
+    <trace_log remove="1"/>
+    <metric_log remove="1"/>
+    <asynchronous_metric_log remove="1"/>
+    <processors_profile_log remove="1"/>
+    <query_metric_log remove="1"/>
+</clickhouse>
+`,
+};
+
 export interface TestClickHouseEndpoint {
   /** Connection URL, with this endpoint's own database in the path. */
   url: string;
@@ -116,6 +160,7 @@ async function startContainerEndpoints({
             [`langwatch.test.${suite}`]: name,
           })
           .withReuse()
+          .withCopyContentToContainer([TEST_CLICKHOUSE_TUNING])
           .withStartupTimeout(120_000)
           .start(),
       ],

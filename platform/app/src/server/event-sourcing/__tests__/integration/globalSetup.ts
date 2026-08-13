@@ -15,6 +15,7 @@ import { migrateUp } from "~/server/clickhouse/goose";
 import {
   nativeClickHouseBaseUrl,
   TEST_CLICKHOUSE_IMAGE,
+  TEST_CLICKHOUSE_TUNING,
 } from "~/test-utils/clickhouseTestEndpoints";
 import { shardSawFailure } from "~/test-utils/shardFailureReporter";
 
@@ -306,6 +307,7 @@ export async function setup(): Promise<void> {
         target: "/etc/clickhouse-server/config.d/storage.xml",
       },
     ])
+    .withCopyContentToContainer([TEST_CLICKHOUSE_TUNING])
     .withStartupTimeout(120000) // 2 minutes for container startup
     .start();
 
