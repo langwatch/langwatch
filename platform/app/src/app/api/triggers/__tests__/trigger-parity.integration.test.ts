@@ -36,6 +36,8 @@ import { prisma } from "~/server/db";
 const testFire = vi.fn();
 
 vi.mock("~/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: () => ({
     triggers: new TriggerService(new PrismaTriggerRepository(prisma)),
     triggerTemplates: { testFire },

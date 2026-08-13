@@ -31,6 +31,8 @@ import { decrypt, encrypt } from "~/utils/encryption";
 // that service over the real repository is what keeps this suite about the
 // route's own rules rather than about booting every other slice of the app.
 vi.mock("~/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: () => ({
     triggers: new TriggerService(new PrismaTriggerRepository(prisma)),
   }),

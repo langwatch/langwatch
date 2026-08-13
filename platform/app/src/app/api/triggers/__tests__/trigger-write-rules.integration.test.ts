@@ -19,6 +19,8 @@ import { TriggerService } from "~/server/app-layer/automations/trigger.service";
 import { prisma } from "~/server/db";
 
 vi.mock("~/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: () => ({
     triggers: new TriggerService(new PrismaTriggerRepository(prisma)),
   }),
