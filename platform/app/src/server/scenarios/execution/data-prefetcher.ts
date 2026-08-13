@@ -230,11 +230,22 @@ export async function prefetchScenarioData(
     "Prefetching scenario data",
   );
 
-  const scenarioResult = await fetchScenario(
-    context.projectId,
-    context.scenarioId,
-    deps.scenarioFetcher,
-  );
+  // The scenario, the project, the target adapter and the suite config are
+  // independent lookups keyed off ids we already hold, so they go out together
+  // rather than one await at a time. This runs on the path between a run being
+  // queued and its child starting, once per simulation.
+  //
+  // The checks below keep their original order, so the error reported for any
+  // given failure is unchanged; the only difference is that a doomed run may
+  // have issued the other queries before finding out.
+  const [scenarioResult, projectResult, adapterResult, suiteOverrides] =
+    await Promise.all([
+      fetchScenario(context.projectId, context.scenarioId, deps.scenarioFetcher),
+      fetchProject(context.projectId, deps.projectFetcher),
+      fetchAgentData(context.projectId, target, deps),
+      deps.suiteConfigFetcher.getBySetId(context.setId, context.projectId),
+    ]);
+
   if (!scenarioResult) {
     logger.warn(
       { projectId: context.projectId, scenarioId: context.scenarioId },
@@ -247,10 +258,6 @@ export async function prefetchScenarioData(
   }
   const scenario = scenarioResult.config;
 
-  const projectResult = await fetchProject(
-    context.projectId,
-    deps.projectFetcher,
-  );
   if (!projectResult.success) {
     logger.warn(
       { projectId: context.projectId, error: projectResult.error },
@@ -260,7 +267,6 @@ export async function prefetchScenarioData(
   }
   const project = projectResult.data;
 
-  const adapterResult = await fetchAgentData(context.projectId, target, deps);
   if (
     adapterResult !== null &&
     "success" in adapterResult &&
@@ -321,11 +327,6 @@ export async function prefetchScenarioData(
   //     use a smart model independently of the agent under test.
   // ModelNotConfiguredError bubbles as a structured "model not configured"
   // failure with the resolver's message.
-  const suiteOverrides = await deps.suiteConfigFetcher.getBySetId(
-    context.setId,
-    context.projectId,
-  );
-
   // A prompt's bindings are configured on the suite target that paired the
   // prompt with this run plan, so they arrive with the suite rather than with
   // the prompt. Agents carry their own on the agent record, already loaded
