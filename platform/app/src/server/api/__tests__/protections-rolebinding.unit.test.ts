@@ -25,6 +25,8 @@ const mockOrgService = {
 
 vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({ organizations: mockOrgService }),
+  // Reached through the TtlCache these paths read; null keeps it in-memory.
+  tryGetApp: () => null,
 }));
 
 const mockPrisma = {

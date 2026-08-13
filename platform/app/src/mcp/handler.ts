@@ -33,8 +33,8 @@ import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import type { Redis } from "ioredis";
+import { tryGetApp } from "../server/app-layer/app";
 import { prisma } from "../server/db";
-import { connection as redis } from "../server/redis";
 import type { NextApiRequest } from "../types/next-stubs";
 import { decrypt, encrypt } from "../utils/encryption";
 import { getClientIp as clientIpFromRequest } from "../utils/getClientIp";
@@ -217,6 +217,15 @@ export interface McpHandler {
  * and routes for the Streamable HTTP transport.
  */
 export function createMcpHandler(): McpHandler {
+  // Resolved once, here: the handler is built after the App is initialized
+  // (start.ts), and the App's connection does not change for the life of the
+  // process. Null means no Redis is configured, and every use below branches on
+  // it — but not all the same way (ADR-093). Session storage degrades to the
+  // in-memory map, so a single process keeps working; the OAuth
+  // authorization-code exchange cannot, because the code is written by whichever
+  // process served the authorize request, so it answers 500 instead.
+  const redis = tryGetApp()?.redis ?? null;
+
   // Ensure the MCP config is initialized with the app's endpoint
   try {
     getConfig();

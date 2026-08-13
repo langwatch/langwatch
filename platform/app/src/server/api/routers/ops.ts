@@ -3,7 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { checkOpsPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { getApp } from "~/server/app-layer/app";
+import { getApp, tryGetApp } from "~/server/app-layer/app";
 import { DASHBOARD_EVENT } from "~/server/app-layer/ops/metrics-collector";
 import {
   type DashboardData,
@@ -30,7 +30,6 @@ import {
   resolveEffectiveForListing,
 } from "~/server/featureFlag/rules";
 import { AnomalyStateStore } from "~/server/observability/anomalyState";
-import { connection } from "~/server/redis";
 
 const opsViewPermission = checkOpsPermission({ permission: "ops:view" });
 
@@ -727,6 +726,7 @@ export const opsRouter = createTRPCRouter({
    * fingerprint loops). Sorted with hard-tier first.
    */
   listAnomalies: protectedProcedure.use(opsViewPermission).query(async () => {
+    const connection = tryGetApp()?.redis ?? null;
     if (!connection) return { anomalies: [] };
     const store = new AnomalyStateStore(connection);
     const anomalies = await store.list();
@@ -751,6 +751,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input }) => {
+      const connection = tryGetApp()?.redis ?? null;
       if (!connection) return { dismissed: false };
       const store = new AnomalyStateStore(connection);
       await store.clear(input.tenantId, input.kind);

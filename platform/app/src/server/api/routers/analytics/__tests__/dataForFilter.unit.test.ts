@@ -21,6 +21,8 @@ vi.mock("../../../rbac", async (importOriginal) => {
 // hands out. Mocking `getApp` is therefore what standing in for the store
 // looks like from here.
 vi.mock("~/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: vi.fn(),
 }));
 
