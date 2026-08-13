@@ -607,6 +607,24 @@ describe("Feature: Webhook endpoints management API", () => {
     expect(body.data.sends_per_minute).toBe(0);
   });
 
+  // The zero-argument rule from ADR-094, end to end. `eventTypes.list` declares
+  // no `input`, so the framework installs no json validator and a POST with no
+  // body at all must succeed. Declaring `input: z.object({}).optional()` to
+  // satisfy a "POSTs take a body" instinct would reinstate the parse and 4xx
+  // exactly this call.
+  /** @scenario An operation taking no arguments accepts a call with no body */
+  it("serves an argument-free operation called with no request body", async () => {
+    planHasWebhookEndpoints = true;
+
+    const res = await app.request("/api/webhooks/eventTypes.list", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKeyToken}` },
+    });
+
+    expect(res.status).toBe(200);
+    expect((await res.json()).data.length).toBeGreaterThan(0);
+  });
+
   it("serves the event-type catalog for the subscription UI", async () => {
     planHasWebhookEndpoints = true;
     const res = await rpc("eventTypes.list");
