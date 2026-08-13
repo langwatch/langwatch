@@ -1,8 +1,8 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import { shouldShowGenericTranslateError } from "../utils/translationError";
 import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { shouldShowGenericTranslateError } from "../utils/translationError";
 
 export interface UseTextTranslationResult {
   /** The texts to render: translations when active, originals otherwise. */
