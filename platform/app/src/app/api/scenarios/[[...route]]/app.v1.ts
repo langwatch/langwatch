@@ -72,6 +72,17 @@ function toScenarioResponse(scenario: Scenario) {
 export function registerScenarioRoutes(
   secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
 ): void {
+  registerListScenariosRoute(secured);
+  registerGetScenarioRoute(secured);
+  registerCreateScenarioRoute(secured);
+  registerUpdateScenarioRoute(secured);
+  registerDeleteScenarioRoute(secured);
+}
+
+/** List every scenario in the project. */
+function registerListScenariosRoute(
+  secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
+): void {
   secured.access(requires("scenarios:view")).get(
     "/",
     describeRoute({
@@ -106,7 +117,12 @@ export function registerScenarioRoutes(
       );
     },
   );
+}
 
+/** Read one scenario by id. */
+function registerGetScenarioRoute(
+  secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
+): void {
   secured.access(requires("scenarios:view")).get(
     "/:id",
     describeRoute({
@@ -163,6 +179,12 @@ export function registerScenarioRoutes(
   // to honour, which is how an assistant scoped to exactly "read and create"
   // ended up unable to create anything. A viewer is unaffected: they keep the
   // read routes and are declined the write, as before.
+}
+
+/** Create a scenario. */
+function registerCreateScenarioRoute(
+  secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
+): void {
   secured.access(requires("scenarios:create")).post(
     "/",
     describeRoute({
@@ -211,6 +233,12 @@ export function registerScenarioRoutes(
 
   // `:update` for the same reason as `:create` above — `:manage` still implies
   // it, so no existing caller changes.
+}
+
+/** Update a scenario in place. */
+function registerUpdateScenarioRoute(
+  secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
+): void {
   secured.access(requires("scenarios:update")).put(
     "/:id",
     describeRoute({
@@ -272,6 +300,12 @@ export function registerScenarioRoutes(
   // refined because access issued at that grain was being refused; nothing is
   // asking to destroy scenarios at a finer grain, and the destructive verb is
   // the wrong place to widen who qualifies.
+}
+
+/** Archive a scenario. */
+function registerDeleteScenarioRoute(
+  secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
+): void {
   secured.access(requires("scenarios:manage")).delete(
     "/:id",
     describeRoute({
