@@ -167,7 +167,7 @@ describe("langyRecoveryPolicy", () => {
     const policy = langyRecoveryPolicy("langy_turn_step_limit");
 
     /** @scenario "A reply stuck in a loop is stopped, and never retried on its own" */
-    it("is TERMINAL — an auto-retry re-drives the identical loop", () => {
+    it("refuses to retry — an auto-retry re-drives the identical loop", () => {
       // The whole reason the reply was stopped is that it was not making
       // progress. Starting it again on the user's behalf spends another full
       // wall-clock reaching the same wall, so the card offers a manual retry

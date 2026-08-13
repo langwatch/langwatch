@@ -155,6 +155,17 @@ Feature: Dedicated Langy API key provisioning
       When the turn is prepared for the assistant
       Then the turn carries no "access you lack" note at all
 
+    # Resolved per turn, not per conversation. Access changes mid-conversation —
+    # someone is granted a role, a team binding lands — and the very next turn
+    # must reflect it. A cached answer would keep declining something the person
+    # can now do, in a chat they are still sitting in.
+    @unit
+    Scenario: Access granted mid-conversation is honoured on the next turn
+      Given the caller lacked one access on their previous turn
+      When they lose a different access before the next turn
+      Then the next turn names only the access they lack now
+      And it no longer names the one from the previous turn
+
     # Degraded, not broken. The key still refuses the action when the assistant
     # reaches for it, so the worst case is the old attempt-then-retry chat —
     # losing the whole turn to a read blip would be strictly worse.

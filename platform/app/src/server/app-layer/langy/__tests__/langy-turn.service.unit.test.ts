@@ -772,6 +772,37 @@ describe("when the caller does not hold every access Langy uses", () => {
     expect(stashed.prompt).toContain(NOTE_MARKER);
   });
 
+  /** @scenario Access granted mid-conversation is honoured on the next turn */
+  it("asks again on the next turn, so a change in access lands immediately", async () => {
+    const { deps, mocks } = makeDeps();
+    mocks.resolveMissingPermissions
+      .mockResolvedValueOnce(["scenarios:create"])
+      .mockResolvedValueOnce(["evaluations:create"]);
+
+    // ONE service, ONE conversation, two turns — the shape a conversation-level
+    // cache would survive. Distinct idempotency keys so the second is a real
+    // turn and not the replay of the first.
+    const service = LangyTurnService.create(deps);
+    await service.startConversationTurn(input({ idempotencyKey: "req-1" }));
+    await service.startConversationTurn(input({ idempotencyKey: "req-2" }));
+
+    expect(mocks.resolveMissingPermissions).toHaveBeenCalledTimes(2);
+
+    const promptAt = (i: number) =>
+      (mocks.dispatch.mock.calls[i] as unknown as [{ prompt: string }])[0]
+        .prompt;
+    const first = promptAt(0);
+    const second = promptAt(1);
+
+    // Each turn carries only its OWN answer. Caching the first would keep
+    // declining something the caller may since have been granted — in a chat
+    // they are still sitting in.
+    expect(first).toContain("`scenarios:create`");
+    expect(first).not.toContain("`evaluations:create`");
+    expect(second).toContain("`evaluations:create`");
+    expect(second).not.toContain("`scenarios:create`");
+  });
+
   /** @scenario A caller who holds everything gets no such note */
   it("says nothing at all when the caller holds everything", async () => {
     const { deps, mocks } = makeDeps();
