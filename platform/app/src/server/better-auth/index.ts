@@ -73,18 +73,20 @@ const plugins =
     : [];
 
 /**
- * Wire BetterAuth's secondary storage to the App's Redis connection. Used by
- * rate limiting (below) so limits are enforced across pods.
+ * Build BetterAuth's secondary storage adapter.
+ * Used by rate limiting so limits are enforced across pods.
  *
- * WHETHER to configure it is decided here, at module load, because
- * `betterAuth()` below is itself constructed at module load and the choice
- * changes its session strategy — a deployment with no Redis must get `undefined`
- * and keep its sessions in the database. That decision is a pure question about
- * *configuration*, so it is answered from env rather than from a live client
- * (ADR-093); the client itself is resolved lazily, inside each callback.
+ * Two degrade paths, both now logged (#6950):
  *
- * `BUILD_TIME` joins `SKIP_REDIS` in the skip signal: a build or a test run has
- * env pointing at a Redis it must not adopt as a session store.
+ * 1. Redis not configured (no REDIS_URL, build time, SKIP_REDIS) → returns
+ *    `undefined`, rate limiting falls back to in-memory (per-process counters).
+ * 2. Redis configured but connection unavailable at call time (pre-init
+ *    window) → set/delete drop, get returns null (cache miss, DB fallback).
+ *    This is correct (throwing would fail the request outright) but must be
+ *    visible so operators notice.
+ *
+ * Exported for unit testing — lets us verify both degrade paths and the
+ * key-prefix contract without re-initializing the module.
  */
 const redisEnv = {
   url: env.REDIS_URL,
@@ -96,36 +98,74 @@ const redisEnv = {
  * The App's connection at the moment a storage callback runs.
  *
  * Null only where env advertises Redis but the App has none — a test app, or a
- * callback firing before boot completes. Degrading to a cache miss there is
- * right: better-auth re-reads from the database, whereas throwing would fail
- * the request outright.
+ * callback firing before boot completes.
  */
 const secondaryStorageConnection = () => tryGetApp()?.redis ?? null;
 
-const secondaryStorage: BetterAuthOptions["secondaryStorage"] =
-  new RedisConfigService().isConfigured(redisEnv)
-    ? {
-        get: async (key) => {
-          const redis = secondaryStorageConnection();
-          if (!redis) return null;
-          return await redis.get(`better-auth:${key}`);
-        },
-        set: async (key, value, ttl) => {
-          const redis = secondaryStorageConnection();
-          if (!redis) return;
-          if (ttl) {
-            await redis.set(`better-auth:${key}`, value, "EX", ttl);
-          } else {
-            await redis.set(`better-auth:${key}`, value);
-          }
-        },
-        delete: async (key) => {
-          const redis = secondaryStorageConnection();
-          if (!redis) return;
-          await redis.del(`better-auth:${key}`);
-        },
+export function buildSecondaryStorage({
+  isRedisConfigured,
+  connectionFactory,
+  logger: log,
+}: {
+  isRedisConfigured: boolean;
+  connectionFactory: () => {
+    get(key: string): Promise<string | null>;
+    set(key: string, value: string, ...args: unknown[]): Promise<unknown>;
+    del(key: string): Promise<unknown>;
+  } | null;
+  logger: Pick<typeof logger, "warn">;
+}): BetterAuthOptions["secondaryStorage"] {
+  if (!isRedisConfigured) {
+    log.warn(
+      "Redis unavailable — rate limiting will use in-memory storage (not distributed across pods)",
+    );
+    return undefined;
+  }
+
+  let runtimeDegradeWarned = false;
+  const warnRuntimeDegrade = () => {
+    if (!runtimeDegradeWarned) {
+      log.warn(
+        "Redis configured but unavailable at call time — rate-limit write dropped (pre-init window)",
+      );
+      runtimeDegradeWarned = true;
+    }
+  };
+
+  return {
+    get: async (key) => {
+      const redis = connectionFactory();
+      if (!redis) return null;
+      return await redis.get(`better-auth:${key}`);
+    },
+    set: async (key, value, ttl) => {
+      const redis = connectionFactory();
+      if (!redis) {
+        warnRuntimeDegrade();
+        return;
       }
-    : undefined;
+      if (ttl) {
+        await redis.set(`better-auth:${key}`, value, "EX", ttl);
+      } else {
+        await redis.set(`better-auth:${key}`, value);
+      }
+    },
+    delete: async (key) => {
+      const redis = connectionFactory();
+      if (!redis) {
+        warnRuntimeDegrade();
+        return;
+      }
+      await redis.del(`better-auth:${key}`);
+    },
+  };
+}
+
+const secondaryStorage = buildSecondaryStorage({
+  isRedisConfigured: new RedisConfigService().isConfigured(redisEnv),
+  connectionFactory: secondaryStorageConnection,
+  logger,
+});
 
 const isBuildTime = !!process.env.BUILD_TIME;
 

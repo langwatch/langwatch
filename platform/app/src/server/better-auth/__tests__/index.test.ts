@@ -6,6 +6,14 @@ import { describe, expect, it, vi } from "vitest";
 // tests pass, causing shard 2 to hang until GitHub Actions cancels it.
 // Established pattern: see fallbackName.test.ts line 17-18.
 vi.mock("~/server/db", () => ({ prisma: {} }));
+vi.mock("@langwatch/observability", () => ({
+  createLogger: () => ({
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  }),
+}));
 
 describe("better-auth config", () => {
   describe("when imported", () => {
@@ -214,6 +222,132 @@ describe("better-auth config", () => {
       };
       expect(google.clientId).toBe("google-client-id");
       expect(google.clientSecret).toBe("google-client-secret");
+    });
+  });
+
+  // ==========================================================================
+  // Secondary storage degrade behavior (rate-limit safety) — issue #6950
+  // ==========================================================================
+
+  describe("when Redis is unavailable", () => {
+    /** @scenario Rate limiting falls back to in-memory when Redis is unavailable */
+    it("sets secondaryStorage to undefined and rate limiting to memory", async () => {
+      const { auth } = await import("../index");
+      const options = (auth as any).options;
+      expect(options?.secondaryStorage).toBeUndefined();
+      expect(options?.rateLimit?.storage).toBe("memory");
+    });
+
+    /** @scenario Secondary storage degrade is logged at startup */
+    it("logs a warning when secondary storage degrades to in-memory", async () => {
+      const { buildSecondaryStorage } = await import("../index");
+      const mockLogger = { warn: vi.fn() };
+      const result = buildSecondaryStorage({
+        isRedisConfigured: false,
+        connectionFactory: () => null,
+        logger: mockLogger,
+      });
+      expect(result).toBeUndefined();
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("rate limiting"),
+      );
+    });
+  });
+
+  describe("when Redis is available", () => {
+    /** @scenario Rate limiting uses Redis secondary storage when available */
+    it("builds secondaryStorage with get, set, and delete operations", async () => {
+      const { buildSecondaryStorage } = await import("../index");
+      const fakeRedis = {
+        get: vi.fn().mockResolvedValue("value"),
+        set: vi.fn().mockResolvedValue("OK"),
+        del: vi.fn().mockResolvedValue(1),
+      };
+      const mockLogger = { warn: vi.fn() };
+      const result = buildSecondaryStorage({
+        isRedisConfigured: true,
+        connectionFactory: () => fakeRedis,
+        logger: mockLogger,
+      });
+
+      expect(result).toBeDefined();
+      expect(typeof result!.get).toBe("function");
+      expect(typeof result!.set).toBe("function");
+      expect(typeof result!.delete).toBe("function");
+      expect(mockLogger.warn).not.toHaveBeenCalled();
+    });
+
+    it("prefixes keys with better-auth:", async () => {
+      const { buildSecondaryStorage } = await import("../index");
+      const fakeRedis = {
+        get: vi.fn().mockResolvedValue("val"),
+        set: vi.fn().mockResolvedValue("OK"),
+        del: vi.fn().mockResolvedValue(1),
+      };
+      const storage = buildSecondaryStorage({
+        isRedisConfigured: true,
+        connectionFactory: () => fakeRedis,
+        logger: { warn: vi.fn() },
+      })!;
+
+      await storage.get("rate-limit:key");
+      expect(fakeRedis.get).toHaveBeenCalledWith("better-auth:rate-limit:key");
+
+      await storage.set("rate-limit:key", "1", 60);
+      expect(fakeRedis.set).toHaveBeenCalledWith(
+        "better-auth:rate-limit:key",
+        "1",
+        "EX",
+        60,
+      );
+
+      await storage.delete("rate-limit:key");
+      expect(fakeRedis.del).toHaveBeenCalledWith("better-auth:rate-limit:key");
+    });
+
+    it("sets value without TTL when ttl is not provided", async () => {
+      const { buildSecondaryStorage } = await import("../index");
+      const fakeRedis = {
+        get: vi.fn(),
+        set: vi.fn().mockResolvedValue("OK"),
+        del: vi.fn(),
+      };
+      const storage = buildSecondaryStorage({
+        isRedisConfigured: true,
+        connectionFactory: () => fakeRedis,
+        logger: { warn: vi.fn() },
+      })!;
+
+      await storage.set("key", "val", undefined);
+      expect(fakeRedis.set).toHaveBeenCalledWith("better-auth:key", "val");
+    });
+  });
+
+  describe("when Redis is configured but connection is unavailable (pre-init window)", () => {
+    /** @scenario Pre-init window drops are logged */
+    it("logs a warning on set/delete and returns null on get", async () => {
+      const { buildSecondaryStorage } = await import("../index");
+      const mockLogger = { warn: vi.fn() };
+      const storage = buildSecondaryStorage({
+        isRedisConfigured: true,
+        connectionFactory: () => null,
+        logger: mockLogger,
+      })!;
+
+      expect(storage).toBeDefined();
+      expect(await storage.get("key")).toBeNull();
+      // get does not warn — a cache miss is fine
+      expect(mockLogger.warn).not.toHaveBeenCalled();
+
+      await storage.set("key", "val", 60);
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("pre-init window"),
+      );
+
+      mockLogger.warn.mockClear();
+      await storage.delete("key");
+      // Second call should NOT warn again (deduped)
+      expect(mockLogger.warn).not.toHaveBeenCalled();
     });
   });
 

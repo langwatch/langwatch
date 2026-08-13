@@ -172,3 +172,38 @@ Feature: BetterAuth config (unmounted)
     Then BetterAuth handles the request
     And no NextAuth handler is reachable on any `/api/auth/*` path
     And `pnpm typecheck` passes
+
+  # ============================================================================
+  # Secondary storage degrade behavior (rate-limit safety)
+  #
+  # When Redis is unavailable (build time, tests, no REDIS_URL), rate-limit
+  # counters must NOT silently disappear — they must fall back to in-memory
+  # storage and the degrade must be logged so operators notice.
+  # ============================================================================
+
+  @unit
+  Scenario: Rate limiting falls back to in-memory when Redis is unavailable
+    Given the Redis connection is null (build time, tests, or no REDIS_URL)
+    When the BetterAuth instance is initialized
+    Then secondaryStorage is undefined
+    And rate limiting uses "memory" storage instead of "secondary-storage"
+
+  @unit
+  Scenario: Rate limiting uses Redis secondary storage when available
+    Given the Redis connection is available
+    When the BetterAuth instance is initialized
+    Then secondaryStorage is defined with get, set, and delete operations
+    And rate limiting uses "secondary-storage"
+
+  @unit
+  Scenario: Secondary storage degrade is logged at startup
+    Given the Redis connection is null
+    When the BetterAuth module loads
+    Then a warning is logged indicating rate limiting will use in-memory storage
+
+  @unit
+  Scenario: Pre-init window drops are logged
+    Given Redis is configured but the connection is unavailable at call time
+    When a rate-limit set or delete is attempted
+    Then a warning is logged indicating the pre-init window drop
+    And get returns null (cache miss, database fallback)
