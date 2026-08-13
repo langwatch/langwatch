@@ -116,6 +116,13 @@ vi.mock("~/utils/api", () => ({
       create: { useMutation: () => ({ mutate: mockCreateGraph }) },
       updateById: { useMutation: () => ({ mutate: vi.fn() }) },
     },
+    // ADR-093 §5: the drawer's gated-block preview reads the project's Slack
+    // connection.
+    slackIntegration: {
+      getStatus: {
+        useQuery: () => ({ data: { connected: false }, isLoading: false }),
+      },
+    },
     dashboards: {
       getAll: { useQuery: () => ({ data: [], isLoading: false }) },
     },
