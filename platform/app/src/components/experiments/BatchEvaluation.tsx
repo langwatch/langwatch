@@ -12,11 +12,15 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { BatchEvaluation, Experiment, Project } from "@prisma/client";
-import type { JsonObject } from "@prisma/client/runtime/library";
+import type { JsonObject } from "@prisma/client/runtime/client";
 import numeral from "numeral";
 import Parse from "papaparse";
 import { Download } from "react-feather";
+import type {
+  BatchEvaluation,
+  Experiment,
+  Project,
+} from "~/generated/prisma/client";
 import { api } from "~/utils/api";
 import { Tooltip } from "../../components/ui/tooltip";
 import { formatMoney } from "../../utils/formatMoney";

@@ -135,7 +135,7 @@ vi.mock("~/utils/api", () => ({
         useQuery: () => ({ data: undefined, isLoading: false }),
       },
     },
-    useContext: () => ({
+    useUtils: () => ({
       automation: {
         getTriggers: { invalidate: vi.fn() },
         getTriggerById: { invalidate: vi.fn() },

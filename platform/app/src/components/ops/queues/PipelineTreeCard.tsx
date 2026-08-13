@@ -27,7 +27,7 @@ export function PipelineTreeCard({
   queueNames: string[];
 }) {
   const { hasAccess } = useOpsPermission();
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const [filter, setFilter] = useState("");
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(
     () => new Set(),

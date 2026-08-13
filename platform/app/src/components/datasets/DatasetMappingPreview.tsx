@@ -10,11 +10,11 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { Dataset } from "@prisma/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { Edit2 } from "react-feather";
 import { useDebouncedCallback } from "use-debounce";
+import type { Dataset } from "~/generated/prisma/client";
 import type { Trace } from "~/server/tracer/types";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type {
@@ -100,7 +100,7 @@ export function DatasetMappingPreview({
     return traces;
   }, [isThreadMapping, threadTraces.data, traces]);
 
-  const trpc = api.useContext();
+  const trpc = api.useUtils();
   const updateStoredMapping_ = api.dataset.updateMapping.useMutation();
   const updateStoredMapping = useCallback(
     (mappingState: MappingState) => {

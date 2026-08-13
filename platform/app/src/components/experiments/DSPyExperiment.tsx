@@ -16,7 +16,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { Experiment, Project, WorkflowVersion } from "@prisma/client";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
@@ -34,6 +33,11 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import type {
+  Experiment,
+  Project,
+  WorkflowVersion,
+} from "~/generated/prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
 import { FormatMoney } from "../../optimization_studio/components/FormatMoney";
 import { VersionBox } from "../../optimization_studio/components/History";
@@ -913,7 +917,7 @@ export const RunDetails = React.memo(
                         Error loading step data
                       </Table.Cell>
                     </Table.Row>
-                  ) : dspyStep.data.examples.length === 0 ? (
+                  ) : dspyStep.data?.examples.length === 0 ? (
                     <Table.Row>
                       <Table.Cell colSpan={4}>No entries</Table.Cell>
                     </Table.Row>
@@ -1014,7 +1018,7 @@ export const RunDetails = React.memo(
                       Error loading step data
                     </Table.Cell>
                   </Table.Row>
-                ) : dspyStep.data.llm_calls.length === 0 ? (
+                ) : dspyStep.data?.llm_calls.length === 0 ? (
                   <Table.Row>
                     <Table.Cell colSpan={6}>No entries</Table.Cell>
                   </Table.Row>

@@ -162,7 +162,7 @@ vi.mock("~/utils/api", () => ({
         useQuery: () => ({ data: undefined, isFetching: false, error: null }),
       },
     },
-    useContext: () => ({
+    useUtils: () => ({
       automation: {
         getTriggers: { invalidate: mockInvalidate },
         getTriggerById: { invalidate: mockGetTriggerByIdInvalidate },

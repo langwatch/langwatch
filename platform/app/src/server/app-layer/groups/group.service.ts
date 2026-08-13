@@ -5,7 +5,7 @@ import type {
   RoleBinding,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { PersonalWorkspaceNotManagedHereError } from "~/server/app-layer/teams/team.service";
 import type { RoleService } from "~/server/role";
 import { RoleNotAssignableError } from "~/server/role/errors";

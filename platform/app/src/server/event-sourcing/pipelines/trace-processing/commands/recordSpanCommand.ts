@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
-import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { TiktokenClient } from "~/server/app-layer/clients/tokenizer/tiktoken.client";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import {
@@ -204,7 +204,15 @@ export class RecordSpanCommand
 
         let resolvedCommandData = commandData;
         if (commandData.spoolRef && this.blobStore) {
-          const spoolBody = await this.blobStore.getSpool(commandData.spoolRef);
+          // The spool location is re-derived from the command's own
+          // authenticated tenantId and span ids — never from spoolRef, which is
+          // just a format marker. See BlobStore.getSpool / SPOOL_REF_V2.
+          const spoolBody = await this.blobStore.getSpool({
+            spoolRef: commandData.spoolRef,
+            projectId: tenantIdStr,
+            traceId: commandData.span.traceId,
+            spanId: commandData.span.spanId,
+          });
           // ADR-022: spool body is the full serialized RecordSpanCommandData.
           // Merge the spooled span/resource/instrumentationScope fields back into
           // the in-flight command (the queue message carries only spoolRef + id fields).
@@ -387,8 +395,8 @@ export class RecordSpanCommand
    * ADR-022: Best-effort spool deletion, invoked by processCommand() AFTER
    * storeEventsFn (event_log INSERT) commits. This ordering ensures the spool
    * is only deleted once the event is durable — if the INSERT fails the spool
-   * survives so the command can be retried. The 24h S3 lifecycle policy is the
-   * safety net for orphans if this call itself fails.
+   * survives so the command can be retried. The 3-day lifecycle rule on the
+   * spool prefix is the safety net for orphans if this call itself fails.
    *
    * The spoolRef is read from the original command argument rather than instance
    * state, eliminating the race bug that arose when a single handler instance was
@@ -399,12 +407,22 @@ export class RecordSpanCommand
   ): Promise<void> {
     const spoolRef = command.data.spoolRef;
     if (spoolRef && this.blobStore) {
-      await this.blobStore.deleteSpool(spoolRef).catch((err: unknown) => {
-        this.logger.warn(
-          { spoolRef, error: err instanceof Error ? err.message : String(err) },
-          "Best-effort spool deletion failed — lifecycle policy will clean up",
-        );
-      });
+      await this.blobStore
+        .deleteSpool({
+          spoolRef,
+          projectId: command.tenantId,
+          traceId: command.data.span.traceId,
+          spanId: command.data.span.spanId,
+        })
+        .catch((err: unknown) => {
+          this.logger.warn(
+            {
+              spoolRef,
+              error: err instanceof Error ? err.message : String(err),
+            },
+            "Best-effort spool deletion failed — lifecycle policy will clean up",
+          );
+        });
     }
   }
 

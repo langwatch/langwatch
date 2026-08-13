@@ -68,6 +68,11 @@ if wasBlocked > 0 then
   -- it did depended on how long the operator took to press the button (the
   -- chain expires on its own after GROUP_ATTEMPT_TTL_SECONDS).
   redis.call("DEL", strikesKey)
+-- The poison guard's per-group state is the claim marker; the legacy strikes
+-- counter above is cleared alongside it so a group blocked by the old guard
+-- still unblocks cleanly while both are in the fleet. Derived from strikesKey
+-- (":strikes" is 8 chars) so the key arity stays fixed.
+redis.call("DEL", string.sub(strikesKey, 1, #strikesKey - 8) .. ":claim")
   -- specs/event-sourcing/poison-group-park-guard.feature
   redis.call("DEL", attemptKey)
   redis.call("DEL", failStreakKey)
@@ -130,6 +135,11 @@ redis.call("DEL", errorKey)
 -- carried failure streak re-quarantines it (ADR-080,
 -- specs/event-sourcing/poison-group-park-guard.feature).
 redis.call("DEL", strikesKey)
+-- The poison guard's per-group state is the claim marker; the legacy strikes
+-- counter above is cleared alongside it so a group blocked by the old guard
+-- still unblocks cleanly while both are in the fleet. Derived from strikesKey
+-- (":strikes" is 8 chars) so the key arity stays fixed.
+redis.call("DEL", string.sub(strikesKey, 1, #strikesKey - 8) .. ":claim")
 redis.call("DEL", attemptKey)
 redis.call("DEL", failStreakKey)
 redis.call("ZREM", readyKey, groupId)
@@ -197,6 +207,11 @@ redis.call("DEL", srcErrorKey)
 -- get a fresh run, not inherit strikes, a spent retry chain, or a failure
 -- streak from the jobs that were carried off (ADR-080).
 redis.call("DEL", strikesKey)
+-- The poison guard's per-group state is the claim marker; the legacy strikes
+-- counter above is cleared alongside it so a group blocked by the old guard
+-- still unblocks cleanly while both are in the fleet. Derived from strikesKey
+-- (":strikes" is 8 chars) so the key arity stays fixed.
+redis.call("DEL", string.sub(strikesKey, 1, #strikesKey - 8) .. ":claim")
 redis.call("DEL", attemptKey)
 redis.call("DEL", failStreakKey)
 redis.call("ZREM", readyKey, groupId)

@@ -1,5 +1,5 @@
-import type { BugReport } from "@prisma/client";
 import { env } from "~/env.mjs";
+import type { BugReport } from "~/generated/prisma/client";
 import { postSlackChatMessage } from "../automations/delivery/slackWebApi";
 
 /**

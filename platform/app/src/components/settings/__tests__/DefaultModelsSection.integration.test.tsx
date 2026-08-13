@@ -56,7 +56,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       modelProvider: {
         getDefaultModelsForProject: { invalidate: mockInvalidate },
         getResolvedDefault: { invalidate: vi.fn() },

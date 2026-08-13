@@ -124,6 +124,108 @@ export const buildCellWorkflow = (
   };
 };
 
+/**
+ * The edge carrying one dataset column into a node's input.
+ *
+ * A mapping names the column the way the user sees it while the entry node
+ * exposes it by id, so the name is resolved here; a column that is no longer in
+ * the dataset keeps its name rather than dropping the edge. Both that
+ * resolution and the `outputs.` / `inputs.` handle naming the engine expects
+ * live in this one place, so the two workflow builders cannot drift apart.
+ */
+const datasetEdge = ({
+  entryNodeId,
+  nodeId,
+  inputField,
+  columnName,
+  datasetColumns,
+}: {
+  entryNodeId: string;
+  nodeId: string;
+  inputField: string;
+  columnName: string;
+  datasetColumns: Array<{ id: string; name: string; type: string }>;
+}): Edge => {
+  const columnId =
+    datasetColumns.find((column) => column.name === columnName)?.id ??
+    columnName;
+  return {
+    id: `${entryNodeId}->${nodeId}.${inputField}`,
+    source: entryNodeId,
+    sourceHandle: `outputs.${columnId}`,
+    target: nodeId,
+    targetHandle: `inputs.${inputField}`,
+    type: "default",
+  };
+};
+
+/**
+ * Builds a mini-workflow holding only the cell's evaluators.
+ *
+ * A workflow target runs its whole Studio graph through execute_flow rather
+ * than as one component, so there is no single target node to hang the
+ * evaluators off. They are dispatched one at a time with explicit inputs, so
+ * what they need from a workflow is the entry row and their own nodes; the
+ * edges that would have carried the target's output stand for a node that is
+ * not in this graph and are left out.
+ */
+export const buildEvaluatorCellWorkflow = ({
+  cell,
+  datasetColumns,
+  loadedEvaluators,
+}: WorkflowBuilderInput & {
+  loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>;
+}): Omit<WorkflowBuilderOutput, "targetNodeId"> => {
+  const { targetConfig, evaluatorConfigs, datasetEntry, rowIndex } = cell;
+
+  const entryNode = buildEntryNode(datasetColumns, datasetEntry);
+  const { evaluatorNodes, evaluatorNodeIds } = buildEvaluatorNodes(
+    evaluatorConfigs,
+    targetConfig.id,
+    cell,
+    loadedEvaluators,
+  );
+
+  const datasetId = cell.datasetEntry._datasetId as string | undefined;
+  const edges: Edge[] = evaluatorConfigs.flatMap((evaluator) => {
+    const evaluatorNodeId = evaluatorNodeIds[evaluator.id];
+    if (!evaluatorNodeId) return [];
+    const mappings = datasetId
+      ? (evaluator.mappings[datasetId]?.[targetConfig.id] ?? {})
+      : {};
+
+    return Object.entries(mappings).flatMap(([inputField, mapping]) => {
+      if (mapping.type !== "source" || mapping.source !== "dataset") return [];
+      return [
+        datasetEdge({
+          entryNodeId: entryNode.id,
+          nodeId: evaluatorNodeId,
+          inputField,
+          columnName: mapping.sourceField,
+          datasetColumns,
+        }),
+      ];
+    });
+  });
+
+  return {
+    workflow: {
+      spec_version: LATEST_SPEC_VERSION,
+      workflow_id: `eval_v3_${nanoid(8)}`,
+      name: `Evaluation V3 - Row ${rowIndex}`,
+      icon: "🧪",
+      description: `Evaluators for row ${rowIndex}`,
+      version: "1.0",
+      template_adapter: "default",
+      enable_tracing: true,
+      nodes: [entryNode, ...evaluatorNodes] as Workflow["nodes"],
+      edges,
+      state: {},
+    },
+    evaluatorNodeIds,
+  };
+};
+
 // ============================================================================
 // Entry Node Builder
 // ============================================================================
@@ -1037,30 +1139,22 @@ const buildEdges = (
   const edges: Edge[] = [];
   const datasetId = cell.datasetEntry._datasetId as string | undefined;
 
-  // Helper to resolve column name to column ID
-  // sourceField in mappings is the column name, but entry node uses column ID
-  const getColumnId = (columnName: string): string => {
-    const column = datasetColumns.find((c) => c.name === columnName);
-    return column?.id ?? columnName; // Fall back to columnName if not found
-  };
-
   // Build edges from entry to target based on target mappings
   const targetMappings = datasetId
     ? (targetConfig.mappings[datasetId] ?? {})
     : {};
 
-  // Python NLP expects handles in format "outputs.field" and "inputs.field"
   for (const [inputField, mapping] of Object.entries(targetMappings)) {
     if (mapping.type === "source" && mapping.source === "dataset") {
-      const columnId = getColumnId(mapping.sourceField);
-      edges.push({
-        id: `${entryNodeId}->${targetNodeId}.${inputField}`,
-        source: entryNodeId,
-        sourceHandle: `outputs.${columnId}`,
-        target: targetNodeId,
-        targetHandle: `inputs.${inputField}`,
-        type: "default",
-      });
+      edges.push(
+        datasetEdge({
+          entryNodeId,
+          nodeId: targetNodeId,
+          inputField,
+          columnName: mapping.sourceField,
+          datasetColumns,
+        }),
+      );
     }
   }
 
@@ -1076,16 +1170,15 @@ const buildEdges = (
     for (const [inputField, mapping] of Object.entries(evaluatorMappings)) {
       if (mapping.type === "source") {
         if (mapping.source === "dataset") {
-          // From dataset entry - use column ID, not name
-          const columnId = getColumnId(mapping.sourceField);
-          edges.push({
-            id: `${entryNodeId}->${evaluatorNodeId}.${inputField}`,
-            source: entryNodeId,
-            sourceHandle: `outputs.${columnId}`,
-            target: evaluatorNodeId,
-            targetHandle: `inputs.${inputField}`,
-            type: "default",
-          });
+          edges.push(
+            datasetEdge({
+              entryNodeId,
+              nodeId: evaluatorNodeId,
+              inputField,
+              columnName: mapping.sourceField,
+              datasetColumns,
+            }),
+          );
         } else if (
           mapping.source === "target" &&
           mapping.sourceId === targetConfig.id

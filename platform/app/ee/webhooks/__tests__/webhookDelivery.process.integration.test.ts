@@ -9,7 +9,6 @@
  * the pipeline's own applier.
  */
 
-import type { Organization, Project, Team } from "@prisma/client";
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -20,6 +19,7 @@ import {
   it,
   vi,
 } from "vitest";
+import type { Organization, Project, Team } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
 import {

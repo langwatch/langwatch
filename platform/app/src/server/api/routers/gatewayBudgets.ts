@@ -37,7 +37,7 @@ const scopeSchema = z.discriminatedUnion("kind", [
 ]);
 
 async function requireOrgAccess(
-  ctx: { prisma: import("@prisma/client").PrismaClient },
+  ctx: { prisma: import("~/generated/prisma/client").PrismaClient },
   organizationId: string,
 ) {
   const org = await ctx.prisma.organization.findUnique({
@@ -335,7 +335,7 @@ export type BudgetListScopeTarget = {
 // view uses the equivalent per-budget path in GatewayBudgetService; list
 // needed its own implementation to avoid N queries per page.
 async function resolveScopeTargetsBatch(
-  prisma: import("@prisma/client").PrismaClient,
+  prisma: import("~/generated/prisma/client").PrismaClient,
   budgets: Array<{ scopeType: string; scopeId: string }>,
   organizationId: string | null,
 ): Promise<Map<string, BudgetListScopeTarget>> {

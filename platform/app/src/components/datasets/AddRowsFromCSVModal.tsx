@@ -246,7 +246,7 @@ export function AddRowsFromCSVModal({
               recordEntries.length === 0 || !canUpload || hasErrors.length > 0
             }
             onClick={uploadCSVData}
-            loading={uploadRecords.isLoading}
+            loading={uploadRecords.isPending}
           >
             Upload
           </Button>

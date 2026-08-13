@@ -16,7 +16,7 @@ import type {
   GatewayGuardrailDirection,
   Monitor,
   PrismaClient,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import type {
   EvaluatorTypes,
   SingleEvaluationResult,

@@ -708,7 +708,7 @@ describe("PrismaProcessStore", () => {
 
       await expect(
         prisma.$executeRawUnsafe(
-          `INSERT INTO pre_fix_inbox VALUES ($1, $2, $3)`,
+          `-- @tenancy: probe against a session-local temp table\nINSERT INTO pre_fix_inbox VALUES ($1, $2, $3)`,
           processName,
           "project-1",
           oversized(),

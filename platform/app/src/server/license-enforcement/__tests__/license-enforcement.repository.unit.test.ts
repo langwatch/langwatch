@@ -1,5 +1,8 @@
-import { OrganizationUserRole, type PrismaClient } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  OrganizationUserRole,
+  type PrismaClient,
+} from "~/generated/prisma/client";
 import { LicenseEnforcementRepository } from "../license-enforcement.repository";
 
 /**

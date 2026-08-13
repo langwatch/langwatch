@@ -26,6 +26,7 @@
 import { Badge, Box, HStack, Portal, Text, VStack } from "@chakra-ui/react";
 import { useCallback, useRef, useState } from "react";
 
+import { useEscapeKey } from "~/hooks/useEscapeKey";
 import { isTextLikelyOverflowing } from "~/utils/textOverflowHeuristic";
 
 import type { BatchComparisonColumn, BatchComparisonVerdict } from "./types";
@@ -94,6 +95,8 @@ export function ComparisonWinnerCell({
   }, []);
 
   const handleCollapse = useCallback(() => setIsExpanded(false), []);
+
+  useEscapeKey({ enabled: isExpanded, onEscape: handleCollapse });
 
   if (!verdict) {
     return (
@@ -182,7 +185,7 @@ export function ComparisonWinnerCell({
       )}
       {expanded && (
         <Text fontSize="11px" color="fg.subtle" alignSelf="end">
-          click outside to close
+          click outside or press Escape to close
         </Text>
       )}
     </VStack>

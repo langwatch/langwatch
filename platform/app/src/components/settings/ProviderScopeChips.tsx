@@ -1,32 +1,139 @@
 import { Badge, HStack, Text } from "@chakra-ui/react";
-import { Boxes, Building2, Folder, Server, User, Users } from "lucide-react";
+import {
+  Boxes,
+  Building2,
+  Folder,
+  KeyRound,
+  Server,
+  User,
+  UserRound,
+  Users,
+  UsersRound,
+} from "lucide-react";
 
+import { Link } from "~/components/ui/link";
 import { Tooltip } from "~/components/ui/tooltip";
 
 /**
  * Scope kinds a chip can render. ORGANIZATION/TEAM/PROJECT mirror the
  * Prisma `ModelProviderScopeType` enum; DEPARTMENT is a picker/badge-only
- * capability (no enum row - see scope-selector-and-badges.md). Surfaces
- * that key on the Prisma enum (model providers) never pass DEPARTMENT;
- * the tile catalog opts into ORGANIZATION + DEPARTMENT only.
+ * capability (no enum row - see scope-selector-and-badges.md). GROUP,
+ * PRINCIPAL, VIRTUAL_KEY and ATTRIBUTED_USER are render-only kinds that
+ * gateway budgets target; they are not offered by `ScopeChipPicker`.
+ * Surfaces that key on the Prisma enum (model providers) never pass
+ * anything but the triad; the tile catalog opts into ORGANIZATION +
+ * DEPARTMENT only.
  */
 export type ProviderScopeType =
   | "ORGANIZATION"
   | "TEAM"
   | "PROJECT"
-  | "DEPARTMENT";
+  | "DEPARTMENT"
+  | "GROUP"
+  | "PRINCIPAL"
+  | "VIRTUAL_KEY"
+  | "ATTRIBUTED_USER";
 
 type ScopeEntry = {
   scopeType: ProviderScopeType;
   scopeId: string;
   /**
    * Display name of the scope (organization name, team name, project
-   * name, or department name). When omitted the chip falls back to the
-   * bare type label - which is what older callers without name access
-   * used to render.
+   * name, department name, group name, person, or virtual key name).
+   * When omitted the chip falls back to the bare type label - which is
+   * what older callers without name access used to render.
    */
   name?: string;
+  /**
+   * Appended to the chip's tooltip after the name, for the identifiers
+   * and counts that would crowd the visible chip: a slug, a key prefix,
+   * a group's member count.
+   */
+  detail?: string;
+  /** Turns the chip into a link to the thing it names. */
+  href?: string;
 };
+
+const CHIP_STYLES: Record<
+  ProviderScopeType,
+  {
+    icon: typeof Building2;
+    colorPalette: string;
+    /** Names the kind in the tooltip and stands in for a missing name. */
+    kind: string;
+    fallbackLabel: string;
+  }
+> = {
+  ORGANIZATION: {
+    icon: Building2,
+    colorPalette: "blue",
+    kind: "Organization",
+    fallbackLabel: "Organization",
+  },
+  TEAM: {
+    icon: Users,
+    colorPalette: "purple",
+    kind: "Team",
+    fallbackLabel: "Team",
+  },
+  PROJECT: {
+    icon: Folder,
+    colorPalette: "gray",
+    kind: "Project",
+    fallbackLabel: "Project",
+  },
+  DEPARTMENT: {
+    icon: Boxes,
+    colorPalette: "cyan",
+    kind: "Department",
+    fallbackLabel: "Department",
+  },
+  GROUP: {
+    icon: UsersRound,
+    colorPalette: "cyan",
+    kind: "Group",
+    fallbackLabel: "Group",
+  },
+  PRINCIPAL: {
+    icon: User,
+    colorPalette: "teal",
+    kind: "Person",
+    fallbackLabel: "Person",
+  },
+  VIRTUAL_KEY: {
+    icon: KeyRound,
+    colorPalette: "orange",
+    kind: "Virtual key",
+    fallbackLabel: "Virtual key",
+  },
+  // The name a chip carries here is the anchor the allowance hangs off, a
+  // key or a project, not a person: the limit is handed to each end user
+  // the anchor's traffic is attributed to.
+  ATTRIBUTED_USER: {
+    icon: UserRound,
+    colorPalette: "green",
+    kind: "Attributed user",
+    fallbackLabel: "Attributed user",
+  },
+};
+
+/**
+ * What a chip says on hover: the kind, the target's name, and whatever
+ * identifying detail was moved off the visible line to keep the chip to
+ * one row. Pure so the composition is assertable without driving a
+ * portal-rendered tooltip open.
+ */
+export function scopeChipTooltip(entry: {
+  scopeType: ProviderScopeType;
+  name?: string;
+  detail?: string;
+}): string {
+  const style = CHIP_STYLES[entry.scopeType] ?? CHIP_STYLES.PROJECT;
+  const label = entry.name ?? style.fallbackLabel;
+  return entry.detail
+    ? `${style.kind}: ${label} · ${entry.detail}`
+    : `${style.kind}: ${label}`;
+}
 
 /**
  * Renders a horizontal list of scope chips. Each chip shows the
@@ -99,55 +206,34 @@ export function ProviderScopeChips({
   return (
     <HStack gap={1} wrap="wrap">
       {entries.map((entry) => {
-        const key = `${entry.scopeType}:${entry.scopeId}`;
-        if (entry.scopeType === "ORGANIZATION") {
-          const label = entry.name ?? "Organization";
-          return (
-            <Tooltip key={key} content={`Organization: ${label}`}>
-              <Badge colorPalette="blue" variant="subtle" size={size}>
-                <HStack gap={1}>
-                  <Building2 size={iconSize} aria-hidden />
-                  <Text>{label}</Text>
-                </HStack>
-              </Badge>
-            </Tooltip>
-          );
-        }
-        if (entry.scopeType === "TEAM") {
-          const label = entry.name ?? "Team";
-          return (
-            <Tooltip key={key} content={`Team: ${label}`}>
-              <Badge colorPalette="purple" variant="subtle" size={size}>
-                <HStack gap={1}>
-                  <Users size={iconSize} aria-hidden />
-                  <Text>{label}</Text>
-                </HStack>
-              </Badge>
-            </Tooltip>
-          );
-        }
-        if (entry.scopeType === "DEPARTMENT") {
-          const label = entry.name ?? "Department";
-          return (
-            <Tooltip key={key} content={`Department: ${label}`}>
-              <Badge colorPalette="cyan" variant="subtle" size={size}>
-                <HStack gap={1}>
-                  <Boxes size={iconSize} aria-hidden />
-                  <Text>{label}</Text>
-                </HStack>
-              </Badge>
-            </Tooltip>
-          );
-        }
-        const label = entry.name ?? "Project";
+        const style = CHIP_STYLES[entry.scopeType] ?? CHIP_STYLES.PROJECT;
+        const Icon = style.icon;
+        const label = entry.name ?? style.fallbackLabel;
+        const tooltip = scopeChipTooltip(entry);
+        const chip = (
+          <Badge colorPalette={style.colorPalette} variant="subtle" size={size}>
+            <HStack gap={1}>
+              <Icon size={iconSize} aria-hidden />
+              <Text>{label}</Text>
+            </HStack>
+          </Badge>
+        );
         return (
-          <Tooltip key={key} content={`Project: ${label}`}>
-            <Badge colorPalette="gray" variant="subtle" size={size}>
-              <HStack gap={1}>
-                <Folder size={iconSize} aria-hidden />
-                <Text>{label}</Text>
-              </HStack>
-            </Badge>
+          <Tooltip
+            key={`${entry.scopeType}:${entry.scopeId}`}
+            content={tooltip}
+          >
+            {entry.href ? (
+              <Link
+                href={entry.href}
+                variant="plain"
+                _hover={{ textDecoration: "underline" }}
+              >
+                {chip}
+              </Link>
+            ) : (
+              chip
+            )}
           </Tooltip>
         );
       })}
