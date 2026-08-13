@@ -259,6 +259,91 @@ redis.call("LTRIM", signalKey, 0, 999)
 return count
 `;
 
+/**
+ * Drop the DLQ-index members whose dead-letter has already expired, and return
+ * the ones still worth showing. The self-healing half of every DLQ read.
+ *
+ * WHY THIS EXISTS. `SADD {queue}:gq:dlq <groupId>` names a dead-letter, but a
+ * Redis SET has no per-member TTL, so the member cannot age out alongside the
+ * `dlq:{groupId}:*` keys it points at — those carry `DLQ_TTL_SECONDS`. The only
+ * `SREM` on a normal path is `REPLAY_FROM_DLQ_LUA`, which runs when an operator
+ * explicitly replays, so a dead-letter left to expire used to leave its groupId
+ * in the set forever while the payload it pointed at vanished after 7 days.
+ * That was tolerable while `moveToDlq` was the only writer — a rare whole-group
+ * operator action, usually followed by a replay. It is not tolerable now that a
+ * body-present drop dead-letters ONE job automatically (#719) under a
+ * per-aggregate group id that is unique and never reused: `dlqCount` was a raw
+ * `SCARD`, so the operator's "there is something in the DLQ" badge became a
+ * number that only ever went up and never returned to zero.
+ *
+ * DO NOT "SIMPLIFY" THIS TO `EXPIRE dlqIndexKey`. It is not the same fix and it
+ * is wrong: the set holds many members with independent deadlines, so a single
+ * EXPIRE drops ALL of them the moment the oldest ages out — live dead-letters
+ * included. A SET has no per-member expiry — true, but not the reason to stop
+ * looking: a deadline-scored ZSET (`ZREMRANGEBYSCORE key -inf <now>` to prune,
+ * `ZCARD` to count) is the standard structure for exactly this, and this module
+ * already uses it — `blobLeases.ts`'s `COUNT_LIVE_LUA` is this index's
+ * structural twin (blobLeases.ts:109: "member is a holder identity and its
+ * score is an absolute Redis-time deadline"). Converting is DEFERRED (#6362),
+ * not rejected: the live production key `{queue}:gq:dlq` is already a SET, so a
+ * deploy that `ZADD`s it would fail `WRONGTYPE` — the migration needs a new key
+ * name and a read-both window, not a type change in place. Until then, the
+ * readers stay authoritative and the set heals behind them.
+ *
+ * LIVENESS PREDICATE — a member is dropped only when BOTH `dlq:{groupId}:jobs`
+ * and `dlq:{groupId}:error` hold nothing, i.e. Redis has nothing left for it.
+ * Deliberately not `ZCARD jobs == 0` alone: `MOVE_TO_DLQ_LUA` always copies the
+ * group's error hash but only creates the jobs zset when the group had staged
+ * jobs, so a stale block (blocked, nothing pending — `isStaleBlock` below)
+ * dead-letters as an error hash with no jobs. Nothing there is replayable, but
+ * it IS the operator's record of why that group died, and a false SREM would
+ * delete a real dead-letter from their only view of it — strictly worse than
+ * leaving an orphan behind. `dlq:{groupId}:data` is deliberately not consulted:
+ * both writers create it in the same script as the jobs zset and with the same
+ * TTL, and without the zset naming its job ids nothing can read or replay it.
+ *
+ * Check and removal are one atomic script on purpose. Reading liveness in TS
+ * and then SREMing would let a concurrent re-dead-lettering of the same group
+ * id land in between, and the stale SREM would unindex it — the false-SREM
+ * hazard again, this time by race rather than by predicate.
+ *
+ * Per-group keys are derived here from `keyPrefix` rather than passed in KEYS,
+ * the same way the queue's own scripts do it: the prefix carries the
+ * `{queueName}` hash tag, so every derived key shares KEYS[1]'s cluster slot.
+ */
+const SWEEP_DLQ_INDEX_LUA = `
+local dlqIndexKey = KEYS[1]
+local keyPrefix   = ARGV[1]
+
+-- One variadic SREM per chunk rather than one per member: the round trip is
+-- already paid for, but unpack() is bounded by the Lua C stack, so a page is
+-- spliced instead of handed over whole.
+local SREM_CHUNK = 250
+
+local live = {}
+local dead = {}
+
+for i = 2, #ARGV do
+  local groupId = ARGV[i]
+  local jobCount   = redis.call("ZCARD", keyPrefix .. "dlq:" .. groupId .. ":jobs")
+  local errorCount = redis.call("HLEN",  keyPrefix .. "dlq:" .. groupId .. ":error")
+  if jobCount == 0 and errorCount == 0 then
+    dead[#dead + 1] = groupId
+  else
+    live[#live + 1] = groupId
+  end
+end
+
+local at = 1
+while at <= #dead do
+  local last = math.min(at + SREM_CHUNK - 1, #dead)
+  redis.call("SREM", dlqIndexKey, unpack(dead, at, last))
+  at = last + 1
+end
+
+return live
+`;
+
 // Re-arm (or drop, when the requested TTL is not positive) the pending-reconcile
 // single-flight marker, but only while the caller still holds it. A marker that
 // lapsed mid-pass may already have been re-acquired by another instance, and
@@ -332,6 +417,7 @@ const unblockScript = new CachedLuaScript(UNBLOCK_LUA);
 const drainGroupScript = new CachedLuaScript(DRAIN_GROUP_LUA);
 const moveToDlqScript = new CachedLuaScript(MOVE_TO_DLQ_LUA);
 const replayFromDlqScript = new CachedLuaScript(REPLAY_FROM_DLQ_LUA);
+const sweepDlqIndexScript = new CachedLuaScript(SWEEP_DLQ_INDEX_LUA);
 const reconcileMarkerTtlScript = new CachedLuaScript(RECONCILE_MARKER_TTL_LUA);
 const reconcileWriteScript = new CachedLuaScript(RECONCILE_WRITE_LUA);
 const pendingIndexPruneScript = new CachedLuaScript(PENDING_INDEX_PRUNE_LUA);
@@ -528,7 +614,6 @@ export class QueueRedisRepository implements QueueRepository {
 
     const readyKey = `${prefix}ready`;
     const blockedKey = `${prefix}blocked`;
-    const dlqKey = `${prefix}dlq`;
     const totalPendingKey = `${prefix}stats:total-pending`;
     const parkedTenantsKey = `${prefix}parked-tenants`;
 
@@ -551,7 +636,11 @@ export class QueueRedisRepository implements QueueRepository {
     ] = await Promise.all([
       this.redis.zcard(readyKey),
       this.redis.scard(blockedKey),
-      this.redis.scard(dlqKey),
+      // Not a SCARD of the DLQ index — see SWEEP_DLQ_INDEX_LUA. This tile is
+      // the operator's primary "there is something in the DLQ" signal (it feeds
+      // the ops nav badge and the dashboard total), so it counts only what is
+      // still there and sweeps what is not.
+      this.countLiveDlqGroups({ prefix }),
       this.redis.zrevrange(readyKey, offset, offset + limit - 1, "WITHSCORES"),
       this.redis.zrange(readyKey, offset, offset + limit - 1, "WITHSCORES"),
       this.redis.get(totalPendingKey),
@@ -1399,6 +1488,10 @@ export class QueueRedisRepository implements QueueRepository {
     const prefix = `${params.queueName}:gq:`;
     const dlqIndexKey = `${prefix}dlq`;
 
+    // Raw SCARD on purpose: this samples the index to redrive, it does not
+    // report a count to an operator. An expired member sampled here is SREMed by
+    // REPLAY_FROM_DLQ_LUA anyway (and reported as not redriven, which it wasn't).
+    // The healing sweep the READ paths use is SWEEP_DLQ_INDEX_LUA.
     const dlqSize = await this.redis.scard(dlqIndexKey);
     if (dlqSize === 0) return { redrivenCount: 0, groupIds: [] };
 
@@ -1524,10 +1617,46 @@ export class QueueRedisRepository implements QueueRepository {
 
   // ── DLQ Listing ─────────────────────────────────────────────────
 
-  async listDlqGroups(params: { queueName: string }): Promise<DlqGroupInfo[]> {
-    const prefix = `${params.queueName}:gq:`;
-    const dlqIndexKey = `${prefix}dlq`;
-    const groups: DlqGroupInfo[] = [];
+  /**
+   * Page through the DLQ index, healing it as it goes: every SSCAN page is
+   * handed to {@link SWEEP_DLQ_INDEX_LUA}, which removes the members whose
+   * dead-letter has expired and returns the rest. Yields one page of live group
+   * ids at a time; never yields an empty page.
+   *
+   * Both DLQ readers go through here — the `dlqCount` gauge and
+   * {@link listDlqGroups} — so the badge and the page can never disagree about
+   * what is in the dead-letter, and the sweep has exactly one home.
+   *
+   * SSCAN guarantees only that a member present for the whole scan is returned
+   * AT LEAST once, so `seen` deduplicates before a page is checked. Without it a
+   * set resized mid-scan could count one dead-letter twice, list it twice, and
+   * re-check members already swept.
+   *
+   * COST — the one statement of it; every caller links here rather than restating
+   * it. One EVALSHA per page, where `dlqCount` used to be a single SCARD. The
+   * liveness check runs inside Redis, so a page is one round trip no matter how
+   * many members it holds — but that round trip is not free work: per
+   * {@link SWEEP_DLQ_INDEX_LUA}, the script runs a `ZCARD` and an `HLEN` per
+   * member (2 × page size) inside Redis's single-threaded main loop before
+   * returning.
+   *
+   * What the sweep amortises, precisely: DEAD members, and only those. The first
+   * pass over a queue SREMs every member whose dead-letter has expired, so those
+   * are gone from the input for good and a later pass no longer pays for them.
+   * A member that is still LIVE is removed by nothing here, so it is re-walked in
+   * full on every pass — steady-state cost is O(live members) per call per queue
+   * and does not decay with repetition. Read either half alone and you get the
+   * wrong answer to "is this path cheap?": it gets cheaper exactly once, by the
+   * orphans it drops, and never again. A queue whose dead-letter fills
+   * automatically per job under never-reused group ids (see "WHY THIS EXISTS" on
+   * {@link SWEEP_DLQ_INDEX_LUA}) can carry a large, persistently live backlog and
+   * pays the full walk for it on every read.
+   */
+  private async *scanLiveDlqGroupIds(params: {
+    prefix: string;
+  }): AsyncGenerator<string[]> {
+    const dlqIndexKey = `${params.prefix}dlq`;
+    const seen = new Set<string>();
 
     let cursor = "0";
     do {
@@ -1539,8 +1668,66 @@ export class QueueRedisRepository implements QueueRepository {
       );
       cursor = nextCursor;
 
-      if (members.length === 0) continue;
+      const fresh = members.filter((groupId) => !seen.has(groupId));
+      for (const groupId of fresh) seen.add(groupId);
+      if (fresh.length === 0) continue;
 
+      const live = (await sweepDlqIndexScript.run(
+        this.redis,
+        1,
+        dlqIndexKey,
+        params.prefix,
+        ...fresh,
+      )) as string[] | null;
+
+      if (live && live.length > 0) yield live;
+    } while (cursor !== "0");
+  }
+
+  /**
+   * How many groups the dead-letter actually still holds — the figure behind the
+   * ops nav badge and the dashboard DLQ tile.
+   *
+   * A raw `SCARD` of the index counted groups whose payload expired days ago,
+   * which made the badge monotonically increasing: once anything had been
+   * dead-lettered and left to expire, it never read zero again. See
+   * {@link SWEEP_DLQ_INDEX_LUA}.
+   *
+   * The metrics collector calls this every 2s, and each tick pays the full walk
+   * costed on {@link scanLiveDlqGroupIds} — O(live members) per tick per queue,
+   * for as long as those members stay live. `collect()` is single-flighted
+   * (`isCollecting`), so a slow pass skips a tick rather than stacking up — that
+   * bounds concurrency, not the size or cost of any single pass.
+   */
+  private async countLiveDlqGroups(params: {
+    prefix: string;
+  }): Promise<number> {
+    let count = 0;
+    for await (const page of this.scanLiveDlqGroupIds({
+      prefix: params.prefix,
+    })) {
+      count += page.length;
+    }
+    return count;
+  }
+
+  async listDlqGroups(params: { queueName: string }): Promise<DlqGroupInfo[]> {
+    const prefix = `${params.queueName}:gq:`;
+    const groups: DlqGroupInfo[] = [];
+
+    // Live members only: an index member whose dead-letter has expired is swept
+    // by the scan and never becomes a row, so the page stops listing — and stops
+    // paying three pipelined commands for — groups there is nothing left to act
+    // on. The ZCARD below re-reads what the sweep already checked: one command
+    // per LIVE member, paid once per queue on every tick of the ops DLQ card's
+    // 10s poll (DlqCard.tsx's `refetchInterval`, fanned out serially over every
+    // discovered queue by `getAllDlqGroups` in queue.service.ts) — not a
+    // one-off operator page load. Accepted because this endpoint sits behind
+    // `opsViewPermission`: load scales with how many ops tabs are open, not
+    // with tenant traffic, and the extra read is one already-scoped command
+    // per live member, not another index scan — the same scan contract the 2s
+    // `dlqCount` collector shares unchanged.
+    for await (const members of this.scanLiveDlqGroupIds({ prefix })) {
       const pipeline = this.redis.pipeline();
       for (const groupId of members) {
         pipeline.hgetall(`${prefix}dlq:${groupId}:error`);
@@ -1591,7 +1778,7 @@ export class QueueRedisRepository implements QueueRepository {
             : null,
         });
       }
-    } while (cursor !== "0");
+    }
 
     groups.sort((a, b) => (b.movedAt ?? 0) - (a.movedAt ?? 0));
     return groups;

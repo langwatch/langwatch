@@ -82,4 +82,21 @@ export class RedisJobBlobStore implements JobBlobStore {
   async delete({ id }: { id: string }): Promise<void> {
     await this.redis.unlink(this.keyPrefix + id);
   }
+
+  /**
+   * Extends the blob's TTL without reading it (#719/#720). Used when a
+   * body-present value is dead-lettered: the DLQ quarantine (7 days) outlives
+   * this store's default backstop, so the referenced blob must be pushed to at
+   * least the quarantine window or the dead-letter would point at a gone blob.
+   * A no-op if the key has already expired (`EXPIRE` returns 0).
+   */
+  async refreshTtl({
+    id,
+    ttlSeconds,
+  }: {
+    id: string;
+    ttlSeconds: number;
+  }): Promise<void> {
+    await this.redis.expire(this.keyPrefix + id, ttlSeconds);
+  }
 }

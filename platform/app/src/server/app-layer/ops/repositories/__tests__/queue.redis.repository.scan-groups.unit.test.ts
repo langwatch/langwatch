@@ -45,6 +45,21 @@ class FakeRedis {
     return (this.sets.get(key) ?? []).slice(0, count);
   }
 
+  /**
+   * Whole set in one page. Real SSCAN may split a large set across cursors and
+   * repeat a member that survived a resize; the scan limit and the caller's
+   * dedup are exercised by the integration test against real Redis, so keeping
+   * the fake single-page here says "iteration is not what this file measures"
+   * rather than half-simulating it.
+   */
+  async sscan(
+    key: string,
+    _cursor: string,
+    ..._opts: unknown[]
+  ): Promise<[string, string[]]> {
+    return ["0", this.sets.get(key) ?? []];
+  }
+
   async get(key: string): Promise<string | null> {
     return this.strings.get(key) ?? null;
   }

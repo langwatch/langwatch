@@ -1,6 +1,9 @@
-import { register } from "prom-client";
+import { Counter, Gauge, Histogram, register } from "prom-client";
 import { beforeEach, describe, expect, it } from "vitest";
-
+// Namespace import so the registry-consistency check below can enumerate
+// every export the module actually defines, independent of the named
+// imports above (which only pull in what THIS file happens to exercise).
+import * as metricsModule from "../metrics";
 // Import to trigger metric registration
 import {
   gqBlockedGroups,
@@ -213,6 +216,61 @@ describe("GroupQueue metrics", () => {
       expect(() =>
         gqBlockedGroups.set({ queue_name: "test-queue" }, 0),
       ).not.toThrow();
+    });
+  });
+});
+
+type PromMetric = Counter<string> | Gauge<string> | Histogram<string>;
+
+/**
+ * prom-client assigns `name` onto the instance at construction time
+ * (`Object.assign(this, ..., config)` in prom-client's shared `Metric` base —
+ * lib/metric.js), but the public `Counter`/`Gauge`/`Histogram` types only
+ * declare `name` on the constructor's configuration object, not on the
+ * instance. Read it back with a narrow cast instead of the config object we
+ * no longer have.
+ */
+function nameOf(metric: PromMetric): string {
+  return (metric as unknown as { name: string }).name;
+}
+
+/**
+ * Every metric this module actually defines, derived from its own exports —
+ * NOT from `metricNames` — so this has independent power to disagree with
+ * the hot-reload list below.
+ */
+function definedMetricNames(): Set<string> {
+  return new Set(
+    Object.values(metricsModule)
+      .filter(
+        (value): value is PromMetric =>
+          value instanceof Counter ||
+          value instanceof Gauge ||
+          value instanceof Histogram,
+      )
+      .map(nameOf),
+  );
+}
+
+describe("metricNames hot-reload list", () => {
+  describe("when compared against the metrics the module actually exports", () => {
+    it("lists every metric the module defines", () => {
+      const defined = definedMetricNames();
+      const listedNames: readonly string[] = metricsModule.metricNames;
+      const missingFromList = [...defined].filter(
+        (name) => !listedNames.includes(name),
+      );
+
+      expect(missingFromList).toEqual([]);
+    });
+
+    it("defines a real metric for every name it lists", () => {
+      const defined = definedMetricNames();
+      const staleListEntries = metricsModule.metricNames.filter(
+        (name) => !defined.has(name),
+      );
+
+      expect(staleListEntries).toEqual([]);
     });
   });
 });
