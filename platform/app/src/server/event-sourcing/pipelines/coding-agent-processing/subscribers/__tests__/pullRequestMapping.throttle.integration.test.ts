@@ -24,12 +24,12 @@ import {
   stopTestContainers,
 } from "../../../../__tests__/integration/testContainers";
 import { GroupStagingScripts } from "../../../../queues/groupQueue/scripts";
-import type { CodingAgentSessionState } from "../../projections/codingAgentSession.foldProjection";
-import type { CodingAgentProcessingEvent } from "../../schemas/events";
 import {
   type CodingAgentProcessingPipelineDeps,
   createCodingAgentProcessingPipeline,
 } from "../../pipeline";
+import type { CodingAgentSessionState } from "../../projections/codingAgentSession.foldProjection";
+import type { CodingAgentProcessingEvent } from "../../schemas/events";
 import { createPullRequestMappingHandler } from "../pullRequestMapping.subscriber";
 
 const QUEUE_NAME = "{test/prmap-throttle}";

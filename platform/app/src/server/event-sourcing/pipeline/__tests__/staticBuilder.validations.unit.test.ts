@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Event } from "../../domain/types";
 import type { StateProjectionDefinition } from "../../projections/stateProjection.types";
-import type { ReactorDefinition } from "../../reactors/reactor.types";
 import {
   createMockFoldProjectionDefinition,
   createMockMapProjectionDefinition,

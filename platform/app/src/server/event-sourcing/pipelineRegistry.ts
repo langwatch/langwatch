@@ -113,13 +113,13 @@ import {
   CodingAgentTraceSessionAppendStore,
   SessionMetricSeriesAppendStore,
 } from "./pipelines/coding-agent-processing/projections/stores";
+import { createCodingAgentLogFactsDispatchSubscriber } from "./pipelines/coding-agent-processing/subscribers/codingAgentLogFactsDispatch.subscriber";
+import { createCodingAgentMetricFactsDispatchSubscriber } from "./pipelines/coding-agent-processing/subscribers/codingAgentMetricFactsDispatch.subscriber";
+import { createCodingAgentSpanFactsDispatchSubscriber } from "./pipelines/coding-agent-processing/subscribers/codingAgentSpanFactsDispatch.subscriber";
 import {
   createPullRequestMappingHandler,
   type PullRequestMappingSubscriberDeps,
 } from "./pipelines/coding-agent-processing/subscribers/pullRequestMapping.subscriber";
-import { createCodingAgentLogFactsDispatchSubscriber } from "./pipelines/coding-agent-processing/subscribers/codingAgentLogFactsDispatch.subscriber";
-import { createCodingAgentMetricFactsDispatchSubscriber } from "./pipelines/coding-agent-processing/subscribers/codingAgentMetricFactsDispatch.subscriber";
-import { createCodingAgentSpanFactsDispatchSubscriber } from "./pipelines/coding-agent-processing/subscribers/codingAgentSpanFactsDispatch.subscriber";
 import { ExecuteEvaluationCommand } from "./pipelines/evaluation-processing/commands/executeEvaluation.command";
 import {
   createEvaluationProcessingPipeline,
@@ -187,6 +187,8 @@ import type { TraceAnalyticsData } from "./pipelines/trace-processing/projection
 import { TraceAnalyticsStore } from "./pipelines/trace-processing/projections/traceAnalytics.store";
 import { TraceAnalyticsRollupAppendStore } from "./pipelines/trace-processing/projections/traceAnalyticsRollup.store";
 import { TraceSummaryStore } from "./pipelines/trace-processing/projections/traceSummary.store";
+import type { ResolveOriginCommandData } from "./pipelines/trace-processing/schemas/commands";
+import type { TraceProcessingEvent } from "./pipelines/trace-processing/schemas/events";
 import { createCustomEvaluationSyncHandler } from "./pipelines/trace-processing/subscribers/customEvaluationSync.subscriber";
 import { createEvaluationTriggerSubscriber } from "./pipelines/trace-processing/subscribers/evaluationTrigger.subscriber";
 import { createExperimentMetricsSyncHandler } from "./pipelines/trace-processing/subscribers/experimentMetricsSync.subscriber";
@@ -202,16 +204,14 @@ import { createSimulationMetricsSyncHandler } from "./pipelines/trace-processing
 import { createSpanStorageBroadcastHandler } from "./pipelines/trace-processing/subscribers/spanStorageBroadcast.subscriber";
 import { createTraceUpdateBroadcastHandler } from "./pipelines/trace-processing/subscribers/traceUpdateBroadcast.subscriber";
 import { createTrackedEventSyncHandler } from "./pipelines/trace-processing/subscribers/trackedEventSync.subscriber";
-import type { ResolveOriginCommandData } from "./pipelines/trace-processing/schemas/commands";
-import type { TraceProcessingEvent } from "./pipelines/trace-processing/schemas/events";
 import type { ProcessStore } from "./process-manager";
-import { throttledWindow } from "./reactors/throttleWindow";
 import type { FoldProjectionStore } from "./projections/foldProjection.types";
 import type { AppendStore } from "./projections/mapProjection.types";
 import { RedisCachedFoldStore } from "./projections/redisCachedFoldStore";
 import { RepositoryFoldStore } from "./projections/repositoryFoldStore";
 import type { StateProjectionStore } from "./projections/stateProjection.types";
 import { BlobSweeper } from "./queues/groupQueue/blobSweeper";
+import { throttledWindow } from "./reactors/throttleWindow";
 import {
   generateKillSwitchKey,
   type KillSwitchComponentType,

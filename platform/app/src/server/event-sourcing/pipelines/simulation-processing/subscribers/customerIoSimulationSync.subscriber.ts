@@ -6,13 +6,13 @@ import {
 } from "../../../../../utils/posthogErrorCapture";
 import type { ProjectService } from "../../../../app-layer/projects/project.service";
 import type { SubscriberSpec } from "../../../pipeline/processManagerDefinition";
+import { CIO_SYNC_DEBOUNCE_TTL_MS } from "../../trace-processing/subscribers/customerIoTraceSync.subscriber";
 import { SIMULATION_RUN_EVENT_TYPES } from "../schemas/constants";
 import type {
   SimulationProcessingEvent,
   SimulationRunFinishedEvent,
 } from "../schemas/events";
 import { isSimulationRunFinishedEvent } from "../schemas/events";
-import { CIO_SYNC_DEBOUNCE_TTL_MS } from "../../trace-processing/subscribers/customerIoTraceSync.subscriber";
 
 const logger = createLogger(
   "langwatch:simulation-processing:customer-io-simulation-sync-subscriber",

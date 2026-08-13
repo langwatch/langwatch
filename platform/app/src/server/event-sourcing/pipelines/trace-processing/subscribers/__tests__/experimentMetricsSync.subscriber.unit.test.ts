@@ -8,8 +8,8 @@ import {
 import type { SpanReceivedEvent } from "../../schemas/events";
 import {
   createExperimentMetricsSyncHandler,
-  hasExperimentCostMetrics,
   type ExperimentMetricsSyncSubscriberDeps,
+  hasExperimentCostMetrics,
 } from "../experimentMetricsSync.subscriber";
 
 const TEST_TENANT_ID = createTenantId("tenant-1");

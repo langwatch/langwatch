@@ -1,14 +1,8 @@
 import { definePipeline } from "../..";
+import type { TriggerContext } from "../../pipeline/processManagerDefinition";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
 import type { AppendStore } from "../../projections/mapProjection.types";
-import type { TriggerContext } from "../../pipeline/processManagerDefinition";
 import { throttledWindow } from "../../reactors/throttleWindow";
-import {
-  PULL_REQUEST_MAPPING_WINDOW_MS,
-  pullRequestMappingGroupKey,
-  pullRequestMappingJobId,
-  shouldMapPullRequests,
-} from "./subscribers/pullRequestMapping.subscriber";
 import { ContributeLogFactsCommand } from "./commands/contributeLogFactsCommand";
 import { ContributeMetricFactsCommand } from "./commands/contributeMetricFactsCommand";
 import { ContributeSpanFactsCommand } from "./commands/contributeSpanFactsCommand";
@@ -30,6 +24,12 @@ import {
 } from "./projections/sessionMetricSeries.mapProjection";
 import { CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH } from "./schemas/constants";
 import type { CodingAgentProcessingEvent } from "./schemas/events";
+import {
+  PULL_REQUEST_MAPPING_WINDOW_MS,
+  pullRequestMappingGroupKey,
+  pullRequestMappingJobId,
+  shouldMapPullRequests,
+} from "./subscribers/pullRequestMapping.subscriber";
 
 export interface CodingAgentProcessingPipelineDeps {
   /** Redis-cached at registration — see the fold store's no-read-back note. */

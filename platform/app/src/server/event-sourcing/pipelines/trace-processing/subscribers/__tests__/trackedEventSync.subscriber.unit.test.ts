@@ -9,8 +9,8 @@ import type {
 import type { OtlpSpan } from "../../schemas/otlp";
 import {
   createTrackedEventSyncHandler,
-  hasSyncableFeedback,
   extractTrackedEventsFromSpan,
+  hasSyncableFeedback,
   type TrackedEventSyncSubscriberDeps,
 } from "../trackedEventSync.subscriber";
 

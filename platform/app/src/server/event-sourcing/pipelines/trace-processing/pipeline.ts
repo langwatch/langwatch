@@ -58,8 +58,8 @@ import {
   hasSyncableEvaluations,
 } from "./subscribers/customEvaluationSync.subscriber";
 import {
-  createCustomerIoTraceSyncSubscriber,
   type CustomerIoTraceSyncSubscriberDeps,
+  createCustomerIoTraceSyncSubscriber,
 } from "./subscribers/customerIoTraceSync.subscriber";
 import {
   EXPERIMENT_METRICS_SYNC_DEDUP_TTL_MS,

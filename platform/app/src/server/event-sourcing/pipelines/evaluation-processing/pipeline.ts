@@ -28,8 +28,8 @@ import {
 } from "./schemas/constants";
 import type { EvaluationProcessingEvent } from "./schemas/events";
 import {
-  createCustomerIoEvaluationSyncSubscriber,
   type CustomerIoEvaluationSyncSubscriberDeps,
+  createCustomerIoEvaluationSyncSubscriber,
 } from "./subscribers/customerIoEvaluationSync.subscriber";
 
 export interface EvaluationProcessingPipelineDeps {
