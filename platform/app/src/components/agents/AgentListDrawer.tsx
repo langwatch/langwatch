@@ -32,13 +32,14 @@ import {
 } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TypedAgent } from "~/server/agents/agent.repository";
+import type { AgentWithFields } from "~/server/agents/agent-fields";
 import { api } from "~/utils/api";
 
 export type AgentListDrawerProps = {
   open?: boolean;
   onClose?: () => void;
-  onSelect?: (agent: TypedAgent) => void;
-  onEdit?: (agent: TypedAgent) => void;
+  onSelect?: (agent: AgentWithFields) => void;
+  onEdit?: (agent: AgentWithFields) => void;
   onCreateNew?: () => void;
 };
 
@@ -115,12 +116,12 @@ export function AgentListDrawer(props: AgentListDrawerProps) {
     },
   });
 
-  const handleSelectAgent = (agent: TypedAgent) => {
+  const handleSelectAgent = (agent: AgentWithFields) => {
     onSelect?.(agent);
     onClose();
   };
 
-  const handleEditAgent = (agent: TypedAgent) => {
+  const handleEditAgent = (agent: AgentWithFields) => {
     if (onEdit) {
       onEdit(agent);
       return;

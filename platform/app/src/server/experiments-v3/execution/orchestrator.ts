@@ -69,7 +69,10 @@ import {
   type ExecutionSummary,
   UNNAMED_FAILURE,
 } from "./types";
-import { buildCellWorkflow } from "./workflowBuilder";
+import {
+  buildCellWorkflow,
+  buildEvaluatorCellWorkflow,
+} from "./workflowBuilder";
 
 const logger = createLogger("experiments-v3:orchestrator");
 
@@ -1024,6 +1027,153 @@ export const priceMetrics = async (
   return estimateCost({ llmModelCost, inputTokens, outputTokens });
 };
 
+/** What every evaluator of a cell is dispatched against. */
+type CellEvaluatorContext = {
+  cell: ExecutionCell;
+  projectId: string;
+  workflow: Workflow;
+  targetOutput: Record<string, unknown>;
+  traceId: string;
+  targetNodes: Set<string>;
+  config: ResultMapperConfig;
+  isAborted?: () => Promise<boolean>;
+};
+
+/**
+ * Dispatches one evaluator and yields whatever the engine reports back.
+ *
+ * The engine's events are collected before any of them is yielded, so a
+ * dispatch that throws part-way through emits nothing and the caller reports a
+ * single error cell instead of a half-written result.
+ */
+async function* runOneCellEvaluator({
+  evaluatorId,
+  evaluatorNodeId,
+  cell,
+  projectId,
+  workflow,
+  targetOutput,
+  traceId,
+  targetNodes,
+  config,
+  isAborted,
+}: CellEvaluatorContext & {
+  evaluatorId: string;
+  evaluatorNodeId: string;
+}): AsyncGenerator<EvaluationV3Event> {
+  const evaluatorInputs = buildEvaluatorInputs(cell, evaluatorId, targetOutput);
+
+  const evaluatorEvent = {
+    type: "execute_component" as const,
+    payload: {
+      trace_id: traceId,
+      workflow: {
+        ...workflow,
+        state: { execution: { status: "idle" as const } },
+      },
+      node_id: evaluatorNodeId,
+      inputs: evaluatorInputs,
+      origin: "evaluation",
+    },
+  };
+
+  const evaluatorEvents: StudioServerEvent[] = [];
+  await studioBackendPostEvent({
+    projectId,
+    message: await addEnvs(evaluatorEvent, projectId),
+    isAborted,
+    onEvent: (serverEvent) => {
+      evaluatorEvents.push(serverEvent);
+    },
+  });
+
+  for (const event of evaluatorEvents) {
+    const mappedEvent = mapNlpEvent({
+      event,
+      rowIndex: cell.rowIndex,
+      targetNodes,
+      config,
+      evaluatorInputs,
+    });
+    if (mappedEvent) {
+      yield mappedEvent;
+    }
+  }
+}
+
+/** The error cell an evaluator that could not run reports for itself. */
+const evaluatorErrorResult = ({
+  cell,
+  evaluatorId,
+  error,
+}: {
+  cell: ExecutionCell;
+  evaluatorId: string;
+  error: unknown;
+}): EvaluationV3Event => ({
+  type: "evaluator_result",
+  rowIndex: cell.rowIndex,
+  targetId: cell.targetId,
+  evaluatorId,
+  result: {
+    status: "error",
+    error_type: "EvaluatorError",
+    details:
+      error instanceof Error ? error.message : "Evaluator execution failed",
+    traceback: [],
+    ...(HandledError.isHandled(error)
+      ? { domainError: error.serialize() }
+      : {}),
+  },
+});
+
+/**
+ * Dispatches a cell's grading evaluators against the target's output.
+ *
+ * Shared by both executors. A prompt or component target runs as one node of a
+ * mini-workflow; a workflow target runs its whole Studio graph. Either way the
+ * evaluators attached to the column are the same evaluators, dispatched one at
+ * a time with explicit inputs, so this is all the two have in common and all
+ * they need to share.
+ *
+ * One evaluator failing does not stop the rest: each reports its own error
+ * cell, and the target's own result is already yielded by the time this runs.
+ */
+async function* runCellEvaluators({
+  evaluatorNodeIds,
+  ...context
+}: CellEvaluatorContext & {
+  evaluatorNodeIds: Record<string, string>;
+}): AsyncGenerator<EvaluationV3Event> {
+  const { cell, isAborted } = context;
+
+  for (const [evaluatorId, evaluatorNodeId] of Object.entries(
+    evaluatorNodeIds,
+  )) {
+    if (isAborted && (await isAborted())) {
+      logger.debug(
+        { cell: cell.rowIndex, evaluatorId },
+        "Cell aborted before evaluator execution",
+      );
+      return;
+    }
+    try {
+      yield* runOneCellEvaluator({ ...context, evaluatorId, evaluatorNodeId });
+    } catch (evalError) {
+      logger.warn(
+        {
+          error: evalError,
+          evaluatorId,
+          rowIndex: cell.rowIndex,
+          targetId: cell.targetId,
+        },
+        "Evaluator execution failed",
+      );
+      yield evaluatorErrorResult({ cell, evaluatorId, error: evalError });
+    }
+  }
+}
+
 /**
  * Executes a single cell and yields events.
  * @param isAborted - Optional function to check if execution should be aborted
@@ -1188,101 +1338,17 @@ export async function* executeCell(
       targetOutput &&
       Object.keys(evaluatorNodeIds).length > 0
     ) {
-      for (const [evaluatorId, evaluatorNodeId] of Object.entries(
+      yield* runCellEvaluators({
+        cell,
+        projectId,
+        workflow,
         evaluatorNodeIds,
-      )) {
-        // Check abort before each evaluator
-        if (isAborted && (await isAborted())) {
-          logger.debug(
-            { cell: cell.rowIndex, evaluatorId },
-            "Cell aborted before evaluator execution",
-          );
-          return;
-        }
-        try {
-          // Build evaluator inputs from target output and dataset
-          const evaluatorInputs = buildEvaluatorInputs(
-            cell,
-            evaluatorId,
-            targetOutput,
-          );
-
-          // Create execute_component event for evaluator
-          const evaluatorEvent = {
-            type: "execute_component" as const,
-            payload: {
-              trace_id: traceId,
-              workflow: {
-                ...workflow,
-                state: { execution: { status: "idle" as const } },
-              },
-              node_id: evaluatorNodeId,
-              inputs: evaluatorInputs,
-              origin: "evaluation",
-            },
-          };
-
-          // Add environment variables
-          const enrichedEvaluatorEvent = await addEnvs(
-            evaluatorEvent,
-            projectId,
-          );
-
-          // Execute evaluator
-          const evaluatorEvents: StudioServerEvent[] = [];
-          await studioBackendPostEvent({
-            projectId,
-            message: enrichedEvaluatorEvent,
-            isAborted,
-            onEvent: (serverEvent) => {
-              evaluatorEvents.push(serverEvent);
-            },
-          });
-
-          // Map and yield evaluator events
-          for (const event of evaluatorEvents) {
-            const mappedEvent = mapNlpEvent({
-              event,
-              rowIndex: cell.rowIndex,
-              targetNodes,
-              config: cellConfig,
-              evaluatorInputs,
-            });
-            if (mappedEvent) {
-              yield mappedEvent;
-            }
-          }
-        } catch (evalError) {
-          // Yield error for this evaluator but continue with others
-          logger.warn(
-            {
-              error: evalError,
-              evaluatorId,
-              rowIndex: cell.rowIndex,
-              targetId: cell.targetId,
-            },
-            "Evaluator execution failed",
-          );
-          yield {
-            type: "evaluator_result",
-            rowIndex: cell.rowIndex,
-            targetId: cell.targetId,
-            evaluatorId,
-            result: {
-              status: "error",
-              error_type: "EvaluatorError",
-              details:
-                evalError instanceof Error
-                  ? evalError.message
-                  : "Evaluator execution failed",
-              traceback: [],
-              ...(HandledError.isHandled(evalError)
-                ? { domainError: evalError.serialize() }
-                : {}),
-            },
-          };
-        }
-      }
+        targetOutput,
+        traceId,
+        targetNodes,
+        config: cellConfig,
+        isAborted,
+      });
     }
   } catch (error) {
     logger.error(
@@ -1306,12 +1372,23 @@ export async function* executeCell(
  * evaluator result. This replaces the legacy nlpgo execute_evaluation loop,
  * keeping orchestration (parallelism, abort, storage) in TypeScript.
  */
-export async function* executeWorkflowCell(
-  cell: ExecutionCell,
-  projectId: string,
-  workflowDsl: Workflow,
-  isAborted?: () => Promise<boolean>,
-): AsyncGenerator<EvaluationV3Event> {
+export async function* executeWorkflowCell({
+  cell,
+  projectId,
+  workflowDsl,
+  datasetColumns = [],
+  loadedEvaluators,
+  resultMapperConfig,
+  isAborted,
+}: {
+  cell: ExecutionCell;
+  projectId: string;
+  workflowDsl: Workflow;
+  datasetColumns?: Array<{ id: string; name: string; type: string }>;
+  loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>;
+  resultMapperConfig?: ResultMapperConfig;
+  isAborted?: () => Promise<boolean>;
+}): AsyncGenerator<EvaluationV3Event> {
   yield {
     type: "cell_started",
     rowIndex: cell.rowIndex,
@@ -1363,6 +1440,12 @@ export async function* executeWorkflowCell(
     });
 
     let targetOutput: unknown;
+    /**
+     * The end node's results as a record, before extractTargetOutput unwraps a
+     * lone "output" into a bare value. This is what an evaluator maps against,
+     * so a mapping to any other result — "chunks", "citations" — still resolves.
+     */
+    let targetOutputRecord: Record<string, unknown> | undefined;
     let totalCost = 0;
     let sawCost = false;
     let targetFailed = false;
@@ -1387,6 +1470,7 @@ export async function* executeWorkflowCell(
         const ex = event.payload.execution_state;
         if (ex?.result !== undefined) {
           targetOutput = extractTargetOutput(ex.result);
+          targetOutputRecord = ex.result;
         }
         if (ex?.trace_id) finalTraceId = ex.trace_id;
         if (
@@ -1482,6 +1566,34 @@ export async function* executeWorkflowCell(
 
     for (const evaluatorEvent of evaluatorEvents) {
       yield evaluatorEvent;
+    }
+
+    // The evaluators attached to this column in the workbench, which are not
+    // part of the workflow and so did not run with it. Only reached when the
+    // workflow produced a result: grading a row that never produced one would
+    // score the absence of an answer rather than an answer.
+    if (
+      !targetFailed &&
+      targetOutputRecord &&
+      cell.evaluatorConfigs.length > 0
+    ) {
+      const { workflow, evaluatorNodeIds } = buildEvaluatorCellWorkflow({
+        projectId,
+        cell,
+        datasetColumns,
+        loadedEvaluators,
+      });
+      yield* runCellEvaluators({
+        cell,
+        projectId,
+        workflow,
+        evaluatorNodeIds,
+        targetOutput: targetOutputRecord,
+        traceId: finalTraceId,
+        targetNodes: new Set([cell.targetId]),
+        config: resultMapperConfig ?? {},
+        isAborted,
+      });
     }
   } catch (error) {
     logger.error(
@@ -2329,12 +2441,15 @@ export async function* runOrchestrator(
               !!loadedData.workflow;
 
             const cellEvents = runsAsWorkflow
-              ? executeWorkflowCell(
+              ? executeWorkflowCell({
                   cell,
                   projectId,
-                  loadedData.workflow!.dsl,
-                  checkAbort,
-                )
+                  workflowDsl: loadedData.workflow!.dsl,
+                  datasetColumns,
+                  loadedEvaluators,
+                  resultMapperConfig,
+                  isAborted: checkAbort,
+                })
               : executeCell(
                   cell,
                   projectId,

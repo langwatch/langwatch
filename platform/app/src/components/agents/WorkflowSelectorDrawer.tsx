@@ -29,7 +29,7 @@ import { EmojiPickerModal } from "~/optimization_studio/components/properties/mo
 import { getRandomWorkflowIcon } from "~/optimization_studio/components/workflow/NewWorkflowForm";
 import { blankTemplate } from "~/optimization_studio/templates/blank";
 import type { Workflow } from "~/optimization_studio/types/dsl";
-import type { TypedAgent } from "~/server/agents/agent.repository";
+import type { AgentWithFields } from "~/server/agents/agent-fields";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { trackEvent } from "~/utils/tracking";
@@ -37,7 +37,7 @@ import { trackEvent } from "~/utils/tracking";
 export type WorkflowSelectorDrawerProps = {
   open?: boolean;
   onClose?: () => void;
-  onSave?: (agent: TypedAgent) => void;
+  onSave?: (agent: AgentWithFields) => void;
   /** Name for the new agent (optional, prompts if not provided) */
   agentName?: string;
 };
