@@ -189,7 +189,13 @@ describe("the governed chart on a page that forbids string evaluation", () => {
 
           render(
             <ChakraProvider value={defaultSystem}>
-              <GovernedSqlChartMode result={RESULT} />
+              {/* Nothing here edits the specification, so the owner's half of
+                  that state is a starter this test never changes. */}
+              <GovernedSqlChartMode
+                result={RESULT}
+                editedSpecText={null}
+                onEditedSpecTextChange={() => undefined}
+              />
             </ChakraProvider>,
           );
           drawn = await poll(() => bars().length === RESULT.rows.length);

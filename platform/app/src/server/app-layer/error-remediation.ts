@@ -61,6 +61,13 @@ const registry = {
       "Request fewer attribute/metadata fields",
     ],
   },
+  query_scan_limit_exceeded: {
+    tips: [
+      "Narrow the time range so fewer partitions are read",
+      "Add filters to reduce the amount of data scanned",
+      "Aggregate in the query rather than reading raw rows",
+    ],
+  },
   filter_parse_error: {
     tips: [
       "Check the filter syntax near the indicated position — filters are field:value pairs combined with AND/OR",

@@ -65,6 +65,14 @@ Feature: Saved governed SQL workbench charts — the persistence model and its w
     Then it is refused
     And nothing is silently reinterpreted as the current version
 
+  @unit
+  Scenario: A definition larger than the stored ceilings is refused
+    Given a definition whose SQL, parameter count or parameter value exceeds what is stored
+    When it is read as a saved workbench chart definition
+    Then it is refused for being too big
+    And the SQL ceiling is the same one the governed query endpoints enforce, so a
+      statement the workbench will run is always one it can save
+
   # ---------------------------------------------------------------------------
   # The write choke point — both governors run on the way in
   # ---------------------------------------------------------------------------
@@ -129,6 +137,14 @@ Feature: Saved governed SQL workbench charts — the persistence model and its w
     When the member reads it as a saved workbench chart
     Then it is not found
     And the builder chart is left untouched
+
+  @integration
+  Scenario: A saved workbench chart is not readable as a builder chart
+    Given the project has a saved workbench chart and an existing builder chart
+    When a chart-builder read path looks the saved chart up by its id
+    Then it is not found
+    And it is not named among the builder charts that were found
+    And the builder chart alongside it is still found
 
   @integration
   Scenario: A stored definition that no longer matches the schema is named, not returned as data
@@ -220,6 +236,14 @@ Feature: Saved governed SQL workbench charts — the persistence model and its w
     Then the editor holds the saved SQL
     And the parameter editor holds the saved values
     And the specification editor holds the saved specification
+
+  @integration
+  Scenario: Save as a new chart leaves the one that was open alone
+    Given the member has opened a saved chart and changed what is on screen
+    When they choose to save it as a new chart
+    Then a second chart is created under the name they give it
+    And it becomes the one Save now writes to
+    And the chart they opened keeps what was saved in it
 
   @integration
   Scenario: A saved chart can be renamed or deleted from the list
@@ -342,15 +366,17 @@ Feature: Saved governed SQL workbench charts — the persistence model and its w
 # AC "extend CustomGraph with a discriminator rather than adding a parallel table"
 #   → Scenario: A saved chart is listed among the project's workbench charts
 #   → Scenario: A builder chart is not readable as a workbench chart
+#   → Scenario: A saved workbench chart is not readable as a builder chart
 #   (the discriminator's whole observable job is that the two kinds do not see
-#   each other; the model decision itself is verified in the PR diff and the
-#   migration)
+#   each other, in BOTH directions; the model decision itself is verified in the
+#   PR diff and the migration)
 # AC "the definition JSON holds { sql, parameters, vegaLiteSpec }, Zod-validated,
 #    versioned"
 #   → Scenario: A saved definition carries the query, its parameter values and its specification
 #   → Scenario: A chart saved without a hand-authored specification is the same record
 #   → Scenario: A parameter value that is not a scalar is refused
 #   → Scenario: A definition written in an unknown version is refused rather than guessed at
+#   → Scenario: A definition larger than the stored ceilings is refused
 # AC "service is the validation and governance choke point — the only write path"
 #   → Scenario: A specification the chart policy refuses never reaches the database
 #   → Scenario: SQL the governed validator refuses never reaches the database
@@ -382,6 +408,7 @@ Feature: Saved governed SQL workbench charts — the persistence model and its w
 # AC "tRPC router — save, list, open, update, delete"
 #   → Scenario: Save stores what is on screen, and saves again into the same chart
 #   → Scenario: Open restores a saved chart's query, parameters and specification
+#   → Scenario: Save as a new chart leaves the one that was open alone
 #   → Scenario: A saved chart can be renamed or deleted from the list
 #   → Scenario: Every procedure answers only for the project in the request
 # AC "the surface stays behind the experimental switch, evaluated server-side"

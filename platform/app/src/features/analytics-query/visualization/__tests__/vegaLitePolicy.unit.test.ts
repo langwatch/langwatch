@@ -310,6 +310,54 @@ describe("the governed Vega-Lite policy", () => {
         }
       });
 
+      /** @scenario "Unknown transforms and expression features fail closed" */
+      it("screens every expression-bearing key, wherever the evaluator reads one", () => {
+        // Each of these is handed to the same evaluator as a `calculate`, so
+        // each has to be screened by it. A key left off the screened set is not
+        // a weaker refusal — it is an unscreened expression.
+        const sites: [string, Record<string, unknown>][] = [
+          [
+            "/encoding/x/axis/labelExpr",
+            {
+              encoding: {
+                x: {
+                  field: "model",
+                  type: "nominal",
+                  axis: { labelExpr: "warn(datum.label)" },
+                },
+              },
+            },
+          ],
+          [
+            "/encoding/color/legend/labelExpr",
+            {
+              encoding: {
+                color: {
+                  field: "model",
+                  type: "nominal",
+                  legend: { labelExpr: "windowSize()[0]" },
+                },
+              },
+            },
+          ],
+          [
+            "/transform/0/calculate",
+            { transform: [{ calculate: "now()", as: "c" }] },
+          ],
+        ];
+
+        for (const [path, extra] of sites) {
+          const errors = refusals(bar(extra));
+          expect(
+            errors.some(
+              (error) =>
+                error.rule === "expression.forbidden" && error.path === path,
+            ),
+            `${path} was not screened`,
+          ).toBe(true);
+        }
+      });
+
       it("admits every allowlisted transform", () => {
         for (const admitted of [
           { filter: "datum.total > 1" },

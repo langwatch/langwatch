@@ -37,6 +37,22 @@ const PROJECT = {
   governedSqlKey: "sk-lw-governed-sql-service-unit-test-key",
 };
 
+/**
+ * The same project as it comes off Prisma: carrying `apiKey` beside the
+ * governed secret.
+ *
+ * Its own fixture because `GovernedSqlCaller` names only the two fields the
+ * service needs, and the decoupling claim is precisely that the extra one is
+ * never reached for — a fixture without it could not tell the difference.
+ */
+const PROJECT_WITH_API_KEY = {
+  ...PROJECT,
+  apiKey: "sk-lw-project-api-key-service-unit-test",
+};
+
+/** A project whose `governedSqlKey` was never selected. */
+const PROJECT_WITHOUT_GOVERNED_KEY = { ...PROJECT, governedSqlKey: "" };
+
 /** Everything visible: the caller the gate is measured against. */
 const FULLY_PERMITTED: Protections = {
   canSeeCapturedInput: true,
@@ -157,6 +173,36 @@ describe("given the governed SQL service", () => {
       // database; a capability that merely contained it would be a leak.
       expect(executor.calls[0]!.tenantCapability).not.toContain(
         PROJECT.governedSqlKey,
+      );
+    });
+
+    /**
+     * The control behind the decoupling: the capability names a *tenant*, and
+     * `Project.apiKey` is a credential that rotates on its own schedule. Both
+     * digests are written out, so swapping which field the service hashes turns
+     * this red — a test that only checked "some digest was sent" would pass
+     * either way, and the failure in production is silent (every governed read
+     * returns zero rows, which reads as a tenant with no data).
+     */
+    it("derives the capability from the governed SQL key, never from the project's API key", async () => {
+      const executor = recordingExecutor();
+
+      await serviceWith(executor).execute({
+        project: PROJECT_WITH_API_KEY,
+        protections: FULLY_PERMITTED,
+        sql: "SELECT count() FROM analytics.traces",
+      });
+
+      expect(executor.calls[0]!.tenantCapability).toBe(
+        "fc9673013bca53b035b608d7d0179f7998f313061274826407da7c49010d6ccd",
+      );
+      // sha256 of PROJECT_WITH_API_KEY.apiKey — what the key map would have to
+      // hold instead, and what no governed query may ever present.
+      expect(executor.calls[0]!.tenantCapability).not.toBe(
+        "725346695d40d416f268694ccc9481c4dc7285693e36226bca84c1b5dade1bd6",
+      );
+      expect(executor.calls[0]!.tenantCapability).not.toContain(
+        PROJECT_WITH_API_KEY.apiKey,
       );
     });
 
@@ -643,6 +689,36 @@ describe("given the governed SQL service", () => {
         serviceWith(null).describeSchema({ protections: FULLY_PERMITTED })
           .datasets,
       ).toHaveLength(GOVERNED_VIEW_CATALOG.length);
+    });
+  });
+
+  describe("when the project carries no governed SQL key", () => {
+    /**
+     * The shape this catches is a caller that forgot `governedSqlKey` in its
+     * Prisma select. Hashing the empty value produces a valid digest matching
+     * no key-map row, so the query would run and return zero rows — which is
+     * indistinguishable from a tenant with no data, and stays that way until
+     * someone asks why the numbers are missing.
+     *
+     * A plain `Error`, not a handled one: nothing the caller of the API did
+     * causes it and nothing they can do fixes it (ADR-045).
+     */
+    it("fails loudly instead of hashing an empty secret into a digest that matches nothing", async () => {
+      const executor = recordingExecutor();
+
+      await expect(
+        serviceWith(executor).execute({
+          project: PROJECT_WITHOUT_GOVERNED_KEY,
+          protections: FULLY_PERMITTED,
+          sql: "SELECT count() FROM analytics.traces",
+        }),
+      ).rejects.toThrow(
+        "governed tenant capability requires a non-empty secret",
+      );
+
+      // Nothing reached the database: the refusal is before execution, not a
+      // query that ran and quietly answered nothing.
+      expect(executor.calls).toHaveLength(0);
     });
   });
 });

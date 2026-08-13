@@ -3,8 +3,11 @@
  *
  * Thin by design. Every procedure does the same four things and nothing else:
  * check the member may do this, check the surface is switched on, resolve who
- * is asking, and hand the request to the service. The service is where a chart
- * is decided to be savable, and a second opinion at this layer could only ever
+ * is asking, and hand the request to the service. The first two are declared
+ * rather than written out — `checkProjectPermission` and
+ * `enforceWorkbenchEnabled` are chained onto every procedure, so a sixth one
+ * cannot be added with either quietly missing. The service is where a chart is
+ * decided to be savable, and a second opinion at this layer could only ever
  * disagree with it.
  *
  * ## Why `definition` is `unknown` here
@@ -21,15 +24,14 @@
  */
 
 import { z } from "zod";
-import type { PrismaClient } from "~/generated/prisma/client";
 
-import { GovernedSqlNotEnabledError } from "~/server/analytics/governed-sql/errors";
 import { SavedWorkbenchChartService } from "~/server/analytics/saved-workbench-charts/savedWorkbenchChart.service";
-import { workbenchEnabled } from "~/server/analytics/workbenchFeatureGate";
 
 import { checkProjectPermission } from "../../rbac";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 import { getUserProtectionsForProject } from "../../utils";
+
+import { enforceWorkbenchEnabled } from "./workbenchAccessMiddleware";
 
 const projectScopeSchema = z.object({ projectId: z.string() });
 const chartScopeSchema = projectScopeSchema.extend({ id: z.string() });
@@ -37,37 +39,12 @@ const chartScopeSchema = projectScopeSchema.extend({ id: z.string() });
 /** Request shape only — length, not meaning. */
 const nameSchema = z.string().min(1).max(200);
 
-/**
- * Refuses unless the workbench switch is on for this member and project.
- *
- * Every procedure calls it, including the reads: a surface that listed charts
- * while it was switched off would be announcing a feature the same member
- * cannot use, and the flag is meant to hide the whole thing.
- */
-async function requireWorkbenchEnabled({
-  userId,
-  projectId,
-  prisma,
-}: {
-  userId: string;
-  projectId: string;
-  prisma: PrismaClient;
-}): Promise<void> {
-  if (!(await workbenchEnabled({ userId, projectId, prisma }))) {
-    throw new GovernedSqlNotEnabledError();
-  }
-}
-
 /** Every saved workbench chart in the project. */
 const getAll = protectedProcedure
   .input(projectScopeSchema)
   .use(checkProjectPermission("analytics:view"))
+  .use(enforceWorkbenchEnabled)
   .query(async ({ ctx, input }) => {
-    await requireWorkbenchEnabled({
-      userId: ctx.session.user.id,
-      projectId: input.projectId,
-      prisma: ctx.prisma,
-    });
     return await SavedWorkbenchChartService.create(ctx.prisma).getAll({
       projectId: input.projectId,
     });
@@ -77,12 +54,8 @@ const getAll = protectedProcedure
 const getById = protectedProcedure
   .input(chartScopeSchema)
   .use(checkProjectPermission("analytics:view"))
+  .use(enforceWorkbenchEnabled)
   .query(async ({ ctx, input }) => {
-    await requireWorkbenchEnabled({
-      userId: ctx.session.user.id,
-      projectId: input.projectId,
-      prisma: ctx.prisma,
-    });
     return await SavedWorkbenchChartService.create(ctx.prisma).getById({
       id: input.id,
       projectId: input.projectId,
@@ -106,12 +79,8 @@ const create = protectedProcedure
     }),
   )
   .use(checkProjectPermission("analytics:create"))
+  .use(enforceWorkbenchEnabled)
   .mutation(async ({ ctx, input }) => {
-    await requireWorkbenchEnabled({
-      userId: ctx.session.user.id,
-      projectId: input.projectId,
-      prisma: ctx.prisma,
-    });
     return await SavedWorkbenchChartService.create(ctx.prisma).createChart({
       projectId: input.projectId,
       protections: await getUserProtectionsForProject(ctx, {
@@ -136,12 +105,8 @@ const update = protectedProcedure
     }),
   )
   .use(checkProjectPermission("analytics:update"))
+  .use(enforceWorkbenchEnabled)
   .mutation(async ({ ctx, input }) => {
-    await requireWorkbenchEnabled({
-      userId: ctx.session.user.id,
-      projectId: input.projectId,
-      prisma: ctx.prisma,
-    });
     return await SavedWorkbenchChartService.create(ctx.prisma).updateChart({
       id: input.id,
       projectId: input.projectId,
@@ -160,12 +125,8 @@ const update = protectedProcedure
 const deleteChart = protectedProcedure
   .input(chartScopeSchema)
   .use(checkProjectPermission("analytics:delete"))
+  .use(enforceWorkbenchEnabled)
   .mutation(async ({ ctx, input }) => {
-    await requireWorkbenchEnabled({
-      userId: ctx.session.user.id,
-      projectId: input.projectId,
-      prisma: ctx.prisma,
-    });
     await SavedWorkbenchChartService.create(ctx.prisma).deleteChart({
       id: input.id,
       projectId: input.projectId,

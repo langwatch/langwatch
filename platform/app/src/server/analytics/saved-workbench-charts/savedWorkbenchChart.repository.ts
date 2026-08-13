@@ -21,7 +21,7 @@ import type {
   PrismaClient,
 } from "~/generated/prisma/client";
 
-import { WORKBENCH_SQL_CHART_KIND } from "./workbenchChartDefinition";
+import { WORKBENCH_SQL_CHART_KIND } from "../chartKinds";
 
 export type CreateSavedWorkbenchChartInput = {
   id: string;

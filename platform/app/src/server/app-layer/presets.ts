@@ -10,6 +10,7 @@ import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
 import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import { createLogger } from "@langwatch/observability";
 import { env } from "~/env.mjs";
+import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
 import { ClickHouseAnalyticsService } from "~/server/analytics/clickhouse/clickhouse-analytics.service";
 import { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
 import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
@@ -1037,13 +1038,25 @@ export function initializeDefaultApp(options?: {
             loadReportCharts: ({ projectId, source, from, to }) =>
               loadReportCharts({
                 deps: {
+                  // Both reads are scoped to builder charts: a scheduled
+                  // report renders each one through `getTimeseries`, which
+                  // needs the series a builder payload carries and a saved
+                  // workbench chart's definition does not have.
                   loadCustomGraph: ({ projectId, customGraphId }) =>
                     prisma.customGraph.findFirst({
-                      where: { id: customGraphId, projectId },
+                      where: {
+                        id: customGraphId,
+                        projectId,
+                        kind: BUILDER_CHART_KIND,
+                      },
                     }),
                   loadDashboardGraphs: ({ projectId, dashboardId }) =>
                     prisma.customGraph.findMany({
-                      where: { dashboardId, projectId },
+                      where: {
+                        dashboardId,
+                        projectId,
+                        kind: BUILDER_CHART_KIND,
+                      },
                       orderBy: [{ gridRow: "asc" }, { gridColumn: "asc" }],
                     }),
                   getTimeseries: (input) =>

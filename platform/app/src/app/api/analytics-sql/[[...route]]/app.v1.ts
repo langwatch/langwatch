@@ -35,6 +35,7 @@ import {
   GOVERNED_SQL_CLEAN_DIAGNOSTICS_MEANING,
   GOVERNED_SQL_DIAGNOSTIC_CODES,
   getGovernedSqlService,
+  MAX_GOVERNED_SQL_LENGTH,
 } from "~/server/analytics/governed-sql";
 import { type createProjectApp, requires } from "~/server/api/security";
 import { getProtectionsForProject } from "~/server/api/utils";
@@ -44,16 +45,6 @@ import { baseResponses } from "../../shared/base-responses";
 import { governedSqlProject } from "./routeGuards";
 
 const logger = createLogger("langwatch:api:analytics-sql");
-
-/**
- * Longest statement the endpoint accepts.
- *
- * A request-shape ceiling rather than a cost one — the cost ceilings are pinned
- * server-side by the settings profile. It exists so that pathological input is
- * refused before it reaches a parser fed attacker-controlled text, and it sits
- * far above any query the issue's analytical shapes produce.
- */
-const MAX_SQL_LENGTH = 50_000;
 
 /**
  * A bound parameter's value.
@@ -72,7 +63,7 @@ const governedSqlQuerySchema = z.object({
   // Deliberately not `.trim()`: the statement the database runs must be the one
   // that was submitted, and normalising it here — however harmlessly — is the
   // first step of the rewriting this API promises never to do.
-  sql: z.string().min(1).max(MAX_SQL_LENGTH),
+  sql: z.string().min(1).max(MAX_GOVERNED_SQL_LENGTH),
   parameters: z.record(z.string(), parameterValueSchema).optional(),
   /**
    * The period this caller is reporting over.
@@ -101,9 +92,12 @@ const governedSqlResultSchema = z.object({
     rowsReturned: z.number(),
   }),
   truncated: z.boolean(),
-  // Whether the statement declared the reserved time-window parameters, so a
-  // consumer placing this result beside another can say which of them follows
-  // the period it is showing.
+  // Whether the statement DECLARED the reserved time-window parameters and was
+  // therefore given the surface's window. It is not a claim about the rows: the
+  // author writes the comparison, so a statement that declares the names and
+  // never compares against them reports `true` and still reads all of time.
+  // What a consumer can say from it is that this result was offered the period
+  // beside it, not that the period bounded it.
   followsTimeWindow: z.boolean(),
   diagnostics: z.array(
     z.object({

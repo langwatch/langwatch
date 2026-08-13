@@ -16,6 +16,14 @@
  *     allowed and runs unchanged; it is reported as not following the period,
  *     not refused. An all-time total is a legitimate chart.
  *
+ * Two platform mechanisms were considered for this instead of bound parameters
+ * and rejected, recorded so the question is not reopened from scratch:
+ * `additional_table_filters` is unusable because the settings profile pins
+ * `readonly = 1 CONST`, which refuses per-query settings outright; a row policy
+ * carrying a time predicate is mandatory by construction, and the window has to
+ * be optional and self-declared per statement — a policy can express neither
+ * that nor `followsTimeWindow`.
+ *
  * @see ./errors.ts — the two refusals
  * @see specs/analytics/governed-sql-workbench.feature
  */

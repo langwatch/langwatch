@@ -559,10 +559,10 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
           `the governed view's tenant predicate did not reach PostgreSQL ("${scan}")`,
         ).toBe(true);
       }
-      // The caller's tenant, never the other one, and never the raw key.
+      // The caller's tenant, never the other one, and never the raw secret.
       const joined = scans.join("\n");
       expect(joined).not.toContain(harness.tenantB.tenantId);
-      expect(joined).not.toContain(harness.tenantA.rawApiKey);
+      expect(joined).not.toContain(harness.tenantA.rawSecret);
     });
 
     /**

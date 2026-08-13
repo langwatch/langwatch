@@ -4,7 +4,8 @@
  * Two controls with two different jobs. Open picks a chart to work on. The
  * chart menu manages the one that is open — and it only exists once a chart is
  * open, because rename and delete are questions about a specific chart rather
- * than about the workbench.
+ * than about the workbench. Delete asks before it acts: nothing here is
+ * recoverable, and it sits one item below Rename.
  *
  * Save says which it will do: with a chart open it reads "Save", writes back to
  * that chart, and creates nothing; with none open it reads "Save chart" and
@@ -19,6 +20,7 @@ import { Button, Input, Stack, Text } from "@chakra-ui/react";
 import { ChevronDown, FolderOpen, MoreVertical, Save } from "lucide-react";
 import { useState } from "react";
 
+import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { Dialog } from "~/components/ui/dialog";
 import { Menu } from "~/components/ui/menu";
 
@@ -45,6 +47,11 @@ export interface SavedChartsToolbarProps {
  * One field and one action: the destructive-looking alternative — a Cancel
  * button beside Save — is left out deliberately, because the dialog's own
  * dismissal already means "not now" and two ways to back out is one too many.
+ *
+ * The field is seeded once, at mount, and never re-seeded — so the caller must
+ * mount a fresh one per opening (see the `key` where it is rendered). Anything
+ * that re-seeded on `open` would have to be told the dialog opened, and a
+ * controlled `open` never says so.
  */
 function NameDialog({
   title,
@@ -69,13 +76,7 @@ function NameDialog({
   };
 
   return (
-    <Dialog.Root
-      open={open}
-      onOpenChange={(event) => {
-        if (event.open) setName(initialName);
-        onOpenChange(event.open);
-      }}
-    >
+    <Dialog.Root open={open} onOpenChange={(event) => onOpenChange(event.open)}>
       <Dialog.Content>
         <Dialog.Header>
           <Dialog.Title>{title}</Dialog.Title>
@@ -109,6 +110,84 @@ function NameDialog({
         <Dialog.CloseTrigger />
       </Dialog.Content>
     </Dialog.Root>
+  );
+}
+
+/**
+ * The name of the chart that is open, and what can be done to it.
+ *
+ * Only rendered while one is open, because rename, save-as-new and delete are
+ * all questions about a specific chart. Delete asks before it acts: a saved
+ * chart is not recoverable, and Delete sits one item below Rename.
+ */
+function OpenedChartMenu({
+  chartId,
+  chartName,
+  onRename,
+  onSaveAsNew,
+  onDelete,
+}: {
+  chartId: string;
+  chartName: string | null;
+  onRename: () => void;
+  onSaveAsNew: () => void;
+  onDelete: (chartId: string) => void;
+}) {
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  return (
+    <>
+      <Text
+        fontSize="12px"
+        color="fg.muted"
+        maxWidth="180px"
+        truncate
+        title={chartName ?? undefined}
+        data-testid="opened-chart-name"
+      >
+        {chartName}
+      </Text>
+      <Menu.Root>
+        <Menu.Trigger asChild>
+          <Button
+            size="xs"
+            variant="ghost"
+            aria-label={`Actions for ${chartName ?? "this chart"}`}
+            data-testid="opened-chart-actions"
+          >
+            <MoreVertical size={14} aria-hidden="true" />
+          </Button>
+        </Menu.Trigger>
+        <Menu.Content>
+          <Menu.Item value="rename" onClick={onRename}>
+            Rename
+          </Menu.Item>
+          <Menu.Item value="save-as-new" onClick={onSaveAsNew}>
+            Save as a new chart
+          </Menu.Item>
+          <Menu.Item
+            value="delete"
+            color="red.500"
+            onClick={() => setConfirmingDelete(true)}
+          >
+            Delete
+          </Menu.Item>
+        </Menu.Content>
+      </Menu.Root>
+
+      <ConfirmDialog
+        open={confirmingDelete}
+        onOpenChange={setConfirmingDelete}
+        title="Delete chart"
+        message={`Delete "${chartName}"? This cannot be undone.`}
+        confirmLabel="Delete"
+        tone="danger"
+        onConfirm={() => {
+          setConfirmingDelete(false);
+          onDelete(chartId);
+        }}
+      />
+    </>
   );
 }
 
@@ -179,48 +258,23 @@ export function SavedChartsToolbar({
       </Button>
 
       {openedChartId && (
-        <>
-          <Text
-            fontSize="12px"
-            color="fg.muted"
-            maxWidth="180px"
-            truncate
-            title={openedChartName ?? undefined}
-            data-testid="opened-chart-name"
-          >
-            {openedChartName}
-          </Text>
-          <Menu.Root>
-            <Menu.Trigger asChild>
-              <Button
-                size="xs"
-                variant="ghost"
-                aria-label={`Actions for ${openedChartName ?? "this chart"}`}
-                data-testid="opened-chart-actions"
-              >
-                <MoreVertical size={14} aria-hidden="true" />
-              </Button>
-            </Menu.Trigger>
-            <Menu.Content>
-              <Menu.Item value="rename" onClick={() => setNaming("rename")}>
-                Rename
-              </Menu.Item>
-              <Menu.Item value="save-as-new" onClick={onSaveAsNew}>
-                Save as a new chart
-              </Menu.Item>
-              <Menu.Item
-                value="delete"
-                color="red.500"
-                onClick={() => onDelete(openedChartId)}
-              >
-                Delete
-              </Menu.Item>
-            </Menu.Content>
-          </Menu.Root>
-        </>
+        <OpenedChartMenu
+          chartId={openedChartId}
+          chartName={openedChartName}
+          onRename={() => setNaming("rename")}
+          onSaveAsNew={onSaveAsNew}
+          onDelete={onDelete}
+        />
       )}
 
+      {/*
+       * Keyed on what the dialog is for, so each opening gets its own instance
+       * and its own freshly seeded field. Without it one instance is reused:
+       * Rename opens empty, and whatever was typed into the last Save is still
+       * sitting there the next time it opens.
+       */}
       <NameDialog
+        key={naming ?? "closed"}
         title={naming === "rename" ? "Rename chart" : "Save chart"}
         initialName={naming === "rename" ? (openedChartName ?? "") : ""}
         open={naming !== null}

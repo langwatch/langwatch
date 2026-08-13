@@ -9,6 +9,12 @@
  *      put there — the policy already refuses a caller-supplied `datasets`, so
  *      this is the second lock rather than the first, and it is the one that
  *      holds if the first is ever loosened.
+ *
+ *      `usermeta` goes the same way and for the same reason. vega-embed reads
+ *      `usermeta.embedOptions` off the specification and lets a `loader` found
+ *      there replace the one the caller passed — which is the deny-everything
+ *      loader — so a single spec property could put the network back. The
+ *      policy refuses that property; this is what holds if it stops.
  *   2. THE PINNED CONFIG IS APPLIED LAST, over whatever `config` the member
  *      wrote. That is the top of a three-layer chain, and each layer is applied
  *      at exactly one seam:
@@ -99,6 +105,11 @@ export function buildGovernedVegaSpec({
   clone.datasets = Object.fromEntries(
     datasetNames.map((name) => [name, [...(datasets[name] ?? [])]]),
   );
+
+  // Nothing the chart runtime reads for its own configuration survives the
+  // build. Vega renders no `usermeta` — it is metadata for tools — so removing
+  // it costs a governed chart nothing.
+  delete clone.usermeta;
 
   clone.config = mergeConfig(
     isPlainObject(clone.config) ? clone.config : {},
