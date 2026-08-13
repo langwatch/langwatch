@@ -464,16 +464,16 @@ describe("given the governed analytics setup applied to a ClickHouse 25.10 serve
 
   describe("when the server's query log is inspected", () => {
     /** @scenario "Key hash is auditable in the query log without exposing the raw key" */
-    it("records the key hash and never the raw API key", async () => {
+    it("records the key hash and never the raw secret", async () => {
       // Pins the construction the audit depends on: only a digest is ever sent.
       // The expected value is written out rather than recomputed, so this stays
       // an independent check — recomputing it here would only restate whatever
       // `governedTenantCapability` does and would agree with it after any
       // change, including a change that stopped hashing at all.
       expect(harness.tenantA.keyHash).toBe(
-        "22e5ba9afad81c15c4dbfb5813e1ca169057f674932e7d0679e93cd268f19b3d",
+        "142385b8994fcc2c4e874cd550c2f9926e6dfecde7785a3138bd438239edadef",
       );
-      expect(harness.tenantA.rawApiKey.length).toBeGreaterThanOrEqual(24);
+      expect(harness.tenantA.rawSecret.length).toBeGreaterThanOrEqual(24);
 
       const queryId = `governed-sql-audit-${Date.now()}-${Math.random().toString(36).slice(2)}`;
       await selectRows(tenantA, `SELECT count() FROM ${database}.traces`, {
@@ -485,7 +485,7 @@ describe("given the governed analytics setup applied to a ClickHouse 25.10 serve
         harness.admin,
         `SELECT * FROM system.query_log WHERE query_id = '${queryId}'`,
       );
-      // A missing row must fail: otherwise "the raw key appears nowhere"
+      // A missing row must fail: otherwise "the raw secret appears nowhere"
       // is satisfied by there being nothing to look at.
       expect(
         entries.length,
@@ -507,8 +507,8 @@ describe("given the governed analytics setup applied to a ClickHouse 25.10 serve
           "sanity: the hash should be findable in the serialised row",
         ).toBe(true);
         expect(
-          serialised.includes(harness.tenantA.rawApiKey),
-          "the raw API key reached ClickHouse — only its hash may ever be sent",
+          serialised.includes(harness.tenantA.rawSecret),
+          "the raw governed SQL key reached ClickHouse — only its hash may ever be sent",
         ).toBe(false);
       }
     });

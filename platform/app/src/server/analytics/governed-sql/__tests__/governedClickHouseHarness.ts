@@ -145,25 +145,33 @@ export const POSTGRES_SQLSTATE = {
   QUERY_CANCELED: "57014",
 } as const;
 
-/** A tenant, its API key, and the hash that is all ClickHouse ever sees. */
+/**
+ * A tenant, its governed SQL secret, and the hash that is all ClickHouse ever
+ * sees.
+ *
+ * The secret stands in for `Project.governedSqlKey`, never for a credential a
+ * caller authenticates with: the capability names a tenant, and the two values
+ * rotate independently (see `../capability.ts`).
+ */
 export interface GovernedTenantFixture {
   tenantId: string;
   /**
-   * The raw key. Deliberately long and distinctive so an audit assertion that
-   * it never reached the server cannot pass by accident on a short substring.
+   * The raw secret. Deliberately long and distinctive so an audit assertion
+   * that it never reached the server cannot pass by accident on a short
+   * substring.
    */
-  rawApiKey: string;
-  /** `sha256(rawApiKey)`, the only form that travels to ClickHouse. */
+  rawSecret: string;
+  /** `sha256(rawSecret)`, the only form that travels to ClickHouse. */
   keyHash: string;
 }
 
 function tenantFixture(
   tenantId: string,
-  rawApiKey: string,
+  rawSecret: string,
 ): GovernedTenantFixture {
   return {
     tenantId,
-    rawApiKey,
+    rawSecret,
     // Derived through the production function rather than re-hashed here: the
     // key map only resolves a tenant when the two agree, and a fixture with its
     // own copy of the algorithm would drift into seeding a digest production
@@ -171,17 +179,17 @@ function tenantFixture(
     // which is indistinguishable from a tenant that simply has no data. What
     // pins the digest to SHA-256 is a known-answer assertion, in
     // `tenantIsolation.integration.test.ts`.
-    keyHash: governedTenantCapability({ secret: rawApiKey }),
+    keyHash: governedTenantCapability({ secret: rawSecret }),
   };
 }
 
 export const TENANT_A = tenantFixture(
   "tenant-a",
-  "raw-api-key-DO-NOT-LOG-abcdef123456",
+  "raw-governed-sql-key-DO-NOT-LOG-abcdef123456",
 );
 export const TENANT_B = tenantFixture(
   "tenant-b",
-  "raw-api-key-VICTIM-DO-NOT-LOG-fedcba654321",
+  "raw-governed-sql-key-VICTIM-DO-NOT-LOG-fedcba654321",
 );
 
 /** The seeded fact tables. Fixtures — the real ones come from migrations. */

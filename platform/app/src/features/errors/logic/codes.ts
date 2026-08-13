@@ -202,6 +202,7 @@ export const APP_ERROR_CODES = [
   "provider_unreachable",
   "published_workflow_version_not_found",
   "query_memory_exceeded",
+  "query_scan_limit_exceeded",
   "query_timeout",
   "resource_limit_exceeded",
   "role_binding_already_exists",
