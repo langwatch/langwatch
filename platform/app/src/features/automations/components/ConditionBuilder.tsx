@@ -135,6 +135,24 @@ function withMinimumRow(conditions: Condition[]): Condition[] {
   return conditions.length > 0 ? conditions : [blankCondition()];
 }
 
+/** The join between two rows. Every row after the first is ANDed onto the
+ *  ones above it, and saying so between them is clearer than a legend. */
+function AndDivider() {
+  return (
+    <HStack gap={2} align="center">
+      <Text
+        textStyle="2xs"
+        fontWeight="bold"
+        letterSpacing="0.08em"
+        color="fg.muted"
+      >
+        AND
+      </Text>
+      <Box flex={1} height="1px" bg="border.subtle" />
+    </HStack>
+  );
+}
+
 /**
  * The structured, no-code front-end over the trace query language. Rows are
  * `field · operator · value`, joined by AND — the common case people reach for.
@@ -218,19 +236,7 @@ export function ConditionBuilder({
     <VStack align="stretch" gap={2}>
       {conditions.map((condition, index) => (
         <VStack key={condition.id} align="stretch" gap={2}>
-          {index > 0 ? (
-            <HStack gap={2} align="center">
-              <Text
-                textStyle="2xs"
-                fontWeight="bold"
-                letterSpacing="0.08em"
-                color="fg.muted"
-              >
-                AND
-              </Text>
-              <Box flex={1} height="1px" bg="border.subtle" />
-            </HStack>
-          ) : null}
+          {index > 0 ? <AndDivider /> : null}
           <ConditionRow
             condition={condition}
             onField={(field) => setField(condition.id, field)}
@@ -289,9 +295,6 @@ function ConditionRow({
   );
 
   const attributePrefix = matchAttributePrefix(condition.field);
-  const attributeKey = attributePrefix
-    ? condition.field.slice(attributePrefix.value.length)
-    : "";
   // Only meaningful once the row is otherwise complete — a key the author
   // hasn't finished typing yet isn't wrong, just unfinished.
   const attributeKeyInvalid = !attributeFieldRoundTrips(condition);
@@ -326,19 +329,12 @@ function ConditionRow({
         </Box>
 
         {attributePrefix ? (
-          <Box width="130px" flexShrink={0}>
-            <Input
-              size="sm"
-              placeholder="attribute key"
-              aria-label={`${attributePrefix.label} key`}
-              value={attributeKey}
-              aria-invalid={attributeKeyInvalid}
-              borderColor={attributeKeyInvalid ? "border.error" : undefined}
-              onChange={(e) =>
-                onFieldKey(attributePrefix.value + e.target.value)
-              }
-            />
-          </Box>
+          <AttributeKeyInput
+            prefix={attributePrefix}
+            field={condition.field}
+            invalid={attributeKeyInvalid}
+            onFieldKey={onFieldKey}
+          />
         ) : null}
 
         {condition.field ? (
@@ -392,6 +388,36 @@ function ConditionRow({
         </Text>
       ) : null}
     </VStack>
+  );
+}
+
+/** The key sub-input a custom-attribute row grows once its prefix is picked,
+ *  so the row targets one specific attribute (`trace.attribute.` + `<key>`).
+ *  Writes the whole field back through `onFieldKey`, which leaves the row's
+ *  operator and value alone — typing a key isn't a field switch. */
+function AttributeKeyInput({
+  prefix,
+  field,
+  invalid,
+  onFieldKey,
+}: {
+  prefix: FieldOption;
+  field: string;
+  invalid: boolean;
+  onFieldKey: (field: string) => void;
+}) {
+  return (
+    <Box width="130px" flexShrink={0}>
+      <Input
+        size="sm"
+        placeholder="attribute key"
+        aria-label={`${prefix.label} key`}
+        value={field.slice(prefix.value.length)}
+        aria-invalid={invalid}
+        borderColor={invalid ? "border.error" : undefined}
+        onChange={(e) => onFieldKey(prefix.value + e.target.value)}
+      />
+    </Box>
   );
 }
 
