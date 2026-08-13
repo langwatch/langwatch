@@ -26,7 +26,11 @@ import {
 import { GroupStagingScripts } from "../../../../queues/groupQueue/scripts";
 import type { CodingAgentSessionState } from "../../projections/codingAgentSession.foldProjection";
 import type { CodingAgentProcessingEvent } from "../../schemas/events";
-import { createPullRequestMappingReactor } from "../pullRequestMapping.reactor";
+import {
+  type CodingAgentProcessingPipelineDeps,
+  createCodingAgentProcessingPipeline,
+} from "../../pipeline";
+import { createPullRequestMappingHandler } from "../pullRequestMapping.subscriber";
 
 const QUEUE_NAME = "{test/prmap-throttle}";
 const TENANT_ID = "project-throttle";
@@ -56,9 +60,18 @@ function payloadFor(sessionId: string) {
   };
 }
 
-const reactor = createPullRequestMappingReactor({
-  requestBranchMapping: async () => undefined,
-});
+const store = {} as never;
+const reactor = createCodingAgentProcessingPipeline({
+  codingAgentSessionStore: store,
+  codingAgentTraceSessionAppendStore: store,
+  sessionMetricSeriesAppendStore: store,
+  codingAgentSessionEventsAppendStore: store,
+  pullRequestMappingHandler: createPullRequestMappingHandler({
+    requestBranchMapping: async () => undefined,
+  }),
+} as unknown as CodingAgentProcessingPipelineDeps).foldReactors.get(
+  "pullRequestMapping",
+)!.definition;
 
 /**
  * The group id `QueueManager.initializeReactorQueues` builds for a reactor

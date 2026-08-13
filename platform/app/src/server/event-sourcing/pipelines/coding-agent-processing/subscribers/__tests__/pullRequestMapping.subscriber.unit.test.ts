@@ -8,9 +8,16 @@
  * @see specs/coding-agent/pull-request-linkage.feature
  */
 import { describe, expect, it, vi } from "vitest";
+import {
+  type CodingAgentProcessingPipelineDeps,
+  createCodingAgentProcessingPipeline,
+} from "../../pipeline";
 import type { CodingAgentSessionState } from "../../projections/codingAgentSession.foldProjection";
 import type { CodingAgentProcessingEvent } from "../../schemas/events";
-import { createPullRequestMappingReactor } from "../pullRequestMapping.reactor";
+import {
+  createPullRequestMappingHandler,
+  shouldMapPullRequests,
+} from "../pullRequestMapping.subscriber";
 
 function foldState(
   over: Partial<CodingAgentSessionState> = {},
@@ -33,22 +40,41 @@ function contextFor(state: CodingAgentSessionState) {
   return {
     tenantId: "project-1",
     aggregateId: "session-1",
-    foldState: state,
+    state,
   };
 }
 
-describe("pullRequestMapping reactor", () => {
+/** The REAL pipeline registration — `build()` only stores references. */
+function registrationWith(
+  requestBranchMapping: (params: never) => Promise<void>,
+) {
+  const store = {} as never;
+  const deps = {
+    codingAgentSessionStore: store,
+    codingAgentTraceSessionAppendStore: store,
+    sessionMetricSeriesAppendStore: store,
+    codingAgentSessionEventsAppendStore: store,
+    pullRequestMappingHandler: createPullRequestMappingHandler({
+      requestBranchMapping: requestBranchMapping as never,
+    }),
+  } as unknown as CodingAgentProcessingPipelineDeps;
+  return createCodingAgentProcessingPipeline(deps).foldReactors.get(
+    "pullRequestMapping",
+  )!.definition;
+}
+
+describe("pullRequestMapping subscriber", () => {
   describe("given a session whose repository host is not the instance's GitHub host", () => {
     /** @scenario "A repository on a host this instance cannot answer for never triggers a GitHub call" */
     it("requests no mapping", async () => {
       const requestBranchMapping = vi.fn().mockResolvedValue(undefined);
-      const reactor = createPullRequestMappingReactor({
+      const handler = createPullRequestMappingHandler({
         requestBranchMapping,
       });
       const state = foldState({ repositoryHost: "gitlab.example.com" });
 
-      expect(reactor.shouldReact?.(event, contextFor(state))).toBe(false);
-      await reactor.handle(event, contextFor(state));
+      expect(shouldMapPullRequests(state)).toBe(false);
+      await handler(event, contextFor(state));
 
       expect(requestBranchMapping).not.toHaveBeenCalled();
     });
@@ -57,13 +83,13 @@ describe("pullRequestMapping reactor", () => {
   describe("given a session carrying a github.com repository and a branch", () => {
     it("requests the mapping for that branch", async () => {
       const requestBranchMapping = vi.fn().mockResolvedValue(undefined);
-      const reactor = createPullRequestMappingReactor({
+      const handler = createPullRequestMappingHandler({
         requestBranchMapping,
       });
       const state = foldState();
 
-      expect(reactor.shouldReact?.(event, contextFor(state))).toBe(true);
-      await reactor.handle(event, contextFor(state));
+      expect(shouldMapPullRequests(state)).toBe(true);
+      await handler(event, contextFor(state));
 
       expect(requestBranchMapping).toHaveBeenCalledWith({
         tenantId: "project-1",
@@ -75,16 +101,9 @@ describe("pullRequestMapping reactor", () => {
     });
 
     it("treats an unreported host as github.com", () => {
-      const reactor = createPullRequestMappingReactor({
-        requestBranchMapping: vi.fn(),
-      });
-
-      expect(
-        reactor.shouldReact?.(
-          event,
-          contextFor(foldState({ repositoryHost: "" })),
-        ),
-      ).toBe(true);
+      expect(shouldMapPullRequests(foldState({ repositoryHost: "" }))).toBe(
+        true,
+      );
     });
 
     // A session records whatever casing its git remote carries, and every
@@ -93,58 +112,41 @@ describe("pullRequestMapping reactor", () => {
     // ever wrote, and the branch reads as having no pull request forever.
     /** @scenario "A session whose remote host casing differs still finds its pull request" */
     it("treats a differently cased github.com as github.com", () => {
-      const reactor = createPullRequestMappingReactor({
-        requestBranchMapping: vi.fn(),
-      });
-
       expect(
-        reactor.shouldReact?.(
-          event,
-          contextFor(foldState({ repositoryHost: "GitHub.com" })),
-        ),
+        shouldMapPullRequests(foldState({ repositoryHost: "GitHub.com" })),
       ).toBe(true);
     });
   });
 
   describe("given a session with no git context", () => {
     it("requests no mapping", () => {
-      const reactor = createPullRequestMappingReactor({
-        requestBranchMapping: vi.fn(),
-      });
-
       for (const missing of [
         { repositoryOwner: "" },
         { repositoryName: "" },
         { gitBranch: "" },
       ]) {
-        expect(
-          reactor.shouldReact?.(event, contextFor(foldState(missing))),
-        ).toBe(false);
+        expect(shouldMapPullRequests(foldState(missing))).toBe(false);
       }
     });
   });
 
   describe("when the mapping fails", () => {
     it("swallows the error so the queue does not retry against the same limit", async () => {
-      const reactor = createPullRequestMappingReactor({
+      const handler = createPullRequestMappingHandler({
         requestBranchMapping: vi
           .fn()
           .mockRejectedValue(new Error("GitHub rate limit reached")),
       });
 
-      await expect(
-        reactor.handle(event, contextFor(foldState())),
-      ).resolves.toBeUndefined();
+      await expect(handler(event, contextFor(foldState()))).resolves.toBeUndefined();
     });
   });
 
-  describe("its queue options", () => {
+  describe("its queue options on the pipeline registration", () => {
     it("keys the job on the project, repository and branch", () => {
-      const reactor = createPullRequestMappingReactor({
-        requestBranchMapping: vi.fn(),
-      });
+      const registration = registrationWith(vi.fn());
 
-      const jobId = reactor.options?.makeJobId?.({
+      const jobId = registration.options?.makeJobId?.({
         event,
         // A session records the casing its git remote carries, and the mapping
         // service's durable claim resolves it lowercased. The key folds to
@@ -155,22 +157,22 @@ describe("pullRequestMapping reactor", () => {
         }),
       });
 
-      expect(jobId).toBe("prmap:project-1:acme/widgets:feat/linkage");
-      expect(reactor.options?.runIn).toEqual(["worker"]);
+      expect(jobId).toBe(
+        "subscriber:pullRequestMapping:prmap:project-1:acme/widgets:feat/linkage",
+      );
+      expect(registration.options?.runIn).toEqual(["worker"]);
     });
 
     /**
-     * The dedup contract, pinned. `makeJobId` + `ttl` alone does NOT collapse
+     * The dedup contract, pinned. A dedup key + ttl alone does NOT collapse
      * anything: with no delay the job dispatches on the first event, dispatch
      * takes it out of staging, and every later event misses the lookup and
      * stages its own job. A non-zero delay is what gives the key something to
      * collapse into, so a future edit that drops it would silently return this
-     * reactor to a GitHub-facing job per fold commit.
+     * subscriber to a GitHub-facing job per fold commit.
      */
     it("holds a real window so one branch's events collapse into one job", () => {
-      const options = createPullRequestMappingReactor({
-        requestBranchMapping: vi.fn(),
-      }).options;
+      const options = registrationWith(vi.fn()).options;
 
       expect(options?.delay).toBeGreaterThan(0);
       expect(options?.deduplication).toBeDefined();
@@ -199,9 +201,7 @@ describe("pullRequestMapping reactor", () => {
      * @scenario "Concurrent sessions on one branch ask GitHub once"
      */
     it("groups the job on the same branch its dedup id is keyed on", () => {
-      const reactor = createPullRequestMappingReactor({
-        requestBranchMapping: vi.fn(),
-      });
+      const registration = registrationWith(vi.fn());
       const first = { event, foldState: foldState() };
       const second = {
         event: { ...event, aggregateId: "session-2" },
@@ -211,17 +211,20 @@ describe("pullRequestMapping reactor", () => {
         }),
       };
 
-      const groupKey = reactor.options?.groupKeyFn;
+      const groupKey = registration.options?.groupKeyFn;
       expect(groupKey).toBeDefined();
       expect(groupKey?.(first)).toBe(groupKey?.(second));
-      expect(groupKey?.(first)).toBe(reactor.options?.makeJobId?.(first));
+      // The dedup id embeds the same branch key the group is keyed on — the
+      // subscriber prefix on the dedup id changes the string, never the unit
+      // of work the two describe.
+      expect(registration.options?.makeJobId?.(first)).toContain(
+        groupKey!(first),
+      );
     });
 
     it("keeps a different branch in its own group", () => {
-      const reactor = createPullRequestMappingReactor({
-        requestBranchMapping: vi.fn(),
-      });
-      const groupKey = reactor.options?.groupKeyFn;
+      const registration = registrationWith(vi.fn());
+      const groupKey = registration.options?.groupKeyFn;
 
       expect(groupKey?.({ event, foldState: foldState() })).not.toBe(
         groupKey?.({
@@ -241,17 +244,16 @@ describe("pullRequestMapping reactor", () => {
     });
 
     /**
-     * A reactor's ready score is the event's own `createdAt`, so a backlogged
-     * group stages jobs whose `createdAt + delay` deadline has already passed:
-     * they dispatch immediately and the window collapses nothing. The TTL
-     * outliving dispatch is what still holds the throttle there.
+     * A subscriber's ready score is the event's own `createdAt`, so a
+     * backlogged group stages jobs whose `createdAt + delay` deadline has
+     * already passed: they dispatch immediately and the window collapses
+     * nothing. The TTL outliving dispatch is what still holds the throttle
+     * there.
      *
      * @scenario "Concurrent sessions on one branch ask GitHub once"
      */
     it("holds the throttle past dispatch, for the window that already elapsed", () => {
-      const options = createPullRequestMappingReactor({
-        requestBranchMapping: vi.fn(),
-      }).options;
+      const options = registrationWith(vi.fn()).options;
 
       expect(options?.deduplication?.shouldSurviveDispatch).toBe(true);
     });

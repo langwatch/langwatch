@@ -11,8 +11,8 @@ vi.mock("@langwatch/observability", () => ({
 
 import {
   billingMeterDispatchGroupKey,
-  createBillingMeterDispatchReactor,
-} from "../billingMeterDispatch.reactor";
+  createBillingMeterDispatchSubscriber,
+} from "../billingMeterDispatch.subscriber";
 
 /**
  * The lane and the dedup id must describe the same unit of work. The queue
@@ -47,8 +47,8 @@ describe("billingMeterDispatchGroupKey", () => {
   });
 });
 
-describe("createBillingMeterDispatchReactor lane wiring", () => {
-  const reactor = createBillingMeterDispatchReactor({
+describe("billingMeterDispatch lane wiring", () => {
+  const reactor = createBillingMeterDispatchSubscriber({
     getDispatch: () => async () => {},
   });
 

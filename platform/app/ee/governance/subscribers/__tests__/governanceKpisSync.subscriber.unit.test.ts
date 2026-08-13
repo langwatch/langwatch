@@ -15,7 +15,7 @@
  *   - Skips traces with occurredAt <= 0 (initial fold sentinel).
  *   - Inserts a contribution row with all fields correctly populated
  *     when origin attrs are present.
- *   - HourBucket is floor-of-hour from foldState.occurredAt.
+ *   - HourBucket is floor-of-hour from state.occurredAt.
  *   - sourceType defaults to "unknown" if attribute missing.
  *
  * Spec contracts:
@@ -26,11 +26,12 @@ import type { GovernanceKpisClickHouseRepository } from "@ee/governance/services
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
-import type { ReactorContext } from "~/server/event-sourcing/reactors/reactor.types";
+import type { TriggerContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import {
-  createGovernanceKpisSyncReactor,
-  type GovernanceKpisSyncReactorDeps,
-} from "../governanceKpisSync.reactor";
+  createGovernanceKpisSyncHandler,
+  isGovernanceKpiTrace,
+  type GovernanceKpisSyncSubscriberDeps,
+} from "../governanceKpisSync.subscriber";
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
@@ -106,7 +107,7 @@ const event: TraceProcessingEvent = {
 } as unknown as TraceProcessingEvent;
 
 function mockDeps(): {
-  deps: GovernanceKpisSyncReactorDeps;
+  deps: GovernanceKpisSyncSubscriberDeps;
   insertContribution: ReturnType<typeof vi.fn>;
 } {
   const insertContribution = vi.fn().mockResolvedValue(undefined);
@@ -120,24 +121,24 @@ function mockDeps(): {
   };
 }
 
-function ctx(foldState: TraceSummaryData): ReactorContext<TraceSummaryData> {
+function ctx(state: TraceSummaryData): TriggerContext<TraceSummaryData> {
   return {
     tenantId: "gov-project-1",
     aggregateId: "trace-1",
-    foldState,
+    state,
   };
 }
 
-describe("governanceKpisSync reactor", () => {
+describe("governanceKpisSync subscriber", () => {
   beforeEach(() => vi.clearAllMocks());
 
   describe("when the trace has no governance origin attributes", () => {
     it("skips silently — application traces never reach the fold", async () => {
       const { deps, insertContribution } = mockDeps();
-      const reactor = createGovernanceKpisSyncReactor(deps);
+      const reactor = createGovernanceKpisSyncHandler(deps);
       const state = createFoldState({});
 
-      await reactor.handle(event, ctx(state));
+      await reactor(event, ctx(state));
 
       expect(insertContribution).not.toHaveBeenCalled();
     });
@@ -146,12 +147,12 @@ describe("governanceKpisSync reactor", () => {
   describe("when langwatch.origin.kind is not 'ingestion_source'", () => {
     it("skips — origin.kind is reserved for governance ingest only", async () => {
       const { deps, insertContribution } = mockDeps();
-      const reactor = createGovernanceKpisSyncReactor(deps);
+      const reactor = createGovernanceKpisSyncHandler(deps);
       const state = createFoldState({
         "langwatch.origin.kind": "personal_workspace",
       });
 
-      await reactor.handle(event, ctx(state));
+      await reactor(event, ctx(state));
 
       expect(insertContribution).not.toHaveBeenCalled();
     });
@@ -160,12 +161,12 @@ describe("governanceKpisSync reactor", () => {
   describe("when origin.kind is set but ingestion_source.id is missing", () => {
     it("warns + skips — defensive against malformed governance traffic", async () => {
       const { deps, insertContribution } = mockDeps();
-      const reactor = createGovernanceKpisSyncReactor(deps);
+      const reactor = createGovernanceKpisSyncHandler(deps);
       const state = createFoldState({
         "langwatch.origin.kind": "ingestion_source",
       });
 
-      await reactor.handle(event, ctx(state));
+      await reactor(event, ctx(state));
 
       expect(insertContribution).not.toHaveBeenCalled();
     });
@@ -174,7 +175,7 @@ describe("governanceKpisSync reactor", () => {
   describe("when occurredAt is the initial sentinel (0)", () => {
     it("skips — fold has not yet observed any spans", async () => {
       const { deps, insertContribution } = mockDeps();
-      const reactor = createGovernanceKpisSyncReactor(deps);
+      const reactor = createGovernanceKpisSyncHandler(deps);
       const state = createFoldState(
         {
           "langwatch.origin.kind": "ingestion_source",
@@ -184,7 +185,7 @@ describe("governanceKpisSync reactor", () => {
         { occurredAt: 0 },
       );
 
-      await reactor.handle(event, ctx(state));
+      await reactor(event, ctx(state));
 
       expect(insertContribution).not.toHaveBeenCalled();
     });
@@ -193,14 +194,14 @@ describe("governanceKpisSync reactor", () => {
   describe("when origin attributes are fully present", () => {
     it("inserts a contribution row with all fields populated", async () => {
       const { deps, insertContribution } = mockDeps();
-      const reactor = createGovernanceKpisSyncReactor(deps);
+      const reactor = createGovernanceKpisSyncHandler(deps);
       const state = createFoldState({
         "langwatch.origin.kind": "ingestion_source",
         "langwatch.ingestion_source.id": "is-1",
         "langwatch.ingestion_source.source_type": "claude_cowork",
       });
 
-      await reactor.handle(event, ctx(state));
+      await reactor(event, ctx(state));
 
       expect(insertContribution).toHaveBeenCalledTimes(1);
       const [row] = insertContribution.mock.calls[0]!;
@@ -219,13 +220,13 @@ describe("governanceKpisSync reactor", () => {
 
     it("defaults sourceType to 'unknown' if attribute missing", async () => {
       const { deps, insertContribution } = mockDeps();
-      const reactor = createGovernanceKpisSyncReactor(deps);
+      const reactor = createGovernanceKpisSyncHandler(deps);
       const state = createFoldState({
         "langwatch.origin.kind": "ingestion_source",
         "langwatch.ingestion_source.id": "is-2",
       });
 
-      await reactor.handle(event, ctx(state));
+      await reactor(event, ctx(state));
 
       expect(insertContribution).toHaveBeenCalledTimes(1);
       const [row] = insertContribution.mock.calls[0]!;
@@ -234,7 +235,7 @@ describe("governanceKpisSync reactor", () => {
 
     it("computes hour bucket as floor-of-hour from occurredAt", async () => {
       const { deps, insertContribution } = mockDeps();
-      const reactor = createGovernanceKpisSyncReactor(deps);
+      const reactor = createGovernanceKpisSyncHandler(deps);
       // 14:35:42 UTC of an arbitrary day — should floor to 14:00:00.
       const occurredAtMs = Date.UTC(2026, 3, 28, 14, 35, 42, 123);
       const expectedHourBucketMs = Date.UTC(2026, 3, 28, 14, 0, 0, 0);
@@ -247,7 +248,7 @@ describe("governanceKpisSync reactor", () => {
         { occurredAt: occurredAtMs },
       );
 
-      await reactor.handle(event, ctx(state));
+      await reactor(event, ctx(state));
 
       const [row] = insertContribution.mock.calls[0]!;
       expect(row.hourBucket.getTime()).toBe(expectedHourBucketMs);
@@ -255,7 +256,7 @@ describe("governanceKpisSync reactor", () => {
 
     it("propagates zero for spend / tokens when fold state has nulls", async () => {
       const { deps, insertContribution } = mockDeps();
-      const reactor = createGovernanceKpisSyncReactor(deps);
+      const reactor = createGovernanceKpisSyncHandler(deps);
       const state = createFoldState(
         {
           "langwatch.origin.kind": "ingestion_source",
@@ -269,7 +270,7 @@ describe("governanceKpisSync reactor", () => {
         },
       );
 
-      await reactor.handle(event, ctx(state));
+      await reactor(event, ctx(state));
 
       const [row] = insertContribution.mock.calls[0]!;
       expect(row.spendUsd).toBe(0);
@@ -283,19 +284,19 @@ describe("governanceKpisSync reactor", () => {
       const insertContribution = vi
         .fn()
         .mockRejectedValue(new Error("CH connection failed"));
-      const deps: GovernanceKpisSyncReactorDeps = {
+      const deps: GovernanceKpisSyncSubscriberDeps = {
         governanceKpisRepository: {
           insertContribution,
         } as unknown as GovernanceKpisClickHouseRepository,
       };
-      const reactor = createGovernanceKpisSyncReactor(deps);
+      const reactor = createGovernanceKpisSyncHandler(deps);
       const state = createFoldState({
         "langwatch.origin.kind": "ingestion_source",
         "langwatch.ingestion_source.id": "is-5",
         "langwatch.ingestion_source.source_type": "otel_generic",
       });
 
-      await expect(reactor.handle(event, ctx(state))).resolves.toBeUndefined();
+      await expect(reactor(event, ctx(state))).resolves.toBeUndefined();
       expect(insertContribution).toHaveBeenCalledTimes(1);
     });
   });
@@ -303,15 +304,11 @@ describe("governanceKpisSync reactor", () => {
   describe("pre-enqueue gate", () => {
     describe("when the trace carries no governance origin", () => {
       it("declines before a job is packed", () => {
-        const { deps } = mockDeps();
-        const reactor = createGovernanceKpisSyncReactor(deps);
-
-        expect(reactor.shouldReact).toBeDefined();
-        expect(reactor.shouldReact!(event, ctx(createFoldState({})))).toBe(
+        expect(isGovernanceKpiTrace(event, ctx(createFoldState({})))).toBe(
           false,
         );
         expect(
-          reactor.shouldReact!(
+          isGovernanceKpiTrace(
             event,
             ctx(createFoldState({ "langwatch.origin.kind": "gateway" })),
           ),
@@ -321,28 +318,16 @@ describe("governanceKpisSync reactor", () => {
 
     describe("when the trace came from an ingestion source", () => {
       it("accepts the event", () => {
-        const { deps } = mockDeps();
-        const reactor = createGovernanceKpisSyncReactor(deps);
         const state = createFoldState({
           "langwatch.origin.kind": "ingestion_source",
           "langwatch.ingestion_source.id": "is-1",
         });
 
-        expect(reactor.shouldReact!(event, ctx(state))).toBe(true);
+        expect(isGovernanceKpiTrace(event, ctx(state))).toBe(true);
       });
     });
   });
 
-  describe("dedup contract", () => {
-    it("declares a per-(tenant, trace) job-id for the queue's dedup", () => {
-      const { deps } = mockDeps();
-      const reactor = createGovernanceKpisSyncReactor(deps);
-      expect(reactor.options?.makeJobId).toBeDefined();
-      const jobId = reactor.options!.makeJobId!({
-        event: { tenantId: "t-1", aggregateId: "trace-x" },
-      } as any);
-      expect(jobId).toBe("governance-kpis-sync-t-1-trace-x");
-      expect(reactor.options?.deduplication?.ttlMs).toBeGreaterThan(0);
-    });
-  });
+  // The window / dedup wiring lives on the pipeline registration composed in
+  // the registry — governanceSubscribersPreEnqueueGate.unit.test.ts drives it.
 });

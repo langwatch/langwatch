@@ -90,10 +90,10 @@ describe("billingMeterDispatchReactor", () => {
 
       const mockDispatch = vi.fn().mockResolvedValue(undefined);
 
-      const { createBillingMeterDispatchReactor } = await import(
-        "../billingMeterDispatch.reactor"
+      const { createBillingMeterDispatchSubscriber } = await import(
+        "../billingMeterDispatch.subscriber"
       );
-      const reactor = createBillingMeterDispatchReactor({
+      const reactor = createBillingMeterDispatchSubscriber({
         getDispatch: () => mockDispatch,
       });
 
@@ -134,10 +134,10 @@ describe("billingMeterDispatchReactor", () => {
 
       const mockDispatch = vi.fn().mockResolvedValue(undefined);
 
-      const { createBillingMeterDispatchReactor } = await import(
-        "../billingMeterDispatch.reactor"
+      const { createBillingMeterDispatchSubscriber } = await import(
+        "../billingMeterDispatch.subscriber"
       );
-      const reactor = createBillingMeterDispatchReactor({
+      const reactor = createBillingMeterDispatchSubscriber({
         getDispatch: () => mockDispatch,
       });
 
@@ -173,10 +173,10 @@ describe("billingMeterDispatchReactor", () => {
 
       const mockDispatch = vi.fn();
 
-      const { createBillingMeterDispatchReactor } = await import(
-        "../billingMeterDispatch.reactor"
+      const { createBillingMeterDispatchSubscriber } = await import(
+        "../billingMeterDispatch.subscriber"
       );
-      const reactor = createBillingMeterDispatchReactor({
+      const reactor = createBillingMeterDispatchSubscriber({
         getDispatch: () => mockDispatch,
       });
 
@@ -203,10 +203,10 @@ describe("billingMeterDispatchReactor", () => {
         .fn()
         .mockRejectedValue(new Error("command dispatch failed"));
 
-      const { createBillingMeterDispatchReactor } = await import(
-        "../billingMeterDispatch.reactor"
+      const { createBillingMeterDispatchSubscriber } = await import(
+        "../billingMeterDispatch.subscriber"
       );
-      const reactor = createBillingMeterDispatchReactor({
+      const reactor = createBillingMeterDispatchSubscriber({
         getDispatch: () => mockDispatch,
       });
 
@@ -236,10 +236,10 @@ describe("billingMeterDispatchReactor", () => {
 
       const mockDispatch = vi.fn().mockResolvedValue(undefined);
 
-      const { createBillingMeterDispatchReactor } = await import(
-        "../billingMeterDispatch.reactor"
+      const { createBillingMeterDispatchSubscriber } = await import(
+        "../billingMeterDispatch.subscriber"
       );
-      const reactor = createBillingMeterDispatchReactor({
+      const reactor = createBillingMeterDispatchSubscriber({
         getDispatch: () => mockDispatch,
       });
 
@@ -281,10 +281,10 @@ describe("billingMeterDispatchReactor", () => {
 
       const mockDispatch = vi.fn().mockResolvedValue(undefined);
 
-      const { createBillingMeterDispatchReactor } = await import(
-        "../billingMeterDispatch.reactor"
+      const { createBillingMeterDispatchSubscriber } = await import(
+        "../billingMeterDispatch.subscriber"
       );
-      const reactor = createBillingMeterDispatchReactor({
+      const reactor = createBillingMeterDispatchSubscriber({
         getDispatch: () => mockDispatch,
       });
 
@@ -308,10 +308,10 @@ describe("billingMeterDispatchReactor", () => {
 
       const mockDispatch = vi.fn().mockResolvedValue(undefined);
 
-      const { createBillingMeterDispatchReactor } = await import(
-        "../billingMeterDispatch.reactor"
+      const { createBillingMeterDispatchSubscriber } = await import(
+        "../billingMeterDispatch.subscriber"
       );
-      const reactor = createBillingMeterDispatchReactor({
+      const reactor = createBillingMeterDispatchSubscriber({
         getDispatch: () => mockDispatch,
       });
 
@@ -331,10 +331,10 @@ describe("billingMeterDispatchReactor", () => {
     it("configures runIn, makeJobId, and an immediate per-project dedup", async () => {
       const {
         BILLING_METER_DISPATCH_SUPPRESS_MS,
-        createBillingMeterDispatchReactor,
-      } = await import("../billingMeterDispatch.reactor");
+        createBillingMeterDispatchSubscriber,
+      } = await import("../billingMeterDispatch.subscriber");
 
-      const reactor = createBillingMeterDispatchReactor({
+      const reactor = createBillingMeterDispatchSubscriber({
         getDispatch: () => vi.fn(),
       });
 

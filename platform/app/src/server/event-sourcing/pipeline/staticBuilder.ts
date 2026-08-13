@@ -500,46 +500,6 @@ export class StaticPipelineBuilderWithNameAndType<
   }
 
   /**
-   * Register a reactor on a fold or map projection.
-   * A reactor is a post-projection side-effect handler that fires after the
-   * projection's processing succeeds.
-   *
-   * @param projectionName - Name of the fold or map projection this reactor is attached to
-   * @param reactorName - Unique name for this reactor within the pipeline
-   * @param definition - Reactor definition with handle function
-   * @returns Builder instance for method chaining
-   */
-  withReactor(
-    projectionName: FoldNames | MapNames,
-    reactorName: string,
-    definition: ReactorDefinition<EventType>,
-  ): this {
-    const nameTaken =
-      this.foldReactors.has(reactorName) || this.mapReactors.has(reactorName);
-    if (nameTaken) {
-      throw new ConfigurationError(
-        "StaticPipelineBuilder",
-        `Reactor with name "${reactorName}" already exists`,
-        { reactorName },
-      );
-    }
-
-    if (this.foldProjections.has(projectionName)) {
-      this.foldReactors.set(reactorName, { projectionName, definition });
-    } else if (this.mapProjections.has(projectionName)) {
-      this.mapReactors.set(reactorName, { projectionName, definition });
-    } else {
-      throw new ConfigurationError(
-        "StaticPipelineBuilder",
-        `Cannot register reactor "${reactorName}" on projection "${projectionName}" — projection not found`,
-        { projectionName, reactorName },
-      );
-    }
-
-    return this;
-  }
-
-  /**
    * Register a command handler class (zero-arg constructor).
    * The framework will instantiate the handler via `new handlerClass()`.
    *

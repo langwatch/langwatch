@@ -16,13 +16,24 @@
  * registered: no job enqueued, no handler run, and the skip counter moved.
  */
 
-import { createGovernanceKpisSyncReactor } from "@ee/governance/reactors/governanceKpisSync.reactor";
-import { createGovernanceOcsfEventsSyncReactor } from "@ee/governance/reactors/governanceOcsfEventsSync.reactor";
+import {
+  createGovernanceKpisSyncHandler,
+  GOVERNANCE_KPIS_SYNC_WINDOW_MS,
+  isGovernanceKpiTrace,
+} from "@ee/governance/subscribers/governanceKpisSync.subscriber";
+import {
+  createGovernanceOcsfEventsSyncHandler,
+  GOVERNANCE_OCSF_EVENTS_SYNC_WINDOW_MS,
+  isGovernanceOcsfTrace,
+} from "@ee/governance/subscribers/governanceOcsfEventsSync.subscriber";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { Event } from "~/server/event-sourcing/domain/types";
+import { buildTraceDeps } from "~/server/event-sourcing/pipelines/trace-processing/__tests__/support/traceProcessingFixtures";
+import { createTraceProcessingPipeline } from "~/server/event-sourcing/pipelines/trace-processing/pipeline";
 import { ProjectionRouter } from "~/server/event-sourcing/projections/projectionRouter";
 import type { ReactorDefinition } from "~/server/event-sourcing/reactors/reactor.types";
+import { throttledWindow } from "~/server/event-sourcing/reactors/throttleWindow";
 import {
   createMockFoldProjectionDefinition,
   createMockFoldProjectionStore,
@@ -59,18 +70,45 @@ function createFoldState(attributes: Record<string, string>): TraceSummaryData {
   } as unknown as TraceSummaryData;
 }
 
-function createGovernanceReactors(): ReactorDefinition<Event>[] {
+/**
+ * The registrations under test are built through the REAL trace pipeline with
+ * the specs composed the way the registry composes them, so what the router
+ * evaluates here is exactly what production registers.
+ */
+function createGovernanceSubscriberDefinitions(): ReactorDefinition<Event>[] {
+  const pipeline = createTraceProcessingPipeline(
+    buildTraceDeps({
+      governanceKpisSync: {
+        fold: "traceSummary",
+        when: isGovernanceKpiTrace,
+        ...throttledWindow({
+          makeId: (e) => `${e.tenantId}:${e.aggregateId}`,
+          windowMs: GOVERNANCE_KPIS_SYNC_WINDOW_MS,
+        }),
+        handler: createGovernanceKpisSyncHandler({
+          governanceKpisRepository: { insertContribution: vi.fn() } as any,
+        }),
+      },
+      governanceOcsfEventsSync: {
+        fold: "traceSummary",
+        when: isGovernanceOcsfTrace,
+        ...throttledWindow({
+          makeId: (e) => `${e.tenantId}:${e.aggregateId}`,
+          windowMs: GOVERNANCE_OCSF_EVENTS_SYNC_WINDOW_MS,
+        }),
+        handler: createGovernanceOcsfEventsSyncHandler({
+          governanceOcsfEventsRepository: { insertEvent: vi.fn() } as any,
+        }),
+      },
+    }),
+  );
   return [
-    createGovernanceKpisSyncReactor({
-      governanceKpisRepository: { insertContribution: vi.fn() } as any,
-    }),
-    createGovernanceOcsfEventsSyncReactor({
-      governanceOcsfEventsRepository: { insertEvent: vi.fn() } as any,
-    }),
+    pipeline.foldReactors.get("governanceKpisSync")!.definition,
+    pipeline.foldReactors.get("governanceOcsfEventsSync")!.definition,
   ] as unknown as ReactorDefinition<Event>[];
 }
 
-function createRouterWithGovernanceReactors(foldState: TraceSummaryData) {
+function createRouterWithGovernanceReactors(state: TraceSummaryData) {
   const send = vi.fn().mockResolvedValue(undefined);
   const queueManager = createMockQueueManager({
     hasReactorQueues: true,
@@ -87,12 +125,12 @@ function createRouterWithGovernanceReactors(foldState: TraceSummaryData) {
   router.registerFoldProjection(
     createMockFoldProjectionDefinition(FOLD_NAME, {
       store,
-      init: () => foldState,
-      apply: () => foldState,
+      init: () => state,
+      apply: () => state,
     }),
   );
 
-  for (const reactor of createGovernanceReactors()) {
+  for (const reactor of createGovernanceSubscriberDefinitions()) {
     router.registerReactor(FOLD_NAME, reactor);
   }
 

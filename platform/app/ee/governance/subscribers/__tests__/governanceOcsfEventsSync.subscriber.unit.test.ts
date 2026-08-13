@@ -20,7 +20,7 @@
  *     IS set (per the spec scenario)
  *   - ActionName falls back to "trace.recorded" when tool.name missing
  *   - TargetName falls back from gen_ai.request.model → models[0] → ""
- *   - EventId equals foldState.traceId (one OCSF row per trace)
+ *   - EventId equals state.traceId (one OCSF row per trace)
  *   - Repository errors captured + suppressed (reactor failures must
  *     NOT block the trace pipeline)
  *   - Job-id dedup contract: per-(tenant, trace) with positive TTL
@@ -38,11 +38,12 @@ import {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
-import type { ReactorContext } from "~/server/event-sourcing/reactors/reactor.types";
+import type { TriggerContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import {
-  createGovernanceOcsfEventsSyncReactor,
-  type GovernanceOcsfEventsSyncReactorDeps,
-} from "../governanceOcsfEventsSync.reactor";
+  createGovernanceOcsfEventsSyncHandler,
+  isGovernanceOcsfTrace,
+  type GovernanceOcsfEventsSyncSubscriberDeps,
+} from "../governanceOcsfEventsSync.subscriber";
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
@@ -116,7 +117,7 @@ const event: TraceProcessingEvent = {
 } as unknown as TraceProcessingEvent;
 
 function mockDeps(): {
-  deps: GovernanceOcsfEventsSyncReactorDeps;
+  deps: GovernanceOcsfEventsSyncSubscriberDeps;
   insertEvent: ReturnType<typeof vi.fn>;
 } {
   const insertEvent = vi.fn().mockResolvedValue(undefined);
@@ -130,22 +131,22 @@ function mockDeps(): {
   };
 }
 
-function ctx(foldState: TraceSummaryData): ReactorContext<TraceSummaryData> {
+function ctx(state: TraceSummaryData): TriggerContext<TraceSummaryData> {
   return {
     tenantId: "gov-project-1",
     aggregateId: "trace-1",
-    foldState,
+    state,
   };
 }
 
-describe("governanceOcsfEventsSync reactor", () => {
+describe("governanceOcsfEventsSync subscriber", () => {
   beforeEach(() => vi.clearAllMocks());
 
   describe("when the trace has no governance origin attributes", () => {
     it("skips silently — application traces never reach OCSF export", async () => {
       const { deps, insertEvent } = mockDeps();
-      const reactor = createGovernanceOcsfEventsSyncReactor(deps);
-      await reactor.handle(event, ctx(createFoldState({})));
+      const reactor = createGovernanceOcsfEventsSyncHandler(deps);
+      await reactor(event, ctx(createFoldState({})));
       expect(insertEvent).not.toHaveBeenCalled();
     });
   });
@@ -153,8 +154,8 @@ describe("governanceOcsfEventsSync reactor", () => {
   describe("when langwatch.origin.kind is not 'ingestion_source'", () => {
     it("skips — origin.kind is reserved for governance ingest only", async () => {
       const { deps, insertEvent } = mockDeps();
-      const reactor = createGovernanceOcsfEventsSyncReactor(deps);
-      await reactor.handle(
+      const reactor = createGovernanceOcsfEventsSyncHandler(deps);
+      await reactor(
         event,
         ctx(createFoldState({ "langwatch.origin.kind": "personal_workspace" })),
       );
@@ -165,8 +166,8 @@ describe("governanceOcsfEventsSync reactor", () => {
   describe("when origin.kind is set but ingestion_source.id is missing", () => {
     it("warns + skips — defensive against malformed governance traffic", async () => {
       const { deps, insertEvent } = mockDeps();
-      const reactor = createGovernanceOcsfEventsSyncReactor(deps);
-      await reactor.handle(
+      const reactor = createGovernanceOcsfEventsSyncHandler(deps);
+      await reactor(
         event,
         ctx(createFoldState({ "langwatch.origin.kind": "ingestion_source" })),
       );
@@ -177,8 +178,8 @@ describe("governanceOcsfEventsSync reactor", () => {
   describe("when occurredAt is the initial sentinel (0)", () => {
     it("skips — fold has not yet observed any spans", async () => {
       const { deps, insertEvent } = mockDeps();
-      const reactor = createGovernanceOcsfEventsSyncReactor(deps);
-      await reactor.handle(
+      const reactor = createGovernanceOcsfEventsSyncHandler(deps);
+      await reactor(
         event,
         ctx(
           createFoldState(
@@ -197,7 +198,7 @@ describe("governanceOcsfEventsSync reactor", () => {
   describe("when origin attributes + actor + target are fully present", () => {
     it("inserts a full OCSF row with all fields populated", async () => {
       const { deps, insertEvent } = mockDeps();
-      const reactor = createGovernanceOcsfEventsSyncReactor(deps);
+      const reactor = createGovernanceOcsfEventsSyncHandler(deps);
       const state = createFoldState({
         "langwatch.origin.kind": "ingestion_source",
         "langwatch.ingestion_source.id": "is-1",
@@ -209,7 +210,7 @@ describe("governanceOcsfEventsSync reactor", () => {
         "gen_ai.request.model": "claude-sonnet-4",
       });
 
-      await reactor.handle(event, ctx(state));
+      await reactor(event, ctx(state));
 
       expect(insertEvent).toHaveBeenCalledTimes(1);
       const [row] = insertEvent.mock.calls[0]!;
@@ -231,14 +232,14 @@ describe("governanceOcsfEventsSync reactor", () => {
 
     it("emits valid OCSF JSON in rawOcsfJson", async () => {
       const { deps, insertEvent } = mockDeps();
-      const reactor = createGovernanceOcsfEventsSyncReactor(deps);
+      const reactor = createGovernanceOcsfEventsSyncHandler(deps);
       const state = createFoldState({
         "langwatch.origin.kind": "ingestion_source",
         "langwatch.ingestion_source.id": "is-1",
         "langwatch.ingestion_source.source_type": "otel_generic",
         "langwatch.user_id": "user-42",
       });
-      await reactor.handle(event, ctx(state));
+      await reactor(event, ctx(state));
       const [row] = insertEvent.mock.calls[0]!;
       const parsed = JSON.parse(row.rawOcsfJson);
       expect(parsed.class_uid).toBe(6003);
@@ -254,14 +255,14 @@ describe("governanceOcsfEventsSync reactor", () => {
   describe("severity elevation per spec scenario", () => {
     it("elevates severity to MEDIUM when langwatch.governance.anomaly_alert_id is set", async () => {
       const { deps, insertEvent } = mockDeps();
-      const reactor = createGovernanceOcsfEventsSyncReactor(deps);
+      const reactor = createGovernanceOcsfEventsSyncHandler(deps);
       const state = createFoldState({
         "langwatch.origin.kind": "ingestion_source",
         "langwatch.ingestion_source.id": "is-1",
         "langwatch.ingestion_source.source_type": "claude_cowork",
         "langwatch.governance.anomaly_alert_id": "alert-anomaly-123",
       });
-      await reactor.handle(event, ctx(state));
+      await reactor(event, ctx(state));
       const [row] = insertEvent.mock.calls[0]!;
       expect(row.severityId).toBe(OCSF_SEVERITY.MEDIUM);
       expect(row.anomalyAlertId).toBe("alert-anomaly-123");
@@ -271,13 +272,13 @@ describe("governanceOcsfEventsSync reactor", () => {
   describe("when tool.name is missing", () => {
     it("falls back ActionName to 'trace.recorded'", async () => {
       const { deps, insertEvent } = mockDeps();
-      const reactor = createGovernanceOcsfEventsSyncReactor(deps);
+      const reactor = createGovernanceOcsfEventsSyncHandler(deps);
       const state = createFoldState({
         "langwatch.origin.kind": "ingestion_source",
         "langwatch.ingestion_source.id": "is-1",
         "langwatch.ingestion_source.source_type": "otel_generic",
       });
-      await reactor.handle(event, ctx(state));
+      await reactor(event, ctx(state));
       const [row] = insertEvent.mock.calls[0]!;
       expect(row.actionName).toBe("trace.recorded");
     });
@@ -286,20 +287,20 @@ describe("governanceOcsfEventsSync reactor", () => {
   describe("TargetName fallback chain", () => {
     it("prefers gen_ai.request.model when present", async () => {
       const { deps, insertEvent } = mockDeps();
-      const reactor = createGovernanceOcsfEventsSyncReactor(deps);
+      const reactor = createGovernanceOcsfEventsSyncHandler(deps);
       const state = createFoldState({
         "langwatch.origin.kind": "ingestion_source",
         "langwatch.ingestion_source.id": "is-1",
         "gen_ai.request.model": "claude-haiku-4-5",
       });
-      await reactor.handle(event, ctx(state));
+      await reactor(event, ctx(state));
       const [row] = insertEvent.mock.calls[0]!;
       expect(row.targetName).toBe("claude-haiku-4-5");
     });
 
-    it("falls back to foldState.models[0] when gen_ai.request.model missing", async () => {
+    it("falls back to state.models[0] when gen_ai.request.model missing", async () => {
       const { deps, insertEvent } = mockDeps();
-      const reactor = createGovernanceOcsfEventsSyncReactor(deps);
+      const reactor = createGovernanceOcsfEventsSyncHandler(deps);
       const state = createFoldState(
         {
           "langwatch.origin.kind": "ingestion_source",
@@ -307,14 +308,14 @@ describe("governanceOcsfEventsSync reactor", () => {
         },
         { models: ["fallback-model"] },
       );
-      await reactor.handle(event, ctx(state));
+      await reactor(event, ctx(state));
       const [row] = insertEvent.mock.calls[0]!;
       expect(row.targetName).toBe("fallback-model");
     });
 
     it("falls back to '' when no model info available", async () => {
       const { deps, insertEvent } = mockDeps();
-      const reactor = createGovernanceOcsfEventsSyncReactor(deps);
+      const reactor = createGovernanceOcsfEventsSyncHandler(deps);
       const state = createFoldState(
         {
           "langwatch.origin.kind": "ingestion_source",
@@ -322,7 +323,7 @@ describe("governanceOcsfEventsSync reactor", () => {
         },
         { models: [] },
       );
-      await reactor.handle(event, ctx(state));
+      await reactor(event, ctx(state));
       const [row] = insertEvent.mock.calls[0]!;
       expect(row.targetName).toBe("");
     });
@@ -333,17 +334,17 @@ describe("governanceOcsfEventsSync reactor", () => {
       const insertEvent = vi
         .fn()
         .mockRejectedValue(new Error("CH connection failed"));
-      const deps: GovernanceOcsfEventsSyncReactorDeps = {
+      const deps: GovernanceOcsfEventsSyncSubscriberDeps = {
         governanceOcsfEventsRepository: {
           insertEvent,
         } as unknown as GovernanceOcsfEventsClickHouseRepository,
       };
-      const reactor = createGovernanceOcsfEventsSyncReactor(deps);
+      const reactor = createGovernanceOcsfEventsSyncHandler(deps);
       const state = createFoldState({
         "langwatch.origin.kind": "ingestion_source",
         "langwatch.ingestion_source.id": "is-1",
       });
-      await expect(reactor.handle(event, ctx(state))).resolves.toBeUndefined();
+      await expect(reactor(event, ctx(state))).resolves.toBeUndefined();
       expect(insertEvent).toHaveBeenCalledTimes(1);
     });
   });
@@ -351,15 +352,11 @@ describe("governanceOcsfEventsSync reactor", () => {
   describe("pre-enqueue gate", () => {
     describe("when the trace carries no governance origin", () => {
       it("declines before a job is packed", () => {
-        const { deps } = mockDeps();
-        const reactor = createGovernanceOcsfEventsSyncReactor(deps);
-
-        expect(reactor.shouldReact).toBeDefined();
-        expect(reactor.shouldReact!(event, ctx(createFoldState({})))).toBe(
+        expect(isGovernanceOcsfTrace(event, ctx(createFoldState({})))).toBe(
           false,
         );
         expect(
-          reactor.shouldReact!(
+          isGovernanceOcsfTrace(
             event,
             ctx(createFoldState({ "langwatch.origin.kind": "gateway" })),
           ),
@@ -369,28 +366,16 @@ describe("governanceOcsfEventsSync reactor", () => {
 
     describe("when the trace came from an ingestion source", () => {
       it("accepts the event", () => {
-        const { deps } = mockDeps();
-        const reactor = createGovernanceOcsfEventsSyncReactor(deps);
         const state = createFoldState({
           "langwatch.origin.kind": "ingestion_source",
           "langwatch.ingestion_source.id": "is-1",
         });
 
-        expect(reactor.shouldReact!(event, ctx(state))).toBe(true);
+        expect(isGovernanceOcsfTrace(event, ctx(state))).toBe(true);
       });
     });
   });
 
-  describe("dedup contract", () => {
-    it("declares a per-(tenant, trace) job-id for the queue's dedup", () => {
-      const { deps } = mockDeps();
-      const reactor = createGovernanceOcsfEventsSyncReactor(deps);
-      expect(reactor.options?.makeJobId).toBeDefined();
-      const jobId = reactor.options!.makeJobId!({
-        event: { tenantId: "t-1", aggregateId: "trace-x" },
-      } as any);
-      expect(jobId).toBe("governance-ocsf-events-sync-t-1-trace-x");
-      expect(reactor.options?.deduplication?.ttlMs).toBeGreaterThan(0);
-    });
-  });
+  // The window / dedup wiring lives on the pipeline registration composed in
+  // the registry — governanceSubscribersPreEnqueueGate.unit.test.ts drives it.
 });
