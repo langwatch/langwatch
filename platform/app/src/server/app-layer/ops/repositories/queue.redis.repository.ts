@@ -9,7 +9,10 @@ import {
 } from "~/server/event-sourcing/queues/groupQueue/cachedLuaScript";
 import {
   decodeJobEnvelope,
+  isEnvelope,
+  readEnvelopeDescriptor,
   readJobRoutingMeta,
+  splitEnvelope,
 } from "~/server/event-sourcing/queues/groupQueue/jobEnvelope";
 import { legacyStagedJobAttempt } from "~/server/event-sourcing/queues/groupQueue/legacyStagedJobAttempt";
 import { RedisJobBlobStore } from "~/server/event-sourcing/queues/groupQueue/redisJobBlobStore";
@@ -774,6 +777,25 @@ export class QueueRedisRepository implements QueueRepository {
 
   // ── Job Browsing ────────────────────────────────────────────────
 
+  /**
+   * The payload size to DISPLAY for a staged value: the encoder-recorded
+   * `header.s` when present, the stored length for bare JSON, and null when
+   * the value cannot say. Deliberately not `readJobPayloadBytes`, whose
+   * "unknown is worth the cap" sentinel is a batch-budget rule — rendered on
+   * a job card it would read as a 50 MB payload that isn't one.
+   */
+  private readDisplayPayloadBytes(raw: string): number | null {
+    try {
+      if (!isEnvelope(raw)) return Buffer.byteLength(raw, "utf8");
+      const { header } = splitEnvelope(raw);
+      return Number.isSafeInteger(header.s) && (header.s as number) >= 0
+        ? (header.s as number)
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
   async getGroupJobs(params: {
     queueName: string;
     groupId: string;
@@ -800,7 +822,13 @@ export class QueueRedisRepository implements QueueRepository {
       const jobId = jobEntries[i]!;
       const score = parseFloat(jobEntries[i + 1]!);
       jobIds.push(jobId);
-      jobs.push({ jobId, score, data: null });
+      jobs.push({
+        jobId,
+        score,
+        data: null,
+        payloadBytes: null,
+        envelope: null,
+      });
     }
 
     if (jobIds.length > 0) {
@@ -830,6 +858,13 @@ export class QueueRedisRepository implements QueueRepository {
         jobIds.map(async (_, i) => {
           const raw = dataResults?.[i]?.[1] as string | null;
           if (raw) {
+            // Storage shape from the header alone — survives a body the
+            // decode below cannot read, which is exactly when an operator
+            // most wants to know where the body was supposed to be.
+            jobs[i]!.envelope = isEnvelope(raw)
+              ? readEnvelopeDescriptor(raw)
+              : null;
+            jobs[i]!.payloadBytes = this.readDisplayPayloadBytes(raw);
             try {
               // Ops-dashboard inspection: DO NOT refresh the blob TTL on read
               // (2026-06-24 review). A repeatedly-viewed blocked group would

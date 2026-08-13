@@ -30,6 +30,7 @@ import {
   resolveEffectiveForListing,
 } from "~/server/featureFlag/rules";
 import { AnomalyStateStore } from "~/server/observability/anomalyState";
+import { grafanaConfigFromEnv } from "~/utils/grafanaLinks";
 
 const opsViewPermission = checkOpsPermission({ permission: "ops:view" });
 
@@ -283,6 +284,20 @@ export const opsRouter = createTRPCRouter({
       }
       return group;
     }),
+
+  /**
+   * The Grafana deep-link config, so ops surfaces can build per-row Explore
+   * links client-side with the pure builders in `~/utils/grafanaLinks`. Null
+   * when no Grafana is configured — callers render no link rather than a dead
+   * one. Gated like every other ops read; Grafana itself is access-controlled,
+   * so the base URL is not a secret to an operator.
+   */
+  getGrafanaLinkConfig: protectedProcedure.use(opsViewPermission).query(() => {
+    const { baseUrl, tempoDatasourceUid, lokiDatasourceUid } =
+      grafanaConfigFromEnv();
+    if (!baseUrl) return null;
+    return { baseUrl, tempoDatasourceUid, lokiDatasourceUid };
+  }),
 
   getBlockedSummary: protectedProcedure
     .use(opsViewPermission)

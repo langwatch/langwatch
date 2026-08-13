@@ -34,10 +34,31 @@ export interface DrainPreview {
   byError: Array<{ message: string; count: number }>;
 }
 
+/**
+ * How a job's staged value is stored, read from the envelope header alone
+ * (shape only, never body bytes — see `readEnvelopeDescriptor`). Null for
+ * legacy bare-JSON values that carry no envelope.
+ */
+export interface JobEnvelopeInfo {
+  /** Body encoding — "redis" | "s3" | "ref" | "gz" | "j". */
+  format: string | null;
+  /** Envelope version (1 = GQ1, 2 = GQ2 content-addressed). */
+  version: number | null;
+  /** GQ1 blob id or GQ2 tiered blob hash when the body is offloaded. */
+  blobId: string | null;
+}
+
 export interface JobEntry {
   jobId: string;
   score: number;
   data: Record<string, unknown> | null;
+  /**
+   * Serialized payload size in bytes as the encoder recorded it — the size the
+   * payload has back in a worker's hands, not the (compressed/offloaded)
+   * stored value's length. Null when the value predates the size field.
+   */
+  payloadBytes: number | null;
+  envelope: JobEnvelopeInfo | null;
 }
 
 /** Result returned by {@link QueueRepository.reconcileTotalPending}. */

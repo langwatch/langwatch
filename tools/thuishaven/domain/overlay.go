@@ -205,8 +205,12 @@ func (s Stack) observabilityEnv() []string {
 		"RUM_ENABLED=true",
 	}
 	// The Grafana base URL, so the app can build clickable trace/log deep links.
-	// Loopback: the link is followed by the developer's own browser on this machine.
-	if s.ObservabilityGrafanaPort != 0 {
+	// The proxied hostname when the portless proxy carries the route (stable,
+	// matches every other haven surface); loopback otherwise — either way the
+	// link is followed by the developer's own browser on this machine.
+	if s.ObservabilityGrafanaURL != "" {
+		env = append(env, "GRAFANA_BASE_URL="+s.ObservabilityGrafanaURL)
+	} else if s.ObservabilityGrafanaPort != 0 {
 		env = append(env, fmt.Sprintf("GRAFANA_BASE_URL=http://127.0.0.1:%d", s.ObservabilityGrafanaPort))
 	}
 	// Quiet the console to warn+ (the full stream is in Grafana). Empty = opt-out.
