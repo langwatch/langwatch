@@ -26,7 +26,6 @@ import {
 } from "react";
 
 import { usePeriodSelector } from "~/components/PeriodSelector";
-import { showErrorToast } from "~/features/errors";
 
 import { useGovernedSqlQuery } from "../hooks/useGovernedSqlQuery";
 import { useGovernedSqlSchema } from "../hooks/useGovernedSqlSchema";
@@ -302,26 +301,15 @@ function useDraftInsert({
   return { registerInsert, handleInsert, insertExample };
 }
 
-export function GovernedSqlWorkbench({ projectId }: GovernedSqlWorkbenchProps) {
-  const schema = useGovernedSqlSchema({ projectId });
-  const query = useGovernedSqlQuery({ projectId });
-
-  const [schemaVisible, setSchemaVisible] = useState(true);
-  const { parameters, parametersSendable } = useParameterState(query);
-  const { registerInsert, handleInsert, insertExample } = useDraftInsert({
-    query,
-    exampleSql: schema.model.datasets[0]?.exampleSql,
-  });
-  const failure = useMemo(() => failureView(query.state), [query.state]);
-  const wiring = useSavedChartWiring({ projectId, query });
-  const timeWindow = useWorkbenchTimeWindow({ query });
-
-  // The chart specification lives here rather than in chart mode, which a
-  // refused query unmounts. A member who edits a chart, hits a refusal, fixes
-  // the SQL and runs again finds the chart they wrote, not the example.
-  //
-  // Scoped to the opened chart's revision: opening a saved chart shows that
-  // chart's specification, not an edit made against the previous one.
+/**
+ * The chart specification lives here rather than in chart mode, which a
+ * refused query unmounts. A member who edits a chart, hits a refusal, fixes
+ * the SQL and runs again finds the chart they wrote, not the example.
+ *
+ * Scoped to the opened chart's revision: opening a saved chart shows that
+ * chart's specification, not an edit made against the previous one.
+ */
+function useSpecDraft(wiring: ReturnType<typeof useSavedChartWiring>) {
   const [specDraft, setSpecDraft] = useState<{
     revision: number;
     text: string | null;
@@ -337,6 +325,23 @@ export function GovernedSqlWorkbench({ projectId }: GovernedSqlWorkbenchProps) {
   // saved specification, else `null` — which chart mode reads as "follow the
   // starter for the result on screen".
   const shownSpecText = editedSpecText ?? wiring.openedSpecText ?? null;
+  return { shownSpecText, setEditedSpecText };
+}
+
+export function GovernedSqlWorkbench({ projectId }: GovernedSqlWorkbenchProps) {
+  const schema = useGovernedSqlSchema({ projectId });
+  const query = useGovernedSqlQuery({ projectId });
+
+  const [schemaVisible, setSchemaVisible] = useState(true);
+  const { parameters, parametersSendable } = useParameterState(query);
+  const { registerInsert, handleInsert, insertExample } = useDraftInsert({
+    query,
+    exampleSql: schema.model.datasets[0]?.exampleSql,
+  });
+  const failure = useMemo(() => failureView(query.state), [query.state]);
+  const wiring = useSavedChartWiring({ projectId, query });
+  const timeWindow = useWorkbenchTimeWindow({ query });
+  const { shownSpecText, setEditedSpecText } = useSpecDraft(wiring);
 
   return (
     <HStack
