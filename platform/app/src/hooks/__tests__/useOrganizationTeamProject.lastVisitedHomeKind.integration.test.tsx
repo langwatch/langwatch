@@ -12,19 +12,17 @@
  * /messages also bind `:project`, and counting those as project visits would
  * clobber MyLayout's "personal" marker.
  *
- * Same boundary-stubbing setup as the personal-workspace resolution tests:
- * the real hook runs; tRPC, router, session, and localStorage are stubbed.
+ * Unlike the sibling resolution tests, `usehooks-ts` is NOT stubbed here: the
+ * real `useLocalStorage` runs against jsdom's localStorage, so every marker
+ * write executes the actual `StorageEvent("local-storage")` fan-out. A probe
+ * subscriber mounted on the same key (standing in for MyLayout's reader)
+ * observes whether that cascade fires. tRPC, router, and session are stubbed.
  */
 import { cleanup, renderHook } from "@testing-library/react";
+import { useLocalStorage } from "usehooks-ts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const {
-  mockOrganizationsQuery,
-  mockRouter,
-  mockLocalStorage,
-  storageWrites,
-  idleQuery,
-} = vi.hoisted(() => ({
+const { mockOrganizationsQuery, mockRouter, idleQuery } = vi.hoisted(() => ({
   mockOrganizationsQuery: vi.fn(),
   idleQuery: () => ({
     data: undefined,
@@ -39,14 +37,6 @@ const {
     push: vi.fn(),
     replace: vi.fn(),
   },
-  mockLocalStorage: {
-    selectedOrganizationId: "",
-    selectedTeamId: "",
-    selectedProjectSlug: "",
-    lastVisitedHomeKind: "",
-  } as Record<string, string>,
-  /** Every setter invocation, per key — the storm surface under test. */
-  storageWrites: {} as Record<string, string[]>,
 }));
 
 vi.mock("~/utils/api", () => ({
@@ -69,25 +59,22 @@ vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => mockRouter,
 }));
 
-// Real usehooks-ts semantics minus the storage-event fan-out, plus a write
-// log: the assertions here are about WHEN the setter fires, since in the real
-// hook every firing broadcasts a storage event to all subscribers.
-vi.mock("usehooks-ts", () => ({
-  useLocalStorage: (key: string, initial: string) => [
-    mockLocalStorage[key] ?? initial,
-    (value: string) => {
-      mockLocalStorage[key] = value;
-      (storageWrites[key] ??= []).push(value);
-    },
-  ],
-}));
-
 import {
   loadedOrganizationsQuery,
   PERSONAL_TEAM,
   SHARED_TEAM,
 } from "~/test-utils/personalWorkspaceOrganization";
 import { useOrganizationTeamProject } from "../useOrganizationTeamProject";
+
+/** usehooks-ts JSON-serializes values; seeds must match its wire format. */
+function seedStorage(key: string, value: string) {
+  window.localStorage.setItem(key, JSON.stringify(value));
+}
+
+function readMarker(): string | null {
+  const raw = window.localStorage.getItem("lastVisitedHomeKind");
+  return raw === null ? null : (JSON.parse(raw) as string);
+}
 
 function renderResolution() {
   return renderHook(() =>
@@ -98,26 +85,42 @@ function renderResolution() {
   );
 }
 
+/**
+ * A mounted subscriber on the marker key, like MyLayout's reader in the real
+ * app. Every marker write broadcasts a storage event that re-renders it, so
+ * its render count observes the fan-out cascade directly.
+ */
+function renderMarkerProbe(renders: { count: number }) {
+  return renderHook(() => {
+    renders.count += 1;
+    const [kind] = useLocalStorage("lastVisitedHomeKind", "");
+    return kind;
+  });
+}
+
 describe("useOrganizationTeamProject lastVisitedHomeKind marker", () => {
+  let setItemSpy: ReturnType<typeof vi.spyOn>;
+  let markerWrites: () => number;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
     mockRouter.query = {};
     mockRouter.route = "/";
     mockRouter.pathname = "/";
     mockRouter.asPath = "/";
-    for (const key of Object.keys(mockLocalStorage)) {
-      mockLocalStorage[key] = "";
-    }
-    for (const key of Object.keys(storageWrites)) {
-      delete storageWrites[key];
-    }
     mockOrganizationsQuery.mockReturnValue(
       loadedOrganizationsQuery([PERSONAL_TEAM, SHARED_TEAM]),
     );
+    setItemSpy = vi.spyOn(Storage.prototype, "setItem");
+    markerWrites = () =>
+      setItemSpy.mock.calls.filter(([key]) => key === "lastVisitedHomeKind")
+        .length;
   });
 
   afterEach(() => {
     cleanup();
+    vi.restoreAllMocks();
   });
 
   describe("given a real project page named in the address bar", () => {
@@ -128,20 +131,41 @@ describe("useOrganizationTeamProject lastVisitedHomeKind marker", () => {
       mockRouter.asPath = "/acme-app/traces";
     });
 
-    /** @scenario A first project visit marks the home preference */
-    it("writes the marker once when it is not set yet", () => {
+    /**
+     * @scenario A first project visit marks the home preference, and the
+     * cascade it triggers converges: one write, one broadcast, done.
+     */
+    it("writes the marker once and the fan-out reaches subscribers exactly once", () => {
+      const probeRenders = { count: 0 };
+      const probe = renderMarkerProbe(probeRenders);
+      const rendersBeforeHook = probeRenders.count;
+
       renderResolution();
 
-      expect(storageWrites.lastVisitedHomeKind).toEqual(["project"]);
+      expect(readMarker()).toBe("project");
+      // The real storage event reached the mounted subscriber…
+      expect(probe.result.current).toBe("project");
+      // …exactly once: an unguarded write re-broadcasts on every effect
+      // pass, which is the cascade that tripped React's clamp.
+      expect(markerWrites()).toBe(1);
+      expect(probeRenders.count).toBe(rendersBeforeHook + 1);
     });
 
     /** @scenario A repeat visit must not re-broadcast a storage event */
-    it("does not write again when the marker already says project", () => {
-      mockLocalStorage.lastVisitedHomeKind = "project";
+    it("does not write or broadcast when the marker already says project", () => {
+      seedStorage("lastVisitedHomeKind", "project");
+      const probeRenders = { count: 0 };
+      renderMarkerProbe(probeRenders);
+      const rendersBeforeHook = probeRenders.count;
+      setItemSpy.mockClear(); // discard the seeding write itself
 
       renderResolution();
 
-      expect(storageWrites.lastVisitedHomeKind).toBeUndefined();
+      expect(markerWrites()).toBe(0);
+      // No broadcast → the mounted subscriber never re-rendered. Before the
+      // guard, this path setStated every subscriber on every effect pass.
+      expect(probeRenders.count).toBe(rendersBeforeHook);
+      expect(readMarker()).toBe("project");
     });
   });
 
@@ -155,16 +179,18 @@ describe("useOrganizationTeamProject lastVisitedHomeKind marker", () => {
       mockRouter.route = "/[project]";
       mockRouter.pathname = "/[project]";
       mockRouter.asPath = "/messages";
-      mockLocalStorage.selectedProjectSlug = "acme-app";
-      mockLocalStorage.lastVisitedHomeKind = "personal";
+      seedStorage("selectedProjectSlug", "acme-app");
+      seedStorage("lastVisitedHomeKind", "personal");
     });
 
     /** @scenario Visiting /messages is not a project-home visit */
     it("leaves a personal marker alone", () => {
+      setItemSpy.mockClear(); // discard the seeding writes themselves
+
       renderResolution();
 
-      expect(storageWrites.lastVisitedHomeKind).toBeUndefined();
-      expect(mockLocalStorage.lastVisitedHomeKind).toBe("personal");
+      expect(markerWrites()).toBe(0);
+      expect(readMarker()).toBe("personal");
     });
   });
 
@@ -173,16 +199,18 @@ describe("useOrganizationTeamProject lastVisitedHomeKind marker", () => {
       mockRouter.route = "/me";
       mockRouter.pathname = "/me";
       mockRouter.asPath = "/me";
-      mockLocalStorage.selectedProjectSlug = "acme-app";
-      mockLocalStorage.lastVisitedHomeKind = "personal";
+      seedStorage("selectedProjectSlug", "acme-app");
+      seedStorage("lastVisitedHomeKind", "personal");
     });
 
     /** @scenario A resolved-but-not-addressed project is not a project visit */
     it("does not clobber the personal marker", () => {
+      setItemSpy.mockClear(); // discard the seeding writes themselves
+
       renderResolution();
 
-      expect(storageWrites.lastVisitedHomeKind).toBeUndefined();
-      expect(mockLocalStorage.lastVisitedHomeKind).toBe("personal");
+      expect(markerWrites()).toBe(0);
+      expect(readMarker()).toBe("personal");
     });
   });
 });
