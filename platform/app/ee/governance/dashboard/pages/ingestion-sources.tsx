@@ -67,6 +67,7 @@ type SourceType =
   | "copilot_studio"
   | "openai_compliance"
   | "claude_compliance"
+  | "databricks_genie"
   | "s3_custom"
   | "http_custom";
 
@@ -125,6 +126,13 @@ const SOURCE_TYPE_OPTIONS: Array<{
     blurb: "Polls Anthropic's compliance API with a workspace API key.",
   },
   {
+    value: "databricks_genie",
+    label: "Databricks AI/BI Genie",
+    mode: "pull",
+    blurb:
+      "Records who asked what in Genie and the SQL it ran against your warehouse. Needs a workspace token with Can Manage on every Genie space you want covered — anything less returns only that token's own conversations.",
+  },
+  {
     value: "s3_custom",
     label: "Custom S3 audit log",
     mode: "s3",
@@ -157,7 +165,7 @@ const STATUS_META: Record<
   disabled: { icon: CircleX, label: "Disabled", color: "fg.muted" },
 };
 
-interface ComposerState {
+export interface ComposerState {
   sourceType: SourceType;
   name: string;
   description: string;
@@ -190,6 +198,7 @@ const PULL_ADAPTER_FOR_SOURCE: Partial<Record<SourceType, string>> = {
   copilot_studio: "copilot_studio",
   openai_compliance: "openai_compliance",
   claude_compliance: "claude_compliance",
+  databricks_genie: "databricks_genie",
   http_custom: "http_polling",
 };
 
@@ -203,6 +212,7 @@ const PULL_SCHEDULE_DEFAULTS: Record<string, string> = {
   copilot_studio: "*/15 * * * *",
   openai_compliance: "*/15 * * * *",
   claude_compliance: "*/15 * * * *",
+  databricks_genie: "*/15 * * * *",
   http_polling: "*/15 * * * *",
 };
 
@@ -319,9 +329,11 @@ function IngestionSourcesPage() {
     const pullConfig =
       composer.sourceType === "http_custom"
         ? buildHttpCustomPullConfig(composer)
-        : pullAdapter
-          ? { adapter: pullAdapter }
-          : null;
+        : composer.sourceType === "databricks_genie"
+          ? buildDatabricksGeniePullConfig(composer)
+          : pullAdapter
+            ? { adapter: pullAdapter }
+            : null;
     if (composer.sourceType === "http_custom" && !pullConfig) {
       // buildHttpCustomPullConfig returns null when required fields are
       // empty - keep the drawer open so the user can fix the form.
@@ -329,6 +341,14 @@ function IngestionSourcesPage() {
         title: "Missing required HTTP source fields",
         description:
           "URL, auth header value, token, events JSONPath, cursor JSONPath, and event mapping are all required.",
+        type: "error",
+      });
+      return;
+    }
+    if (composer.sourceType === "databricks_genie" && !pullConfig) {
+      toaster.create({
+        title: "Missing required Databricks fields",
+        description: "Workspace URL and workspace token are both required.",
         type: "error",
       });
       return;
@@ -940,9 +960,18 @@ interface FieldDef {
   placeholder: string;
   hint?: string;
   required?: boolean;
+  /**
+   * True when this field's value is a secret: something that must be
+   * masked as the admin types it AND kept out of the plaintext
+   * `parserConfig` JSONB (it belongs only inside the encrypted
+   * `credentials` subtree). This is the single declaration both of those
+   * decisions are driven from - see `isSecretFieldKey` below for why
+   * that matters.
+   */
+  secret?: boolean;
 }
 
-const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
+export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
   // No parser-config fields for generic OTel sources today - the
   // receiver accepts any well-formed OTLP/HTTP body. (Earlier copy
   // referenced a `LangWatchSourceType` attribute filter that the
@@ -990,6 +1019,7 @@ const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       placeholder: "(value pasted from Azure portal)",
       hint: "We hash this server-side; only the hash is persisted.",
       required: true,
+      secret: true,
     },
     {
       key: "pollEverySec",
@@ -1031,11 +1061,38 @@ const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       placeholder: "sk-ant-admin-...",
       hint: "Generate under Anthropic Admin Console → Compliance → Workspace API Keys. We hash this server-side.",
       required: true,
+      secret: true,
     },
     {
       key: "pollEverySec",
       label: "Polling cadence (seconds)",
       placeholder: "300",
+    },
+  ],
+  databricks_genie: [
+    {
+      key: "workspaceUrl",
+      label: "Workspace URL",
+      placeholder: "https://adb-1234567890123456.7.azuredatabricks.net",
+      required: true,
+    },
+    {
+      // Named `credentialsToken` on purpose: `buildParserConfig` routes every
+      // `credentials*` field into the `credentials` subtree, which is the ONLY
+      // part of parserConfig the server encrypts before it reaches the
+      // database. A field named `token` would sit in the JSONB in plaintext.
+      key: "credentialsToken",
+      label: "Workspace token",
+      placeholder: "dapi...",
+      hint: "A personal access token or OAuth token for a service principal holding Can Manage on every Genie space you want covered. Read access is not enough — Databricks only returns other people's conversations to a token that can manage the space, so a weaker token records nothing and reports no error. We encrypt this server-side.",
+      required: true,
+      secret: true,
+    },
+    {
+      key: "spaceIds",
+      label: "Genie space IDs (optional)",
+      placeholder: "Leave empty to cover every space the token can see",
+      hint: "Comma-separated. Empty is the usual setting — new spaces are then covered the day someone creates them.",
     },
   ],
   s3_custom: [
@@ -1097,6 +1154,7 @@ const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       placeholder: "(value pasted from the upstream admin console)",
       hint: "Persisted server-side; only the value is held in IngestionSource.pullConfig.credentials. Substituted into the header template at request time.",
       required: true,
+      secret: true,
     },
     {
       key: "eventsJsonPath",
@@ -1128,6 +1186,37 @@ const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
     },
   ],
 };
+
+const SECRET_FIELD_KEYS = new Set(
+  Object.values(PARSER_FIELDS)
+    .flat()
+    .filter((f) => f.secret)
+    .map((f) => f.key),
+);
+
+/**
+ * "Is this field a secret" used to be answered two different ways in this
+ * file: an exact-match allowlist decided whether the input rendered masked,
+ * and a separate `key.startsWith("credentials")` check in `parserFieldValue`
+ * decided whether the value was routed into the encrypted `credentials`
+ * subtree instead of the plaintext `parserConfig`. They happened to agree on
+ * every field that existed at the time, but nothing forced them to keep
+ * agreeing - a future field could satisfy one rule and not the other, and
+ * the two ways that can go wrong are both bad: a genuinely secret value
+ * rendered in plaintext on screen, or a plausibly-secret-looking value
+ * persisted to Postgres unencrypted because it missed the `credentials*`
+ * naming convention.
+ *
+ * This is now the ONE place that decision gets made. Both the input-masking
+ * render and the parserConfig storage routing call this function, driven
+ * first by the explicit `secret: true` declaration on the `FieldDef` (the
+ * source of truth - see the doc comment on `FieldDef.secret`), with the
+ * `credentials` prefix kept only as a belt-and-braces fallback so an
+ * undeclared `credentials*` field still can't slip through and leak.
+ */
+export function isSecretFieldKey(key: string): boolean {
+  return SECRET_FIELD_KEYS.has(key) || key.startsWith("credentials");
+}
 
 /**
  * Build the full `HttpPollingConfig`-shaped pullConfig for the
@@ -1194,6 +1283,40 @@ function buildHttpCustomPullConfig(
   };
 }
 
+/**
+ * The Databricks Genie adapter config, or null when a required field is empty.
+ *
+ * Genie needs a real builder rather than the bare `{ adapter }` the other
+ * reference pullers get, for two reasons the form cannot express on its own:
+ * the token has to land under `credentials` so the server encrypts it, and
+ * `spaceIds` is a comma-separated string in the form but an array in the
+ * adapter's schema.
+ */
+function buildDatabricksGeniePullConfig(
+  c: ComposerState,
+): Record<string, unknown> | null {
+  const p = c.parserConfig;
+  const workspaceUrl = (p.workspaceUrl ?? "").trim().replace(/\/+$/, "");
+  const token = (p.credentialsToken ?? "").trim();
+  if (!workspaceUrl || !token) return null;
+
+  return {
+    adapter: "databricks_genie",
+    workspaceUrl,
+    // Empty means "every space the token can see", which is the setting most
+    // workspaces want and the one that covers a new space automatically.
+    spaceIds: (p.spaceIds ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0),
+    schedule:
+      c.pullSchedule.trim() ||
+      PULL_SCHEDULE_DEFAULTS.databricks_genie ||
+      "*/15 * * * *",
+    credentials: { token },
+  };
+}
+
 function ParserConfigFields({
   sourceType,
   values,
@@ -1234,13 +1357,7 @@ function ParserConfigFields({
             <Input
               size="sm"
               backgroundColor="white"
-              type={
-                f.key === "credentialsToken" ||
-                f.key === "clientSecret" ||
-                f.key === "workspaceApiKey"
-                  ? "password"
-                  : "text"
-              }
+              type={isSecretFieldKey(f.key) ? "password" : "text"}
               value={values[f.key] ?? ""}
               onChange={(e) => onChange({ ...values, [f.key]: e.target.value })}
               placeholder={f.placeholder}
@@ -1291,23 +1408,62 @@ function PullScheduleField({
   );
 }
 
-function buildParserConfig(c: ComposerState): Record<string, unknown> {
+/**
+ * Form fields owned by a source type's ADAPTER config rather than by
+ * parserConfig.
+ *
+ * The server merges pullConfig into parserConfig and lets parserConfig WIN on a
+ * key clash, so a raw form value copied through here would silently override
+ * the typed one its builder produced. For Genie that is not cosmetic:
+ * `spaceIds` is a comma string in the form and an array in the adapter's
+ * schema, so the string would win and the source would fail validation at pull
+ * time — a broken source that looked fine when it was saved.
+ */
+const PULL_CONFIG_OWNED_FIELDS: Partial<Record<SourceType, readonly string[]>> =
+  {
+    databricks_genie: ["workspaceUrl", "spaceIds"],
+  };
+
+// Skip sentinel for a parserConfig entry that must not be persisted, kept
+// distinct from a legitimately-falsy value an admin typed.
+const DROP_PARSER_FIELD = Symbol("drop");
+
+// The persisted value for one parserConfig entry, or DROP_PARSER_FIELD to omit
+// it. Pulling the per-key decision out of the loop keeps `buildParserConfig`
+// flat instead of a five-deep branch ladder.
+function parserFieldValue(
+  key: string,
+  value: unknown,
+): unknown | typeof DROP_PARSER_FIELD {
+  if (value == null || value === "") return DROP_PARSER_FIELD;
+  // Secrets travel in exactly one place: `pullConfig.credentials`, which is
+  // the only subtree `encryptParserConfigCredentials` wraps before the row
+  // reaches Postgres. A secret field copied to the top level of parserConfig
+  // would be persisted as plaintext JSONB — so it never is. `isSecretFieldKey`
+  // is the single source of truth for "is this a secret" (see its doc
+  // comment) — this must not go back to an inline
+  // `key.startsWith("credentials")` check here, or the storage-routing rule
+  // can drift from the input-masking rule again.
+  if (isSecretFieldKey(key)) return DROP_PARSER_FIELD;
+  if (key === "pollEverySec") {
+    const n = Number(value);
+    return Number.isNaN(n) ? DROP_PARSER_FIELD : n;
+  }
+  return value;
+}
+
+export function buildParserConfig(c: ComposerState): Record<string, unknown> {
   const out: Record<string, unknown> = {};
+  const adapterOwned = new Set(PULL_CONFIG_OWNED_FIELDS[c.sourceType] ?? []);
   for (const [k, v] of Object.entries(c.parserConfig)) {
-    if (v == null || v === "") continue;
-    if (k === "pollEverySec") {
-      const n = Number(v);
-      if (!Number.isNaN(n)) out[k] = n;
-      continue;
-    }
-    out[k] = v;
+    if (adapterOwned.has(k)) continue;
+    const resolved = parserFieldValue(k, v);
+    if (resolved !== DROP_PARSER_FIELD) out[k] = resolved;
   }
   // Strip empty rows from the OTTL statement list - admins may leave a
   // blank trailing row from clicking "Add statement"; persisting it
   // would force the gateway parser to handle empty input as an error.
-  const ottl = c.ottlStatements
-    .map((s) => s)
-    .filter((s) => s.trim().length > 0);
+  const ottl = c.ottlStatements.filter((s) => s.trim().length > 0);
   if (ottl.length > 0) {
     out.ottlStatements = ottl;
   }
