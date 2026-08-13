@@ -64,7 +64,7 @@ function parsePrivateEnvVars(
       );
     }
 
-    map.set(orgId, { cluster, url: value });
+    map.set(orgId, { orgId, cluster, url: value });
     logger.info(
       { orgId, cluster, envVar: key },
       `Loaded private ${label} URL from env var`,
@@ -250,5 +250,12 @@ export function clearProjectOrgCache(): void {
  * Returns the parsed private ClickHouse URLs map. Exposed for testing.
  */
 export function getPrivateClickHouseUrls(): ReadonlyMap<string, string> {
-  return privateClickHouseUrls;
+  // Projected, not returned directly. The backing map now holds a route object
+  // so a failure can name its cluster, but this getter's contract is one URL
+  // per org and `tasks/clickhouseMigrate.ts` hands each value straight to goose
+  // as a connection string — returning the route would have run every private
+  // instance's migrations against "[object Object]".
+  return new Map(
+    [...privateClickHouseUrls].map(([orgId, route]) => [orgId, route.url]),
+  );
 }

@@ -18,7 +18,13 @@ import {
 } from "./resilience";
 
 export interface RetryNotice {
-  request: QueryRequest;
+  /**
+   * Absent when the policy was run without one — `run(task)` is a supported
+   * form. Optional rather than cast away: a callback that reads tenant or table
+   * off this would otherwise throw into runWithRetry's guard, and the retry
+   * telemetry would vanish rather than fail loudly.
+   */
+  request?: QueryRequest | undefined;
   /** Zero-based. */
   attempt: number;
   maxAttempts: number;
@@ -204,7 +210,7 @@ export class RetryPolicy {
         ? {}
         : {
             onRetry: (notice: Omit<RetryNotice, "request">) =>
-              onRetry({ ...notice, request } as RetryNotice),
+              onRetry({ ...notice, request }),
           }),
     });
   }

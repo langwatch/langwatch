@@ -15,7 +15,7 @@
  * query; the text of it belongs in the code, where it already is.
  */
 
-import type { QueryMiddleware, QueryRequest, QueryResult } from "./query";
+import type { QueryRequest, QueryResult } from "./query";
 
 /**
  * A failure, reduced to what is safe to ship.

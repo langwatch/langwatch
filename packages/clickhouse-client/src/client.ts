@@ -82,7 +82,7 @@ export class ClickHouseQueryClient {
     const withRetries = () =>
       this.retries === undefined
         ? runOnce()
-        : this.retries.run(runOnce, { signal: request.signal });
+        : this.retries.run(runOnce, { signal: request.signal, request });
 
     // The slot wraps the retries, so it is held for the whole statement.
     const withSlot = () =>

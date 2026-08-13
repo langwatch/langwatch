@@ -41,11 +41,19 @@ async function withTransientRetry<T>(
   fn: () => Promise<T>,
   {
     operation,
+    cluster,
     maxRetries,
     baseDelayMs,
     maxDelayMs,
   }: {
     operation: "query" | "insert";
+    /**
+     * Which ClickHouse refused the attempt. Threaded in because for a transient
+     * failure that later succeeds this is the ONLY line emitted — logFailure
+     * never runs — so without it a recovered failure on a customer's private
+     * instance is indistinguishable from one on the shared cluster.
+     */
+    cluster: string;
     maxRetries: number;
     baseDelayMs: number;
     maxDelayMs: number;
@@ -62,6 +70,7 @@ async function withTransientRetry<T>(
         logger[level](
           {
             source: "clickhouse",
+            cluster,
             operation,
             attempt: attempt + 1,
             maxRetries: maxAttempts - 1,
@@ -411,7 +420,7 @@ export function createResilientClickHouseClient({
     try {
       const result = await withTransientRetry(
         () => client.query(params as Parameters<typeof client.query>[0]),
-        { operation: "query", maxRetries, baseDelayMs, maxDelayMs },
+        { operation: "query", cluster, maxRetries, baseDelayMs, maxDelayMs },
       );
       const durationMs = performance.now() - start;
       logSuccess({ operation: "query", durationMs, params });
