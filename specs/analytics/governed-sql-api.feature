@@ -253,6 +253,7 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
     Given the governed analytics schema catalog
     When a dataset whose source sorts by a column its write path moves is inspected
     Then it declares that one row is one record rather than one sort key
+    And a dataset that declares a grain narrower than its engine's key declares a strategy that can deliver it
     And the datasets whose sort keys hold still keep the shipped default
 
   @integration

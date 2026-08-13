@@ -199,9 +199,13 @@ export interface GovernedViewDedup {
    * bucket's cost, which looks like a real number rather than like an error.
    *
    * The survivor is the merge, so there is no version to pick and
-   * {@link versionColumn} must stay absent; `FINAL` performs the merge and the
-   * key columns must be the source's whole `ORDER BY`, since that is what the
-   * engine merges on.
+   * {@link versionColumn} must stay absent; the key columns must be the
+   * source's whole `ORDER BY`, since that is what the engine merges on. `FINAL`
+   * performs the merge where the published grain is that whole key; where the
+   * grain is narrower, the view aggregates instead — `GROUP BY` the grain with
+   * every measure summed, which subsumes the merge — because `FINAL` can only
+   * collapse to the key and the surplus key columns would surface as extra rows
+   * per logical row.
    */
   readonly aggregating?: boolean;
 }
@@ -285,14 +289,22 @@ export interface GovernedViewDefinition {
    * {@link GovernedViewDefinition.grain} as columns: the identity of one
    * logical row.
    *
-   * Two consumers read it, and they are the reason it is separate from
+   * Three consumers read it, and they are the reason it is separate from
    * {@link GovernedViewDedup.keyColumns}. The fanout diagnostic asks whether a
    * join matched enough of a dataset's identity for one row to meet one row —
    * a question about the *dataset*, where the engine's sort key can be wider
    * and reporting the surplus as unmatched is a false alarm on the join the
    * schema endpoint itself advertises. The `in-tuple` strategy groups by it, so
    * what the view collapses on and what the diagnostic calls a row are one
-   * declaration rather than two that have to agree.
+   * declaration rather than two that have to agree. And an *aggregating* source
+   * whose grain is narrower than its key is rendered as a `GROUP BY` over it —
+   * see {@link GovernedViewDedup.aggregating}.
+   *
+   * Declaring it is therefore a claim the strategy has to be able to honour:
+   * under plain `FINAL` the engine collapses to its own sort key and nothing
+   * narrower, so a `FINAL` dataset whose declared grain is narrower than the
+   * key would publish a grain the view cannot deliver. The catalog guard
+   * enforces this.
    *
    * Absent — and defaulted to the sort key by {@link governedGrainColumns} —
    * wherever the two are the same list, which is most of the catalog.
@@ -383,6 +395,7 @@ export function governedGrainColumns(
 export function columnExpression(
   column: GovernedViewColumn,
   source: (name: string) => string,
+  options?: { readonly aggregated?: boolean },
 ): string {
   if (column.expression) {
     // Refused rather than resolved in either direction: a summed measure's SQL
@@ -419,7 +432,11 @@ export function columnExpression(
         `plain numeric type the merged total can be cast to`,
     );
   }
-  return `to${column.type}(${source(only)})`;
+  // Under a `GROUP BY` render the merge has not run for the view — the group
+  // is what performs it — so the measure is summed explicitly; elsewhere the
+  // merged total is already in the column and only the cast is needed.
+  const merged = options?.aggregated ? `sum(${source(only)})` : source(only);
+  return `to${column.type}(${merged})`;
 }
 
 /**

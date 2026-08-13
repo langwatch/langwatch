@@ -51,6 +51,7 @@ import { GOVERNED_VIEW_CATALOG } from "./catalog/governedViews";
 import {
   columnExpression,
   type GovernedDedupStrategy,
+  type GovernedViewColumn,
   type GovernedViewDefinition,
   governedGrainColumns,
   governedPostgresViews,
@@ -385,6 +386,33 @@ function dedupPredicate(
 }
 
 /**
+ * One projection expression under the `GROUP BY` render mode.
+ *
+ * A grain column passes through untouched — it is what the view groups on — and
+ * every other column must be a summed measure, whose expression sums inside the
+ * derived cast. Anything else is refused at provisioning time: a plain column
+ * under a `GROUP BY` would need an arbitrary-value aggregate, and an arbitrary
+ * value that looks like a real one is exactly the class of wrong number this
+ * catalog exists to prevent.
+ */
+function groupedColumnExpression(
+  view: GovernedViewDefinition,
+  column: GovernedViewColumn,
+): string {
+  const grain = governedGrainColumns(view);
+  if (grain.includes(column.name)) {
+    return columnExpression(column, sourceColumn);
+  }
+  if (!column.summed) {
+    throw new Error(
+      `governed view ${view.name} groups by its grain, and column "${column.name}" is neither part of ` +
+        `the grain nor a summed measure, so it would take an arbitrary value from its group`,
+    );
+  }
+  return columnExpression(column, sourceColumn, { aggregated: true });
+}
+
+/**
  * `CREATE OR REPLACE VIEW` for one catalog entry.
  *
  * `OR REPLACE` rather than `IF NOT EXISTS`: re-provisioning a server whose
@@ -412,6 +440,16 @@ export function governedViewStatement({
   // predicate that keeps the read off the primary from being a whole-table one.
   const postgres = isPostgresResident(view);
   const strategy = dedupStrategyFor({ view, dedup });
+  const grain = governedGrainColumns(view);
+  // An aggregating source whose published grain is narrower than the engine's
+  // key cannot be served by `FINAL`: the merge collapses to the key, and the
+  // surplus key columns would surface as extra rows per logical row. The view
+  // aggregates instead — `GROUP BY` the grain with every measure summed —
+  // which subsumes the merge, so `FINAL` is dropped rather than paid twice.
+  const grouped =
+    !postgres &&
+    view.dedup.aggregating === true &&
+    view.dedup.keyColumns.some((key) => !grain.includes(key));
   const projection = view.columns
     .map((column) => {
       // The engine table already carries the catalog's names and types — the
@@ -421,23 +459,31 @@ export function governedViewStatement({
       // have.
       const expression = postgres
         ? sourceColumn(column.name)
-        : columnExpression(column, sourceColumn);
+        : grouped
+          ? groupedColumnExpression(view, column)
+          : columnExpression(column, sourceColumn);
       return `  ${expression} AS ${quotedColumn(column.name)}`;
     })
     .join(",\n");
   const aliased = `${relation} AS ${SOURCE_ALIAS}`;
-  const from = strategy === "final" && !postgres ? `${aliased} FINAL` : aliased;
+  const from =
+    strategy === "final" && !postgres && !grouped
+      ? `${aliased} FINAL`
+      : aliased;
   const where = postgres
     ? `\n${postgresTenantPredicate({ names })}`
     : strategy === "in-tuple"
       ? `\n${dedupPredicate(view, relation)}`
       : "";
+  const groupBy = grouped
+    ? `\nGROUP BY ${grain.map(sourceColumn).join(", ")}`
+    : "";
   return (
     `CREATE OR REPLACE VIEW ` +
     `${assertIdentifier(names.database, "database")}.${assertIdentifier(view.name, "view")}\n` +
     `SQL SECURITY INVOKER\n` +
     `AS SELECT\n${projection}\n` +
-    `FROM ${from}${where}`
+    `FROM ${from}${where}${groupBy}`
   );
 }
 

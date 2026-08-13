@@ -157,13 +157,37 @@ not fan out (or stays silent on ones that do). The rule is true by construction
 now rather than by review.
 
 **The grain is a separate declaration from the sort key**
-(`GovernedViewDefinition.grainColumns`). The analytics projections are sorted
-time-first for range scans, so `trace_analytics` sorts by
-`(TenantId, OccurredAt, TraceId)` while still being one row per trace. Publishing
-the sort key as the grain made the fanout diagnostic contradict the schema
-endpoint on the very join it advertises — `(TenantId, TraceId)` reported as
-fanning out on `OccurredAt`. The diagnostic reads the grain; `keyColumns` stays
-the engine's key, which is what the enforcement above compares.
+(`GovernedViewDefinition.grainColumns`) — but only where the strategy can
+deliver the narrower grain. `evaluation_metrics` declares
+`(TenantId, EvaluationId)` against a sort key of
+`(TenantId, OccurredAt, EvaluationId)`: its `in-tuple` dedup groups by the
+grain, so the view really does return one row per evaluation, and the fanout
+diagnostic reads the same declaration the view collapses on. `trace_metrics`
+deliberately does **not** declare one, although it too is one row per trace for
+every row the current fold writes: it deduplicates with `FINAL`, which merges on
+the engine's sort key `(TenantId, OccurredAt, TraceId)` and nothing narrower, so
+a pre-freeze row whose `OccurredAt` moved (migration 00061, ADR-071) comes back
+as two rows. Declaring `(TenantId, TraceId)` there would publish a grain the
+engine cannot deliver; the diagnostic honestly reporting `OccurredAt` unmatched
+is the price of not overstating it. A catalog invariant enforces the rule:
+a grain narrower than `keyColumns` requires a strategy that groups —
+`in-tuple`, or the aggregating `GROUP BY` render below.
+
+**An aggregating source whose published grain is narrower than its key renders
+as `GROUP BY`, not `FINAL`.** `trace_metrics_by_minute` publishes
+`(TenantId, BucketStart)` over a rollup keyed
+`(TenantId, BucketStart, Model, SpanType)`: half its measures are trace facts
+(`TraceCount`, `ErrorCount`, `DurationSum`) that a per-model breakdown would
+misstate, so the view groups the breakdown away — `GROUP BY` the grain, every
+measure as `to<type>(sum(…))`, no `FINAL`, since the aggregation subsumes the
+merge. A column of such a view that is neither grain nor a summed measure is a
+provisioning error rather than an arbitrary value. The per-model breakdown is
+its own dataset, `model_usage_by_minute`, at the full key with span-fact
+measures only. This does not reopen the `argMax` rejection below: that was
+aggregation as a *dedup* device on a detail dataset, where the group keys are
+the sort key and a caller's predicates on anything else stop pruning. Here the
+group keys are the published grain of a rollup — `TenantId` and the partition
+column `BucketStart` — which is exactly where a caller's predicates already go.
 
 **`evaluation_metrics` pins the `in-tuple` strategy** (`GovernedViewDedup
 .strategy`), the one entry in the catalog that does not take the measured
@@ -177,7 +201,10 @@ on this table for the same reason. The cost is the one the measurement above
 found — the `max()` subquery carries no predicate from the caller's query, so it
 reads the tenant's whole evaluation history per query — and it is paid on this
 dataset only, rather than by moving the default onto tables whose sort keys hold
-still. The residual is a tie: two writers that stamp the same `UpdatedAt` both
+still. That cost is an **accepted risk, not a solved one**: it grows linearly
+with retained history under the query-time cap, and the row count at which a
+tenant's queries start hitting that cap is unmeasured. Measuring the crossover
+is a filed follow-up, not a blocker here. The residual is a tie: two writers that stamp the same `UpdatedAt` both
 satisfy the `IN`, and a view has no per-key `LIMIT 1` to rank them, so such a pair
 returns two rows — rare, and visible as a duplicate rather than as a plausible
 number.

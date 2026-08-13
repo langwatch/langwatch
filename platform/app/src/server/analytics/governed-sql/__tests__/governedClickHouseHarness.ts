@@ -764,6 +764,7 @@ export const ROLLUP_MERGE_FIXTURE = {
  */
 export const ROLLUP_MERGE_TOTALS: {
   readonly trace: Readonly<Record<string, number>>;
+  readonly modelUsage: Readonly<Record<string, number>>;
   readonly evaluation: Readonly<Record<string, number>>;
 } = {
   trace: {
@@ -773,6 +774,18 @@ export const ROLLUP_MERGE_TOTALS: {
     CostSum: 0.75,
     NonBilledCostSum: 0.1875,
     DurationSum: 1_300,
+    PromptTokensSum: 220,
+    CompletionTokensSum: 80,
+    CacheReadTokensSum: 40,
+    CacheWriteTokensSum: 20,
+    ReasoningTokensSum: 130,
+  },
+  // The span-fact subset of the same bucket: `model_usage_by_minute` keeps the
+  // per-model breakdown and carries no trace-level measures.
+  modelUsage: {
+    SpanCount: 13,
+    CostSum: 0.75,
+    NonBilledCostSum: 0.1875,
     PromptTokensSum: 220,
     CompletionTokensSum: 80,
     CacheReadTokensSum: 40,

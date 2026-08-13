@@ -643,11 +643,20 @@ describe("given the governed views provisioned over the shipped fact tables", ()
     /** @scenario "A pre-aggregated dataset returns one merged row per bucket" */
     it("returns one merged row, each measure the sum of its own column's parts", async () => {
       for (const [name, filter, parts, totals] of [
+        // The grouped rollup: no Model/SpanType columns to filter on, so the
+        // bucket is isolated by its own grain. The fixture's bucket sits at
+        // minute :01, which no weekly seed row occupies.
         [
           "trace_metrics_by_minute",
-          `Model = '${ROLLUP_MERGE_FIXTURE.model}'`,
+          `BucketStart = '${ROLLUP_MERGE_FIXTURE.bucketStart}'`,
           ROLLUP_MERGE_FIXTURE.traceParts,
           ROLLUP_MERGE_TOTALS.trace,
+        ],
+        [
+          "model_usage_by_minute",
+          `Model = '${ROLLUP_MERGE_FIXTURE.model}'`,
+          ROLLUP_MERGE_FIXTURE.traceParts,
+          ROLLUP_MERGE_TOTALS.modelUsage,
         ],
         [
           "evaluation_metrics_by_minute",

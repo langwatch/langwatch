@@ -817,8 +817,14 @@ const TRACE_METRICS: GovernedViewDefinition = {
   description:
     "One row per trace, time-sorted, carrying its metrics and the user, conversation, customer and origin dimensions. Count traces with uniqExact(TraceId).",
   gates: [],
-  grain: "one row per (TenantId, TraceId), latest version only",
-  grainColumns: ["TenantId", "TraceId"],
+  grain:
+    "one row per (TenantId, OccurredAt, TraceId), latest version only; one row per trace wherever OccurredAt held still",
+  // No `grainColumns`: `FINAL` merges on the sort key and nothing narrower, so
+  // declaring `(TenantId, TraceId)` would publish a grain the engine cannot
+  // deliver — a pre-freeze row whose anchor moved carries two `OccurredAt`s and
+  // comes back as two rows (see the doc above). The join below is still the
+  // right one; the fanout diagnostic honestly reporting `OccurredAt` unmatched
+  // is the price of not overstating the grain.
   joinKeys: ["TenantId", "TraceId"],
   timeColumn: "OccurredAt",
   freshness: PROJECTION_FRESHNESS,
@@ -1025,42 +1031,41 @@ const TRACE_METRICS: GovernedViewDefinition = {
     // split it off `OccurredAt` so `store.get()` can decode the fold's span
     // timing baseline, which is how a row gets written rather than anything
     // about the trace.
-    {
-      name: "Attributes",
-      type: "Map(String, String)",
-      description:
-        "Trace-level attributes, with every captured-content key removed.",
-      gates: [],
-      sourceColumns: ["Attributes"],
-      // Filtered here even though the fold already trimmed this map: the trim
-      // (`analytics-attribute-trim.service.ts`) is a size heuristic with a
-      // four-key blocklist, not the data-privacy policy, and the two do not
-      // agree on what content is.
-      expression: (source) => contentFilteredMapSql(source("Attributes")),
-    },
+    //
+    // `Attributes` is withheld: the fold's size trim
+    // (`analytics-attribute-trim.service.ts`) can evict keys with nothing in
+    // the row saying it happened, so a caller cannot tell an absent key from a
+    // trimmed one — a silently incomplete map read as complete. `traces`
+    // carries the attributes; re-add here once the trim marks what it dropped.
   ],
 };
 
-/** Trace metrics per minute: the pre-aggregated fast path. */
+/**
+ * Trace metrics per minute: the pre-aggregated fast path.
+ *
+ * The source rollup breaks each minute down by (Model, SpanType); this view
+ * groups that breakdown away, because half its measures are trace facts
+ * (TraceCount, ErrorCount, DurationSum) that a per-model split would
+ * misstate. The span-fact breakdown is `model_usage_by_minute`.
+ */
 const TRACE_METRICS_BY_MINUTE: GovernedViewDefinition = {
   name: "trace_metrics_by_minute",
   sourceTable: "trace_analytics_rollup",
   description:
-    "Trace and span metrics summed per minute, per model and span type. Every measure is a sum: divide by TraceCount for a per-trace average.",
+    "Trace and span metrics summed per minute. Every measure is a sum: divide by TraceCount for a per-trace average.",
   gates: [],
-  grain:
-    "one merged row per (TenantId, BucketStart, Model, SpanType), every measure summed",
-  // The whole bucket key, not the `(TenantId, BucketStart)` prefix a caller is
-  // most likely to want: every column here is a *sum*, so a join that matches
-  // less than the key meets several buckets and multiplies them — a wrong
-  // number rather than a repeated row. The prefix is still expressible; what
-  // the schema no longer does is advertise it as the way to join this dataset.
-  joinKeys: ["TenantId", "BucketStart", "Model", "SpanType"],
+  grain: "one row per (TenantId, BucketStart), every measure summed",
+  grainColumns: ["TenantId", "BucketStart"],
+  // The grain itself: the source's (Model, SpanType) breakdown is grouped away
+  // in the view, so a minute join meets exactly one row. The per-model
+  // breakdown lives in `model_usage_by_minute`.
+  joinKeys: ["TenantId", "BucketStart"],
   timeColumn: "BucketStart",
   freshness: PROJECTION_FRESHNESS,
   dedup: {
-    // The source's whole `ORDER BY`, because that is the key the
-    // `AggregatingMergeTree` merges on.
+    // The source's whole `ORDER BY` — the key the `AggregatingMergeTree`
+    // merges on — which is wider than the published grain, so the view is
+    // rendered as a `GROUP BY` over the grain rather than with `FINAL`.
     keyColumns: ["TenantId", "BucketStart", "Model", "SpanType"],
     aggregating: true,
   },
@@ -1079,22 +1084,6 @@ const TRACE_METRICS_BY_MINUTE: GovernedViewDefinition = {
         "Start of the minute the measures cover. Filter on this to prune partitions.",
       gates: [],
       sourceColumns: ["BucketStart"],
-    },
-    {
-      name: "Model",
-      type: "LowCardinality(String)",
-      description:
-        "Model the spans in this bucket used, empty when they recorded none.",
-      gates: [],
-      sourceColumns: ["Model"],
-    },
-    {
-      name: "SpanType",
-      type: "LowCardinality(String)",
-      description:
-        "Kind of span the bucket covers, empty when the spans recorded none.",
-      gates: [],
-      sourceColumns: ["SpanType"],
     },
     {
       name: "SpanCount",
@@ -1149,6 +1138,143 @@ const TRACE_METRICS_BY_MINUTE: GovernedViewDefinition = {
         "Total wall-clock duration of the bucket's traces, in milliseconds.",
       gates: [],
       sourceColumns: ["DurationSum"],
+      summed: true,
+    },
+    {
+      name: "PromptTokensSum",
+      type: "UInt64",
+      unit: "tokens",
+      description: "Prompt tokens across the bucket's spans.",
+      gates: [],
+      sourceColumns: ["PromptTokensSum"],
+      summed: true,
+    },
+    {
+      name: "CompletionTokensSum",
+      type: "UInt64",
+      unit: "tokens",
+      description: "Completion tokens across the bucket's spans.",
+      gates: [],
+      sourceColumns: ["CompletionTokensSum"],
+      summed: true,
+    },
+    {
+      name: "CacheReadTokensSum",
+      type: "UInt64",
+      unit: "tokens",
+      description:
+        "Tokens served from the provider's prompt cache across the bucket's spans.",
+      gates: [],
+      sourceColumns: ["CacheReadTokensSum"],
+      summed: true,
+    },
+    {
+      name: "CacheWriteTokensSum",
+      type: "UInt64",
+      unit: "tokens",
+      description:
+        "Tokens written into the provider's prompt cache across the bucket's spans.",
+      gates: [],
+      sourceColumns: ["CacheWriteTokensSum"],
+      summed: true,
+    },
+    {
+      name: "ReasoningTokensSum",
+      type: "UInt64",
+      unit: "tokens",
+      description: "Reasoning tokens across the bucket's spans.",
+      gates: [],
+      sourceColumns: ["ReasoningTokensSum"],
+      summed: true,
+    },
+  ],
+};
+
+/**
+ * Model usage per minute: the (Model, SpanType) breakdown of the trace rollup.
+ *
+ * Span facts only. The rollup also carries trace facts — TraceCount,
+ * ErrorCount, DurationSum — which belong to a whole trace and would be
+ * misleading broken out by the model of individual spans, so they are
+ * published on `trace_metrics_by_minute` and withheld here.
+ */
+const MODEL_USAGE_BY_MINUTE: GovernedViewDefinition = {
+  name: "model_usage_by_minute",
+  sourceTable: "trace_analytics_rollup",
+  description:
+    "Span metrics summed per minute, per model and span type: span counts, costs and tokens.",
+  gates: [],
+  grain:
+    "one merged row per (TenantId, BucketStart, Model, SpanType), every measure summed",
+  // The whole bucket key: every column here is a *sum*, so a join that
+  // matches less than the key meets several buckets and multiplies them —
+  // a wrong number rather than a repeated row.
+  joinKeys: ["TenantId", "BucketStart", "Model", "SpanType"],
+  timeColumn: "BucketStart",
+  freshness: PROJECTION_FRESHNESS,
+  dedup: {
+    // The source's whole `ORDER BY`, because that is the key the
+    // `AggregatingMergeTree` merges on.
+    keyColumns: ["TenantId", "BucketStart", "Model", "SpanType"],
+    aggregating: true,
+  },
+  columns: [
+    {
+      name: "TenantId",
+      type: "String",
+      description: "Project the bucket belongs to.",
+      gates: [],
+      sourceColumns: ["TenantId"],
+    },
+    {
+      name: "BucketStart",
+      type: "DateTime64(3)",
+      description:
+        "Start of the minute the measures cover. Filter on this to prune partitions.",
+      gates: [],
+      sourceColumns: ["BucketStart"],
+    },
+    {
+      name: "Model",
+      type: "LowCardinality(String)",
+      description:
+        "Model the spans in this bucket used, empty when they recorded none.",
+      gates: [],
+      sourceColumns: ["Model"],
+    },
+    {
+      name: "SpanType",
+      type: "LowCardinality(String)",
+      description:
+        "Kind of span the bucket covers, empty when the spans recorded none.",
+      gates: [],
+      sourceColumns: ["SpanType"],
+    },
+    {
+      name: "SpanCount",
+      type: "UInt64",
+      description: "Spans recorded in the bucket.",
+      gates: [],
+      sourceColumns: ["SpanCount"],
+      summed: true,
+    },
+    {
+      name: "CostSum",
+      type: "Float64",
+      unit: "USD",
+      description: "Total cost of the bucket's spans, in USD.",
+      gates: ["costs"],
+      sourceColumns: ["CostSum"],
+      summed: true,
+    },
+    {
+      name: "NonBilledCostSum",
+      type: "Float64",
+      unit: "USD",
+      description:
+        "Cost of the bucket's spans that is not billed, in USD. Billed cost is the difference from CostSum.",
+      gates: ["costs"],
+      sourceColumns: ["NonBilledCostSum"],
       summed: true,
     },
     {
@@ -1407,7 +1533,9 @@ const EVALUATION_METRICS_BY_MINUTE: GovernedViewDefinition = {
   gates: [],
   grain:
     "one merged row per (TenantId, BucketStart, EvaluatorType, Status), every measure summed",
-  // The whole bucket key, for the reason `trace_metrics_by_minute` states.
+  // The whole bucket key: every column here is a *sum*, so a join that
+  // matches less than the key meets several buckets and multiplies them —
+  // a wrong number rather than a repeated row.
   joinKeys: ["TenantId", "BucketStart", "EvaluatorType", "Status"],
   timeColumn: "BucketStart",
   freshness: PROJECTION_FRESHNESS,
@@ -1561,6 +1689,7 @@ export const GOVERNED_VIEW_CATALOG: readonly GovernedViewDefinition[] = [
   SIMULATIONS,
   TRACE_METRICS,
   TRACE_METRICS_BY_MINUTE,
+  MODEL_USAGE_BY_MINUTE,
   EVALUATION_METRICS,
   EVALUATION_METRICS_BY_MINUTE,
   ...GOVERNED_POSTGRES_CATALOG,
