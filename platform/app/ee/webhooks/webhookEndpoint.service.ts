@@ -19,6 +19,7 @@ import { WEBHOOK_PREVIOUS_SECRET_TTL_MS } from "~/server/webhooks/signature";
 import {
   allowsInsecureLocalUrls,
   inspectWebhookUrl,
+  privateIpLiteral,
 } from "~/server/webhooks/urlPolicy";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { decrypt, encrypt } from "~/utils/encryption";
@@ -197,11 +198,13 @@ export class WebhookEndpointValidationError extends HandledError {
 
 /**
  * Which rule an endpoint broke. `url_*` mirror the admission policy's own
- * codes; `delivery_controls` covers a batch-size, delay or in-flight value
- * outside its server bound; `events` an unknown event selector.
+ * codes; `private_host` a loopback / link-local / RFC1918 destination;
+ * `delivery_controls` covers a batch-size, delay or in-flight value outside
+ * its server bound; `events` an unknown event selector.
  */
 export type WebhookEndpointProblem =
   | WebhookUrlProblemCode
+  | "private_host"
   | "delivery_controls"
   | "events";
 
@@ -281,14 +284,26 @@ function assertValidUrl(url: string): void {
   // an endpoint that can deliver. Operator opt-in for local development and
   // internal receivers relaxes the origin here exactly as it relaxes the
   // local-address fence on the send.
-  const problem = inspectWebhookUrl({
-    url,
-    allowInsecureLocal: allowsInsecureLocalUrls(),
-  });
+  const allowInsecureLocal = allowsInsecureLocalUrls();
+  const problem = inspectWebhookUrl({ url, allowInsecureLocal });
   if (problem) {
     throw new WebhookEndpointValidationError(
       URL_PROBLEM_MESSAGES[problem.code],
       problem.code,
+    );
+  }
+
+  // The shape check above reads scheme, host presence, port and credentials —
+  // every one of which `https://169.254.169.254/latest/meta-data` satisfies.
+  // The private-address fence lived only in `assertWebhookUrlAllowed`, which
+  // runs on the SEND, so a loopback or link-local endpoint saved happily and
+  // then failed terminally on its first delivery. Running it here is what
+  // makes the sentence above true.
+  const privateLiteral = allowInsecureLocal ? null : privateIpLiteral(url);
+  if (privateLiteral) {
+    throw new WebhookEndpointValidationError(
+      `url must not point at the private or loopback address "${privateLiteral}"`,
+      "private_host",
     );
   }
 }

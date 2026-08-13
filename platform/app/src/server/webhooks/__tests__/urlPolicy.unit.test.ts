@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
-import { assertWebhookUrlAllowed, inspectWebhookUrl } from "../urlPolicy";
+import {
+  assertWebhookUrlAllowed,
+  inspectWebhookUrl,
+  privateIpLiteral,
+} from "../urlPolicy";
 
 /**
  * The admission matrix both webhook channels now share. Before this policy the
@@ -40,6 +44,30 @@ describe("webhook URL admission policy", () => {
         "credentials",
       );
       expect(inspect("https://user@example.com/x")?.code).toBe("credentials");
+    });
+  });
+
+  /**
+   * The shape check reads scheme, host presence, port and credentials, and a
+   * private address satisfies every one of them — `privateIpLiteral` is the
+   * separate check that catches them. Pinned as a pair because reading only
+   * the first led to "the shared policy already blocks SSRF", which is how the
+   * save path went without the fence while the send path had it.
+   */
+  describe("when the destination is a private or loopback address", () => {
+    it.each([
+      "https://127.0.0.1/hooks",
+      "https://[::1]/hooks",
+      "https://10.0.0.5/hooks",
+      "https://169.254.169.254/latest/meta-data",
+    ])("passes the shape check but is caught as a private literal: %s", (url) => {
+      expect(inspect(url)).toBeNull();
+      expect(privateIpLiteral(url)).not.toBeNull();
+    });
+
+    it("leaves a public host alone", () => {
+      expect(privateIpLiteral("https://example.com/hooks")).toBeNull();
+      expect(privateIpLiteral("https://93.184.216.34/hooks")).toBeNull();
     });
   });
 

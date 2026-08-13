@@ -409,6 +409,32 @@ describe("Feature: Webhook endpoints management API", () => {
       expect(error.meta?.reason).toBe("scheme");
       expect(error.tips?.join(" ")).toContain("https");
     });
+
+    /**
+     * These satisfy every rule the SHAPE check knows about — https, a host, the
+     * default port, no credentials — so they saved, and then failed terminally
+     * on the first delivery when the send path's private-address fence caught
+     * them. The fence now runs at save too. `169.254.169.254` is in the list on
+     * purpose: it is the cloud metadata address, the destination that makes
+     * this worth refusing rather than merely tidy.
+     */
+    it.each([
+      "https://127.0.0.1/hooks",
+      "https://[::1]/hooks",
+      "https://10.0.0.5/hooks",
+      "https://169.254.169.254/latest/meta-data",
+    ])("refuses the private destination %s at save time", async (url) => {
+      planHasWebhookEndpoints = true;
+      const res = await rpc("endpoints.create", {
+        url,
+        enabled_events: ["gateway.request.completed"],
+      });
+      const error = await expectApiError(res, {
+        status: 400,
+        code: "webhook_endpoint_invalid",
+      });
+      expect(error.meta?.reason).toBe("private_host");
+    });
   });
 
   describe("when the test button fires at a real receiver", () => {
