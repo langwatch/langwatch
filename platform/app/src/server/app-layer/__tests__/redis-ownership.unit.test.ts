@@ -358,9 +358,14 @@ describe("Redis ownership", () => {
 
     /** @scenario The source guard scans JavaScript files alongside TypeScript */
     it("includes .js, .mjs, and .cjs files in the scan", () => {
-      const files = allSourceFiles().map(relative);
+      // Assert the mechanism — SOURCE_EXTENSIONS contains all three JS variants.
+      // (No .js files exist in the tree today, so we can only observe .mjs/.cjs.)
+      expect(SOURCE_EXTENSIONS.has(".js")).toBe(true);
+      expect(SOURCE_EXTENSIONS.has(".mjs")).toBe(true);
+      expect(SOURCE_EXTENSIONS.has(".cjs")).toBe(true);
 
-      // These three files exist under src/ and were previously invisible.
+      // These files exist under src/ and prove the walker picks them up.
+      const files = allSourceFiles().map(relative);
       expect(files).toContain("platform/app/src/env.mjs");
       expect(files).toContain("platform/app/src/env-create.mjs");
       expect(files).toContain("platform/app/src/noop-css.cjs");
