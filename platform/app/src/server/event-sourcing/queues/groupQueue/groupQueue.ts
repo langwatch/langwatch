@@ -144,8 +144,14 @@ function nonEmptyString(value: unknown): string | undefined {
 
 /**
  * Configuration for the group queue.
+ *
+ * Exported because `activeTtlSec` and the heartbeat interval derived from it
+ * set the floor on how soon a dead worker's group is redispatched, and the
+ * poison guard's beacon TTL has to stay under that floor to be able to observe
+ * the death at all. The two constants live in different modules, so the
+ * inequality between them is pinned by a test rather than by proximity.
  */
-const GROUP_QUEUE_CONFIG = {
+export const GROUP_QUEUE_CONFIG = {
   /** Default global concurrency (max parallel groups) */
   defaultGlobalConcurrency: Number(process.env.GLOBAL_QUEUE_CONCURRENCY) || 100,
   /** TTL for the active key (safety net for crashes), in seconds */
@@ -931,12 +937,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     const guardEnabled = deathThreshold > 0 && this.beaconLive;
     if (guardEnabled) {
       let deaths = 0;
+      let lastOwnerState = "";
       try {
-        deaths = await this.scripts.recordClaim({
+        ({ deaths, lastOwnerState } = await this.scripts.recordClaim({
           groupId,
           workerId: this.workerId,
           stagedJobId,
-        });
+        }));
       } catch {
         // Poison accounting is protective, never load-bearing: an unreadable
         // marker must not stop the queue.
@@ -948,6 +955,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
           jobDataJson,
           originalScore,
           reason: "claim_strikes",
+          lastOwnerState,
           errorMessage: `Poison guard: ${deaths} confirmed worker deaths while this group was in flight (threshold ${deathThreshold}). Each was a worker that claimed this group and then stopped heartbeating without shutting down. Inspect the staged jobs, then unblock the group to retry.`,
         });
         return;
@@ -958,11 +966,17 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       await this.processClaimedJob(dispatched);
     } finally {
       if (guardEnabled) {
-        this.scripts.clearClaim(groupId).catch(() => {
-          // Safe to lose: the marker it would have removed still names this
-          // worker, which is alive (and will retire rather than vanish), so the
-          // next claim reads it as ordinary rather than as a death.
-        });
+        // Compare-and-delete: this job may have outlived its own active lease
+        // (heartbeat failures are warn-and-continue), in which case the group
+        // was redispatched and the marker now belongs to someone else. Deleting
+        // it blind would erase their ownership AND the group's accrued deaths.
+        this.scripts
+          .releaseClaim({ groupId, workerId: this.workerId })
+          .catch(() => {
+            // Safe to lose: the marker it would have removed still names this
+            // worker, which is alive (and will retire rather than vanish), so
+            // the next claim reads it as ordinary rather than as a death.
+          });
       }
     }
   }
@@ -2460,6 +2474,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     originalScore,
     reason,
     errorMessage,
+    lastOwnerState,
   }: {
     groupId: string;
     stagedJobId: string;
@@ -2467,6 +2482,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     originalScore: number;
     reason: "claim_strikes" | "oversized_payload";
     errorMessage: string;
+    /**
+     * What the parking claim found the previous owner to be. A crash-loop and a
+     * Redis outage that expired healthy beacons both park with the same count
+     * and the same message; this is the field that tells them apart. Absent for
+     * the oversized-payload park, which consults no owner.
+     */
+    lastOwnerState?: string;
   }): Promise<void> {
     // Same reasoning as handleExhaustedRetries: keep the original score when it
     // is a real timestamp, otherwise the parked group reads as decades old.
@@ -2485,7 +2507,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     // count survived the park, so an operator who unblocked inside the marker's
     // TTL had the group re-park on its very next claim — and whether it did
     // depended on how long they took to press the button.
-    await this.scripts.clearClaim(groupId).catch(() => {
+    // Unconditional, unlike the release on the healthy path: the group is
+    // leaving the dispatch path, and a marker left at the threshold would
+    // re-park it on the operator's very next unblock.
+    await this.scripts.discardClaim(groupId).catch(() => {
       // The marker's TTL bounds a failed clear; unblock clears it outright.
     });
     gqGroupsPoisonParkedTotal.inc({
@@ -2499,6 +2524,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         groupId,
         stagedJobId,
         reason,
+        // "gone" on every death is the crash-loop signature. A park whose
+        // observations were mostly "alive"/"retired" points at beacon weather
+        // (a Redis outage expiring healthy beacons), not at this group.
+        lastOwnerState,
       },
       "Poison guard parked group into the blocked set",
     );

@@ -11,8 +11,14 @@
 import { Redis as IORedis } from "ioredis";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { EventSourcedQueueDefinition } from "../../queue.types";
-import { GroupQueueProcessor } from "../groupQueue";
-import { GroupStagingScripts } from "../scripts";
+import { GROUP_QUEUE_CONFIG, GroupQueueProcessor } from "../groupQueue";
+import {
+  CLAIM_MARKER_TTL_SECONDS,
+  GroupStagingScripts,
+  WORKER_LIVENESS_REFRESH_MS,
+  WORKER_LIVENESS_TTL_SECONDS,
+  WORKER_RETIRED_TTL_SECONDS,
+} from "../scripts";
 
 vi.mock("../dispatcher", () => ({
   GroupQueueDispatcher: class {
@@ -38,6 +44,49 @@ function makeDefinition(): EventSourcedQueueDefinition<TestPayload> {
     groupKey: (p) => p.groupId,
   };
 }
+
+describe("poison-guard timing invariants", () => {
+  describe("given a dead worker whose group is waiting to be redispatched", () => {
+    describe("when the guard tries to observe the death", () => {
+      /**
+       * The guard can only see a death if the dead worker's beacon has already
+       * expired by the time someone else claims the group. The soonest that
+       * claim can happen is when the active key lapses, and the worst case is a
+       * worker dying immediately before a heartbeat that never lands — so the
+       * beacon has to expire within `activeTtlSec` minus one heartbeat
+       * interval. Nothing co-locates these constants: the beacon TTL is in
+       * scripts.ts and the lease is in groupQueue.ts, so a retune of either can
+       * invert this silently and turn every death into "still alive".
+       *
+       * @scenario a claim left behind by a worker that vanished without retiring is a death
+       */
+      it("expires the beacon before the group can be redispatched", () => {
+        const heartbeatIntervalSec = GROUP_QUEUE_CONFIG.activeTtlSec / 3;
+        const redispatchFloorSec =
+          GROUP_QUEUE_CONFIG.activeTtlSec - heartbeatIntervalSec;
+
+        expect(WORKER_LIVENESS_TTL_SECONDS).toBeLessThan(redispatchFloorSec);
+      });
+
+      it("refreshes the beacon often enough to survive a lost write or two", () => {
+        // A single failed refresh must not expire a live worker's beacon, or
+        // ordinary Redis noise starts booking deaths against healthy workers.
+        const refreshesPerTtl =
+          (WORKER_LIVENESS_TTL_SECONDS * 1000) / WORKER_LIVENESS_REFRESH_MS;
+
+        expect(refreshesPerTtl).toBeGreaterThanOrEqual(3);
+      });
+
+      it("keeps the retirement tombstone alive longer than the markers it answers for", () => {
+        // A marker outliving the tombstone that explains its owner would decay
+        // from "retired" into "no beacon" — a false death on a clean shutdown.
+        expect(WORKER_RETIRED_TTL_SECONDS).toBeGreaterThan(
+          CLAIM_MARKER_TTL_SECONDS,
+        );
+      });
+    });
+  });
+});
 
 describe("GroupQueueProcessor worker liveness beacon", () => {
   const connections: IORedis[] = [];

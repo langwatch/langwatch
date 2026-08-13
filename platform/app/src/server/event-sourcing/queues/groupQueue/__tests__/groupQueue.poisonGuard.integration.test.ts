@@ -342,6 +342,86 @@ describe.skipIf(!hasTestcontainers)(
       });
     });
 
+    describe("given a claim that changed hands while the first worker ran on", () => {
+      describe("when the first worker finally releases", () => {
+        // Heartbeat failures are warn-and-continue, so a worker paused or
+        // partitioned past the active-key TTL keeps running while its group is
+        // redispatched. An unconditional release then deletes the NEW owner's
+        // marker, taking the group's accrued deaths with it — a poisoned group
+        // silently loses its progress toward the threshold.
+        /** @scenario a worker releases only a claim it still owns */
+        it("leaves the new owner's claim and death count intact", async () => {
+          const { queue, name } = createQueue(async () => {});
+          await queue.waitUntilReady();
+          const scripts = new GroupStagingScripts(redis, name);
+
+          const staleWorker = "worker-that-outlived-its-lease";
+          const currentWorker = "worker-that-took-over";
+
+          // The stale worker's claim, then the handover to the current one.
+          await redis.set(beaconKey(name, staleWorker), "alive", "EX", 90);
+          await redis.set(beaconKey(name, currentWorker), "alive", "EX", 90);
+          await scripts.recordClaim({
+            groupId: "handed-over",
+            workerId: staleWorker,
+            stagedJobId: "job-1",
+          });
+          await scripts.recordClaim({
+            groupId: "handed-over",
+            workerId: currentWorker,
+            stagedJobId: "job-2",
+          });
+          await redis.hset(
+            claimKey(name, "handed-over"),
+            "deaths",
+            String(DEFAULT_CONFIRMED_DEATH_THRESHOLD - 1),
+          );
+
+          // The stale worker's job returns at last and releases.
+          await scripts.releaseClaim({
+            groupId: "handed-over",
+            workerId: staleWorker,
+          });
+
+          expect(await redis.hget(claimKey(name, "handed-over"), "owner")).toBe(
+            currentWorker,
+          );
+          expect(await confirmedDeaths(name, "handed-over")).toBe(
+            String(DEFAULT_CONFIRMED_DEATH_THRESHOLD - 1),
+          );
+
+          // The count survived, so the current owner's death is still counted.
+          await redis.del(beaconKey(name, currentWorker));
+          const { deaths } = await scripts.recordClaim({
+            groupId: "handed-over",
+            workerId: "worker-after-the-death",
+            stagedJobId: "job-3",
+          });
+          expect(deaths).toBe(DEFAULT_CONFIRMED_DEATH_THRESHOLD);
+        });
+
+        /** @scenario a worker releases only a claim it still owns */
+        it("still releases the marker when the owner has not changed", async () => {
+          const { queue, name } = createQueue(async () => {});
+          await queue.waitUntilReady();
+          const scripts = new GroupStagingScripts(redis, name);
+
+          await redis.set(beaconKey(name, "sole-worker"), "alive", "EX", 90);
+          await scripts.recordClaim({
+            groupId: "sole-owner",
+            workerId: "sole-worker",
+            stagedJobId: "job-1",
+          });
+          await scripts.releaseClaim({
+            groupId: "sole-owner",
+            workerId: "sole-worker",
+          });
+
+          expect(await redis.exists(claimKey(name, "sole-owner"))).toBe(0);
+        });
+      });
+    });
+
     describe("given a worker whose own beacon write fails", () => {
       describe("when it claims a group one death short of the threshold", () => {
         // A worker that cannot publish its beacon cannot be vouched for. If it
@@ -551,9 +631,14 @@ describe.skipIf(!hasTestcontainers)(
           await queue.waitUntilReady();
 
           const internals = queue as unknown as {
-            scripts: { clearClaim: (groupId: string) => Promise<void> };
+            scripts: {
+              releaseClaim: (params: {
+                groupId: string;
+                workerId: string;
+              }) => Promise<void>;
+            };
           };
-          vi.spyOn(internals.scripts, "clearClaim").mockResolvedValue(
+          vi.spyOn(internals.scripts, "releaseClaim").mockResolvedValue(
             undefined,
           );
 

@@ -110,6 +110,14 @@ Feature: GroupQueue poison-group park guard
     And the group is dispatched and processed instead of being parked
 
   @integration
+  Scenario: a worker releases only a claim it still owns
+    Given a group whose claim was taken over by a second worker after the first
+      one outlived its lease
+    When the first worker finishes and releases
+    Then the second worker's claim survives, with the group's death count intact
+    And a later death is still counted against the group
+
+  @integration
   Scenario: a worker that cannot report itself as running enforces nothing
     Given a worker that is temporarily unable to report itself as running
     When it claims a group already one death short of the threshold

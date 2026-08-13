@@ -1498,8 +1498,34 @@ return 1
  *
  * A dropped clear, a torn-down connection and an abandoned drain all land in
  * the middle three branches, so none of them can park a healthy group; a pod
- * the job actually killed lands in the fourth, so a genuine poison group still
- * parks in exactly the same number of laps as before.
+ * the job actually killed lands in the fourth, and a crash-looping group parks
+ * in the same number of laps as before.
+ *
+ * Two honest limits on those two claims:
+ *
+ *  - "Nothing healthy parks" holds against every failure of OUR writes, not
+ *    against Redis itself being gone. An outage longer than
+ *    WORKER_LIVENESS_TTL_SECONDS expires every healthy beacon, and a handoff
+ *    claimed in the window after recovery but before the previous owner's next
+ *    refresh reads as a death. Reaching a park still needs the threshold met
+ *    with no completed job in between (a release resets the marker), so this is
+ *    strictly better than the guard it replaces rather than impossible. The
+ *    same shape applies if `retireWorker` times out during a shutdown. The park
+ *    log carries the observed state so an operator can tell the two apart.
+ *
+ *  - "The same number of laps" is about crash-loops specifically. A job that
+ *    hangs with the event loop free is NOT counted when a routine SIGTERM
+ *    overlaps it: the tombstone is written before the platform's SIGKILL, so
+ *    that kill reads as a planned exit. That is deliberate — hangs are the
+ *    exhausted-retries path's problem, not this guard's
+ *    (specs/event-sourcing/poison-group-park-guard.feature).
+ *
+ * Detection also rests on an inequality between constants that live apart:
+ * a dead worker's beacon must expire BEFORE its group is redispatched, i.e.
+ * WORKER_LIVENESS_TTL_SECONDS must stay under the redispatch floor
+ * (`activeTtlSec` minus one heartbeat interval). Pinned by
+ * groupQueue.workerLiveness.unit.test.ts so a future retune of either side
+ * cannot silently invert it.
  */
 const CLAIM_GUARD_LUA = `
 local claimKey = KEYS[1]
@@ -1513,11 +1539,20 @@ local previous  = redis.call("HMGET", claimKey, "owner", "deaths")
 local prevOwner = previous[1]
 local deaths    = tonumber(previous[2] or "0") or 0
 
-if prevOwner and prevOwner ~= workerId then
-  -- GET returns false for a missing key: no beacon at all is the death.
-  -- Either state ("alive" or "retired") is an ordinary outcome.
-  if not redis.call("GET", keyPrefix .. "worker:" .. prevOwner) then
-    deaths = deaths + 1
+local observed = "none"
+if prevOwner then
+  if prevOwner == workerId then
+    observed = "self"
+  else
+    -- GET returns false for a missing key: no beacon at all is the death.
+    -- Either state ("alive" or "retired") is an ordinary outcome.
+    local state = redis.call("GET", keyPrefix .. "worker:" .. prevOwner)
+    if state then
+      observed = state
+    else
+      observed = "gone"
+      deaths = deaths + 1
+    end
   end
 end
 
@@ -1529,7 +1564,33 @@ redis.call(
 )
 redis.call("EXPIRE", claimKey, ttlSec)
 
-return deaths
+-- The state is returned so the park log can say WHY a group was parked. A real
+-- crash-loop and a Redis outage that expired healthy beacons both arrive here
+-- as "gone"; only the run of observations tells an operator which one it was.
+return { deaths, observed }
+`;
+
+/**
+ * Release a claim marker, but only if this worker still owns it.
+ *
+ * The unconditional DEL this replaced assumed the releasing worker was still
+ * the owner. It is not always: heartbeat failures are warn-and-continue, so a
+ * worker paused or partitioned past the active-key TTL keeps running while its
+ * group is redispatched to someone else. When its job finally returned, its
+ * release deleted the NEW owner's marker — erasing both the owner and the
+ * accrued death count, so a genuinely poisoned group silently lost its
+ * progress toward the threshold and parked later than it should.
+ *
+ * Same shape as a Redlock release, and the same fix: compare-and-delete.
+ */
+const RELEASE_CLAIM_LUA = `
+local claimKey = KEYS[1]
+local workerId = ARGV[1]
+
+if redis.call("HGET", claimKey, "owner") == workerId then
+  return redis.call("DEL", claimKey)
+end
+return 0
 `;
 
 const RETRY_RESTAGE_LUA =
@@ -1893,6 +1954,7 @@ const refreshScript = new CachedLuaScript(REFRESH_LUA);
 const restageAndBlockScript = new CachedLuaScript(RESTAGE_AND_BLOCK_LUA);
 const retryRestageScript = new CachedLuaScript(RETRY_RESTAGE_LUA);
 const claimGuardScript = new CachedLuaScript(CLAIM_GUARD_LUA);
+const releaseClaimScript = new CachedLuaScript(RELEASE_CLAIM_LUA);
 
 export class GroupStagingScripts {
   private readonly keyPrefix: string;
@@ -2478,8 +2540,12 @@ export class GroupStagingScripts {
    * count is derived from the previous owner's beacon rather than from the
    * absence of a delete.
    *
-   * @returns the confirmed-death count for the group, including any death this
-   *   claim just observed
+   * @returns the confirmed-death count for the group including any death this
+   *   claim just observed, and what this claim found the previous owner to be —
+   *   `none` (no marker), `self`, `alive`, `retired`, or `gone` (the state that
+   *   books a death). The state is diagnostic only: it is what lets a park line
+   *   distinguish a real crash-loop from a Redis outage that expired healthy
+   *   beacons, which otherwise read identically.
    */
   async recordClaim({
     groupId,
@@ -2489,8 +2555,8 @@ export class GroupStagingScripts {
     groupId: string;
     workerId: string;
     stagedJobId: string;
-  }): Promise<number> {
-    const deaths = await claimGuardScript.run(
+  }): Promise<{ deaths: number; lastOwnerState: string }> {
+    const result = await claimGuardScript.run(
       this.redis,
       // Declared as a KEY, not derived in Lua: ioredis routes a cluster EVAL by
       // its KEYS, so a zero-key script lands on an arbitrary node and the
@@ -2503,16 +2569,50 @@ export class GroupStagingScripts {
       stagedJobId,
       String(CLAIM_MARKER_TTL_SECONDS),
     );
-    return typeof deaths === "number" ? deaths : 0;
+    const [deaths, lastOwnerState] = Array.isArray(result) ? result : [];
+    return {
+      deaths: typeof deaths === "number" ? deaths : 0,
+      lastOwnerState: typeof lastOwnerState === "string" ? lastOwnerState : "",
+    };
   }
 
   /**
-   * Release the claim marker. Unlike the strike delete this replaced, losing
-   * this write is harmless: the marker it would have removed still names a live
-   * (or cleanly retired) owner, so the next claim reads it as ordinary rather
-   * than as a death.
+   * Release this worker's claim marker, if it is still the owner.
+   *
+   * Losing this write is harmless: the marker it would have removed still names
+   * a live (or cleanly retired) owner, so the next claim reads it as ordinary
+   * rather than as a death.
+   *
+   * Deleting it when we are NOT the owner is not harmless, which is why this is
+   * a compare-and-delete — see {@link RELEASE_CLAIM_LUA}.
    */
-  async clearClaim(groupId: string): Promise<void> {
+  async releaseClaim({
+    groupId,
+    workerId,
+  }: {
+    groupId: string;
+    workerId: string;
+  }): Promise<void> {
+    await releaseClaimScript.run(
+      this.redis,
+      1,
+      this.claimMarkerKey(groupId),
+      workerId,
+    );
+  }
+
+  /**
+   * Drop the claim marker whoever owns it.
+   *
+   * Only for parking, where the group leaves the dispatch path entirely and the
+   * marker must not survive to re-park the group on the operator's next
+   * unblock. An ownership check here would reintroduce exactly that: the park
+   * can run on a claim this worker never recorded (the guard stands down when
+   * its beacon is unconfirmed, and the oversized-payload park does not consult
+   * the guard at all), and the marker would then be left sitting at the
+   * threshold.
+   */
+  async discardClaim(groupId: string): Promise<void> {
     await this.redis.del(this.claimMarkerKey(groupId));
   }
 
