@@ -5,8 +5,9 @@
  * second unique constraint into a SELECT followed by an INSERT, so two first
  * saves for the same trace can both decide to insert.
  */
-import type { PrismaClient } from "@prisma/client";
+
 import { describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { TraceEditOverlayRepository } from "../traceEditOverlay.repository";
 import type { TraceEditOverlayPatch } from "../traceEditOverlay.schemas";
 

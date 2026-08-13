@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 
 import type { LLMConfig } from "../../optimization_studio/types/dsl";
 import { DEFAULT_MODEL } from "../../utils/constants";

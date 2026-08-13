@@ -6,9 +6,10 @@
  *
  * Requires: PostgreSQL database (Prisma)
  */
-import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
+
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import { TokenResolver } from "../../../api-key/token-resolver";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";

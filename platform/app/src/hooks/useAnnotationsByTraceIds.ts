@@ -1,3 +1,4 @@
+import { keepPreviousData as holdPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { api, type RouterOutputs } from "~/utils/api";
 
@@ -75,7 +76,7 @@ export function useAnnotationsByTraceIds({
         { projectId, traceIds: ids, anchor },
         {
           enabled: enabled && !!projectId && ids.length > 0,
-          keepPreviousData,
+          placeholderData: keepPreviousData ? holdPreviousData : undefined,
           staleTime: 5 * 60_000,
           refetchOnWindowFocus: false,
         },

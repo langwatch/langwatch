@@ -210,7 +210,7 @@ export function EvaluationsV3Table({
   const drawerParams = useDrawerParams();
   const drawerParamsKey = JSON.stringify(drawerParams);
   const { project } = useOrganizationTeamProject();
-  const trpcUtils = api.useContext();
+  const trpcUtils = api.useUtils();
 
   // Sync saved dataset changes to DB
   useDatasetSync();

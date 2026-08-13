@@ -55,7 +55,7 @@ export function AgentListDrawer(props: AgentListDrawerProps) {
   const { project } = useOrganizationTeamProject();
   const { closeDrawer, openDrawer } = useDrawer();
   const complexProps = getComplexProps();
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   // Get flow callbacks for this drawer (set by parent flows like useAgentPickerFlow)
   const flowCallbacks = getFlowCallbacks("agentList");

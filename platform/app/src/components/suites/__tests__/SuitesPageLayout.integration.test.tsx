@@ -18,7 +18,7 @@ vi.mock("~/components/SetupWithAgentButton", () => ({
   SetupWithAgentButton: () => null,
 }));
 
-import type { SimulationSuite } from "@prisma/client";
+import type { SimulationSuite } from "~/generated/prisma/client";
 
 // The existing `vi.mock("~/hooks/useOrganizationTeamProject", ...)` below
 // (richer shape with slug / hasAnyPermission / isLoading) covers
@@ -44,7 +44,7 @@ vi.mock("~/hooks/useSSESubscription", () => ({
 // Mock tRPC api
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       suites: {
         getAll: { invalidate: vi.fn() },
         getSummaries: { invalidate: vi.fn() },

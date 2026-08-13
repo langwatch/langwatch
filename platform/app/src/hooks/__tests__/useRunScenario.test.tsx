@@ -20,7 +20,7 @@ vi.mock("~/utils/api", () => ({
         fetch: vi.fn(),
       },
     },
-    useContext: () => ({
+    useUtils: () => ({
       scenarios: {
         getBatchRunData: {
           fetch: vi.fn(),

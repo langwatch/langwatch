@@ -98,7 +98,7 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
   const complexProps = getComplexProps();
   const drawerParams = useDrawerParams();
   const flowCallbacks = getFlowCallbacks("agentCodeEditor");
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   const onClose = props.onClose ?? closeDrawer;
   const onSave =

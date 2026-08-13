@@ -59,7 +59,7 @@ type AcceptInviteMutation = ReturnType<
 >;
 type AcceptInviteMutationResult = Pick<
   AcceptInviteMutation,
-  "isLoading" | "isSuccess" | "isError" | "error"
+  "isPending" | "isSuccess" | "isError" | "error"
 >;
 
 export type AcceptInviteStatus =

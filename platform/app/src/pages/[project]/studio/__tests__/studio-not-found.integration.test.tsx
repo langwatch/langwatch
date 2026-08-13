@@ -65,7 +65,7 @@ vi.mock("../../../../optimization_studio/hooks/useWorkflowStore", () => ({
 
 vi.mock("../../../../utils/api", () => ({
   api: {
-    useContext: () => ({ workflow: { getById: { invalidate: vi.fn() } } }),
+    useUtils: () => ({ workflow: { getById: { invalidate: vi.fn() } } }),
   },
 }));
 
