@@ -1,6 +1,6 @@
 /**
  * The two checks every governed analytics SQL route runs before it does
- * anything.
+ * anything, and the ordered pair of them every route actually calls.
  *
  * They live here rather than beside one route file because there is more than
  * one now, and a copied gate is how a surface ends up switched on for a
@@ -74,4 +74,32 @@ export async function requireGovernedSqlEnabled(
     },
   );
   if (!enabled) throw new GovernedSqlNotEnabledError();
+}
+
+/**
+ * The project a governed analytics SQL request runs for: the credential's, once
+ * the path has been checked against it and the surface has been found switched
+ * on.
+ *
+ * Both guards, in this order, on every route in the family. The order is the
+ * claim: a path naming another project is refused before the flag is consulted,
+ * so a caller cannot use the two answers together to learn which projects exist
+ * on a deployment that has the surface switched off.
+ *
+ * It lives here rather than beside either route file because both of them need
+ * it, and a second copy is exactly how one surface ends up running one guard.
+ *
+ * @throws {NotFoundError} `project_not_found` — see {@link callerProject}.
+ * @throws {GovernedSqlNotEnabledError} — see {@link requireGovernedSqlEnabled}.
+ */
+export async function governedSqlProject({
+  project,
+  requestedProjectId,
+}: {
+  project: Project;
+  requestedProjectId: string | undefined;
+}): Promise<Project> {
+  const resolved = callerProject({ project, requestedProjectId });
+  await requireGovernedSqlEnabled(resolved);
+  return resolved;
 }

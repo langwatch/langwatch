@@ -41,7 +41,7 @@ import { getProtectionsForProject } from "~/server/api/utils";
 import { validator as zValidator } from "~/server/api/validation";
 import { prisma } from "~/server/db";
 import { baseResponses } from "../../shared/base-responses";
-import { callerProject, requireGovernedSqlEnabled } from "./routeGuards";
+import { governedSqlProject } from "./routeGuards";
 
 const logger = createLogger("langwatch:api:analytics-sql");
 
@@ -170,11 +170,10 @@ export function registerGovernedSqlRoutes(
     }),
     zValidator("json", governedSqlQuerySchema),
     async (c) => {
-      const project = callerProject({
+      const project = await governedSqlProject({
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });
-      await requireGovernedSqlEnabled(project);
       const { sql, parameters, timeWindow } = c.req.valid("json");
 
       logger.info(
@@ -214,11 +213,10 @@ export function registerGovernedSqlRoutes(
       },
     }),
     async (c) => {
-      const project = callerProject({
+      const project = await governedSqlProject({
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });
-      await requireGovernedSqlEnabled(project);
 
       return c.json(
         getGovernedSqlService().describeSchema({

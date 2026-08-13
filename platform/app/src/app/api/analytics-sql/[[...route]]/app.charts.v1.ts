@@ -32,6 +32,8 @@
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
+import { GOVERNED_VEGA_LIMITS } from "~/features/analytics-query/visualization/vegaLitePolicy";
+import { measureSpecBytes } from "~/features/analytics-query/visualization/vegaLiteStructure";
 import type { Project } from "~/generated/prisma/client";
 
 import {
@@ -45,25 +47,62 @@ import { prisma } from "~/server/db";
 
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
-import { callerProject, requireGovernedSqlEnabled } from "./routeGuards";
+import { governedSqlProject } from "./routeGuards";
 
 /** Request shape only — a length, not a meaning. Matches the tRPC surface. */
 const nameSchema = z.string().min(1).max(200);
 
+/**
+ * Longest definition this endpoint accepts, in UTF-8 bytes of its JSON.
+ *
+ * The definition's *meaning* is the service's to judge, but its size is this
+ * route's: nothing below here bounds it — the versioned schema puts no ceiling
+ * on the statement it holds — so without this a key-holder could store a body
+ * of any size on a surface that is metered everywhere else.
+ *
+ * Derived from the specification's own ceiling rather than picked, plus room
+ * for the statement and parameter values that travel beside it, so this can
+ * never refuse a definition the Vega-Lite policy would have admitted. The
+ * headroom sits above the query endpoint's statement ceiling too: SQL short
+ * enough to run is always short enough to save.
+ */
+const MAX_CHART_DEFINITION_BYTES = GOVERNED_VEGA_LIMITS.maxSpecBytes + 65_536;
+
+/**
+ * The definition: bounded, and otherwise untouched.
+ *
+ * `unknown` is the honest declaration of its shape — that belongs to the
+ * service's versioned schema, and a definition this route rejected on shape
+ * would be rejected by a second, drifting copy of that decision. A byte ceiling
+ * forks nothing, because it is a fact about the request rather than about what
+ * a chart means.
+ */
+const definitionSchema = z.unknown().superRefine((definition, ctx) => {
+  // `z.unknown()` is satisfied by an absent key. A create that omits the
+  // definition is the service's refusal to give, not a size one.
+  if (definition === undefined) return;
+
+  // Measured the way the visualization policy measures its own ceiling, so the
+  // two are in the same unit. `null` is "could not be serialized at all", which
+  // is a refusal rather than "small enough".
+  const bytes = measureSpecBytes(definition);
+  if (bytes !== null && bytes <= MAX_CHART_DEFINITION_BYTES) return;
+
+  ctx.addIssue({
+    code: z.ZodIssueCode.custom,
+    message: `Chart definition must serialize to at most ${MAX_CHART_DEFINITION_BYTES} bytes.`,
+  });
+});
+
 const createChartSchema = z.object({
   name: nameSchema,
-  /**
-   * Passed through untouched. `unknown` is the honest declaration: the shape is
-   * the service's versioned schema, and a definition this route rejected would
-   * be rejected by a second, drifting copy of that decision.
-   */
-  definition: z.unknown(),
+  definition: definitionSchema,
 });
 
 const updateChartSchema = z
   .object({
     name: nameSchema.optional(),
-    definition: z.unknown().optional(),
+    definition: definitionSchema.optional(),
   })
   // A PATCH naming neither field is a mistake worth reporting: answering 200
   // with an untouched chart tells an integrator their update was applied.
@@ -120,8 +159,10 @@ function chartResource({
     id: chart.id,
     name: chart.name,
     definition: chart.definition,
-    createdAt: chart.createdAt,
-    updatedAt: chart.updatedAt,
+    // Serialized here rather than left to `JSON.stringify`, so the response
+    // matches the string the schema publishes by construction.
+    createdAt: chart.createdAt.toISOString(),
+    updatedAt: chart.updatedAt.toISOString(),
     platformUrl: platformUrl({
       projectSlug: project.slug,
       path: "/analytics/query",
@@ -129,29 +170,23 @@ function chartResource({
   };
 }
 
-/** The service, for a request that has already passed both guards. */
 function chartService(): SavedWorkbenchChartService {
   return SavedWorkbenchChartService.create(prisma);
 }
 
 /**
- * The project a chart request runs for: the credential's, once the path has
- * been checked against it and the surface has been found switched on.
+ * The chart id the path matched.
  *
- * Both guards, in this order, on every route — the flag hides the whole
- * surface, so a caller must not be able to learn a chart id exists by being
- * told the project does not.
+ * @throws {Error} when a chart route matched without one. That is a routing
+ *   fault rather than a caller's mistake, and the plain error is deliberate:
+ *   substituting `""` would turn it into a lookup that answers "not found",
+ *   reporting the bug as a normal, expected outcome.
  */
-async function chartRequestProject({
-  project,
-  requestedProjectId,
-}: {
-  project: Project;
-  requestedProjectId: string | undefined;
-}): Promise<Project> {
-  const resolved = callerProject({ project, requestedProjectId });
-  await requireGovernedSqlEnabled(resolved);
-  return resolved;
+function chartIdOf(chartId: string | undefined): string {
+  if (!chartId) {
+    throw new Error("chart route matched without a chartId path parameter");
+  }
+  return chartId;
 }
 
 function registerList(secured: ReturnType<typeof createProjectApp>): void {
@@ -173,7 +208,7 @@ function registerList(secured: ReturnType<typeof createProjectApp>): void {
       },
     }),
     async (c) => {
-      const project = await chartRequestProject({
+      const project = await governedSqlProject({
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });
@@ -203,7 +238,7 @@ function registerCreate(secured: ReturnType<typeof createProjectApp>): void {
     }),
     zValidator("json", createChartSchema),
     async (c) => {
-      const project = await chartRequestProject({
+      const project = await governedSqlProject({
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });
@@ -237,12 +272,12 @@ function registerRead(secured: ReturnType<typeof createProjectApp>): void {
       },
     }),
     async (c) => {
-      const project = await chartRequestProject({
+      const project = await governedSqlProject({
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });
       const chart = await chartService().getById({
-        id: c.req.param("chartId") ?? "",
+        id: chartIdOf(c.req.param("chartId")),
         projectId: project.id,
       });
       return c.json(chartResource({ chart, project }));
@@ -268,13 +303,13 @@ function registerUpdate(secured: ReturnType<typeof createProjectApp>): void {
     }),
     zValidator("json", updateChartSchema),
     async (c) => {
-      const project = await chartRequestProject({
+      const project = await governedSqlProject({
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });
       const { name, definition } = c.req.valid("json");
       const chart = await chartService().updateChart({
-        id: c.req.param("chartId") ?? "",
+        id: chartIdOf(c.req.param("chartId")),
         projectId: project.id,
         protections: await getProtectionsForProject(prisma, {
           projectId: project.id,
@@ -303,12 +338,12 @@ function registerDelete(secured: ReturnType<typeof createProjectApp>): void {
       },
     }),
     async (c) => {
-      const project = await chartRequestProject({
+      const project = await governedSqlProject({
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });
       await chartService().deleteChart({
-        id: c.req.param("chartId") ?? "",
+        id: chartIdOf(c.req.param("chartId")),
         projectId: project.id,
       });
       return c.body(null, 204);

@@ -265,6 +265,14 @@ Feature: Saved governed SQL workbench charts — the persistence model and its w
     And the project's chart listing is unchanged
 
   @integration
+  Scenario: A definition larger than the endpoint's ceiling is refused before anything is stored
+    Given an integration holding a project API key
+    When it posts a chart whose definition is larger than the endpoint accepts
+    Then the request is refused with error code validation_error
+    And the project's chart listing is unchanged
+    And an edit into a definition that large is refused the same way
+
+  @integration
   Scenario: Every chart endpoint stays dark while the workbench switch is off
     Given the governed SQL feature switch is off for the project
     When the integration lists, reads, creates, updates or deletes a chart
@@ -406,6 +414,11 @@ Feature: Saved governed SQL workbench charts — the persistence model and its w
 #   → Scenario: A specification the chart policy refuses is refused over the API, and nothing is written
 #   (the listing half of that scenario is the load-bearing one: a refusal alone
 #   passes against a handler that wrote first and threw afterwards)
+#   → Scenario: A definition larger than the endpoint's ceiling is refused before anything is stored
+#   (the definition reaches the service as `unknown`, and nothing below the
+#   route bounds its size — the versioned schema puts no ceiling on the
+#   statement it holds — so the request-shape ceiling is the route's own, and
+#   the listing half is again what makes "nothing is written" mean anything)
 # AC3 "the governed validator's own codes survive the wire"
 #   → Scenario: SQL the governed validator refuses earns the same code over the API as the query endpoint
 # AC4 "the feature switch closes every route"

@@ -460,6 +460,56 @@ describe("given the saved workbench chart REST endpoints", () => {
     });
   });
 
+  describe("when a definition is larger than the endpoint accepts", () => {
+    /**
+     * The same statement, made long by a trailing comment, so size is the only
+     * thing that varies between the control and the refusal. The statement is
+     * the part nothing below the route bounds — the versioned definition schema
+     * puts no ceiling on it — so this is the shape that would actually be
+     * stored if the request-shape ceiling were removed.
+     */
+    const paddedSql = (padding: number) => `${SQL} -- ${"x".repeat(padding)}`;
+
+    /** @scenario "A definition larger than the endpoint's ceiling is refused before anything is stored" */
+    it("refuses the create and the same edit, and stores neither", async () => {
+      // The control: identical padding, small. Without it the refusals below
+      // could be about the comment rather than about the size.
+      const permitted = await createChart(openProject, {
+        name: "Padded, and within the ceiling",
+        definition: { ...DEFINITION, sql: paddedSql(1_000) },
+      });
+      expect(permitted.definition.sql).toBe(paddedSql(1_000));
+
+      const creating = await refused({
+        path: chartsPath(openProject),
+        method: "POST",
+        auth: asProject(openProject),
+        body: {
+          name: "Past the ceiling",
+          definition: { ...DEFINITION, sql: paddedSql(400_000) },
+        },
+      });
+      expect(creating.error).toBe("validation_error");
+
+      const editing = await refused({
+        path: chartPath(openProject, permitted.id),
+        method: "PATCH",
+        auth: asProject(openProject),
+        body: { definition: { ...DEFINITION, sql: paddedSql(400_000) } },
+      });
+      expect(editing.error).toBe("validation_error");
+
+      // The half that matters: the control chart is the only thing here, and it
+      // still holds the statement it was saved with.
+      expect(await listedIds(openProject)).toEqual([permitted.id]);
+      const after = await succeeds({
+        path: chartPath(openProject, permitted.id),
+        auth: asProject(openProject),
+      });
+      expect(after.definition.sql).toBe(paddedSql(1_000));
+    });
+  });
+
   describe("when the governed SQL feature switch is off for the project", () => {
     /** Runs one request with the switch off, whatever else the suite set. */
     const withFlagOff = async <T>(request: () => Promise<T>): Promise<T> => {
