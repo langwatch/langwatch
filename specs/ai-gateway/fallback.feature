@@ -7,9 +7,10 @@ Feature: Provider fallback chain
   # tests in services/aigateway/.
 
   When a primary provider fails for a reason that indicates "try again
-  elsewhere" (5xx, timeout, 429, network), the gateway walks the VK's
-  fallback chain. Client-fault errors (400/401/403/404) are returned as-is
-  so the customer sees the real problem.
+  elsewhere" (5xx, timeout, 429, network, and 404 because in a multi-provider
+  chain it usually means this provider does not serve that model), the gateway
+  walks the VK's fallback chain. Terminal client-fault errors (400/401/403)
+  are returned as-is so the customer sees the real problem.
 
   See contract.md §7.
 
@@ -17,9 +18,7 @@ Feature: Provider fallback chain
     Given a VK with fallback config:
       """
       {
-        "on": ["5xx", "timeout", "rate_limit_exceeded", "network_error"],
         "chain": ["pc_openai_primary", "pc_anthropic_secondary", "pc_gemini_tertiary"],
-        "timeout_ms": 10000,
         "max_attempts": 3
       }
       """
@@ -70,10 +69,31 @@ Feature: Provider fallback chain
       And "pc_anthropic_secondary" is NOT called
 
     @integration @unimplemented
-    Scenario: primary 404 (model unknown at provider) returns as-is
-      When the request uses a model that does not exist at the primary provider
+    Scenario: primary 403 (provider refuses the account) returns as-is
+      Given "pc_openai_primary" returns 403 from OpenAI
+      When I POST /v1/chat/completions
       Then fallback does NOT trigger
-      And the error propagates so the user corrects their request
+      And the error propagates so the customer fixes the account it names
+
+  Rule: Which failures walk the chain is not per-key configuration
+
+    The chain is walked on the real upstream outcome, decided in one place
+    from the response itself. There is no per-key trigger list: a list could
+    only ever narrow the set, and every narrowing turns a failure the gateway
+    could have recovered from into one the customer sees.
+
+    The bundle wire once carried "on" and "timeout_ms" for that purpose. They
+    were never read, and are gone. A control plane that still sends them is
+    not an error, because a rolling deploy has both versions running at once
+    and neither side may refuse the other.
+
+    @unit
+    Scenario: A bundle carrying the retired fallback keys still decodes
+      Given a config payload whose fallback block carries "on" and "timeout_ms"
+      When the gateway decodes it
+      Then the decode succeeds
+      And max_attempts is taken from the payload
+      And the retired keys change nothing about which failures walk the chain
 
   Rule: All attempts exhausted returns the last error
 

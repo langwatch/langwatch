@@ -92,8 +92,17 @@ func (r *Resolver) Resolve(ctx context.Context, req *domain.Request, config doma
 	target := rawModel
 	source := domain.ModelSourceImplicit
 
-	// 1. Check aliases
+	// 1. Check aliases. The allowlist judges the model the alias resolves to,
+	// not the name the caller typed: an alias is a convenience for naming a
+	// model, never a way to reach one this key may not use. Returning here
+	// without the check is what let an alias route around models_allowed.
 	if alias, ok := config.ModelAliases[rawModel]; ok {
+		if !config.AllowsResolvedModel(alias.ProviderID, alias.Model) {
+			return nil, herr.New(ctx, domain.ErrModelNotAllowed, herr.M{
+				"message": "model not allowed: " + alias.Model + ` (named "` + rawModel + `" by this key)`,
+				"fault":   "customer",
+			})
+		}
 		target = alias.Model
 		source = domain.ModelSourceAlias
 		return &domain.ResolvedModel{
@@ -110,7 +119,7 @@ func (r *Resolver) Resolve(ctx context.Context, req *domain.Request, config doma
 		providerID := normalizeProvider(parts[0])
 		modelID := parts[1]
 
-		if !modelAllowed(config, modelID) {
+		if !config.AllowsResolvedModel(providerID, modelID) {
 			return nil, herr.New(ctx, domain.ErrModelNotAllowed, herr.M{"message": "model not allowed: " + modelID})
 		}
 

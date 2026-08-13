@@ -86,9 +86,20 @@ func (a *App) buildInterceptors() []pipeline.Interceptor {
 	}
 	if a.policy != nil {
 		chain = append(chain, pipeline.Policy(a.policy.Check))
+		if a.models == nil {
+			// Model rules are enforced from the model resolver, on the
+			// resolved id. Without a resolver there is nothing to enforce
+			// them against, and an unenforced deny rule is the one failure
+			// mode that looks exactly like a working one.
+			a.logger.Warn("policy_model_rules_unenforced_without_resolver")
+		}
 	}
 	if a.models != nil {
-		chain = append(chain, pipeline.ModelResolve(a.models.Resolve))
+		var checkModel pipeline.CheckModelFunc
+		if a.policy != nil {
+			checkModel = a.policy.CheckModel
+		}
+		chain = append(chain, pipeline.ModelResolve(a.models.Resolve, checkModel))
 	}
 	if a.cache != nil {
 		chain = append(chain, pipeline.Cache(a.evaluateCache))

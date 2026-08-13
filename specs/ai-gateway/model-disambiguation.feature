@@ -149,3 +149,50 @@ Feature: AI Gateway — model disambiguation when a VK has multiple providers
     And the response sets `X-LangWatch-Model-Warn: ambiguous: chose primary of [primary, fallback-1]`
     # Gives migration teams a soft-landing window to update client configs
     # without 400-ing every request. Strict mode is the default.
+
+  # ============================================================================
+  # models_allowed and aliases
+  # ============================================================================
+
+  Rule: An alias never reaches a model the key is not allowed to use
+
+    An alias is a convenience for naming a model, not a second door into
+    models_allowed. Resolution used to return the alias target before any
+    allowlist check ran, so naming a forbidden model in an alias was enough
+    to reach it, while the documentation promised the opposite.
+
+    The allowlist judges what the alias resolved to, in either spelling: an
+    operator who allowed "openai/gpt-5-mini" and one who allowed "gpt-5-mini"
+    allowed the same model, and neither should have to guess which form the
+    resolver will hand the check.
+
+    @unit
+    Scenario: An alias resolving outside models_allowed is refused
+      Given a virtual key allowing only "claude-*"
+      And the key aliases "coding" to "openai/gpt-5-mini"
+      When a request names model "coding"
+      Then the request is refused as model not allowed
+      And the rejection names the model the alias resolved to
+      And no call is made to any provider
+
+    @unit
+    Scenario: An alias resolving inside models_allowed is served
+      Given a virtual key allowing only "claude-*"
+      And the key aliases "coding" to "anthropic/claude-haiku-4-5"
+      When a request names model "coding"
+      Then the request resolves to "claude-haiku-4-5" on provider "anthropic"
+
+    @unit
+    Scenario: The allowlist accepts either spelling of the same model
+      Given a virtual key allowing only "openai/gpt-5-mini"
+      And the key aliases "coding" to "openai/gpt-5-mini"
+      When a request names model "coding"
+      Then the request resolves to "gpt-5-mini" on provider "openai"
+      And a key allowing the bare "gpt-5-mini" resolves the same alias
+
+    @unit
+    Scenario: A key with no allowlist keeps serving every alias it defines
+      Given a virtual key with no models_allowed
+      And the key aliases "coding" to "openai/gpt-5-mini"
+      When a request names model "coding"
+      Then the request resolves to "gpt-5-mini" on provider "openai"

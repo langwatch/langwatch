@@ -92,10 +92,13 @@ export type GatewayConfigPayload = {
   team_id: string | null;
   principal_id: string | null;
   providers: ProviderSlot[];
+  /**
+   * `chain` is the ordered provider slots; `max_attempts` bounds the walk.
+   * Which failures walk it is decided by the gateway from the real upstream
+   * outcome, never per key.
+   */
   fallback: {
-    on: string[];
     chain: string[];
-    timeout_ms: number;
     max_attempts: number;
   };
   model_aliases: Record<string, string>;
@@ -254,9 +257,7 @@ export class GatewayConfigMaterialiser {
           : "skip",
       providers: providers.map((mp, index) => buildProviderSlot(mp, index)),
       fallback: {
-        on: config.fallback.on,
         chain: providers.map((mp) => mp.id),
-        timeout_ms: config.fallback.timeoutMs,
         // routing_mode NONE means the request never leaves the provider
         // that serves the model, so the attempt budget is one. Pinning it
         // here makes no-fallback real for gateways that predate the

@@ -26,7 +26,15 @@ func NewMatcher() *Matcher {
 }
 
 // Check evaluates the body against the given rules. Returns a herr.E if violated.
+//
+// Model rules are deliberately NOT evaluated here. This runs before the model
+// resolver, so the only model name in the body is the one the caller typed,
+// and judging that means an alias routes around a deny: name the denied model
+// in an alias and the rule never sees it. CheckModel judges the resolved id
+// instead, from the resolver, which is what actually runs. Every other target
+// (tools, MCP, URLs) is a property of the body as sent and belongs here.
 func (m *Matcher) Check(ctx context.Context, rules []domain.PolicyRule, body []byte) error {
+	rules = rulesExcludingModel(rules)
 	if len(rules) == 0 {
 		return nil
 	}
@@ -65,6 +73,102 @@ func (m *Matcher) Check(ctx context.Context, rules []domain.PolicyRule, body []b
 	}
 
 	return nil
+}
+
+// CheckModel evaluates the model rules against a model the resolver already
+// settled on, so the rule is about the model that will actually be billed and
+// served rather than the string the caller happened to type.
+//
+// A deliberate consequence: a denied raw name that resolves to a permitted
+// model is allowed, because nothing denied ever runs. The reverse also holds,
+// which is the point: a permitted alias pointing at a denied model is refused.
+//
+// Both spellings of the resolved model are judged (see domain.ModelSpellings),
+// so a rule written "openai/gpt-4.*" and one written "gpt-4.*" reach the same
+// model instead of one of them quietly matching nothing.
+func (m *Matcher) CheckModel(ctx context.Context, rules []domain.PolicyRule, resolved domain.ResolvedModel) error {
+	deny, allow := modelPatterns(rules)
+	if len(deny) == 0 && len(allow) == 0 {
+		return nil
+	}
+
+	spellings := domain.ModelSpellings(resolved.ProviderID, resolved.ModelID)
+	if len(spellings) == 0 {
+		return nil
+	}
+
+	denied, err := m.anyMatches(deny, spellings)
+	if err != nil {
+		return herr.New(ctx, domain.ErrInternal, nil, err)
+	}
+	if denied {
+		return modelPolicyViolation(ctx, resolved.ModelID, "is blocked by policy")
+	}
+
+	if len(allow) == 0 {
+		return nil
+	}
+	// An allowlist is satisfied when ANY spelling matches ANY entry: the
+	// operator allowed the model, not one way of writing it down. Invalid
+	// patterns fail closed here the way they do in Check, by never matching.
+	allowed, _ := m.anyMatches(allow, spellings)
+	if allowed {
+		return nil
+	}
+	return modelPolicyViolation(ctx, resolved.ModelID, "is not in allowlist")
+}
+
+// anyMatches reports whether any pattern matches any candidate. It stops at
+// the first pattern that will not compile, so a typo fails the request closed
+// rather than quietly narrowing the rule set.
+func (m *Matcher) anyMatches(patterns, candidates []string) (bool, error) {
+	for _, pattern := range patterns {
+		re, err := m.compile(pattern)
+		if err != nil {
+			return false, err
+		}
+		for _, candidate := range candidates {
+			if re.MatchString(candidate) {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+
+// modelPatterns splits the model rules into deny and allow patterns.
+func modelPatterns(rules []domain.PolicyRule) (deny, allow []string) {
+	for _, r := range rules {
+		if r.Target != domain.PolicyTargetModel {
+			continue
+		}
+		switch r.Type {
+		case domain.PolicyDeny:
+			deny = append(deny, r.Pattern)
+		case domain.PolicyAllow:
+			allow = append(allow, r.Pattern)
+		}
+	}
+	return deny, allow
+}
+
+func modelPolicyViolation(ctx context.Context, model, reason string) error {
+	return herr.New(ctx, domain.ErrPolicyViolation, herr.M{
+		"message": fmt.Sprintf("model %q %s", model, reason),
+		"fault":   "customer",
+	})
+}
+
+// rulesExcludingModel drops the model rules, which CheckModel owns.
+func rulesExcludingModel(rules []domain.PolicyRule) []domain.PolicyRule {
+	out := make([]domain.PolicyRule, 0, len(rules))
+	for _, r := range rules {
+		if r.Target == domain.PolicyTargetModel {
+			continue
+		}
+		out = append(out, r)
+	}
+	return out
 }
 
 func (m *Matcher) compile(pattern string) (*regexp.Regexp, error) {
@@ -122,26 +226,8 @@ func extractCandidates(body []byte, rules []domain.PolicyRule) map[domain.Policy
 	if targets[domain.PolicyTargetURL] {
 		result[domain.PolicyTargetURL] = extractURLs(body)
 	}
-	if targets[domain.PolicyTargetModel] {
-		result[domain.PolicyTargetModel] = extractModel(body)
-	}
 
 	return result
-}
-
-// extractModel pulls the requested model id from the top-level `model`
-// field shared by the OpenAI and Anthropic request shapes.
-func extractModel(body []byte) []string {
-	var env struct {
-		Model string `json:"model"`
-	}
-	if err := sonic.Unmarshal(body, &env); err != nil {
-		return nil
-	}
-	if env.Model == "" {
-		return nil
-	}
-	return []string{env.Model}
 }
 
 // extractToolNames pulls tool names from both OpenAI (tools[].function.name)

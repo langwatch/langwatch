@@ -364,3 +364,40 @@ func TestProviderSlotToCredential_GeminiAgentPlatform(t *testing.T) {
 		assert.Empty(t, cred.Extra["project_id"])
 	})
 }
+
+// A rolling deploy runs both versions of the gateway against both versions of
+// the control plane, in both directions, so neither side may refuse the
+// other's payload. "on" and "timeout_ms" were never read; retiring them must
+// stay a decode-time non-event rather than a coordinated release.
+//
+// @scenario "A bundle carrying the retired fallback keys still decodes"
+func TestConfigWire_RetiredFallbackKeysStillDecode(t *testing.T) {
+	payload := []byte(`{
+		"routing_mode": "fallback_all",
+		"fallback": {
+			"on": ["5xx", "timeout", "rate_limit_exceeded"],
+			"chain": ["pc_openai", "pc_anthropic"],
+			"timeout_ms": 30000,
+			"max_attempts": 3
+		}
+	}`)
+
+	var wire configWire
+	require.NoError(t, json.Unmarshal(payload, &wire))
+
+	cfg := wire.toDomain()
+	assert.Equal(t, 3, cfg.Fallback.MaxAttempts)
+	assert.Equal(t, []string{"pc_openai", "pc_anthropic"}, wire.Fallback.Chain)
+}
+
+// A control plane that has already dropped the keys is the other direction of
+// the same deploy, and must decode identically.
+func TestConfigWire_FallbackWithoutRetiredKeysDecodes(t *testing.T) {
+	payload := []byte(`{"routing_mode":"fallback_all","fallback":{"chain":["pc_openai"],"max_attempts":2}}`)
+
+	var wire configWire
+	require.NoError(t, json.Unmarshal(payload, &wire))
+
+	cfg := wire.toDomain()
+	assert.Equal(t, 2, cfg.Fallback.MaxAttempts)
+}

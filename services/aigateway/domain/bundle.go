@@ -178,6 +178,43 @@ func ModelPatternIsWildcard(pattern string) bool {
 	return strings.HasSuffix(pattern, "*")
 }
 
+// ModelSpellings returns the ways one resolved model can be written: the bare
+// model id, plus the provider-qualified form when the provider is known.
+//
+// Both models_allowed and the policy model rules judge every spelling, because
+// an operator writes whichever one their client sends and neither is more
+// canonical than the other. Judging only the bare id turns "openai/*" into a
+// rule that allows nothing, and judging only the qualified id turns
+// "gpt-5-mini" into one that allows nothing either. A rule that silently
+// matches no model is worse than a wrong answer, because nothing about the
+// traffic reveals it.
+func ModelSpellings(providerID ProviderID, modelID string) []string {
+	if modelID == "" {
+		return nil
+	}
+	if providerID == "" {
+		return []string{modelID}
+	}
+	return []string{modelID, string(providerID) + "/" + modelID}
+}
+
+// AllowsResolvedModel reports whether a model the resolver settled on
+// satisfies models_allowed, in either spelling. This is the check every
+// resolution path owes the allowlist: the model that actually reaches a
+// provider is the one the allowlist is about, whether the caller named it
+// directly or reached it through an alias.
+func (c BundleConfig) AllowsResolvedModel(providerID ProviderID, modelID string) bool {
+	if len(c.AllowedModels) == 0 {
+		return true
+	}
+	for _, spelling := range ModelSpellings(providerID, modelID) {
+		if c.AllowsModel(spelling) {
+			return true
+		}
+	}
+	return false
+}
+
 // ModelAlias maps a friendly name to a provider + model.
 type ModelAlias struct {
 	ProviderID ProviderID
@@ -185,9 +222,15 @@ type ModelAlias struct {
 }
 
 // FallbackConfig controls retry/fallback behavior.
+//
+// MaxAttempts is the whole of it. Which failures are worth another provider
+// is decided in one place, classifyProviderError, from the real upstream
+// outcome: 5xx, 429, 404 and transport failures walk the chain, and a
+// terminal 4xx does not. That is not configurable, on purpose. A per-key
+// trigger list could only ever narrow it, and every narrowing turns a
+// recoverable failure into a customer-visible one.
 type FallbackConfig struct {
 	MaxAttempts int
-	On          []string // trigger codes: "5xx", "timeout", "rate_limit", "network"
 }
 
 // GuardrailsConfig holds per-direction guardrail policies.

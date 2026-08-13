@@ -245,7 +245,6 @@ const LEGACY_UNBOUND: string[] = [
 const LEGACY_INERT: string[] = [
   "specs/agents/create-workflow-agent.feature",
   "specs/agents/workflow-agent-editor.feature",
-  "specs/ai-gateway/advanced-routing.feature",
   "specs/ai-gateway/azure-endpoint-from-api-base.feature",
   "specs/ai-gateway/budgets-principal-cascade.feature",
   "specs/ai-gateway/cache-control-rules.feature",
@@ -301,10 +300,8 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/guardrails.feature",
   "specs/ai-gateway/health-checks.feature",
   "specs/ai-gateway/license-gate-governance.feature",
-  "specs/ai-gateway/model-disambiguation.feature",
   "specs/ai-gateway/model-provider-scoping.feature",
   "specs/ai-gateway/payload-capture.feature",
-  "specs/ai-gateway/policy-rules.feature",
   "specs/ai-gateway/prometheus-metrics.feature",
   "specs/ai-gateway/rate-limits.feature",
   "specs/ai-gateway/rbac-legacy-admin-fallback.feature",
