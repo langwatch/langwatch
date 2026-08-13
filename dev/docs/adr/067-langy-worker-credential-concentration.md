@@ -158,10 +158,13 @@ relay exists to prevent.
   turn's live secrets, and the turn lifecycle gains an explicit "settled → drop
   secrets" hook. Post-drop mid-turn retries must re-supply or fail closed.
 - `WorkerInfo` / `workerEntry` lose their credential fields, so `Relay.Register`
-  no longer carries a secret at all and the pool's spawn path stops passing one.
-  The fields that replace them are `[]byte`, explicitly overwritten on drop; the
-  guarantee is "no live reference between turns", not erasure from process
-  memory, which Go does not offer.
+  no longer carries a secret and the pool stops passing one *to the relay*. This
+  is a change to relay registration only — **worker spawning is untouched**:
+  `buildWorkerEnv` still injects `LANGWATCH_API_KEY`, and a mediated worker
+  still gets the `langy-mediated` placeholder rather than the real
+  `LLMVirtualKey`. The fields that replace them are `[]byte`, explicitly
+  overwritten on drop; the guarantee is "no live reference between turns", not
+  erasure from process memory, which Go does not offer.
 - Per-entry non-secret state (the turn trace context, `LastLLMError`) is
   unaffected — it is not a customer credential.
 - No change to the worker-isolation story — kernel UID + 0700 + 128-bit routing
