@@ -220,8 +220,8 @@ function AdvancedSection({
               </Text>
               <Input
                 {...register("maxTurns", {
-                  setValueAs: (v: string) =>
-                    v === ""
+                  setValueAs: (v) =>
+                    v == null || v === ""
                       ? null
                       : Number.isNaN(Number(v))
                         ? null
@@ -238,8 +238,8 @@ function AdvancedSection({
               </Text>
               <Input
                 {...register("minTurns", {
-                  setValueAs: (v: string) =>
-                    v === ""
+                  setValueAs: (v) =>
+                    v == null || v === ""
                       ? null
                       : Number.isNaN(Number(v))
                         ? null
