@@ -247,9 +247,9 @@ registry, and dashboard stay the same.
   leaves its Testcontainers (a stray ClickHouse, a Redis) running in the shared
   VM forever — the library's own reaper (Ryuk) dies with the run, and reused
   containers are skipped by it entirely. The daemon removes
-  Testcontainers-labelled containers: exited ones older than
-  `HAVEN_TESTCONTAINER_TTL` (default 10m; 0 disables the sweep), every other
-  state only past the greater of that and `HAVEN_TESTCONTAINER_RUNNING_TTL`
+  Testcontainers-labelled containers: terminally stopped ones (exited or dead)
+  older than `HAVEN_TESTCONTAINER_TTL` (default 10m; 0 disables the sweep),
+  every other state only past the greater of that and `HAVEN_TESTCONTAINER_RUNNING_TTL`
   (default 2h) since a running (or paused, or mid-restart) container may still
   be serving a live run whatever its age. Ryuk itself is never touched, and the
   sweep never boots the VM just to clean it. See
