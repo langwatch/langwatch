@@ -17,10 +17,17 @@
  *   5. actor row still exists         → else 403
  *   6. shared `startConversationTurn` → 202
  *
- * The flag is checked AFTER authentication because it has to be: it is
- * evaluated per project, so there is no project to evaluate it against until a
- * credential resolves. What the dark surface hides is therefore scoped, and
- * worth stating exactly. A caller holding a real project API key cannot tell
+ * The flag is checked AFTER authentication as a deliberate choice, NOT because
+ * it is impossible to check earlier. Rollback is staged per project, so the
+ * check that matters is the one evaluated against the caller's own project,
+ * and that project is not known until a credential resolves. A project-less
+ * evaluation is available -- `isEnabled` requires only `distinctId`, and
+ * `resolveEffectiveForListing` in `featureFlag/rules.ts` already evaluates
+ * against an empty context in production -- but it answers on the flag's
+ * default rather than on the caller's project, so it cannot replace this
+ * check. It could be added in front of it as an extra pre-auth filter, which
+ * would also close the enumeration gap described below. That is not done here.
+ * What the dark surface hides is therefore scoped, and worth stating exactly. A caller holding a real project API key cannot tell
  * whether Langy exists here — that is the rollback property this route is
  * built around. A caller holding no credential, or a bad one, still gets a 401
  * rather than a 404, and so can tell that SOME authenticated route is mounted
