@@ -651,7 +651,11 @@ export function extractToolText(output: unknown): string {
   if (fromContent !== null) return fromContent;
 
   try {
-    return JSON.stringify(output, null, 2);
+    // `JSON.stringify` is typed as returning `string`, but it returns
+    // `undefined` for a value whose `toJSON` yields `undefined`. The type lies,
+    // so nothing here catches it, and every caller treats the result as a
+    // string: `.match`, `.split` and `.trim` all throw one frame later.
+    return JSON.stringify(output, null, 2) ?? "";
   } catch {
     return "";
   }
