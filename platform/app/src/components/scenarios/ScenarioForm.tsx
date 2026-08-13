@@ -1,6 +1,15 @@
-import { Field, Input, Text, Textarea, VStack } from "@chakra-ui/react";
+import {
+  Collapsible,
+  Field,
+  HStack,
+  Input,
+  Text,
+  Textarea,
+  VStack,
+} from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useRef } from "react";
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { Controller, type UseFormReturn, useForm } from "react-hook-form";
 import { z } from "zod";
 import { scenarioParameterDefinitionsSchema } from "~/server/scenarios/parameters";
@@ -20,6 +29,8 @@ export const scenarioFormSchema = z.object({
   criteria: z.array(z.string()),
   labels: z.array(z.string()),
   parameters: scenarioParameterDefinitionsSchema,
+  maxTurns: z.number().int().min(1).max(100).nullish(),
+  minTurns: z.number().int().min(0).max(100).nullish(),
 });
 
 export type ScenarioFormData = z.infer<typeof scenarioFormSchema>;
@@ -128,9 +139,13 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
           )}
         />
       </VStack>
+
+      {/* ADVANCED Section (ADR-015) */}
+      <AdvancedSection register={register} errors={errors} />
     </VStack>
   );
 }
+
 
 /**
  * Re-seeds the form when the scenario being edited changes.
@@ -155,6 +170,8 @@ function useResetOnDefaultsChange({
           defaultValues.criteria,
           defaultValues.labels,
           defaultValues.parameters,
+          defaultValues.maxTurns,
+          defaultValues.minTurns,
         ])
       : null;
     if (currentDefaults !== prevDefaultsRef.current) {
@@ -171,4 +188,68 @@ function useResetOnDefaultsChange({
       }
     }
   }, [defaultValues, reset]);
+}
+
+function AdvancedSection({
+  register,
+  errors,
+}: {
+  register: ReturnType<typeof useForm<ScenarioFormData>>["register"];
+  errors: ReturnType<typeof useForm<ScenarioFormData>>["formState"]["errors"];
+}) {
+  const [open, setOpen] = useState(false);
+  const ChevronIcon = open ? ChevronDown : ChevronRight;
+
+  return (
+    <Collapsible.Root open={open} onOpenChange={({ open }) => setOpen(open)}>
+      <Collapsible.Trigger asChild>
+        <HStack
+          cursor="pointer"
+          userSelect="none"
+          _hover={{ color: "fg.emphasized" }}
+        >
+          <ChevronIcon size={14} />
+          <SectionHeader>Advanced</SectionHeader>
+        </HStack>
+      </Collapsible.Trigger>
+      <Collapsible.Content>
+        <VStack align="stretch" gap={3} pt={3}>
+          <HStack gap={4} align="start">
+            <Field.Root invalid={!!errors.maxTurns} flex={1}>
+              <Text fontSize="13px" fontWeight="medium">
+                Max Turns
+              </Text>
+              <Input
+                {...register("maxTurns", {
+                  setValueAs: (v: string) =>
+                    v === "" ? null : Number.isNaN(Number(v)) ? null : Number(v),
+                })}
+                type="number"
+                placeholder="Default: 10"
+              />
+              <Field.ErrorText>{errors.maxTurns?.message}</Field.ErrorText>
+            </Field.Root>
+            <Field.Root invalid={!!errors.minTurns} flex={1}>
+              <Text fontSize="13px" fontWeight="medium">
+                Min Turns
+              </Text>
+              <Input
+                {...register("minTurns", {
+                  setValueAs: (v: string) =>
+                    v === "" ? null : Number.isNaN(Number(v)) ? null : Number(v),
+                })}
+                type="number"
+                placeholder="Default: none"
+              />
+              <Field.ErrorText>{errors.minTurns?.message}</Field.ErrorText>
+            </Field.Root>
+          </HStack>
+          <Text fontSize="12px" color="fg.muted">
+            Max Turns caps the conversation length. Min Turns prevents the judge
+            from ending the test early.
+          </Text>
+        </VStack>
+      </Collapsible.Content>
+    </Collapsible.Root>
+  );
 }

@@ -2213,6 +2213,8 @@ model Scenario {
   // DEFAULT-role models. See specs/scenarios/scenario-model-selection.feature.
   simulatorModel  String?
   judgeModel      String?
+  maxTurns        Int?
+  minTurns        Int?
   lastUpdatedById String?
   lastUpdatedBy   User?     @relation(fields: [lastUpdatedById], references: [id])
   archivedAt      DateTime?

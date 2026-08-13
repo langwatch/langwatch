@@ -79,6 +79,9 @@ export interface ScenarioFetcher {
     judgeModel?: string | null;
     /** The parameters the scenario declares, as stored on its JSON column. */
     parameters?: unknown;
+    /** Turn config (ADR-015); null = SDK default. */
+    maxTurns?: number | null;
+    minTurns?: number | null;
   } | null>;
 }
 
@@ -624,6 +627,8 @@ async function fetchScenario({
       situation: rendered.situation,
       criteria: rendered.criteria,
       labels: scenario.labels,
+      maxTurns: scenario.maxTurns ?? undefined,
+      minTurns: scenario.minTurns ?? undefined,
     },
     parameters,
     simulatorModel: scenario.simulatorModel ?? null,
