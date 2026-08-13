@@ -525,7 +525,12 @@ secured.access(gatewayPolicy()).get("/config/:vk_id", async (c) => {
       // empty alias map plus empty deny/allow lists, so the gateway never
       // resolves an alias and never enforces a model deny rule.
       routingPolicy: {
-        select: { id: true, modelAliases: true, policyRules: true },
+        select: {
+          id: true,
+          modelAliases: true,
+          defaultModel: true,
+          policyRules: true,
+        },
       },
     },
   });

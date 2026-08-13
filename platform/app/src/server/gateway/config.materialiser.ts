@@ -29,6 +29,7 @@ import {
   resolveApplicableBudgets,
 } from "./budgetResolution.service";
 import { GatewayCacheRuleService } from "./cacheRule.service";
+import { withTierFallthrough } from "./modelTierFallthrough";
 import { eligibleModelProvidersForVk, traceProjectFor } from "./scopeResolver";
 import { parseVirtualKeyConfig } from "./virtualKey.config";
 import type { VirtualKeyWithScopes } from "./virtualKey.repository";
@@ -511,7 +512,10 @@ function resolvePolicySideOfBundle(
         )
       : {};
   return {
-    modelAliases: aliases,
+    modelAliases: withTierFallthrough({
+      aliases,
+      defaultModel: rp.defaultModel,
+    }),
     policyRules: normalisePolicyRules(rp.policyRules),
   };
 }

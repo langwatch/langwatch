@@ -276,7 +276,6 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
           urls: { deny: [], allow: null },
           models: { deny: [], allow: null },
         },
-        strategy: "priority",
         isDefault: true,
       },
     });

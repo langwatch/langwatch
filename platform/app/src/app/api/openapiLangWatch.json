@@ -15856,29 +15856,6 @@
                       "fallback": {
                         "type": "object",
                         "properties": {
-                          "on": {
-                            "type": "array",
-                            "items": {
-                              "type": "string",
-                              "enum": [
-                                "5xx",
-                                "timeout",
-                                "rate_limit_exceeded",
-                                "network_error",
-                                "circuit_breaker"
-                              ]
-                            },
-                            "default": [
-                              "5xx",
-                              "timeout",
-                              "rate_limit_exceeded"
-                            ]
-                          },
-                          "timeoutMs": {
-                            "type": "integer",
-                            "exclusiveMinimum": 0,
-                            "default": 30000
-                          },
                           "maxAttempts": {
                             "type": "integer",
                             "exclusiveMinimum": 0,
@@ -15886,12 +15863,6 @@
                           }
                         },
                         "default": {
-                          "on": [
-                            "5xx",
-                            "timeout",
-                            "rate_limit_exceeded"
-                          ],
-                          "timeoutMs": 30000,
                           "maxAttempts": 3
                         }
                       },
@@ -16934,29 +16905,6 @@
                       "fallback": {
                         "type": "object",
                         "properties": {
-                          "on": {
-                            "type": "array",
-                            "items": {
-                              "type": "string",
-                              "enum": [
-                                "5xx",
-                                "timeout",
-                                "rate_limit_exceeded",
-                                "network_error",
-                                "circuit_breaker"
-                              ]
-                            },
-                            "default": [
-                              "5xx",
-                              "timeout",
-                              "rate_limit_exceeded"
-                            ]
-                          },
-                          "timeoutMs": {
-                            "type": "integer",
-                            "exclusiveMinimum": 0,
-                            "default": 30000
-                          },
                           "maxAttempts": {
                             "type": "integer",
                             "exclusiveMinimum": 0,
@@ -16964,12 +16912,6 @@
                           }
                         },
                         "default": {
-                          "on": [
-                            "5xx",
-                            "timeout",
-                            "rate_limit_exceeded"
-                          ],
-                          "timeoutMs": 30000,
                           "maxAttempts": 3
                         }
                       },

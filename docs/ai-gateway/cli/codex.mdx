@@ -125,7 +125,7 @@ Every engineer's Codex usage counts against the team budget. The team lead gets 
 The combination that's been most-tested with Codex on v1:
 
 - VK `cache.mode: respect`.
-- VK `fallback.on: [5xx, timeout, 429]`, chain: `openai-primary → anthropic-fallback`.
+- VK fallback chain: `openai-primary → anthropic-fallback`.
 - VK `models_allowed: ["gpt-5-mini", "gpt-5", "gpt-4o", "claude-haiku-4-5-20251001"]`.
 - Personal-access VK bound to the engineer.
 - Monthly `principal` budget with `warn` at 80%, `block` at 100%.

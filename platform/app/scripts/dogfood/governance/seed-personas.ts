@@ -217,9 +217,7 @@ export async function runSeedPersonas(
           },
           name: "developer-default",
           isDefault: true,
-          strategy: "priority",
           modelProviderIds: [modelProvider.id],
-          modelAllowlist: ["gpt-5-mini", "gpt-5", "gpt-4o", "gpt-4o-mini"],
         },
       });
       modelProviderSeeded = true;

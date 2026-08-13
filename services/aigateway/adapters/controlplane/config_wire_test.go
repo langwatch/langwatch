@@ -370,7 +370,7 @@ func TestProviderSlotToCredential_GeminiAgentPlatform(t *testing.T) {
 // other's payload. "on" and "timeout_ms" were never read; retiring them must
 // stay a decode-time non-event rather than a coordinated release.
 //
-// @scenario "A bundle carrying the retired fallback keys still decodes"
+// @scenario "A bundle carrying unread fallback keys still decodes"
 func TestConfigWire_RetiredFallbackKeysStillDecode(t *testing.T) {
 	payload := []byte(`{
 		"routing_mode": "fallback_all",

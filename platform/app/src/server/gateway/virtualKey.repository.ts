@@ -27,6 +27,7 @@ export type VirtualKeyWithScopes = VirtualKey & {
   routingPolicy?: {
     id: string;
     modelAliases: Prisma.JsonValue;
+    defaultModel: string | null;
     policyRules: Prisma.JsonValue;
   } | null;
 };
@@ -97,7 +98,12 @@ export class VirtualKeyRepository {
         scopes: true,
         principalUser: { select: { id: true, name: true, email: true } },
         routingPolicy: {
-          select: { id: true, modelAliases: true, policyRules: true },
+          select: {
+            id: true,
+            modelAliases: true,
+            defaultModel: true,
+            policyRules: true,
+          },
         },
       },
     });
@@ -114,7 +120,12 @@ export class VirtualKeyRepository {
         scopes: true,
         principalUser: { select: { id: true, name: true, email: true } },
         routingPolicy: {
-          select: { id: true, modelAliases: true, policyRules: true },
+          select: {
+            id: true,
+            modelAliases: true,
+            defaultModel: true,
+            policyRules: true,
+          },
         },
       },
     });
@@ -139,7 +150,12 @@ export class VirtualKeyRepository {
         scopes: true,
         principalUser: { select: { id: true, name: true, email: true } },
         routingPolicy: {
-          select: { id: true, modelAliases: true, policyRules: true },
+          select: {
+            id: true,
+            modelAliases: true,
+            defaultModel: true,
+            policyRules: true,
+          },
         },
       },
     });
@@ -192,7 +208,12 @@ export class VirtualKeyRepository {
         scopes: true,
         principalUser: { select: { id: true, name: true, email: true } },
         routingPolicy: {
-          select: { id: true, modelAliases: true, policyRules: true },
+          select: {
+            id: true,
+            modelAliases: true,
+            defaultModel: true,
+            policyRules: true,
+          },
         },
       },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
@@ -211,7 +232,12 @@ export class VirtualKeyRepository {
         scopes: true,
         principalUser: { select: { id: true, name: true, email: true } },
         routingPolicy: {
-          select: { id: true, modelAliases: true, policyRules: true },
+          select: {
+            id: true,
+            modelAliases: true,
+            defaultModel: true,
+            policyRules: true,
+          },
         },
       },
       orderBy: { createdAt: "desc" },
@@ -240,7 +266,12 @@ export class VirtualKeyRepository {
         scopes: true,
         principalUser: { select: { id: true, name: true, email: true } },
         routingPolicy: {
-          select: { id: true, modelAliases: true, policyRules: true },
+          select: {
+            id: true,
+            modelAliases: true,
+            defaultModel: true,
+            policyRules: true,
+          },
         },
       },
       orderBy: { createdAt: "desc" },
@@ -281,7 +312,12 @@ export class VirtualKeyRepository {
         scopes: true,
         principalUser: { select: { id: true, name: true, email: true } },
         routingPolicy: {
-          select: { id: true, modelAliases: true, policyRules: true },
+          select: {
+            id: true,
+            modelAliases: true,
+            defaultModel: true,
+            policyRules: true,
+          },
         },
       },
     });
@@ -301,7 +337,12 @@ export class VirtualKeyRepository {
         scopes: true,
         principalUser: { select: { id: true, name: true, email: true } },
         routingPolicy: {
-          select: { id: true, modelAliases: true, policyRules: true },
+          select: {
+            id: true,
+            modelAliases: true,
+            defaultModel: true,
+            policyRules: true,
+          },
         },
       },
     });
@@ -343,7 +384,12 @@ export class VirtualKeyRepository {
         scopes: true,
         principalUser: { select: { id: true, name: true, email: true } },
         routingPolicy: {
-          select: { id: true, modelAliases: true, policyRules: true },
+          select: {
+            id: true,
+            modelAliases: true,
+            defaultModel: true,
+            policyRules: true,
+          },
         },
       },
     });
@@ -372,7 +418,12 @@ export class VirtualKeyRepository {
         scopes: true,
         principalUser: { select: { id: true, name: true, email: true } },
         routingPolicy: {
-          select: { id: true, modelAliases: true, policyRules: true },
+          select: {
+            id: true,
+            modelAliases: true,
+            defaultModel: true,
+            policyRules: true,
+          },
         },
       },
     });
@@ -399,7 +450,12 @@ export class VirtualKeyRepository {
         scopes: true,
         principalUser: { select: { id: true, name: true, email: true } },
         routingPolicy: {
-          select: { id: true, modelAliases: true, policyRules: true },
+          select: {
+            id: true,
+            modelAliases: true,
+            defaultModel: true,
+            policyRules: true,
+          },
         },
       },
     });
@@ -432,7 +488,12 @@ export class VirtualKeyRepository {
         scopes: true,
         principalUser: { select: { id: true, name: true, email: true } },
         routingPolicy: {
-          select: { id: true, modelAliases: true, policyRules: true },
+          select: {
+            id: true,
+            modelAliases: true,
+            defaultModel: true,
+            policyRules: true,
+          },
         },
       },
     });

@@ -37,11 +37,10 @@ Feature: Provider fallback chain
 
     @integration @unimplemented
     Scenario: primary timeout triggers fallback
-      Given "pc_openai_primary" exceeds timeout_ms
+      Given "pc_openai_primary" never answers and the request deadline passes
       And "pc_anthropic_secondary" returns 200
       When I POST /v1/chat/completions
       Then the client receives 200 from anthropic
-      And the timeout_ms limit is enforced per attempt, not across attempts
 
     @integration @unimplemented
     Scenario: 429 from primary triggers fallback
@@ -82,13 +81,12 @@ Feature: Provider fallback chain
     only ever narrow the set, and every narrowing turns a failure the gateway
     could have recovered from into one the customer sees.
 
-    The bundle wire once carried "on" and "timeout_ms" for that purpose. They
-    were never read, and are gone. A control plane that still sends them is
-    not an error, because a rolling deploy has both versions running at once
-    and neither side may refuse the other.
+    A control plane may still send "on" and "timeout_ms" in the fallback block.
+    Neither is read, and neither is an error: a rolling deploy has both
+    versions of both sides running at once, and neither may refuse the other.
 
     @unit
-    Scenario: A bundle carrying the retired fallback keys still decodes
+    Scenario: A bundle carrying unread fallback keys still decodes
       Given a config payload whose fallback block carries "on" and "timeout_ms"
       When the gateway decodes it
       Then the decode succeeds

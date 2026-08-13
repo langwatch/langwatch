@@ -190,6 +190,11 @@ const DataPrivacyRuleDrawer = lazyDefault({
   factory: () => import("./settings/DataPrivacyRuleDrawer"),
   key: "DataPrivacyRuleDrawer",
 });
+const RoutingPolicyDrawer = lazyDefault({
+  factory: () =>
+    import("./settings/governance/routingPolicies/RoutingPolicyDrawer"),
+  key: "RoutingPolicyDrawer",
+});
 const DefaultModelOverrideDrawer = lazyDefault({
   factory: () => import("./settings/DefaultModelOverrideDrawer"),
   key: "DefaultModelOverrideDrawer",
@@ -281,6 +286,8 @@ export const drawers = {
   suiteEditor: SuiteFormDrawer,
   // Data privacy
   dataPrivacyRule: DataPrivacyRuleDrawer,
+  // AI governance
+  routingPolicy: RoutingPolicyDrawer,
   // Project management
   createProject: CreateProjectDrawer,
   editProject: EditProjectDrawer,

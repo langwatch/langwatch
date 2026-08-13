@@ -9223,26 +9223,10 @@ export interface operations {
                         };
                         /**
                          * @default {
-                         *       "on": [
-                         *         "5xx",
-                         *         "timeout",
-                         *         "rate_limit_exceeded"
-                         *       ],
-                         *       "timeoutMs": 30000,
                          *       "maxAttempts": 3
                          *     }
                          */
                         fallback?: {
-                            /**
-                             * @default [
-                             *       "5xx",
-                             *       "timeout",
-                             *       "rate_limit_exceeded"
-                             *     ]
-                             */
-                            on?: ("5xx" | "timeout" | "rate_limit_exceeded" | "network_error" | "circuit_breaker")[];
-                            /** @default 30000 */
-                            timeoutMs?: number;
                             /** @default 3 */
                             maxAttempts?: number;
                         };
@@ -9649,26 +9633,10 @@ export interface operations {
                         };
                         /**
                          * @default {
-                         *       "on": [
-                         *         "5xx",
-                         *         "timeout",
-                         *         "rate_limit_exceeded"
-                         *       ],
-                         *       "timeoutMs": 30000,
                          *       "maxAttempts": 3
                          *     }
                          */
                         fallback?: {
-                            /**
-                             * @default [
-                             *       "5xx",
-                             *       "timeout",
-                             *       "rate_limit_exceeded"
-                             *     ]
-                             */
-                            on?: ("5xx" | "timeout" | "rate_limit_exceeded" | "network_error" | "circuit_breaker")[];
-                            /** @default 30000 */
-                            timeoutMs?: number;
                             /** @default 3 */
                             maxAttempts?: number;
                         };

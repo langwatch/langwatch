@@ -304,7 +304,7 @@ Feature: AI Gateway — Virtual Keys
 
   @integration @unimplemented
   Scenario: Per-VK chain ordering is owned by RoutingPolicy.model_provider_ids
-    Given a RoutingPolicy "rp-strict" with strategy="ordered" and model_provider_ids=["anthropic", "openai", "azure"]
+    Given a RoutingPolicy "rp-strict" with model_provider_ids=["anthropic", "openai", "azure"] in that order
     And a VirtualKey "prod-key" scoped to ORGANIZATION "acme" with routingPolicyId="rp-strict"
     When the gateway materialises the /config bundle for "prod-key"
     Then `routing_policy.model_provider_ids` equals ["anthropic", "openai", "azure"]
@@ -312,12 +312,12 @@ Feature: AI Gateway — Virtual Keys
     And changing the policy's model_provider_ids bumps every dependent VK's revision
 
   @integration @unimplemented
-  Scenario: Fallback trigger conditions live on RoutingPolicy (per-policy, not per-VK)
-    Given a RoutingPolicy "rp-resilient" with triggers={on:["5xx","429","timeout"], timeout_ms:30000, max_attempts:3}
+  Scenario: The attempt budget lives on RoutingPolicy (per-policy, not per-VK)
+    Given a RoutingPolicy "rp-resilient" with max_attempts=3
     And a VirtualKey "prod-key" with routingPolicyId="rp-resilient"
     When the bundle is materialised
-    Then `routing_policy.triggers` equals {on:["5xx","429","timeout"], timeout_ms:30000, max_attempts:3}
-    And the gateway applies those triggers per-request, not per-VK
+    Then `fallback.max_attempts` equals 3
+    And which failures walk the chain is decided by the gateway from the upstream outcome, not by the policy
 
   # ============================================================================
   # Model aliases

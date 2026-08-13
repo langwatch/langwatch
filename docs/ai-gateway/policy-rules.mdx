@@ -11,11 +11,11 @@ Four kinds of patterns:
 - **Tools**: matched against the names of tools the client declares.
 - **MCP servers**: matched against MCP server names, URLs the client declares.
 - **URLs**: heuristically matched against outbound URLs in tool-call arguments.
-- **Models**: regex-matched against the requested model id (distinct from the glob-based `models_allowed` allowlist, see [Models dimension vs models_allowed](#models-dimension-vs-models_allowed)).
+- **Models**: regex-matched against the resolved model id (distinct from the glob-based `models_allowed` allowlist, see [Models dimension vs models_allowed](#models-dimension-vs-models_allowed)).
 
 Each has a `deny` list and an optional `allow` list.
 
-<Note>**Enforcement point:** policy-rule checks run immediately after authentication and rate limiting, **before** request-body parsing, guardrails, budget reconciliation, or the upstream provider. A blocked request never incurs a provider token cost, a guardrail evaluator run, or a budget debit. This is the cheapest possible reject path in the dispatcher.</Note>
+<Note>**Enforcement point:** policy-rule checks run immediately after authentication and rate limiting, **before** guardrails, budget reconciliation, or the upstream provider. The tools, MCP, and URL dimensions judge the request body as sent; the models dimension runs a step later, at model resolution, so it can judge the model the request actually resolves to. A blocked request never incurs a provider token cost, a guardrail evaluator run, or a budget debit. This is the cheapest possible reject path in the dispatcher.</Note>
 
 ## How it works
 
@@ -73,7 +73,16 @@ First URL that hits a deny rule (or falls outside a non-null `allow` list) → `
 
 ### Models
 
-Every request's `model` field is RE2-matched against the `models` dimension before dispatch. This is policy-by-regex (e.g. "block anything matching `^gpt-4(-turbo)?$`"), distinct from the static `models_allowed` glob allowlist on the VK.
+The `models` dimension is RE2-matched against the **resolved** model id, the one the request will actually be billed and served under, not the string the caller typed. Alias resolution runs first, then the rules judge its result. This is policy-by-regex (e.g. "block anything matching `^gpt-4(-turbo)?$`"), distinct from the static `models_allowed` glob allowlist on the VK.
+
+Two consequences follow directly, and both are the point of judging the resolved id:
+
+- An alias pointing at a denied model **is** blocked. Naming `gpt-4` in an alias is not a way around a rule that denies `^gpt-4(-turbo)?$`.
+- A rule denying a name that resolves elsewhere does **not** block. If `gpt-4` is an alias for `azure/my-eastus-deployment`, a deny on `^gpt-4$` never fires, because nothing denied ever runs.
+
+Rules match either spelling of the resolved model, the bare id and the provider-qualified one, so `^gpt-4.*` and `^openai/gpt-4.*` both reach `openai/gpt-4o`. Write whichever your team reads more naturally instead of maintaining both.
+
+The other three dimensions are properties of the request body as sent, so tools, MCP servers, and URLs are judged exactly as the client wrote them.
 
 Blocked → `403 model_not_allowed`. Attribution via request-id correlation (see [§Tools](#tools) above).
 
@@ -86,7 +95,7 @@ Both gate which models a VK can call, but they solve different problems:
 | `models_allowed` | `["claude-haiku-*", "gpt-5-mini"]` (glob allowlist) | Static, human-readable "these models and no others." Simplest case. |
 | `policy_rules.models` | `{deny: [...], allow: [...]}` (RE2 regex) | Policy that needs regex power, "deny any `gpt-4*` except `gpt-4o-mini`," "deny anything not from a provider prefix." |
 
-They compose: a request passes only if both checks allow it. Use `models_allowed` for 90% of cases and reach for `policy_rules.models` when regex semantics are actually needed.
+They compose: a request passes only if both checks allow it. `models_allowed` is applied first, during model resolution, and the regex rules judge what resolution settled on. Both read the resolved model in either spelling, so neither can be routed around with an alias. Use `models_allowed` for 90% of cases and reach for `policy_rules.models` when regex semantics are actually needed.
 
 ## Common policies
 
@@ -132,7 +141,7 @@ On the VK edit screen (Gateway → Virtual Keys → **Edit**), the **Policy Rule
 | **Tools** | RE2 regexes, one per line. Match against `tools[].function.name` (OpenAI) and `tools[].name` (Anthropic). | Non-empty → only tools matching `allow` pass. Empty → deny-only. |
 | **MCP** | RE2 regexes for MCP server names and URLs. | Same allow semantics. |
 | **URLs** | RE2 regexes matched against every `http(s)://` URL extracted from the request body. | Same allow semantics. |
-| **Models** | RE2 regex policy on the `model` field (distinct from the static `models_allowed` glob on the top of the VK form). | Same allow semantics. |
+| **Models** | RE2 regex policy on the resolved model, after any alias is applied (distinct from the static `models_allowed` glob on the top of the VK form). | Same allow semantics. |
 
 The section header links to the relevant 403 error codes (`tool_not_allowed`, `url_not_allowed`, `model_not_allowed`) and calls out the fail-closed behaviour: **if any regex is invalid, the VK fails with 503 service_unavailable, never silent-bypass**. Fix the pattern, save the VK, and the next request picks it up (the bundle refresh invalidates the broken compiled cache).
 

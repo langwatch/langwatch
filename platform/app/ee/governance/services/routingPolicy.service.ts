@@ -39,7 +39,7 @@
  * that, not the path.
  */
 import {
-  Prisma,
+  type Prisma,
   type PrismaClient,
   type RoutingPolicy,
   type RoutingPolicyScope as RoutingPolicyScopeRow,
@@ -105,10 +105,17 @@ export interface CreateRoutingPolicyInput {
   name: string;
   description?: string | null;
   modelProviderIds: string[];
-  modelAllowlist?: string[] | null;
-  strategy?: "priority" | "cost" | "latency" | "round_robin";
   isDefault?: boolean;
+  /**
+   * Model name mapping. The reserved tier names (complex / reasoning / fast)
+   * are ordinary entries in here; see src/utils/modelTierPresets.ts.
+   */
   modelAliases?: Record<string, string>;
+  /**
+   * The model a reserved tier name resolves to when this policy names no
+   * target of its own for it. Concrete model id, never a moving name.
+   */
+  defaultModel?: string | null;
   policyRules?: Record<string, unknown>;
   actorUserId: string;
 }
@@ -119,9 +126,8 @@ export interface UpdateRoutingPolicyInput {
   name?: string;
   description?: string | null;
   modelProviderIds?: string[];
-  modelAllowlist?: string[] | null;
-  strategy?: "priority" | "cost" | "latency" | "round_robin";
   modelAliases?: Record<string, string>;
+  defaultModel?: string | null;
   policyRules?: Record<string, unknown>;
   actorUserId: string;
 }
@@ -215,12 +221,9 @@ export class RoutingPolicyService {
           name: input.name,
           description: input.description ?? null,
           modelProviderIds: input.modelProviderIds as Prisma.InputJsonValue,
-          modelAllowlist: input.modelAllowlist
-            ? (input.modelAllowlist as Prisma.InputJsonValue)
-            : Prisma.JsonNull,
-          strategy: input.strategy ?? "priority",
           isDefault: input.isDefault ?? false,
           modelAliases: (input.modelAliases ?? {}) as Prisma.InputJsonValue,
+          defaultModel: input.defaultModel ?? null,
           policyRules: (input.policyRules ?? {}) as Prisma.InputJsonValue,
           createdById: input.actorUserId,
           updatedById: input.actorUserId,
@@ -267,13 +270,10 @@ export class RoutingPolicyService {
     if (input.description !== undefined) data.description = input.description;
     if (input.modelProviderIds !== undefined)
       data.modelProviderIds = input.modelProviderIds as Prisma.InputJsonValue;
-    if (input.modelAllowlist !== undefined)
-      data.modelAllowlist = input.modelAllowlist
-        ? (input.modelAllowlist as Prisma.InputJsonValue)
-        : Prisma.JsonNull;
-    if (input.strategy !== undefined) data.strategy = input.strategy;
     if (input.modelAliases !== undefined)
       data.modelAliases = input.modelAliases as Prisma.InputJsonValue;
+    if (input.defaultModel !== undefined)
+      data.defaultModel = input.defaultModel;
     if (input.policyRules !== undefined)
       data.policyRules = input.policyRules as Prisma.InputJsonValue;
 
