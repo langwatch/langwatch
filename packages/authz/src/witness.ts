@@ -1,13 +1,15 @@
 import type { AuthzDecision, AuthzScopeRef } from "./engine";
 
 /**
- * ADR-092 §7 L3 — the authorization witness: a branded, unforgeable proof
- * that `authz.require()` allowed `permission` at `scope`. Repositories that
+ * ADR-092 §7 L3 — the authorization witness: a branded proof that
+ * `authz.authorize()` allowed `permission` at `scope`. Repositories that
  * adopt the witness convention take `Authorized<"project">` instead of a raw
  * projectId, which makes "forgot the permission check" fail to compile.
  *
- * The brand symbol is module-private: the only factory is
- * `mintWitness`, and the only caller of that is the authz service.
+ * The brand symbol is module-private, so the brand blocks accidental
+ * construction: the only factory is `mintWitness`, and it is off the package
+ * barrel — the `@langwatch/authz/witness` subpath is for the server runtime
+ * only, where AuthzService mints one after a decision it just made.
  */
 const AUTHORIZED_BRAND: unique symbol = Symbol("langwatch.authz.authorized");
 
@@ -18,7 +20,7 @@ export type Authorized<S extends AuthzScopeRef["type"]> = {
   readonly decision: AuthzDecision;
 };
 
-/** @internal — only the authz service may mint witnesses. */
+/** @internal — only the authz service (server runtime) may mint witnesses. */
 export function mintWitness<S extends AuthzScopeRef["type"]>({
   scope,
   permission,

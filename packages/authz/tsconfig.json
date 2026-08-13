@@ -6,17 +6,17 @@
     "lib": ["es2020"],
     "strict": true,
     "noUncheckedIndexedAccess": true,
+    "noImplicitReturns": true,
     "incremental": true,
     "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/authz.tsbuildinfo",
-    "declaration": true,
-    "emitDeclarationOnly": true,
-    "outDir": "./dist",
+    "noEmit": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "verbatimModuleSyntax": true
   },
   "include": ["src/**/*.ts"],
-  // Tests run via vitest (`pnpm test`), which provides the `vitest` module and
-  // its types at runtime; the declaration build must not require them.
+  // The package ships its TypeScript sources (exports point at src/*.ts), so
+  // nothing is emitted from here. Tests are checked by tsconfig.test.json,
+  // which supplies the `vitest` module types this config has no need of.
   "exclude": ["src/__tests__/**"]
 }

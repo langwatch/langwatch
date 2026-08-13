@@ -265,9 +265,13 @@ export function permissionSatisfiedBy({
 }
 
 /**
- * ADR-092 §8 — the resource tier. Individually shareable resource kinds and
- * the child kinds a grant on them covers via the chain walk (children have
- * no grant rows of their own; documented here as resource knowledge).
+ * ADR-092 §8 — the resource tier: the individually shareable resource kinds.
+ *
+ * `children` is documentation, not behaviour. Nothing reads it: a child read
+ * authorizes at its parent resource's node because the CALLER supplies that
+ * ancestry as `scope.parents`, and the walk consults only that. The lists are
+ * here so the resource knowledge has one home while stage C5 turns ShareLink
+ * into full resource-grant storage.
  */
 export const SHAREABLE_RESOURCE_KINDS = {
   trace: {

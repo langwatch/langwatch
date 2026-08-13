@@ -5,6 +5,7 @@ import {
   type CollectedBinding,
   type CollectedGrants,
   type LegacyTeamMembership,
+  type ResourceGrant,
 } from "../engine";
 
 const engine = new AuthzEngine();
@@ -26,6 +27,28 @@ const otherProjectScope: AuthzScopeRef = {
   organizationId: ORG,
 };
 const orgScope: AuthzScopeRef = { type: "organization", id: ORG };
+const teamScope: AuthzScopeRef = {
+  type: "team",
+  id: TEAM,
+  organizationId: ORG,
+};
+const TRACE = "trace-1";
+const traceScope: Extract<AuthzScopeRef, { type: "resource" }> = {
+  type: "resource",
+  kind: "trace",
+  id: TRACE,
+  shareTokens: ["share-token-1"],
+  projectId: PROJECT,
+  teamId: TEAM,
+  organizationId: ORG,
+};
+const publicTraceGrant: ResourceGrant = {
+  kind: "trace",
+  id: TRACE,
+  projectId: PROJECT,
+  permission: "traces:view",
+  audience: { kind: "anyone" },
+};
 
 function makeGrants({
   bindings = [] as CollectedBinding[],
@@ -58,17 +81,27 @@ const binding = (
 
 describe("authz engine decide()", () => {
   describe("given an org admin binding and a project viewer binding", () => {
-    const grants = makeGrants({
-      bindings: [
-        binding({ role: "ADMIN", scopeType: "ORGANIZATION", scopeId: ORG }),
-        binding({ role: "VIEWER", scopeType: "PROJECT", scopeId: PROJECT }),
-      ],
-    });
+    const bindings = [
+      binding({ role: "ADMIN", scopeType: "ORGANIZATION", scopeId: ORG }),
+      binding({ role: "VIEWER", scopeType: "PROJECT", scopeId: PROJECT }),
+    ];
+    const grants = makeGrants({ bindings });
 
     /** @scenario "Grants are an additive union across scopes" */
     it("grants via the union — the narrower binding is inert", () => {
       const decision = engine.decide({
         grants,
+        permission: "traces:update",
+        scope: projectScope,
+      });
+      expect(decision.allowed).toBe(true);
+      expect(decision.via).toBe("binding");
+    });
+
+    /** @scenario "Grants are an additive union across scopes" */
+    it("reaches the same verdict with the bindings collected in the other order", () => {
+      const decision = engine.decide({
+        grants: makeGrants({ bindings: [...bindings].reverse() }),
         permission: "traces:update",
         scope: projectScope,
       });
@@ -469,6 +502,103 @@ describe("authz engine decide()", () => {
     });
   });
 
+  describe("given a user with no OrganizationUser row", () => {
+    const nonMember = (overrides: Partial<CollectedGrants> = {}) =>
+      makeGrants({ organizationRole: null, isOrgMember: false, ...overrides });
+
+    it("denies at project scope despite a PROJECT binding naming them", () => {
+      const decision = engine.decide({
+        grants: nonMember({
+          bindings: [
+            binding({ role: "ADMIN", scopeType: "PROJECT", scopeId: PROJECT }),
+          ],
+        }),
+        permission: "traces:view",
+        scope: projectScope,
+      });
+      expect(decision.allowed).toBe(false);
+      expect(decision.denialReason).toBe("no-membership");
+    });
+
+    it("denies at team scope despite a TEAM binding naming them", () => {
+      const decision = engine.decide({
+        grants: nonMember({
+          bindings: [
+            binding({ role: "ADMIN", scopeType: "TEAM", scopeId: TEAM }),
+          ],
+        }),
+        permission: "traces:view",
+        scope: teamScope,
+      });
+      expect(decision.allowed).toBe(false);
+      expect(decision.denialReason).toBe("no-membership");
+    });
+
+    it("denies at project scope despite a legacy TeamUser row", () => {
+      const decision = engine.decide({
+        grants: nonMember({
+          legacyTeamMemberships: [
+            {
+              teamId: TEAM,
+              role: "ADMIN",
+              customRoleId: null,
+              isPersonal: false,
+            },
+          ],
+        }),
+        permission: "project:delete",
+        scope: projectScope,
+      });
+      expect(decision.allowed).toBe(false);
+      expect(decision.denialReason).toBe("no-membership");
+    });
+
+    it("still resolves a presented share link through the resource tier", () => {
+      const decision = engine.decide({
+        grants: nonMember(),
+        permission: "traces:view",
+        scope: traceScope,
+        resourceGrants: [publicTraceGrant],
+      });
+      expect(decision.allowed).toBe(true);
+      expect(decision.via).toBe("resource-grant");
+      expect(decision.audience).toBe("public");
+    });
+  });
+
+  describe("given several resource grants matching the same trace", () => {
+    const orgTraceGrant: ResourceGrant = {
+      kind: "trace",
+      id: TRACE,
+      projectId: PROJECT,
+      permission: "traces:view",
+      audience: { kind: "organization", id: ORG },
+    };
+    const decideWith = (resourceGrants: ResourceGrant[]) =>
+      engine.decide({
+        grants: makeGrants(),
+        permission: "traces:view",
+        scope: traceScope,
+        resourceGrants,
+      });
+
+    it("picks the least-redacting audience whatever order the rows arrive in", () => {
+      for (const resourceGrants of [
+        [publicTraceGrant, orgTraceGrant],
+        [orgTraceGrant, publicTraceGrant],
+      ]) {
+        const decision = decideWith(resourceGrants);
+        expect(decision.allowed).toBe(true);
+        expect(decision.via).toBe("resource-grant");
+        expect(decision.audience).toBe("member");
+      }
+    });
+
+    it("falls back to the public audience when only the public grant matches", () => {
+      expect(decideWith([publicTraceGrant]).audience).toBe("public");
+    });
+  });
+
   describe("given the demo project", () => {
     /** @scenario "The demo project opens for signed-in callers only" */
     it("grants demo-bag permissions to any signed-in caller, and nothing else", () => {
@@ -492,6 +622,21 @@ describe("authz engine decide()", () => {
           demoProjectId: PROJECT,
         }).allowed,
       ).toBe(false);
+    });
+
+    /** @scenario "The demo project opens for signed-in callers only" */
+    it("denies the demo bag to an api-key caller — legacy reaches it from the session path only", () => {
+      const decision = engine.decide({
+        grants: makeGrants({
+          principal: { type: "apiKey", id: "key-1" },
+          organizationRole: null,
+          isOrgMember: false,
+        }),
+        permission: "traces:view",
+        scope: projectScope,
+        demoProjectId: PROJECT,
+      });
+      expect(decision.allowed).toBe(false);
     });
 
     /** @scenario "The demo project opens for signed-in callers only" */
@@ -553,13 +698,14 @@ describe("authz engine decideWithCeiling()", () => {
   });
 
   describe("given an owner who holds more than the key", () => {
+    const ownerGrants = makeGrants({
+      bindings: [
+        binding({ role: "ADMIN", scopeType: "ORGANIZATION", scopeId: ORG }),
+      ],
+    });
+
     /** @scenario "Promotion does not grow a scoped API key" */
     it("denies what only the owner holds — a scoped key never grows", () => {
-      const ownerGrants = makeGrants({
-        bindings: [
-          binding({ role: "ADMIN", scopeType: "ORGANIZATION", scopeId: ORG }),
-        ],
-      });
       const decision = engine.decideWithCeiling({
         keyGrants,
         ownerGrants,
@@ -568,6 +714,17 @@ describe("authz engine decideWithCeiling()", () => {
       });
       expect(decision.allowed).toBe(false);
       expect(decision.denialReason).toBe("no-binding");
+    });
+
+    /** @scenario "Promotion does not grow a scoped API key" */
+    it("allows the owner's own session the same permission — the ceiling is not what denied", () => {
+      expect(
+        engine.decide({
+          grants: ownerGrants,
+          permission: "project:delete",
+          scope: projectScope,
+        }).allowed,
+      ).toBe(true);
     });
   });
 

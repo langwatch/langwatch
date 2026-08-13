@@ -5,18 +5,22 @@
  *
  *   AuthzCollectorService   COLLECT policies over AuthzReadRepository
  *   AuthzService            can / check / authorize / effectivePermissions
- *                           (+ the §12 epoch cache inside the instance)
+ *                           (+ the §9 owner ceiling and the §12 epoch cache
+ *                           inside the instance)
  *   GrantsService           the one write surface, over AuthzGrantsRepository
  *   AuthzShadowService      the legacy resolvers' engine comparison
  *
- * No storage engine lives here. The app implements the repository
- * interfaces with Prisma (platform/app/src/server/authz/repositories/) and
- * composes everything once in its runtime
- * (platform/app/src/server/authz/runtime.ts). The pure half (registry,
- * roles, decide()) is `@langwatch/authz`.
+ * No storage engine lives here, and no environment read either: every knob
+ * arrives as a closure through a service's options. The app implements the
+ * repository interfaces with Prisma
+ * (platform/app/src/server/authz/repositories/) and composes everything
+ * once in its runtime (platform/app/src/server/authz/runtime.ts). The pure
+ * half (registry, roles, decide()) is `@langwatch/authz`.
  */
 export { AuthzCollectorService } from "./authz-collector.service";
+export type { AuthzCollectorOptions } from "./authz-collector.service";
 export {
+  BindingMissingError,
   type BindingPrincipalWhere,
   DuplicateBindingError,
   type AuthzGrantsRepository,
@@ -27,19 +31,18 @@ export type {
   AuthzReadRepository,
   CustomRolePermissionsRow,
   OrganizationRole,
+  ScopeLineageRepository,
   ShareLinkRow,
 } from "./authz-read.repository";
 export { AuthzShadowService } from "./authz-shadow.service";
+export type { AuthzShadowOptions } from "./authz-shadow.service";
 export { AuthzService } from "./authz.service";
 export type {
   AuthzEpochReader,
   AuthzServiceOptions,
 } from "./authz.service";
-export {
-  GrantsService,
-  GrantValidationError,
-  OffboardIncompleteError,
-} from "./grants.service";
+export { GrantValidationError } from "./grant-validation";
+export { GrantsService } from "./grants.service";
 export type {
   AuthzAuditWriter,
   AuthzEpochBumper,
@@ -47,3 +50,5 @@ export type {
   GrantRole,
   GrantsServiceDeps,
 } from "./grants.service";
+export { OffboardIncompleteError } from "./offboard";
+export type { OffboardResult } from "./offboard";

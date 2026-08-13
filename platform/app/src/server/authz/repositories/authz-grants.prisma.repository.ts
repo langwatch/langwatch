@@ -3,9 +3,9 @@
  * the grants surface performs, plus the tenancy lookups it validates with.
  * Atomicity lives here (replaceBinding and offboardUser own their
  * transactions); validation, failure naming, and the offboarding proof stay
- * in @langwatch/authz-server's GrantsService. Prisma's P2002 is mapped to
- * the port's DuplicateBindingError at this boundary so the service never
- * sees an engine-specific error.
+ * in @langwatch/authz-server's GrantsService. Prisma's P2002 and P2025 are
+ * mapped to the port's DuplicateBindingError / BindingMissingError at this
+ * boundary so the service never sees an engine-specific error.
  */
 import type {
   AuthzGrantsRepository,
@@ -14,10 +14,27 @@ import type {
   OffboardCounts,
   RoleBindingWrite,
 } from "@langwatch/authz-server";
-import { DuplicateBindingError } from "@langwatch/authz-server";
+import {
+  BindingMissingError,
+  DuplicateBindingError,
+} from "@langwatch/authz-server";
 import type { PrismaClient } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { PrismaAuthzReadRepository } from "./authz-read.prisma.repository";
+
+/**
+ * The union back onto the three nullable columns. The other two are written
+ * as explicit nulls rather than left off: this is the one place the "exactly
+ * one principal" shape the port guarantees is turned back into columns that
+ * could each hold a value, so it says so.
+ */
+function principalColumns(principal: BindingPrincipalWhere) {
+  return {
+    userId: "userId" in principal ? principal.userId : null,
+    groupId: "groupId" in principal ? principal.groupId : null,
+    apiKeyId: "apiKeyId" in principal ? principal.apiKeyId : null,
+  };
+}
 
 function bindingData(row: RoleBindingWrite) {
   return {
@@ -27,20 +44,29 @@ function bindingData(row: RoleBindingWrite) {
     scopeId: row.scopeId,
     role: row.role,
     customRoleId: row.customRoleId,
-    userId: row.userId,
-    groupId: row.groupId,
-    apiKeyId: row.apiKeyId,
+    ...principalColumns(row.principal),
   };
 }
 
+function isPrismaCode(error: unknown, code: string): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError && error.code === code
+  );
+}
+
 function mapDuplicate(error: unknown): never {
-  if (
-    error instanceof Prisma.PrismaClientKnownRequestError &&
-    error.code === "P2002"
-  ) {
+  if (isPrismaCode(error, "P2002")) {
     throw new DuplicateBindingError();
   }
   throw error;
+}
+
+/** P2025 is Prisma's "row the write targeted is not there". */
+function mapDuplicateOrMissing(error: unknown): never {
+  if (isPrismaCode(error, "P2025")) {
+    throw new BindingMissingError();
+  }
+  mapDuplicate(error);
 }
 
 export class PrismaAuthzGrantsRepository implements AuthzGrantsRepository {
@@ -69,12 +95,16 @@ export class PrismaAuthzGrantsRepository implements AuthzGrantsRepository {
         data: { role, customRoleId },
       });
     } catch (error) {
-      mapDuplicate(error);
+      mapDuplicateOrMissing(error);
     }
   }
 
   async deleteBinding({ bindingId }: { bindingId: string }): Promise<void> {
-    await this.prisma.roleBinding.delete({ where: { id: bindingId } });
+    try {
+      await this.prisma.roleBinding.delete({ where: { id: bindingId } });
+    } catch (error) {
+      mapDuplicateOrMissing(error);
+    }
   }
 
   async findBinding({
@@ -88,14 +118,14 @@ export class PrismaAuthzGrantsRepository implements AuthzGrantsRepository {
     });
   }
 
-  async findCustomRoleOrganization({
+  async findCustomRole({
     customRoleId,
   }: {
     customRoleId: string;
-  }): Promise<{ organizationId: string } | null> {
+  }): Promise<{ organizationId: string; permissions: unknown } | null> {
     return this.prisma.customRole.findUnique({
       where: { id: customRoleId },
-      select: { organizationId: true },
+      select: { organizationId: true, permissions: true },
     });
   }
 
@@ -140,7 +170,7 @@ export class PrismaAuthzGrantsRepository implements AuthzGrantsRepository {
   }): Promise<void> {
     try {
       await this.prisma.$transaction(async (tx) => {
-        await tx.roleBinding.deleteMany({
+        const deleted = await tx.roleBinding.deleteMany({
           where: {
             organizationId: deleteWhere.organizationId,
             scopeType: deleteWhere.scopeType,
@@ -148,10 +178,15 @@ export class PrismaAuthzGrantsRepository implements AuthzGrantsRepository {
             ...deleteWhere.principal,
           },
         });
+        // Nothing to reduce: the broad grant this call narrows is already
+        // gone. Thrown inside the transaction so the create rolls back with
+        // it - a replace must never leave the new binding alongside no
+        // removal.
+        if (deleted.count === 0) throw new BindingMissingError();
         await tx.roleBinding.create({ data: bindingData(create) });
       });
     } catch (error) {
-      mapDuplicate(error);
+      mapDuplicateOrMissing(error);
     }
   }
 

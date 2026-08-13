@@ -14,6 +14,16 @@ import {
   teamRoleHasPermission,
 } from "../api/rbac";
 import { authzShadowFor } from "../authz/shadow";
+// The shadow comparison runs on the APP's own Prisma handle, never the
+// caller's. Both of this module's public functions are called on the API-key
+// mint path with `prisma` bound to an OPEN interactive transaction
+// (ApiKeyService.create), and a detached fire-and-forget query on that handle
+// either lengthens the transaction it was never part of or lands after the
+// commit and fails with "Transaction already closed". This module is
+// server-only — its importers are org-auth.ts, auth-middleware.ts and
+// api-key.service.ts — so the singleton is safe to hold here, unlike in
+// ./shadow.ts, which rbac.ts (client-reachable) imports.
+import { prisma as appPrisma } from "../db";
 import { CUSTOM_ROLE_KIND } from "../role/role-kind";
 import {
   MalformedCustomRolePermissionsError,
@@ -275,6 +285,7 @@ export async function checkRoleBindingPermission({
   organizationId,
   scope,
   permission,
+  skipShadow = false,
 }: {
   prisma: PrismaClient;
   userId?: string;
@@ -282,6 +293,14 @@ export async function checkRoleBindingPermission({
   organizationId: string;
   scope: ScopeRef;
   permission: Permission;
+  /**
+   * Set by callers that ask this question once per permission in a loop (the
+   * API-key mint ceiling): one shadow comparison per permission is ~23
+   * detached collects for a single mint, and the mint path's engine coverage
+   * already comes from `enforceApiKeyCeiling`, which runs the same check
+   * per REQUEST for the key's whole life.
+   */
+  skipShadow?: boolean;
 }): Promise<boolean> {
   const resolvedPrincipal: Principal = principal ?? {
     type: "user",
@@ -298,17 +317,19 @@ export async function checkRoleBindingPermission({
   // ADR-092 stage A4: engine shadow comparison. Mismatches on this path for
   // EXTERNAL owners are the documented resolver divergence (no lite-member
   // cap here), auto-tagged knownDivergence by shadow.ts.
+  if (skipShadow) return permitted;
   const scopeIds = scopeRefToIds(scope, organizationId);
   if (resolvedPrincipal.type === "user") {
-    authzShadowFor(prisma).userPermissionCheck({
+    authzShadowFor(appPrisma).userPermissionCheck({
       userId: resolvedPrincipal.id,
       permission,
       legacyAllowed: permitted,
       caller: "apiKeyPath.userBindings",
+      fromApiKeyPath: true,
       ...scopeIds,
     });
   } else {
-    authzShadowFor(prisma).apiKeyPermissionCheck({
+    authzShadowFor(appPrisma).apiKeyPermissionCheck({
       apiKeyId: resolvedPrincipal.id,
       ownerUserId: null,
       organizationId,
@@ -350,11 +371,9 @@ async function checkRoleBindingPermissionInner({
   scope: ScopeRef;
   permission: Permission;
 }): Promise<boolean> {
-  const resolvedPrincipal: Principal = principal;
-
   const bindings = await collectBindingsForScope({
     prisma,
-    principal: resolvedPrincipal,
+    principal,
     organizationId,
     scope,
   });
@@ -378,7 +397,7 @@ async function checkRoleBindingPermissionInner({
         where: {
           id: binding.customRoleId,
           organizationId,
-          ...systemRoleGuard(resolvedPrincipal),
+          ...systemRoleGuard(principal),
         },
         select: { permissions: true },
       });
@@ -579,6 +598,7 @@ export async function resolveApiKeyPermission({
   organizationId,
   scope,
   permission,
+  skipShadow = false,
 }: {
   prisma: PrismaClient;
   apiKeyId: string;
@@ -586,6 +606,8 @@ export async function resolveApiKeyPermission({
   organizationId: string;
   scope: ScopeRef;
   permission: Permission;
+  /** See checkRoleBindingPermission - the per-permission mint loops opt out. */
+  skipShadow?: boolean;
 }): Promise<boolean> {
   // 1. Check API key's own bindings (inner variant: the composite shadow
   // below covers this path, so the per-leg wrapper shadow is skipped)
@@ -641,8 +663,9 @@ export async function resolveApiKeyPermission({
   }
 
   // ADR-092 stage A4: engine ceiling-algebra shadow comparison.
+  if (skipShadow) return permitted;
   const scopeIds = scopeRefToIds(scope, organizationId);
-  authzShadowFor(prisma).apiKeyPermissionCheck({
+  authzShadowFor(appPrisma).apiKeyPermissionCheck({
     apiKeyId,
     ownerUserId: userId,
     organizationId,

@@ -6,10 +6,267 @@ import { PrismaAuthzReadRepository } from "../authz-read.prisma.repository";
  * The adapter's contract with Prisma: exact query shapes. The POLICIES over
  * these rows are tested in @langwatch/authz-server; what matters here is
  * that the queries filter what they claim to - above all that ShareLink
- * reads are keyed on the presented tokens, which is the possession gate's
- * storage half.
+ * reads are keyed on the presented tokens (the possession gate's storage
+ * half), that every binding read is fenced on CURRENT organization
+ * membership, and that an API key's private permission role stays with the
+ * key it was minted for.
  */
 describe("PrismaAuthzReadRepository", () => {
+  describe("findOrganizationRole", () => {
+    it("reads the membership row for this user in this organization", async () => {
+      const findFirst = vi.fn().mockResolvedValue({ role: "ADMIN" });
+      const prisma = {
+        organizationUser: { findFirst },
+      } as unknown as Prisma.TransactionClient;
+
+      const role = await new PrismaAuthzReadRepository(
+        prisma,
+      ).findOrganizationRole({ userId: "alice", organizationId: "org-1" });
+
+      expect(findFirst).toHaveBeenCalledWith({
+        where: { userId: "alice", organizationId: "org-1" },
+        select: { role: true },
+      });
+      expect(role).toBe("ADMIN");
+    });
+
+    it("reports no membership as null, so the caller fails closed", async () => {
+      const prisma = {
+        organizationUser: { findFirst: vi.fn().mockResolvedValue(null) },
+      } as unknown as Prisma.TransactionClient;
+
+      expect(
+        await new PrismaAuthzReadRepository(prisma).findOrganizationRole({
+          userId: "alice",
+          organizationId: "org-1",
+        }),
+      ).toBeNull();
+    });
+  });
+
+  describe("findUserBindings", () => {
+    it("gates the direct binding on current organization membership", async () => {
+      const findMany = vi.fn().mockResolvedValue([
+        {
+          role: "ADMIN",
+          customRoleId: null,
+          scopeType: "TEAM",
+          scopeId: "team-1",
+        },
+      ]);
+      const prisma = {
+        roleBinding: { findMany },
+      } as unknown as Prisma.TransactionClient;
+
+      const rows = await new PrismaAuthzReadRepository(prisma).findUserBindings(
+        {
+          userId: "alice",
+          organizationId: "org-1",
+        },
+      );
+
+      expect(findMany).toHaveBeenCalledWith({
+        where: {
+          organizationId: "org-1",
+          userId: "alice",
+          user: { orgMemberships: { some: { organizationId: "org-1" } } },
+        },
+        select: {
+          role: true,
+          customRoleId: true,
+          scopeType: true,
+          scopeId: true,
+        },
+      });
+      expect(rows).toEqual([
+        {
+          role: "ADMIN",
+          customRoleId: null,
+          scopeType: "TEAM",
+          scopeId: "team-1",
+          viaGroupId: null,
+        },
+      ]);
+    });
+  });
+
+  describe("findGroupBindings", () => {
+    it("reaches bindings through group membership and stamps viaGroupId", async () => {
+      const findMany = vi.fn().mockResolvedValue([
+        {
+          role: "MEMBER",
+          customRoleId: null,
+          scopeType: "PROJECT",
+          scopeId: "proj-1",
+          groupId: "group-1",
+        },
+      ]);
+      const prisma = {
+        roleBinding: { findMany },
+      } as unknown as Prisma.TransactionClient;
+
+      const rows = await new PrismaAuthzReadRepository(
+        prisma,
+      ).findGroupBindings({ userId: "alice", organizationId: "org-1" });
+
+      // The membership gate sits on the GROUP MEMBER, not on the binding: a
+      // GroupMembership row outlives removal from the organization, so
+      // without it an offboarded user keeps what their groups granted.
+      expect(findMany).toHaveBeenCalledWith({
+        where: {
+          organizationId: "org-1",
+          group: {
+            members: {
+              some: {
+                userId: "alice",
+                user: { orgMemberships: { some: { organizationId: "org-1" } } },
+              },
+            },
+          },
+        },
+        select: {
+          role: true,
+          customRoleId: true,
+          scopeType: true,
+          scopeId: true,
+          groupId: true,
+        },
+      });
+      expect(rows).toEqual([
+        {
+          role: "MEMBER",
+          customRoleId: null,
+          scopeType: "PROJECT",
+          scopeId: "proj-1",
+          viaGroupId: "group-1",
+        },
+      ]);
+    });
+  });
+
+  describe("findApiKeyBindings", () => {
+    it("reads the key's own bindings in this organization, with no membership gate", async () => {
+      const findMany = vi.fn().mockResolvedValue([]);
+      const prisma = {
+        roleBinding: { findMany },
+      } as unknown as Prisma.TransactionClient;
+
+      await new PrismaAuthzReadRepository(prisma).findApiKeyBindings({
+        apiKeyId: "key-1",
+        organizationId: "org-1",
+      });
+
+      // A key has no OrganizationUser row of its own - the owner's standing
+      // enters as the §9 ceiling, computed elsewhere, never as a predicate
+      // here.
+      expect(findMany).toHaveBeenCalledWith({
+        where: { organizationId: "org-1", apiKeyId: "key-1" },
+        select: {
+          role: true,
+          customRoleId: true,
+          scopeType: true,
+          scopeId: true,
+        },
+      });
+    });
+  });
+
+  describe("findApiKeyOwner", () => {
+    it("returns the owning user id for a personal key", async () => {
+      const findUnique = vi.fn().mockResolvedValue({ userId: "alice" });
+      const prisma = {
+        apiKey: { findUnique },
+      } as unknown as Prisma.TransactionClient;
+
+      const owner = await new PrismaAuthzReadRepository(prisma).findApiKeyOwner(
+        "key-1",
+      );
+
+      expect(findUnique).toHaveBeenCalledWith({
+        where: { id: "key-1" },
+        select: { userId: true },
+      });
+      expect(owner).toEqual({ userId: "alice" });
+    });
+
+    it("distinguishes a service key from a key that is not there", async () => {
+      const findUnique = vi
+        .fn()
+        .mockResolvedValueOnce({ userId: null })
+        .mockResolvedValueOnce(null);
+      const prisma = {
+        apiKey: { findUnique },
+      } as unknown as Prisma.TransactionClient;
+      const repository = new PrismaAuthzReadRepository(prisma);
+
+      // { userId: null } carries no ceiling; null is an unknown key.
+      expect(await repository.findApiKeyOwner("service-key")).toEqual({
+        userId: null,
+      });
+      expect(await repository.findApiKeyOwner("ghost")).toBeNull();
+    });
+  });
+
+  describe("findCustomRolePermissions", () => {
+    describe("when the principal is a user", () => {
+      it("fences on the organization and excludes every API-key system role", async () => {
+        const findMany = vi.fn().mockResolvedValue([]);
+        const prisma = {
+          customRole: { findMany },
+        } as unknown as Prisma.TransactionClient;
+
+        await new PrismaAuthzReadRepository(prisma).findCustomRolePermissions({
+          organizationId: "org-1",
+          principal: { type: "user", id: "alice" },
+          customRoleIds: ["role-1", "role-2"],
+        });
+
+        expect(findMany).toHaveBeenCalledWith({
+          where: {
+            id: { in: ["role-1", "role-2"] },
+            organizationId: "org-1",
+            kind: { not: "system_api_key" },
+          },
+          select: { id: true, permissions: true },
+        });
+      });
+    });
+
+    describe("when the principal is an API key", () => {
+      it("allows the key's OWN system role and excludes every other key's", async () => {
+        const findMany = vi.fn().mockResolvedValue([]);
+        const prisma = {
+          customRole: { findMany },
+        } as unknown as Prisma.TransactionClient;
+
+        await new PrismaAuthzReadRepository(prisma).findCustomRolePermissions({
+          organizationId: "org-1",
+          principal: { type: "apiKey", id: "key-1" },
+          customRoleIds: ["role-1"],
+        });
+
+        // "Its own" is the same exclusivity the role repository uses: every
+        // binding on the role belongs to this key, and no legacy assignment
+        // holds it. A binding from key A to key B's system role would
+        // otherwise hand B's permissions to A.
+        expect(findMany).toHaveBeenCalledWith({
+          where: {
+            id: { in: ["role-1"] },
+            organizationId: "org-1",
+            OR: [
+              { kind: { not: "system_api_key" } },
+              {
+                roleBindings: { every: { apiKeyId: "key-1" } },
+                assignedUsers: { none: {} },
+              },
+            ],
+          },
+          select: { id: true, permissions: true },
+        });
+      });
+    });
+  });
+
   describe("findShareLinks", () => {
     it("filters by presented token AND the resource links, project-anchored", async () => {
       const findMany = vi.fn().mockResolvedValue([]);
@@ -48,50 +305,6 @@ describe("PrismaAuthzReadRepository", () => {
     });
   });
 
-  describe("findGroupBindings", () => {
-    it("reaches bindings through group membership and stamps viaGroupId", async () => {
-      const findMany = vi.fn().mockResolvedValue([
-        {
-          role: "MEMBER",
-          customRoleId: null,
-          scopeType: "PROJECT",
-          scopeId: "proj-1",
-          groupId: "group-1",
-        },
-      ]);
-      const prisma = {
-        roleBinding: { findMany },
-      } as unknown as Prisma.TransactionClient;
-
-      const rows = await new PrismaAuthzReadRepository(
-        prisma,
-      ).findGroupBindings({ userId: "alice", organizationId: "org-1" });
-
-      expect(findMany).toHaveBeenCalledWith({
-        where: {
-          organizationId: "org-1",
-          group: { members: { some: { userId: "alice" } } },
-        },
-        select: {
-          role: true,
-          customRoleId: true,
-          scopeType: true,
-          scopeId: true,
-          groupId: true,
-        },
-      });
-      expect(rows).toEqual([
-        {
-          role: "MEMBER",
-          customRoleId: null,
-          scopeType: "PROJECT",
-          scopeId: "proj-1",
-          viaGroupId: "group-1",
-        },
-      ]);
-    });
-  });
-
   describe("findLegacyTeamMemberships", () => {
     it("scopes TeamUser rows to the organization and flattens the personal flag", async () => {
       const findMany = vi.fn().mockResolvedValue([
@@ -110,8 +323,17 @@ describe("PrismaAuthzReadRepository", () => {
         prisma,
       ).findLegacyTeamMemberships({ userId: "alice", organizationId: "org-1" });
 
+      // Two predicates, not one: the team is in this organization AND the
+      // user is a current member of it. A stale cross-org TeamUser row must
+      // not confer access any more than a stale RoleBinding.
       expect(findMany).toHaveBeenCalledWith({
-        where: { userId: "alice", team: { organizationId: "org-1" } },
+        where: {
+          userId: "alice",
+          team: {
+            organizationId: "org-1",
+            organization: { members: { some: { userId: "alice" } } },
+          },
+        },
         select: {
           teamId: true,
           role: true,

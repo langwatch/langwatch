@@ -12,33 +12,55 @@ Feature: Unified authorization engine
   # Supersedes, upon ADR-092 acceptance, the "most specific scope wins"
   # scenarios in scoped-role-bindings.feature ("Project-level binding
   # overrides team-level binding", "More specific binding takes precedence
-  # over org-level binding"): the implemented and hereby-chosen semantic is
+  # over org-level binding", "Group binding at project scope overrides group
+  # binding at team scope"): the implemented and hereby-chosen semantic is
   # an additive union of grants. Bindings only ever ADD permissions; scoping
   # someone down means granting them less, not overriding them with less.
-  # See ADR-092 "Grant semantics" for why.
+  # See ADR-092 "Grant semantics" for why. That file's premise sentence -
+  # "The most specific scope always wins" - is superseded by the same
+  # decision and gets rewritten with those scenarios at stage C4, not
+  # before: until then it still describes the resolver in production.
+  #
+  # Also superseded: fetch-org-role-permission-resolution.feature's "Demo
+  # projects are accessible without organization membership". Demo access
+  # has always required a session, and "The demo project opens for
+  # signed-in callers only" below is the version that holds.
 
   Background:
     Given an organization "acme"
     And a team "client-a" in "acme" with project "chatbot"
+    And a team "client-b" in "acme"
 
   # ============================================================================
   # One vocabulary with resource knowledge
   # ============================================================================
 
+  # "Rotating" a trace is not something the product does - traces are
+  # written once and read. The platform's one list of what each resource
+  # supports (the ADR-092 registry) is what makes that unsayable.
   @unimplemented
-  Scenario: The permission registry only admits actions a resource supports
-    Given the registry declares resource "traces" with actions "view, share, create, update"
+  Scenario: A permission naming an action its resource does not support is rejected
+    Given traces cannot be rotated
     When a custom role is saved with permission "traces:rotate"
     Then the save is rejected as an invalid permission
     And the same rejection applies on every surface that accepts permissions
 
+  # Every surface reads the same registry, so none of them can offer an
+  # action the resource does not have.
   @unimplemented
-  Scenario: Registry knowledge drives every projection of the vocabulary
-    Given the registry declares resource "cost" as read-only with actions "view"
+  Scenario: Every surface offers the same actions for a resource
+    Given cost data is read-only
     When the custom-role editor, the API-key scope picker, and the docs list "cost"
-    Then each offers exactly the actions the registry declares
+    Then each offers viewing and nothing else
     And no surface maintains its own list of valid actions
 
+  # Two different surfaces, two facts, both true. The grants WRITE surface
+  # refuses this outright: role-bindings-rest-api.feature binds
+  # "org_exclusive_permission_scope" / 422 when a caller tries to bind an
+  # organization-tier permission below organization scope. This scenario
+  # pins what the read side does with a row that exists anyway - one
+  # imported, backfilled, or written before the refusal existed. It is
+  # collected and then grants nothing, so a stale row cannot escalate.
   @unit
   Scenario: A permission can only be granted at scopes where its resource exists
     Given the registry declares resource "governance" as organization-tier only
@@ -133,12 +155,17 @@ Feature: Unified authorization engine
   # Fail-closed surfaces
   # ============================================================================
 
+  # The HTTP half of this is already bound elsewhere:
+  # specs/security/api-endpoint-authorization.feature covers the Hono
+  # routes and their build-time enumeration. What is left unbound is the
+  # tRPC stack, which has no equivalent sweep yet - stage D adds one, and
+  # Gate D is the two stacks answering to the same rule with no allowlist.
   @unimplemented
-  Scenario: Every endpoint declares its access decision or an explicit reason not to
-    When the API surface is enumerated at build time
-    Then every tRPC procedure and every HTTP route either declares a permission
+  Scenario: Every tRPC procedure declares its access decision or an explicit reason not to
+    When the tRPC surface is enumerated at build time
+    Then every procedure either declares a permission
     Or carries an explicit no-permission marker with a written reason
-    And the build fails for any endpoint that does neither
+    And the build fails for any procedure that does neither
 
   @unimplemented
   Scenario: Legacy membership rows resolve identically to their backfilled bindings
@@ -197,13 +224,6 @@ Feature: Unified authorization engine
     Then the editor shows who loses which access before the change is saved
 
   @unimplemented
-  Scenario: A publicly shared trace opens without sign-in, redacted
-    Given trace "t1" in project "chatbot" is marked publicly shared
-    When a visitor with no session opens the share link
-    Then trace "t1" renders with the public audience's redactions applied
-    And no other trace or resource in "chatbot" is reachable
-
-  @unimplemented
   Scenario: The creator of an API key manages it without any binding
     Given user "dave" created API key "lw-sk-42"
     And dave holds no binding granting any "apiKeys" permission
@@ -250,6 +270,13 @@ Feature: Unified authorization engine
   # ============================================================================
   # The resource tier (ADR-092 §8) — sharing is a grant on the tree
   # ============================================================================
+  #
+  # Scope note: this section pins what the ENGINE decides about a resource
+  # grant. It deliberately does not restate what a customer sees when they
+  # open a share link - specs/traces-v2/sharing.feature owns that, including
+  # "A public link resolves for an anonymous viewer" and the Rule covering
+  # the redactions an anonymous viewer's payload carries. The engine
+  # supplies the audience; that spec pins what the audience is shown.
 
   # Needs the first child-read consumer (a span/log read that authorizes AT
   # its trace's node) - no such call site exists yet, so a unit binding here
@@ -297,11 +324,17 @@ Feature: Unified authorization engine
     When a visitor presenting the link requests the other project's trace
     Then the request is denied
 
+  # Engine-level capability, not a link a customer can mint today: ADR-057's
+  # ShareService only ever writes TRACE links (sharing.feature pins "A share
+  # link covers the trace alone"), and thread-level links arrive with C5.
+  # What is bound here is that a grant on a thread node covers the traces
+  # beneath it through the parents chain, with no rows of their own.
   @unit
   Scenario: A shared thread covers its traces and their children
-    Given thread "th1" in project "chatbot" is shared with anyone via a share link
-    When a visitor presenting the link reads a trace inside "th1" and that trace's spans
-    Then every read is granted through thread "th1"'s single grant
+    Given thread "th1" in project "chatbot" carries a resource grant of "traces:view"
+    When a visitor presenting the grant reads a trace whose parent is "th1"
+    Then the read is granted through thread "th1"'s single grant
+    And a trace outside "th1" is not readable
 
   @unit
   Scenario: Offboarding a user removes every grant, with proof

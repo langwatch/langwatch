@@ -1254,6 +1254,22 @@ const permissionProcedureBuilder = <
   TOutputOut,
   TCaller
 > => {
+  /**
+   * The one chain both entry points build: the surrounding middlewares are
+   * identical and only the permission check in the middle differs, so
+   * `.use()` and `.permission()` cannot drift in what wraps them. Order is
+   * behaviour — the check must sit inside the error/tracing middlewares and
+   * before `enforcePermissionCheck`, which is what proves a check ran at all.
+   */
+  const withPermissionCheck = (check: unknown) =>
+    procedure
+      .use(tracerMiddleware as any)
+      .use(loggerMiddleware as any)
+      .use(handledErrorMiddleware as any)
+      .use(check as any)
+      .use(enforcePermissionCheck as any)
+      .use(auditLogMutations as any) as any;
+
   return {
     input: ((input: Parser) => {
       return permissionProcedureBuilder(procedure.input(input as any));
@@ -1267,24 +1283,9 @@ const permissionProcedureBuilder = <
       TOutputOut,
       TCaller
     >["input"],
-    use: (middleware) => {
-      return procedure
-        .use(tracerMiddleware as any)
-        .use(loggerMiddleware as any)
-        .use(handledErrorMiddleware as any)
-        .use(middleware as any)
-        .use(enforcePermissionCheck as any)
-        .use(auditLogMutations as any) as any;
-    },
-    permission: (permission) => {
-      return procedure
-        .use(tracerMiddleware as any)
-        .use(loggerMiddleware as any)
-        .use(handledErrorMiddleware as any)
-        .use(checkPermissionV2(permission) as any)
-        .use(enforcePermissionCheck as any)
-        .use(auditLogMutations as any) as any;
-    },
+    use: (middleware) => withPermissionCheck(middleware),
+    permission: (permission) =>
+      withPermissionCheck(checkPermissionV2(permission)),
   };
 };
 

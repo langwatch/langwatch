@@ -1,40 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  GrantsService,
-  GrantValidationError,
-  OffboardIncompleteError,
-} from "../grants.service";
+import { AuthzCollectorService } from "../authz-collector.service";
 import {
   type AuthzGrantsRepository,
+  BindingMissingError,
   DuplicateBindingError,
 } from "../authz-grants.repository";
 import type { AuthzReadRepository } from "../authz-read.repository";
+import { AuthzService } from "../authz.service";
+import { GrantValidationError } from "../grant-validation";
+import { GrantsService } from "../grants.service";
+import { OffboardIncompleteError } from "../offboard";
+import { makeReader } from "./support/authz-read.stub";
 
 const ORG = "org-1";
+const OTHER_ORG = "org-other";
 const TEAM = "team-1";
+const PROJECT = "proj-1";
 
 type RepositoryStub = {
   [K in keyof AuthzGrantsRepository]: ReturnType<typeof vi.fn>;
 };
-
-/** A read repository whose every method resolves empty - the post-offboard
- *  world. Individual tests override what should still resolve. */
-function makeEmptyReader(
-  overrides: Partial<AuthzReadRepository> = {},
-): AuthzReadRepository {
-  return {
-    findOrganizationRole: vi.fn().mockResolvedValue(null),
-    findUserBindings: vi.fn().mockResolvedValue([]),
-    findGroupBindings: vi.fn().mockResolvedValue([]),
-    findApiKeyBindings: vi.fn().mockResolvedValue([]),
-    findLegacyTeamMemberships: vi.fn().mockResolvedValue([]),
-    findCustomRolePermissions: vi.fn().mockResolvedValue([]),
-    findShareLinks: vi.fn().mockResolvedValue([]),
-    findProjectLineage: vi.fn().mockResolvedValue(null),
-    findTeamOrganization: vi.fn().mockResolvedValue(null),
-    ...overrides,
-  };
-}
 
 const OFFBOARD_COUNTS = {
   bindings: 2,
@@ -52,9 +37,9 @@ function makeRepository(
     updateBindingRole: vi.fn().mockResolvedValue(undefined),
     deleteBinding: vi.fn().mockResolvedValue(undefined),
     findBinding: vi.fn().mockResolvedValue({ id: "rb-1", organizationId: ORG }),
-    findCustomRoleOrganization: vi
+    findCustomRole: vi
       .fn()
-      .mockResolvedValue({ organizationId: ORG }),
+      .mockResolvedValue({ organizationId: ORG, permissions: ["traces:view"] }),
     findTeamOrganization: vi.fn().mockResolvedValue({ organizationId: ORG }),
     findProjectLineage: vi.fn().mockResolvedValue(null),
     replaceBinding: vi.fn().mockResolvedValue(undefined),
@@ -63,7 +48,7 @@ function makeRepository(
     // with a transaction-bound reader; the stub mirrors that contract - a
     // throw from prove() rejects the whole call, like a rollback.
     offboardUser: vi.fn(async ({ prove }) => {
-      await prove(makeEmptyReader());
+      await prove(makeReader());
       return OFFBOARD_COUNTS;
     }),
     findOwnedApiKeys: vi.fn().mockResolvedValue([]),
@@ -74,12 +59,20 @@ function makeRepository(
 
 const actor = { userId: "admin-1" };
 
-function makeService(repository: RepositoryStub) {
-  const audit = vi.fn().mockResolvedValue(undefined);
+function makeService(
+  repository: RepositoryStub,
+  { audit = vi.fn().mockResolvedValue(undefined) } = {},
+) {
   const bumpEpoch = vi.fn().mockResolvedValue(undefined);
   const service = new GrantsService(
     repository as unknown as AuthzGrantsRepository,
-    { audit, newBindingId: () => "rb_test_ksuid", bumpEpoch },
+    {
+      audit,
+      newBindingId: () => "rb_test_ksuid",
+      bumpEpoch,
+      collectorFor: (reader: AuthzReadRepository) =>
+        new AuthzCollectorService(reader),
+    },
   );
   return { service, audit, bumpEpoch };
 }
@@ -109,9 +102,7 @@ describe("GrantsService.attach", () => {
         scopeId: TEAM,
         role: "VIEWER",
         customRoleId: null,
-        userId: "alice",
-        groupId: null,
-        apiKeyId: null,
+        principal: { userId: "alice" },
       });
       expect(bumpEpoch).toHaveBeenCalledWith({ organizationId: ORG });
       expect(audit).toHaveBeenCalledWith(
@@ -123,9 +114,9 @@ describe("GrantsService.attach", () => {
   describe("when the custom role belongs to another organization", () => {
     it("rejects the attach", async () => {
       const repository = makeRepository({
-        findCustomRoleOrganization: vi
+        findCustomRole: vi
           .fn()
-          .mockResolvedValue({ organizationId: "org-other" }),
+          .mockResolvedValue({ organizationId: OTHER_ORG, permissions: [] }),
       });
       const { service } = makeService(repository);
 
@@ -141,12 +132,57 @@ describe("GrantsService.attach", () => {
     });
   });
 
+  describe("when the custom role lists a permission the registry never heard of", () => {
+    it("rejects the attach and names the offending strings", async () => {
+      const repository = makeRepository({
+        findCustomRole: vi.fn().mockResolvedValue({
+          organizationId: ORG,
+          permissions: ["traces:view", "traces:teleport"],
+        }),
+      });
+      const { service } = makeService(repository);
+
+      await expect(
+        service.attach({
+          actor,
+          who: { type: "user", id: "alice" },
+          role: { customRoleId: "cr-typo" },
+          where: { type: "team", id: TEAM, organizationId: ORG },
+        }),
+      ).rejects.toMatchObject({
+        code: "grant_validation_failed",
+        meta: { unknownPermissions: ["traces:teleport"] },
+      });
+      expect(repository.createBinding).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the custom role's payload is not a list at all", () => {
+    it("attaches, because a malformed payload grants nothing to validate", async () => {
+      const repository = makeRepository({
+        findCustomRole: vi
+          .fn()
+          .mockResolvedValue({ organizationId: ORG, permissions: null }),
+      });
+      const { service } = makeService(repository);
+
+      await service.attach({
+        actor,
+        who: { type: "user", id: "alice" },
+        role: { customRoleId: "cr-empty" },
+        where: { type: "team", id: TEAM, organizationId: ORG },
+      });
+
+      expect(repository.createBinding).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("when the team is not in the target organization", () => {
     it("rejects the attach", async () => {
       const repository = makeRepository({
         findTeamOrganization: vi
           .fn()
-          .mockResolvedValue({ organizationId: "org-other" }),
+          .mockResolvedValue({ organizationId: OTHER_ORG }),
       });
       const { service } = makeService(repository);
 
@@ -187,7 +223,7 @@ describe("GrantsService.revoke", () => {
     it("deletes the row and bumps the epoch so the next check recollects", async () => {
       const repository = makeRepository();
       const { service, audit, bumpEpoch } = makeService(repository);
-      await service.revoke({ actor, bindingId: "rb-1" });
+      await service.revoke({ actor, bindingId: "rb-1", organizationId: ORG });
       expect(repository.deleteBinding).toHaveBeenCalledWith({
         bindingId: "rb-1",
       });
@@ -195,6 +231,58 @@ describe("GrantsService.revoke", () => {
       expect(audit).toHaveBeenCalledWith(
         expect.objectContaining({ action: "authz.grants.revoke" }),
       );
+    });
+  });
+
+  describe("when the binding belongs to another organization", () => {
+    it("answers not-found rather than confirming it exists", async () => {
+      const repository = makeRepository({
+        findBinding: vi
+          .fn()
+          .mockResolvedValue({ id: "rb-1", organizationId: OTHER_ORG }),
+      });
+      const { service } = makeService(repository);
+
+      await expect(
+        service.revoke({ actor, bindingId: "rb-1", organizationId: ORG }),
+      ).rejects.toMatchObject({
+        code: "grant_validation_failed",
+        message: "Role binding not found",
+      });
+      expect(repository.deleteBinding).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the row disappears between the read and the delete", () => {
+    it("answers with the same not-found the pre-read produces", async () => {
+      const repository = makeRepository({
+        deleteBinding: vi.fn().mockRejectedValue(new BindingMissingError()),
+      });
+      const { service, bumpEpoch } = makeService(repository);
+
+      await expect(
+        service.revoke({ actor, bindingId: "rb-1", organizationId: ORG }),
+      ).rejects.toMatchObject({
+        code: "grant_validation_failed",
+        message: "Role binding not found",
+      });
+      expect(bumpEpoch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the audit write rejects", () => {
+    it("has already bumped the epoch before the error propagates", async () => {
+      const repository = makeRepository();
+      const { service, bumpEpoch } = makeService(repository, {
+        audit: vi.fn().mockRejectedValue(new Error("audit sink down")),
+      });
+
+      await expect(
+        service.revoke({ actor, bindingId: "rb-1", organizationId: ORG }),
+      ).rejects.toThrow("audit sink down");
+      // The delete is committed; if the epoch had not moved, every cached
+      // caller would keep the revoked grant.
+      expect(bumpEpoch).toHaveBeenCalledWith({ organizationId: ORG });
     });
   });
 });
@@ -212,6 +300,7 @@ describe("GrantsService.update", () => {
         service.update({
           actor,
           bindingId: "rb-1",
+          organizationId: ORG,
           role: { builtin: "MEMBER" },
         }),
       ).rejects.toMatchObject({ code: "grant_validation_failed" });
@@ -223,18 +312,67 @@ describe("GrantsService.update", () => {
     /** @scenario "A role binding can never reference another organization's custom role" */
     it("rejects with the same tenancy rule as attach", async () => {
       const repository = makeRepository({
-        findCustomRoleOrganization: vi
+        findCustomRole: vi
           .fn()
-          .mockResolvedValue({ organizationId: "org-other" }),
+          .mockResolvedValue({ organizationId: OTHER_ORG, permissions: [] }),
       });
       const { service } = makeService(repository);
       await expect(
         service.update({
           actor,
           bindingId: "rb-1",
+          organizationId: ORG,
           role: { customRoleId: "cr-foreign" },
         }),
       ).rejects.toMatchObject({ code: "grant_validation_failed" });
+      expect(repository.updateBindingRole).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when re-pointing at a custom role with an unknown permission", () => {
+    it("rejects with the same vocabulary rule as attach", async () => {
+      const repository = makeRepository({
+        findCustomRole: vi.fn().mockResolvedValue({
+          organizationId: ORG,
+          permissions: ["definitely:notreal"],
+        }),
+      });
+      const { service } = makeService(repository);
+      await expect(
+        service.update({
+          actor,
+          bindingId: "rb-1",
+          organizationId: ORG,
+          role: { customRoleId: "cr-typo" },
+        }),
+      ).rejects.toMatchObject({
+        code: "grant_validation_failed",
+        meta: { unknownPermissions: ["definitely:notreal"] },
+      });
+      expect(repository.updateBindingRole).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the binding belongs to another organization", () => {
+    it("answers not-found rather than confirming it exists", async () => {
+      const repository = makeRepository({
+        findBinding: vi
+          .fn()
+          .mockResolvedValue({ id: "rb-1", organizationId: OTHER_ORG }),
+      });
+      const { service } = makeService(repository);
+
+      await expect(
+        service.update({
+          actor,
+          bindingId: "rb-1",
+          organizationId: ORG,
+          role: { builtin: "MEMBER" },
+        }),
+      ).rejects.toMatchObject({
+        code: "grant_validation_failed",
+        message: "Role binding not found",
+      });
       expect(repository.updateBindingRole).not.toHaveBeenCalled();
     });
   });
@@ -267,6 +405,7 @@ describe("GrantsService.replace", () => {
           scopeType: "TEAM",
           scopeId: TEAM,
           role: "MEMBER",
+          principal: { userId: "user-1" },
         }),
       });
       expect(repository.createBinding).not.toHaveBeenCalled();
@@ -281,7 +420,6 @@ describe("GrantsService.replace", () => {
 
 describe("GrantsService.offboard", () => {
   describe("when every grant source deletes cleanly", () => {
-    /** @scenario "Offboarding a user removes every grant, with proof" */
     it("returns the removal counts, the manifest, and bumps the epoch", async () => {
       const repository = makeRepository({
         findOwnedApiKeys: vi
@@ -314,14 +452,13 @@ describe("GrantsService.offboard", () => {
   });
 
   describe("when something still resolves after the deletes", () => {
-    /** @scenario "Offboarding a user removes every grant, with proof" */
-    it("throws from the proof and the transaction rolls back", async () => {
+    it("throws from the proof and leaves storage untouched", async () => {
       const repository = makeRepository({
         // The transaction-bound reader still sees a binding - the proof
         // must throw, and the adapter contract turns that into a rollback.
         offboardUser: vi.fn(async ({ prove }) => {
           await prove(
-            makeEmptyReader({
+            makeReader({
               findUserBindings: vi.fn().mockResolvedValue([
                 {
                   role: "MEMBER",
@@ -342,6 +479,45 @@ describe("GrantsService.offboard", () => {
         service.offboard({ actor, userId: "dave", organizationId: ORG }),
       ).rejects.toBeInstanceOf(OffboardIncompleteError);
       expect(bumpEpoch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the offboarded user still owns a personal api key", () => {
+    /** @scenario "Offboarding a user removes every grant, with proof" */
+    it("resolves nothing through the key, because its owner now resolves nothing", async () => {
+      // The post-offboard world: the KEY's own binding survived the
+      // offboarding (nobody deleted the key), but its owner has nothing
+      // left, and the §9 ceiling is what closes the hole.
+      const authz = new AuthzService(
+        new AuthzCollectorService(
+          makeReader({
+            findApiKeyOwner: vi.fn().mockResolvedValue({ userId: "dave" }),
+            findApiKeyBindings: vi.fn().mockResolvedValue([
+              {
+                role: "ADMIN",
+                customRoleId: null,
+                scopeType: "PROJECT",
+                scopeId: PROJECT,
+                viaGroupId: null,
+              },
+            ]),
+          }),
+        ),
+      );
+
+      const decision = await authz.check({
+        principal: { type: "apiKey", id: "key-1" },
+        permission: "datasets:manage",
+        scope: {
+          type: "project",
+          id: PROJECT,
+          teamId: TEAM,
+          organizationId: ORG,
+        },
+      });
+
+      expect(decision.allowed).toBe(false);
+      expect(decision.denialReason).toBe("owner-ceiling");
     });
   });
 });

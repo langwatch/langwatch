@@ -104,15 +104,13 @@ describe("authz registry", () => {
       expect(permissionIndex("langy:manage")).toBe(ALL_PERMISSIONS.length - 1);
     });
 
-    it("pins the total permission count (bump deliberately when appending)", () => {
-      expect(ALL_PERMISSIONS.length).toBe(126);
-    });
-
     it("pins the FULL serialization order (bitset indices ship inside signed passports — edit only by appending)", () => {
       // Point sentinels cannot catch a reorder between two pinned indices;
       // passports serialize bitset positions across process boundaries, so
       // the whole order is the contract. Append new permissions at the end
-      // of this list in the same change that appends them to the registry.
+      // of this list in the same change that appends them to the registry —
+      // this list is also the count, so a bare length pin beside it only
+      // ever failed in the same commit as this one.
       expect(ALL_PERMISSIONS).toEqual([
         "organization:view",
         "organization:manage",
@@ -251,8 +249,10 @@ describe("authz registry", () => {
         const [resource, action] = permission.split(":");
         expect(resource).toBeTruthy();
         expect(action).toBeTruthy();
-        // Type-level check: assignment compiles.
-        const legacy: Permission = permission as Permission;
+        // Type-level check: the assignment compiles WITHOUT a cast, which is
+        // the whole assertion - a registry entry that is not a legal legacy
+        // Permission string fails the typecheck rather than this expect.
+        const legacy: Permission = permission;
         expect(legacy).toBe(permission);
       }
     });

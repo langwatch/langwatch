@@ -1114,8 +1114,18 @@ export async function resolveProjectPermission(
     return { permitted: false, organizationRole: null };
   }
 
-  // Check demo project access
+  // Check demo project access. The comparison fires BEFORE the return: the
+  // engine carries its own demo-project rule, and an early return here used
+  // to hide the entire demo surface from shadow mode. The legacy answer is
+  // unchanged by it.
   if (isDemoProject(projectId, permission)) {
+    authzShadowFor(ctx.prisma).userPermissionCheck({
+      userId: ctx.session.user.id,
+      permission,
+      legacyAllowed: true,
+      projectId,
+      caller: "trpc.project",
+    });
     return { permitted: true, organizationRole: null };
   }
 
@@ -1186,6 +1196,18 @@ async function resolveProjectPermissionAny(
       organizationRole: context.organizationRole,
       permission,
     });
+
+    // ADR-092 stage A4: one comparison per candidate the legacy path
+    // actually evaluated - the loop stops at the first grant, so the
+    // shadowed set is exactly the set legacy answered.
+    authzShadowFor(ctx.prisma).userPermissionCheck({
+      userId: context.userId,
+      permission,
+      legacyAllowed: permitted,
+      projectId,
+      caller: "trpc.projectAny",
+    });
+
     if (permitted) {
       return { permitted: true, organizationRole: context.organizationRole };
     }
@@ -1836,6 +1858,34 @@ export async function batchScopePermissions(
         args.permission,
       ),
     );
+  }
+
+  // ADR-092 stage A4: every verdict this batch produced is a real
+  // authorization answer, so each one is compared. The volume is bounded by
+  // the shadow's own per-call sampling — at the rates this ships at, a page
+  // enumerating a hundred scopes compares a handful of them, and the batched
+  // legacy answer above still costs its four queries flat.
+  const userId = ctx.session?.user?.id;
+  if (userId) {
+    const shadow = authzShadowFor(ctx.prisma);
+    for (const [teamId, permitted] of teamsMap) {
+      shadow.userPermissionCheck({
+        userId,
+        permission: args.permission,
+        legacyAllowed: permitted,
+        teamId,
+        caller: "trpc.batch",
+      });
+    }
+    for (const [projectId, permitted] of projectsMap) {
+      shadow.userPermissionCheck({
+        userId,
+        permission: args.permission,
+        legacyAllowed: permitted,
+        projectId,
+        caller: "trpc.batch",
+      });
+    }
   }
 
   return { teams: teamsMap, projects: projectsMap };

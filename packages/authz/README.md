@@ -18,10 +18,13 @@ The design is three layers, app-layer service/repository idiom throughout:
 - **the app** (`platform/app/src/server/authz/`) - the Prisma repository
   implementations (`repositories/*.prisma.repository.ts`), the redis epoch
   store, the tRPC middleware, and `runtime.ts`: the composition root that
-  builds ONE of each service and exports them (`authz`, `authzCollector`,
-  `authzShadow`, `grantsService()`).
+  builds ONE of each service and exports `authz`, `authzCollector` and
+  `grantsService()`. The shadow is the exception - `authzShadowFor(prisma)`
+  in `server/authz/shadow.ts` composes one per call, because its caller
+  `rbac.ts` is imported by client code and must not pull the composition
+  root's server-only graph into the browser bundle.
 
-```
+```text
  PERMISSION   "traces:view"             a verb on a resource, from ONE registry
  ROLE         viewer ⊂ member ⊂ admin   a named set of permissions
  ROLE BINDING (WHO, ROLE, WHERE)        the only grant primitive
@@ -33,7 +36,7 @@ The design is three layers, app-layer service/repository idiom throughout:
  Grants are an additive union. Narrowing = granting less, never overriding.
 ```
 
-```
+```text
  app (platform/app)              @langwatch/authz-server        @langwatch/authz
  ─────────────────────           ───────────────────────        ─────────────────
  Prisma*Repository ─ implements ─► AuthzReadRepository          AuthzEngine
@@ -244,10 +247,10 @@ them, and the migration deletes the synonyms.
 ## Migration, in one screen
 
 Full detail: [ADR-092 §13](../../dev/docs/adr/092-unified-authorization-engine.md)
-and the [delivery plan](../../../adr-092-authz-delivery-plan.md) (stages,
-gates, rollbacks, and the data runbook). The shape:
+and the [delivery plan](../../dev/docs/plans/adr-092-authz-delivery-plan.md)
+(stages, gates, rollbacks, and the data runbook). The shape:
 
-```
+```text
  A  EXTRACT    this package + adapters, parity suites, SHADOW mode   [shipped]
  B  BACKFILL   TeamUser → role bindings, then delete the fallback
  C  UNIFY      lite member becomes a role; ShareLink → resource grants (C5)
@@ -265,15 +268,24 @@ write path must bump the epoch **before** `AUTHZ_EPOCH_CACHE` ever ships on
 (M7). Every step is expand → dual-run → verify → cut over → delete, one flag
 per cutover.
 
-## Flags (read by the app adapters - this package reads no env at all)
+## Flags (resolved by the app's composition root, passed in as options)
 
-```
+No package here reads the environment: the app's `runtime.ts` resolves each
+flag and passes it to the service that needs it, so a test sets an option
+instead of an env var.
+
+```text
  AUTHZ_V2_SHADOW        0 | 1 | 0.0-1.0   shadow-comparison sample rate (default off)
  AUTHZ_EPOCH_CACHE      0 | 1             L1 grants cache (default off = always collect)
- AUTHZ_PASSPORT_SECRET  hex               passed INTO mintPassport/verifyPassport by the
-                                          app when stage F wires them (unset = disabled)
+ AUTHZ_PASSPORT_SECRET  hex               handed to PassportService's constructor when
+                                          stage F wires passports (unset = disabled)
 ```
 
 `passport.ts` is not re-exported from the package barrel - it uses
-`node:crypto`, and the barrel stays browser-safe for `useCan`. Server code
-imports `@langwatch/authz/passport`.
+`node:crypto` and `Buffer`, and the barrel stays browser-safe for `useCan`.
+Server code imports `@langwatch/authz/passport`, which is also where the
+base64url bitset codecs live (`bitsetToBase64Url` / `bitsetFromBase64Url`);
+the pure bit operations stay on the barrel. `mintWitness` is off the barrel
+for the same reason of blast radius, not bundle size - the server runtime
+imports `@langwatch/authz/witness`, and the `Authorized` type stays on the
+barrel because types are erased.

@@ -16,10 +16,24 @@
  * No consumers are wired in this PR — adoption is stage F per surface.
  */
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { bitsetToBase64Url, encodePermissionBitset } from "./bitset";
+import { encodePermissionBitset } from "./bitset";
 
 const PASSPORT_VERSION = 1;
 export const MAX_PASSPORT_TTL_SECONDS = 60;
+
+/**
+ * The base64url codecs for a bitset live here rather than in bitset.ts: they
+ * are the passport wire format and they need node's Buffer, which the
+ * browser-safe barrel must not pull in. The bit operations themselves
+ * (encodePermissionBitset, bitsetHasPermission) stay pure and client-safe.
+ */
+export function bitsetToBase64Url(bitset: Uint8Array): string {
+  return Buffer.from(bitset).toString("base64url");
+}
+
+export function bitsetFromBase64Url(encoded: string): Uint8Array {
+  return new Uint8Array(Buffer.from(encoded, "base64url"));
+}
 
 export type PassportPayload = {
   v: number;
@@ -43,6 +57,8 @@ export type PassportVerification =
         | "malformed"
         | "bad-signature"
         | "expired"
+        /** `x` sits further ahead than mint() can ever place it. */
+        | "ttl-exceeded"
         | "stale-epoch"
         | "no-secret";
     };
@@ -116,12 +132,9 @@ export class PassportService {
     const [body, signature] = parts as [string, string];
 
     const expected = sign(body, secret);
-    let provided: Buffer;
-    try {
-      provided = Buffer.from(signature, "base64url");
-    } catch {
-      return { ok: false, reason: "malformed" };
-    }
+    // Buffer.from never throws on a base64url string — invalid characters are
+    // dropped, and the length compare below fails closed on the short result.
+    const provided = Buffer.from(signature, "base64url");
     if (
       provided.length !== expected.length ||
       !timingSafeEqual(provided, expected)
@@ -138,7 +151,14 @@ export class PassportService {
     if (payload.v !== PASSPORT_VERSION) {
       return { ok: false, reason: "malformed" };
     }
-    if (Math.floor(this.now() / 1000) >= payload.x) {
+    const nowSeconds = Math.floor(this.now() / 1000);
+    // The 60s ceiling is enforced at both ends. mint() clamps it, and a token
+    // claiming a longer life than mint() can issue is refused here — a forged
+    // or replayed `x` never buys more time than the epoch check allows.
+    if (payload.x > nowSeconds + MAX_PASSPORT_TTL_SECONDS) {
+      return { ok: false, reason: "ttl-exceeded" };
+    }
+    if (nowSeconds >= payload.x) {
       return { ok: false, reason: "expired" };
     }
     if (currentEpoch === null || payload.e !== currentEpoch) {

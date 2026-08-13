@@ -1,11 +1,13 @@
+import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
+import { bitsetHasPermission, encodePermissionBitset } from "../bitset";
 import {
   bitsetFromBase64Url,
-  bitsetHasPermission,
   bitsetToBase64Url,
-  encodePermissionBitset,
-} from "../bitset";
-import { PassportService } from "../passport";
+  MAX_PASSPORT_TTL_SECONDS,
+  type PassportPayload,
+  PassportService,
+} from "../passport";
 
 describe("permission bitsets", () => {
   it("round-trips a permission set through encode/decode", () => {
@@ -37,10 +39,11 @@ describe("permission bitsets", () => {
 
 describe("authz passports", () => {
   const now = () => 1_700_000_000_000;
+  const nowSeconds = Math.floor(now() / 1000);
   const secret = "test-passport-secret";
   const passports = new PassportService({ secret, now });
 
-  function mint(epoch = 7) {
+  function mint(epoch = 7, ttlSeconds = 60) {
     return passports.mint({
       principal: { type: "user", id: "alice" },
       organizationId: "org-1",
@@ -48,9 +51,31 @@ describe("authz passports", () => {
         { scopeKey: "project:proj-1", permissions: ["traces:view"] },
       ],
       epoch,
-      ttlSeconds: 60,
+      ttlSeconds,
     });
   }
+
+  /** Signs an arbitrary body with the same secret — how a forgery would look
+   *  if the signing key itself leaked, which is what the payload guards are
+   *  for. */
+  function signedToken(body: string): string {
+    return `${body}.${createHmac("sha256", secret).update(body).digest("base64url")}`;
+  }
+
+  function tokenCarrying(payload: unknown): string {
+    return signedToken(
+      Buffer.from(JSON.stringify(payload)).toString("base64url"),
+    );
+  }
+
+  const validPayload: PassportPayload = {
+    v: 1,
+    p: "user:alice",
+    o: "org-1",
+    s: {},
+    e: 7,
+    x: nowSeconds + MAX_PASSPORT_TTL_SECONDS,
+  };
 
   describe("given a freshly minted passport", () => {
     it("verifies with the matching epoch and carries the bitmap", () => {
@@ -101,6 +126,62 @@ describe("authz passports", () => {
       expect(later.verify({ token, currentEpoch: 7 })).toEqual({
         ok: false,
         reason: "expired",
+      });
+    });
+  });
+
+  describe("when the token is not a passport at all", () => {
+    it("fails with malformed on a token with no signature part", () => {
+      expect(
+        passports.verify({ token: "just-one-part", currentEpoch: 7 }),
+      ).toEqual({ ok: false, reason: "malformed" });
+    });
+
+    it("fails with malformed on a correctly signed non-JSON body", () => {
+      const token = signedToken(
+        Buffer.from("not json at all").toString("base64url"),
+      );
+      expect(passports.verify({ token, currentEpoch: 7 })).toEqual({
+        ok: false,
+        reason: "malformed",
+      });
+    });
+
+    it("fails with malformed on a payload from a future format version", () => {
+      const token = tokenCarrying({ ...validPayload, v: 2 });
+      expect(passports.verify({ token, currentEpoch: 7 })).toEqual({
+        ok: false,
+        reason: "malformed",
+      });
+    });
+  });
+
+  describe("when a longer life is asked for than the ceiling allows", () => {
+    it("clamps the minted expiry to the 60s ceiling", () => {
+      const verification = passports.verify({
+        token: mint(7, 3600)!,
+        currentEpoch: 7,
+      });
+      expect(verification.ok).toBe(true);
+      if (!verification.ok) return;
+      expect(verification.payload.x).toBe(
+        nowSeconds + MAX_PASSPORT_TTL_SECONDS,
+      );
+    });
+
+    it("expires that passport 61 seconds later like any other", () => {
+      const later = new PassportService({ secret, now: () => now() + 61_000 });
+      expect(later.verify({ token: mint(7, 3600)!, currentEpoch: 7 })).toEqual({
+        ok: false,
+        reason: "expired",
+      });
+    });
+
+    it("refuses a forged expiry beyond the ceiling", () => {
+      const token = tokenCarrying({ ...validPayload, x: nowSeconds + 3600 });
+      expect(passports.verify({ token, currentEpoch: 7 })).toEqual({
+        ok: false,
+        reason: "ttl-exceeded",
       });
     });
   });

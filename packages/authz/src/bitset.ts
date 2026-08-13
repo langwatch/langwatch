@@ -2,6 +2,9 @@
  * ADR-092 §12 — permission bitsets. The registry is a fixed, append-only
  * ordered list, so an effective permission set is a few dozen bytes and a
  * membership test is a bit test. Used by passports; client-safe.
+ *
+ * The base64url wire codecs live in passport.ts, their only consumer: they
+ * need node's Buffer, and this module stays on the browser-safe barrel.
  */
 import { ALL_PERMISSIONS, permissionIndex } from "./registry";
 
@@ -29,12 +32,4 @@ export function bitsetHasPermission({
   const byte = bitset[Math.floor(index / 8)];
   if (byte === undefined) return false;
   return (byte & (1 << (index % 8))) !== 0;
-}
-
-export function bitsetToBase64Url(bitset: Uint8Array): string {
-  return Buffer.from(bitset).toString("base64url");
-}
-
-export function bitsetFromBase64Url(encoded: string): Uint8Array {
-  return new Uint8Array(Buffer.from(encoded, "base64url"));
 }

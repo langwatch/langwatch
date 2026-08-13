@@ -14,10 +14,13 @@ import {
   type AuthzScopeRef,
   PermissionDeniedError,
 } from "@langwatch/authz";
+import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import { LiteMemberRestrictedError } from "../app-layer/permissions/errors";
 import type { Session } from "../auth";
 import { authz, authzCollector } from "./runtime";
+
+const logger = createLogger("langwatch:authz");
 
 type ScopeInput = {
   projectId?: string;
@@ -25,9 +28,13 @@ type ScopeInput = {
   organizationId?: string;
 };
 
+/** The tier and id a check was refused at - what PermissionDeniedError needs,
+ *  which a resolved AuthzScopeRef also satisfies structurally. */
+type DeniedScope = { type: AuthzScopeRef["type"]; id: string };
+
 type MiddlewareParams = {
   ctx: {
-    session: Session;
+    session: Session | null;
     permissionChecked: boolean;
     organizationRole?: "ADMIN" | "MEMBER" | "EXTERNAL" | null;
   };
@@ -43,10 +50,18 @@ type MiddlewareParams = {
 export const checkPermissionV2 =
   (permission: AuthzPermission) =>
   async ({ ctx, input, next }: MiddlewareParams) => {
-    const scope = await requireScopeFromInput({ input });
+    // `publicProcedure` exposes `.permission()` too, so a session is not a
+    // given here. Answering "unauthenticated" before any id is looked at
+    // keeps an anonymous caller from learning anything about the scope.
+    const user = ctx.session?.user;
+    if (!user) {
+      throw new TRPCError({ code: "UNAUTHORIZED" });
+    }
+
+    const scope = await requireScopeFromInput({ input, permission });
 
     const { decision, grants } = await authz.checkDetailed({
-      principal: { type: "user", id: ctx.session.user.id },
+      principal: { type: "user", id: user.id },
       permission,
       scope,
     });
@@ -66,13 +81,15 @@ export const checkPermissionV2 =
 
 /**
  * Resolve the check's scope from the procedure input, most specific id
- * first. No id at all is a wiring bug and fails loudly; an unknown id
- * denies without leaking (legacy posture).
+ * first. No id at all is a wiring bug and fails loudly; an id that does not
+ * resolve is denied.
  */
 async function requireScopeFromInput({
   input,
+  permission,
 }: {
   input: ScopeInput;
+  permission: AuthzPermission;
 }): Promise<AuthzScopeRef> {
   const scope = await authzCollector.resolveScopeRef({
     projectId: input.projectId,
@@ -81,17 +98,40 @@ async function requireScopeFromInput({
       input.projectId || input.teamId ? undefined : input.organizationId,
   });
   if (scope) return scope;
-  if (!input.projectId && !input.teamId && !input.organizationId) {
+
+  const requested = requestedScope(input);
+  if (!requested) {
+    // Nothing the caller did can fix this, so the sentence they read says
+    // only that; which procedure is miswired goes to the log.
+    logger.error(
+      { permission },
+      "permission procedure input carries no projectId, teamId, or organizationId",
+    );
     throw new TRPCError({
       code: "INTERNAL_SERVER_ERROR",
-      message:
-        "checkPermissionV2 requires projectId, teamId, or organizationId in the procedure input",
+      message: "Something went wrong. Please try again.",
     });
   }
-  throw new TRPCError({
-    code: "UNAUTHORIZED",
-    message: "You do not have permission to access this resource",
+
+  // An id that resolves to nothing answers exactly like an id the caller may
+  // not touch. Two things used to leak here: the 401-with-prose told an
+  // outsider whether an id EXISTS, and the missing error code left the
+  // client rendering a generic "unknown error" for a denial it can name.
+  throw deniedError({
+    permission,
+    scope: requested,
+    denialReason: "no-membership",
   });
+}
+
+/** The tier the caller aimed at, by the same precedence the resolve uses. */
+function requestedScope(input: ScopeInput): DeniedScope | null {
+  if (input.projectId) return { type: "project", id: input.projectId };
+  if (input.teamId) return { type: "team", id: input.teamId };
+  if (input.organizationId) {
+    return { type: "organization", id: input.organizationId };
+  }
+  return null;
 }
 
 function deniedError({
@@ -100,7 +140,7 @@ function deniedError({
   denialReason,
 }: {
   permission: AuthzPermission;
-  scope: AuthzScopeRef;
+  scope: DeniedScope;
   denialReason: NonNullable<AuthzDecision["denialReason"]>;
 }): TRPCError {
   const denied = new PermissionDeniedError({ permission, scope, denialReason });

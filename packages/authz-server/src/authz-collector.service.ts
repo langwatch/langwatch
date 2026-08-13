@@ -20,8 +20,20 @@ import type {
   ShareLinkRow,
 } from "./authz-read.repository";
 
+export type AuthzCollectorOptions = {
+  /** Injected so share-link liveness is testable at its exact boundary. */
+  now?: () => Date;
+};
+
 export class AuthzCollectorService {
-  constructor(private readonly reader: AuthzReadRepository) {}
+  private readonly now: () => Date;
+
+  constructor(
+    private readonly reader: AuthzReadRepository,
+    options: AuthzCollectorOptions = {},
+  ) {
+    this.now = options.now ?? (() => new Date());
+  }
 
   /**
    * Resolve a scope reference from the ids a request carries. Project ids
@@ -102,6 +114,19 @@ export class AuthzCollectorService {
     };
   }
 
+  /**
+   * The user an API key belongs to, for the ADR-092 §9 owner ceiling.
+   * AuthzService asks through here rather than holding its own reader: the
+   * collector is the one seam in front of storage.
+   */
+  async findApiKeyOwner({
+    apiKeyId,
+  }: {
+    apiKeyId: string;
+  }): Promise<{ userId: string | null } | null> {
+    return this.reader.findApiKeyOwner(apiKeyId);
+  }
+
   async collectGrants({
     principal,
     organizationId,
@@ -127,6 +152,15 @@ export class AuthzCollectorService {
         return this.collectApiKeyGrants({ principal, organizationId });
       case "user":
         return this.collectUserGrants({ principal, organizationId });
+      default: {
+        // A principal kind added to the union without a collect path here
+        // would otherwise silently resolve to "no grants" - a fail-open
+        // shape. Fail loudly instead.
+        const unreachable: never = principal;
+        throw new Error(
+          `unhandled authz principal type: ${JSON.stringify(unreachable)}`,
+        );
+      }
     }
   }
 
@@ -160,7 +194,7 @@ export class AuthzCollectorService {
       tokens: scope.shareTokens,
       links,
     });
-    const now = new Date();
+    const now = this.now();
     return rows
       .filter((row) => isLiveShareLink(row, now))
       .map((row) => ({
@@ -171,10 +205,14 @@ export class AuthzCollectorService {
         id: row.resourceId,
         projectId: row.projectId,
         permission: "traces:view",
+        // The row's own project anchors both the grant and its audience: a
+        // row can only be reached through a query already scoped to this
+        // project, and taking the audience from anywhere else would let a
+        // grant name a project it does not sit in.
         audience: audienceForVisibility({
           visibility: row.visibility,
           organizationId: scope.organizationId,
-          projectId: scope.projectId,
+          projectId: row.projectId,
         }),
       }));
   }
@@ -193,13 +231,18 @@ export class AuthzCollectorService {
     return {
       principal,
       organizationId,
+      // A key has no OrganizationUser row and no TeamUser rows of its own:
+      // its bindings are the whole story, and the owner's grants enter only
+      // as the §9 ceiling, never as an addition.
       organizationRole: null,
       isOrgMember: false,
       bindings,
       legacyTeamMemberships: [],
-      customRolePermissions: await this.prefetchCustomRolePermissions(
-        dedupeCustomRoleIds(bindings, []),
-      ),
+      customRolePermissions: await this.prefetchCustomRolePermissions({
+        principal,
+        organizationId,
+        customRoleIds: dedupeCustomRoleIds(bindings, []),
+      }),
     };
   }
 
@@ -223,8 +266,9 @@ export class AuthzCollectorService {
         }),
         // LEGACY-QUIRK(B): TeamUser fallback rows. Always fetched because
         // the org-scope path unions them on any denial even when bindings
-        // exist (rbac.ts:1094-1110); the engine applies the per-scope
-        // gating rules.
+        // exist (the TeamUser union at the end of legacy
+        // hasOrganizationPermissionLegacy); the engine applies the
+        // per-scope gating rules.
         this.reader.findLegacyTeamMemberships({
           userId: principal.id,
           organizationId,
@@ -239,26 +283,42 @@ export class AuthzCollectorService {
       isOrgMember: organizationRole != null,
       bindings,
       legacyTeamMemberships: legacyRows,
-      customRolePermissions: await this.prefetchCustomRolePermissions(
-        dedupeCustomRoleIds(bindings, legacyRows),
-      ),
+      customRolePermissions: await this.prefetchCustomRolePermissions({
+        principal,
+        organizationId,
+        customRoleIds: dedupeCustomRoleIds(bindings, legacyRows),
+      }),
     };
   }
 
-  private async prefetchCustomRolePermissions(
-    customRoleIds: string[],
-  ): Promise<Map<string, readonly string[]>> {
+  private async prefetchCustomRolePermissions({
+    principal,
+    organizationId,
+    customRoleIds,
+  }: {
+    principal: AuthzPrincipalRef;
+    organizationId: string;
+    customRoleIds: string[];
+  }): Promise<Map<string, readonly string[]>> {
     if (customRoleIds.length === 0) return new Map();
     return parseCustomRolePermissions(
-      await this.reader.findCustomRolePermissions({ customRoleIds }),
+      await this.reader.findCustomRolePermissions({
+        organizationId,
+        principal,
+        customRoleIds,
+      }),
     );
   }
 }
 
 /**
- * Lenient parse, matching both legacy resolvers' net behaviour: malformed
- * or non-array permission JSON degrades to an empty list, which the engine
- * treats as "fall through to the built-in bag", never as a grant.
+ * Lenient parse, matching the legacy tRPC resolver's net behaviour:
+ * malformed or non-array permission JSON degrades to an empty list, which
+ * the engine treats as "fall through to the built-in bag", never as a
+ * grant. The legacy API-key resolver is STRICTER here - it rejects a mixed
+ * array outright rather than dropping the non-string entries - so on that
+ * path this parse is deliberately the more permissive of the two, and the
+ * shadow comparison is where that shows up.
  */
 function parseCustomRolePermissions(
   rows: CustomRolePermissionsRow[],
@@ -281,6 +341,18 @@ function isLiveShareLink(row: ShareLinkRow, now: Date): boolean {
   return true;
 }
 
+/**
+ * The ADR-057 visibility a link was created with, as the ADR-092 audience
+ * it means.
+ *
+ * KNOWN NARROWING (C5): the PROJECT audience resolves through
+ * project-scoped bindings only (see audienceMatches in the engine), while
+ * legacy's project-visibility check probes actual project membership - so a
+ * caller who reaches the project through a team or organization binding
+ * matches legacy and not this. The membership probe lands with the C5
+ * storage pass; until then this is narrower than legacy, which fails
+ * closed.
+ */
 function audienceForVisibility({
   visibility,
   organizationId,
@@ -297,6 +369,14 @@ function audienceForVisibility({
       return { kind: "organization", id: organizationId };
     case "PROJECT":
       return { kind: "project", id: projectId };
+    default: {
+      // A visibility added to the stored enum without an audience here
+      // would otherwise fall out as undefined and read as "no audience".
+      const unreachable: never = visibility;
+      throw new Error(
+        `unhandled share link visibility: ${String(unreachable)}`,
+      );
+    }
   }
 }
 

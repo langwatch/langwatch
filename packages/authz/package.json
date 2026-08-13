@@ -13,6 +13,10 @@
     "./passport": {
       "types": "./src/passport.ts",
       "default": "./src/passport.ts"
+    },
+    "./witness": {
+      "types": "./src/witness.ts",
+      "default": "./src/witness.ts"
     }
   },
   "main": "./src/index.ts",
@@ -21,14 +25,14 @@
     "src"
   ],
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit -p . && tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run"
   },
   "dependencies": {
     "@langwatch/handled-error": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^26.0.1",
+    "@types/node": "^24",
     "typescript": "^5.9.2",
     "vitest": "^4.1.9"
   }

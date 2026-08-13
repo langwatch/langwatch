@@ -6,9 +6,21 @@
  * GrantsService.
  */
 import type { RoleBindingScopeType, TeamUserRole } from "@langwatch/authz";
-import type { AuthzReadRepository } from "./authz-read.repository";
+import type {
+  AuthzReadRepository,
+  ScopeLineageRepository,
+} from "./authz-read.repository";
 
-/** The row shape for a binding INSERT - exactly one principal id set. */
+/** Which principal a binding row points at. Exactly one, by construction -
+ *  the union is what makes "two principals on one row" unrepresentable. */
+export type BindingPrincipalWhere =
+  | { userId: string }
+  | { groupId: string }
+  | { apiKeyId: string };
+
+/** The row shape for a binding INSERT. The adapter spreads `principal` onto
+ *  its three nullable columns; the union is the only place that mapping is
+ *  allowed to reintroduce nulls. */
 export type RoleBindingWrite = {
   bindingId: string;
   organizationId: string;
@@ -16,15 +28,8 @@ export type RoleBindingWrite = {
   scopeId: string;
   role: TeamUserRole;
   customRoleId: string | null;
-  userId: string | null;
-  groupId: string | null;
-  apiKeyId: string | null;
+  principal: BindingPrincipalWhere;
 };
-
-export type BindingPrincipalWhere =
-  | { userId: string }
-  | { groupId: string }
-  | { apiKeyId: string };
 
 /**
  * Thrown by write implementations when a binding INSERT/UPDATE collides
@@ -39,6 +44,21 @@ export class DuplicateBindingError extends Error {
   }
 }
 
+/**
+ * Thrown by write implementations when the row a write targets is not there
+ * - the adapter maps its engine's missing-row signal (Prisma P2025, or an
+ * update/delete that touched zero rows) onto this. GrantsService turns it
+ * into the same not-found error a pre-read miss produces, so a binding
+ * deleted between the read and the write reads identically to one that was
+ * never there.
+ */
+export class BindingMissingError extends Error {
+  constructor() {
+    super("role binding no longer exists");
+    this.name = "BindingMissingError";
+  }
+}
+
 export type OffboardCounts = {
   bindings: number;
   groupMemberships: number;
@@ -47,29 +67,35 @@ export type OffboardCounts = {
   organizationMembership: boolean;
 };
 
-export interface AuthzGrantsRepository {
+export interface AuthzGrantsRepository extends ScopeLineageRepository {
   /** @throws DuplicateBindingError on a unique-index collision. */
   createBinding(row: RoleBindingWrite): Promise<void>;
-  /** @throws DuplicateBindingError on a unique-index collision. */
+  /**
+   * @throws DuplicateBindingError on a unique-index collision.
+   * @throws BindingMissingError when the row is gone.
+   */
   updateBindingRole(args: {
     bindingId: string;
     role: RoleBindingWrite["role"];
     customRoleId: string | null;
   }): Promise<void>;
+  /** @throws BindingMissingError when the row is gone. */
   deleteBinding(args: { bindingId: string }): Promise<void>;
   findBinding(args: {
     bindingId: string;
   }): Promise<{ id: string; organizationId: string } | null>;
-  findCustomRoleOrganization(args: {
+  /**
+   * A custom role's owning organization and its stored permission payload -
+   * the tenancy check and the vocabulary check read the same row, so they
+   * take one query.
+   */
+  findCustomRole(args: {
     customRoleId: string;
-  }): Promise<{ organizationId: string } | null>;
-  findTeamOrganization(args: {
-    teamId: string;
-  }): Promise<{ organizationId: string } | null>;
-  findProjectLineage(args: {
-    projectId: string;
-  }): Promise<{ teamId: string; organizationId: string } | null>;
-  /** Delete-then-create as ONE transaction - the REDUCE verb's atomicity. */
+  }): Promise<{ organizationId: string; permissions: unknown } | null>;
+  /**
+   * Delete-then-create as ONE transaction - the REDUCE verb's atomicity.
+   * @throws BindingMissingError when the delete matched nothing.
+   */
   replaceBinding(args: {
     deleteWhere: {
       organizationId: string;

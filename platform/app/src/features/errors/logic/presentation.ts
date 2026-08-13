@@ -1159,7 +1159,7 @@ const presentations = {
     // so nothing was half-removed.
     title: "Offboarding didn't finish",
     describe: () =>
-      "Nothing was changed - the removal was rolled back. Try again, and contact support if it keeps failing.",
+      "Nothing was changed — the removal was rolled back. Try again, and contact support if it keeps failing.",
   },
   cannot_impersonate_admin: {
     // A deliberate denial, not a mistake to correct: admin-to-admin

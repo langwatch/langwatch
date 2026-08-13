@@ -495,7 +495,7 @@ They just all call the one engine:
  Hono      SecuredApp permission argument (surface unchanged, engine inside);
            the packages/api versioned builder adopts AccessPolicy - its
            `auth: "none"` never ships as a third convention
- services  authz.require({ principal, permission, scope })       ← ADR-019: services
+ services  authz.authorize({ principal, permission, scope })     ← ADR-019: services
            (replaces PermissionsService + the four *.authz.ts)     depend on the port
  workers/  same call with a service or user principal - no more direct-DB
  automations  "trust me" paths
@@ -583,11 +583,11 @@ somehow happens anyway, the request dies closed.
      runtime     unknown scope → deny; malformed custom role → deny + log
 ```
 
-L3 is the one that changes daily work. `authz.require()` returns a branded,
+L3 is the one that changes daily work. `authz.authorize()` returns a branded,
 unforgeable proof, and data access demands it:
 
 ```
- const chatbot = await authz.require({          // the ONLY factory of
+ const chatbot = await authz.authorize({        // the ONLY factory of
    principal,                                   // Authorized<"project">
    permission: "traces:view",
    scope: project(input.projectId),
@@ -666,7 +666,7 @@ same job ADR-057's share gates do today, driven by one engine verdict instead
 of a bespoke resolver. ADR-057's share tokens verify possession and then
 resolve to exactly these grants.
 
-**The shim (migration stage A'):** ADR-057's `ShareLink` table is already a
+**The shim (migration stage A5):** ADR-057's `ShareLink` table is already a
 resource-grant table in disguise: `(resourceType, resourceId, projectId)` is
 the grant anchor, `visibility` is the audience (PUBLIC is anyone,
 ORGANIZATION the org, PROJECT the project), and the secret `token` is the
@@ -792,7 +792,7 @@ sentence they perform:
 await authz.can({ principal, permission: "prompts:update", scope: project(id) });
 // → boolean
 
-await authz.require({ principal, permission: "prompts:update", scope: project(id) });
+await authz.authorize({ principal, permission: "prompts:update", scope: project(id) });
 // → Authorized<"project"> witness · throws PermissionDeniedError(denialReason)
 
 await authz.check({ ... });           // → full AuthzDecision, never throws
@@ -819,7 +819,7 @@ await grants.replace({ who: user(aliceId), from: org(acmeId),   // the REDUCE
 tRPC and Hono sugar stays declarative -
 `protectedProcedure.permission("prompts:update")`,
 `.permission("traces:view").orPublicResource("trace", i => i.traceId)`,
-`SecuredApp`'s `requires("…")` - all compiling down to `authz.require`.
+`SecuredApp`'s `requires("…")` - all compiling down to `authz.authorize`.
 
 ### 12. Instant checks: the epoch ladder (no DB on the hot path)
 
@@ -876,7 +876,13 @@ gateway's 15-minute HS256 JWT with a `revision` claim
 (`server/gateway/gatewayJwt.ts`) is exactly this pattern for virtual keys,
 and epochs generalise it to every principal. A revoked binding is dead on the
 caller's next request (the epoch bump outruns any TTL), so the
-no-stale-grants property survives, minus the per-check query tax. The
+no-stale-grants property survives, minus the per-check query tax. That
+guarantee has a precondition, and it is the reason the cache ships flagged:
+it holds only once **every** write path that changes a grant bumps the org
+epoch. Until the last one is routed through `grants.*` (delivery-plan step
+M7), a legacy write that skips the bump would leave the cache serving stale
+grants - fail-open - so `AUTHZ_EPOCH_CACHE` stays off and every check
+collects. The
 coarseness is deliberate: one epoch per org means any grant write re-collects
 every cached principal in that org once. Grant writes are rare, and a
 re-collect is the same 1-2 queries the engine already does.
@@ -887,6 +893,8 @@ re-collect is the same 1-2 queries the engine already does.
  A  EXTRACT   server/authz/ registry + engine + AuthzDecision.
               Characterization tests generated from the registry
               (role × permission × scope matrix vs today's answers).
+              A5 adds the RESOURCE TIER (§8), collected from ADR-057's
+              ShareLink rows as grants - no schema change.
               SHADOW MODE flag: run engine alongside legacy on real traffic,
               log mismatches, fix until silent.                    [no behaviour Δ]
 
@@ -910,7 +918,7 @@ re-collect is the same 1-2 queries the engine already does.
               collapse the ~15 handlerManagedAuth copies into edge identity
               resolution; triage 23 skips + 16 resolver-authz sites into the
               new named escapes; fold imperative second-phase checks into
-              service-level authz.require.
+              service-level authz.authorize.
 
  E  DERIVE    Roles UI, API-key categories, docs, useCan, and the CI
               route-coverage test all read the registry; delete
@@ -918,8 +926,10 @@ re-collect is the same 1-2 queries the engine already does.
               resolver, and the rbac.ts monolith. ADR-001 → Superseded.
 
  F  ACCELERATE org authz epochs + the L1 cache land behind a flag (shadow-
-              compared exactly like stage A); signed passports roll out per
-              stateless surface (collector, Go gateway, ADR-039 share
+              compared exactly like stage A), and the flag only turns on
+              once every grant write bumps the epoch (§12's precondition,
+              delivered by D0); signed passports roll out per
+              stateless surface (collector, Go gateway, ADR-057 share
               links); witness types (§7) become the convention for new
               repositories.
 ```
@@ -1040,9 +1050,23 @@ deliberately out of scope.
 - Related: [ADR-019](./019-repository-service-layering.md) (authz as a service-layer
   port), [ADR-021](./021-multi-scope-targeting-and-tenancy.md) (tenancy anchors,
   org-exclusive rule - absorbed into the registry), [ADR-045](./045-domain-errors-handled-boundary.md)
-  (`PermissionDeniedError` as a `HandledError`), ADR-039 sharing redesign (PR #5809).
+  (`PermissionDeniedError` as a `HandledError`).
+- Related: [ADR-057](./057-token-gated-trace-sharing.md) (token-gated trace
+  sharing, PR #5809) - its `ShareLink` table is the resource tier's storage
+  for stages A5 through C5, and its possession-not-existence invariant is
+  preserved by the collector (§8).
+- Related: [ADR-070](./070-modular-package-architecture.md) (bounded-context
+  packages). The engine ships as two of them: `@langwatch/authz` is the pure
+  vocabulary and decision core - Prisma-free, env-free, browser-safe, so the
+  frontend can import the vocabulary without dragging the server graph -
+  and `@langwatch/authz-server` holds the services over repository
+  *interfaces*, with the Prisma implementations and the composition root
+  staying in the app. The dependency direction ADR-070 asks for is what
+  lets one engine serve both sides.
 - Spec: `specs/rbac/unified-authorization-engine.feature` (this ADR);
   supersedes the override scenarios in `specs/rbac/scoped-role-bindings.feature`.
+- Delivery plan: [`dev/docs/plans/adr-092-authz-delivery-plan.md`](../plans/adr-092-authz-delivery-plan.md)
+  (stages sliced into PRs, gates, flags, rollback, the data-migration runbook).
 - Evidence: `dev/docs/security/hono-api-rbac-audit.md` (PR #4283); issues
   #1247, #3388, #3429, #3685, #4008; `git log --since=2026-01-01 --
   langwatch/src/server/api/rbac.ts` (28 commits).

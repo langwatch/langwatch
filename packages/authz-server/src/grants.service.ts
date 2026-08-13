@@ -1,10 +1,11 @@
 /**
  * ADR-092 §11 (setting) + §10 (offboarding) — the one write surface for
- * grants. Every mutation validates against the registry/tenancy, emits an
- * audit event, and bumps the org's authz epoch so caches and passports die
- * on the caller's next request. Storage is behind AuthzGrantsRepository -
- * the Prisma implementation (and its transactions) lives in the app; this
- * service owns validation, naming failures, and the offboarding proof.
+ * grants. Every mutation validates against the registry/tenancy, bumps the
+ * org's authz epoch so caches and passports die on the caller's next
+ * request, and emits an audit event. Storage is behind
+ * AuthzGrantsRepository - the Prisma implementation (and its transactions)
+ * lives in the app; ./grant-validation.ts owns what a write must satisfy,
+ * and ./offboard.ts owns the offboarding transaction and its proof.
  *
  * Migration note (stage D0): the eight legacy RoleBinding write paths
  * (member add, invites, SCIM, groups, API keys, project creation, role
@@ -12,14 +13,25 @@
  * new code starts here.
  */
 import { type AuthzScopeRef, scopeOrganizationId } from "@langwatch/authz";
-import { HandledError } from "@langwatch/handled-error";
-import { AuthzCollectorService } from "./authz-collector.service";
-import {
-  type AuthzGrantsRepository,
-  type BindingPrincipalWhere,
-  DuplicateBindingError,
-  type RoleBindingWrite,
+import type { AuthzCollectorService } from "./authz-collector.service";
+import type {
+  AuthzGrantsRepository,
+  OffboardCounts,
+  RoleBindingWrite,
 } from "./authz-grants.repository";
+import type { AuthzReadRepository } from "./authz-read.repository";
+import {
+  assertBindingInOrganization,
+  assertRoleUsable,
+  assertScopeBelongsToOrganization,
+  type GrantableScope,
+  GrantValidationError,
+  principalWhere,
+  RESOURCE_SCOPE_REJECTION,
+  rethrowKnownWriteFailure,
+  SCOPE_TYPE_FOR_REF,
+} from "./grant-validation";
+import { offboardUserFromOrganization } from "./offboard";
 
 /** The app's audit writer (EE) - every grant mutation records one event. */
 export type AuthzAuditWriter = (entry: {
@@ -34,26 +46,6 @@ export type AuthzEpochBumper = (args: {
   organizationId: string;
 }) => Promise<void>;
 
-export class GrantValidationError extends HandledError {
-  constructor(message: string, meta: Record<string, unknown> = {}) {
-    super("grant_validation_failed", message, { httpStatus: 400, meta });
-    this.name = "GrantValidationError";
-  }
-}
-
-export class OffboardIncompleteError extends HandledError {
-  constructor(meta: Record<string, unknown> = {}) {
-    super(
-      "offboard_incomplete",
-      "Offboarding left resolvable grants behind; transaction rolled back",
-      // fault: the proof failing means OUR deletes missed a grant source -
-      // a platform defect, never something the admin did wrong.
-      { httpStatus: 500, fault: "platform", meta },
-    );
-    this.name = "OffboardIncompleteError";
-  }
-}
-
 export type GrantPrincipal =
   | { type: "user"; id: string }
   | { type: "group"; id: string }
@@ -65,23 +57,19 @@ export type GrantRole =
 
 type Actor = { userId: string };
 
-const SCOPE_TYPE_FOR_REF = {
-  project: "PROJECT",
-  team: "TEAM",
-  organization: "ORGANIZATION",
-} as const;
-
-type GrantableScope = Exclude<AuthzScopeRef, { type: "resource" }>;
-
 /**
  * The app-owned effect seams, composed once in the app's runtime
  * (platform/app/src/server/authz/runtime.ts): the EE audit writer, the
- * KSUID minter for binding ids, and the redis-backed epoch bump.
+ * KSUID minter for binding ids, the redis-backed epoch bump, and the
+ * collector factory the offboarding proof re-binds to its transaction
+ * (injected rather than constructed so this module keeps no value import of
+ * the collector).
  */
 export type GrantsServiceDeps = {
   audit: AuthzAuditWriter;
   newBindingId: () => string;
   bumpEpoch: AuthzEpochBumper;
+  collectorFor: (reader: AuthzReadRepository) => AuthzCollectorService;
 };
 
 export class GrantsService {
@@ -103,29 +91,28 @@ export class GrantsService {
     where: AuthzScopeRef;
   }): Promise<{ bindingId: string }> {
     if (where.type === "resource") {
-      throw new GrantValidationError(
-        "Resource-tier access is granted by sharing the resource, not by a role binding (ResourceGrant storage lands in stage C5)",
-        { kind: where.kind, resourceId: where.id },
-      );
-    }
-    const organizationId = scopeOrganizationId(where);
-    await this.assertScopeBelongsToOrganization({ where, organizationId });
-    if ("customRoleId" in role) {
-      await this.assertCustomRoleInOrganization({
-        customRoleId: role.customRoleId,
-        organizationId,
+      throw new GrantValidationError(RESOURCE_SCOPE_REJECTION, {
+        kind: where.kind,
+        resourceId: where.id,
       });
     }
+    const organizationId = scopeOrganizationId(where);
+    const { repository } = this;
+    await assertScopeBelongsToOrganization({
+      repository,
+      where,
+      organizationId,
+    });
+    await assertRoleUsable({ repository, role, organizationId });
 
     const row = this.bindingRow({ who, role, where, organizationId });
     try {
-      await this.repository.createBinding(row);
+      await repository.createBinding(row);
     } catch (error) {
-      this.throwIfDuplicateBinding(error, {
+      rethrowKnownWriteFailure(error, {
         scopeType: where.type,
         scopeId: where.id,
       });
-      throw error;
     }
 
     await this.recordAndBump({
@@ -141,21 +128,23 @@ export class GrantsService {
   async update({
     actor,
     bindingId,
+    organizationId,
     role,
   }: {
     actor: Actor;
     bindingId: string;
+    organizationId: string;
     role: GrantRole;
   }): Promise<void> {
-    const binding = await this.requireBinding(bindingId);
-    if ("customRoleId" in role) {
-      await this.assertCustomRoleInOrganization({
-        customRoleId: role.customRoleId,
-        organizationId: binding.organizationId,
-      });
-    }
+    const { repository } = this;
+    await assertBindingInOrganization({
+      repository,
+      bindingId,
+      organizationId,
+    });
+    await assertRoleUsable({ repository, role, organizationId });
     try {
-      await this.repository.updateBindingRole({
+      await repository.updateBindingRole({
         bindingId,
         role: "customRoleId" in role ? "CUSTOM" : role.builtin,
         customRoleId: "customRoleId" in role ? role.customRoleId : null,
@@ -163,12 +152,11 @@ export class GrantsService {
     } catch (error) {
       // A role change can collide with a sibling binding the principal
       // already holds at the same scope - same knowable failure as attach.
-      this.throwIfDuplicateBinding(error, { bindingId });
-      throw error;
+      rethrowKnownWriteFailure(error, { bindingId });
     }
     await this.recordAndBump({
       actor,
-      organizationId: binding.organizationId,
+      organizationId,
       action: "authz.grants.update",
       metadata: { bindingId, role },
     });
@@ -178,15 +166,26 @@ export class GrantsService {
   async revoke({
     actor,
     bindingId,
+    organizationId,
   }: {
     actor: Actor;
     bindingId: string;
+    organizationId: string;
   }): Promise<void> {
-    const binding = await this.requireBinding(bindingId);
-    await this.repository.deleteBinding({ bindingId });
+    const { repository } = this;
+    await assertBindingInOrganization({
+      repository,
+      bindingId,
+      organizationId,
+    });
+    try {
+      await repository.deleteBinding({ bindingId });
+    } catch (error) {
+      rethrowKnownWriteFailure(error, { bindingId });
+    }
     await this.recordAndBump({
       actor,
-      organizationId: binding.organizationId,
+      organizationId,
       action: "authz.grants.revoke",
       metadata: { bindingId },
     });
@@ -211,9 +210,7 @@ export class GrantsService {
     role: GrantRole;
   }): Promise<{ bindingId: string }> {
     if (from.type === "resource" || to.type === "resource") {
-      throw new GrantValidationError(
-        "Resource-tier access is granted by sharing the resource, not by a role binding (ResourceGrant storage lands in stage C5)",
-      );
+      throw new GrantValidationError(RESOURCE_SCOPE_REJECTION);
     }
     const organizationId = scopeOrganizationId(from);
     if (scopeOrganizationId(to) !== organizationId) {
@@ -221,19 +218,16 @@ export class GrantsService {
         "replace() must stay within one organization",
       );
     }
-    await this.assertScopeBelongsToOrganization({
+    const { repository } = this;
+    await assertScopeBelongsToOrganization({
+      repository,
       where: to,
       organizationId,
     });
-    if ("customRoleId" in role) {
-      await this.assertCustomRoleInOrganization({
-        customRoleId: role.customRoleId,
-        organizationId,
-      });
-    }
+    await assertRoleUsable({ repository, role, organizationId });
     const row = this.bindingRow({ who, role, where: to, organizationId });
     try {
-      await this.repository.replaceBinding({
+      await repository.replaceBinding({
         deleteWhere: {
           organizationId,
           scopeType: SCOPE_TYPE_FOR_REF[from.type],
@@ -243,11 +237,10 @@ export class GrantsService {
         create: row,
       });
     } catch (error) {
-      this.throwIfDuplicateBinding(error, {
+      rethrowKnownWriteFailure(error, {
         scopeType: to.type,
         scopeId: to.id,
       });
-      throw error;
     }
     await this.recordAndBump({
       actor,
@@ -259,12 +252,9 @@ export class GrantsService {
   }
 
   /**
-   * ADR-092 §10 — offboarding, one transaction with a postcondition. The
-   * repository deletes every grant source for the user and calls back with
-   * a transaction-bound reader; re-collecting through it proves the
-   * effective set resolves to nothing INSIDE the transaction (anything left
-   * rolls the whole thing back). Returns the manifest of what still needs
-   * a human decision.
+   * ADR-092 §10 — remove every grant source for a user in one transaction,
+   * proven inside it (see ./offboard.ts). Returns the manifest of what
+   * still needs a human decision.
    */
   async offboard({
     actor,
@@ -275,54 +265,18 @@ export class GrantsService {
     userId: string;
     organizationId: string;
   }): Promise<{
-    removed: {
-      bindings: number;
-      groupMemberships: number;
-      legacyTeamMemberships: number;
-      pendingInvites: number;
-      organizationMembership: boolean;
-    };
+    removed: OffboardCounts;
     needsHumanDecision: {
       ownedApiKeys: Array<{ id: string; name: string }>;
       personalTeams: Array<{ id: string; name: string }>;
     };
   }> {
-    const email = await this.repository.findUserEmail({ userId });
-
-    const removed = await this.repository.offboardUser({
+    const result = await offboardUserFromOrganization({
+      repository: this.repository,
+      collectorFor: this.deps.collectorFor,
       userId,
       organizationId,
-      email,
-      // The proof (§10 step 7): re-collect against the transaction — the
-      // deletes are visible there — and fail loudly if anything still
-      // resolves. Group- or key-held grants cannot survive for this user:
-      // memberships are gone and personal keys are ceilinged by an owner
-      // who now resolves to nothing.
-      prove: async (txReader) => {
-        const grants = await new AuthzCollectorService(txReader).collectGrants({
-          principal: { type: "user", id: userId },
-          organizationId,
-        });
-        if (
-          grants.isOrgMember ||
-          grants.bindings.length > 0 ||
-          grants.legacyTeamMemberships.length > 0
-        ) {
-          throw new OffboardIncompleteError({
-            userId,
-            organizationId,
-            remainingBindings: grants.bindings.length,
-            remainingLegacyRows: grants.legacyTeamMemberships.length,
-            stillOrgMember: grants.isOrgMember,
-          });
-        }
-      },
     });
-
-    const [ownedApiKeys, personalTeams] = await Promise.all([
-      this.repository.findOwnedApiKeys({ userId, organizationId }),
-      this.repository.findPersonalTeams({ userId, organizationId }),
-    ]);
 
     await this.recordAndBump({
       actor,
@@ -330,13 +284,17 @@ export class GrantsService {
       action: "authz.grants.offboard",
       metadata: {
         offboardedUserId: userId,
-        removed,
-        ownedApiKeyIds: ownedApiKeys.map((key) => key.id),
-        personalTeamIds: personalTeams.map((team) => team.id),
+        removed: result.removed,
+        ownedApiKeyIds: result.needsHumanDecision.ownedApiKeys.map(
+          (key) => key.id,
+        ),
+        personalTeamIds: result.needsHumanDecision.personalTeams.map(
+          (team) => team.id,
+        ),
       },
     });
 
-    return { removed, needsHumanDecision: { ownedApiKeys, personalTeams } };
+    return result;
   }
 
   private bindingRow({
@@ -357,90 +315,16 @@ export class GrantsService {
       scopeId: where.id,
       role: "customRoleId" in role ? "CUSTOM" : role.builtin,
       customRoleId: "customRoleId" in role ? role.customRoleId : null,
-      userId: who.type === "user" ? who.id : null,
-      groupId: who.type === "group" ? who.id : null,
-      apiKeyId: who.type === "apiKey" ? who.id : null,
+      principal: principalWhere(who),
     };
   }
 
   /**
-   * The partial unique indexes on RoleBinding make a duplicate a knowable
-   * failure the caller can act on - the repository surfaces it as
-   * DuplicateBindingError, and it is named here instead of degrading to
-   * "unknown error". The indexes key on the role too, so this only fires
-   * when the principal already holds this SAME role (or custom role) at
-   * the scope.
+   * Epoch first, audit second, and deliberately not one unit of work. The
+   * bump is what makes the write VISIBLE to the next check; a failed audit
+   * must never leave a committed grant change sitting behind a stale cache,
+   * so the audit error propagates only after the bump has happened.
    */
-  private throwIfDuplicateBinding(
-    error: unknown,
-    meta: Record<string, unknown>,
-  ): void {
-    if (error instanceof DuplicateBindingError) {
-      throw new GrantValidationError(
-        "This principal already holds this role at this scope - update or revoke the existing binding",
-        meta,
-      );
-    }
-  }
-
-  private async requireBinding(bindingId: string) {
-    const binding = await this.repository.findBinding({ bindingId });
-    if (!binding) {
-      throw new GrantValidationError("Role binding not found", { bindingId });
-    }
-    return binding;
-  }
-
-  private async assertScopeBelongsToOrganization({
-    where,
-    organizationId,
-  }: {
-    where: GrantableScope;
-    organizationId: string;
-  }): Promise<void> {
-    if (where.type === "organization") return;
-    if (where.type === "team") {
-      const team = await this.repository.findTeamOrganization({
-        teamId: where.id,
-      });
-      if (team?.organizationId !== organizationId) {
-        throw new GrantValidationError("Team is not in this organization", {
-          teamId: where.id,
-        });
-      }
-      return;
-    }
-    const lineage = await this.repository.findProjectLineage({
-      projectId: where.id,
-    });
-    if (
-      lineage?.organizationId !== organizationId ||
-      lineage.teamId !== where.teamId
-    ) {
-      throw new GrantValidationError("Project is not in this scope", {
-        projectId: where.id,
-      });
-    }
-  }
-
-  private async assertCustomRoleInOrganization({
-    customRoleId,
-    organizationId,
-  }: {
-    customRoleId: string;
-    organizationId: string;
-  }): Promise<void> {
-    const customRole = await this.repository.findCustomRoleOrganization({
-      customRoleId,
-    });
-    if (!customRole || customRole.organizationId !== organizationId) {
-      throw new GrantValidationError(
-        "Custom role does not belong to this organization",
-        { customRoleId },
-      );
-    }
-  }
-
   private async recordAndBump({
     actor,
     organizationId,
@@ -452,23 +336,12 @@ export class GrantsService {
     action: string;
     metadata: Record<string, unknown>;
   }): Promise<void> {
+    await this.deps.bumpEpoch({ organizationId });
     await this.deps.audit({
       userId: actor.userId,
       organizationId,
       action,
       metadata,
     });
-    await this.deps.bumpEpoch({ organizationId });
-  }
-}
-
-function principalWhere(who: GrantPrincipal): BindingPrincipalWhere {
-  switch (who.type) {
-    case "user":
-      return { userId: who.id };
-    case "group":
-      return { groupId: who.id };
-    case "apiKey":
-      return { apiKeyId: who.id };
   }
 }

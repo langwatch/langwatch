@@ -1,5 +1,5 @@
 import { type AuthzPermission, permissionSatisfiedBy } from "@langwatch/authz";
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 
@@ -27,21 +27,30 @@ export function useCan() {
     },
   );
 
+  // Built once per fetched set rather than per `can()` call: a page asking
+  // about a dozen permissions on every render would otherwise rebuild the
+  // same ~126-entry set a dozen times.
+  const granted = useMemo(
+    () => new Set(effective.data?.permissions),
+    [effective.data?.permissions],
+  );
+
   const can = useCallback(
     (permission: AuthzPermission): boolean => {
-      const permissions = effective.data?.permissions;
-      if (!permissions) return false;
-      return permissionSatisfiedBy({
-        granted: new Set(permissions),
-        requested: permission,
-      });
+      if (!effective.data?.permissions) return false;
+      return permissionSatisfiedBy({ granted, requested: permission });
     },
-    [effective.data?.permissions],
+    [granted, effective.data?.permissions],
   );
 
   return {
     can,
-    isLoading: effective.isLoading,
+    // React Query v4 reports a DISABLED query as loading forever, and this
+    // query is disabled until there is an org or a project to ask about. A
+    // consumer gating its render on `isLoading` would never render at all on
+    // those screens; `isInitialLoading` is the flag that means "a fetch this
+    // hook actually started has not answered yet".
+    isLoading: effective.isInitialLoading,
     permissions: effective.data?.permissions ?? [],
   };
 }
