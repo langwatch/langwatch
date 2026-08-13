@@ -5,7 +5,8 @@ import {
   type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
+import { isRootPrismaClient } from "~/server/db";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { CUSTOM_ROLE_KIND } from "../role-kind";
 
@@ -347,12 +348,12 @@ export class RoleRepository {
   }
 
   private requireFullClient(): PrismaClient {
-    if (!("$transaction" in this.prisma)) {
+    if (!isRootPrismaClient(this.prisma)) {
       throw new Error(
         "assignToUser/removeFromUser require PrismaClient, not a TransactionClient",
       );
     }
-    return this.prisma as PrismaClient;
+    return this.prisma;
   }
 
   async assignToUser(userId: string, teamId: string, customRoleId: string) {

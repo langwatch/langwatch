@@ -6,11 +6,7 @@ import type { Logger } from "@langwatch/observability";
 import { COMMAND_INLINE_THRESHOLD } from "~/server/app-layer/traces/lean-for-projection";
 import type { TenantId } from "~/server/event-sourcing/domain/tenantId";
 import type { ProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
-import {
-  mintAzureBlobUri,
-  mintFileUri,
-  mintS3Uri,
-} from "~/server/stored-objects/uri";
+import { mintUriForDestination } from "~/server/stored-objects/uri";
 
 import { BLOB_BACKSTOP_TTL_SECONDS, MAX_BLOB_BYTES } from "./blobConstants";
 import { blobNamespaceId } from "./blobKeys";
@@ -44,6 +40,14 @@ export const S3_TIER_THRESHOLD_BYTES = COMMAND_INLINE_THRESHOLD;
  * read location is re-derived from these server-trusted inputs (the redis key /
  * a re-minted s3 uri), never trusted from a stored uri, so a tampered envelope
  * can't redirect a read across tenants (ADR-030 §5).
+ */
+/**
+ * `tier` says WHERE the blob lives, not WHICH provider stored it: "redis", or
+ * "s3" meaning the durable object store whatever its scheme. An Azure-only
+ * deployment produces `tier: "s3"` refs whose bytes are in Azure Blob — the
+ * provider is re-derived per operation by `mintUri`, never read off the ref
+ * (ADR-030 §5), so nothing branches on this value beyond "is it redis".
+ * Renaming it is a job-envelope wire-format change; see issue #6096.
  */
 export type BlobRef =
   | { tier: "redis"; projectId: TenantId; hash: string }
@@ -216,29 +220,10 @@ export class TieredBlobStore {
     hash: string;
   }): Promise<string> {
     const destination = await this.resolveDestinationCached(projectId);
-    switch (destination.kind) {
-      case "s3":
-        return mintS3Uri({
-          bucket: destination.bucket,
-          projectId,
-          sha256: hash,
-        });
-      case "file":
-        return mintFileUri({ root: destination.root, projectId, sha256: hash });
-      case "azure":
-        return mintAzureBlobUri({
-          accountName: destination.accountName,
-          container: destination.container,
-          projectId,
-          sha256: hash,
-        });
-      default: {
-        const unhandled: never = destination;
-        throw new Error(
-          `Unhandled storage destination kind: ${JSON.stringify(unhandled)}`,
-        );
-      }
-    }
+    return mintUriForDestination({
+      destination,
+      objectPath: `${projectId}/${hash}`,
+    });
   }
 
   async put({

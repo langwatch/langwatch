@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 
 /**
  * Resolves the first ADMIN member's email for an org. Strictly an email

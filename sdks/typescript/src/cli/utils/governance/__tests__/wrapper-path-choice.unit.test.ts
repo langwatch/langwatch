@@ -219,7 +219,7 @@ describe("resolveWrapperPath", () => {
           "keep your own plan, send only telemetry to LangWatch",
         );
         expect(promptArg.choices[1]!.description).toBe(
-          "route calls through LangWatch with a virtual key, billed per token",
+          "route calls through LangWatch with a virtual key",
         );
         // Remembered for next time.
         expect(save).toHaveBeenCalledTimes(1);
@@ -398,11 +398,14 @@ describe("resolveWrapperPath", () => {
       });
       const promptArg = (prompt as unknown as ReturnType<typeof vi.fn>).mock
         .calls[0]![0] as {
-        choices: Array<{ value: string }>;
+        choices: Array<{ value: string; description: string }>;
         initial: number;
       };
       const values = promptArg.choices.map((c) => c.value);
       expect(values[promptArg.initial]).toBe("ingestion");
+      expect(promptArg.choices[values.indexOf("gateway")]!.description).toBe(
+        "route calls through LangWatch with a virtual key",
+      );
     });
 
     /** @scenario An explicit --tool-mode=gateway flag routes copilot through the gateway */
@@ -586,7 +589,9 @@ describe("resolveWrapperPath", () => {
         "keep your own plan, send only telemetry to LangWatch",
       );
       expect(gatewayChoiceTitle()).toBe("Using an API key");
-      expect(gatewayChoiceDescription()).toContain("billed per token");
+      expect(gatewayChoiceDescription()).toBe(
+        "route calls through LangWatch with a virtual key",
+      );
     });
 
     it("names the right subscription per tool, with a neutral fallback", () => {

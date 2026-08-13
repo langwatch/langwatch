@@ -15,7 +15,7 @@
  * flagged at the moment someone looks at it rather than after a day of
  * traffic that accrued nothing.
  */
-import type { GatewayBudget, PrismaClient } from "@prisma/client";
+import type { GatewayBudget, PrismaClient } from "~/generated/prisma/client";
 
 import { traceProjectsByIds } from "./scopeResolver";
 

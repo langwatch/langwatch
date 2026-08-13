@@ -52,7 +52,8 @@ export interface GetAllTracesForProjectOptions {
 export type GetAllTracesForProjectInput = z.infer<
   typeof sharedFiltersInputSchema
 > & {
-  pageOffset?: number;
+  // No pageOffset: offset paging was dropped in the ClickHouse migration and
+  // the boundary now rejects a non-zero one (#6808). Paging is scrollId only.
   pageSize?: number;
   groupBy?: string;
   sortBy?: string;
@@ -70,6 +71,27 @@ export interface TracesForProjectResult {
   totalHits: number;
   traceChecks: Record<string, Evaluation[]>;
   scrollId?: string;
+  /**
+   * Updated axis only. The upper bound this scroll actually covered, in epoch
+   * ms — the moment it was pinned to, which is at or before the requested
+   * `endDate`.
+   *
+   * A scroll reads each trace as of its start so mid-scroll writes cannot move
+   * rows out from under the cursor. The cost is that anything written after
+   * that instant is not in this scroll, even when the requested window extends
+   * past it. A client that resumed from the `endDate` it asked for would step
+   * over that gap and lose those traces; resuming from this value cannot.
+   *
+   * Both ends of the window are inclusive, so a trace last written at exactly
+   * this millisecond is delivered by this pull and by the next one. That is the
+   * axis's at-least-once guarantee doing its job — a duplicate is recoverable
+   * by an idempotent apply, a gap is not — and it is why resuming here is the
+   * advice rather than resuming one millisecond past it.
+   *
+   * Absent on the occurred axis, which needs no snapshot: OccurredAt does not
+   * move, so the requested window is the window delivered.
+   */
+  updatedThrough?: number;
 }
 
 /**

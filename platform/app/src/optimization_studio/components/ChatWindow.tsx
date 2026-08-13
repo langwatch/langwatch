@@ -225,7 +225,7 @@ export const ChatBox = ({
               ))}
               {message.output.map((output, outputIndex) =>
                 output ||
-                optimization.isLoading ||
+                optimization.isPending ||
                 executionStatus === "running" ? (
                   <Box
                     key={`output-${outputIndex}`}
@@ -239,9 +239,9 @@ export const ChatBox = ({
                       borderRadius="lg"
                       whiteSpace="pre-wrap"
                     >
-                      {optimization.isLoading ||
+                      {optimization.isPending ||
                       executionStatus === "running" ? (
-                        <RunningStatus isLoading={optimization.isLoading} />
+                        <RunningStatus isLoading={optimization.isPending} />
                       ) : (
                         output
                       )}

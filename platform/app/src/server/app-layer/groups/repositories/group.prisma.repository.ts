@@ -4,7 +4,7 @@ import {
   type PrismaClient,
   type RoleBinding,
   RoleBindingScopeType,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { scopesTouchPersonalTeam } from "~/server/role-bindings/personal-team-scope";
 import type {
   CreateBindingInput,

@@ -11,14 +11,13 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { TeamUserRole } from "@prisma/client";
 import { ShieldUser } from "lucide-react";
-
 import { useState } from "react";
 import { Eye, Plus, Shield, Users } from "react-feather";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { showErrorToast } from "~/features/errors";
+import { TeamUserRole } from "~/generated/prisma/client";
 import SettingsLayout from "../../components/SettingsLayout";
 import { PermissionViewer } from "../../components/settings/PermissionViewer";
 import { RoleCard } from "../../components/settings/RoleCard";
@@ -140,7 +139,7 @@ function RolesManagement({
     id: string;
     name: string;
   } | null>(null);
-  const apiContext = api.useContext();
+  const apiContext = api.useUtils();
   // Fetch custom roles
   const roles = api.role.getAll.useQuery({ organizationId });
 
@@ -396,7 +395,7 @@ function RolesManagement({
         onSubmit={handleCreateSubmit}
         title="Create Custom Role"
         submitLabel="Create Role"
-        isSubmitting={createRole.isLoading}
+        isSubmitting={createRole.isPending}
       />
 
       {/* Edit Role Dialog */}
@@ -418,7 +417,7 @@ function RolesManagement({
         }
         title="Edit Role"
         submitLabel="Update Role"
-        isSubmitting={updateRole.isLoading}
+        isSubmitting={updateRole.isPending}
       />
 
       <ConfirmDialog
@@ -432,7 +431,7 @@ function RolesManagement({
         }"?`}
         confirmLabel="Delete"
         tone="danger"
-        loading={deleteRole.isLoading}
+        loading={deleteRole.isPending}
         onConfirm={() => {
           if (!roleToDelete) return;
           deleteRole.mutate(

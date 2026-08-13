@@ -5,7 +5,7 @@ import type {
   Trigger,
   TriggerAction,
   TriggerKind,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import type { TriggerFilters } from "~/server/filters/types";
 
 export interface TriggerSummary {

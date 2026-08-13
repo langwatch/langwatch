@@ -148,8 +148,12 @@ jobs:
           file: infra/docker/Dockerfile.langevals
           push: false
           tags: langwatch/langevals:test
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # Scoped, like every other buildx cache in this repo. Unscoped, this
+          # and langwatch-nlp-ci both wrote to buildkit's default scope and
+          # evicted each other's layers on every run — and with mode=max
+          # against a 10 GB per-repo budget, images this size evict a lot.
+          cache-from: type=gha,scope=langevals
+          cache-to: type=gha,mode=max,scope=langevals
 
   langevals-complete:
     needs: [changes, lint, test, docker-build]

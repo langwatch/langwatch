@@ -22,7 +22,7 @@
  * project is how the Usage page rendered "No usage in this window" while
  * the keys table showed spend for the same keys.
  */
-import { Prisma, type PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 
 import type { GatewayBudgetClickHouseRepository } from "./budget.clickhouse.repository";
 import type { GatewayVirtualKeySpendRepository } from "./virtualKeySpend.clickhouse.repository";

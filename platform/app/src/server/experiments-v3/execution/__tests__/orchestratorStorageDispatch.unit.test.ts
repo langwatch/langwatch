@@ -9,6 +9,11 @@
  *   - cell-error events dispatching recordTargetResult with predicted null
  *     and the failure's code populated, so a reload reads back the same copy
  *     the live run showed
+ *   - what a non-processed evaluation may carry into storage: no score, no
+ *     label, no verdict, but the money it really spent
+ *
+ * spec: specs/experiments/comparison.feature
+ *   - "An inconclusive row still reports what it cost"
  */
 
 import { describe, expect, it } from "vitest";
@@ -17,6 +22,7 @@ import { nodeErrorToDomainError } from "~/optimization_studio/utils/nodeErrorDom
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import {
+  buildEvaluatorResultDispatch,
   buildTargetMetadata,
   buildTargetResultDispatch,
 } from "../orchestrator";
@@ -325,6 +331,96 @@ describe("buildTargetResultDispatch", () => {
       });
 
       expect(dispatch).toBeNull();
+    });
+  });
+});
+
+describe("buildEvaluatorResultDispatch", () => {
+  const base = {
+    tenantId: "project-1",
+    runId: "run-1",
+    experimentId: "experiment-1",
+    evaluatorName: "Comparison",
+    occurredAt: 1234,
+    event: {
+      rowIndex: 4,
+      targetId: "",
+      evaluatorId: "langevals/select_best_compare",
+      duration: 8200,
+    },
+  };
+
+  describe("given a judge that spent money and then declined to score", () => {
+    /** @scenario "An inconclusive row still reports what it cost" */
+    it("records what the row cost, with no score to go with it", () => {
+      const dispatch = buildEvaluatorResultDispatch({
+        ...base,
+        result: {
+          status: "skipped",
+          details: "Order-sensitive verdict: the two passes disagreed.",
+          cost: { currency: "USD", amount: 0.0021 },
+        },
+      });
+
+      expect(dispatch.cost).toBe(0.0021);
+      expect(dispatch.status).toBe("skipped");
+      expect(dispatch.score).toBeNull();
+      expect(dispatch.label).toBeNull();
+      expect(dispatch.passed).toBeNull();
+    });
+  });
+
+  describe("given a judge that declined without spending anything", () => {
+    it("records no cost rather than a zero", () => {
+      const dispatch = buildEvaluatorResultDispatch({
+        ...base,
+        result: {
+          status: "skipped",
+          details: "N-way compare needs at least 2 candidates with output",
+        },
+      });
+
+      expect(dispatch.cost).toBeNull();
+    });
+  });
+
+  describe("given a judge that picked a winner", () => {
+    it("records the verdict alongside its cost", () => {
+      const dispatch = buildEvaluatorResultDispatch({
+        ...base,
+        result: {
+          status: "processed",
+          score: 1,
+          label: "variant_1",
+          details: "Confirmed under order swap.",
+          cost: { currency: "USD", amount: 0.0013 },
+        },
+      });
+
+      expect(dispatch).toMatchObject({
+        status: "processed",
+        score: 1,
+        label: "variant_1",
+        cost: 0.0013,
+        details: "Confirmed under order swap.",
+      });
+    });
+  });
+
+  describe("given a judge that failed", () => {
+    it("records the failure with no cost", () => {
+      const dispatch = buildEvaluatorResultDispatch({
+        ...base,
+        result: {
+          status: "error",
+          error_type: "EVALUATOR_ERROR",
+          details: "the judge could not be reached",
+          traceback: [],
+        },
+      });
+
+      expect(dispatch.cost).toBeNull();
+      expect(dispatch.details).toBe("the judge could not be reached");
     });
   });
 });

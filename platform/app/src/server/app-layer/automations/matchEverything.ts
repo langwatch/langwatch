@@ -1,4 +1,4 @@
-import { TriggerKind } from "@prisma/client";
+import { TriggerKind } from "~/generated/prisma/client";
 
 import { hasActionableTriggerFilters } from "~/server/filters/triggerFilter.matcher";
 import type { TriggerSummary } from "./repositories/trigger.repository";

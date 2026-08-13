@@ -44,10 +44,11 @@ import {
   type OrgModelProvider,
 } from "~/components/gateway/eligibleModelProviders";
 import { GuardrailAttachmentsSection } from "~/components/gateway/GuardrailAttachmentsSection";
+import { resolveTracesHrefForKey } from "~/components/gateway/tracesHrefForKey";
 import { VirtualKeyEditDrawer } from "~/components/gateway/VirtualKeyEditDrawer";
+import { VirtualKeyOwnershipReadOnly } from "~/components/gateway/VirtualKeyOwnershipSection";
 import { VirtualKeySecretReveal } from "~/components/gateway/VirtualKeySecretReveal";
 import { VirtualKeyUsageSnippet } from "~/components/gateway/VirtualKeyUsageSnippet";
-import { ProviderScopeChips } from "~/components/settings/ProviderScopeChips";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Link } from "~/components/ui/link";
@@ -90,18 +91,6 @@ function VirtualKeyDetailPage() {
       ) ?? [],
     [organization?.teams],
   );
-  const teamNameById = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const t of organization?.teams ?? []) map.set(t.id, t.name);
-    return map;
-  }, [organization?.teams]);
-  const projectNameById = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const t of organization?.teams ?? []) {
-      for (const p of t.projects) map.set(p.id, p.name);
-    }
-    return map;
-  }, [organization?.teams]);
   const usageWindow = useRollingWindow(30);
   const usageQuery = api.gatewayUsage.summaryForVirtualKey.useQuery(
     {
@@ -112,7 +101,7 @@ function VirtualKeyDetailPage() {
     },
     { enabled: !!orgId && !!vkId },
   );
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const rotateMutation = api.virtualKeys.rotate.useMutation({
     onSuccess: () =>
       utils.virtualKeys.get.invalidate({ organizationId: orgId, id: vkId }),
@@ -185,6 +174,19 @@ function VirtualKeyDetailPage() {
     }
     return { id, slug: null as string | null };
   }, [vk?.scopes, organization?.teams]);
+
+  const viewTracesHref = useMemo(
+    () =>
+      vk
+        ? resolveTracesHrefForKey({
+            teams: organization?.teams ?? [],
+            virtualKeyId: vk.id,
+            traceProjectId: vk.traceProjectId,
+            traceProjectArchived: vk.traceProjectArchived,
+          })
+        : undefined,
+    [vk, organization?.teams],
+  );
 
   const guardrailAttachments = useMemo(
     () =>
@@ -387,19 +389,13 @@ function VirtualKeyDetailPage() {
 
               <Section title="Scope & routing">
                 <VStack align="stretch" gap={3}>
-                  <ProviderScopeChips
+                  <VirtualKeyOwnershipReadOnly
                     scopes={(vk.scopes ?? []).map((s) => ({
                       scopeType: s.scopeType as
                         | "ORGANIZATION"
                         | "TEAM"
                         | "PROJECT",
                       scopeId: s.scopeId,
-                      name:
-                        s.scopeType === "ORGANIZATION"
-                          ? organization?.name
-                          : s.scopeType === "TEAM"
-                            ? teamNameById.get(s.scopeId)
-                            : projectNameById.get(s.scopeId),
                     }))}
                     principal={
                       vk.principalUserId && vk.principalUser
@@ -409,6 +405,14 @@ function VirtualKeyDetailPage() {
                           }
                         : undefined
                     }
+                    traceProjectId={vk.traceProjectId ?? null}
+                    traceProjectArchived={vk.traceProjectArchived ?? false}
+                    viewTracesHref={viewTracesHref}
+                    ctx={{
+                      organizationName: organization?.name,
+                      availableTeams,
+                      availableProjects,
+                    }}
                   />
                   <HStack>
                     <Text fontSize="sm" color="fg.muted">
@@ -418,7 +422,7 @@ function VirtualKeyDetailPage() {
                       <Code fontSize="xs">{vk.routingPolicyId}</Code>
                     ) : (
                       <Text fontSize="sm" color="fg.muted">
-                        default cascade — all eligible providers in priority
+                        default cascade, all eligible providers in priority
                         order
                       </Text>
                     )}

@@ -48,7 +48,7 @@ The pattern is `governance_<resource_with_underscores>_<verb_with_underscores>`,
 
 ## Authentication
 
-Governance MCP tools register inside LangWatch's existing MCP server (mounted at `/api/mcp/*` on the same host that serves the dashboard), there is **no separate `langwatch mcp serve` binary**. Clients connect over HTTP using either streamable-HTTP at `/mcp` or SSE at `/sse`, and authenticate with one of:
+Governance MCP tools register inside LangWatch's existing MCP server (served on the same host that serves the dashboard), there is **no separate `langwatch mcp serve` binary**. Clients connect over HTTP using either streamable-HTTP at `/mcp` or SSE at `/sse`, and authenticate with one of:
 
 - **Project API key as Bearer** (`Authorization: Bearer <projectApiKey>`), the plain read tools work immediately. Sufficient to call `governance_*_list` and `governance_*_get`. Admin reads (`governance_*_admin_list`, which expose `ottlRules`) and every write tool require a user-bound session and reject a project-key-only caller.
 - **OAuth (PKCE) flow** at `/api/mcp/authorize` → `/oauth/token`, required for write tools and admin reads. The OAuth flow captures the user's id at authorize time, threads it through the session token cache, and surfaces it to governance tools as `ctx.callerUserId`. Without it, a write tool returns an `AUTH_REQUIRED:` error pointing the client at the OAuth flow.
@@ -59,7 +59,9 @@ Governance MCP tools register inside LangWatch's existing MCP server (mounted at
 {
   "mcpServers": {
     "langwatch-governance": {
-      "url": "https://app.langwatch.ai/api/mcp"
+      "url": "https://app.langwatch.ai/mcp"
+      // Clients that speak the older SSE transport use
+      // https://app.langwatch.ai/sse instead.
       // Read-only access: add Authorization: Bearer <projectApiKey>.
       // Read+write access: complete the OAuth PKCE flow at /api/mcp/authorize.
     }

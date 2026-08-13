@@ -14,7 +14,7 @@ vi.mock("../../../src/server/app-layer/app", () => ({
   }),
 }));
 
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import type { ILicenseEnforcementRepository } from "~/server/license-enforcement/license-enforcement.repository";
 import {
   PLATFORM_DEFAULT_RETENTION_DAYS,

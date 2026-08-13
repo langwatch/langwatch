@@ -1,6 +1,6 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repositories implement the interface as intentional no-ops.
 
-import type { Organization, Subscription } from "@prisma/client";
+import type { Organization, Subscription } from "~/generated/prisma/client";
 
 export type SubscriptionWithOrg = Subscription & { organization: Organization };
 export type CancelledSubscription = { stripeSubscriptionId: string | null };

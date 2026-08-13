@@ -101,7 +101,7 @@ export function useProviderFormSubmit({
   onSuccess?: () => void;
   onError?: (error: unknown) => void;
 }): UseProviderFormSubmitReturn {
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const updateMutation = api.modelProvider.update.useMutation();
   // B3 redesign: the user's onboarding picks for the three role models
   // need to win over the additive seed (which fills in the registry

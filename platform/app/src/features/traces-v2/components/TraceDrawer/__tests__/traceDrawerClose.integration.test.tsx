@@ -61,6 +61,7 @@ vi.mock("~/features/traces-v2/hooks/useSpanTree", () => ({
   useSpanTreeWithCaptured: () => ({
     captured: { data: [] },
     corrected: { data: [], isLoading: false },
+    display: { data: [], isLoading: false },
   }),
 }));
 
