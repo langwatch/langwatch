@@ -1,5 +1,7 @@
 /**
- * SavedViewsBar -- sticky bottom bar showing filter presets for the traces page.
+ * SavedViewsBar -- sticky bottom bar showing filter presets for Analytics,
+ * the last v1 surface that uses it. The Trace Explorer has its own lens
+ * system and never renders this bar.
  *
  * Displays "All Traces" as a permanent view and user-defined custom views
  * (including seeded origin views) with drag-and-drop reordering in edit mode.
@@ -62,8 +64,8 @@ function getViewColors(view: { filters: SavedView["filters"]; name: string }): {
 }
 
 /**
- * SavedViewsBar renders a sticky bar at the bottom of the traces page
- * with clickable view badges for quick filter switching.
+ * SavedViewsBar renders a sticky bar at the bottom of the page with
+ * clickable view badges for quick filter switching.
  */
 export function SavedViewsBar() {
   const {

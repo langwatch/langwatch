@@ -50,8 +50,10 @@ Feature: Saved Views on Traces List
   #
   # Feature gate (planned, not implemented): The saved views bar and origin
   # column are intended to only show for projects with ClickHouse enabled
-  # (featureClickHouseDataSourceTraces). As of 2026-05-01, DashboardLayout
-  # gates the bar only on the path being /messages or /analytics.
+  # (featureClickHouseDataSourceTraces). As of 2026-08-13, DashboardLayout
+  # gates the bar on the path being /analytics — the only v1 surface left
+  # since the legacy Traces page was removed. The Trace Explorer carries its
+  # own lens system rather than this bar.
   #
   # Colors: Origin values use colors from featureIcons. Custom/user-defined
   # view names use getColorForString hash-based colors.
