@@ -205,34 +205,34 @@ Feature: One automation flow with a subject choice
     returned to any client. The composer only picks a channel. Rotation
     happens in one place and needs no automation edits.
 
-    @integration @unimplemented
+    @integration
     Scenario: Connecting Slack for a project
       Given the user can manage the project
       When the user connects Slack with a valid bot token in settings
       Then the integration shows the connected workspace by name
       And the token itself is never returned to the client
 
-    @integration @unimplemented
+    @integration
     Scenario: A token Slack rejects is refused at setup
       When the user connects Slack with a token the workspace rejects
       Then the setup is refused with the machine-readable invalid-token code
       And no integration is stored
 
-    @integration @unimplemented
+    @integration
     Scenario: The composer only asks for a channel
       Given the project has a Slack integration
       When the user configures Slack delivery in the wizard
       Then the user picks a channel from the connected workspace
       And no token field is shown
 
-    @integration @unimplemented
+    @integration
     Scenario: Slack delivery without any token fails with a named cause
       Given the project has no Slack integration
       And an automation whose Slack delivery stores no token of its own
       When the automation fires
       Then the delivery fails with the machine-readable integration-missing code
 
-    @integration @unimplemented
+    @integration
     Scenario: Rotating the token needs no automation edits
       Given the project has a Slack integration used by several automations
       When the user replaces the token in settings
@@ -248,21 +248,21 @@ Feature: One automation flow with a subject choice
     visibility — every unmigrated token is flagged where the automation
     appears — never by silence.
 
-    @integration @unimplemented
+    @integration
     Scenario: A legacy automation keeps delivering with its own token
       Given an automation that stores its own Slack bot token
       And the project also has a Slack integration
       When the automation fires
       Then the delivery uses the automation's own token
 
-    @integration @unimplemented
+    @integration
     Scenario: An automation using its own token is flagged where it appears
       Given an automation that stores its own Slack bot token
       When the user sees it in the automations list or opens its drawer
       Then it says the automation uses its own Slack token
       And it offers switching to the project integration
 
-    @integration @unimplemented
+    @integration
     Scenario: Switching a legacy automation to the project integration
       Given an automation that stores its own Slack bot token
       And the project has a Slack integration
@@ -270,13 +270,13 @@ Feature: One automation flow with a subject choice
       Then the automation's stored token is cleared
       And its next delivery uses the project integration's token
 
-    @integration @unimplemented
+    @integration
     Scenario: Settings counts the automations still on their own token
       Given two automations that store their own Slack bot tokens
       When the user opens the Slack integration in settings
       Then it says two automations still use their own token
 
-    @integration @unimplemented
+    @integration
     Scenario: Bulk-switching clears each automation independently
       Given three automations that store their own Slack bot tokens
       And one of them cannot be updated
@@ -285,7 +285,7 @@ Feature: One automation flow with a subject choice
       And the result says two were switched and one failed
       And the failed automation still delivers with its own token
 
-    @integration @unimplemented
+    @integration
     Scenario: The composer can tell the three token states apart
       Given the user opens the Slack delivery configuration
       Then it reads as one of exactly three states
@@ -293,7 +293,7 @@ Feature: One automation flow with a subject choice
       And an automation without one in a connected project reads as using the project integration
       And an automation without one in an unconnected project reads as needing Slack to be connected
 
-    @integration @unimplemented
+    @integration
     Scenario: New automations never store a token
       Given the project has a Slack integration
       When the user creates an automation with Slack delivery

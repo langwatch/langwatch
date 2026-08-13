@@ -29,9 +29,9 @@ Feature: Slack delivery via a bot connection (Web API)
     When the author edits it and leaves the token blank
     Then the existing token is kept
 
-  Scenario: A bot automation is incomplete without a token and channel
+  Scenario: A bot automation is incomplete without a channel
     Given a new Slack automation set to the bot connection
-    When the token or channel is missing
+    When the channel is missing
     Then it cannot be saved
 
   Scenario: The richer templates are offered only for a bot connection
@@ -42,6 +42,7 @@ Feature: Slack delivery via a bot connection (Web API)
     When the automation uses a bot connection
     Then those templates become selectable
 
-  Scenario: The author is guided to create a Slack app
-    Given the bot connection form
-    Then it links to where to create a Slack app and which scope to grant
+  Scenario: The author is guided to connect Slack for the project
+    Given the bot connection form in a project with no Slack integration
+    Then it points at the project's integration settings, where creating a
+    Slack app and granting its scopes is explained

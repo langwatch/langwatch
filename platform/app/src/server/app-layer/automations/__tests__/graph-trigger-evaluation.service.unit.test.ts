@@ -885,6 +885,7 @@ describe("evaluateGraphTrigger", () => {
   });
 
   describe("given a breach whose dispatch throws a typed DispatchError", () => {
+    /** @scenario "A terminally failing endpoint is not re-posted every evaluation" */
     it("keeps the claim when the failure is terminal (retryable: false), so a dead endpoint is not re-posted every evaluation", async () => {
       harness.dispatch.mockRejectedValue(
         new DispatchError({ message: "webhook revoked", retryable: false }),
@@ -957,6 +958,7 @@ describe("evaluateGraphTrigger", () => {
   // branch. Bot params carry no `slackWebhook`, so the dispatcher logged "no
   // Slack webhook configured" and returned didSend false — a silent hole.
   describe("given a bot-delivery Slack alert whose connection cannot be resolved", () => {
+    /** @scenario "Slack delivery without any token fails with a named cause" */
     it("throws rather than falling through to the webhook branch", async () => {
       harness = makeHarness({
         trigger: makeTrigger({
@@ -980,7 +982,7 @@ describe("evaluateGraphTrigger", () => {
           projectId: PROJECT_ID,
           reason: "real-time",
         }),
-      ).rejects.toThrow(/missing its token or channel/);
+      ).rejects.toThrow(/has no bot token/);
 
       expect(harness.dispatch).not.toHaveBeenCalled();
       // The throw happens during bot-destination resolution, which runs BEFORE

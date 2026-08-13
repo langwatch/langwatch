@@ -21,12 +21,80 @@ import {
 } from "~/features/automations/logic/draftReducer";
 import { resolveSeriesLabel } from "~/features/automations/logic/seriesOptions";
 import type { TriggerActionParams } from "~/features/automations/logic/triggerActionParams";
-import type { RouterOutputs } from "~/utils/api";
+import { describeError } from "~/features/errors";
+import { api, type RouterOutputs } from "~/utils/api";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 
 type EnhancedTrigger = RouterOutputs["automation"]["getTriggers"][number];
 type TriggerStats = RouterOutputs["automation"]["getTriggerStats"][number];
 type ReportSchedule = RouterOutputs["automation"]["getReportSchedules"][number];
+
+/**
+ * Row nudge for an automation that still stores its own Slack token
+ * (ADR-093 §5). Delivery never retargets such a row on its own, so the only
+ * thing that moves it onto the project integration is someone choosing to —
+ * which means every unmigrated token has to stay visible where the automation
+ * appears. One action, the same one the drawer and the settings card offer:
+ * clear the stored credential and let delivery fall through.
+ *
+ * Rendered only when the project actually has an integration to fall through
+ * to; offering the switch before then would break the automation.
+ */
+export function OwnSlackTokenNudge({
+  projectId,
+  automationId,
+}: {
+  projectId: string;
+  automationId: string;
+}) {
+  const utils = api.useContext();
+  const integration = api.slackIntegration.getStatus.useQuery(
+    { projectId },
+    { enabled: !!projectId, refetchOnWindowFocus: false },
+  );
+  const switchOver = api.slackIntegration.switchToIntegration.useMutation({
+    onSuccess: () => {
+      void utils.automation.getTriggers.invalidate({ projectId });
+      void utils.slackIntegration.getLegacyTokenCensus.invalidate({
+        projectId,
+      });
+    },
+  });
+
+  return (
+    <VStack align="start" gap={0} paddingTop={1}>
+      <Text textStyle="xs" color="fg.muted">
+        Uses its own Slack token
+      </Text>
+      {integration.data?.connected ? (
+        <Button
+          variant="plain"
+          size="xs"
+          height="auto"
+          paddingX={0}
+          color="fg.muted"
+          _hover={{ color: "fg" }}
+          loading={switchOver.isPending}
+          onClick={(event) => {
+            // The whole row opens the automation; this action is its own.
+            event.stopPropagation();
+            switchOver.mutate({ projectId, automationIds: [automationId] });
+          }}
+        >
+          Use the project integration
+        </Button>
+      ) : null}
+      {switchOver.isError ? (
+        <Text textStyle="xs" color="fg.error">
+          {describeError({
+            error: switchOver.error,
+            fallbackTitle: "Couldn't switch this automation",
+          })}
+        </Text>
+      ) : null}
+    </VStack>
+  );
+}
 
 /** Column header with a help tooltip explaining the metric. */
 export function MetricHeader({ label, help }: { label: string; help: string }) {

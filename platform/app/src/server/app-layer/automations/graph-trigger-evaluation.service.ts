@@ -49,6 +49,10 @@ import {
   graphAlertFireDigest,
 } from "~/server/app-layer/automations/dispatch/graphAlertActionDispatch";
 import { decryptSlackBotToken } from "~/server/app-layer/automations/providers/slack/server";
+import {
+  type ResolvedSlackToken,
+  slackTokenMissingDispatchError,
+} from "~/server/app-layer/automations/slack-integration/slack-token-resolver";
 import type { ActionParams } from "~/server/app-layer/automations/trigger.types";
 import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import {
@@ -201,6 +205,16 @@ export interface GraphTriggerEvaluationDeps {
    * recording problem cannot suppress an alert.
    */
   recordEvaluation?(input: RecordEvaluationInput): Promise<void>;
+  /**
+   * ADR-093 §5 token resolution: the automation's own stored token, else the
+   * project's Slack integration, else null. Optional so the test doubles that
+   * predate the integration keep working; absent behaves as "the project has
+   * no integration", which is what this path did before.
+   */
+  resolveSlackToken?(params: {
+    projectId: string;
+    actionParams: Pick<SlackActionParams, "slackBotToken">;
+  }): Promise<ResolvedSlackToken | null>;
   /** Base host for building deep links inside rendered templates
    *  (ADR-034 Phase 8.1). Injected, not read from env, so this service
    *  stays pure and testable. */
@@ -633,15 +647,28 @@ async function runGraphTriggerEvaluation({
     if (trigger.action === "SEND_SLACK_MESSAGE") {
       const slackParams = (trigger.actionParams ?? {}) as SlackActionParams;
       if (slackDeliveryMethodOf(slackParams) === "bot") {
-        const token = decryptSlackBotToken(slackParams);
+        // ADR-093 §5: the automation's own token wins; the project's Slack
+        // integration serves the rest.
+        const ownToken = decryptSlackBotToken(slackParams);
+        const resolved: ResolvedSlackToken | null = deps.resolveSlackToken
+          ? await deps.resolveSlackToken({
+              projectId,
+              actionParams: slackParams,
+            })
+          : ownToken
+            ? { token: ownToken, source: "automation" }
+            : null;
+        if (!resolved) {
+          throw slackTokenMissingDispatchError({ triggerName: trigger.name });
+        }
         const channel = slackParams.slackChannelId?.trim();
-        if (!token || !channel) {
+        if (!channel) {
           throw new DispatchError({
-            message: `Slack bot connection for alert "${trigger.name}" is missing its token or channel — the alert cannot be delivered.`,
+            message: `Slack bot connection for alert "${trigger.name}" is missing its channel — the alert cannot be delivered.`,
             retryable: false,
           });
         }
-        botDestination = { token, channel };
+        botDestination = { token: resolved.token, channel };
       }
     }
 

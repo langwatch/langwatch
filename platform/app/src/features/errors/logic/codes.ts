@@ -177,7 +177,6 @@ export const APP_ERROR_CODES = [
   // boundary rather than thrown. It still reaches a customer, so it still needs
   // copy — see RELAYED_META_CODES in `__tests__/codes.unit.test.ts`.
   "missing_provider",
-  "missing_slack_bot_token",
   "missing_slack_webhook",
   "model_default_scope_forbidden",
   "model_not_configured",
@@ -256,6 +255,8 @@ export const APP_ERROR_CODES = [
   "share_link_forbidden",
   "share_link_not_found",
   "share_read_rate_limited",
+  "slack_integration_invalid_token",
+  "slack_integration_missing",
   "span_not_found",
   "spend_source_unavailable",
   "subscription_ambiguous",

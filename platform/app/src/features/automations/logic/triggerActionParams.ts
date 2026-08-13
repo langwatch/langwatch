@@ -24,6 +24,11 @@ export interface TriggerActionParams {
    *  comes from a live, bot-token-authenticated Slack API call the display
    *  surfaces don't have. */
   slackChannelId?: string;
+  /** Read-only echo: the row stores a Slack bot token of its own. The token
+   *  itself never reaches the browser — this flag is what the redaction hook
+   *  puts in its place, and it is what the legacy-token nudge reads
+   *  (ADR-093 section 5). */
+  slackBotTokenSet?: boolean;
   members?: string[];
   datasetId?: string;
   annotators?: { id: string; name: string }[];

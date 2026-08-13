@@ -160,6 +160,11 @@ vi.mock("~/utils/api", () => ({
     dashboards: {
       getAll: { useQuery: () => ({ data: [], isLoading: false }) },
     },
+    // ADR-093 §5: the preview's gated-block decision reads whether the project
+    // has a Slack workspace connected.
+    slackIntegration: {
+      getStatus: { useQuery: () => ({ data: { connected: false } }) },
+    },
     // The trace-subject query editor previews matches via tracesV2.list.
     tracesV2: {
       list: {

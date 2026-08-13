@@ -1558,9 +1558,30 @@ const presentations = {
     title: "Slack webhook missing",
     describe: () => "Paste a Slack incoming webhook URL to continue.",
   },
-  missing_slack_bot_token: {
-    title: "Slack isn't connected",
-    describe: () => "Connect Slack before sending to a channel.",
+  slack_integration_invalid_token: {
+    title: "Slack didn't accept that token",
+    // `meta.slackError` is the code Slack's auth.test answered with, and only
+    // a few of them tell the customer anything they can act on. The rest read
+    // as provider slugs, so they stay in the log line and this falls back to
+    // the general instruction.
+    describe: (error) => {
+      switch (str(error, "slackError", "")) {
+        case "invalid_auth":
+        case "not_authed":
+          return "Paste a Bot User OAuth token from your Slack app — it starts with xoxb-.";
+        case "token_revoked":
+          return "That token was revoked in Slack. Reinstall the app and paste the new token.";
+        case "account_inactive":
+          return "That Slack app was removed from the workspace. Reinstall it and paste the new token.";
+        default:
+          return "Check the token and try again.";
+      }
+    },
+  },
+  slack_integration_missing: {
+    title: "Slack isn't connected for this project",
+    describe: () =>
+      "Connect Slack in this project's integration settings, then try again.",
   },
   missing_annotator: {
     title: "No annotator assigned",

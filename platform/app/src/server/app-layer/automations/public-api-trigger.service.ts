@@ -54,6 +54,7 @@ import {
   type ReportActionParams,
   reportActionParamsSchema,
 } from "./report.builder";
+import type { ResolvedSlackToken } from "./slack-integration/slack-token-resolver";
 import type { TriggerService } from "./trigger.service";
 import type { TriggerFireHistoryService } from "./trigger-fire-history.service";
 import {
@@ -110,6 +111,16 @@ export class PublicApiTriggerService {
       fireHistory: TriggerFireHistoryService;
       testFire: (input: PublicApiTestFireInput) => Promise<TestFireResult>;
       resolveProject: (projectId: string) => Promise<DraftProject>;
+      /**
+       * ADR-093 §5 token resolution: the automation's own stored token, else
+       * the project's Slack integration, else null. Optional so the existing
+       * test doubles keep working; absent behaves as "the project has no
+       * integration".
+       */
+      resolveSlackToken?: (params: {
+        projectId: string;
+        actionParams: Pick<SlackActionParams, "slackBotToken">;
+      }) => Promise<ResolvedSlackToken | null>;
     },
   ) {}
 
@@ -611,21 +622,23 @@ export class PublicApiTriggerService {
           }
         : null,
       report: report ? { sourceKind: report.source.kind } : null,
-      ...this.savedDestination(trigger),
+      ...(await this.savedDestination(trigger)),
     });
   }
 
   /** Where this automation's test fire goes: the destination on the saved row,
    *  read the way a real delivery reads it. */
-  private savedDestination(
+  private async savedDestination(
     trigger: Trigger,
-  ): Pick<
-    PublicApiTestFireInput,
-    | "channel"
-    | "recipients"
-    | "webhook"
-    | "botDestination"
-    | "webhookDestination"
+  ): Promise<
+    Pick<
+      PublicApiTestFireInput,
+      | "channel"
+      | "recipients"
+      | "webhook"
+      | "botDestination"
+      | "webhookDestination"
+    >
   > {
     const params = (trigger.actionParams ?? {}) as Record<string, unknown>;
 
@@ -641,7 +654,10 @@ export class PublicApiTriggerService {
         return { channel: "email", recipients, webhook: null };
       }
       case TriggerAction.SEND_SLACK_MESSAGE:
-        return this.savedSlackDestination(params);
+        return this.savedSlackDestination({
+          params,
+          projectId: trigger.projectId,
+        });
       case TriggerAction.SEND_WEBHOOK:
         return this.savedWebhookDestination(
           params as WebhookStoredActionParams,
@@ -658,15 +674,30 @@ export class PublicApiTriggerService {
   }
 
   /** A Slack automation reaches Slack the way it is configured to: as the bot
-   *  in its channel where a token is stored, otherwise through its incoming
-   *  webhook. */
-  private savedSlackDestination(
-    params: Record<string, unknown>,
-  ): Pick<
-    PublicApiTestFireInput,
-    "channel" | "recipients" | "webhook" | "botDestination"
+   *  in its channel where a token resolves — its own first, then the project's
+   *  Slack integration (ADR-093 §5) — otherwise through its incoming webhook. */
+  private async savedSlackDestination({
+    params,
+    projectId,
+  }: {
+    params: Record<string, unknown>;
+    projectId: string;
+  }): Promise<
+    Pick<
+      PublicApiTestFireInput,
+      "channel" | "recipients" | "webhook" | "botDestination"
+    >
   > {
-    const botToken = decryptSlackBotToken(params as SlackActionParams);
+    const ownToken = decryptSlackBotToken(params as SlackActionParams);
+    const resolved = this.deps.resolveSlackToken
+      ? await this.deps.resolveSlackToken({
+          projectId,
+          actionParams: params as SlackActionParams,
+        })
+      : ownToken
+        ? ({ token: ownToken, source: "automation" } as ResolvedSlackToken)
+        : null;
+    const botToken = resolved?.token ?? null;
     const channelId = (params.slackChannelId ?? "") as string;
     if (botToken && channelId) {
       return {

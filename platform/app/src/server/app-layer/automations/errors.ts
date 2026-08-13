@@ -70,16 +70,42 @@ export class InvalidEmailRecipientError extends HandledError {
   }
 }
 
-export class MissingSlackBotTokenError extends HandledError {
-  declare readonly code: "missing_slack_bot_token";
+/**
+ * Slack refused the bot token at setup (ADR-093 §5). Setup validates against
+ * `auth.test` before anything is stored, so this always means nothing was
+ * written. Slack's own code travels in `meta.slackError` — a few of them
+ * ("token_revoked") change what the customer has to do, and the presentation
+ * registry switches on it.
+ */
+export class SlackIntegrationInvalidTokenError extends HandledError {
+  declare readonly code: "slack_integration_invalid_token";
+
+  constructor(public readonly slackError: string) {
+    super(
+      "slack_integration_invalid_token",
+      "Slack did not accept that bot token.",
+      { meta: { slackError }, httpStatus: 422 },
+    );
+    this.name = "SlackIntegrationInvalidTokenError";
+  }
+}
+
+/**
+ * Slack delivery had no token to use: the automation stores none of its own and
+ * the project has no Slack integration (ADR-093 §5, step 3 of the resolution
+ * order). Customer fault — connecting Slack in the project's integration
+ * settings is the whole remediation.
+ */
+export class SlackIntegrationMissingError extends HandledError {
+  declare readonly code: "slack_integration_missing";
 
   constructor() {
     super(
-      "missing_slack_bot_token",
-      "A Slack bot token is required for a bot connection.",
-      { meta: { field: "slackBotToken" }, httpStatus: 422 },
+      "slack_integration_missing",
+      "This project has no Slack integration, and this automation stores no Slack token of its own.",
+      { httpStatus: 422 },
     );
-    this.name = "MissingSlackBotTokenError";
+    this.name = "SlackIntegrationMissingError";
   }
 }
 

@@ -8,6 +8,7 @@ const logger = createLogger("langwatch:triggers:slackWebApi");
 
 const CHAT_POST_MESSAGE_URL = "https://slack.com/api/chat.postMessage";
 const CONVERSATIONS_LIST_URL = "https://slack.com/api/conversations.list";
+const AUTH_TEST_URL = "https://slack.com/api/auth.test";
 
 /**
  * The Slack Web API calls are the last outbound sends that ran without a
@@ -161,6 +162,72 @@ export async function postSlackChatMessage({
         }
       : {}),
   });
+}
+
+/** Which workspace a bot token belongs to, as Slack itself reports it. */
+export interface SlackWorkspaceIdentity {
+  teamId: string;
+  teamName: string;
+}
+
+interface SlackAuthTestResponse {
+  ok: boolean;
+  error?: string;
+  team_id?: string;
+  team?: string;
+}
+
+/**
+ * Ask Slack which workspace a bot token belongs to (`auth.test`) — the
+ * save-time identity pinning ADR-093 §5 decided on. A token that Slack rejects
+ * never reaches storage, and the workspace it names is stored beside the
+ * ciphertext so the settings card can say which workspace is connected without
+ * ever reading the token back.
+ *
+ * Returns the identity on success, or Slack's own error code on refusal, so the
+ * caller decides which handled error to raise. A transport failure is reported
+ * as `request_failed` rather than thrown: to the customer setting the
+ * integration up, "Slack didn't accept that token" and "we couldn't reach
+ * Slack" are the same next step — check it and try again.
+ */
+export async function fetchSlackWorkspaceIdentity(
+  token: string,
+): Promise<
+  { ok: true; identity: SlackWorkspaceIdentity } | { ok: false; error: string }
+> {
+  let response: { status: number; body: string };
+  try {
+    response = await sendHttpDestination({
+      url: AUTH_TEST_URL,
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: "",
+      contextLabel: "Slack auth.test",
+      validateUrl: validateSlackApiUrl,
+    });
+  } catch {
+    return { ok: false, error: "request_failed" };
+  }
+
+  let body: SlackAuthTestResponse;
+  try {
+    body = JSON.parse(response.body) as SlackAuthTestResponse;
+  } catch {
+    return { ok: false, error: "bad_response" };
+  }
+
+  if (!body.ok) return { ok: false, error: body.error ?? "unknown_error" };
+  // Slack answers `ok: true` for a token whose workspace it can name, so a
+  // missing team_id here means the response is not the shape we compiled
+  // against — pinning an empty workspace would make the mismatch nudge lie.
+  if (!body.team_id) return { ok: false, error: "bad_response" };
+  return {
+    ok: true,
+    identity: { teamId: body.team_id, teamName: body.team ?? body.team_id },
+  };
 }
 
 export interface SlackChannel {

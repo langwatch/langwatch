@@ -323,6 +323,7 @@ export const ORG_TENANCY_EXEMPT: readonly string[] = [
   "DataPrivacyPolicy",
   "ModelProvider",
   "ModelDefaultConfig",
+  "SlackIntegration",
   // Webhook platform: enforced by guardProjectId's SCOPED_MODELS (org id,
   // row id, endpoint FK, or project FK required on every query; creates must
   // carry one channel's complete tenancy pair); the delivery sweep and

@@ -144,6 +144,10 @@ import {
 } from "./automations/repositories/emailSuppression.repository";
 import { PrismaTriggerRepository } from "./automations/repositories/trigger.prisma.repository";
 import { NullTriggerRepository } from "./automations/repositories/trigger.repository";
+import {
+  findSlackBotToken,
+  slackProjectTokenReader,
+} from "./automations/slack-integration/slack-token-resolver";
 import { TriggerService } from "./automations/trigger.service";
 import { testFireTrigger } from "./automations/trigger-template.service";
 import { PrismaBillingCheckpointService } from "./billing/billingCheckpoint.service";
@@ -1041,6 +1045,13 @@ export function initializeDefaultApp(options?: {
             sendEmail: sendRenderedTriggerEmail,
             sendSlack: sendRenderedSlackMessage,
             sendSlackBot: postSlackChatMessage,
+            // ADR-093 §5: a report's own stored token first, the project's
+            // Slack integration second.
+            resolveSlackToken: (params) =>
+              findSlackBotToken({
+                ...params,
+                projectIntegration: slackProjectTokenReader(prisma),
+              }),
             filterSuppressedRecipients: ({ projectId, triggerId, emails }) =>
               emailSuppressions.filterSuppressed({
                 projectId,

@@ -42,6 +42,7 @@ import {
   GraphWatchCell,
   LastFiredCell,
   MetricHeader,
+  OwnSlackTokenNudge,
   ReportRunCells,
   ReportSubjectCell,
   SectionHeader,
@@ -979,6 +980,14 @@ function AutomationsPage() {
                                           actionParams,
                                         )}
                                       </Box>
+                                      {trigger.action ===
+                                        "SEND_SLACK_MESSAGE" &&
+                                      actionParams.slackBotTokenSet ? (
+                                        <OwnSlackTokenNudge
+                                          projectId={project?.id ?? ""}
+                                          automationId={trigger.id}
+                                        />
+                                      ) : null}
                                     </VStack>
                                   </Table.Cell>
                                   <Table.Cell whiteSpace="nowrap">

@@ -73,6 +73,7 @@ import { scimTokenRouter } from "./routers/scimToken";
 import { secretsRouter } from "./routers/secrets";
 import { shareRouter } from "./routers/share";
 import { sharedTraceRouter } from "./routers/sharedTrace";
+import { slackIntegrationRouter } from "./routers/slackIntegration";
 import { spansRouter } from "./routers/spans";
 import { storedObjectsRouter } from "./routers/stored-objects.router";
 import { subscriptionRouter } from "./routers/subscription";
@@ -173,6 +174,7 @@ const coreRouters = {
   gatewaySpendEvents: gatewaySpendEventsRouter,
   webhookEndpoints: webhookEndpointsRouter,
   github: githubRouter,
+  slackIntegration: slackIntegrationRouter,
   langyEgress: langyEgressRouter,
   langy: langyRouter,
 };

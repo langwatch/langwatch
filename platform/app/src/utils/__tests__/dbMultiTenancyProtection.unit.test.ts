@@ -1113,3 +1113,81 @@ describe("guardProjectId — ShareLink", () => {
     });
   });
 });
+
+/**
+ * ADR-093 §5's project Slack integration. The failure this pins is not
+ * hypothetical: a model registered in no regime makes EVERY query against it
+ * throw, so the shapes the repository actually issues have to be accepted here
+ * before they are trusted anywhere else.
+ */
+describe("guardProjectId — SlackIntegration", () => {
+  const projectScope = { scopeType: "PROJECT", scopeId: "project-1" };
+
+  describe("when a query names the project's scope pair", () => {
+    it("passes the compound unique read the repository issues", async () => {
+      await expect(
+        runGuard({
+          model: "SlackIntegration",
+          action: "findUnique",
+          args: { where: { scopeType_scopeId: projectScope } },
+        }),
+      ).resolves.toBe("ok");
+    });
+
+    it("passes the scope-predicate delete", async () => {
+      await expect(
+        runGuard({
+          model: "SlackIntegration",
+          action: "deleteMany",
+          args: { where: projectScope },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("when a create names its owning organization", () => {
+    it("passes", async () => {
+      await expect(
+        runGuard({
+          model: "SlackIntegration",
+          action: "create",
+          args: {
+            data: {
+              ...projectScope,
+              organizationId: "org-1",
+              botTokenEncrypted: "enc",
+              slackTeamId: "T1",
+              slackTeamName: "Acme",
+              createdById: "user-1",
+              updatedById: "user-1",
+            },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("when a read names no tenant at all", () => {
+    it("throws rather than walking every workspace connection", async () => {
+      await expect(
+        runGuard({
+          model: "SlackIntegration",
+          action: "findMany",
+          args: {},
+        }),
+      ).rejects.toThrow();
+    });
+  });
+
+  describe("when a create omits the organization anchor", () => {
+    it("throws rather than storing an unanchored row", async () => {
+      await expect(
+        runGuard({
+          model: "SlackIntegration",
+          action: "create",
+          args: { data: { ...projectScope, botTokenEncrypted: "enc" } },
+        }),
+      ).rejects.toThrow();
+    });
+  });
+});

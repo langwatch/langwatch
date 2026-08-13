@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SLACK_APP_MANIFEST } from "../client";
+import { SLACK_APP_MANIFEST } from "../slackAppManifest";
 
 describe("Slack app manifest", () => {
   describe('given the copy-paste manifest for "Create app → From a manifest"', () => {

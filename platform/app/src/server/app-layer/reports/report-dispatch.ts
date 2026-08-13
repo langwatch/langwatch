@@ -21,6 +21,7 @@ import type { postSlackChatMessage } from "~/server/app-layer/automations/delive
 import { decryptSlackBotToken } from "~/server/app-layer/automations/providers/slack/server";
 import type { ReportSource } from "~/server/app-layer/automations/report.builder";
 import { extractReportFromTriggerRow } from "~/server/app-layer/automations/report.builder";
+import type { ResolvedSlackToken } from "~/server/app-layer/automations/slack-integration/slack-token-resolver";
 import type { ScheduledJobFire } from "~/server/app-layer/scheduler/scheduler.types";
 import type { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 
@@ -35,6 +36,15 @@ export interface ReportDispatchDeps {
   sendEmail: typeof sendRenderedTriggerEmail;
   sendSlack: typeof sendRenderedSlackMessage;
   sendSlackBot: typeof postSlackChatMessage;
+  /**
+   * ADR-093 §5 token resolution: the report's own stored token, else the
+   * project's Slack integration, else null. Optional so the existing test
+   * doubles keep working; absent behaves as "the project has no integration".
+   */
+  resolveSlackToken?(params: {
+    projectId: string;
+    actionParams: Pick<SlackActionParams, "slackBotToken">;
+  }): Promise<ResolvedSlackToken | null>;
   filterSuppressedRecipients: (params: {
     projectId: string;
     triggerId: string;
@@ -289,9 +299,33 @@ export async function dispatchScheduledReport({
       // ADR-041: a bot connection posts via the Web API with the gate open.
       const slackParams = (trigger.actionParams ?? {}) as SlackActionParams;
       if (slackDeliveryMethodOf(slackParams) === "bot") {
-        const token = decryptSlackBotToken(slackParams);
+        // ADR-093 §5: the report's own token wins; the project's Slack
+        // integration serves the rest. A report with neither delivers nothing
+        // and records no fire — the same "unusable bot connection" outcome
+        // this branch has always had, now reached for a named reason.
+        const ownToken = decryptSlackBotToken(slackParams);
+        const resolved: ResolvedSlackToken | null = deps.resolveSlackToken
+          ? await deps.resolveSlackToken({
+              projectId: project.id,
+              actionParams: slackParams,
+            })
+          : ownToken
+            ? { token: ownToken, source: "automation" }
+            : null;
         const channel = slackParams.slackChannelId?.trim();
-        if (!token || !channel) return false;
+        if (!resolved) {
+          logger.warn(
+            {
+              projectId: project.id,
+              triggerId: trigger.id,
+              code: "slack_integration_missing",
+            },
+            "Report has no Slack bot token of its own and the project has no Slack integration — nothing sent",
+          );
+          return false;
+        }
+        const token = resolved.token;
+        if (!channel) return false;
         const rendered = await renderTriggerSlack({
           templateType: resolveSlackTemplateType({
             configured: trigger.slackTemplateType,

@@ -26,6 +26,10 @@ import {
 import { graphAlertActionParamsSchema } from "~/server/app-layer/automations/graph-alert.builder";
 import { PublicApiTriggerService } from "~/server/app-layer/automations/public-api-trigger.service";
 import { reportActionParamsSchema } from "~/server/app-layer/automations/report.builder";
+import {
+  findSlackBotToken,
+  slackProjectTokenReader,
+} from "~/server/app-layer/automations/slack-integration/slack-token-resolver";
 import { TriggerFireHistoryService } from "~/server/app-layer/automations/trigger-fire-history.service";
 import {
   redactTriggerForPublicApi,
@@ -504,6 +508,13 @@ const triggerService = () =>
     graphs: AutomationCustomGraphService.create(prisma),
     fireHistory: TriggerFireHistoryService.create(prisma),
     testFire: (input) => getApp().triggerTemplates.testFire(input),
+    // ADR-093 §5: a test fire proves the same connection a real delivery would
+    // use — the automation's own token first, the project integration second.
+    resolveSlackToken: (params) =>
+      findSlackBotToken({
+        ...params,
+        projectIntegration: slackProjectTokenReader(prisma),
+      }),
     resolveProject: async (projectId) => {
       const project = await getApp().projects.getById(projectId);
       if (!project) throw new ProjectNotFoundError(projectId);

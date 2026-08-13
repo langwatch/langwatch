@@ -898,6 +898,36 @@ model Trigger {
   @@index([projectId])
 }
 
+/// The scopes a Slack integration can be set up at. PROJECT is the only value
+/// today (ADR-093 §5); TEAM and ORGANIZATION are a future enum add, which is
+/// why the row carries (scopeType, scopeId) rather than a bare projectId.
+enum SlackIntegrationScopeType {
+  PROJECT
+}
+
+/// A Slack workspace connection owned by one scope (ADR-093 §5). The bot token
+/// is AES-256-GCM encrypted at rest (shared encrypt/decrypt, CREDENTIALS_SECRET)
+/// and is never returned to any client: reads answer with presence plus the
+/// workspace identity pinned by `auth.test` at save time. Single-scope-per-row
+/// per ADR-021 — inline (scopeType, scopeId) plus the organizationId tenancy
+/// anchor — and the one-per-project decision is the unique constraint.
+model SlackIntegration {
+  id                String                    @id @default(nanoid())
+  scopeType         SlackIntegrationScopeType @default(PROJECT)
+  scopeId           String
+  organizationId    String
+  botTokenEncrypted String
+  slackTeamId       String
+  slackTeamName     String
+  createdById       String
+  updatedById       String
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @default(now()) @updatedAt
+
+  @@unique([scopeType, scopeId])
+  @@index([organizationId])
+}
+
 enum WebhookDeliveryOutcome {
   success
   retryable

@@ -586,6 +586,39 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
       return null;
     },
   },
+  // Inline single-scope-per-row (ADR-021, ADR-093 section 5), one row per
+  // scope. Same regime as RetentionPolicy: a query is bounded by a row id, the
+  // organizationId anchor, a (scopeType, scopeId) predicate, or the
+  // (scopeType, scopeId) compound unique the per-project read, upsert and
+  // delete all go through. No projectId column - the scope pair is the project.
+  SlackIntegration: {
+    validateWhere: (where) => {
+      const reason =
+        "requires a row id, organizationId, or scope predicate in the where clause";
+      if (!where) return reason;
+      const ok = validateRecursive(
+        where,
+        (c) =>
+          hasIdOrInPredicate(c) ||
+          typeof c.organizationId === "string" ||
+          (c.organizationId && Array.isArray(c.organizationId.in)) ||
+          hasScopePredicate(c) ||
+          (c.scopeType_scopeId &&
+            typeof c.scopeType_scopeId.scopeId === "string"),
+      );
+      return ok ? null : reason;
+    },
+    validateCreateData: (data) => {
+      const records = Array.isArray(data) ? data : [data];
+      for (const d of records) {
+        if (!d) return "create requires a data payload";
+        if (typeof d.organizationId !== "string") {
+          return "create requires an organizationId in the data payload";
+        }
+      }
+      return null;
+    },
+  },
   // Org-anchored webhook platform (no projectId column): every query must be
   // bounded by the organization or a row id; the cross-org delivery sweep and
   // the retention prune use the raw-SQL tenancy opt-out instead.

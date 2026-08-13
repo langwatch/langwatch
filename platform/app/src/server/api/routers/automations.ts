@@ -33,6 +33,7 @@ import {
   MissingAnnotatorError,
   NotificationDeliveryError,
   ProjectNotFoundError,
+  SlackIntegrationMissingError,
   TriggerFiltersRequiredError,
 } from "~/server/app-layer/automations/errors";
 import {
@@ -49,7 +50,6 @@ import {
   actionParamsSchemaFor,
   persistActionParamsFor,
 } from "~/server/app-layer/automations/providers/registry";
-import { decryptSlackBotToken } from "~/server/app-layer/automations/providers/slack/server";
 import {
   decryptWebhookHeaders,
   decryptWebhookSigningSecrets,
@@ -60,6 +60,10 @@ import {
   extractReportFromTriggerRow,
   reportActionParamsSchema,
 } from "~/server/app-layer/automations/report.builder";
+import {
+  findSlackBotToken,
+  slackProjectTokenReader,
+} from "~/server/app-layer/automations/slack-integration/slack-token-resolver";
 import { TriggerFireHistoryService } from "~/server/app-layer/automations/trigger-fire-history.service";
 import { TriggerLatestEvaluationService } from "~/server/app-layer/automations/trigger-latest-evaluation.service";
 import { redactTriggerForRead } from "~/server/app-layer/automations/trigger-redaction";
@@ -718,16 +722,25 @@ export const automationRouter = createTRPCRouter({
     // triggers:update (not :view): this endpoint decrypts and exercises the
     // stored Slack bot token — the same capability testFireTemplate gates on.
     .use(checkProjectPermission("triggers:update"))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       let token = input.botToken?.trim() || null;
-      if (!token && input.automationId) {
-        const saved = await getApp().triggers.getById({
-          triggerId: input.automationId,
+      if (!token) {
+        // ADR-093 §5: the saved automation's own token wins, and the project's
+        // Slack integration serves everything else — so the picker lists the
+        // workspace delivery will actually hit. A fresh draft with no
+        // automation id resolves against the project integration alone.
+        const saved = input.automationId
+          ? await getApp().triggers.getById({
+              triggerId: input.automationId,
+              projectId: input.projectId,
+            })
+          : null;
+        const resolved = await findSlackBotToken({
+          actionParams: (saved?.actionParams ?? {}) as SlackActionParams,
           projectId: input.projectId,
+          projectIntegration: slackProjectTokenReader(ctx.prisma),
         });
-        token = decryptSlackBotToken(
-          (saved?.actionParams ?? {}) as SlackActionParams,
-        );
+        token = resolved?.token ?? null;
       }
       if (!token)
         return { channels: [], error: "no_token" as string, gaps: [] };
@@ -906,20 +919,27 @@ export const automationRouter = createTRPCRouter({
         if (input.channel === "slack" && input.botDestination) {
           const channel = input.botDestination.channelId.trim();
           let token = input.botDestination.botToken?.trim() || null;
-          if (!token && input.automationId) {
-            const saved = await getApp().triggers.getById({
-              triggerId: input.automationId,
+          if (!token) {
+            // Same resolution order the real delivery takes (ADR-093 §5), so a
+            // test fire proves the connection the automation will actually use.
+            const saved = input.automationId
+              ? await getApp().triggers.getById({
+                  triggerId: input.automationId,
+                  projectId: input.projectId,
+                })
+              : null;
+            const resolved = await findSlackBotToken({
+              actionParams: (saved?.actionParams ?? {}) as SlackActionParams,
               projectId: input.projectId,
+              projectIntegration: slackProjectTokenReader(ctx.prisma),
             });
-            token = decryptSlackBotToken(
-              (saved?.actionParams ?? {}) as SlackActionParams,
-            );
+            token = resolved?.token ?? null;
           }
-          if (!token || !channel) {
+          if (!token) throw new SlackIntegrationMissingError();
+          if (!channel) {
             throw new TRPCError({
               code: "BAD_REQUEST",
-              message:
-                "Add a Slack bot token and channel before sending a test fire.",
+              message: "Pick a Slack channel before sending a test fire.",
             });
           }
           botDestination = { token, channel };
