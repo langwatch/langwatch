@@ -151,7 +151,11 @@ beforeEach(() => {
 /** The words the registry keys to a code, as a member reads them. */
 function copyFor(payload: unknown) {
   const copy = explainHandledError(readHandledError(payload)!);
-  expect(copy.isRegistered).toBe(true);
+  if (!copy.isRegistered) {
+    throw new Error(
+      "the code is not in the registry — the copy below is the fallback, not the registered words",
+    );
+  }
   return copy;
 }
 
