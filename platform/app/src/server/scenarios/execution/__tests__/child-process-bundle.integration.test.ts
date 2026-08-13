@@ -66,7 +66,7 @@ describe("Pre-compiled Scenario Child Process", () => {
       expect(stderr).not.toContain("Cannot find module");
     });
 
-    /** @scenario 'OpenTelemetry stays external so the child holds one tracer provider' */
+    /** @scenario 'A simulation still reports its spans' */
     it("keeps OpenTelemetry external so exactly one API instance exists", () => {
       const content = fs.readFileSync(BUNDLE_PATH, "utf8");
 
@@ -81,7 +81,7 @@ describe("Pre-compiled Scenario Child Process", () => {
       expect(content).not.toContain("createNoopMeter");
     });
 
-    /** @scenario 'The scenario SDK is inlined rather than required at runtime' */
+    /** @scenario 'Starting a simulation does not re-read its dependencies from disk' */
     it("inlines the scenario SDK instead of resolving it from node_modules", () => {
       const content = fs.readFileSync(BUNDLE_PATH, "utf8");
 
@@ -91,7 +91,7 @@ describe("Pre-compiled Scenario Child Process", () => {
       expect(content).not.toContain('require("@langwatch/scenario")');
     });
 
-    /** @scenario 'The child starts its log transport when logging is configured' */
+    /** @scenario 'Configuring log output does not stop a simulation starting' */
     it.each([
       ["pretty console logs", { LOG_FORMAT: "pretty" }],
       ["the telemetry log transport", { PINO_OTEL_ENABLED: "true" }],
@@ -182,7 +182,7 @@ describe("Pre-compiled Scenario Child Process", () => {
     // This entry now inlines its graph, which shrinks the exposure to the
     // OpenTelemetry packages held out on purpose — but it does not remove it,
     // and the check stays as the thing that proves it.
-    /** @scenario 'Every externalized require resolves from the bundle directory' */
+    /** @scenario 'The child starts with every dependency it needs' */
     it("boots without MODULE_NOT_FOUND — every externalized require() resolves in a prod-shaped layout", () => {
       const content = fs.readFileSync(BUNDLE_PATH, "utf8");
       const distDir = path.dirname(BUNDLE_PATH);
