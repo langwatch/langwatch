@@ -88,52 +88,16 @@ export function createGovernanceKpisSyncHandler(
   return async (_event, context) => {
     const { tenantId, state: foldState } = context;
 
-    if (!isGovernanceOriginTrace(foldState.attributes)) {
-      return;
-    }
-
-    const sourceId = foldState.attributes[ATTR_INGESTION_SOURCE_ID];
-    const sourceType =
-      foldState.attributes[ATTR_INGESTION_SOURCE_TYPE] ?? "unknown";
-
-    if (!sourceId) {
-      logger.warn(
-        {
-          tenantId,
-          traceId: foldState.traceId,
-        },
-        "governance trace missing langwatch.ingestion_source.id — skipping fold",
-      );
-      return;
-    }
+    const contribution = resolveContribution({ tenantId, foldState });
+    if (!contribution) return;
 
     try {
-      const occurredAtMs = foldState.occurredAt;
-      if (!occurredAtMs || occurredAtMs <= 0) {
-        return;
-      }
-      const hourBucket = new Date(
-        Math.floor(occurredAtMs / (60 * 60 * 1000)) * 60 * 60 * 1000,
-      );
-
-      const contribution: GovernanceKpiContribution = {
-        tenantId,
-        sourceId,
-        sourceType,
-        hourBucket,
-        traceId: foldState.traceId,
-        spendUsd: foldState.totalCost ?? 0,
-        promptTokens: foldState.totalPromptTokenCount ?? 0,
-        completionTokens: foldState.totalCompletionTokenCount ?? 0,
-        lastEventOccurredAt: new Date(occurredAtMs),
-      };
-
       await deps.governanceKpisRepository.insertContribution(contribution);
     } catch (error) {
       logger.error(
         {
           tenantId,
-          sourceId,
+          sourceId: contribution.sourceId,
           traceId: foldState.traceId,
           error,
         },
@@ -141,5 +105,45 @@ export function createGovernanceKpisSyncHandler(
       );
       captureException(toError(error));
     }
+  };
+}
+
+/** The guards plus the row: undefined means "not a foldable governance trace". */
+function resolveContribution({
+  tenantId,
+  foldState,
+}: {
+  tenantId: string;
+  foldState: TraceSummaryData;
+}): GovernanceKpiContribution | undefined {
+  if (!isGovernanceOriginTrace(foldState.attributes)) return undefined;
+
+  const sourceId = foldState.attributes[ATTR_INGESTION_SOURCE_ID];
+  if (!sourceId) {
+    logger.warn(
+      {
+        tenantId,
+        traceId: foldState.traceId,
+      },
+      "governance trace missing langwatch.ingestion_source.id — skipping fold",
+    );
+    return undefined;
+  }
+
+  const occurredAtMs = foldState.occurredAt;
+  if (!occurredAtMs || occurredAtMs <= 0) return undefined;
+
+  return {
+    tenantId,
+    sourceId,
+    sourceType: foldState.attributes[ATTR_INGESTION_SOURCE_TYPE] ?? "unknown",
+    hourBucket: new Date(
+      Math.floor(occurredAtMs / (60 * 60 * 1000)) * 60 * 60 * 1000,
+    ),
+    traceId: foldState.traceId,
+    spendUsd: foldState.totalCost ?? 0,
+    promptTokens: foldState.totalPromptTokenCount ?? 0,
+    completionTokens: foldState.totalCompletionTokenCount ?? 0,
+    lastEventOccurredAt: new Date(occurredAtMs),
   };
 }

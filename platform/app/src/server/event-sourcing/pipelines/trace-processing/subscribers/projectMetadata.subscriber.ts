@@ -114,76 +114,11 @@ export function createProjectMetadataHandler(
 ) => Promise<void> {
   return async (_event, context) => {
     const { tenantId, state: foldState } = context;
-    const attrs = foldState.attributes ?? {};
 
     if (!isRealFirstIngest(foldState)) return;
 
     try {
-      const project = await deps.projects.getById(tenantId);
-
-      if (!project) {
-        logger.warn(
-          { tenantId },
-          "Project not found — skipping metadata update",
-        );
-        return;
-      }
-
-      // Level-triggered, so it runs BEFORE the already-marked early return
-      // below: an established project is exactly the case that used to be
-      // unreachable here, and exactly the case the deploy backfill existed
-      // to repair.
-      //
-      // Own error handling: a bootstrap failure must not be reported as a
-      // metadata failure, and must not stop the metadata write that follows.
-      // Failing is survivable now — the next trace re-asserts it.
-      try {
-        await deps.bootstrapTopicClustering?.(tenantId);
-      } catch (error) {
-        logger.error(
-          {
-            tenantId,
-            error: error instanceof Error ? error.message : String(error),
-          },
-          "Topic clustering bootstrap failed — retried on this project's next trace (non-fatal)",
-        );
-      }
-
-      // Already marked — nothing to do
-      if (project.firstMessage && project.integrated) {
-        return;
-      }
-
-      const isOptimizationStudio =
-        attrs["langwatch.platform"] === "optimization_studio";
-
-      const sdkLanguage = attrs["sdk.language"];
-      const language = isOptimizationStudio
-        ? "other"
-        : sdkLanguage === "python"
-          ? "python"
-          : sdkLanguage === "typescript"
-            ? "typescript"
-            : "other";
-
-      await deps.projects.updateMetadata({
-        id: tenantId,
-        data: {
-          firstMessage: true,
-          integrated: isOptimizationStudio ? project.integrated : true,
-          language,
-        },
-      });
-
-      // Fired after the metadata write commits, so a failed write retries
-      // the event on the project's next trace instead of dropping it.
-      if (!project.firstMessage) {
-        await trackFirstTraceIntegrated({
-          projects: deps.projects,
-          tenantId,
-          attrs,
-        });
-      }
+      await syncProjectMetadata(deps, tenantId, foldState);
     } catch (error) {
       logger.error(
         {
@@ -194,4 +129,100 @@ export function createProjectMetadataHandler(
       );
     }
   };
+}
+
+async function syncProjectMetadata(
+  deps: ProjectMetadataSubscriberDeps,
+  tenantId: string,
+  foldState: TraceSummaryData,
+): Promise<void> {
+  const project = await deps.projects.getById(tenantId);
+
+  if (!project) {
+    logger.warn({ tenantId }, "Project not found — skipping metadata update");
+    return;
+  }
+
+  // Level-triggered, so it runs BEFORE the already-marked early return
+  // below: an established project is exactly the case that used to be
+  // unreachable here, and exactly the case the deploy backfill existed
+  // to repair.
+  await assertClusteringSchedule(deps, tenantId);
+
+  // Already marked — nothing to do
+  if (project.firstMessage && project.integrated) {
+    return;
+  }
+
+  await markFirstMessage({
+    deps,
+    tenantId,
+    project,
+    attrs: foldState.attributes ?? {},
+  });
+}
+
+/**
+ * Own error handling: a bootstrap failure must not be reported as a metadata
+ * failure, and must not stop the metadata write that follows. Failing is
+ * survivable — the next trace re-asserts it.
+ */
+async function assertClusteringSchedule(
+  deps: ProjectMetadataSubscriberDeps,
+  tenantId: string,
+): Promise<void> {
+  try {
+    await deps.bootstrapTopicClustering?.(tenantId);
+  } catch (error) {
+    logger.error(
+      {
+        tenantId,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      "Topic clustering bootstrap failed — retried on this project's next trace (non-fatal)",
+    );
+  }
+}
+
+function detectLanguage(attrs: Record<string, string>): string {
+  if (attrs["langwatch.platform"] === "optimization_studio") return "other";
+  const sdkLanguage = attrs["sdk.language"];
+  if (sdkLanguage === "python" || sdkLanguage === "typescript") {
+    return sdkLanguage;
+  }
+  return "other";
+}
+
+async function markFirstMessage({
+  deps,
+  tenantId,
+  project,
+  attrs,
+}: {
+  deps: ProjectMetadataSubscriberDeps;
+  tenantId: string;
+  project: { firstMessage: boolean; integrated: boolean };
+  attrs: Record<string, string>;
+}): Promise<void> {
+  const isOptimizationStudio =
+    attrs["langwatch.platform"] === "optimization_studio";
+
+  await deps.projects.updateMetadata({
+    id: tenantId,
+    data: {
+      firstMessage: true,
+      integrated: isOptimizationStudio ? project.integrated : true,
+      language: detectLanguage(attrs),
+    },
+  });
+
+  // Fired after the metadata write commits, so a failed write retries
+  // the event on the project's next trace instead of dropping it.
+  if (!project.firstMessage) {
+    await trackFirstTraceIntegrated({
+      projects: deps.projects,
+      tenantId,
+      attrs,
+    });
+  }
 }

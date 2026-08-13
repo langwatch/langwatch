@@ -74,114 +74,170 @@ export function createCustomerIoEvaluationSyncSubscriber(
         return;
       }
 
-      const { tenantId: projectId, state: foldState } = context;
-
-      try {
-        const { userId, organizationId } =
-          await deps.projects.resolveOrgAdmin(projectId);
-
-        if (!userId || !organizationId) {
-          logger.warn(
-            { projectId },
-            "No admin user found for project — skipping CIO evaluation sync",
-          );
-          return;
-        }
-
-        const now = new Date(event.occurredAt).toISOString();
-
-        const rawCount = await deps.evaluationCountFn(organizationId);
-        if (rawCount === null) {
-          logger.warn(
-            { projectId },
-            "Could not determine evaluation count — skipping CIO evaluation sync",
-          );
-          return;
-        }
-        // The fold projection persists before subscribers fire, so the current
-        // evaluation is already counted — subtract 1 to get prior count.
-        const existingCount = Math.max(0, rawCount - 1);
-        const isFirstEvaluation = existingCount === 0;
-
-        if (isFirstEvaluation) {
-          // Fire-and-forget: do not block subscriber processing
-          void deps.nurturing
-            .identifyUser({
-              userId,
-              traits: {
-                has_evaluations: true,
-                evaluation_count: 1,
-                first_evaluation_at: now,
-              },
-            })
-            .catch((error) => {
-              logger.error(
-                { projectId, error },
-                "Failed to identify user for first evaluation",
-              );
-              captureException(toError(error));
-            });
-          void deps.nurturing
-            .trackEvent({
-              userId,
-              event: "first_evaluation_created",
-              properties: {
-                evaluation_type: foldState.evaluatorType,
-                project_id: projectId,
-              },
-            })
-            .catch((error) => {
-              logger.error(
-                { projectId, error },
-                "Failed to track first_evaluation_created event",
-              );
-              captureException(toError(error));
-            });
-        } else {
-          const newCount = existingCount + 1;
-          // Fire-and-forget: do not block subscriber processing
-          void deps.nurturing
-            .identifyUser({
-              userId,
-              traits: {
-                evaluation_count: newCount,
-                last_evaluation_at: now,
-              },
-            })
-            .catch((error) => {
-              logger.error(
-                { projectId, error },
-                "Failed to identify user for evaluation update",
-              );
-              captureException(toError(error));
-            });
-        }
-
-        // Track evaluation_ran for every evaluation (first and subsequent)
-        void deps.nurturing
-          .trackEvent({
-            userId,
-            event: "evaluation_ran",
-            properties: {
-              evaluation_id: foldState.evaluationId,
-              score: foldState.score,
-              passed: foldState.passed,
-            },
-          })
-          .catch((error) => {
-            logger.error(
-              { projectId, error },
-              "Failed to track evaluation_ran event",
-            );
-            captureException(toError(error));
-          });
-      } catch (error) {
-        logger.error(
-          { projectId, error },
-          "Failed to process CIO evaluation sync — non-fatal",
-        );
-        captureException(toError(error));
-      }
+      await syncTerminalEvaluation(deps, {
+        projectId: context.tenantId,
+        foldState: context.state,
+        occurredAt: event.occurredAt,
+      });
     },
   };
+}
+
+async function syncTerminalEvaluation(
+  deps: CustomerIoEvaluationSyncSubscriberDeps,
+  {
+    projectId,
+    foldState,
+    occurredAt,
+  }: { projectId: string; foldState: EvaluationRunData; occurredAt: number },
+): Promise<void> {
+  try {
+    const { userId, organizationId } =
+      await deps.projects.resolveOrgAdmin(projectId);
+
+    if (!userId || !organizationId) {
+      logger.warn(
+        { projectId },
+        "No admin user found for project — skipping CIO evaluation sync",
+      );
+      return;
+    }
+
+    const now = new Date(occurredAt).toISOString();
+
+    const rawCount = await deps.evaluationCountFn(organizationId);
+    if (rawCount === null) {
+      logger.warn(
+        { projectId },
+        "Could not determine evaluation count — skipping CIO evaluation sync",
+      );
+      return;
+    }
+    // The fold projection persists before subscribers fire, so the current
+    // evaluation is already counted — subtract 1 to get prior count.
+    const existingCount = Math.max(0, rawCount - 1);
+
+    if (existingCount === 0) {
+      trackFirstEvaluation(deps, { projectId, userId, now, foldState });
+    } else {
+      identifySubsequentEvaluation(deps, {
+        projectId,
+        userId,
+        now,
+        newCount: existingCount + 1,
+      });
+    }
+
+    trackEvaluationRan(deps, { projectId, userId, foldState });
+  } catch (error) {
+    logger.error(
+      { projectId, error },
+      "Failed to process CIO evaluation sync — non-fatal",
+    );
+    captureException(toError(error));
+  }
+}
+
+/** Fire-and-forget: do not block subscriber processing. */
+function trackFirstEvaluation(
+  deps: CustomerIoEvaluationSyncSubscriberDeps,
+  {
+    projectId,
+    userId,
+    now,
+    foldState,
+  }: {
+    projectId: string;
+    userId: string;
+    now: string;
+    foldState: EvaluationRunData;
+  },
+): void {
+  void deps.nurturing
+    .identifyUser({
+      userId,
+      traits: {
+        has_evaluations: true,
+        evaluation_count: 1,
+        first_evaluation_at: now,
+      },
+    })
+    .catch((error) => {
+      logger.error(
+        { projectId, error },
+        "Failed to identify user for first evaluation",
+      );
+      captureException(toError(error));
+    });
+  void deps.nurturing
+    .trackEvent({
+      userId,
+      event: "first_evaluation_created",
+      properties: {
+        evaluation_type: foldState.evaluatorType,
+        project_id: projectId,
+      },
+    })
+    .catch((error) => {
+      logger.error(
+        { projectId, error },
+        "Failed to track first_evaluation_created event",
+      );
+      captureException(toError(error));
+    });
+}
+
+/** Fire-and-forget: do not block subscriber processing. */
+function identifySubsequentEvaluation(
+  deps: CustomerIoEvaluationSyncSubscriberDeps,
+  {
+    projectId,
+    userId,
+    now,
+    newCount,
+  }: { projectId: string; userId: string; now: string; newCount: number },
+): void {
+  void deps.nurturing
+    .identifyUser({
+      userId,
+      traits: {
+        evaluation_count: newCount,
+        last_evaluation_at: now,
+      },
+    })
+    .catch((error) => {
+      logger.error(
+        { projectId, error },
+        "Failed to identify user for evaluation update",
+      );
+      captureException(toError(error));
+    });
+}
+
+/** Tracked for every evaluation, first and subsequent. Fire-and-forget. */
+function trackEvaluationRan(
+  deps: CustomerIoEvaluationSyncSubscriberDeps,
+  {
+    projectId,
+    userId,
+    foldState,
+  }: { projectId: string; userId: string; foldState: EvaluationRunData },
+): void {
+  void deps.nurturing
+    .trackEvent({
+      userId,
+      event: "evaluation_ran",
+      properties: {
+        evaluation_id: foldState.evaluationId,
+        score: foldState.score,
+        passed: foldState.passed,
+      },
+    })
+    .catch((error) => {
+      logger.error(
+        { projectId, error },
+        "Failed to track evaluation_ran event",
+      );
+      captureException(toError(error));
+    });
 }

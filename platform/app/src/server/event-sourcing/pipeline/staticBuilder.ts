@@ -23,7 +23,10 @@ import type {
   MapProjectionOptions,
 } from "../projections/mapProjection.types";
 import type { StateProjectionDefinition } from "../projections/stateProjection.types";
-import type { ReactorDefinition } from "../reactors/reactor.types";
+import type {
+  ReactorDefinition,
+  ReactorOptions,
+} from "../reactors/reactor.types";
 import { ConfigurationError } from "../services/errorHandling";
 import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types";
 import {
@@ -332,107 +335,7 @@ export class StaticPipelineBuilderWithNameAndType<
     }
 
     if (spec.fold !== undefined || spec.map !== undefined) {
-      const projectionName = (spec.fold ?? spec.map)!;
-      const isFold = spec.fold !== undefined;
-      if (isFold && !this.foldProjections.has(projectionName)) {
-        throw new ConfigurationError(
-          "StaticPipelineBuilder",
-          `Subscriber "${subscriberName}" fold "${projectionName}" — projection not found on this pipeline`,
-          { subscriberName, projectionName },
-        );
-      }
-      if (!isFold && !this.mapProjections.has(projectionName)) {
-        throw new ConfigurationError(
-          "StaticPipelineBuilder",
-          `Subscriber "${subscriberName}" map "${projectionName}" — projection not found on this pipeline`,
-          { subscriberName, projectionName },
-        );
-      }
-      const eventFilter =
-        spec.events !== undefined ? new Set<string>(spec.events) : null;
-      const passes = (
-        event: EventType,
-        context: TriggerContext<unknown>,
-      ): boolean => {
-        if (eventFilter && !eventFilter.has(event.type)) return false;
-        return spec.when?.(event, context) ?? true;
-      };
-      const toTriggerContext = (reactorContext: {
-        tenantId: string;
-        aggregateId: string;
-        foldState: unknown;
-      }): TriggerContext<unknown> => ({
-        tenantId: reactorContext.tenantId,
-        aggregateId: reactorContext.aggregateId,
-        state: reactorContext.foldState,
-      });
-      // Dedup only when the spec asks for it (dedup / dedupId / ttl). A spec
-      // without any of those means EVERY event must dispatch its own job —
-      // e.g. a lifecycle sync where a coalesced batch carrying both `started`
-      // and `finished` must deliver both, not collapse to the newest.
-      const wantsDedup =
-        spec.dedup !== undefined ||
-        spec.dedupId !== undefined ||
-        spec.ttl !== undefined;
-      const deduplication = (() => {
-        if (!wantsDedup) return undefined;
-        const defaultId = (event: Event) =>
-          `${event.tenantId}:${String(event.aggregateId)}`;
-        const customDedup =
-          spec.dedup && spec.dedup !== "aggregate" ? spec.dedup : undefined;
-        if (customDedup) {
-          return {
-            ...customDedup,
-            makeId: (payload: { event: Event; foldState: unknown }) =>
-              `subscriber:${subscriberName}:${customDedup.makeId(payload.event as EventType, payload.foldState)}`,
-            ttlMs: spec.ttl ?? customDedup.ttlMs,
-          };
-        }
-        return {
-          makeId: (payload: { event: Event; foldState: unknown }) =>
-            `subscriber:${subscriberName}:${
-              spec.dedupId
-                ? spec.dedupId(payload.event as EventType)
-                : defaultId(payload.event)
-            }`,
-          ttlMs: spec.ttl ?? 30_000,
-        };
-      })();
-      const definition: ReactorDefinition<EventType> = {
-        name: subscriberName,
-        options: {
-          deduplication,
-          // The router's pre-staging batch collapse reads `makeJobId`, the
-          // queue reads `deduplication.makeId`; one function serves both so
-          // they cannot drift (same doctrine as `throttledPerWindow`).
-          makeJobId: deduplication?.makeId,
-          runIn: spec.runIn,
-          disabled: spec.disabled,
-          delay: spec.delay ?? 0,
-          // Reactor payloads wrap the event; adapt the spec's event-shaped
-          // key so fold/map subscribers get the same lane semantics as raw
-          // ones instead of a silently dropped option.
-          groupKeyFn: spec.groupKeyFn
-            ? (payload: { event: Event; foldState: unknown }) =>
-                spec.groupKeyFn!(payload.event as EventType, payload.foldState)
-            : undefined,
-        },
-        // Pre-enqueue rejection: a filtered event never pays serialization.
-        // The committed projection state is in hand at guard time, so
-        // state-dependent `when` guards reject before enqueue too.
-        shouldReact: (event, context) =>
-          passes(event, toTriggerContext(context)),
-        handle: async (event, context) => {
-          const triggerContext = toTriggerContext(context);
-          if (!passes(event, triggerContext)) return;
-          await spec.handler(event, triggerContext);
-        },
-      };
-      if (isFold) {
-        this.foldReactors.set(subscriberName, { projectionName, definition });
-      } else {
-        this.mapReactors.set(subscriberName, { projectionName, definition });
-      }
+      this.registerProjectionSubscriber(subscriberName, spec);
       return this;
     }
 
@@ -463,6 +366,40 @@ export class StaticPipelineBuilderWithNameAndType<
       },
     });
     return this;
+  }
+
+  /** The fold/map half of `withSubscriber`: compiles the spec into the shared
+   *  post-projection registration and validates its parent projection. */
+  private registerProjectionSubscriber(
+    subscriberName: string,
+    spec: SubscriberSpec<EventType>,
+  ): void {
+    const projectionName = (spec.fold ?? spec.map)!;
+    const isFold = spec.fold !== undefined;
+    if (isFold && !this.foldProjections.has(projectionName)) {
+      throw new ConfigurationError(
+        "StaticPipelineBuilder",
+        `Subscriber "${subscriberName}" fold "${projectionName}" — projection not found on this pipeline`,
+        { subscriberName, projectionName },
+      );
+    }
+    if (!isFold && !this.mapProjections.has(projectionName)) {
+      throw new ConfigurationError(
+        "StaticPipelineBuilder",
+        `Subscriber "${subscriberName}" map "${projectionName}" — projection not found on this pipeline`,
+        { subscriberName, projectionName },
+      );
+    }
+
+    const definition = buildProjectionSubscriberDefinition(
+      subscriberName,
+      spec,
+    );
+    if (isFold) {
+      this.foldReactors.set(subscriberName, { projectionName, definition });
+    } else {
+      this.mapReactors.set(subscriberName, { projectionName, definition });
+    }
   }
 
   /**
@@ -695,4 +632,102 @@ export function definePipeline<
   EventType extends Event,
 >(): StaticPipelineBuilder<EventType> {
   return new StaticPipelineBuilder<EventType>();
+}
+
+type SubscriberJobPayload = { event: Event; foldState: unknown };
+
+function toTriggerContext(reactorContext: {
+  tenantId: string;
+  aggregateId: string;
+  foldState: unknown;
+}): TriggerContext<unknown> {
+  return {
+    tenantId: reactorContext.tenantId,
+    aggregateId: reactorContext.aggregateId,
+    state: reactorContext.foldState,
+  };
+}
+
+/**
+ * Dedup only when the spec asks for it (dedup / dedupId / ttl). A spec
+ * without any of those means EVERY event must dispatch its own job —
+ * e.g. a lifecycle sync where a coalesced batch carrying both `started`
+ * and `finished` must deliver both, not collapse to the newest.
+ */
+function buildProjectionSubscriberDedup<E extends Event>(
+  subscriberName: string,
+  spec: SubscriberSpec<E>,
+): (ReactorOptions["deduplication"] & object) | undefined {
+  const wantsDedup =
+    spec.dedup !== undefined ||
+    spec.dedupId !== undefined ||
+    spec.ttl !== undefined;
+  if (!wantsDedup) return undefined;
+
+  const customDedup =
+    spec.dedup && spec.dedup !== "aggregate" ? spec.dedup : undefined;
+  if (customDedup) {
+    return {
+      ...customDedup,
+      makeId: (payload: SubscriberJobPayload) =>
+        `subscriber:${subscriberName}:${customDedup.makeId(payload.event as E, payload.foldState)}`,
+      ttlMs: spec.ttl ?? customDedup.ttlMs,
+    };
+  }
+
+  const defaultId = (event: Event) =>
+    `${event.tenantId}:${String(event.aggregateId)}`;
+  return {
+    makeId: (payload: SubscriberJobPayload) =>
+      `subscriber:${subscriberName}:${
+        spec.dedupId
+          ? spec.dedupId(payload.event as E)
+          : defaultId(payload.event)
+      }`,
+    ttlMs: spec.ttl ?? 30_000,
+  };
+}
+
+function buildProjectionSubscriberDefinition<E extends Event>(
+  subscriberName: string,
+  spec: SubscriberSpec<E>,
+): ReactorDefinition<E> {
+  const eventFilter =
+    spec.events !== undefined ? new Set<string>(spec.events) : null;
+  const passes = (event: E, context: TriggerContext<unknown>): boolean => {
+    if (eventFilter && !eventFilter.has(event.type)) return false;
+    return spec.when?.(event, context) ?? true;
+  };
+
+  const deduplication = buildProjectionSubscriberDedup(subscriberName, spec);
+
+  return {
+    name: subscriberName,
+    options: {
+      deduplication,
+      // The router's pre-staging batch collapse reads `makeJobId`, the
+      // queue reads `deduplication.makeId`; one function serves both so
+      // they cannot drift (same doctrine as `throttledPerWindow`).
+      makeJobId: deduplication?.makeId,
+      runIn: spec.runIn,
+      disabled: spec.disabled,
+      delay: spec.delay ?? 0,
+      // Subscriber payloads wrap the event; adapt the spec's event-shaped
+      // key so fold/map subscribers get the same lane semantics as raw
+      // ones instead of a silently dropped option.
+      groupKeyFn: spec.groupKeyFn
+        ? (payload: SubscriberJobPayload) =>
+            spec.groupKeyFn!(payload.event as E, payload.foldState)
+        : undefined,
+    },
+    // Pre-enqueue rejection: a filtered event never pays serialization.
+    // The committed projection state is in hand at guard time, so
+    // state-dependent `when` guards reject before enqueue too.
+    shouldReact: (event, context) => passes(event, toTriggerContext(context)),
+    handle: async (event, context) => {
+      const triggerContext = toTriggerContext(context);
+      if (!passes(event, triggerContext)) return;
+      await spec.handler(event, triggerContext);
+    },
+  };
 }

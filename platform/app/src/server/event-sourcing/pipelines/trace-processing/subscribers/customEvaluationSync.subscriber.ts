@@ -63,6 +63,35 @@ function deterministicEvaluationId({
 
 const EVAL_EVENT_NAME = "langwatch.evaluation.custom";
 
+type OtlpSpanEvent = NonNullable<OtlpSpan["events"]>[number];
+
+function readEvaluationPayload(event: OtlpSpanEvent): string | undefined {
+  if (event.name !== EVAL_EVENT_NAME) return undefined;
+  const jsonAttr = event.attributes.find(
+    (attr) => attr.key === "json_encoded_event",
+  );
+  return jsonAttr?.value && "stringValue" in jsonAttr.value
+    ? (jsonAttr.value.stringValue ?? undefined)
+    : undefined;
+}
+
+function parseEvaluation(jsonPayload: string): SdkEvaluation | undefined {
+  try {
+    const parsed: unknown = JSON.parse(jsonPayload);
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed))
+      return undefined;
+    const record = parsed as Record<string, unknown>;
+    if (typeof record.name !== "string") return undefined;
+    return record as unknown as SdkEvaluation;
+  } catch {
+    logger.warn(
+      { payloadLength: jsonPayload.length },
+      "Failed to parse json_encoded_event from evaluation span event",
+    );
+    return undefined;
+  }
+}
+
 /**
  * Extracts SDK evaluations directly from OTLP span events.
  *
@@ -71,38 +100,12 @@ const EVAL_EVENT_NAME = "langwatch.evaluation.custom";
  */
 export function extractEvaluationsFromSpan(span: OtlpSpan): SdkEvaluation[] {
   const evaluations: SdkEvaluation[] = [];
-
   for (const event of span.events ?? []) {
-    if (event.name !== EVAL_EVENT_NAME) continue;
-
-    const jsonAttr = event.attributes.find(
-      (attr) => attr.key === "json_encoded_event",
-    );
-    const jsonPayload =
-      jsonAttr?.value && "stringValue" in jsonAttr.value
-        ? jsonAttr.value.stringValue
-        : undefined;
+    const jsonPayload = readEvaluationPayload(event);
     if (typeof jsonPayload !== "string") continue;
-
-    try {
-      const parsed: unknown = JSON.parse(jsonPayload);
-      if (
-        typeof parsed !== "object" ||
-        parsed === null ||
-        Array.isArray(parsed)
-      )
-        continue;
-      const record = parsed as Record<string, unknown>;
-      if (typeof record.name !== "string") continue;
-      evaluations.push(record as unknown as SdkEvaluation);
-    } catch {
-      logger.warn(
-        { payloadLength: jsonPayload.length },
-        "Failed to parse json_encoded_event from evaluation span event",
-      );
-    }
+    const evaluation = parseEvaluation(jsonPayload);
+    if (evaluation) evaluations.push(evaluation);
   }
-
   return evaluations;
 }
 
@@ -166,56 +169,13 @@ export function createCustomEvaluationSyncHandler(
       "Syncing custom SDK evaluations",
     );
 
-    const errors: Error[] = [];
-
-    for (const evaluation of evaluations) {
-      const evaluationId =
-        evaluation.evaluation_id ??
-        deterministicEvaluationId({ traceId, evaluation });
-      const evaluatorId =
-        evaluation.evaluator_id ?? evaluationNameAutoslug(evaluation.name);
-      const status =
-        evaluation.status ?? (evaluation.error ? "error" : "processed");
-      // A verdict is only real when the evaluator ran to completion — an
-      // errored/skipped run's stray passed/score/label must not reach
-      // analytics or triggers as a real result (#6833). Same gate as the shared
-      // verdictGate helpers now applied at the executeEvaluation command boundary.
-      const hasVerdict = status === "processed";
-      const occurredAt = event.occurredAt;
-
-      try {
-        await deps.reportEvaluation({
-          tenantId,
-          evaluationId,
-          evaluatorId,
-          evaluatorType: "custom",
-          evaluatorName: evaluation.name,
-          traceId,
-          isGuardrail: evaluation.is_guardrail ?? undefined,
-          status,
-          score: hasVerdict ? (evaluation.score ?? null) : null,
-          passed: hasVerdict ? (evaluation.passed ?? null) : null,
-          label: hasVerdict ? (evaluation.label ?? null) : null,
-          details: evaluation.details ?? null,
-          error: evaluation.error?.message ?? null,
-          errorDetails: evaluation.error?.stacktrace?.join("\n") ?? null,
-          costId: evaluation.cost_id ?? null,
-          occurredAt,
-        });
-      } catch (error) {
-        logger.error(
-          {
-            tenantId,
-            traceId,
-            evaluationId,
-            evaluatorId,
-            error: error instanceof Error ? error.message : String(error),
-          },
-          "Failed to sync custom evaluation",
-        );
-        errors.push(error instanceof Error ? error : new Error(String(error)));
-      }
-    }
+    const errors = await reportEvaluations({
+      deps,
+      tenantId,
+      traceId,
+      evaluations,
+      occurredAt: event.occurredAt,
+    });
 
     logger.debug(
       {
@@ -231,4 +191,127 @@ export function createCustomEvaluationSyncHandler(
       throw errors[0];
     }
   };
+}
+
+/**
+ * Reports every evaluation before surfacing failures, so one broken
+ * evaluation cannot block the rest of the span's evaluations.
+ */
+async function reportEvaluations({
+  deps,
+  tenantId,
+  traceId,
+  evaluations,
+  occurredAt,
+}: {
+  deps: CustomEvaluationSyncSubscriberDeps;
+  tenantId: string;
+  traceId: string;
+  evaluations: SdkEvaluation[];
+  occurredAt: number;
+}): Promise<Error[]> {
+  const errors: Error[] = [];
+  for (const evaluation of evaluations) {
+    const failure = await reportOneEvaluation({
+      deps,
+      tenantId,
+      traceId,
+      evaluation,
+      occurredAt,
+    });
+    if (failure) errors.push(failure);
+  }
+  return errors;
+}
+
+/**
+ * A verdict is only real when the evaluator ran to completion — an
+ * errored/skipped run's stray passed/score/label must not reach
+ * analytics or triggers as a real result (#6833). Same gate as the shared
+ * verdictGate helpers now applied at the executeEvaluation command boundary.
+ */
+function verdictFields(evaluation: SdkEvaluation, hasVerdict: boolean) {
+  return {
+    score: hasVerdict ? (evaluation.score ?? null) : null,
+    passed: hasVerdict ? (evaluation.passed ?? null) : null,
+    label: hasVerdict ? (evaluation.label ?? null) : null,
+  };
+}
+
+function buildReportPayload({
+  tenantId,
+  traceId,
+  evaluation,
+  occurredAt,
+}: {
+  tenantId: string;
+  traceId: string;
+  evaluation: SdkEvaluation;
+  occurredAt: number;
+}): ReportEvaluationCommandData {
+  const status =
+    evaluation.status ?? (evaluation.error ? "error" : "processed");
+
+  return {
+    tenantId,
+    evaluationId:
+      evaluation.evaluation_id ??
+      deterministicEvaluationId({ traceId, evaluation }),
+    evaluatorId:
+      evaluation.evaluator_id ?? evaluationNameAutoslug(evaluation.name),
+    evaluatorType: "custom",
+    evaluatorName: evaluation.name,
+    traceId,
+    isGuardrail: evaluation.is_guardrail ?? undefined,
+    status,
+    ...verdictFields(evaluation, status === "processed"),
+    details: evaluation.details ?? null,
+    error: evaluation.error?.message ?? null,
+    errorDetails: evaluation.error?.stacktrace?.join("\n") ?? null,
+    costId: evaluation.cost_id ?? null,
+    occurredAt,
+  };
+}
+
+/**
+ * Reports one SDK evaluation through the reportEvaluation command, returning
+ * the failure instead of throwing so the caller can attempt the rest of the
+ * span's evaluations first.
+ */
+async function reportOneEvaluation({
+  deps,
+  tenantId,
+  traceId,
+  evaluation,
+  occurredAt,
+}: {
+  deps: CustomEvaluationSyncSubscriberDeps;
+  tenantId: string;
+  traceId: string;
+  evaluation: SdkEvaluation;
+  occurredAt: number;
+}): Promise<Error | undefined> {
+  const payload = buildReportPayload({
+    tenantId,
+    traceId,
+    evaluation,
+    occurredAt,
+  });
+
+  try {
+    await deps.reportEvaluation(payload);
+    return undefined;
+  } catch (error) {
+    logger.error(
+      {
+        tenantId,
+        traceId,
+        evaluationId: payload.evaluationId,
+        evaluatorId: payload.evaluatorId,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      "Failed to sync custom evaluation",
+    );
+    return error instanceof Error ? error : new Error(String(error));
+  }
 }

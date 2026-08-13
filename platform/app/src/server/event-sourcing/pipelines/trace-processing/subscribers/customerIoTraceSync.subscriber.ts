@@ -72,63 +72,17 @@ export function createCustomerIoTraceSyncSubscriber(
           return;
         }
 
-        const sdkLanguage = foldState.attributes["sdk.language"] ?? "unknown";
-        const sdkFramework =
-          foldState.attributes["langwatch.sdk.framework"] ?? "unknown";
         const traceOccurredAt = new Date(foldState.occurredAt).toISOString();
 
         if (!firstMessage) {
-          // First trace — fire immediately, fire-and-forget
-          void deps.nurturing
-            .identifyUser({
-              userId,
-              traits: {
-                has_traces: true,
-                sdk_language: sdkLanguage,
-                sdk_framework: sdkFramework,
-                first_trace_at: traceOccurredAt,
-              },
-            })
-            .catch((error) => {
-              logger.error(
-                { projectId, error },
-                "Failed to identify user for first trace",
-              );
-              captureException(toError(error));
-            });
-          void deps.nurturing
-            .trackEvent({
-              userId,
-              event: "first_trace_integrated",
-              properties: {
-                sdk_language: sdkLanguage,
-                sdk_framework: sdkFramework,
-                project_id: projectId,
-              },
-            })
-            .catch((error) => {
-              logger.error(
-                { projectId, error },
-                "Failed to track first_trace_integrated event",
-              );
-              captureException(toError(error));
-            });
+          trackFirstTrace(deps, {
+            projectId,
+            userId,
+            traceOccurredAt,
+            attrs: foldState.attributes,
+          });
         } else {
-          // Subsequent trace — debounced via dedupId, fire-and-forget
-          void deps.nurturing
-            .identifyUser({
-              userId,
-              traits: {
-                last_trace_at: traceOccurredAt,
-              },
-            })
-            .catch((error) => {
-              logger.error(
-                { projectId, error },
-                "Failed to identify user for trace update",
-              );
-              captureException(toError(error));
-            });
+          identifySubsequentTrace(deps, { projectId, userId, traceOccurredAt });
         }
       } catch (error) {
         logger.error(
@@ -139,4 +93,83 @@ export function createCustomerIoTraceSyncSubscriber(
       }
     },
   };
+}
+
+/** First trace — fire immediately, fire-and-forget. */
+function trackFirstTrace(
+  deps: CustomerIoTraceSyncSubscriberDeps,
+  {
+    projectId,
+    userId,
+    traceOccurredAt,
+    attrs,
+  }: {
+    projectId: string;
+    userId: string;
+    traceOccurredAt: string;
+    attrs: Record<string, string>;
+  },
+): void {
+  const sdkLanguage = attrs["sdk.language"] ?? "unknown";
+  const sdkFramework = attrs["langwatch.sdk.framework"] ?? "unknown";
+
+  void deps.nurturing
+    .identifyUser({
+      userId,
+      traits: {
+        has_traces: true,
+        sdk_language: sdkLanguage,
+        sdk_framework: sdkFramework,
+        first_trace_at: traceOccurredAt,
+      },
+    })
+    .catch((error) => {
+      logger.error(
+        { projectId, error },
+        "Failed to identify user for first trace",
+      );
+      captureException(toError(error));
+    });
+  void deps.nurturing
+    .trackEvent({
+      userId,
+      event: "first_trace_integrated",
+      properties: {
+        sdk_language: sdkLanguage,
+        sdk_framework: sdkFramework,
+        project_id: projectId,
+      },
+    })
+    .catch((error) => {
+      logger.error(
+        { projectId, error },
+        "Failed to track first_trace_integrated event",
+      );
+      captureException(toError(error));
+    });
+}
+
+/** Subsequent trace — debounced via dedupId, fire-and-forget. */
+function identifySubsequentTrace(
+  deps: CustomerIoTraceSyncSubscriberDeps,
+  {
+    projectId,
+    userId,
+    traceOccurredAt,
+  }: { projectId: string; userId: string; traceOccurredAt: string },
+): void {
+  void deps.nurturing
+    .identifyUser({
+      userId,
+      traits: {
+        last_trace_at: traceOccurredAt,
+      },
+    })
+    .catch((error) => {
+      logger.error(
+        { projectId, error },
+        "Failed to identify user for trace update",
+      );
+      captureException(toError(error));
+    });
 }
