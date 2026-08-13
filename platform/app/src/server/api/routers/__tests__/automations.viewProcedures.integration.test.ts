@@ -7,8 +7,9 @@
  * Binds specs/automations/evaluation-visibility.feature at the API boundary —
  * the drawer tests bind the same feature at the surface.
  */
-import { TriggerAction, TriggerKind } from "@prisma/client";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { TriggerAction, TriggerKind } from "~/generated/prisma/client";
 import { globalForApp } from "../../../app-layer/app";
 import { createTestApp } from "../../../app-layer/presets";
 
