@@ -158,8 +158,10 @@ async function readPage(options: Record<string, unknown>) {
     openProtections,
     options,
   );
-  expect(results).not.toBeNull();
-  return results!.groups.flat();
+  if (results === null) {
+    throw new Error("getAllTracesForProject returned null for a page read");
+  }
+  return results.groups.flat();
 }
 
 beforeAll(async () => {

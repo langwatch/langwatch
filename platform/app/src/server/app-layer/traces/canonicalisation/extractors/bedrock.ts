@@ -39,17 +39,7 @@ export class BedrockExtractor implements CanonicalAttributesExtractor {
   readonly id = "bedrock";
 
   apply(ctx: ExtractorContext): void {
-    const { attrs } = ctx.bag;
-
-    const isBedrock =
-      attrs.get(BEDROCK_ATTR_KEYS.RPC_SERVICE) === "BedrockRuntime" ||
-      attrs.get(ATTR_KEYS.GEN_AI_SYSTEM) === "aws.bedrock" ||
-      attrs.get(ATTR_KEYS.GEN_AI_PROVIDER_NAME) === "aws.bedrock" ||
-      attrs.has(BEDROCK_ATTR_KEYS.REQUEST_MESSAGES) ||
-      attrs.has(BEDROCK_ATTR_KEYS.RESPONSE_OUTPUT) ||
-      attrs.has(BEDROCK_ATTR_KEYS.MODEL_ID);
-
-    if (!isBedrock) return;
+    if (!this.isBedrockSpan(ctx)) return;
 
     // ─────────────────────────────────────────────────────────────────────────
     // Model
@@ -79,29 +69,54 @@ export class BedrockExtractor implements CanonicalAttributesExtractor {
     // The Converse response nests the assistant turn: unwrap `output` and/or
     // `message` wrappers down to the message object itself.
     // ─────────────────────────────────────────────────────────────────────────
-    if (
-      !attrs.has(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES) &&
-      ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES] === undefined
-    ) {
-      const raw = attrs.take(BEDROCK_ATTR_KEYS.RESPONSE_OUTPUT);
-      if (raw !== undefined) {
-        let parsed = safeJsonParse(raw);
-        if (isRecord(parsed) && isRecord(parsed.output)) parsed = parsed.output;
-        if (isRecord(parsed) && isRecord(parsed.message))
-          parsed = parsed.message;
-        if (isRecord(parsed) || Array.isArray(parsed)) {
-          const messages = Array.isArray(parsed) ? parsed : [parsed];
-          ctx.setAttr(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, messages);
-          ctx.recordRule(
-            `${this.id}:aws.bedrock.response.output->gen_ai.output.messages`,
-          );
-          recordValueType(
-            ctx,
-            ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES,
-            "chat_messages",
-          );
-        }
-      }
-    }
+    this.extractOutputMessages(ctx);
   }
+
+  private isBedrockSpan(ctx: ExtractorContext): boolean {
+    const { attrs } = ctx.bag;
+    return (
+      attrs.get(BEDROCK_ATTR_KEYS.RPC_SERVICE) === "BedrockRuntime" ||
+      attrs.get(ATTR_KEYS.GEN_AI_SYSTEM) === "aws.bedrock" ||
+      attrs.get(ATTR_KEYS.GEN_AI_PROVIDER_NAME) === "aws.bedrock" ||
+      attrs.has(BEDROCK_ATTR_KEYS.REQUEST_MESSAGES) ||
+      attrs.has(BEDROCK_ATTR_KEYS.RESPONSE_OUTPUT) ||
+      attrs.has(BEDROCK_ATTR_KEYS.MODEL_ID)
+    );
+  }
+
+  private extractOutputMessages(ctx: ExtractorContext): void {
+    const { attrs } = ctx.bag;
+    if (
+      attrs.has(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES) ||
+      ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES] !== undefined
+    ) {
+      return;
+    }
+
+    const raw = attrs.take(BEDROCK_ATTR_KEYS.RESPONSE_OUTPUT);
+    if (raw === undefined) return;
+
+    const messages = unwrapConverseOutput(safeJsonParse(raw));
+    if (messages === null) return;
+
+    ctx.setAttr(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, messages);
+    ctx.recordRule(
+      `${this.id}:aws.bedrock.response.output->gen_ai.output.messages`,
+    );
+    recordValueType(ctx, ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, "chat_messages");
+  }
+}
+
+/**
+ * The Converse API nests the assistant turn as `{ output: { message: {...} } }`;
+ * the attribute may carry the wrapper, the inner `{ message: {...} }`, the
+ * message itself, or already-listed messages. Unwrap down to a message array.
+ */
+function unwrapConverseOutput(parsed: unknown): unknown[] | null {
+  let value = parsed;
+  if (isRecord(value) && isRecord(value.output)) value = value.output;
+  if (isRecord(value) && isRecord(value.message)) value = value.message;
+  if (Array.isArray(value)) return value;
+  if (isRecord(value)) return [value];
+  return null;
 }
