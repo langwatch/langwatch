@@ -99,7 +99,7 @@ def _build_response(
 def sync_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> Response[
     GetApiGatewayV1BudgetsByIdResponse200
     | GetApiGatewayV1BudgetsByIdResponse400
@@ -114,7 +114,8 @@ def sync_detailed(
     the per-person `end_users_seen` / `end_users_over` standing on attributed-user templates. Archived
     budgets are not returned. `spend_available: false` means spend could not be totalled, and
     `spent_usd` / `spent_nano_usd` are null rather than a figure that cannot be told apart from zero
-    spend.
+    spend. A per-person template reports null there too, because one allowance per person has no single
+    total; each person's figure is in `GET /spend-summaries` and the seat buckets.
 
     Args:
         id (str):
@@ -141,7 +142,7 @@ def sync_detailed(
 def sync(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> (
     GetApiGatewayV1BudgetsByIdResponse200
     | GetApiGatewayV1BudgetsByIdResponse400
@@ -157,7 +158,8 @@ def sync(
     the per-person `end_users_seen` / `end_users_over` standing on attributed-user templates. Archived
     budgets are not returned. `spend_available: false` means spend could not be totalled, and
     `spent_usd` / `spent_nano_usd` are null rather than a figure that cannot be told apart from zero
-    spend.
+    spend. A per-person template reports null there too, because one allowance per person has no single
+    total; each person's figure is in `GET /spend-summaries` and the seat buckets.
 
     Args:
         id (str):
@@ -179,7 +181,7 @@ def sync(
 async def asyncio_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> Response[
     GetApiGatewayV1BudgetsByIdResponse200
     | GetApiGatewayV1BudgetsByIdResponse400
@@ -194,7 +196,8 @@ async def asyncio_detailed(
     the per-person `end_users_seen` / `end_users_over` standing on attributed-user templates. Archived
     budgets are not returned. `spend_available: false` means spend could not be totalled, and
     `spent_usd` / `spent_nano_usd` are null rather than a figure that cannot be told apart from zero
-    spend.
+    spend. A per-person template reports null there too, because one allowance per person has no single
+    total; each person's figure is in `GET /spend-summaries` and the seat buckets.
 
     Args:
         id (str):
@@ -219,7 +222,7 @@ async def asyncio_detailed(
 async def asyncio(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> (
     GetApiGatewayV1BudgetsByIdResponse200
     | GetApiGatewayV1BudgetsByIdResponse400
@@ -235,7 +238,8 @@ async def asyncio(
     the per-person `end_users_seen` / `end_users_over` standing on attributed-user templates. Archived
     budgets are not returned. `spend_available: false` means spend could not be totalled, and
     `spent_usd` / `spent_nano_usd` are null rather than a figure that cannot be told apart from zero
-    spend.
+    spend. A per-person template reports null there too, because one allowance per person has no single
+    total; each person's figure is in `GET /spend-summaries` and the seat buckets.
 
     Args:
         id (str):

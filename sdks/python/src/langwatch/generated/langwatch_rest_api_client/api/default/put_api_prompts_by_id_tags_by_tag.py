@@ -112,7 +112,7 @@ def sync_detailed(
     id: str,
     tag: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PutApiPromptsByIdTagsByTagBody | Unset = UNSET,
 ) -> Response[
     PutApiPromptsByIdTagsByTagResponse200
@@ -154,7 +154,7 @@ def sync(
     id: str,
     tag: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PutApiPromptsByIdTagsByTagBody | Unset = UNSET,
 ) -> (
     PutApiPromptsByIdTagsByTagResponse200
@@ -192,7 +192,7 @@ async def asyncio_detailed(
     id: str,
     tag: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PutApiPromptsByIdTagsByTagBody | Unset = UNSET,
 ) -> Response[
     PutApiPromptsByIdTagsByTagResponse200
@@ -232,7 +232,7 @@ async def asyncio(
     id: str,
     tag: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PutApiPromptsByIdTagsByTagBody | Unset = UNSET,
 ) -> (
     PutApiPromptsByIdTagsByTagResponse200

@@ -54,7 +54,7 @@ def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Res
 def sync_detailed(
     slug: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: DatasetPostEntries | Unset = UNSET,
 ) -> Response[Any]:
     """Add entries to a dataset
@@ -86,7 +86,7 @@ def sync_detailed(
 async def asyncio_detailed(
     slug: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: DatasetPostEntries | Unset = UNSET,
 ) -> Response[Any]:
     """Add entries to a dataset

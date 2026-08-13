@@ -59,7 +59,7 @@ def sync_detailed(
     slug_or_id: str,
     record_id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PatchApiDatasetBySlugOrIdRecordsByRecordIdBody | Unset = UNSET,
 ) -> Response[Any]:
     """Update or create a record in a dataset
@@ -94,7 +94,7 @@ async def asyncio_detailed(
     slug_or_id: str,
     record_id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PatchApiDatasetBySlugOrIdRecordsByRecordIdBody | Unset = UNSET,
 ) -> Response[Any]:
     """Update or create a record in a dataset

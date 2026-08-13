@@ -101,7 +101,7 @@ def _build_response(
 def sync_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PatchApiGatewayV1VirtualKeysByIdBody | Unset = UNSET,
 ) -> Response[
     PatchApiGatewayV1VirtualKeysByIdResponse200
@@ -113,8 +113,10 @@ def sync_detailed(
     """Update virtual key
 
      Partial update: send only the fields you want to change. `scopes` replaces the entire visibility set
-    and requires `virtualKeys:manage` at every NEW scope. `config` is deep-merged. `budget` upserts the
-    key's own cap; explicit null archives it.
+    and requires `virtualKeys:manage` at every NEW scope, and does NOT move where the key's traces and
+    costs land: send `trace_project_id` for that, validated the way create validates it; explicit null
+    re-resolves it under the create-time rules rather than clearing it. `config` is deep-merged.
+    `budget` upserts the key's own cap; explicit null archives it.
 
     Args:
         id (str):
@@ -143,7 +145,7 @@ def sync_detailed(
 def sync(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PatchApiGatewayV1VirtualKeysByIdBody | Unset = UNSET,
 ) -> (
     PatchApiGatewayV1VirtualKeysByIdResponse200
@@ -156,8 +158,10 @@ def sync(
     """Update virtual key
 
      Partial update: send only the fields you want to change. `scopes` replaces the entire visibility set
-    and requires `virtualKeys:manage` at every NEW scope. `config` is deep-merged. `budget` upserts the
-    key's own cap; explicit null archives it.
+    and requires `virtualKeys:manage` at every NEW scope, and does NOT move where the key's traces and
+    costs land: send `trace_project_id` for that, validated the way create validates it; explicit null
+    re-resolves it under the create-time rules rather than clearing it. `config` is deep-merged.
+    `budget` upserts the key's own cap; explicit null archives it.
 
     Args:
         id (str):
@@ -181,7 +185,7 @@ def sync(
 async def asyncio_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PatchApiGatewayV1VirtualKeysByIdBody | Unset = UNSET,
 ) -> Response[
     PatchApiGatewayV1VirtualKeysByIdResponse200
@@ -193,8 +197,10 @@ async def asyncio_detailed(
     """Update virtual key
 
      Partial update: send only the fields you want to change. `scopes` replaces the entire visibility set
-    and requires `virtualKeys:manage` at every NEW scope. `config` is deep-merged. `budget` upserts the
-    key's own cap; explicit null archives it.
+    and requires `virtualKeys:manage` at every NEW scope, and does NOT move where the key's traces and
+    costs land: send `trace_project_id` for that, validated the way create validates it; explicit null
+    re-resolves it under the create-time rules rather than clearing it. `config` is deep-merged.
+    `budget` upserts the key's own cap; explicit null archives it.
 
     Args:
         id (str):
@@ -221,7 +227,7 @@ async def asyncio_detailed(
 async def asyncio(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PatchApiGatewayV1VirtualKeysByIdBody | Unset = UNSET,
 ) -> (
     PatchApiGatewayV1VirtualKeysByIdResponse200
@@ -234,8 +240,10 @@ async def asyncio(
     """Update virtual key
 
      Partial update: send only the fields you want to change. `scopes` replaces the entire visibility set
-    and requires `virtualKeys:manage` at every NEW scope. `config` is deep-merged. `budget` upserts the
-    key's own cap; explicit null archives it.
+    and requires `virtualKeys:manage` at every NEW scope, and does NOT move where the key's traces and
+    costs land: send `trace_project_id` for that, validated the way create validates it; explicit null
+    re-resolves it under the create-time rules rather than clearing it. `config` is deep-merged.
+    `budget` upserts the key's own cap; explicit null archives it.
 
     Args:
         id (str):

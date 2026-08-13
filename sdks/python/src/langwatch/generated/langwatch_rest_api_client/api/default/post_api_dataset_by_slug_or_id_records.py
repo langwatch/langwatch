@@ -54,7 +54,7 @@ def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Res
 def sync_detailed(
     slug_or_id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PostApiDatasetBySlugOrIdRecordsBody | Unset = UNSET,
 ) -> Response[Any]:
     """Create records in a dataset in batch
@@ -86,7 +86,7 @@ def sync_detailed(
 async def asyncio_detailed(
     slug_or_id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PostApiDatasetBySlugOrIdRecordsBody | Unset = UNSET,
 ) -> Response[Any]:
     """Create records in a dataset in batch
