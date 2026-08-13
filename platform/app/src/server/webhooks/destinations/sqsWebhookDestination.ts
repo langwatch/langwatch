@@ -5,11 +5,8 @@ import {
 } from "@aws-sdk/client-sqs";
 import { buildAwsClientConfig } from "~/server/aws/awsClientConfig";
 import { assertDispatchBudget } from "../dispatchBudget";
-import {
-  signWebhookPayload,
-  WEBHOOK_SIGNATURE_HEADER,
-} from "../signature";
 import { WEBHOOK_DELIVERY_ID_HEADER } from "../sendWebhook";
+import { signWebhookPayload, WEBHOOK_SIGNATURE_HEADER } from "../signature";
 import { parseSqsQueueUrl, sqsHostFor } from "./sqsQueueUrl";
 import type {
   WebhookDestination,
@@ -174,44 +171,53 @@ const RETRYABLE_NETWORK_CODES = new Set([
  * and the ladder gives up on its own after eleven attempts, whereas a wrongly
  * terminal verdict drops a billing event on the floor with no second chance.
  */
+/** The three things an SDK failure can tell us apart by. */
+function failureShape(error: unknown): {
+  name: string;
+  code: string;
+  httpStatus: number | undefined;
+} {
+  if (typeof error !== "object" || error === null) {
+    return { name: "", code: "", httpStatus: undefined };
+  }
+  const metadata = Reflect.get(error, "$metadata") ?? {};
+  return {
+    name: (Reflect.get(error, "name") as string | undefined) ?? "",
+    code: (Reflect.get(error, "code") as string | undefined) ?? "",
+    httpStatus: Reflect.get(metadata, "httpStatusCode") as number | undefined,
+  };
+}
+
+/** The verdict a status code alone implies: 5xx and throttling are this
+ *  moment, a 4xx we do not recognize is the request itself, which the next
+ *  attempt would send again unchanged. */
+function verdictFromStatus(httpStatus: number): "retryable" | "terminal" {
+  return httpStatus >= 500 || httpStatus === 429 ? "retryable" : "terminal";
+}
+
 export function classifySqsFailure(error: unknown): {
   verdict: "retryable" | "terminal";
   reason: string;
 } {
-  const name =
-    (typeof error === "object" && error !== null
-      ? (Reflect.get(error, "name") as string | undefined)
-      : undefined) ?? "";
-  const code =
-    (typeof error === "object" && error !== null
-      ? (Reflect.get(error, "code") as string | undefined)
-      : undefined) ?? "";
-  const httpStatus =
-    typeof error === "object" && error !== null
-      ? (Reflect.get(
-          Reflect.get(error, "$metadata") ?? {},
-          "httpStatusCode",
-        ) as number | undefined)
-      : undefined;
+  const { name, code, httpStatus } = failureShape(error);
+  const named = name || code;
 
   if (TERMINAL_ERROR_NAMES.has(name) || TERMINAL_ERROR_NAMES.has(code)) {
-    return { verdict: "terminal", reason: name || code };
+    return { verdict: "terminal", reason: named };
   }
   if (RETRYABLE_ERROR_NAMES.has(name) || RETRYABLE_ERROR_NAMES.has(code)) {
-    return { verdict: "retryable", reason: name || code };
+    return { verdict: "retryable", reason: named };
   }
   if (RETRYABLE_NETWORK_CODES.has(code)) {
     return { verdict: "retryable", reason: code };
   }
   if (httpStatus !== undefined) {
-    // 5xx and throttling are this moment; a 4xx we do not recognize is the
-    // request itself, which the next attempt would send again unchanged.
-    if (httpStatus >= 500 || httpStatus === 429) {
-      return { verdict: "retryable", reason: `HTTP ${httpStatus}` };
-    }
-    return { verdict: "terminal", reason: name || code || `HTTP ${httpStatus}` };
+    return {
+      verdict: verdictFromStatus(httpStatus),
+      reason: named || `HTTP ${httpStatus}`,
+    };
   }
-  return { verdict: "retryable", reason: name || code || "unknown" };
+  return { verdict: "retryable", reason: named || "unknown" };
 }
 
 export interface SqsDestinationConfig {
@@ -226,13 +232,106 @@ export interface SqsDestinationConfig {
 /** How much of a failure rides in the delivery log's error column. */
 const ERROR_SNIPPET_CHARS = 500;
 
+/** The attributes one delivery rides with, signature included. */
+function attributesFor(
+  request: WebhookDispatchRequest,
+): Record<string, MessageAttributeValue> {
+  const signature =
+    request.signingSecrets.length > 0
+      ? signWebhookPayload({
+          secrets: request.signingSecrets,
+          body: request.body,
+          timestampSeconds: Math.floor(Date.now() / 1000),
+        })
+      : null;
+  return sqsMessageAttributes({
+    batchId: request.batchId,
+    attempt: request.attempt,
+    signature,
+    ...(request.testFire ? { testFire: true } : {}),
+  });
+}
+
+/**
+ * The refusal for a batch no queue message can carry, or null when it fits.
+ *
+ * Terminal, and it says what to change: the same bytes will never fit, and
+ * splitting is not on the table because one batch is one message and the
+ * batch id is the replay-safety key.
+ */
+function oversizeRefusal({
+  bytes,
+  batchId,
+}: {
+  bytes: number;
+  batchId: string;
+}): WebhookDispatchResult | null {
+  if (bytes <= SQS_MAX_MESSAGE_BYTES) return null;
+  return {
+    verdict: "terminal",
+    status: null,
+    body: "",
+    dispatchId: batchId,
+    error:
+      `Batch is ${bytes} bytes, over the ${SQS_MAX_MESSAGE_BYTES}-byte Amazon SQS message limit. ` +
+      "Lower the endpoint's maximum batch size so each delivery carries fewer events.",
+  };
+}
+
+/** The send itself, and whatever the queue answered, as a verdict. */
+async function putOnQueue({
+  client,
+  queueUrl,
+  body,
+  attributes,
+  batchId,
+}: {
+  client: SQSClient;
+  queueUrl: string;
+  body: string;
+  attributes: Record<string, MessageAttributeValue>;
+  batchId: string;
+}): Promise<WebhookDispatchResult> {
+  try {
+    const answer = await client.send(
+      new SendMessageCommand({
+        QueueUrl: queueUrl,
+        MessageBody: body,
+        MessageAttributes: attributes,
+      }),
+    );
+    return {
+      verdict: "success",
+      // A queue has no status to report, and inventing one (200) would make
+      // the delivery log lie about what answered.
+      status: null,
+      body: answer.MessageId ?? "",
+      dispatchId: batchId,
+    };
+  } catch (error) {
+    const { verdict, reason } = classifySqsFailure(error);
+    const detail = error instanceof Error ? error.message : String(error ?? "");
+    return {
+      verdict,
+      status: null,
+      body: "",
+      dispatchId: batchId,
+      error: `${reason}: ${detail}`.slice(0, ERROR_SNIPPET_CHARS),
+    };
+  } finally {
+    client.destroy();
+  }
+}
+
 export function sqsWebhookDestination(
   config: SqsDestinationConfig,
   deps: { createClient?: (queueUrl: string) => SQSClient } = {},
 ): WebhookDestination {
   return {
     kind: "sqs",
-    async send(request: WebhookDispatchRequest): Promise<WebhookDispatchResult> {
+    async send(
+      request: WebhookDispatchRequest,
+    ): Promise<WebhookDispatchResult> {
       // The same cap the HTTPS transport answers to, called here directly
       // because a queue send never passes through the HTTP sender that used
       // to own it. Without this line a queue endpoint would be uncapped. A
@@ -244,70 +343,20 @@ export function sqsWebhookDestination(
         });
       }
 
-      const signature =
-        request.signingSecrets.length > 0
-          ? signWebhookPayload({
-              secrets: request.signingSecrets,
-              body: request.body,
-              timestampSeconds: Math.floor(Date.now() / 1000),
-            })
-          : null;
-      const attributes = sqsMessageAttributes({
+      const attributes = attributesFor(request);
+      const refusal = oversizeRefusal({
+        bytes: sqsMessageBytes({ body: request.body, attributes }),
         batchId: request.batchId,
-        attempt: request.attempt,
-        signature,
-        ...(request.testFire ? { testFire: true } : {}),
       });
+      if (refusal) return refusal;
 
-      const bytes = sqsMessageBytes({ body: request.body, attributes });
-      if (bytes > SQS_MAX_MESSAGE_BYTES) {
-        // Terminal, and it says what to change: the same bytes will never
-        // fit, and splitting is not on the table because one batch is one
-        // message and the batch id is the replay-safety key.
-        return {
-          verdict: "terminal",
-          status: null,
-          body: "",
-          dispatchId: request.batchId,
-          error:
-            `Batch is ${bytes} bytes, over the ${SQS_MAX_MESSAGE_BYTES}-byte Amazon SQS message limit. ` +
-            "Lower the endpoint's maximum batch size so each delivery carries fewer events.",
-        };
-      }
-
-      const client = (deps.createClient ?? createSqsClient(config))(
-        config.queueUrl,
-      );
-      try {
-        const answer = await client.send(
-          new SendMessageCommand({
-            QueueUrl: config.queueUrl,
-            MessageBody: request.body,
-            MessageAttributes: attributes,
-          }),
-        );
-        return {
-          verdict: "success",
-          // A queue has no status to report, and inventing one (200) would
-          // make the delivery log lie about what answered.
-          status: null,
-          body: answer.MessageId ?? "",
-          dispatchId: request.batchId,
-        };
-      } catch (error) {
-        const { verdict, reason } = classifySqsFailure(error);
-        const detail =
-          error instanceof Error ? error.message : String(error ?? "");
-        return {
-          verdict,
-          status: null,
-          body: "",
-          dispatchId: request.batchId,
-          error: `${reason}: ${detail}`.slice(0, ERROR_SNIPPET_CHARS),
-        };
-      } finally {
-        client.destroy();
-      }
+      return await putOnQueue({
+        client: (deps.createClient ?? createSqsClient(config))(config.queueUrl),
+        queueUrl: config.queueUrl,
+        body: request.body,
+        attributes,
+        batchId: request.batchId,
+      });
     },
   };
 }

@@ -51492,8 +51492,74 @@
                         "id": {
                           "type": "string"
                         },
+                        "destination_kind": {
+                          "type": "string",
+                          "enum": [
+                            "http",
+                            "sqs"
+                          ]
+                        },
                         "url": {
-                          "type": "string"
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "sqs": {
+                          "type": [
+                            "object",
+                            "null"
+                          ],
+                          "properties": {
+                            "queue_url": {
+                              "type": "string"
+                            },
+                            "region": {
+                              "type": "string"
+                            },
+                            "account_id": {
+                              "type": "string"
+                            },
+                            "queue_name": {
+                              "type": "string"
+                            },
+                            "credential_mode": {
+                              "type": "string",
+                              "enum": [
+                                "assume_role",
+                                "static",
+                                "ambient"
+                              ]
+                            },
+                            "role_arn": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "external_id": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "access_key_id": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "queue_url",
+                            "region",
+                            "account_id",
+                            "queue_name",
+                            "credential_mode",
+                            "role_arn",
+                            "external_id",
+                            "access_key_id"
+                          ]
                         },
                         "enabled_events": {
                           "type": "array",
@@ -51559,7 +51625,9 @@
                       },
                       "required": [
                         "id",
+                        "destination_kind",
                         "url",
+                        "sqs",
                         "enabled_events",
                         "status",
                         "disabled_reason",
@@ -51829,10 +51897,50 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "destination_kind": {
+                    "type": "string",
+                    "enum": [
+                      "http",
+                      "sqs"
+                    ]
+                  },
                   "url": {
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 2000
+                  },
+                  "sqs": {
+                    "type": "object",
+                    "properties": {
+                      "queue_url": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2000
+                      },
+                      "role_arn": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2048
+                      },
+                      "external_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1224
+                      },
+                      "access_key_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      },
+                      "secret_access_key": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256
+                      }
+                    },
+                    "required": [
+                      "queue_url"
+                    ]
                   },
                   "enabled_events": {
                     "type": "array",
@@ -51855,7 +51963,6 @@
                   }
                 },
                 "required": [
-                  "url",
                   "enabled_events"
                 ]
               }
@@ -51885,8 +51992,74 @@
                           "id": {
                             "type": "string"
                           },
+                          "destination_kind": {
+                            "type": "string",
+                            "enum": [
+                              "http",
+                              "sqs"
+                            ]
+                          },
                           "url": {
-                            "type": "string"
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "sqs": {
+                            "type": [
+                              "object",
+                              "null"
+                            ],
+                            "properties": {
+                              "queue_url": {
+                                "type": "string"
+                              },
+                              "region": {
+                                "type": "string"
+                              },
+                              "account_id": {
+                                "type": "string"
+                              },
+                              "queue_name": {
+                                "type": "string"
+                              },
+                              "credential_mode": {
+                                "type": "string",
+                                "enum": [
+                                  "assume_role",
+                                  "static",
+                                  "ambient"
+                                ]
+                              },
+                              "role_arn": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "external_id": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "access_key_id": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "queue_url",
+                              "region",
+                              "account_id",
+                              "queue_name",
+                              "credential_mode",
+                              "role_arn",
+                              "external_id",
+                              "access_key_id"
+                            ]
                           },
                           "enabled_events": {
                             "type": "array",
@@ -51949,7 +52122,9 @@
                         },
                         "required": [
                           "id",
+                          "destination_kind",
                           "url",
+                          "sqs",
                           "enabled_events",
                           "status",
                           "disabled_reason",
@@ -52180,8 +52355,74 @@
                         "id": {
                           "type": "string"
                         },
+                        "destination_kind": {
+                          "type": "string",
+                          "enum": [
+                            "http",
+                            "sqs"
+                          ]
+                        },
                         "url": {
-                          "type": "string"
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "sqs": {
+                          "type": [
+                            "object",
+                            "null"
+                          ],
+                          "properties": {
+                            "queue_url": {
+                              "type": "string"
+                            },
+                            "region": {
+                              "type": "string"
+                            },
+                            "account_id": {
+                              "type": "string"
+                            },
+                            "queue_name": {
+                              "type": "string"
+                            },
+                            "credential_mode": {
+                              "type": "string",
+                              "enum": [
+                                "assume_role",
+                                "static",
+                                "ambient"
+                              ]
+                            },
+                            "role_arn": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "external_id": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "access_key_id": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "queue_url",
+                            "region",
+                            "account_id",
+                            "queue_name",
+                            "credential_mode",
+                            "role_arn",
+                            "external_id",
+                            "access_key_id"
+                          ]
                         },
                         "enabled_events": {
                           "type": "array",
@@ -52244,7 +52485,9 @@
                       },
                       "required": [
                         "id",
+                        "destination_kind",
                         "url",
+                        "sqs",
                         "enabled_events",
                         "status",
                         "disabled_reason",
@@ -52525,8 +52768,74 @@
                         "id": {
                           "type": "string"
                         },
+                        "destination_kind": {
+                          "type": "string",
+                          "enum": [
+                            "http",
+                            "sqs"
+                          ]
+                        },
                         "url": {
-                          "type": "string"
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "sqs": {
+                          "type": [
+                            "object",
+                            "null"
+                          ],
+                          "properties": {
+                            "queue_url": {
+                              "type": "string"
+                            },
+                            "region": {
+                              "type": "string"
+                            },
+                            "account_id": {
+                              "type": "string"
+                            },
+                            "queue_name": {
+                              "type": "string"
+                            },
+                            "credential_mode": {
+                              "type": "string",
+                              "enum": [
+                                "assume_role",
+                                "static",
+                                "ambient"
+                              ]
+                            },
+                            "role_arn": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "external_id": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "access_key_id": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "queue_url",
+                            "region",
+                            "account_id",
+                            "queue_name",
+                            "credential_mode",
+                            "role_arn",
+                            "external_id",
+                            "access_key_id"
+                          ]
                         },
                         "enabled_events": {
                           "type": "array",
@@ -52589,7 +52898,9 @@
                       },
                       "required": [
                         "id",
+                        "destination_kind",
                         "url",
+                        "sqs",
                         "enabled_events",
                         "status",
                         "disabled_reason",
@@ -52848,17 +53159,54 @@
           }
         ],
         "summary": "Update a webhook endpoint",
-        "description": "Update a webhook endpoint's url, event subscriptions, or status (`active` re-enables, `disabled` pauses; re-enabling does not re-send the gap, replay covers it)",
+        "description": "Update a webhook endpoint's address, event subscriptions, or status (`active` re-enables, `disabled` pauses; re-enabling does not re-send the gap, replay covers it). `destination_kind` cannot change: batches already planned against the old transport are in flight, so a move means a new endpoint alongside this one until it has drained.",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
                 "properties": {
+                  "destination_kind": {
+                    "type": "string",
+                    "enum": [
+                      "http",
+                      "sqs"
+                    ]
+                  },
                   "url": {
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 2000
+                  },
+                  "sqs": {
+                    "type": "object",
+                    "properties": {
+                      "queue_url": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2000
+                      },
+                      "role_arn": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2048
+                      },
+                      "external_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1224
+                      },
+                      "access_key_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      },
+                      "secret_access_key": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256
+                      }
+                    }
                   },
                   "enabled_events": {
                     "type": "array",
@@ -53186,8 +53534,74 @@
                         "id": {
                           "type": "string"
                         },
+                        "destination_kind": {
+                          "type": "string",
+                          "enum": [
+                            "http",
+                            "sqs"
+                          ]
+                        },
                         "url": {
-                          "type": "string"
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "sqs": {
+                          "type": [
+                            "object",
+                            "null"
+                          ],
+                          "properties": {
+                            "queue_url": {
+                              "type": "string"
+                            },
+                            "region": {
+                              "type": "string"
+                            },
+                            "account_id": {
+                              "type": "string"
+                            },
+                            "queue_name": {
+                              "type": "string"
+                            },
+                            "credential_mode": {
+                              "type": "string",
+                              "enum": [
+                                "assume_role",
+                                "static",
+                                "ambient"
+                              ]
+                            },
+                            "role_arn": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "external_id": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "access_key_id": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "queue_url",
+                            "region",
+                            "account_id",
+                            "queue_name",
+                            "credential_mode",
+                            "role_arn",
+                            "external_id",
+                            "access_key_id"
+                          ]
                         },
                         "enabled_events": {
                           "type": "array",
@@ -53253,7 +53667,9 @@
                       },
                       "required": [
                         "id",
+                        "destination_kind",
                         "url",
+                        "sqs",
                         "enabled_events",
                         "status",
                         "disabled_reason",

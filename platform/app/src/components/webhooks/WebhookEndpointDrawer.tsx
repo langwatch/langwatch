@@ -14,11 +14,11 @@ import { Checkbox } from "~/components/ui/checkbox";
 import { Drawer } from "~/components/ui/drawer";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { SegmentedControl } from "~/components/ui/segmented-control";
+import type { RouterOutputs } from "~/utils/api";
 import {
   WEBHOOK_DESTINATION_LABELS,
   type WebhookDestinationKind,
 } from "~/utils/webhookDestinations";
-import type { RouterOutputs } from "~/utils/api";
 
 type EventType = WebhookEventType;
 type EndpointView = RouterOutputs["webhookEndpoints"]["list"][number];
@@ -95,7 +95,7 @@ function withFamilyToggled(
  * The drawer's form: the fields, reset to the endpoint being edited every
  * time the drawer opens, plus the save payload they add up to.
  */
-function useEndpointForm(isOpen: boolean, endpoint: EndpointView | null) {
+function useDestinationFields(isOpen: boolean, endpoint: EndpointView | null) {
   const [destinationKind, setDestinationKind] =
     useState<WebhookDestinationKind>("http");
   const [url, setUrl] = useState("");
@@ -103,10 +103,6 @@ function useEndpointForm(isOpen: boolean, endpoint: EndpointView | null) {
   const [roleArn, setRoleArn] = useState("");
   const [accessKeyId, setAccessKeyId] = useState("");
   const [secretAccessKey, setSecretAccessKey] = useState("");
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [maxBatchSize, setMaxBatchSize] = useState(100);
-  const [maxBatchDelayMs, setMaxBatchDelayMs] = useState(250);
-  const [maxInFlight, setMaxInFlight] = useState(4);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -118,6 +114,73 @@ function useEndpointForm(isOpen: boolean, endpoint: EndpointView | null) {
     // Never prefilled: the stored secret is not readable, and an empty box
     // means "keep what is stored" rather than "clear it".
     setSecretAccessKey("");
+  }, [isOpen, endpoint]);
+
+  return {
+    destinationKind,
+    setDestinationKind,
+    url,
+    setUrl,
+    queueUrl,
+    setQueueUrl,
+    roleArn,
+    setRoleArn,
+    accessKeyId,
+    setAccessKeyId,
+    secretAccessKey,
+    setSecretAccessKey,
+    addressFilled:
+      destinationKind === "sqs"
+        ? queueUrl.trim().length > 0
+        : url.trim().length > 0,
+    toDestinationInput: (): DestinationInput =>
+      destinationKind === "sqs"
+        ? {
+            destinationKind,
+            sqs: sqsInput({
+              queueUrl,
+              roleArn,
+              accessKeyId,
+              secretAccessKey,
+            }),
+          }
+        : { destinationKind, url: url.trim() },
+  };
+}
+
+type DestinationInput = Pick<EndpointInput, "destinationKind" | "url" | "sqs">;
+
+/** The queue fields as the wire takes them: trimmed, and empty ones left
+ *  out entirely rather than sent as blanks. An absent secret is what keeps
+ *  the stored one rather than clearing it. */
+function sqsInput({
+  queueUrl,
+  roleArn,
+  accessKeyId,
+  secretAccessKey,
+}: {
+  queueUrl: string;
+  roleArn: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+}): NonNullable<EndpointInput["sqs"]> {
+  return {
+    queueUrl: queueUrl.trim(),
+    ...(roleArn.trim() ? { roleArn: roleArn.trim() } : {}),
+    ...(accessKeyId.trim() ? { accessKeyId: accessKeyId.trim() } : {}),
+    ...(secretAccessKey ? { secretAccessKey } : {}),
+  };
+}
+
+function useEndpointForm(isOpen: boolean, endpoint: EndpointView | null) {
+  const destination = useDestinationFields(isOpen, endpoint);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [maxBatchSize, setMaxBatchSize] = useState(100);
+  const [maxBatchDelayMs, setMaxBatchDelayMs] = useState(250);
+  const [maxInFlight, setMaxInFlight] = useState(4);
+
+  useEffect(() => {
+    if (!isOpen) return;
     setSelected(new Set(endpoint?.enabledEvents ?? []));
     setMaxBatchSize(endpoint?.maxBatchSize ?? 100);
     setMaxBatchDelayMs(endpoint?.maxBatchDelayMs ?? 250);
@@ -137,24 +200,8 @@ function useEndpointForm(isOpen: boolean, endpoint: EndpointView | null) {
     setSelected((prev) => withFamilyToggled(prev, family, on));
   };
 
-  const addressFilled =
-    destinationKind === "sqs"
-      ? queueUrl.trim().length > 0
-      : url.trim().length > 0;
-
   return {
-    destinationKind,
-    setDestinationKind,
-    url,
-    setUrl,
-    queueUrl,
-    setQueueUrl,
-    roleArn,
-    setRoleArn,
-    accessKeyId,
-    setAccessKeyId,
-    secretAccessKey,
-    setSecretAccessKey,
+    ...destination,
     selected,
     maxBatchSize,
     setMaxBatchSize,
@@ -165,25 +212,11 @@ function useEndpointForm(isOpen: boolean, endpoint: EndpointView | null) {
     toggleType,
     toggleFamily,
     isValid:
-      addressFilled &&
+      destination.addressFilled &&
       selected.size > 0 &&
       controlsWithinBounds(maxBatchSize, maxBatchDelayMs, maxInFlight),
     toInput: (): EndpointInput => ({
-      destinationKind,
-      ...(destinationKind === "sqs"
-        ? {
-            sqs: {
-              queueUrl: queueUrl.trim(),
-              ...(roleArn.trim() ? { roleArn: roleArn.trim() } : {}),
-              ...(accessKeyId.trim()
-                ? { accessKeyId: accessKeyId.trim() }
-                : {}),
-              // Left out entirely when the box is empty, which is what keeps
-              // the stored secret rather than clearing it.
-              ...(secretAccessKey ? { secretAccessKey } : {}),
-            },
-          }
-        : { url: url.trim() }),
+      ...destination.toDestinationInput(),
       enabledEvents: [...selected],
       maxBatchSize,
       maxBatchDelayMs,

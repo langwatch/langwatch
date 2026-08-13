@@ -10,8 +10,7 @@
 /** The wire spelling, lowercase: the same strings appear in the database,
  *  the REST DTO, both SDKs and the CLI. */
 export const WEBHOOK_DESTINATION_KINDS = ["http", "sqs"] as const;
-export type WebhookDestinationKind =
-  (typeof WEBHOOK_DESTINATION_KINDS)[number];
+export type WebhookDestinationKind = (typeof WEBHOOK_DESTINATION_KINDS)[number];
 
 export function isWebhookDestinationKind(
   value: string,

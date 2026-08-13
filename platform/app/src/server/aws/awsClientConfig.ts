@@ -132,6 +132,41 @@ export function staticCredentialsOrUndefined(
 /** How long an assumed session lasts before the provider refreshes it. */
 const DEFAULT_ASSUME_ROLE_DURATION_SECONDS = 900;
 
+/**
+ * The credentials field, or undefined so the default chain runs.
+ *
+ * Undefined is the important case: an omitted field is what lets IRSA, an
+ * instance profile or an SSO session answer. An empty object would stop the
+ * search with an answer of "" and fail.
+ */
+function resolveCredentials({
+  region,
+  staticCredentials,
+  assumeRole,
+}: Pick<
+  AwsClientConfigInput,
+  "region" | "staticCredentials" | "assumeRole"
+>): AwsClientConfig["credentials"] {
+  const staticIdentity = staticCredentialsOrUndefined(staticCredentials);
+  if (!assumeRole) return staticIdentity;
+  // The role is assumed WITH whatever the outer credentials are, so a static
+  // pair here means "these keys may assume that role"; absent, the
+  // deployment's own identity does the assuming.
+  return fromTemporaryCredentials({
+    params: {
+      RoleArn: assumeRole.roleArn,
+      RoleSessionName: assumeRole.sessionName ?? "langwatch",
+      ...(present(assumeRole.externalId)
+        ? { ExternalId: assumeRole.externalId }
+        : {}),
+      DurationSeconds:
+        assumeRole.durationSeconds ?? DEFAULT_ASSUME_ROLE_DURATION_SECONDS,
+    },
+    ...(present(region) ? { clientConfig: { region } } : {}),
+    ...(staticIdentity ? { masterCredentials: staticIdentity } : {}),
+  });
+}
+
 export function buildAwsClientConfig({
   region,
   targetHost,
@@ -146,28 +181,12 @@ export function buildAwsClientConfig({
   if (present(endpoint)) config.endpoint = endpoint;
   if (disableSdkRetries) config.maxAttempts = 1;
 
-  const staticIdentity = staticCredentialsOrUndefined(staticCredentials);
-  if (assumeRole) {
-    // The role is assumed WITH whatever the outer credentials are, so a
-    // static pair here means "these keys may assume that role"; absent, the
-    // deployment's own identity does the assuming.
-    config.credentials = fromTemporaryCredentials({
-      params: {
-        RoleArn: assumeRole.roleArn,
-        RoleSessionName: assumeRole.sessionName ?? "langwatch",
-        ...(present(assumeRole.externalId)
-          ? { ExternalId: assumeRole.externalId }
-          : {}),
-        DurationSeconds:
-          assumeRole.durationSeconds ?? DEFAULT_ASSUME_ROLE_DURATION_SECONDS,
-      },
-      ...(present(region) ? { clientConfig: { region } } : {}),
-      ...(staticIdentity ? { masterCredentials: staticIdentity } : {}),
-    });
-  } else if (staticIdentity) {
-    // Absent, not empty: an omitted field is what lets the default chain run.
-    config.credentials = staticIdentity;
-  }
+  const credentials = resolveCredentials({
+    region,
+    staticCredentials,
+    assumeRole,
+  });
+  if (credentials) config.credentials = credentials;
 
   const proxyUrl = resolveProxyForHost(hostnameOf(targetHost));
   if (proxyUrl) config.requestHandler = proxyRequestHandler(proxyUrl);

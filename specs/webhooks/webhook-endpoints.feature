@@ -131,7 +131,7 @@ Feature: Webhook endpoints, signed outbound event delivery
       Then it is posted exactly as before, to the same URL with the same headers
       And its delivery log rows are indistinguishable from the ones it recorded before
 
-    @integration
+    @unit
     Scenario: Both destinations answer to the same hourly dispatch cap
       Given an organization at its hourly dispatch cap
       When a batch is delivered to a queue destination

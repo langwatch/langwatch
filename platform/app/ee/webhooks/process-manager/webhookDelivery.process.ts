@@ -25,9 +25,9 @@ import type {
   NewOutboxMessage,
   ProcessStore,
 } from "~/server/event-sourcing/process-manager/stores/processStore.types";
+import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import type { SpendEventRow } from "~/server/gateway/spendEvents.clickhouse.repository";
 import { nanoUsdToDecimalString } from "~/server/gateway/wireMoney";
-import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import { pruneExpiredIdempotencyReceipts } from "~/server/webhooks/deliveryLog";
 import { webhookDestinationFor } from "~/server/webhooks/destinations";
 import type { WebhookDispatchResult } from "~/server/webhooks/destinations/types";

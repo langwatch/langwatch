@@ -744,4 +744,194 @@ describe("Feature: Webhook endpoints REST API", () => {
       expect(error.meta?.target).toBe("query");
     });
   });
+
+  describe("destination kinds", () => {
+    const QUEUE_URL =
+      "https://sqs.eu-central-1.amazonaws.com/381491922238/lw-test-billing";
+
+    const createEndpoint = (body: Record<string, unknown>) =>
+      app.request("/api/webhooks/v1/endpoints", {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify(body),
+      });
+
+    /** @scenario A FIFO queue is refused at save time */
+    it("refuses a FIFO queue and says standard queues only", async () => {
+      planHasWebhookEndpoints = true;
+      process.env.WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS = "1";
+      const res = await createEndpoint({
+        destination_kind: "sqs",
+        sqs: {
+          queue_url:
+            "https://sqs.eu-central-1.amazonaws.com/381491922238/orders.fifo",
+        },
+        enabled_events: ["gateway.request.completed"],
+      });
+      const error = await expectCanonicalError(res, {
+        status: 400,
+        code: "webhook_endpoint_invalid",
+      });
+      expect(error.message).toMatch(/standard queue/i);
+      delete process.env.WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS;
+    });
+
+    /** @scenario A queue URL outside the canonical Amazon SQS shape is refused */
+    it("refuses a queue URL that is not an Amazon SQS queue URL", async () => {
+      planHasWebhookEndpoints = true;
+      process.env.WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS = "1";
+      const res = await createEndpoint({
+        destination_kind: "sqs",
+        sqs: { queue_url: "https://queues.example.com/mine" },
+        enabled_events: ["gateway.request.completed"],
+      });
+      await expectCanonicalError(res, {
+        status: 400,
+        code: "webhook_endpoint_invalid",
+      });
+      delete process.env.WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS;
+    });
+
+    /** @scenario Ambient AWS credentials need the operator opt-in */
+    it("refuses a queue endpoint with no credentials of its own unless the operator opted in", async () => {
+      planHasWebhookEndpoints = true;
+      delete process.env.WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS;
+      const refused = await createEndpoint({
+        destination_kind: "sqs",
+        sqs: { queue_url: QUEUE_URL },
+        enabled_events: ["gateway.request.completed"],
+      });
+      const error = await expectCanonicalError(refused, {
+        status: 400,
+        code: "webhook_endpoint_invalid",
+      });
+      // The refusal has to say what to supply, not merely that something is
+      // missing: this is the control that keeps one tenant off another's queue.
+      expect(error.message).toMatch(/role_arn|access_key_id/);
+
+      process.env.WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS = "1";
+      const accepted = await createEndpoint({
+        destination_kind: "sqs",
+        sqs: { queue_url: QUEUE_URL },
+        enabled_events: ["gateway.request.completed"],
+      });
+      expect(accepted.status).toBe(201);
+      const body = (await accepted.json()) as {
+        data: {
+          sqs: { credential_mode: string; region: string; account_id: string };
+        };
+      };
+      expect(body.data.sqs.credential_mode).toBe("ambient");
+      expect(body.data.sqs.region).toBe("eu-central-1");
+      expect(body.data.sqs.account_id).toBe("381491922238");
+      delete process.env.WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS;
+    });
+
+    /** @scenario Static queue credentials are stored encrypted and never echoed */
+    it("encrypts a static secret at rest and never returns it", async () => {
+      planHasWebhookEndpoints = true;
+      const res = await createEndpoint({
+        destination_kind: "sqs",
+        sqs: {
+          queue_url: QUEUE_URL,
+          access_key_id: "AKIAEXAMPLEKEYID",
+          secret_access_key: "an-example-secret-access-key",
+        },
+        enabled_events: ["gateway.request.completed"],
+      });
+      expect(res.status).toBe(201);
+      const created = (await res.json()) as { data: { id: string } };
+
+      // Not in the create response, and not in any read of it either.
+      const serialized = JSON.stringify(created);
+      expect(serialized).not.toContain("an-example-secret-access-key");
+      const read = await app.request(
+        `/api/webhooks/v1/endpoints/${created.data.id}`,
+        { headers: headers() },
+      );
+      expect(await read.text()).not.toContain("an-example-secret-access-key");
+
+      const row = await prisma.webhookEndpoint.findFirst({
+        where: { id: created.data.id },
+        select: { sqsSecretAccessKeyEncrypted: true, sqsAccessKeyId: true },
+      });
+      expect(row?.sqsAccessKeyId).toBe("AKIAEXAMPLEKEYID");
+      expect(row?.sqsSecretAccessKeyEncrypted).not.toBeNull();
+      expect(row?.sqsSecretAccessKeyEncrypted).not.toContain(
+        "an-example-secret-access-key",
+      );
+    });
+
+    /** @scenario Saving an endpoint names the field its destination kind is missing */
+    it("names the missing field for the kind rather than refusing the whole body", async () => {
+      planHasWebhookEndpoints = true;
+      const res = await createEndpoint({
+        destination_kind: "sqs",
+        enabled_events: ["gateway.request.completed"],
+      });
+      const error = await expectCanonicalError(res, {
+        status: 400,
+        type: "bad_request",
+        code: "validation_error",
+      });
+      expect(error.meta?.fields).toEqual(
+        expect.arrayContaining(["sqs.queue_url"]),
+      );
+    });
+
+    /** @scenario An endpoint never changes its destination kind */
+    it("refuses to move an existing endpoint to another destination kind", async () => {
+      planHasWebhookEndpoints = true;
+      const created = await createEndpoint({
+        url: "https://example.com/hooks/kind-change",
+        enabled_events: ["gateway.request.completed"],
+      });
+      expect(created.status).toBe(201);
+      const { data } = (await created.json()) as { data: { id: string } };
+
+      const res = await app.request(`/api/webhooks/v1/endpoints/${data.id}`, {
+        method: "PATCH",
+        headers: headers(),
+        body: JSON.stringify({
+          destination_kind: "sqs",
+          sqs: { queue_url: QUEUE_URL },
+        }),
+      });
+      const error = await expectCanonicalError(res, {
+        status: 400,
+        code: "webhook_endpoint_invalid",
+      });
+      expect(error.message).toMatch(/cannot be changed/i);
+    });
+
+    /** @scenario An HTTP endpoint delivers unchanged through the transport seam */
+    it("keeps an endpoint with no destination kind on the HTTPS transport", async () => {
+      planHasWebhookEndpoints = true;
+      const created = await createEndpoint({
+        url: "https://example.com/hooks/default-kind",
+        enabled_events: ["gateway.request.completed"],
+      });
+      expect(created.status).toBe(201);
+      const { data } = (await created.json()) as {
+        data: { id: string; destination_kind: string; url: string; sqs: null };
+      };
+      expect(data.destination_kind).toBe("http");
+      expect(data.url).toBe("https://example.com/hooks/default-kind");
+      expect(data.sqs).toBeNull();
+
+      const { WebhookEndpointService } = await import(
+        "@ee/webhooks/webhookEndpoint.service"
+      );
+      const destination = await new WebhookEndpointService({
+        prisma,
+      }).getDestinationConfig({
+        organizationId: organization.id,
+        endpointId: data.id,
+      });
+      expect(destination).toEqual({
+        kind: "http",
+        url: "https://example.com/hooks/default-kind",
+      });
+    });
+  });
 });

@@ -22,7 +22,6 @@ import {
   inspectSqsQueueUrl,
   parseSqsQueueUrl,
 } from "~/server/webhooks/destinations/sqsQueueUrl";
-import type { WebhookDestinationKind } from "~/utils/webhookDestinations";
 import { WEBHOOK_PREVIOUS_SECRET_TTL_MS } from "~/server/webhooks/signature";
 import {
   allowsInsecureLocalUrls,
@@ -30,6 +29,7 @@ import {
 } from "~/server/webhooks/urlPolicy";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { decrypt, encrypt } from "~/utils/encryption";
+import type { WebhookDestinationKind } from "~/utils/webhookDestinations";
 import { isValidEventSelector } from "./eventRegistry";
 
 const logger = createLogger("langwatch:webhooks:endpoint-service");
@@ -244,10 +244,7 @@ export interface SqsDestinationView {
 
 /** Where an endpoint delivers, in one line, for a log or a notification. */
 export function describeDestination(
-  endpoint: Pick<
-    WebhookEndpoint,
-    "destinationKind" | "url" | "sqsQueueUrl"
-  >,
+  endpoint: Pick<WebhookEndpoint, "destinationKind" | "url" | "sqsQueueUrl">,
 ): string {
   return endpoint.destinationKind === "sqs"
     ? (endpoint.sqsQueueUrl ?? "an Amazon SQS queue")
@@ -406,6 +403,45 @@ function storedSqsDestination(sqs: SqsDestinationInput): StoredDestination {
       ? encrypt(sqs.secretAccessKey)
       : null,
   };
+}
+
+/**
+ * An update may adjust the destination it has, never swap it for another.
+ *
+ * Batches already planned against the old transport are sitting in the outbox
+ * with the old endpoint's shape. Creating a new endpoint is the move, and it
+ * is also the only one that lets both run in parallel while the receiving side
+ * is cut over.
+ */
+function assertDestinationUnchanged({
+  endpoint,
+  params,
+}: {
+  endpoint: WebhookEndpoint;
+  params: {
+    destinationKind?: WebhookDestinationKind;
+    url?: string;
+    sqs?: Partial<SqsDestinationInput>;
+  };
+}): void {
+  if (
+    params.destinationKind !== undefined &&
+    params.destinationKind !== endpoint.destinationKind
+  ) {
+    throw new WebhookEndpointValidationError(
+      `destination_kind cannot be changed after an endpoint is created; create a new endpoint for the ${params.destinationKind} destination and archive this one once it has drained`,
+    );
+  }
+  if (params.url !== undefined && endpoint.destinationKind !== "http") {
+    throw new WebhookEndpointValidationError(
+      "url does not apply to this endpoint; it delivers to an Amazon SQS queue",
+    );
+  }
+  if (params.sqs !== undefined && endpoint.destinationKind !== "sqs") {
+    throw new WebhookEndpointValidationError(
+      "sqs does not apply to this endpoint; it delivers over HTTPS",
+    );
+  }
 }
 
 /**
@@ -571,28 +607,7 @@ export class WebhookEndpointService {
     maxInFlight?: number;
   }): Promise<WebhookEndpointView> {
     const endpoint = await this.requireEndpoint(params);
-    if (
-      params.destinationKind !== undefined &&
-      params.destinationKind !== endpoint.destinationKind
-    ) {
-      // Batches already planned against the old transport are sitting in the
-      // outbox with the old endpoint's shape. Creating a new endpoint is the
-      // move, and it is also the only one that lets both run in parallel
-      // while the receiving side is cut over.
-      throw new WebhookEndpointValidationError(
-        `destination_kind cannot be changed after an endpoint is created; create a new endpoint for the ${params.destinationKind} destination and archive this one once it has drained`,
-      );
-    }
-    if (params.url !== undefined && endpoint.destinationKind !== "http") {
-      throw new WebhookEndpointValidationError(
-        "url does not apply to this endpoint; it delivers to an Amazon SQS queue",
-      );
-    }
-    if (params.sqs !== undefined && endpoint.destinationKind !== "sqs") {
-      throw new WebhookEndpointValidationError(
-        "sqs does not apply to this endpoint; it delivers over HTTPS",
-      );
-    }
+    assertDestinationUnchanged({ endpoint, params });
     if (params.url !== undefined) assertValidUrl(params.url);
     const sqsUpdate =
       params.sqs !== undefined

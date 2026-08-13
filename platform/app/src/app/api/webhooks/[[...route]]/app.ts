@@ -31,8 +31,8 @@ import { prisma } from "~/server/db";
 import { PrismaProcessStore } from "~/server/event-sourcing/process-manager/stores/prismaProcessStore";
 import { toStoredEnum, toWireEnum } from "~/server/gateway/wireEnums";
 import { webhookDestinationFor } from "~/server/webhooks/destinations";
-import { WEBHOOK_DESTINATION_KINDS } from "~/utils/webhookDestinations";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
+import { WEBHOOK_DESTINATION_KINDS } from "~/utils/webhookDestinations";
 import {
   canonicalBaseResponses,
   canonicalConflictResponses,

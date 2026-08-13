@@ -8,6 +8,10 @@ export const updateWebhookCommand = async (
   id: string,
   options: {
     url?: string;
+    queueUrl?: string;
+    roleArn?: string;
+    accessKeyId?: string;
+    secretAccessKey?: string;
     events?: string;
     maxBatchSize?: string;
     maxBatchDelay?: string;
@@ -15,15 +19,26 @@ export const updateWebhookCommand = async (
   },
 ): Promise<CommandResult | void> => {
   const apiKey = checkOrgApiKey();
+  const sqsFields = {
+    ...(options.queueUrl !== undefined ? { queue_url: options.queueUrl } : {}),
+    ...(options.roleArn !== undefined ? { role_arn: options.roleArn } : {}),
+    ...(options.accessKeyId !== undefined
+      ? { access_key_id: options.accessKeyId }
+      : {}),
+    ...(options.secretAccessKey !== undefined
+      ? { secret_access_key: options.secretAccessKey }
+      : {}),
+  };
   if (
     options.url === undefined &&
+    Object.keys(sqsFields).length === 0 &&
     options.events === undefined &&
     options.maxBatchSize === undefined &&
     options.maxBatchDelay === undefined &&
     options.maxInFlight === undefined
   ) {
     console.error(
-      "Nothing to update: pass at least one of --url, --events, --max-batch-size, --max-batch-delay, --max-in-flight.",
+      "Nothing to update: pass at least one of --url, --queue-url, --role-arn, --access-key-id, --secret-access-key, --events, --max-batch-size, --max-batch-delay, --max-in-flight.",
     );
     process.exit(1);
   }
@@ -52,6 +67,9 @@ export const updateWebhookCommand = async (
   try {
     const endpoint = await service.update(id, {
       url: options.url,
+      // An endpoint keeps the destination it was created with, so these only
+      // ever adjust a queue endpoint's own queue and credentials.
+      ...(Object.keys(sqsFields).length > 0 ? { sqs: sqsFields } : {}),
       max_batch_size: maxBatchSize,
       max_batch_delay_ms: maxBatchDelayMs,
       max_in_flight: maxInFlight,

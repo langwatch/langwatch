@@ -1,20 +1,60 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
+import type {
+  CreateWebhookEndpointInput,
+  WebhookSqsDestinationInput,
+} from "@/client-sdk/services/webhooks/webhooks-api.service";
 import { WebhooksApiService } from "@/client-sdk/services/webhooks/webhooks-api.service";
 import { checkOrgApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 
-export const createWebhookCommand = async (options: {
-  url: string;
+export interface CreateWebhookOptions {
+  url?: string;
+  queueUrl?: string;
+  roleArn?: string;
+  accessKeyId?: string;
+  secretAccessKey?: string;
   events: string;
-}): Promise<CommandResult | void> => {
+}
+
+/**
+ * Which destination the flags describe, and its fields.
+ *
+ * Naming a queue is what selects the queue destination: there is no separate
+ * kind flag to keep in agreement with the address, so the two can never
+ * disagree.
+ */
+export function destinationFromOptions(
+  options: CreateWebhookOptions,
+): Pick<CreateWebhookEndpointInput, "destination_kind" | "url" | "sqs"> {
+  if (options.queueUrl) {
+    if (options.url) {
+      throw new Error(
+        "Pass --url or --queue-url, not both: an endpoint delivers to one destination.",
+      );
+    }
+    const sqs: WebhookSqsDestinationInput = { queue_url: options.queueUrl };
+    if (options.roleArn) sqs.role_arn = options.roleArn;
+    if (options.accessKeyId) sqs.access_key_id = options.accessKeyId;
+    if (options.secretAccessKey) sqs.secret_access_key = options.secretAccessKey;
+    return { destination_kind: "sqs", sqs };
+  }
+  if (!options.url) {
+    throw new Error("Pass --url for an HTTPS endpoint, or --queue-url for an Amazon SQS queue.");
+  }
+  return { destination_kind: "http", url: options.url };
+}
+
+export const createWebhookCommand = async (
+  options: CreateWebhookOptions,
+): Promise<CommandResult | void> => {
   const apiKey = checkOrgApiKey();
   const service = new WebhooksApiService({ apiKey });
   const spinner = createSpinner("Creating webhook endpoint...").start();
   try {
     const endpoint = await service.create({
-      url: options.url,
+      ...destinationFromOptions(options),
       enabled_events: options.events.split(",").map((e) => e.trim()).filter(Boolean),
     });
     spinner.succeed(`Created endpoint ${endpoint.id}`);
@@ -25,7 +65,21 @@ export const createWebhookCommand = async (options: {
         console.log(chalk.yellow("Signing secret (shown ONCE, store it now):"));
         console.log(chalk.cyan(`  ${endpoint.secret}`));
         console.log();
+        if (endpoint.sqs?.external_id) {
+          console.log(chalk.yellow("External id for the role's trust policy:"));
+          console.log(chalk.cyan(`  ${endpoint.sqs.external_id}`));
+          console.log(
+            chalk.gray(
+              `  Trust ${endpoint.sqs.role_arn ?? "the role"} to be assumed by LangWatch with this sts:ExternalId.`,
+            ),
+          );
+          console.log();
+        }
         console.log(chalk.gray("Verify deliveries with the X-LangWatch-Signature header (t=,v1= HMAC-SHA256, 5-minute tolerance)."));
+        if (endpoint.destination_kind === "sqs") {
+          // The one thing every queue consumer gets wrong on its first run.
+          console.log(chalk.gray("On a queue, that signature is a MESSAGE ATTRIBUTE: pass MessageAttributeNames: [\"All\"] to ReceiveMessage or you will not see it."));
+        }
         console.log();
       },
     };

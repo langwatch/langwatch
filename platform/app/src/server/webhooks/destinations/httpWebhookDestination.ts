@@ -31,7 +31,9 @@ export function httpWebhookDestination({
 }): WebhookDestination {
   return {
     kind: "http",
-    async send(request: WebhookDispatchRequest): Promise<WebhookDispatchResult> {
+    async send(
+      request: WebhookDispatchRequest,
+    ): Promise<WebhookDispatchResult> {
       const result = await sendWebhook({
         url,
         body: request.body,

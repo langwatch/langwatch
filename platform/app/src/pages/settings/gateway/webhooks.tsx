@@ -29,13 +29,13 @@ import { ContactSalesBlock } from "~/components/subscription/ContactSalesBlock";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Menu } from "~/components/ui/menu";
 import { WebhookDeliveriesDrawer } from "~/components/webhooks/WebhookDeliveriesDrawer";
+import { WebhookDestinationCell } from "~/components/webhooks/WebhookDestinationCell";
 import { WebhookEndpointDrawer } from "~/components/webhooks/WebhookEndpointDrawer";
 import { WebhookSecretDialog } from "~/components/webhooks/WebhookSecretDialog";
 import { showErrorToast } from "~/features/errors";
 import { useActivePlan } from "~/hooks/useActivePlan";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
-import { WEBHOOK_DESTINATION_LABELS } from "~/utils/webhookDestinations";
 
 type EndpointView = RouterOutputs["webhookEndpoints"]["list"][number];
 type EventTypesView = RouterOutputs["webhookEndpoints"]["eventTypes"];
@@ -282,44 +282,11 @@ function WebhookRowMenu(props: EndpointActionProps) {
   );
 }
 
-/**
- * Where the endpoint delivers, in one cell: a badge naming the transport and
- * the address it uses. A queue endpoint has no URL, so without the address
- * falling through to the queue this column would simply be blank on one of
- * the two kinds.
- */
-function DestinationCell({ endpoint }: { endpoint: EndpointView }) {
-  const address = endpoint.sqs?.queueUrl ?? endpoint.url ?? "";
-  return (
-    <Table.Cell maxWidth="360px">
-      <VStack align="start" gap={1}>
-        <Badge
-          size="sm"
-          colorPalette={endpoint.destinationKind === "sqs" ? "purple" : "gray"}
-          data-testid={`webhook-destination-badge-${endpoint.id}`}
-        >
-          {WEBHOOK_DESTINATION_LABELS[endpoint.destinationKind]}
-        </Badge>
-        <Text
-          fontSize="sm"
-          overflow="hidden"
-          textOverflow="ellipsis"
-          whiteSpace="nowrap"
-          maxWidth="340px"
-          title={address}
-        >
-          {address}
-        </Text>
-      </VStack>
-    </Table.Cell>
-  );
-}
-
 function WebhookRow(props: EndpointActionProps) {
   const { endpoint } = props;
   return (
     <Table.Row>
-      <DestinationCell endpoint={endpoint} />
+      <WebhookDestinationCell endpoint={endpoint} />
       <Table.Cell>
         <Text fontSize="sm" color="fg.muted">
           {eventsSummary(endpoint.enabledEvents)}
