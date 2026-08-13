@@ -81,6 +81,27 @@ describe("the saved chart toolbar", () => {
         expect(screen.getByTestId("save-chart")).toBeDisabled();
       });
     });
+
+    describe("when they abandon one name and start over", () => {
+      it("asks again with an empty field, not the abandoned text", async () => {
+        const user = userEvent.setup();
+        mount();
+
+        await user.click(screen.getByTestId("save-chart"));
+        await user.type(
+          await screen.findByLabelText("Chart name"),
+          "Half a thought",
+        );
+        await user.click(screen.getByRole("button", { name: "Close" }));
+        await waitFor(() =>
+          expect(screen.queryByLabelText("Chart name")).toBeNull(),
+        );
+
+        await user.click(screen.getByTestId("save-chart"));
+
+        expect(await screen.findByLabelText("Chart name")).toHaveValue("");
+      });
+    });
   });
 
   describe("given a chart is open", () => {
@@ -105,7 +126,7 @@ describe("the saved chart toolbar", () => {
 
     describe("when the member renames or deletes it", () => {
       /** @scenario "A saved chart can be renamed or deleted from the list" */
-      it("renames through the chart's own menu", async () => {
+      it("renames through the chart's own menu, starting from the name it has", async () => {
         const user = userEvent.setup();
         const handlers = mount({
           openedChartId: "chart-1",
@@ -115,7 +136,11 @@ describe("the saved chart toolbar", () => {
         await user.click(screen.getByTestId("opened-chart-actions"));
         await user.click(await screen.findByText("Rename"));
 
+        // Renaming edits a name that already exists. An empty field would make
+        // the member retype it, and the one they retype is the one that sticks.
         const field = await screen.findByLabelText("Chart name");
+        expect(field).toHaveValue("Traces per day");
+
         await user.clear(field);
         await user.type(field, "Traces per week");
         await user.click(screen.getByRole("button", { name: "Save" }));
@@ -127,7 +152,7 @@ describe("the saved chart toolbar", () => {
       });
 
       /** @scenario "A saved chart can be renamed or deleted from the list" */
-      it("deletes through the same menu", async () => {
+      it("deletes through the same menu, once the member confirms", async () => {
         const user = userEvent.setup();
         const handlers = mount({
           openedChartId: "chart-1",
@@ -137,7 +162,43 @@ describe("the saved chart toolbar", () => {
         await user.click(screen.getByTestId("opened-chart-actions"));
         await user.click(await screen.findByText("Delete"));
 
+        // The menu click asks the question; it does not answer it.
+        expect(handlers.onDelete).not.toHaveBeenCalled();
+
+        await user.click(await screen.findByRole("button", { name: "Delete" }));
+
         expect(handlers.onDelete).toHaveBeenCalledWith("chart-1");
+      });
+
+      /** @scenario "Save as a new chart leaves the one that was open alone" */
+      it("detaches the open chart when they ask for a new one", async () => {
+        const user = userEvent.setup();
+        const handlers = mount({
+          openedChartId: "chart-1",
+          openedChartName: "Traces per day",
+        });
+
+        await user.click(screen.getByTestId("opened-chart-actions"));
+        await user.click(await screen.findByText("Save as a new chart"));
+
+        // Nothing is written yet — the next Save is what creates it, and it
+        // creates rather than updates because nothing is open any more.
+        expect(handlers.onSaveAsNew).toHaveBeenCalled();
+        expect(handlers.onSave).not.toHaveBeenCalled();
+      });
+
+      it("destroys nothing when the member backs out of the confirmation", async () => {
+        const user = userEvent.setup();
+        const handlers = mount({
+          openedChartId: "chart-1",
+          openedChartName: "Traces per day",
+        });
+
+        await user.click(screen.getByTestId("opened-chart-actions"));
+        await user.click(await screen.findByText("Delete"));
+        await user.click(await screen.findByRole("button", { name: "Cancel" }));
+
+        expect(handlers.onDelete).not.toHaveBeenCalled();
       });
     });
   });

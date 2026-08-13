@@ -222,6 +222,14 @@ Feature: Saved governed SQL workbench charts — the persistence model and its w
     And the specification editor holds the saved specification
 
   @integration
+  Scenario: Save as a new chart leaves the one that was open alone
+    Given the member has opened a saved chart and changed what is on screen
+    When they choose to save it as a new chart
+    Then a second chart is created under the name they give it
+    And it becomes the one Save now writes to
+    And the chart they opened keeps what was saved in it
+
+  @integration
   Scenario: A saved chart can be renamed or deleted from the list
     Given the project has saved charts
     When the member renames one and deletes another
@@ -275,6 +283,7 @@ Feature: Saved governed SQL workbench charts — the persistence model and its w
 # AC "tRPC router — save, list, open, update, delete"
 #   → Scenario: Save stores what is on screen, and saves again into the same chart
 #   → Scenario: Open restores a saved chart's query, parameters and specification
+#   → Scenario: Save as a new chart leaves the one that was open alone
 #   → Scenario: A saved chart can be renamed or deleted from the list
 #   → Scenario: Every procedure answers only for the project in the request
 # AC "the surface stays behind the experimental switch, evaluated server-side"

@@ -18,11 +18,9 @@ import { Box, Button, HStack, Kbd, Spinner, Text } from "@chakra-ui/react";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { type ReactNode, useCallback, useMemo, useRef, useState } from "react";
 
-import { showErrorToast } from "~/features/errors";
-
 import { useGovernedSqlQuery } from "../hooks/useGovernedSqlQuery";
 import { useGovernedSqlSchema } from "../hooks/useGovernedSqlSchema";
-import { useSavedWorkbenchCharts } from "../hooks/useSavedWorkbenchCharts";
+import { useSavedChartWiring } from "../hooks/useSavedChartWiring";
 import {
   GOVERNED_SQL_PARAMETER_MISSING_CODE,
   type GovernedSqlEditorMarker,
@@ -30,7 +28,6 @@ import {
   readGovernedSqlFailure,
 } from "../logic/governedSqlFailure";
 import {
-  type GovernedSqlParameterValue,
   type GovernedSqlRequestState,
   isGovernedSqlResultStale,
 } from "../logic/governedSqlRequestState";
@@ -221,94 +218,6 @@ function useDraftInsert({
   );
 
   return { registerInsert, handleInsert, insertExample };
-}
-
-/**
- * Everything Save and Open need from the workbench.
- *
- * `openedRevision` is bumped whenever a saved chart is opened, and is used as a
- * React key so the parameters form and the chart remount and read their saved
- * starting values — which is what makes "opening restores them" true without
- * either of them having to arbitrate against what the member is halfway
- * through typing. The chart hands back a spec reader once it has mounted;
- * until then — a query saved before its chart was ever opened — Save stores
- * the query alone, which is a whole record: the starter specification is
- * derived on open.
- */
-function useSavedChartWiring({
-  projectId,
-  query,
-}: {
-  projectId: string;
-  query: ReturnType<typeof useGovernedSqlQuery>;
-}) {
-  const [openedRevision, setOpenedRevision] = useState(0);
-  const [openedSpecText, setOpenedSpecText] = useState<string | undefined>(
-    undefined,
-  );
-  const [openedParameters, setOpenedParameters] = useState<
-    Readonly<Record<string, GovernedSqlParameterValue>> | undefined
-  >(undefined);
-
-  const specReaderRef = useRef<
-    (() => Record<string, unknown> | undefined) | null
-  >(null);
-  const registerSpecReader = useCallback(
-    (read: (() => Record<string, unknown> | undefined) | null) => {
-      specReaderRef.current = read;
-    },
-    [],
-  );
-
-  const { draft } = query.state;
-  const { setSql, setParameters } = query;
-
-  const saved = useSavedWorkbenchCharts({
-    projectId,
-    onOpened: useCallback(
-      (opened) => {
-        setSql(opened.sql);
-        setParameters(opened.parameters);
-        setOpenedParameters(opened.parameters);
-        setOpenedSpecText(
-          opened.vegaLiteSpec
-            ? JSON.stringify(opened.vegaLiteSpec, null, 2)
-            : undefined,
-        );
-        setOpenedRevision((revision) => revision + 1);
-      },
-      [setSql, setParameters],
-    ),
-    onError: useCallback(
-      (error: unknown, fallbackTitle: string) =>
-        showErrorToast({ error, fallbackTitle }),
-      [],
-    ),
-  });
-
-  // What Save writes: the draft the member is looking at, plus the
-  // specification if they have opened the chart at all.
-  const currentDraft = useCallback(() => {
-    // `undefined` covers both "the chart was never opened" and "the text on
-    // screen is not valid JSON". Either way the query is saved alone rather
-    // than the whole save being refused, which would cost the member their SQL
-    // over a half-typed specification.
-    const vegaLiteSpec = specReaderRef.current?.();
-    return {
-      sql: draft.sql,
-      parameters: draft.parameters,
-      ...(vegaLiteSpec ? { vegaLiteSpec } : {}),
-    };
-  }, [draft.sql, draft.parameters]);
-
-  return {
-    saved,
-    currentDraft,
-    registerSpecReader,
-    openedRevision,
-    openedSpecText,
-    openedParameters,
-  };
 }
 
 export function GovernedSqlWorkbench({ projectId }: GovernedSqlWorkbenchProps) {

@@ -24,12 +24,13 @@ import { NotFoundError } from "@langwatch/handled-error";
 import { z } from "zod";
 
 import { getGovernedSqlService } from "~/server/analytics/governed-sql";
-import { GovernedSqlNotEnabledError } from "~/server/analytics/governed-sql/errors";
 import { workbenchEnabled } from "~/server/analytics/workbenchFeatureGate";
 
 import { checkProjectPermission } from "../../rbac";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 import { getUserProtectionsForProject } from "../../utils";
+
+import { enforceWorkbenchEnabled } from "./workbenchAccessMiddleware";
 
 /**
  * Longest statement this router accepts.
@@ -60,6 +61,11 @@ const projectScopeSchema = z.object({ projectId: z.string() });
  * Separate from `schema` because the schema is answerable without an executor
  * (it is the catalog), so a deployment with no governed identity would describe
  * a surface it cannot run. The navigation gates on this, never on the schema.
+ *
+ * The one procedure that reads the switch rather than being gated by it: its
+ * whole job is to answer "off" out loud, so `enforceWorkbenchEnabled` — which
+ * every other procedure on this surface chains — would refuse the very question
+ * being asked.
  */
 const availability = protectedProcedure
   .input(projectScopeSchema)
@@ -77,16 +83,8 @@ const availability = protectedProcedure
 const schema = protectedProcedure
   .input(projectScopeSchema)
   .use(checkProjectPermission("analytics:view"))
+  .use(enforceWorkbenchEnabled)
   .query(async ({ ctx, input }) => {
-    if (
-      !(await workbenchEnabled({
-        prisma: ctx.prisma,
-        userId: ctx.session.user.id,
-        projectId: input.projectId,
-      }))
-    ) {
-      throw new GovernedSqlNotEnabledError();
-    }
     return getGovernedSqlService().describeSchema({
       protections: await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
@@ -113,17 +111,8 @@ const query = protectedProcedure
     }),
   )
   .use(checkProjectPermission("analytics:view"))
+  .use(enforceWorkbenchEnabled)
   .mutation(async ({ ctx, input }) => {
-    if (
-      !(await workbenchEnabled({
-        prisma: ctx.prisma,
-        userId: ctx.session.user.id,
-        projectId: input.projectId,
-      }))
-    ) {
-      throw new GovernedSqlNotEnabledError();
-    }
-
     // The project's governed SQL secret is hashed into the tenant capability
     // the query runs under. It is read server-side and never leaves this
     // function — no field of it appears in the response.
