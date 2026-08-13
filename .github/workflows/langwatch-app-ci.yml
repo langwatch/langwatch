@@ -294,6 +294,13 @@ jobs:
         if: matrix.shard == 1
         run: pnpm --filter @langwatch/api run test:unit
 
+      # Same reason as @langwatch/api above. The app's vitest root is
+      # `platform/app`, so a suite under `packages/` is not merely unsharded —
+      # it is unreachable, and without this step it never runs anywhere.
+      - name: Run @langwatch/redis-client unit tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/redis-client run test:unit
+
       - name: Run unit tests (shard ${{ matrix.shard }}/4)
         id: unit-tests
         working-directory: platform/app

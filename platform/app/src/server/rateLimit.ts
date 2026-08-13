@@ -1,4 +1,4 @@
-import { connection as redisConnection } from "./redis";
+import { tryGetApp } from "./app-layer/app";
 
 /**
  * Per-key sliding-window rate limiter. Uses Redis when available
@@ -54,6 +54,9 @@ export async function rateLimit(opts: {
   const { key, windowSeconds, max } = opts;
   const now = Date.now();
 
+  // Fail-open by contract: no App or no Redis both mean the per-process
+  // fallback below, never a crash (ADR-093).
+  const redisConnection = tryGetApp()?.redis ?? null;
   if (redisConnection) {
     const redisKey = `langwatch:ratelimit:${key}`;
     const count = await redisConnection.incr(redisKey);
