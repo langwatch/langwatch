@@ -137,6 +137,7 @@ import { app as teamsApp } from "../app/api/teams/[[...route]]/app";
 import { app as tracesApp } from "../app/api/traces/[[...route]]/app";
 import { app as triggersApp } from "../app/api/triggers/[[...route]]/app";
 import { app as webhooksApp } from "../app/api/webhooks/[[...route]]/app";
+import { WEBHOOKS_SPEC_OPTIONS } from "../app/api/webhooks/[[...route]]/openapi";
 import { app as workflowsApp } from "../app/api/workflows/[[...route]]/app";
 
 const overwriteMerge = (_destinationArray: any[], sourceArray: any[]) =>
@@ -241,7 +242,10 @@ export default async function execute() {
   const triggersSpec = await generateSpecs(triggersApp);
   console.log("Building workflows spec...");
   const workflowsSpec = await generateSpecs(workflowsApp);
-  const webhooksSpec = await generateSpecs(webhooksApp);
+  console.log("Building webhooks spec...");
+  // WEBHOOKS_SPEC_OPTIONS is load-bearing: without it every RPC path is taken
+  // for a static file and the family publishes nothing, silently.
+  const webhooksSpec = await generateSpecs(webhooksApp, WEBHOOKS_SPEC_OPTIONS);
   const gatewaySpendSpec = await generateSpecs(gatewaySpendApp);
   console.log("Merging specs...");
   const mergedSpec = deepmerge.all(
