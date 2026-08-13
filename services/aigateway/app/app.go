@@ -85,14 +85,12 @@ func (a *App) buildInterceptors() []pipeline.Interceptor {
 		chain = append(chain, pipeline.RateLimit(a.ratelimit.Allow))
 	}
 	if a.policy != nil {
-		chain = append(chain, pipeline.Policy(a.policy.Check))
-		if a.models == nil {
-			// Model rules are enforced from the model resolver, on the
-			// resolved id. Without a resolver there is nothing to enforce
-			// them against, and an unenforced deny rule is the one failure
-			// mode that looks exactly like a working one.
-			a.logger.Warn("policy_model_rules_unenforced_without_resolver")
-		}
+		// Model rules are enforced from the model resolver, on the resolved
+		// id, so without a resolver there is nothing to enforce them against.
+		// A bundle carrying one is refused rather than served: an unenforced
+		// deny rule is the one failure mode that looks exactly like a working
+		// one, and this build cannot honor what the bundle asks for.
+		chain = append(chain, pipeline.Policy(a.policy.Check, a.models != nil))
 	}
 	if a.models != nil {
 		var checkModel pipeline.CheckModelFunc

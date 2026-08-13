@@ -9,6 +9,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { ChevronDown } from "lucide-react";
+import { useState } from "react";
 import type { Control, UseFormRegister } from "react-hook-form";
 import { useWatch } from "react-hook-form";
 
@@ -66,12 +67,29 @@ export function RestrictionsSection({
   control: Control<RoutingPolicyFormValues>;
   register: UseFormRegister<RoutingPolicyFormValues>;
 }) {
-  const values = useWatch({ control });
-  const ruleCount = countRestrictions(values as RoutingPolicyFormValues);
-  const openByDefault = ruleCount > 0 ? ["restrictions"] : [];
+  const restrictions = useWatch({ control, name: "restrictions" });
+  const ruleCount = countRestrictions({ restrictions });
+
+  // Controlled, not defaultValue. The form is reset once the policy query
+  // resolves, so an existing policy's rules arrive after the first render.
+  // With defaultValue the section would still be sitting closed over them,
+  // which is the exact footgun collapsing is supposed to avoid. The operator
+  // can still close it: openedFor remembers the count that opened it, so a
+  // deliberate close is not undone on the next keystroke.
+  const [open, setOpen] = useState<string[]>([]);
+  const [openedFor, setOpenedFor] = useState(0);
+  if (ruleCount > 0 && openedFor === 0) {
+    setOpenedFor(ruleCount);
+    setOpen(["restrictions"]);
+  }
 
   return (
-    <Accordion.Root collapsible width="full" defaultValue={openByDefault}>
+    <Accordion.Root
+      collapsible
+      width="full"
+      value={open}
+      onValueChange={(details) => setOpen(details.value)}
+    >
       <Accordion.Item value="restrictions" width="full">
         <Accordion.ItemTrigger paddingY={2}>
           <HStack width="full" justify="space-between">

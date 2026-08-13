@@ -48,6 +48,7 @@ import {
 import { TRPCError } from "@trpc/server";
 
 import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
+import { isLatestAlias } from "~/server/modelProviders/latestAliases";
 
 export type RoutingPolicyScope = "organization" | "team" | "project";
 
@@ -96,6 +97,56 @@ export class RoutingPolicyMustHaveScopeError extends Error {
   constructor(message = "Routing policy must include at least one scope") {
     super(message);
     this.name = "RoutingPolicyMustHaveScopeError";
+  }
+}
+
+/**
+ * A policy may only name concrete models. A moving name such as
+ * `openai/latest` resolves in the product, never in the gateway: the resolver
+ * looks a model name up literally, so a stored alias would make every request
+ * that reaches it dispatch a model called "latest".
+ *
+ * The editor already writes the concrete id it resolved. This guards the paths
+ * that do not go through the editor.
+ */
+export class RoutingPolicyModelMustBeConcreteError extends Error {
+  readonly code = "routing_policy_model_must_be_concrete" as const;
+  constructor(
+    readonly field: string,
+    readonly value: string,
+  ) {
+    super(
+      `"${value}" names whichever model is newest rather than a specific one, ` +
+        `so it cannot be stored on a routing policy. Use the model id it currently resolves to.`,
+    );
+    this.name = "RoutingPolicyModelMustBeConcreteError";
+  }
+}
+
+/**
+ * Refuses every moving name a policy could carry, across the default model and
+ * every entry in the name mapping, tiers included.
+ */
+function assertModelsAreConcrete({
+  defaultModel,
+  modelAliases,
+}: {
+  defaultModel?: string | null;
+  modelAliases?: Record<string, string>;
+}): void {
+  if (defaultModel && isLatestAlias(defaultModel.trim())) {
+    throw new RoutingPolicyModelMustBeConcreteError(
+      "defaultModel",
+      defaultModel.trim(),
+    );
+  }
+  for (const [from, to] of Object.entries(modelAliases ?? {})) {
+    if (isLatestAlias(to.trim())) {
+      throw new RoutingPolicyModelMustBeConcreteError(
+        `modelAliases.${from}`,
+        to.trim(),
+      );
+    }
   }
 }
 
@@ -194,6 +245,10 @@ export class RoutingPolicyService {
     if (input.modelProviderIds.length === 0) {
       throw new RoutingPolicyMustHaveProviderError();
     }
+    assertModelsAreConcrete({
+      defaultModel: input.defaultModel,
+      modelAliases: input.modelAliases,
+    });
     await this.assertModelProvidersBelongToOrg(
       input.organizationId,
       input.modelProviderIds,
@@ -253,6 +308,10 @@ export class RoutingPolicyService {
     input: UpdateRoutingPolicyInput,
   ): Promise<RoutingPolicyWithScopes> {
     const existing = await this.requireOwn(input.id, input.organizationId);
+    assertModelsAreConcrete({
+      defaultModel: input.defaultModel,
+      modelAliases: input.modelAliases,
+    });
     if (input.modelProviderIds !== undefined) {
       if (input.modelProviderIds.length === 0) {
         throw new RoutingPolicyMustHaveProviderError();

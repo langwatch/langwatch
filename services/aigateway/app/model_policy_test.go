@@ -140,3 +140,55 @@ func TestHandleChat_AliasOutsideAllowlistNeverReachesAProvider(t *testing.T) {
 	assert.True(t, herr.IsCode(err, domain.ErrModelNotAllowed))
 	assert.False(t, dispatched)
 }
+
+// Model rules are enforced from the model resolver. A build with no resolver
+// cannot honor them, and serving the request anyway would silently grant
+// exactly what the rule exists to withhold.
+func TestHandleChat_ModelRuleWithNoResolverIsRefused(t *testing.T) {
+	dispatched := false
+	provider := &mockProvider{
+		dispatchFn: func(_ context.Context, _ *domain.Request, _ domain.Credential) (*domain.Response, error) {
+			dispatched = true
+			return successResponse(), nil
+		},
+	}
+
+	bundle := testBundle()
+	bundle.Config.PolicyRules = []domain.PolicyRule{
+		{Pattern: "^gpt-4.*", Type: domain.PolicyDeny, Target: domain.PolicyTargetModel},
+	}
+
+	application := New(
+		WithProviders(provider),
+		WithPolicy(policy.NewMatcher()),
+		WithLogger(zap.NewNop()),
+	)
+
+	_, err := application.HandleChat(context.Background(), bundle, bytes.NewReader(testBody()), "gpt-4")
+	require.Error(t, err)
+	assert.True(t, herr.IsCode(err, domain.ErrInternal))
+	assert.False(t, dispatched)
+}
+
+// A key whose policy carries no model rule is unaffected by the guard.
+func TestHandleChat_NonModelRuleWithNoResolverStillServes(t *testing.T) {
+	provider := &mockProvider{
+		dispatchFn: func(_ context.Context, _ *domain.Request, _ domain.Credential) (*domain.Response, error) {
+			return successResponse(), nil
+		},
+	}
+
+	bundle := testBundle()
+	bundle.Config.PolicyRules = []domain.PolicyRule{
+		{Pattern: "^shell\\..*", Type: domain.PolicyDeny, Target: domain.PolicyTargetTool},
+	}
+
+	application := New(
+		WithProviders(provider),
+		WithPolicy(policy.NewMatcher()),
+		WithLogger(zap.NewNop()),
+	)
+
+	_, err := application.HandleChat(context.Background(), bundle, bytes.NewReader(testBody()), "gpt-4")
+	require.NoError(t, err)
+}

@@ -83,10 +83,10 @@ function supportsReasoning(entry: LLMModelEntry): boolean {
 }
 
 /**
- * Cost of one average request, weighting output more heavily than input
- * because a chat completion emits far fewer tokens than it reads and a
- * ranking on input price alone puts long-context bargains above genuinely
- * cheap models.
+ * Cost of one average request. Input carries the larger weight because a chat
+ * completion reads far more tokens than it emits, and the output rate is
+ * folded in so a model priced cheaply to read and dearly to answer does not
+ * rank as a bargain.
  */
 function blendedCostPerToken(entry: LLMModelEntry): number {
   const pricing = entry.pricing;

@@ -124,6 +124,12 @@ export function RoutingPoliciesPage() {
   );
 }
 
+/**
+ * A scope with the display name resolved. Separate from ScopeTriadEntry, whose
+ * `name` is optional, because everything downstream of the resolver renders it.
+ */
+type NamedScope = ScopeTriadEntry & { name: string | undefined };
+
 /** Turns scope ids into the names an operator recognizes. */
 function useScopeNameResolver(
   organization:
@@ -150,7 +156,7 @@ function useScopeNameResolver(
     return { teams, projects };
   }, [organization?.teams]);
 
-  return (scopes: ScopeTriadEntry[]): ScopeTriadEntry[] =>
+  return (scopes: ScopeTriadEntry[]): NamedScope[] =>
     scopes.map((scope) => ({
       ...scope,
       name:

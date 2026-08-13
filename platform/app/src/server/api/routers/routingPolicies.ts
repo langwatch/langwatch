@@ -11,6 +11,7 @@
  */
 
 import {
+  RoutingPolicyModelMustBeConcreteError,
   RoutingPolicyMustHaveProviderError,
   RoutingPolicyMustHaveScopeError,
   RoutingPolicyService,
@@ -38,6 +39,13 @@ function mapServiceErrorToTrpc(err: unknown): never {
     });
   }
   if (err instanceof RoutingPolicyMustHaveScopeError) {
+    throw new TRPCError({
+      code: "UNPROCESSABLE_CONTENT",
+      message: err.message,
+      cause: err,
+    });
+  }
+  if (err instanceof RoutingPolicyModelMustBeConcreteError) {
     throw new TRPCError({
       code: "UNPROCESSABLE_CONTENT",
       message: err.message,

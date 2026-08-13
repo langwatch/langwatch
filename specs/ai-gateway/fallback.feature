@@ -37,10 +37,12 @@ Feature: Provider fallback chain
 
     @integration @unimplemented
     Scenario: primary timeout triggers fallback
-      Given "pc_openai_primary" never answers and the request deadline passes
+      Given "pc_openai_primary" never answers and its attempt times out
+      And the caller is still connected, so there is budget for another attempt
       And "pc_anthropic_secondary" returns 200
       When I POST /v1/chat/completions
       Then the client receives 200 from anthropic
+      And a caller who has already given up gets no further attempt
 
     @integration @unimplemented
     Scenario: 429 from primary triggers fallback

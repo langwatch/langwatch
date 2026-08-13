@@ -97,43 +97,60 @@ func (m *Matcher) CheckModel(ctx context.Context, rules []domain.PolicyRule, res
 		return nil
 	}
 
-	denied, err := m.anyMatches(deny, spellings)
+	// Every pattern in the set is compiled before any of them is matched, so
+	// one the platform cannot read fails the request closed no matter where it
+	// sits in the list. Matching first and compiling lazily would make
+	// enforcement depend on rule order: an allow list of ["^gpt-.*", "["] would
+	// admit gpt-5-mini and only notice the broken rule for models the good one
+	// misses.
+	denyPatterns, err := m.compileAll(deny)
 	if err != nil {
 		return herr.New(ctx, domain.ErrInternal, nil, err)
 	}
-	if denied {
+	allowPatterns, err := m.compileAll(allow)
+	if err != nil {
+		return herr.New(ctx, domain.ErrInternal, nil, err)
+	}
+
+	if anyMatches(denyPatterns, spellings) {
 		return modelPolicyViolation(ctx, resolved.ModelID, "is blocked by policy")
 	}
 
-	if len(allow) == 0 {
+	if len(allowPatterns) == 0 {
 		return nil
 	}
 	// An allowlist is satisfied when ANY spelling matches ANY entry: the
-	// operator allowed the model, not one way of writing it down. Invalid
-	// patterns fail closed here the way they do in Check, by never matching.
-	allowed, _ := m.anyMatches(allow, spellings)
-	if allowed {
+	// operator allowed the model, not one way of writing it down.
+	if anyMatches(allowPatterns, spellings) {
 		return nil
 	}
 	return modelPolicyViolation(ctx, resolved.ModelID, "is not in allowlist")
 }
 
-// anyMatches reports whether any pattern matches any candidate. It stops at
-// the first pattern that will not compile, so a typo fails the request closed
-// rather than quietly narrowing the rule set.
-func (m *Matcher) anyMatches(patterns, candidates []string) (bool, error) {
+// compileAll compiles every pattern, refusing the whole set if any one of them
+// will not compile.
+func (m *Matcher) compileAll(patterns []string) ([]*regexp.Regexp, error) {
+	compiled := make([]*regexp.Regexp, 0, len(patterns))
 	for _, pattern := range patterns {
 		re, err := m.compile(pattern)
 		if err != nil {
-			return false, err
+			return nil, err
 		}
+		compiled = append(compiled, re)
+	}
+	return compiled, nil
+}
+
+// anyMatches reports whether any pattern matches any candidate.
+func anyMatches(patterns []*regexp.Regexp, candidates []string) bool {
+	for _, re := range patterns {
 		for _, candidate := range candidates {
 			if re.MatchString(candidate) {
-				return true, nil
+				return true
 			}
 		}
 	}
-	return false, nil
+	return false
 }
 
 // modelPatterns splits the model rules into deny and allow patterns.

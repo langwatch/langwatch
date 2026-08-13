@@ -41,7 +41,7 @@ const { mockOpenDrawer, mockCloseDrawer, policies, organization } = vi.hoisted(
         modelProviderIds: ["mp-openai"],
         modelAliases: { complex: "anthropic/claude-opus-4-5" },
         defaultModel: "openai/gpt-5-mini",
-        policyRules: {},
+        policyRules: { tools: { deny: ["^shell_.*"], allow: null } },
         scopes: [{ scopeType: "ORGANIZATION", scopeId: "org-1" }],
       },
     ],
@@ -193,6 +193,19 @@ describe("given a shared link that carries a policy", () => {
       "anthropic/claude-opus-4-5",
     );
     expect(screen.getByDisplayValue("openai/gpt-5-mini")).toBeInTheDocument();
+  });
+
+  // The rules arrive with the form reset that follows the policy query, which
+  // is after the first render. An uncontrolled accordion would still be closed
+  // over them, which is the footgun collapsing is meant to avoid.
+  it("opens Restrictions for a policy that already has rules", async () => {
+    renderWithChakra(<RoutingPolicyDrawer policyId="rp-1" />);
+
+    await screen.findByText("Edit routing policy");
+    await waitFor(() => {
+      expect(screen.getByText("1 rule")).toBeInTheDocument();
+    });
+    expect(screen.getByDisplayValue("^shell_.*")).toBeInTheDocument();
   });
 
   it("offers no Cancel button, because the drawer's close already cancels", async () => {

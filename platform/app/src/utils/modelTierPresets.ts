@@ -7,9 +7,9 @@
  * gateway resolver needs no knowledge of it: the control plane emits
  * `tier -> the model the tier points at` alongside every other mapping, and
  * the resolver looks it up like any other name. What makes a tier different
- * is only that the four names below are reserved, presented in the product as
- * a first-class choice, and fall through to the policy's default model when
- * the policy names no target for them.
+ * is only that the names below are reserved, presented in the product as a
+ * first-class choice, and fall through to the policy's default model when the
+ * policy names no target for them.
  *
  * That fallthrough is deliberately limited to these names. A catch-all would
  * serve a caller a model they never asked for, turn every typo into a billed

@@ -5,6 +5,7 @@
  *
  * Returns state and callbacks, never JSX.
  */
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 
@@ -15,6 +16,7 @@ import type { ProviderCredentialOption } from "./ProviderCredentialPicker";
 import {
   emptyRoutingPolicyForm,
   type RoutingPolicyFormValues,
+  routingPolicyFormSchema,
   routingPolicyToFormValues,
   validateRoutingPolicyForm,
 } from "./routingPolicyForm";
@@ -56,8 +58,13 @@ export function useRoutingPolicyDrawerForm({
       { enabled: !!organizationId, refetchOnWindowFocus: false },
     );
 
+  // The schema runs, rather than only typing the form: its required-field
+  // messages and the name length limit are the ones the operator reads, and a
+  // schema used for inference alone silently enforces nothing.
   const form = useForm<RoutingPolicyFormValues>({
     defaultValues: emptyRoutingPolicyForm(seedScopes, seedIsDefault),
+    resolver: zodResolver(routingPolicyFormSchema),
+    mode: "onChange",
   });
   const { reset, watch } = form;
 
@@ -67,32 +74,11 @@ export function useRoutingPolicyDrawerForm({
     reset(routingPolicyToFormValues(policy));
   }, [policy, reset]);
 
-  const providers = providersQuery.data?.providers;
-  const providerOptions: ProviderCredentialOption[] = useMemo(
-    () =>
-      (providers ?? [])
-        .filter((provider) => !!provider.id)
-        .map((provider) => ({
-          id: provider.id!,
-          modelProviderName: provider.name ?? provider.provider,
-          slot: "primary",
-          disabledAt: provider.disabledAt
-            ? new Date(provider.disabledAt).toISOString()
-            : null,
-          healthStatus: provider.healthStatus ?? "UNKNOWN",
-        })),
-    [providers],
-  );
-
   const values = watch();
-  const boundProviderTypes = useMemo(() => {
-    const byId = new Map(
-      (providers ?? []).map((provider) => [provider.id, provider.provider]),
-    );
-    return values.modelProviderIds
-      .map((id) => byId.get(id))
-      .filter((type): type is string => !!type);
-  }, [values.modelProviderIds, providers]);
+  const { providerOptions, boundProviderTypes } = useProviderOptions({
+    providers: providersQuery.data?.providers,
+    selectedIds: values.modelProviderIds,
+  });
 
   const problems = useMemo(
     () =>
@@ -124,6 +110,53 @@ export function useRoutingPolicyDrawerForm({
     availableProjects,
     scopesWithNames,
   };
+}
+
+/**
+ * The providers the picker offers, and the provider types the currently
+ * selected ones resolve to, which is what a name mapping is validated against.
+ */
+function useProviderOptions({
+  providers,
+  selectedIds,
+}: {
+  providers:
+    | Array<{
+        id?: string | null;
+        name?: string | null;
+        provider: string;
+        disabledAt?: Date | string | null;
+        healthStatus?: string | null;
+      }>
+    | undefined;
+  selectedIds: string[];
+}) {
+  const providerOptions: ProviderCredentialOption[] = useMemo(
+    () =>
+      (providers ?? [])
+        .filter((provider) => !!provider.id)
+        .map((provider) => ({
+          id: provider.id!,
+          modelProviderName: provider.name ?? provider.provider,
+          slot: "primary",
+          disabledAt: provider.disabledAt
+            ? new Date(provider.disabledAt).toISOString()
+            : null,
+          healthStatus: provider.healthStatus ?? "UNKNOWN",
+        })),
+    [providers],
+  );
+
+  const boundProviderTypes = useMemo(() => {
+    const byId = new Map(
+      (providers ?? []).map((provider) => [provider.id, provider.provider]),
+    );
+    return selectedIds
+      .map((id) => byId.get(id))
+      .filter((type): type is string => !!type);
+  }, [selectedIds, providers]);
+
+  return { providerOptions, boundProviderTypes };
 }
 
 /** The teams and projects the scope picker offers. */

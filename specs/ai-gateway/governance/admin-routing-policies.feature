@@ -52,7 +52,7 @@ Feature: AI Gateway Governance — Admin RoutingPolicies (decoupled from VK)
     And the change is reflected in any new VK config materialised after the update
     And an audit log row "gateway.routing_policy.updated" is written
     And a ROUTING_POLICY_UPDATED change event is appended in the same transaction
-    And existing VKs that reference this policy pick up the new mapping on the gateway's next /changes long-poll, which evicts their cached bundles
+    And virtual keys already using this policy serve the new mapping without being recreated
 
   @bdd @routing-policy @set-default
   Scenario: Admin can swap the default policy at org scope

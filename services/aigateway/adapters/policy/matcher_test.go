@@ -222,3 +222,34 @@ func TestCheckModel_JudgesBothSpellings(t *testing.T) {
 		}))
 	})
 }
+
+// A pattern the platform cannot read must refuse the request wherever it sits
+// in the list. Matching before compiling would make enforcement depend on rule
+// order: the good pattern here answers first, and the broken one is only
+// noticed for models the good one misses.
+func TestCheckModel_InvalidAllowPatternAfterAMatchStillFailsClosed(t *testing.T) {
+	m := NewMatcher()
+	rules := []domain.PolicyRule{
+		{Pattern: "^gpt-.*", Type: domain.PolicyAllow, Target: domain.PolicyTargetModel},
+		{Pattern: "(unterminated", Type: domain.PolicyAllow, Target: domain.PolicyTargetModel},
+	}
+
+	err := m.CheckModel(context.Background(), rules, domain.ResolvedModel{ModelID: "gpt-5-mini"})
+	require.Error(t, err)
+	assert.True(t, herr.IsCode(err, domain.ErrInternal))
+}
+
+func TestCheckModel_InvalidDenyPatternAfterAMatchStillFailsClosed(t *testing.T) {
+	m := NewMatcher()
+	rules := []domain.PolicyRule{
+		{Pattern: "^claude-.*", Type: domain.PolicyDeny, Target: domain.PolicyTargetModel},
+		{Pattern: "(unterminated", Type: domain.PolicyDeny, Target: domain.PolicyTargetModel},
+	}
+
+	// The first rule matches, so a lazy compile would answer "blocked" and
+	// never reach the broken one. Either answer refuses the request, but only
+	// the internal error tells the operator their rule set is unreadable.
+	err := m.CheckModel(context.Background(), rules, domain.ResolvedModel{ModelID: "claude-haiku-4-5"})
+	require.Error(t, err)
+	assert.True(t, herr.IsCode(err, domain.ErrInternal))
+}

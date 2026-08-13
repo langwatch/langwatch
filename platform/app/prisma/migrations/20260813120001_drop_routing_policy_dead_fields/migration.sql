@@ -19,8 +19,11 @@
 -- Production counts at the time of the drop are recorded in the pull request
 -- that carries this migration.
 --
--- To roll back, uncomment and run manually. The data is not recoverable from
--- here; restore it from a backup if it is ever needed.
+-- IRREVERSIBLE: re-adding the columns does not restore what was in them. The
+-- statements below rebuild the shape only; the values come from a backup or
+-- from the census this pull request recorded, or not at all.
+--
+-- To roll back the shape, uncomment and run manually.
 -- ALTER TABLE "RoutingPolicy" ADD COLUMN "modelAllowlist" JSONB;
 -- ALTER TABLE "RoutingPolicy" ADD COLUMN "strategy" TEXT NOT NULL DEFAULT 'priority';
 

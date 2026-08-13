@@ -65,15 +65,12 @@ export function RoutingPoliciesTable({
   onSetDefault: (policy: RoutingPolicyRow) => void;
   onDelete: (policy: RoutingPolicyRow) => void;
 }) {
+  const { bucketed, unplaced } = bucketByScopeLevel(policies);
+
   return (
     <>
       {SCOPE_LEVELS.map(({ level, label, subtitle }) => {
-        // A policy that applies at several levels is listed under the first
-        // one it names; its chips show the rest.
-        const rows = policies.filter(
-          (policy) =>
-            String(policy.scopes[0]?.scopeType ?? "").toLowerCase() === level,
-        );
+        const rows = bucketed.get(level) ?? [];
         return (
           <Box
             key={level}
@@ -117,8 +114,68 @@ export function RoutingPoliciesTable({
           </Box>
         );
       })}
+
+      {unplaced.length > 0 && (
+        <Box
+          borderWidth="1px"
+          borderColor="orange.300"
+          borderRadius="md"
+          padding={4}
+        >
+          <VStack align="start" gap={0} marginBottom={3}>
+            <Text fontSize="sm" fontWeight="semibold">
+              Elsewhere
+            </Text>
+            <Text fontSize="xs" color="fg.muted">
+              These policies apply somewhere this page does not have a section
+              for. They still route traffic, so they are listed here rather than
+              hidden.
+            </Text>
+          </VStack>
+          <VStack align="stretch" gap={2}>
+            {unplaced.map((policy) => (
+              <PolicyRow
+                key={policy.id}
+                policy={policy}
+                resolveScopeNames={resolveScopeNames}
+                onEdit={() => onEdit(policy)}
+                onSetDefault={() => onSetDefault(policy)}
+                onDelete={() => onDelete(policy)}
+              />
+            ))}
+          </VStack>
+        </Box>
+      )}
     </>
   );
+}
+
+/**
+ * Files every policy under the level of its first scope, and everything else
+ * under `unplaced`.
+ *
+ * Nothing is dropped. A policy with no scope rows, or one naming a scope kind
+ * this build predates, still routes traffic, and a policy an operator cannot
+ * see is one they cannot fix. A policy that applies at several levels is
+ * listed under the first one it names; its chips show the rest.
+ */
+function bucketByScopeLevel(policies: RoutingPolicyRow[]): {
+  bucketed: Map<RoutingPolicyScopeLevel, RoutingPolicyRow[]>;
+  unplaced: RoutingPolicyRow[];
+} {
+  const bucketed = new Map<RoutingPolicyScopeLevel, RoutingPolicyRow[]>(
+    SCOPE_LEVELS.map(({ level }) => [level, []]),
+  );
+  const unplaced: RoutingPolicyRow[] = [];
+  for (const policy of policies) {
+    const level = String(
+      policy.scopes[0]?.scopeType ?? "",
+    ).toLowerCase() as RoutingPolicyScopeLevel;
+    const bucket = bucketed.get(level);
+    if (bucket) bucket.push(policy);
+    else unplaced.push(policy);
+  }
+  return { bucketed, unplaced };
 }
 
 function PolicyRow({

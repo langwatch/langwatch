@@ -65,7 +65,7 @@ export function ProviderCredentialPicker({
     () => activeAvailable.filter((c) => !selectedIds.includes(c.id)),
     [activeAvailable, selectedIds],
   );
-  const onlyDisabledExist =
+  const hasOnlyDisabledProviders =
     available.length > 0 && activeAvailable.length === 0;
 
   const { removeAt, swap, addById } = orderedListHandlers({
@@ -94,7 +94,7 @@ export function ProviderCredentialPicker({
     );
   }
 
-  if (onlyDisabledExist && selectedIds.length === 0) {
+  if (hasOnlyDisabledProviders && selectedIds.length === 0) {
     return (
       <NoProvidersToPick
         title="All model providers are disabled"
@@ -155,7 +155,6 @@ function AddProvider({
         {remaining.map((option) => (
           <option key={option.id} value={option.id}>
             {formatLabel(option)}
-            {option.disabledAt ? " (disabled)" : ""}
           </option>
         ))}
       </NativeSelect.Field>

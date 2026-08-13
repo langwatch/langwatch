@@ -26,8 +26,8 @@
  * A census of what a migration deletes has to outlive the model it counts, and
  * the typed client cannot name a column the schema no longer declares.
  *
- * The counts are a shape, not a ledger. There is no snapshot around the read,
- * so a policy written while it runs may or may not be seen.
+ * The counts come from one statement snapshot, so a policy written after the
+ * SELECT begins is not in them. They are a shape, not a ledger.
  *
  * Usage:
  *   DATABASE_URL=postgres://... pnpm tsx scripts/report-routing-policy-dead-fields.ts
@@ -447,18 +447,31 @@ function reportSql(policies: AllowlistPolicy[]): void {
   }
 }
 
+const MODE_FLAGS: Record<string, Mode> = {
+  "--json": "json",
+  "--emit-sql": "sql",
+};
+
 function parseMode(argv: string[]): Mode {
-  let mode: Mode = "text";
+  // The modes are alternatives, not layers. Letting the last flag win would
+  // make the output depend on argument order, which is how someone asks for
+  // SQL and pastes JSON into a migration.
+  const requested = new Set<Mode>();
   for (const argument of argv) {
-    if (argument === "--json") mode = "json";
-    else if (argument === "--emit-sql") mode = "sql";
-    else {
-      console.error(`unknown argument: ${argument}`);
-      console.error(USAGE);
-      process.exit(1);
-    }
+    const mode = MODE_FLAGS[argument];
+    if (!mode) return refuse(`unknown argument: ${argument}`);
+    requested.add(mode);
   }
-  return mode;
+  if (requested.size > 1) {
+    return refuse("--json and --emit-sql are alternatives; pass one.");
+  }
+  return [...requested][0] ?? "text";
+}
+
+function refuse(reason: string): never {
+  console.error(reason);
+  console.error(USAGE);
+  process.exit(1);
 }
 
 /**

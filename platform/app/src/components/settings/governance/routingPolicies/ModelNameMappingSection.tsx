@@ -7,7 +7,11 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { ArrowRight, Plus, Trash2 } from "lucide-react";
-import { type Control, useFieldArray } from "react-hook-form";
+import {
+  type Control,
+  type UseFormRegister,
+  useFieldArray,
+} from "react-hook-form";
 
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 
@@ -23,9 +27,7 @@ export function ModelNameMappingSection({
   register,
 }: {
   control: Control<RoutingPolicyFormValues>;
-  register: (
-    name: `nameMappings.${number}.from` | `nameMappings.${number}.to`,
-  ) => object;
+  register: UseFormRegister<RoutingPolicyFormValues>;
 }) {
   const { fields, append, remove } = useFieldArray({
     control,

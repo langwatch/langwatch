@@ -177,13 +177,19 @@ export function restrictionsToPayload(
   return payload;
 }
 
-/** How many restriction rules are configured, across every dimension. */
-export function countRestrictions(values: RoutingPolicyFormValues): number {
+/**
+ * How many restriction rules are configured, across every dimension. Takes
+ * just the restrictions rather than the whole form, so a caller watching only
+ * that subtree does not have to fabricate the rest of the values to ask.
+ */
+export function countRestrictions({
+  restrictions,
+}: Pick<RoutingPolicyFormValues, "restrictions">): number {
   return RESTRICTION_DIMENSIONS.reduce(
     (total, dimension) =>
       total +
-      splitLines(values.restrictions[dimension].deny).length +
-      splitLines(values.restrictions[dimension].allow).length,
+      splitLines(restrictions[dimension].deny).length +
+      splitLines(restrictions[dimension].allow).length,
     0,
   );
 }

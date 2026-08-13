@@ -22,6 +22,7 @@ import {
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import {
+  RoutingPolicyModelMustBeConcreteError,
   RoutingPolicyMustHaveProviderError,
   RoutingPolicyMustHaveScopeError,
   RoutingPolicyService,
@@ -188,6 +189,30 @@ describe("given an organization with a model provider", () => {
       ).rejects.toBeInstanceOf(RoutingPolicyMustHaveProviderError);
     });
 
+    it("refuses a moving name as the default model", async () => {
+      // The gateway looks a model name up literally, so storing this would
+      // make every tier that falls through to it dispatch a model called
+      // "latest".
+      await expect(
+        createPolicy({ defaultModel: "openai/latest" }),
+      ).rejects.toBeInstanceOf(RoutingPolicyModelMustBeConcreteError);
+    });
+
+    it("refuses a moving name as a tier target", async () => {
+      await expect(
+        createPolicy({ modelAliases: { fast: "openai/latest-mini" } }),
+      ).rejects.toBeInstanceOf(RoutingPolicyModelMustBeConcreteError);
+    });
+
+    it("accepts the concrete id a moving name resolves to", async () => {
+      const policy = await createPolicy({
+        defaultModel: "openai/gpt-5-mini",
+        modelAliases: { fast: "openai/gpt-5-mini" },
+      });
+
+      expect(policy.defaultModel).toBe("openai/gpt-5-mini");
+    });
+
     it("refuses a provider another organization owns", async () => {
       // The provider id is guessable, so the guard is what stops one
       // organization routing through another's credentials.
@@ -265,6 +290,19 @@ describe("given an organization with a model provider", () => {
           actorUserId: USER_ID,
         }),
       ).rejects.toBeInstanceOf(RoutingPolicyMustHaveProviderError);
+    });
+
+    it("refuses a moving name on the way in", async () => {
+      const policy = await createPolicy();
+
+      await expect(
+        service().update({
+          id: policy.id,
+          organizationId: ORG_ID,
+          defaultModel: "anthropic/latest",
+          actorUserId: USER_ID,
+        }),
+      ).rejects.toBeInstanceOf(RoutingPolicyModelMustBeConcreteError);
     });
 
     it("refuses to edit a policy another organization owns", async () => {
