@@ -10,7 +10,7 @@ import { buildChildProcessEnv } from "../scenario.processor";
 
 describe("buildChildProcessEnv", () => {
   describe("given the scenario processor builds the child environment", () => {
-    /** @scenario 'The spawned child is given a compile cache directory' */
+    /** @scenario 'Repeat simulations do not repeat the same startup work' */
     it("names a compile cache directory, and keeps one the caller already set", () => {
       // The child is a fresh process per scenario run, so without a compile
       // cache it re-compiles the same bundle on every single run.

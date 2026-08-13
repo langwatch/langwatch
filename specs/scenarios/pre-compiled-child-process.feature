@@ -40,13 +40,13 @@ Feature: Pre-compiled Scenario Child Process
     Then it produces a single JavaScript file at dist/server/scenario-child-process.cjs
 
   @integration
-  Scenario: The scenario SDK is inlined rather than required at runtime
+  Scenario: Starting a simulation does not re-read its dependencies from disk
     When the child process build step runs
     Then the bundle does not require the scenario SDK from node_modules
     And the SDK's own module graph is not resolved from disk at child startup
 
   @integration
-  Scenario: OpenTelemetry stays external so the child holds one tracer provider
+  Scenario: A simulation still reports its spans
     A second copy of the OTEL API inside the bundle would take the provider
     registration and the span flush to different global registries, and the
     child would report no spans at all while still exiting successfully.
@@ -56,7 +56,7 @@ Feature: Pre-compiled Scenario Child Process
     And no copy of the OpenTelemetry API is inlined into the bundle
 
   @regression
-  Scenario: The child starts its log transport when logging is configured
+  Scenario: Configuring log output does not stop a simulation starting
     A package that locates a FILE relative to its own directory cannot be
     inlined, because inlining is what moves that directory. The logger is one:
     it runs its transport on a worker thread whose script it finds next to
@@ -71,7 +71,7 @@ Feature: Pre-compiled Scenario Child Process
     Then it does not die failing to load its log transport worker
 
   @integration
-  Scenario: Every externalized require resolves from the bundle directory
+  Scenario: The child starts with every dependency it needs
     Given a pre-compiled child process bundle
     When the bundle is loaded from a production-shaped directory layout
     Then no module fails to resolve
@@ -118,7 +118,7 @@ Feature: Pre-compiled Scenario Child Process
     Then it is ready to receive job data well inside the startup budget
 
   @unit
-  Scenario: The spawned child is given a compile cache directory
+  Scenario: Repeat simulations do not repeat the same startup work
     Re-compiling the bundle's JavaScript on every spawn is wasted work, since
     the bundle only changes when the app is rebuilt.
 
