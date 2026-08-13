@@ -46,7 +46,6 @@ vi.mock("~/server/app-layer/app", () => ({
 
 import { app } from "../[[...route]]/app";
 
-
 /**
  * The error envelope `@langwatch/api` serves, which is FLAT rather than the
  * `{ error: { ... } }` the hand-rolled family answered.
@@ -62,7 +61,10 @@ interface ApiErrorBody {
   type?: string;
   kind?: string;
   meta?: Record<string, unknown>;
-  reasons?: Array<{ code: string; meta?: { field?: string } }>;
+  reasons?: Array<{
+    code: string;
+    meta?: { field?: string; message?: string };
+  }>;
   tips?: string[];
 }
 
@@ -229,7 +231,10 @@ describe("Feature: Webhook endpoints management API", () => {
         );
       try {
         const res = await rpc("endpoints.list");
-        const error = await expectApiError(res, { status: 500, code: "internal_error" });
+        const error = await expectApiError(res, {
+          status: 500,
+          code: "internal_error",
+        });
         expect(error.message).not.toContain("WebhookEndpoint");
       } finally {
         boom.mockRestore();
@@ -278,7 +283,10 @@ describe("Feature: Webhook endpoints management API", () => {
       { ...body, url: "https://example.com/hooks/other" },
       { "Idempotency-Key": key },
     );
-    const error = await expectApiError(mutated, { status: 409, code: "idempotency_error" });
+    const error = await expectApiError(mutated, {
+      status: 409,
+      code: "idempotency_error",
+    });
     expect(error.meta?.reason).toBe("body_mismatch");
   });
 
@@ -286,9 +294,9 @@ describe("Feature: Webhook endpoints management API", () => {
   it("creates an endpoint returning the secret once; reads never carry it", async () => {
     planHasWebhookEndpoints = true;
     const createRes = await rpc("endpoints.create", {
-        url: "https://example.com/hooks/billing",
-        enabled_events: ["gateway.request.completed"],
-      });
+      url: "https://example.com/hooks/billing",
+      enabled_events: ["gateway.request.completed"],
+    });
     expect(createRes.status).toBe(201);
     const created = (await createRes.json()) as {
       data: { id: string; secret: string; enabled_events: string[] };
@@ -321,10 +329,10 @@ describe("Feature: Webhook endpoints management API", () => {
   it("rejects out-of-bounds delivery controls with the bound in the error", async () => {
     planHasWebhookEndpoints = true;
     const res = await rpc("endpoints.create", {
-        url: "https://example.com/hooks/bounds",
-        enabled_events: ["gateway.request.completed"],
-        max_batch_size: 1000,
-      });
+      url: "https://example.com/hooks/bounds",
+      enabled_events: ["gateway.request.completed"],
+      max_batch_size: 1000,
+    });
     const error = await expectApiError(res, {
       status: 400,
       code: "webhook_endpoint_invalid",
@@ -361,9 +369,9 @@ describe("Feature: Webhook endpoints management API", () => {
     it("rejects a non-default port, which used to save and then probe it", async () => {
       planHasWebhookEndpoints = true;
       const res = await rpc("endpoints.create", {
-          url: "https://example.com:6379/hooks",
-          enabled_events: ["gateway.request.completed"],
-        });
+        url: "https://example.com:6379/hooks",
+        enabled_events: ["gateway.request.completed"],
+      });
       const error = await expectApiError(res, {
         status: 400,
         code: "webhook_endpoint_invalid",
@@ -375,9 +383,9 @@ describe("Feature: Webhook endpoints management API", () => {
     it("rejects credentials in the URL", async () => {
       planHasWebhookEndpoints = true;
       const res = await rpc("endpoints.create", {
-          url: "https://user:pass@example.com/hooks",
-          enabled_events: ["gateway.request.completed"],
-        });
+        url: "https://user:pass@example.com/hooks",
+        enabled_events: ["gateway.request.completed"],
+      });
       const error = await expectApiError(res, {
         status: 400,
         code: "webhook_endpoint_invalid",
@@ -389,9 +397,9 @@ describe("Feature: Webhook endpoints management API", () => {
     it("still rejects plain http when the escape hatch is off", async () => {
       planHasWebhookEndpoints = true;
       const res = await rpc("endpoints.create", {
-          url: "http://example.com/hooks",
-          enabled_events: ["gateway.request.completed"],
-        });
+        url: "http://example.com/hooks",
+        enabled_events: ["gateway.request.completed"],
+      });
       const error = await expectApiError(res, {
         status: 400,
         code: "webhook_endpoint_invalid",
@@ -454,9 +462,9 @@ describe("Feature: Webhook endpoints management API", () => {
       captured = [];
 
       const createRes = await rpc("endpoints.create", {
-          url: receiverUrl,
-          enabled_events: ["gateway.request.completed"],
-        });
+        url: receiverUrl,
+        enabled_events: ["gateway.request.completed"],
+      });
       expect(createRes.status).toBe(201);
       const { data } = (await createRes.json()) as {
         data: { id: string; secret: string };
@@ -495,28 +503,34 @@ describe("Feature: Webhook endpoints management API", () => {
   it("rejects unknown event selectors with a 400", async () => {
     planHasWebhookEndpoints = true;
     const res = await rpc("endpoints.create", {
-        url: "https://example.com/hooks",
-        enabled_events: ["gateway.request.imagined"],
-      });
+      url: "https://example.com/hooks",
+      enabled_events: ["gateway.request.imagined"],
+    });
     expect(res.status).toBe(400);
   });
 
   it("PATCH status flips enable and disable with the manual reason", async () => {
     planHasWebhookEndpoints = true;
     const createRes = await rpc("endpoints.create", {
-        url: "https://example.com/hooks/toggle",
-        enabled_events: ["gateway.*"],
-      });
+      url: "https://example.com/hooks/toggle",
+      enabled_events: ["gateway.*"],
+    });
     const { data } = (await createRes.json()) as { data: { id: string } };
 
-    const disableRes = await rpc("endpoints.update", { id: data.id, status: "disabled" });
+    const disableRes = await rpc("endpoints.update", {
+      id: data.id,
+      status: "disabled",
+    });
     const disabled = (await disableRes.json()) as {
       data: { status: string; disabled_reason: string };
     };
     expect(disabled.data.status).toBe("disabled");
     expect(disabled.data.disabled_reason).toBe("manual");
 
-    const enableRes = await rpc("endpoints.update", { id: data.id, status: "active" });
+    const enableRes = await rpc("endpoints.update", {
+      id: data.id,
+      status: "active",
+    });
     const enabled = (await enableRes.json()) as { data: { status: string } };
     expect(enabled.data.status).toBe("active");
   });
@@ -524,9 +538,9 @@ describe("Feature: Webhook endpoints management API", () => {
   it("refuses the stored SCREAMING_SNAKE spelling of status", async () => {
     planHasWebhookEndpoints = true;
     const createRes = await rpc("endpoints.create", {
-        url: "https://example.com/hooks/casing",
-        enabled_events: ["gateway.*"],
-      });
+      url: "https://example.com/hooks/casing",
+      enabled_events: ["gateway.*"],
+    });
     const { data } = (await createRes.json()) as { data: { id: string } };
 
     const res = await rpc("endpoints.update", {
@@ -557,9 +571,9 @@ describe("Feature: Webhook endpoints management API", () => {
   it("archives an endpoint and hides it from reads", async () => {
     planHasWebhookEndpoints = true;
     const createRes = await rpc("endpoints.create", {
-        url: "https://example.com/hooks/archive-me",
-        enabled_events: ["gateway.request.completed"],
-      });
+      url: "https://example.com/hooks/archive-me",
+      enabled_events: ["gateway.request.completed"],
+    });
     const { data } = (await createRes.json()) as { data: { id: string } };
 
     const deleteRes = await rpc("endpoints.archive", { id: data.id });
@@ -572,9 +586,9 @@ describe("Feature: Webhook endpoints management API", () => {
   it("serves the health report for an endpoint", async () => {
     planHasWebhookEndpoints = true;
     const createRes = await rpc("endpoints.create", {
-        url: "https://example.com/hooks/health-probe",
-        enabled_events: ["gateway.request.completed"],
-      });
+      url: "https://example.com/hooks/health-probe",
+      enabled_events: ["gateway.request.completed"],
+    });
     const { data } = (await createRes.json()) as { data: { id: string } };
 
     const res = await rpc("endpoints.getHealth", { id: data.id });
@@ -612,7 +626,10 @@ describe("Feature: Webhook endpoints management API", () => {
       planHasWebhookEndpoints = true;
       const res = await rpc("events.get", { id: "req_nothing_here:completed" });
       expect(res.status).toBe(404);
-      await expectApiError(res, { status: 404, code: "webhook_event_not_found" });
+      await expectApiError(res, {
+        status: 404,
+        code: "webhook_event_not_found",
+      });
     });
 
     /** @scenario A malformed event id is refused the same way as a missing one */
@@ -662,9 +679,9 @@ describe("Feature: Webhook endpoints management API", () => {
       for (const { args, missing } of cases) {
         const res = await rpc("events.list", args);
         const error = await expectValidationError(res);
-        expect(
-          error.reasons?.map((r) => r.meta?.field),
-        ).toEqual(expect.arrayContaining([missing]));
+        expect(error.reasons?.map((r) => r.meta?.field)).toEqual(
+          expect.arrayContaining([missing]),
+        );
       }
     });
 
@@ -674,8 +691,13 @@ describe("Feature: Webhook endpoints management API", () => {
       const now = Date.now();
       const res = await rpc("events.list", { from: now, to: now - 60_000 });
       const error = await expectValidationError(res);
-      // Without this the case passes for a validation error about anything at
-      // all, including a body the route does not take.
-          });
+      // Without naming the rule, the case passes for a validation error about
+      // anything at all — including a field the operation does not take.
+      expect(error.reasons?.map((r) => r.meta?.message)).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining("less than or equal to"),
+        ]),
+      );
+    });
   });
 });

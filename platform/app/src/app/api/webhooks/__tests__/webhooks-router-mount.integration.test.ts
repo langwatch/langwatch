@@ -24,9 +24,9 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { MANAGEMENT_API_VERSION } from "~/server/api/management/version";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { createApiRouter } from "~/server/api-router";
-import { MANAGEMENT_API_VERSION } from "~/server/api/management/version";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";

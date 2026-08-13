@@ -108,10 +108,7 @@ export function createManagementService({
    * the route-policy registry, and the authorization test that reads it, stay
    * green over an endpoint that authenticates and then admits anyone.
    */
-  const guard = (
-    permission: Permission,
-    extra: MiddlewareHandler[] = [],
-  ) => ({
+  const guard = (permission: Permission, extra: MiddlewareHandler[] = []) => ({
     meta: { policy: requires(permission) } satisfies ManagementEndpointMeta,
     middleware: [
       requireOrgPermissionOrThrow(permission),
