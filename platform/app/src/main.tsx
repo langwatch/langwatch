@@ -23,7 +23,9 @@ if (!container) throw new Error("Root element not found");
 createRoot(container).render(
   <OuterProviders>
     <Suspense fallback={null}>
-      <RouterProvider router={router} />
+      {/* Lazy routes and drawers subscribe to external stores. Transition-wrapped
+          navigation can advance history while leaving the old tree committed. */}
+      <RouterProvider router={router} useTransitions={false} />
     </Suspense>
   </OuterProviders>,
 );
