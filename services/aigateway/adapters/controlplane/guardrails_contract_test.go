@@ -358,7 +358,7 @@ func TestControlPlaneVerdictDecidesEachWitnessCombination(t *testing.T) {
 	}{
 		{
 			name:    "both witnesses present and valid",
-			fixture: controlPlaneFixture{workspace: true, controlPlaneDir: true, manifest: validManifest},
+			fixture: controlPlaneFixture{hasWorkspaceManifest: true, hasControlPlaneDir: true, manifest: validManifest},
 			want:    controlPlaneOK,
 		},
 		{
@@ -366,13 +366,13 @@ func TestControlPlaneVerdictDecidesEachWitnessCombination(t *testing.T) {
 			// carries the app but not the workspace file still has a control
 			// plane to compare against.
 			name:    "the control plane is present without the workspace manifest",
-			fixture: controlPlaneFixture{controlPlaneDir: true, manifest: validManifest},
+			fixture: controlPlaneFixture{hasControlPlaneDir: true, manifest: validManifest},
 			want:    controlPlaneOK,
 		},
 		{
 			// The literal shape of the ADR-076 rename.
 			name:               "the workspace is present and the control plane directory is gone",
-			fixture:            controlPlaneFixture{workspace: true},
+			fixture:            controlPlaneFixture{hasWorkspaceManifest: true},
 			want:               controlPlaneFatal,
 			wantReasonContains: "Repoint controlPlaneRoot",
 		},
@@ -380,20 +380,20 @@ func TestControlPlaneVerdictDecidesEachWitnessCombination(t *testing.T) {
 			// The old sentinel's exact defect: a bare directory, re-created by
 			// any stray file, used to read as a live control plane.
 			name:               "the workspace is present and the control plane path is an empty directory",
-			fixture:            controlPlaneFixture{workspace: true, controlPlaneDir: true},
+			fixture:            controlPlaneFixture{hasWorkspaceManifest: true, hasControlPlaneDir: true},
 			want:               controlPlaneFatal,
 			wantReasonContains: "Repoint controlPlaneRoot",
 		},
 		{
 			// Same empty directory, no workspace: still must not be ok.
 			name:               "the control plane path is an empty directory and nothing else",
-			fixture:            controlPlaneFixture{controlPlaneDir: true},
+			fixture:            controlPlaneFixture{hasControlPlaneDir: true},
 			want:               controlPlaneSkip,
 			wantReasonContains: "no TypeScript control plane",
 		},
 		{
 			name:               "the manifest names another package",
-			fixture:            controlPlaneFixture{workspace: true, controlPlaneDir: true, manifest: foreignManifest},
+			fixture:            controlPlaneFixture{hasWorkspaceManifest: true, hasControlPlaneDir: true, manifest: foreignManifest},
 			want:               controlPlaneFatal,
 			wantReasonContains: "@langwatch/some-other-package",
 		},
@@ -401,25 +401,25 @@ func TestControlPlaneVerdictDecidesEachWitnessCombination(t *testing.T) {
 			// A wrong-named manifest is a present witness, so the absent-both
 			// premise for skipping is false even without the workspace file.
 			name:               "the manifest names another package and there is no workspace",
-			fixture:            controlPlaneFixture{controlPlaneDir: true, manifest: foreignManifest},
+			fixture:            controlPlaneFixture{hasControlPlaneDir: true, manifest: foreignManifest},
 			want:               controlPlaneFatal,
 			wantReasonContains: "@langwatch/some-other-package",
 		},
 		{
 			name:               "the manifest is malformed JSON",
-			fixture:            controlPlaneFixture{workspace: true, controlPlaneDir: true, manifest: malformed},
+			fixture:            controlPlaneFixture{hasWorkspaceManifest: true, hasControlPlaneDir: true, manifest: malformed},
 			want:               controlPlaneFatal,
 			wantReasonContains: "not valid JSON",
 		},
 		{
 			name:               "the manifest is malformed JSON and there is no workspace",
-			fixture:            controlPlaneFixture{controlPlaneDir: true, manifest: malformed},
+			fixture:            controlPlaneFixture{hasControlPlaneDir: true, manifest: malformed},
 			want:               controlPlaneFatal,
 			wantReasonContains: "not valid JSON",
 		},
 		{
 			name:               "the manifest is present but will not open",
-			fixture:            controlPlaneFixture{controlPlaneDir: true, manifestIsDir: true},
+			fixture:            controlPlaneFixture{hasControlPlaneDir: true, isManifestDirectory: true},
 			want:               controlPlaneFatal,
 			wantReasonContains: "could not be read",
 		},
@@ -428,7 +428,7 @@ func TestControlPlaneVerdictDecidesEachWitnessCombination(t *testing.T) {
 			// manifest witness above: a witness that will not stat is present,
 			// not absent, so the both-absent premise for skipping is false.
 			name:               "the workspace manifest is present but will not stat",
-			fixture:            controlPlaneFixture{workspaceUnreadable: true},
+			fixture:            controlPlaneFixture{hasUnreadableWorkspaceManifest: true},
 			want:               controlPlaneFatal,
 			wantReasonContains: "An unreadable witness is not an absent one",
 		},
@@ -466,11 +466,11 @@ func TestControlPlaneVerdictDecidesEachWitnessCombination(t *testing.T) {
 // controlPlaneFixture describes which witnesses a temp repo root carries. The
 // zero value is a checkout with no TypeScript side at all.
 type controlPlaneFixture struct {
-	workspace           bool   // pnpm-workspace.yaml at the repo root
-	workspaceUnreadable bool   // pnpm-workspace.yaml exists but will not stat
-	controlPlaneDir     bool   // platform/app exists, possibly empty
-	manifest            string // written to platform/app/package.json when set
-	manifestIsDir       bool   // platform/app/package.json exists but will not open
+	hasWorkspaceManifest           bool   // pnpm-workspace.yaml at the repo root
+	hasUnreadableWorkspaceManifest bool   // pnpm-workspace.yaml exists but will not stat
+	hasControlPlaneDir             bool   // platform/app exists, possibly empty
+	manifest                       string // written to platform/app/package.json when set
+	isManifestDirectory            bool   // platform/app/package.json exists but will not open
 }
 
 // build materializes the fixture under t.TempDir() and returns the repo root.
@@ -478,10 +478,10 @@ func (f controlPlaneFixture) build(t *testing.T) string {
 	t.Helper()
 
 	root := t.TempDir()
-	if f.workspace {
+	if f.hasWorkspaceManifest {
 		writeControlPlaneFile(t, filepath.Join(root, workspaceManifest), "packages:\n  - platform/app\n")
 	}
-	if f.workspaceUnreadable {
+	if f.hasUnreadableWorkspaceManifest {
 		// A symlink pointing at itself stats as ELOOP rather than ENOENT,
 		// which is the cheapest deterministic unreadable witness -- and like
 		// the directory below, it holds when the suite runs as root.
@@ -492,7 +492,7 @@ func (f controlPlaneFixture) build(t *testing.T) string {
 	}
 
 	cpRoot := controlPlaneRootFor(root)
-	if f.controlPlaneDir || f.manifest != "" || f.manifestIsDir {
+	if f.hasControlPlaneDir || f.manifest != "" || f.isManifestDirectory {
 		if err := os.MkdirAll(cpRoot, 0o750); err != nil {
 			t.Fatalf("mkdir %s: %v", cpRoot, err)
 		}
@@ -500,7 +500,7 @@ func (f controlPlaneFixture) build(t *testing.T) string {
 
 	manifestPath := filepath.Join(cpRoot, "package.json")
 	switch {
-	case f.manifestIsDir:
+	case f.isManifestDirectory:
 		// A directory opens but will not read, which is the cheapest
 		// deterministic stand-in for an unreadable manifest -- unlike a
 		// permission bit, it also holds when the suite runs as root.
@@ -553,14 +553,14 @@ func TestRequireControlPlaneDispatchesTheVerdictItWasGiven(t *testing.T) {
 		{
 			name: "a present control plane lets the test run",
 			fixture: controlPlaneFixture{
-				workspace:       true,
-				controlPlaneDir: true,
-				manifest:        `{"name":"` + controlPlanePackage + `"}`,
+				hasWorkspaceManifest: true,
+				hasControlPlaneDir:   true,
+				manifest:             `{"name":"` + controlPlanePackage + `"}`,
 			},
 		},
 		{
 			name:       "an ambiguous checkout fails rather than skipping",
-			fixture:    controlPlaneFixture{workspace: true},
+			fixture:    controlPlaneFixture{hasWorkspaceManifest: true},
 			wantFailed: true,
 		},
 		{
