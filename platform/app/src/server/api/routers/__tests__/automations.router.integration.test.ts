@@ -4,8 +4,8 @@
  * Router-level tests for automation filter validation and update sanitization.
  */
 import {
-  createRedisConnection,
   type RedisConnection,
+  RedisConnectionService,
 } from "@langwatch/redis-client";
 import { nanoid } from "nanoid";
 import {
@@ -26,12 +26,10 @@ import { createTestApp } from "../../../app-layer/presets";
 let connection: RedisConnection | null = null;
 
 beforeAll(() => {
-  connection = createRedisConnection({
-    env: {
-      url: process.env.REDIS_URL,
-      clusterEndpoints: process.env.REDIS_CLUSTER_ENDPOINTS,
-      dbIndex: process.env.REDIS_DB_INDEX,
-    },
+  connection = new RedisConnectionService().connect({
+    url: process.env.REDIS_URL,
+    clusterEndpoints: process.env.REDIS_CLUSTER_ENDPOINTS,
+    dbIndex: process.env.REDIS_DB_INDEX,
   });
 });
 

@@ -56,7 +56,7 @@ import { GroupQueueProcessor } from "~/server/event-sourcing/queues/groupQueue/g
 import { createStorageRegistry } from "~/server/stored-objects/stored-objects-factory";
 import { resolveProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
 
-// The App owns the process's connection (ADR-090). It is null when no Redis is
+// The App owns the process's connection (ADR-093). It is null when no Redis is
 // configured, and this processor requires one — so narrow before constructing.
 const redis = getApp().redis;
 if (!redis) throw new Error("this queue needs Redis");

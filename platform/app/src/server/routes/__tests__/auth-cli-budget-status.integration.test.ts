@@ -56,7 +56,7 @@ async function callBudgetStatus(authHeader: string | null) {
 describe("GET /api/auth/cli/budget/status", () => {
   beforeAll(async () => {
     ({ redisConnection } = await startTestContainers());
-    // The route reads its connection off the App (ADR-090).
+    // The route reads its connection off the App (ADR-093).
     await resetApp();
     globalForApp.__langwatch_app = createTestApp({ redis: redisConnection });
 

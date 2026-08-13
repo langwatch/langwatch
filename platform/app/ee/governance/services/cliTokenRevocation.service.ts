@@ -56,7 +56,7 @@ export class CliTokenRevocationService {
    * "there are no CLI tokens to revoke" — which is not what "the App is not
    * initialized" means. Collapsing the two would report a successful revocation
    * of nothing and leave live CLI credentials working, the same reasoning that
-   * keeps `revokeSessions` on `getApp` (ADR-090).
+   * keeps `revokeSessions` on `getApp` (ADR-093).
    *
    * Construction stays App-free regardless, because this getter runs during a
    * revocation rather than at build time.

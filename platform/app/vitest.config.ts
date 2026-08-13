@@ -98,7 +98,7 @@ export default defineConfig({
     env: {
       /*
        * Marks the run as non-production for the code that still asks. Since
-       * ADR-090 nothing opens a Redis connection at import, so this no longer
+       * ADR-093 nothing opens a Redis connection at import, so this no longer
        * has to hold the connection back — a test that wants one builds it or
        * injects it, and better-auth reads it as a skip signal for its
        * secondary-storage decision.

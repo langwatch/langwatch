@@ -22,7 +22,7 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 import { createLogger } from "@langwatch/observability";
-import { createRedisConnection } from "@langwatch/redis-client";
+import { RedisConnectionService } from "@langwatch/redis-client";
 import { Cluster } from "ioredis";
 import { z } from "zod";
 import { env } from "~/env.mjs";
@@ -371,15 +371,12 @@ function createMigrationInventory(
 
 async function auditQueuesForCutover() {
   // `task.ts` boots no App, so this task owns the connection it needs and
-  // closes it below (ADR-090). It used to read the `~/server/redis` module
+  // closes it below (ADR-093). It used to read the `~/server/redis` module
   // singleton, which no longer exists.
-  const connection = createRedisConnection({
-    env: {
-      url: env.REDIS_URL,
-      clusterEndpoints: env.REDIS_CLUSTER_ENDPOINTS,
-      dbIndex: env.REDIS_DB_INDEX,
-    },
-    logger,
+  const connection = new RedisConnectionService({ logger }).connect({
+    url: env.REDIS_URL,
+    clusterEndpoints: env.REDIS_CLUSTER_ENDPOINTS,
+    dbIndex: env.REDIS_DB_INDEX,
   });
   if (!connection) {
     throw new Error(

@@ -10,8 +10,8 @@
  */
 
 import {
-  createRedisConnection,
   type RedisConnection,
+  RedisConnectionService,
 } from "@langwatch/redis-client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -45,12 +45,10 @@ function track(project: string, tabKey: string): string {
 let connection: RedisConnection | null = null;
 
 beforeAll(async () => {
-  connection = createRedisConnection({
-    env: {
-      url: process.env.REDIS_URL,
-      clusterEndpoints: process.env.REDIS_CLUSTER_ENDPOINTS,
-      dbIndex: process.env.REDIS_DB_INDEX,
-    },
+  connection = new RedisConnectionService().connect({
+    url: process.env.REDIS_URL,
+    clusterEndpoints: process.env.REDIS_CLUSTER_ENDPOINTS,
+    dbIndex: process.env.REDIS_DB_INDEX,
   });
   if (!connection) {
     throw new Error(

@@ -6,7 +6,7 @@ import { tryGetApp } from "~/server/app-layer/app";
  *
  * Omitting `redis` takes the App's; passing `null` explicitly forces the
  * in-memory path. A default parameter can't tell "not passed" from "passed
- * undefined", so the sentinel is how a caller opts out (ADR-090).
+ * undefined", so the sentinel is how a caller opts out (ADR-093).
  *
  * Shared rather than repeated: the three-way meaning of `undefined` / `null` /
  * a connection is the whole contract, and two copies of it drift into two

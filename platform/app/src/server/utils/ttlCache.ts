@@ -30,7 +30,7 @@ export class TtlCache<T> {
    * `tryGetApp` rather than `getApp` because falling back is this class's
    * contract, not a failure: no Redis configured, and no App yet, both mean
    * "cache in memory". Throwing here would turn the documented fallback into a
-   * crash for every caller constructed at module scope (ADR-090).
+   * crash for every caller constructed at module scope (ADR-093).
    */
   private get redis() {
     return tryGetApp()?.redis ?? null;

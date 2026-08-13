@@ -167,7 +167,7 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
   //
   // Exiting is this caller's decision, not the probe's: the web server owns the
   // process, and one that cannot reach Redis has nothing to serve. The probe
-  // has already logged what and where (ADR-090).
+  // has already logged what and where (ADR-093).
   try {
     await assertRedisReady();
   } catch (err) {

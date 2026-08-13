@@ -57,7 +57,7 @@ describe("POST /api/auth/cli/logout", () => {
   beforeAll(async () => {
     ({ redisConnection } = await startTestContainers());
     // The route reads its connection off the App, so the App has to carry the
-    // container's (ADR-090).
+    // container's (ADR-093).
     await resetApp();
     globalForApp.__langwatch_app = createTestApp({ redis: redisConnection });
   }, 60_000);

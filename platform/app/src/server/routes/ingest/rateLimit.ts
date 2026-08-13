@@ -33,7 +33,7 @@ type RedisLike = Redis | Cluster;
 /**
  * Omitting `redis` takes the App's; passing `null` explicitly forces the
  * open-fail path. A default parameter can't tell "not passed" from "passed
- * undefined", so the sentinel is how a caller opts out (ADR-090).
+ * undefined", so the sentinel is how a caller opts out (ADR-093).
  */
 function resolveRedis(redis: RedisLike | null | undefined): RedisLike | null {
   return redis === void 0 ? (tryGetApp()?.redis ?? null) : redis;

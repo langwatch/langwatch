@@ -29,7 +29,7 @@ let redis: Redis | null = null;
 describe("OAuth client registry", () => {
   beforeAll(async () => {
     ({ redisConnection: redis } = await startTestContainers());
-    // The registry reads its connection off the App (ADR-090).
+    // The registry reads its connection off the App (ADR-093).
     await resetApp();
     globalForApp.__langwatch_app = createTestApp({ redis });
   }, 60_000);

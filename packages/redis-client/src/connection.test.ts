@@ -14,6 +14,9 @@ class FakeConnection {
   }
 }
 
+// ioredis is mocked rather than injected through a factory seam on purpose:
+// the module mock is what lets "importing the package opens no connection"
+// observe the REAL constructors, which is the guarantee ADR-093 makes.
 vi.mock("ioredis", () => {
   class FakeIORedis extends FakeConnection {
     constructor(url: string, options: Record<string, unknown>) {
@@ -30,14 +33,13 @@ vi.mock("ioredis", () => {
   return { default: FakeIORedis, Cluster: FakeCluster };
 });
 
-const { connectRedis, createRedisConnection } = await import("./connection");
-const { resolveRedisConfig } = await import("./config");
+const { RedisConnectionService } = await import("./connection");
 
 function createLoggerSpy() {
   return { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
 }
 
-describe("createRedisConnection", () => {
+describe("RedisConnectionService", () => {
   beforeEach(() => {
     standaloneCalls.length = 0;
     clusterCalls.length = 0;
@@ -51,21 +53,26 @@ describe("createRedisConnection", () => {
     });
   });
 
-  describe("when called with a standalone URL", () => {
+  describe("given a service constructed without a logger", () => {
     /** @scenario "A connection exists only when something asks for one" */
-    it("constructs exactly one client", () => {
-      const connection = createRedisConnection({
-        env: { url: "redis://localhost:6379" },
-      });
+    it("constructs no client until connect is called", () => {
+      const connections = new RedisConnectionService();
+
+      expect(standaloneCalls).toHaveLength(0);
+
+      const connection = connections.connect({ url: "redis://localhost:6379" });
 
       expect(connection).not.toBeNull();
       expect(standaloneCalls).toHaveLength(1);
       expect(clusterCalls).toHaveLength(0);
     });
+  });
 
+  describe("when connecting to a standalone URL", () => {
     it("passes the URL, database index and TLS setting through", () => {
-      createRedisConnection({
-        env: { url: "rediss://host:6379", dbIndex: "4" },
+      new RedisConnectionService().connect({
+        url: "rediss://host:6379",
+        dbIndex: "4",
       });
 
       expect(standaloneCalls[0]?.[0]).toBe("rediss://host:6379");
@@ -73,7 +80,7 @@ describe("createRedisConnection", () => {
     });
 
     it("lifts the per-request retry budget for blocking commands", () => {
-      createRedisConnection({ env: { url: "redis://localhost:6379" } });
+      new RedisConnectionService().connect({ url: "redis://localhost:6379" });
 
       expect(standaloneCalls[0]?.[1]).toMatchObject({
         maxRetriesPerRequest: null,
@@ -81,7 +88,7 @@ describe("createRedisConnection", () => {
     });
 
     it("passes no offline-queue option, leaving ioredis's default in place", () => {
-      createRedisConnection({ env: { url: "redis://localhost:6379" } });
+      new RedisConnectionService().connect({ url: "redis://localhost:6379" });
 
       // Guards the finding this replaced: `offlineQueue` is not a constructor
       // option ioredis reads, so passing it advertised a fail-fast the client
@@ -92,9 +99,11 @@ describe("createRedisConnection", () => {
     });
   });
 
-  describe("when called with cluster endpoints", () => {
+  describe("when connecting to cluster endpoints", () => {
     it("constructs a cluster client over the parsed endpoints", () => {
-      createRedisConnection({ env: { clusterEndpoints: "one:6379,two:6380" } });
+      new RedisConnectionService().connect({
+        clusterEndpoints: "one:6379,two:6380",
+      });
 
       expect(standaloneCalls).toHaveLength(0);
       expect(clusterCalls).toHaveLength(1);
@@ -105,7 +114,7 @@ describe("createRedisConnection", () => {
     });
 
     it("reads from all nodes", () => {
-      createRedisConnection({ env: { clusterEndpoints: "one:6379" } });
+      new RedisConnectionService().connect({ clusterEndpoints: "one:6379" });
 
       expect(clusterCalls[0]?.[1]).toMatchObject({ scaleReads: "all" });
     });
@@ -113,32 +122,56 @@ describe("createRedisConnection", () => {
 
   describe("when the environment configures no Redis", () => {
     it("returns null without constructing a client", () => {
-      expect(createRedisConnection({ env: {} })).toBeNull();
-      expect(createRedisConnection({ env: { url: "redis://x", skip: true } })).toBeNull();
+      const connections = new RedisConnectionService();
+
+      expect(connections.connect({})).toBeNull();
+      expect(connections.connect({ url: "redis://x", skip: true })).toBeNull();
       expect(standaloneCalls).toHaveLength(0);
       expect(clusterCalls).toHaveLength(0);
     });
   });
 
-  describe("when a logger is supplied", () => {
+  describe("when a standalone client is asked for specifically", () => {
+    it("returns a client typed as standalone", () => {
+      const connection = new RedisConnectionService().connectStandalone({
+        url: "redis://localhost:6379",
+        dbIndex: "2",
+      });
+
+      expect(connection).not.toBeNull();
+      expect(standaloneCalls).toHaveLength(1);
+      expect(standaloneCalls[0]?.[1]).toMatchObject({ db: 2 });
+      expect(clusterCalls).toHaveLength(0);
+    });
+
+    it("returns null without a URL, constructing nothing", () => {
+      expect(
+        new RedisConnectionService().connectStandalone({ url: void 0 }),
+      ).toBeNull();
+      expect(standaloneCalls).toHaveLength(0);
+    });
+  });
+
+  describe("when a logger is supplied to the service", () => {
     it("reports configuration warnings", () => {
       const logger = createLoggerSpy();
 
-      createRedisConnection({
-        env: { clusterEndpoints: "one:6379", dbIndex: "3" },
-        logger,
+      new RedisConnectionService({ logger }).connect({
+        clusterEndpoints: "one:6379",
+        dbIndex: "3",
       });
 
       expect(logger.warn).toHaveBeenCalledTimes(1);
-      expect(logger.warn.mock.calls[0]?.[1]).toContain("only supports database 0");
+      expect(logger.warn.mock.calls[0]?.[1]).toContain(
+        "only supports database 0",
+      );
     });
 
     it("reports connection lifecycle events", () => {
       const logger = createLoggerSpy();
 
-      const connection = createRedisConnection({
-        env: { url: "redis://localhost:6379" },
-        logger,
+      const connection = new RedisConnectionService({ logger }).connect({
+        url: "redis://localhost:6379",
       }) as unknown as FakeConnection;
 
       connection.emit("ready");
@@ -158,13 +191,12 @@ describe("createRedisConnection", () => {
     it("warns even when no connection is created", () => {
       const logger = createLoggerSpy();
 
-      connectRedis({
+      new RedisConnectionService({ logger }).connectResolved({
         config: {
           configured: false,
           reason: "unconfigured",
           warnings: ["heads up"],
         },
-        logger,
       });
 
       expect(logger.warn).toHaveBeenCalledWith({}, "heads up");
@@ -172,10 +204,15 @@ describe("createRedisConnection", () => {
   });
 
   describe("when a resolved configuration is supplied directly", () => {
-    it("connects without re-resolving it", () => {
-      const config = resolveRedisConfig({ url: "redis://localhost:6379" });
+    it("connects without re-resolving it", async () => {
+      const { RedisConfigService } = await import("./config");
+      const config = new RedisConfigService().resolve({
+        url: "redis://localhost:6379",
+      });
 
-      expect(connectRedis({ config })).not.toBeNull();
+      expect(
+        new RedisConnectionService().connectResolved({ config }),
+      ).not.toBeNull();
       expect(standaloneCalls).toHaveLength(1);
     });
   });

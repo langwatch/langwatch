@@ -58,7 +58,7 @@ export function installClickHouseTestApp({
     organizationId: string,
   ) => Promise<ClickHouseClientLike | null>;
   /**
-   * The connection routes under test read as `getApp().redis` (ADR-090).
+   * The connection routes under test read as `getApp().redis` (ADR-093).
    * Defaults to none, which is right for a test that asserts only on rows; a
    * test whose route needs Redis passes the one it already opened.
    */

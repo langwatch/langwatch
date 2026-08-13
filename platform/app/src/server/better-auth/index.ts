@@ -13,7 +13,7 @@ import {
   requestPathname,
 } from "@ee/sso/ssoPathGate";
 import { createLogger } from "@langwatch/observability";
-import { isRedisConfigured } from "@langwatch/redis-client";
+import { RedisConfigService } from "@langwatch/redis-client";
 import { compare, hash } from "bcrypt";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
@@ -81,7 +81,7 @@ const plugins =
  * changes its session strategy — a deployment with no Redis must get `undefined`
  * and keep its sessions in the database. That decision is a pure question about
  * *configuration*, so it is answered from env rather than from a live client
- * (ADR-090); the client itself is resolved lazily, inside each callback.
+ * (ADR-093); the client itself is resolved lazily, inside each callback.
  *
  * `BUILD_TIME` joins `SKIP_REDIS` in the skip signal: a build or a test run has
  * env pointing at a Redis it must not adopt as a session store.
@@ -103,7 +103,7 @@ const redisEnv = {
 const secondaryStorageConnection = () => tryGetApp()?.redis ?? null;
 
 const secondaryStorage: BetterAuthOptions["secondaryStorage"] =
-  isRedisConfigured(redisEnv)
+  new RedisConfigService().isConfigured(redisEnv)
     ? {
         get: async (key) => {
           const redis = secondaryStorageConnection();

@@ -9,7 +9,7 @@ import { PersonalUsageClickHouseRepository } from "@ee/governance/services/perso
 import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
 import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import { createLogger } from "@langwatch/observability";
-import { createRedisConnection } from "@langwatch/redis-client";
+import { RedisConnectionService } from "@langwatch/redis-client";
 import { env } from "~/env.mjs";
 import { ClickHouseAnalyticsService } from "~/server/analytics/clickhouse/clickhouse-analytics.service";
 import { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
@@ -316,7 +316,7 @@ import { TraceSummaryService } from "./traces/trace-summary.service";
 import { traced } from "./tracing";
 import { UsageService } from "./usage/usage.service";
 
-/** Keeps the connection's lifecycle lines under the name they had before ADR-090. */
+/** Keeps the connection's lifecycle lines under the name they had before ADR-093. */
 const redisLogger = createLogger("langwatch:redis");
 
 /**
@@ -373,21 +373,18 @@ export function initializeDefaultApp(options?: {
     params,
   ) => clusterTopicsForProject({ ...params, resolveClickHouseClient });
 
-  // ADR-090: the composition root owns the App's Redis connection, and nothing
+  // ADR-093: the composition root owns the App's Redis connection, and nothing
   // holds one at module scope. Two entry points outside a serving process build
   // their own and close it themselves — `replayPreset` (which needs a
   // standalone client, since its multi-key work CROSSSLOT-rejects on a cluster)
   // and the `migrateObjectStorage` task, which boots no App at all. Both go
   // through the client package; neither is a second live connection in a
   // process this one is serving.
-  const redis = createRedisConnection({
-    env: {
-      url: config.redisUrl,
-      clusterEndpoints: config.redisClusterEndpoints,
-      dbIndex: config.redisDbIndex,
-      skip: config.skipRedis,
-    },
-    logger: redisLogger,
+  const redis = new RedisConnectionService({ logger: redisLogger }).connect({
+    url: config.redisUrl,
+    clusterEndpoints: config.redisClusterEndpoints,
+    dbIndex: config.redisDbIndex,
+    skip: config.skipRedis,
   });
 
   const broadcast = new BroadcastService(redis);

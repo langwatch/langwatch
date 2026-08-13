@@ -1,4 +1,4 @@
-# ADR-090: Redis is an owned client, not a module singleton
+# ADR-093: Redis is an owned client, not a module singleton
 
 **Date:** 2026-08-10
 
@@ -61,8 +61,12 @@ BEFORE — two owners, one of them implicit
 
 AFTER — one owner, explicit
 
-  @langwatch/redis-client   (pure: config + factory + readiness, no side effects)
+  @langwatch/redis-client   (three services, no import side effects)
         │
+        │   RedisConfigService       env ──▶ connection plan   (pure)
+        │   RedisConnectionService   plan ──▶ [ IORedis ]      (the only
+        │                                                       constructor)
+        │   RedisReadinessService    connection ──▶ ping
         ▼
   presets.ts  ──creates──▶ [ IORedis ]  ──▶ App.redis  ──closed by App.close()
                                               │
@@ -82,10 +86,21 @@ module scope.**
 Three parts:
 
 1. **`@langwatch/redis-client` — a pure package.** It holds configuration
-   resolution, the connection factory, and the readiness probe. It reads no
+   resolution, connection construction, and the readiness probe. It reads no
    ambient environment; the caller supplies config. Importing it creates
    nothing. It absorbs `clients/redis.factory.ts`, `redis-db-index.ts`, and the
    connection/readiness logic of `server/redis.ts`.
+
+   Each of the three is a **service class** — `RedisConfigService`,
+   `RedisConnectionService`, `RedisReadinessService` — following the idiom
+   `@langwatch/authz` sets: collaborators and the logger arrive once at
+   construction, the methods take only what varies per call. `RedisConfigService`
+   is stateless and pure, in the same sense as `AuthzEngine`, so it is
+   constructed freely and shared; `RedisConnectionService` composes one rather
+   than resolving configuration itself. Instantiating any of them opens
+   nothing — a socket exists only because `connect()` was called. The endpoint
+   and database-index parsers stay private to the package: they are details of
+   `resolve()`, and the behaviour they carry is covered through it.
 
 2. **The App owns the one connection.** `presets.ts` already created it; it is
    now exposed as `getApp().redis` (`Redis | Cluster | null`) and registered as
@@ -155,9 +170,10 @@ immediate error — but it does mean each call site had to move its resolution
 into the function that uses it. `better-auth` was the sharp edge: it decides
 whether to configure `secondaryStorage` at module scope, from whether a
 connection exists. That decision is now made from *configuration*
-(`isRedisConfigured`, a pure predicate over supplied env) while the connection
-itself is resolved lazily inside the storage callbacks, which preserves the
-existing behaviour exactly without needing a live client at module load.
+(`RedisConfigService.isConfigured`, a pure predicate over supplied env) while
+the connection itself is resolved lazily inside the storage callbacks, which
+preserves the existing behaviour exactly without needing a live client at module
+load.
 
 We keep `null` rather than introducing a null-object client. Every existing
 consumer already branches on absence, and those branches encode real product

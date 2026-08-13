@@ -115,7 +115,7 @@ export async function startReplicaPair({
   }
 
   // `createMcpHandler` reads its connection from the App at construction
-  // (ADR-090), so the App has to hold the one this suite opened before the
+  // (ADR-093), so the App has to hold the one this suite opened before the
   // replicas are built. Both replicas share it: a single connection is
   // precisely the "only Redis in common" the pair is meant to model, and each
   // handler still duplicates its own relay subscriber.

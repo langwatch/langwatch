@@ -21,8 +21,8 @@
  * Spec: specs/ai-gateway/governance/receiver-auth-rate-limit.feature
  */
 import {
-  createRedisConnection,
   type RedisConnection,
+  RedisConnectionService,
 } from "@langwatch/redis-client";
 import { nanoid } from "nanoid";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
@@ -52,12 +52,10 @@ const ORIGINAL_DISABLED = process.env.LW_INGEST_RATE_LIMIT_DISABLED;
 process.env.LW_INGEST_RATE_LIMIT_DISABLED = "0";
 
 beforeAll(async () => {
-  redisConnection = createRedisConnection({
-    env: {
-      url: process.env.REDIS_URL,
-      clusterEndpoints: process.env.REDIS_CLUSTER_ENDPOINTS,
-      dbIndex: process.env.REDIS_DB_INDEX,
-    },
+  redisConnection = new RedisConnectionService().connect({
+    url: process.env.REDIS_URL,
+    clusterEndpoints: process.env.REDIS_CLUSTER_ENDPOINTS,
+    dbIndex: process.env.REDIS_DB_INDEX,
   });
   if (!redisConnection) {
     throw new Error("Redis connection unavailable in test env");

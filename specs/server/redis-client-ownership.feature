@@ -30,7 +30,7 @@ Feature: Redis is an owned client, never a module singleton
   # package holding the contract, and the composition root owning the instance,
   # reached as `getApp().clickhouse`. This feature applies the same rule to Redis.
   #
-  # See dev/docs/adr/090-redis-is-an-owned-client.md.
+  # See dev/docs/adr/093-redis-is-an-owned-client.md.
 
   Rule: The client package never connects as an import side effect
 

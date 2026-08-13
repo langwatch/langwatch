@@ -10,7 +10,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // No App, so the cache runs memory-only and these tests stay deterministic —
-// the fallback TtlCache is specified to take (ADR-090).
+// the fallback TtlCache is specified to take (ADR-093).
 vi.mock("~/server/app-layer/app", () => ({
   tryGetApp: () => null,
 }));

@@ -2,9 +2,9 @@
  * @vitest-environment node
  *
  * @see specs/server/redis-client-ownership.feature
- * @see dev/docs/adr/090-redis-is-an-owned-client.md
+ * @see dev/docs/adr/093-redis-is-an-owned-client.md
  *
- * The ownership half of ADR-090: the App holds the process's one connection,
+ * The ownership half of ADR-093: the App holds the process's one connection,
  * hands it out, and closes it — and no module in the tree keeps one of its own.
  *
  * The two source guards below are the ones that keep the decision true over
@@ -283,7 +283,12 @@ describe("Redis ownership", () => {
       for (const innocent of [
         "new RedisLikeThing(url)",
         "renew Redis(url)",
-        "createRedisConnection({ env })",
+        // The client package's services are the sanctioned way to reach Redis,
+        // and every converted consumer spells one `new Redis…` — one character
+        // of slack in the pattern above would flag the whole platform.
+        "new RedisConnectionService({ logger }).connect(env)",
+        "new RedisConfigService().isConfigured(env)",
+        "new RedisReadinessService({ logger })",
       ]) {
         expect(IOREDIS_CONSTRUCTION.test(innocent)).toBe(false);
       }

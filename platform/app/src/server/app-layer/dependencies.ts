@@ -214,7 +214,7 @@ export interface AppDependencies {
   };
   /**
    * The process's one Redis connection, owned by the composition root and
-   * closed with the App (ADR-090).
+   * closed with the App (ADR-093).
    *
    * `null` when this deployment or test run configures no Redis — a supported
    * outcome, not an error: consumers branch on it to take their documented
@@ -226,7 +226,7 @@ export interface AppDependencies {
    *
    * Most such readers go through `tryGetApp()` rather than `getApp()`, because
    * they already branch on absence and treat "no App" the same as "no Redis".
-   * See ADR-090 for which ones deliberately do not.
+   * See ADR-093 for which ones deliberately do not.
    */
   redis: RedisConnection | null;
   /** Deduplicated usage counters written to ClickHouse for billing. */

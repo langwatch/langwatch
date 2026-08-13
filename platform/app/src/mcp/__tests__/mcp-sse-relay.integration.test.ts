@@ -9,8 +9,8 @@
  * connection the balancer may hand to any replica.
  */
 import {
-  createRedisConnection,
   type RedisConnection,
+  RedisConnectionService,
 } from "@langwatch/redis-client";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
@@ -67,13 +67,11 @@ describe("Feature: MCP SSE transport across replicas", () => {
 
   beforeAll(async () => {
     // This suite boots no App of its own, so it owns the connection it opens
-    // and closes it below (ADR-090). The harness lends it to the replicas.
-    redis = createRedisConnection({
-      env: {
-        url: process.env.REDIS_URL,
-        clusterEndpoints: process.env.REDIS_CLUSTER_ENDPOINTS,
-        dbIndex: process.env.REDIS_DB_INDEX,
-      },
+    // and closes it below (ADR-093). The harness lends it to the replicas.
+    redis = new RedisConnectionService().connect({
+      url: process.env.REDIS_URL,
+      clusterEndpoints: process.env.REDIS_CLUSTER_ENDPOINTS,
+      dbIndex: process.env.REDIS_DB_INDEX,
     });
     if (!redis) {
       throw new Error(

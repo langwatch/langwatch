@@ -55,7 +55,7 @@ export async function rateLimit(opts: {
   const now = Date.now();
 
   // Fail-open by contract: no App or no Redis both mean the per-process
-  // fallback below, never a crash (ADR-090).
+  // fallback below, never a crash (ADR-093).
   const redisConnection = tryGetApp()?.redis ?? null;
   if (redisConnection) {
     const redisKey = `langwatch:ratelimit:${key}`;

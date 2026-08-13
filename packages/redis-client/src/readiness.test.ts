@@ -1,22 +1,25 @@
 import { describe, expect, it, vi } from "vitest";
-import { pingRedis } from "./readiness";
+import { RedisReadinessService } from "./readiness";
 import type { RedisConnection } from "./types";
 
 function connectionThat(ping: () => Promise<unknown>): RedisConnection {
   return { ping } as unknown as RedisConnection;
 }
 
-describe("pingRedis", () => {
+function createLoggerSpy() {
+  return { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+}
+
+describe("RedisReadinessService", () => {
   describe("given a connection that answers", () => {
     /** @scenario "A responsive Redis is reported ready" */
     it("resolves", async () => {
-      const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+      const logger = createLoggerSpy();
 
       await expect(
-        pingRedis({
+        new RedisReadinessService({ logger }).ping({
           connection: connectionThat(() => Promise.resolve("PONG")),
           target: "redis://localhost:6379",
-          logger,
         }),
       ).resolves.toBeUndefined();
 
@@ -31,19 +34,18 @@ describe("pingRedis", () => {
   describe("given a target carrying an AUTH password", () => {
     /** @scenario "A credential in the Redis URL never reaches the logs" */
     it("logs the host without the credential, on success and on failure", async () => {
-      const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+      const logger = createLoggerSpy();
+      const readiness = new RedisReadinessService({ logger });
       const target = "rediss://admin:hunter2@redis.internal:6379";
 
-      await pingRedis({
+      await readiness.ping({
         connection: connectionThat(() => Promise.resolve("PONG")),
         target,
-        logger,
       });
       await expect(
-        pingRedis({
+        readiness.ping({
           connection: connectionThat(() => Promise.reject(new Error("down"))),
           target,
-          logger,
         }),
       ).rejects.toThrow("down");
 
@@ -58,12 +60,11 @@ describe("pingRedis", () => {
     });
 
     it("drops a password containing a comma", async () => {
-      const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+      const logger = createLoggerSpy();
 
-      await pingRedis({
+      await new RedisReadinessService({ logger }).ping({
         connection: connectionThat(() => Promise.resolve("PONG")),
         target: "rediss://admin:p,a@redis.internal:6379",
-        logger,
       });
 
       // Splitting the target on commas first sent `rediss://admin:p` and
@@ -76,12 +77,11 @@ describe("pingRedis", () => {
     });
 
     it("drops a password passed as a query parameter, keeping the database index", async () => {
-      const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+      const logger = createLoggerSpy();
 
-      await pingRedis({
+      await new RedisReadinessService({ logger }).ping({
         connection: connectionThat(() => Promise.resolve("PONG")),
         target: "redis://redis.internal:6379/3?password=hunter2",
-        logger,
       });
 
       expect(logger.info).toHaveBeenCalledWith(
@@ -91,12 +91,11 @@ describe("pingRedis", () => {
     });
 
     it("keeps a credential-free cluster endpoint list intact", async () => {
-      const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+      const logger = createLoggerSpy();
 
-      await pingRedis({
+      await new RedisReadinessService({ logger }).ping({
         connection: connectionThat(() => Promise.resolve("PONG")),
         target: "one:6379,two:6380",
-        logger,
       });
 
       expect(logger.info).toHaveBeenCalledWith(
@@ -109,13 +108,12 @@ describe("pingRedis", () => {
   describe("given a connection that never answers", () => {
     /** @scenario "An unresponsive Redis fails the probe rather than the process" */
     it("rejects with a timeout error", async () => {
-      const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+      const logger = createLoggerSpy();
 
       await expect(
-        pingRedis({
+        new RedisReadinessService({ logger }).ping({
           connection: connectionThat(() => new Promise(() => void 0)),
           timeoutMs: 5,
-          logger,
         }),
       ).rejects.toThrow("PING timeout after 5ms");
 
@@ -126,7 +124,7 @@ describe("pingRedis", () => {
   describe("given a connection that rejects", () => {
     it("propagates the failure as an Error", async () => {
       await expect(
-        pingRedis({
+        new RedisReadinessService().ping({
           connection: connectionThat(() => Promise.reject("ECONNREFUSED")),
           timeoutMs: 50,
         }),
@@ -137,8 +135,10 @@ describe("pingRedis", () => {
   describe("given no connection", () => {
     /** @scenario "Probing without a connection succeeds trivially" */
     it("resolves without probing anything", async () => {
-      await expect(pingRedis({ connection: null })).resolves.toBeUndefined();
-      await expect(pingRedis({})).resolves.toBeUndefined();
+      const readiness = new RedisReadinessService();
+
+      await expect(readiness.ping({ connection: null })).resolves.toBeUndefined();
+      await expect(readiness.ping({})).resolves.toBeUndefined();
     });
   });
 
@@ -146,7 +146,7 @@ describe("pingRedis", () => {
     it("leaves no pending timer behind", async () => {
       vi.useFakeTimers();
       try {
-        await pingRedis({
+        await new RedisReadinessService().ping({
           connection: connectionThat(() => Promise.resolve("PONG")),
           timeoutMs: 15_000,
         });

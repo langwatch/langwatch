@@ -649,7 +649,7 @@ export async function startScenarioProcessor({
   injectedDeps?: ProcessorDependencies | undefined;
 }): Promise<{ close: () => Promise<void> } | undefined> {
   // Skipping the processor is this function's documented outcome when there
-  // is no Redis, so absence must not raise (ADR-090).
+  // is no Redis, so absence must not raise (ADR-093).
   const connection = tryGetApp()?.redis ?? null;
   if (!connection) {
     logger.info("No Redis connection, skipping scenario processor");

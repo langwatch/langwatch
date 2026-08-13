@@ -79,7 +79,7 @@ export class CliSessionInventoryService {
   /**
    * Builds the service. Takes a connection when the caller has one; otherwise
    * the App's is resolved when a read actually runs, so constructing this
-   * never demands an App (ADR-090).
+   * never demands an App (ADR-093).
    */
   static create(redis?: RedisLike | null): CliSessionInventoryService {
     return new CliSessionInventoryService(redis);
