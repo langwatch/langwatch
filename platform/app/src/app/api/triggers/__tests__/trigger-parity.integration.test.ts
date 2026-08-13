@@ -9,12 +9,7 @@
  * dispatch seam rather than delivered, so the assertion is about the
  * destination the API resolved from the saved row — the part this surface owns.
  */
-import {
-  type Organization,
-  type Project,
-  type Team,
-  TriggerAction,
-} from "@prisma/client";
+
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -25,6 +20,12 @@ import {
   it,
   vi,
 } from "vitest";
+import {
+  type Organization,
+  type Project,
+  type Team,
+  TriggerAction,
+} from "~/generated/prisma/client";
 import { extractGraphAlertFromTriggerRow } from "~/server/app-layer/automations/graph-alert.builder";
 import { decryptWebhookHeaders } from "~/server/app-layer/automations/providers/webhook/server";
 import { PrismaTriggerRepository } from "~/server/app-layer/automations/repositories/trigger.prisma.repository";

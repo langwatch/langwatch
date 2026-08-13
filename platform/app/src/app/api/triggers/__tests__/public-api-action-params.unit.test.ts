@@ -6,8 +6,9 @@
  * field the published schema names is one its channel actually reads, and no
  * field the channel requires is left out of what is published.
  */
-import type { TriggerAction } from "@prisma/client";
+
 import { describe, expect, it } from "vitest";
+import type { TriggerAction } from "~/generated/prisma/client";
 import { SERVER_PROVIDERS } from "~/server/app-layer/automations/providers/registry";
 import { deliveryFieldNames } from "~/server/app-layer/automations/trigger-redaction";
 import { PUBLIC_API_ACTION_PARAMS_SCHEMAS } from "../[[...route]]/app";
