@@ -71,6 +71,7 @@ export function mergeSnapshots({
     latencyP99Ms: live.latencyP99Ms,
     peakLatencyP50Ms: live.peakLatencyP50Ms,
     peakLatencyP99Ms: live.peakLatencyP99Ms,
+    latencyWindows: detail?.latencyWindows ?? null,
     pausedKeys: live.pausedKeys,
 
     // Detail lags live by design. Its absence renders as "nothing to show

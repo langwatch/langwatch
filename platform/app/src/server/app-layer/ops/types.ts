@@ -1,3 +1,4 @@
+import type { LatencyWindows } from "~/shared/ops/latency";
 import type { BoundedSection, ParkedTenant } from "./snapshot/snapshot.types";
 
 /** One tenant's parked group, as the drill-down lists it. */
@@ -162,6 +163,12 @@ export interface DashboardData {
   latencyP99Ms: number;
   peakLatencyP50Ms: number;
   peakLatencyP99Ms: number;
+  /**
+   * Bucketed percentiles per time window (hour/day/week/all time), computed
+   * by the writer's detail cycle from the completion histograms. Null until
+   * the first detail cycle lands.
+   */
+  latencyWindows: LatencyWindows | null;
   phases: {
     commands: PhaseMetrics;
     projections: PhaseMetrics;

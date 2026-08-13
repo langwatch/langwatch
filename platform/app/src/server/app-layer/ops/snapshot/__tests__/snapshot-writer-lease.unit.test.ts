@@ -17,6 +17,7 @@ const redisStub = {
     lrange: vi.fn().mockReturnThis(),
     zadd: vi.fn().mockReturnThis(),
     zremrangebyscore: vi.fn().mockReturnThis(),
+    hgetall: vi.fn().mockReturnThis(),
     exec: vi.fn().mockResolvedValue([]),
   }),
   zrange: vi.fn().mockResolvedValue([]),

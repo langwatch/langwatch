@@ -9,6 +9,7 @@ import type { DashboardData } from "~/server/app-layer/ops/types";
 import { api } from "~/utils/api";
 import { ActiveOperationsSection } from "./ActiveOperationsSection";
 import { HealthLine } from "./HealthLine";
+import { LatencyWindowsCard } from "./LatencyWindowsCard";
 import { ParkedCard } from "./ParkedCard";
 import { ReplayHistorySection } from "./ReplayHistorySection";
 import { StatStrip } from "./StatStrip";
@@ -74,6 +75,8 @@ export function OpsDashboardContent({ data }: { data: DashboardData }) {
           <ThroughputChart data={data} />
         </Card.Body>
       </Card.Root>
+
+      <LatencyWindowsCard windows={data.latencyWindows} />
 
       <PipelineTreeCard
         pipelineTree={data.pipelineTree}

@@ -2,6 +2,16 @@ import * as os from "node:os";
 import { createLogger } from "@langwatch/observability";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
+import {
+  LATENCY_HOUR_BUCKET_MS,
+  LATENCY_MINUTE_BUCKET_MS,
+  type LatencyWindows,
+  latencyAllTimeKey,
+  latencyHourBucketKey,
+  latencyMinuteBucketKey,
+  mergeHistogramCounts,
+  windowPercentiles,
+} from "~/shared/ops/latency";
 import { normalizeErrorMessage } from "./normalize-error-message";
 import {
   computeEngineCpuPercent,
@@ -597,6 +607,7 @@ export class OpsMetricsCollector {
       latencyP99Ms: this.currentLatencyP99Ms,
       peakLatencyP50Ms: this.peakLatencyP50Ms,
       peakLatencyP99Ms: this.peakLatencyP99Ms,
+      latencyWindows: this.latestDetail?.latencyWindows ?? null,
       phases: this.currentPhases,
       jobNameMetrics: this.currentJobNameMetrics,
       pausedKeys: this.currentPausedKeys,
@@ -692,7 +703,7 @@ export class OpsMetricsCollector {
     this.detailInFlight = true;
     void (async () => {
       try {
-        const [blocked, parked] = await Promise.all([
+        const [blocked, parked, latencyWindows] = await Promise.all([
           this.queueRepo.getBlockedSummary({
             queueNames: this.groupQueueNames,
           }),
@@ -700,6 +711,7 @@ export class OpsMetricsCollector {
             queueNames: this.groupQueueNames,
             maxTenants: MAX_PARKED_TENANTS,
           }),
+          this.computeLatencyWindows(),
         ]);
 
         const treeSeedKeys = [
@@ -724,6 +736,7 @@ export class OpsMetricsCollector {
           pipelineTree: buildPipelineTree({ queues, seedKeys: treeSeedKeys }),
           phases: this.currentPhases,
           jobNameMetrics: this.currentJobNameMetrics,
+          latencyWindows,
         };
 
         // Only adopt the artifact the fence ACCEPTED. A rejected write means
@@ -754,6 +767,83 @@ export class OpsMetricsCollector {
   /** The detail artifact this writer most recently produced, if any. */
   getLatestDetail(): DetailSnapshot | null {
     return this.latestDetail;
+  }
+
+  /**
+   * Windowed P50/P99 from the completion histograms GroupQueue maintains:
+   * the hour window merges the last sixty minute-buckets, day and week merge
+   * hour-buckets, all time reads the cumulative hash. Runs on the detail
+   * cycle only — one writer, ~230 pipelined HGETALLs per queue per 15s.
+   */
+  private async computeLatencyWindows(): Promise<LatencyWindows> {
+    try {
+      return await this.readLatencyWindows();
+    } catch (err) {
+      // Fail soft: the rest of the detail artifact (blocked clusters, parked
+      // tenants) must not be lost to a histogram read hiccup. All-null
+      // windows render as "nothing to report yet".
+      logger.warn({ error: err }, "Failed to compute latency windows");
+      return { hour: null, day: null, week: null, allTime: null };
+    }
+  }
+
+  private async readLatencyWindows(): Promise<LatencyWindows> {
+    const nowMs = Date.now();
+    const pipeline = this.redis.pipeline();
+    const plan: Array<"minute" | "hour" | "all"> = [];
+
+    for (const queueName of this.groupQueueNames) {
+      for (let i = 0; i < 60; i++) {
+        pipeline.hgetall(
+          latencyMinuteBucketKey(
+            queueName,
+            nowMs - i * LATENCY_MINUTE_BUCKET_MS,
+          ),
+        );
+        plan.push("minute");
+      }
+      for (let i = 0; i < 168; i++) {
+        pipeline.hgetall(
+          latencyHourBucketKey(queueName, nowMs - i * LATENCY_HOUR_BUCKET_MS),
+        );
+        plan.push("hour");
+      }
+      pipeline.hgetall(latencyAllTimeKey(queueName));
+      plan.push("all");
+    }
+
+    const results = (await pipeline.exec()) ?? [];
+    const minuteHashes: Array<Record<string, string>> = [];
+    const dayHashes: Array<Record<string, string>> = [];
+    const weekHashes: Array<Record<string, string>> = [];
+    const allHashes: Array<Record<string, string>> = [];
+    let hourIndex = 0;
+    for (let i = 0; i < plan.length; i++) {
+      const hash = (results[i]?.[1] as Record<string, string>) ?? {};
+      switch (plan[i]) {
+        case "minute":
+          minuteHashes.push(hash);
+          break;
+        case "hour": {
+          // Hour buckets are emitted newest-first per queue; the first 24 of
+          // each queue's 168 belong to the day window as well as the week's.
+          if (hourIndex % 168 < 24) dayHashes.push(hash);
+          weekHashes.push(hash);
+          hourIndex++;
+          break;
+        }
+        case "all":
+          allHashes.push(hash);
+          break;
+      }
+    }
+
+    return {
+      hour: windowPercentiles(mergeHistogramCounts(minuteHashes)),
+      day: windowPercentiles(mergeHistogramCounts(dayHashes)),
+      week: windowPercentiles(mergeHistogramCounts(weekHashes)),
+      allTime: windowPercentiles(mergeHistogramCounts(allHashes)),
+    };
   }
 
   private aggregatePhaseCounts(queues: QueueInfo[]): DashboardData["phases"] {

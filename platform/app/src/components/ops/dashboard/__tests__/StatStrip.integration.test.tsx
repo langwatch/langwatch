@@ -55,6 +55,7 @@ const makeData = (overrides: Partial<DashboardData> = {}): DashboardData => ({
   latencyP99Ms: 1_648,
   peakLatencyP50Ms: 327,
   peakLatencyP99Ms: 1_648,
+  latencyWindows: null,
   phases: {
     commands: emptyPhase(),
     projections: emptyPhase(),

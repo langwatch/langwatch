@@ -156,6 +156,20 @@ export const liveSnapshotSchema = z.object({
   throughputHistory: z.array(throughputPointSchema),
 });
 
+const latencyWindowPercentilesSchema = z.object({
+  p50Ms: z.number(),
+  p99Ms: z.number(),
+  count: z.number(),
+});
+
+/** Bucketed-histogram percentiles per window; null = no completions there. */
+export const latencyWindowsSchema = z.object({
+  hour: latencyWindowPercentilesSchema.nullable(),
+  day: latencyWindowPercentilesSchema.nullable(),
+  week: latencyWindowPercentilesSchema.nullable(),
+  allTime: latencyWindowPercentilesSchema.nullable(),
+});
+
 export const detailSnapshotSchema = z.object({
   version: z.literal(SNAPSHOT_VERSION),
   computedAt: z.number(),
@@ -176,6 +190,10 @@ export const detailSnapshotSchema = z.object({
     reactions: phaseMetricsSchema,
   }),
   jobNameMetrics: z.array(jobNameMetricsSchema),
+
+  // Optional so an artifact written by a pre-windows writer still parses
+  // during a rolling handover; readers coalesce absence to null.
+  latencyWindows: latencyWindowsSchema.nullable().optional(),
 });
 
 export type LiveSnapshot = z.infer<typeof liveSnapshotSchema>;
