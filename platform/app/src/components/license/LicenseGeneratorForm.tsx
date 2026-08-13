@@ -295,14 +295,14 @@ export const LicenseGeneratorForm = forwardRef<
 
   useEffect(() => {
     onFormStateChange?.({
-      isGenerating: generateMutation.isLoading,
+      isGenerating: generateMutation.isPending,
       isFormValid,
     });
-  }, [generateMutation.isLoading, isFormValid, onFormStateChange]);
+  }, [generateMutation.isPending, isFormValid, onFormStateChange]);
 
   useImperativeHandle(ref, () => ({
     handleGenerate,
-    isGenerating: generateMutation.isLoading,
+    isGenerating: generateMutation.isPending,
     isFormValid,
     hasGeneratedLicense: !!generatedLicense,
   }));
@@ -363,7 +363,7 @@ export const LicenseGeneratorForm = forwardRef<
           onValueChange={(e) =>
             handlePrivateKeyMethodChange(e.value as PrivateKeyInputMethod)
           }
-          disabled={generateMutation.isLoading}
+          disabled={generateMutation.isPending}
         >
           <HStack gap={4} marginBottom={3}>
             <Radio value="file">Upload private key file</Radio>
@@ -404,7 +404,7 @@ export const LicenseGeneratorForm = forwardRef<
                     variant="ghost"
                     size="sm"
                     onClick={handleRemoveKeyFile}
-                    disabled={generateMutation.isLoading}
+                    disabled={generateMutation.isPending}
                     aria-label="Remove file"
                   >
                     <X size={16} />
@@ -450,7 +450,7 @@ export const LicenseGeneratorForm = forwardRef<
             fontFamily="mono"
             fontSize="xs"
             rows={6}
-            disabled={generateMutation.isLoading}
+            disabled={generateMutation.isPending}
           />
         )}
       </Field.Root>

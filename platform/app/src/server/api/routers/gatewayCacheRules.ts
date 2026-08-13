@@ -37,7 +37,7 @@ const actionSchema = z
   .strict();
 
 async function requireOrgAccess(
-  ctx: { prisma: import("@prisma/client").PrismaClient },
+  ctx: { prisma: import("~/generated/prisma/client").PrismaClient },
   organizationId: string,
 ) {
   const org = await ctx.prisma.organization.findUnique({
@@ -153,7 +153,7 @@ export const gatewayCacheRulesRouter = createTRPCRouter({
     }),
 });
 
-function toDto(r: import("@prisma/client").GatewayCacheRule) {
+function toDto(r: import("~/generated/prisma/client").GatewayCacheRule) {
   return {
     id: r.id,
     organizationId: r.organizationId,

@@ -483,6 +483,40 @@ describe("TargetCellContent", () => {
       });
     });
 
+    // The backdrop covers the viewport and swallows every pointer event, so an
+    // expanded cell that ignores Escape leaves the rest of the workbench dead
+    // until the reader happens to click the backdrop.
+    it("closes expanded view when pressing Escape", async () => {
+      const user = userEvent.setup();
+      const target = createTarget();
+      mockScrollHeight(200);
+
+      render(
+        <TargetCellContent
+          target={target}
+          output="This is some content that would overflow"
+          evaluatorResults={{}}
+          row={0}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      const outputText = screen.getByText(/This is some content/);
+      await user.click(outputText);
+
+      await waitFor(() => {
+        expect(
+          screen.getByTestId("expanded-cell-backdrop"),
+        ).toBeInTheDocument();
+      });
+
+      await user.keyboard("{Escape}");
+
+      await waitFor(() => {
+        expect(screen.queryByTestId("expanded-cell-backdrop")).toBeNull();
+      });
+    });
+
     it("shows same content in expanded view as collapsed", async () => {
       const user = userEvent.setup();
       const target = createTarget();

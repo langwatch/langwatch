@@ -3,7 +3,7 @@ import {
   type Project,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import type {
   CreateProjectInput,
   CreateTeamWithBindingInput,

@@ -7,15 +7,15 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import { generate } from "@langwatch/ksuid";
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   type Organization,
   OrganizationUserRole,
   type Project,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+} from "~/generated/prisma/client";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { prisma } from "~/server/db";
 import {
@@ -75,6 +75,7 @@ vi.mock("~/server/clickhouse/clickhouseClient", async (importOriginal) => {
   };
 });
 
+import { holdClickHouseSchemaLockForFile } from "~/server/clickhouse/__tests__/holdSchemaLock";
 import { app } from "../[[...route]]/app";
 
 const ns = `billing-api-${nanoid(8)}`;
@@ -110,6 +111,11 @@ async function deleteOrganizationDependents(
     });
   }
 }
+
+// Held for the whole file. The rollup this suite writes to and reads back is
+// database-wide, so a neighbouring suite rebuilding it drops the materialised
+// view out from under these fixtures.
+holdClickHouseSchemaLockForFile();
 
 describe("Feature: Gateway spend reconciliation REST surface", () => {
   let organization: Organization;

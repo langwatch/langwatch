@@ -2,11 +2,11 @@ import {
   AlertType as PackageAlertType,
   TriggerAction as PackageTriggerAction,
 } from "@langwatch/automations";
+import { describe, expect, it } from "vitest";
 import {
   AlertType as PrismaAlertType,
   TriggerAction as PrismaTriggerAction,
-} from "@prisma/client";
-import { describe, expect, it } from "vitest";
+} from "~/generated/prisma/client";
 
 /**
  * @langwatch/automations owns copies of the Prisma enums so that CLI/MCP/web

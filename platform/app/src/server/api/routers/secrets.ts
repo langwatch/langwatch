@@ -1,4 +1,4 @@
-import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { RESERVED_PROJECT_SECRET_NAMES } from "~/server/projects/reserved-secret-names";

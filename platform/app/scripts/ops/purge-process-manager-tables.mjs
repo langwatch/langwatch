@@ -27,7 +27,7 @@
  * MAX_BATCHES (10000). Each is validated before anything runs, see `intEnv`.
  */
 
-import { PrismaClient } from "@prisma/client";
+import pg from "pg";
 
 /** A whole number and nothing else: no hex, no exponent, no decimal point. */
 const INTEGER_PATTERN = /^[+-]?\d+$/;
@@ -70,7 +70,25 @@ const BATCH_SIZE = intEnv("BATCH_SIZE", 10_000, 1);
 const SLEEP_MS = intEnv("SLEEP_MS", 200, 0);
 const MAX_BATCHES = intEnv("MAX_BATCHES", 10_000, 1);
 
-const prisma = new PrismaClient();
+// Prisma 7's client is generated TypeScript compiled into the app bundles, so
+// a standalone ops script talks to Postgres through pg directly. The one
+// Prisma-URL convention that matters here: `?schema=` names the search-path
+// schema (pg ignores unknown URL params), and these statements use unqualified
+// table names, so it must become the session search_path — the same mapping
+// src/server/prismaPgAdapter.ts does for the app.
+const DATABASE_URL = process.env.DATABASE_URL ?? "";
+const SCHEMA = (() => {
+  try {
+    return new URL(DATABASE_URL).searchParams.get("schema") ?? undefined;
+  } catch {
+    return undefined;
+  }
+})();
+const pool = new pg.Pool({
+  connectionString: DATABASE_URL,
+  max: 2,
+  ...(SCHEMA ? { options: `-c search_path="${SCHEMA}"` } : {}),
+});
 
 /** @param {number} ms */
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -91,31 +109,51 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const TARGETS = [
   {
     name: "ProcessManagerOutbox (dispatched)",
-    countEligible: () => prisma.$queryRaw`
-      SELECT count(*)::bigint AS n FROM "ProcessManagerOutbox"
-      WHERE "status" = 'dispatched'
-        AND "dispatchedAt" < now() - (${RETENTION_DAYS}::int * interval '1 day')`,
-    deleteBatch: () => prisma.$executeRaw`
-      WITH batch AS (
-        SELECT ctid FROM "ProcessManagerOutbox"
-        WHERE "status" = 'dispatched'
-          AND "dispatchedAt" < now() - (${RETENTION_DAYS}::int * interval '1 day')
-        LIMIT ${BATCH_SIZE}
-      )
-      DELETE FROM "ProcessManagerOutbox" o USING batch WHERE o.ctid = batch.ctid`,
+    countEligible: async () => {
+      const { rows } = await pool.query(
+        `SELECT count(*)::bigint AS n FROM "ProcessManagerOutbox"
+         WHERE "status" = 'dispatched'
+           AND "dispatchedAt" < now() - ($1::int * interval '1 day')`,
+        [RETENTION_DAYS],
+      );
+      return rows;
+    },
+    deleteBatch: async () => {
+      const { rowCount } = await pool.query(
+        `WITH batch AS (
+           SELECT ctid FROM "ProcessManagerOutbox"
+           WHERE "status" = 'dispatched'
+             AND "dispatchedAt" < now() - ($1::int * interval '1 day')
+           LIMIT $2
+         )
+         DELETE FROM "ProcessManagerOutbox" o USING batch WHERE o.ctid = batch.ctid`,
+        [RETENTION_DAYS, BATCH_SIZE],
+      );
+      return rowCount ?? 0;
+    },
   },
   {
     name: "ProcessManagerInbox (consumed)",
-    countEligible: () => prisma.$queryRaw`
-      SELECT count(*)::bigint AS n FROM "ProcessManagerInbox"
-      WHERE "consumedAt" < now() - (${RETENTION_DAYS}::int * interval '1 day')`,
-    deleteBatch: () => prisma.$executeRaw`
-      WITH batch AS (
-        SELECT ctid FROM "ProcessManagerInbox"
-        WHERE "consumedAt" < now() - (${RETENTION_DAYS}::int * interval '1 day')
-        LIMIT ${BATCH_SIZE}
-      )
-      DELETE FROM "ProcessManagerInbox" i USING batch WHERE i.ctid = batch.ctid`,
+    countEligible: async () => {
+      const { rows } = await pool.query(
+        `SELECT count(*)::bigint AS n FROM "ProcessManagerInbox"
+         WHERE "consumedAt" < now() - ($1::int * interval '1 day')`,
+        [RETENTION_DAYS],
+      );
+      return rows;
+    },
+    deleteBatch: async () => {
+      const { rowCount } = await pool.query(
+        `WITH batch AS (
+           SELECT ctid FROM "ProcessManagerInbox"
+           WHERE "consumedAt" < now() - ($1::int * interval '1 day')
+           LIMIT $2
+         )
+         DELETE FROM "ProcessManagerInbox" i USING batch WHERE i.ctid = batch.ctid`,
+        [RETENTION_DAYS, BATCH_SIZE],
+      );
+      return rowCount ?? 0;
+    },
   },
 ];
 
@@ -193,7 +231,7 @@ async function main() {
   // identifier position, and VACUUM takes no parameters at all. Both names are
   // literals in this line, so nothing outside this file reaches the string.
   for (const table of ["ProcessManagerOutbox", "ProcessManagerInbox"]) {
-    await prisma.$executeRawUnsafe(`VACUUM (ANALYZE) "${table}"`);
+    await pool.query(`VACUUM (ANALYZE) "${table}"`);
   }
   console.log("DONE");
 }
@@ -201,5 +239,5 @@ async function main() {
 try {
   await main();
 } finally {
-  await prisma.$disconnect();
+  await pool.end();
 }

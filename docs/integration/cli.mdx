@@ -74,10 +74,10 @@ You'll see two questions:
 1. **Where do you want to log in?**: LangWatch Cloud (`app.langwatch.ai`) or a self-hosted instance (custom URL).
 2. **How do you want to use it?**: three options:
    - **AI tools, agentic flows**: `claude`, `codex`, `cursor`, `gemini`, `opencode`. Mints an OAuth-style device session in `~/.langwatch/config.json` (user-scoped) so `langwatch claude` etc. wrap any tool through your gateway.
-   - **Project, SDK API key**: for `langwatch sync`, `langwatch eval`, and SDK auto-instrumentation. Mints a fresh project API key into `$CWD/.env` (project-scoped).
+   - **Project, SDK API key**: for `langwatch sync`, `langwatch eval`, and SDK auto-instrumentation. Writes the API key of the project you pick into `$CWD/.env` (project-scoped).
    - **Both**: runs both flows in sequence.
 
-The browser shows an "Approve" or "Generate API key" button (depending on the chosen mode); after you click, the credential is delivered back to the CLI over the same RFC 8628 device-code poll. **You never copy-paste a key.**
+The browser shows an "Approve" or "Send API key" button (depending on the chosen mode); after you click, the credential is delivered back to the CLI over the same RFC 8628 device-code poll. **You never copy-paste a key.**
 
 ### Storage discipline (where credentials land)
 

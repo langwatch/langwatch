@@ -1,4 +1,4 @@
-import type { Project, Team } from "@prisma/client";
+import type { Project, Team } from "~/generated/prisma/client";
 
 export type ProjectWithTeam = Project & { team: Team };
 

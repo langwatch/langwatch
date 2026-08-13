@@ -43,7 +43,7 @@ import { formatLoginCeremony } from "./login-ceremony";
 import { refreshTelemetryWiringForLogin } from "./telemetry-refresh";
 
 export interface RunUnifiedLoginOptions {
-	/** Credential type to mint. Defaults to 'device_session' for back-compat. */
+	/** Credential type to request. Defaults to 'device_session' for back-compat. */
 	kind?: CredentialType;
 	/** Optional browser override (LANGWATCH_BROWSER also honoured). */
 	browser?: string;
@@ -223,7 +223,7 @@ export async function runUnifiedLoginFlow(
 
 		// kind === 'api_key' — write to project-local .env (NO copy-paste)
 		spinner.succeed(
-			`API key generated for project ${chalk.bold(result.project.name)}`,
+			`Connected to project ${chalk.bold(result.project.name)}`,
 		);
 		// Seed the identity notice's credential-to-project-name cache while the
 		// server is telling us the name anyway, so the first api-key notice

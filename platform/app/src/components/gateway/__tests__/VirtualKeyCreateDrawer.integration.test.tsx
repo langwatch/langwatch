@@ -75,7 +75,7 @@ vi.mock("~/hooks/useRequiredSession", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       virtualKeys: {
         list: { invalidate: async () => undefined },
         applicableBudgets: { invalidate: async () => undefined },

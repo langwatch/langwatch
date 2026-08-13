@@ -8,11 +8,11 @@
  * editors render the same row with no seat, and must keep every role.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { OrganizationUserRole } from "@prisma/client";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { OrganizationUserRole } from "~/generated/prisma/client";
 import { BindingInputRow } from "../GroupBindingInputRow";
 
 vi.mock("~/utils/api", () => ({

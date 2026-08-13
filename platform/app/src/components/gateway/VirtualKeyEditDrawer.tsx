@@ -176,7 +176,7 @@ export function VirtualKeyEditDrawer({
     [vk, organization?.teams],
   );
 
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const policiesQuery = api.routingPolicy.list.useQuery(
     { organizationId },
     { enabled: !!vk && !!organizationId },

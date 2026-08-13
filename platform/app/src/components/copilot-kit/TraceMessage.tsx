@@ -12,7 +12,7 @@ export const TRACE_QUERY_CONFIG = {
     Math.min(2000 * 2 ** attemptIndex, 60000),
   // Traces are immutable once written, so caching forever is correct.
   staleTime: Infinity,
-  cacheTime: Infinity,
+  gcTime: Infinity,
 } as const;
 
 interface TraceMessageProps extends StackProps {

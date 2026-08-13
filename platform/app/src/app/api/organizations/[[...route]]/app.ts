@@ -21,10 +21,10 @@
 import { timingSafeEqual } from "node:crypto";
 import { auditLog } from "@ee/audit-log/auditLog";
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
-import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import type { Context, Next } from "hono";
 import { describeRoute } from "hono-openapi";
 import { z } from "zod";
+import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import { createServiceApp, internalSecret } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { ApiKeyService } from "~/server/api-key/api-key.service";

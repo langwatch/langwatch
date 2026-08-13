@@ -88,7 +88,7 @@ vi.mock("~/utils/api", () => ({
         useMutation: () => ({ mutate: vi.fn() }),
       },
     },
-    useContext: () => ({
+    useUtils: () => ({
       scenarios: {
         getAll: {
           invalidate: vi.fn(),

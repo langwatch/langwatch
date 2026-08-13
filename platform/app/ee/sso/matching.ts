@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { Organization } from "@prisma/client";
+import type { Organization } from "~/generated/prisma/client";
 
 export interface OAuthAccountLike {
   providerId: string;

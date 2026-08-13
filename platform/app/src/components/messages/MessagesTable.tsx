@@ -85,7 +85,7 @@ export function MessagesTable({
   const openLiteMemberRestriction = useUpgradeModalStore(
     (s) => s.openLiteMemberRestriction,
   );
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
 
   const { filterParams, queryOpts } = useFilterParams();
   const [selectedTraceIds, setSelectedTraceIds] = useState<string[]>([]);
@@ -1387,7 +1387,7 @@ export function MessagesTable({
                         setAnnotators={setAnnotators}
                         queueDrawerOpen={queueDrawerOpen}
                         sendToQueue={sendToQueue}
-                        isLoading={queueItem.isLoading}
+                        isLoading={queueItem.isPending}
                       />
                     </Dialog.Body>
 
