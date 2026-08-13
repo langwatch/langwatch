@@ -27,6 +27,7 @@ import {
   screen,
   within,
 } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ConfigFormCtx } from "~/features/automations/providers/types";
@@ -381,6 +382,76 @@ describe("webhookClient signing secret", () => {
 function bodyTextbox() {
   return within(screen.getByTestId("webhook-body-editor")).getByRole("textbox");
 }
+
+describe("webhookClient body format", () => {
+  afterEach(() => cleanup());
+
+  describe("given a fresh webhook draft", () => {
+    it("starts on JSON, so a new automation behaves as every existing one does", () => {
+      const params = webhookClient.toActionParams(
+        webhookClient.initialSlice(),
+      ) as WebhookActionParams;
+
+      expect(params.bodyFormat).toBe("json");
+    });
+  });
+
+  describe("when the author picks plain text", () => {
+    it("sends the format on toActionParams", async () => {
+      const user = userEvent.setup();
+      const onChangeSpy = vi.fn();
+      renderForm({ onChangeSpy });
+
+      await user.click(screen.getByText("Plain text"));
+
+      const params = webhookClient.toActionParams(
+        onChangeSpy.mock.calls.at(-1)![0],
+      ) as WebhookActionParams;
+      expect(params.bodyFormat).toBe("text");
+    });
+
+    it("stops seeding the editor with the JSON envelope", () => {
+      renderForm({
+        initial: { ...webhookClient.initialSlice(), bodyFormat: "text" },
+      });
+
+      expect(bodyTextbox()).toHaveValue("");
+    });
+
+    it("drops the default-body affordances, which plain text does not have", () => {
+      renderForm({
+        initial: { ...webhookClient.initialSlice(), bodyFormat: "text" },
+      });
+
+      expect(screen.queryByText("Using default")).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /reset to default/i }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given a saved trigger row", () => {
+    it("reads the stored format back", () => {
+      const slice = webhookClient.fromTriggerRow(
+        savedRowWith({
+          url: "https://example.com/hooks",
+          bodyFormat: "text",
+          bodyTemplate: "hello",
+        }),
+      );
+
+      expect(slice.bodyFormat).toBe("text");
+    });
+
+    it("reads a row saved before the field existed as JSON", () => {
+      const slice = webhookClient.fromTriggerRow(
+        savedRowWith({ url: "https://example.com/hooks", bodyTemplate: null }),
+      );
+
+      expect(slice.bodyFormat).toBe("json");
+    });
+  });
+});
 
 describe("webhookClient JSON-body default resolution", () => {
   afterEach(() => cleanup());

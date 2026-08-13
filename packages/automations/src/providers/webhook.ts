@@ -5,6 +5,30 @@ import type { PreviewEnvelope, SharedDef } from "./types";
 export const WEBHOOK_METHODS = ["POST", "PUT", "PATCH"] as const;
 
 /**
+ * What the rendered body IS, which decides both how it is rendered and the
+ * `Content-Type` the request carries: `json` renders Liquid into JSON and
+ * re-serializes it (the original and still the default), `text` sends whatever
+ * the template rendered, byte for byte, for endpoints that speak anything else
+ * — plain prose, a form encoding, XML, a line-oriented log format.
+ */
+export const WEBHOOK_BODY_FORMATS = ["json", "text"] as const;
+export const webhookBodyFormatSchema = z.enum(WEBHOOK_BODY_FORMATS);
+export type WebhookBodyFormat = z.infer<typeof webhookBodyFormatSchema>;
+
+/**
+ * The `Content-Type` a delivery carries, derived from its body format so the
+ * two can never disagree. Customers cannot set it — `content-type` is a
+ * reserved header (see {@link isReservedWebhookHeader}).
+ *
+ * Only the text type states a charset: JSON is UTF-8 by definition (RFC 8259),
+ * while `text/plain` without one is read as US-ASCII by a strict receiver, so
+ * an unstated charset is how an accented character arrives as mojibake.
+ */
+export function webhookContentTypeFor(format: WebhookBodyFormat): string {
+	return format === "text" ? "text/plain; charset=utf-8" : "application/json";
+}
+
+/**
  * Sentinel a stored SECRET carries on the wire to mean "keep the saved value".
  * Header values (Authorization, API keys) and the signing secret are all
  * secrets: they are encrypted at rest and never returned to the client
@@ -149,9 +173,15 @@ export const webhookActionParamsSchema = z.object({
 		.record(z.string(), z.string())
 		.default({})
 		.transform(sanitizeWebhookHeaders),
-	/** Liquid JSON body source. NULL = the framework default envelope. Stored
-	 *  inside `actionParams` (not a Trigger template column) — ADR-040 §1. */
+	/** Liquid body source. NULL = the framework default envelope for a `json`
+	 *  body, and an empty body for a `text` one — plain text has no envelope
+	 *  worth guessing at. Stored inside `actionParams` (not a Trigger template
+	 *  column) — ADR-040 §1. */
 	bodyTemplate: z.string().nullable().default(null),
+	/** What the rendered body is, and so what `Content-Type` it is sent as.
+	 *  Absent means `json`, which is what every webhook automation was before
+	 *  the field existed. */
+	bodyFormat: webhookBodyFormatSchema.default("json"),
 	/**
 	 * Optional HMAC signing secret (ADR-040 §3). NULL means unsigned, which is
 	 * what every webhook automation was until this existed: one signing scheme
@@ -185,9 +215,10 @@ const def: SharedDef = {
 	action: TriggerAction.SEND_WEBHOOK,
 	category: "notify",
 	label: "Webhook",
-	description: "Send a JSON payload to your own endpoint when a trace matches.",
+	description:
+		"Send a JSON or plain-text body to your own endpoint when a trace matches.",
 	alertDescription:
-		"Send a JSON payload to your own endpoint when it fires.",
+		"Send a JSON or plain-text body to your own endpoint when it fires.",
 	actionParamsSchema: webhookActionParamsSchema,
 };
 

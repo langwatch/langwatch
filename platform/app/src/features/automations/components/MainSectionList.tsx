@@ -34,11 +34,9 @@ type FacetKey = "subject" | "cadence" | "severity" | "delivery";
 export function MainSectionList({
   isEdit,
   prefilledGraphId,
-  webhookEnabled,
 }: {
   isEdit: boolean;
   prefilledGraphId?: string;
-  webhookEnabled: boolean;
 }) {
   const draft = useDraft();
   const dispatch = useAutomationStore((s) => s.dispatch);
@@ -71,8 +69,6 @@ export function MainSectionList({
         value={draft.action}
         onChange={(value) => dispatch({ type: "SET_ACTION", value })}
         source={draft.source}
-        webhookEnabled={webhookEnabled}
-        preserveHiddenWebhook={isEdit}
         accordion={facetProps("delivery")}
       />
     </VStack>

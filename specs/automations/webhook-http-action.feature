@@ -1,25 +1,23 @@
 Feature: Webhook (generic HTTP) automation action
   Automations can deliver to a customer-supplied HTTP endpoint (ADR-040):
-  on a trace match or a graph alert, LangWatch renders a Liquid JSON body
-  and sends it to the configured URL over an SSRF-fenced HTTP client.
-  The channel ships dark behind the release_webhook_automations flag.
-
-  Background:
-    Given the release_webhook_automations flag is on for the project
+  on a trace match or a graph alert, LangWatch renders a Liquid body — JSON
+  or any other text format — and sends it to the configured URL over an
+  SSRF-fenced HTTP client. Every project has the channel.
 
   Rule: Authoring a webhook automation
 
+    @integration
     Scenario: The webhook card appears among the notify channels
       Given a user opens the delivery picker in the automation drawer
       Then a "Webhook" card is offered alongside Email and Slack
       And picking it opens the webhook setup
 
-    Scenario: A webhook automation configures a URL, method, headers, and a JSON body
+    Scenario: A webhook automation configures a URL, method, headers, and a body
       Given a user picks the Webhook delivery
       Then the user sets the destination URL and HTTP method
       And can add static request headers
-      And can author the JSON body as a Liquid template
-      And leaving the body empty sends the framework default payload
+      And can author the body as a Liquid template
+      And leaving a JSON body empty sends the framework default payload
 
     Scenario: Only https URLs are accepted
       Given a user enters an http:// destination URL
@@ -31,16 +29,32 @@ Feature: Webhook (generic HTTP) automation action
       When they save the automation
       Then the save is rejected explaining only the default https port is allowed
 
-    Scenario: The flag hides the channel end to end
-      Given the release_webhook_automations flag is off for the project
-      Then the delivery picker does not offer the Webhook card
-      And the flag-off authoring copy does not mention webhooks
-      And saving a webhook automation through the API is rejected
+  Rule: The body may be any text format
 
-    Scenario: An existing webhook automation remains understandable while the flag is off
-      Given a saved webhook automation is opened after the project flag is turned off
-      Then its selected Webhook card remains visible and read-only
-      And a notice explains that another channel must be selected before saving
+    Scenario: A JSON body is checked before it is sent
+      Given a webhook automation whose body format is JSON
+      When the automation fires
+      Then the rendered body is valid JSON, sent as application/json
+      And a body that does not parse falls back to the framework default payload
+
+    @unit
+    Scenario: A plain-text body is sent exactly as it renders
+      Given a webhook automation whose body format is plain text
+      When the automation fires
+      Then the endpoint receives the rendered template byte for byte
+      And the request is sent as text/plain in UTF-8
+
+    @unit
+    Scenario: A plain-text body that fails to render sends nothing
+      Given a plain-text body whose template cannot render
+      When the automation fires
+      Then the endpoint receives an empty body, not a JSON envelope it cannot read
+      And the author is shown what broke, as they are for a JSON body
+
+    Scenario: An automation saved before formats existed still sends JSON
+      Given a webhook automation saved without stating a body format
+      When the automation fires
+      Then it renders and sends exactly as it did before, as JSON
 
   Rule: Header values are secrets
 
@@ -64,7 +78,7 @@ Feature: Webhook (generic HTTP) automation action
     Scenario: A test fire sends the rendered request to the configured endpoint
       Given a webhook automation draft with a URL set
       When the user presses "Send a test"
-      Then the rendered JSON body is sent to that URL through the SSRF-fenced sender
+      Then the rendered body is sent to that URL through the SSRF-fenced sender
       And the request carries a non-suppressible X-LangWatch-Test-Fire header
 
     Scenario: A successful test shows the real status code inline

@@ -4,6 +4,7 @@ import {
   validateWebhookUrlShape,
   WEBHOOK_HEADER_VALUE_KEPT,
   webhookActionParamsSchema,
+  webhookContentTypeFor,
 } from "../webhook";
 
 describe("validateWebhookUrlShape", () => {
@@ -118,18 +119,44 @@ describe("webhookActionParamsSchema", () => {
         method: "PUT",
         headers: { Authorization: "Bearer x" },
         bodyTemplate: "{}",
+        bodyFormat: "json",
       });
     });
   });
 
   describe("when fields are omitted", () => {
-    it("defaults method, headers, and bodyTemplate", () => {
+    it("defaults method, headers, bodyTemplate, and bodyFormat", () => {
       const parsed = webhookActionParamsSchema.parse({
         url: "https://example.com/hook",
       });
       expect(parsed.method).toBe("POST");
       expect(parsed.headers).toEqual({});
       expect(parsed.bodyTemplate).toBeNull();
+      // Every automation saved before the field existed sent JSON, so the
+      // absent value has to keep meaning exactly that.
+      expect(parsed.bodyFormat).toBe("json");
+    });
+  });
+
+  describe("when the config asks for a plain-text body", () => {
+    it("keeps the format through a parse round-trip", () => {
+      const parsed = webhookActionParamsSchema.parse({
+        url: "https://example.com/hook",
+        bodyFormat: "text",
+        bodyTemplate: "Alert: {{ trigger.name }}",
+      });
+
+      expect(parsed.bodyFormat).toBe("text");
+      expect(webhookActionParamsSchema.parse(parsed).bodyFormat).toBe("text");
+    });
+
+    it("refuses a format nothing knows how to send", () => {
+      expect(() =>
+        webhookActionParamsSchema.parse({
+          url: "https://example.com/hook",
+          bodyFormat: "xml",
+        }),
+      ).toThrow();
     });
   });
 
@@ -142,6 +169,23 @@ describe("webhookActionParamsSchema", () => {
     });
     it("rejects a missing URL", () => {
       expect(webhookActionParamsSchema.safeParse({}).success).toBe(false);
+    });
+  });
+});
+
+describe("webhookContentTypeFor", () => {
+  describe("when the body is JSON", () => {
+    it("announces it as application/json", () => {
+      expect(webhookContentTypeFor("json")).toBe("application/json");
+    });
+  });
+
+  describe("when the body is plain text", () => {
+    // text/plain with no charset is read as US-ASCII by a strict receiver, so
+    // the charset is what keeps an accented character from arriving as
+    // mojibake. JSON needs no such statement — it is UTF-8 by definition.
+    it("announces it as text/plain in UTF-8", () => {
+      expect(webhookContentTypeFor("text")).toBe("text/plain; charset=utf-8");
     });
   });
 });

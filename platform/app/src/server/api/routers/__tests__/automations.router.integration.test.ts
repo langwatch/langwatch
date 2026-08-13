@@ -285,6 +285,32 @@ describe("automationRouter", () => {
         message: expect.stringMatching(/Re-enter webhook header values/),
       });
     });
+
+    // The webhook channel is no longer gated: a flag read per test fire bought
+    // nothing once every project had the channel, and leaving the call in
+    // invites the OFF branch growing back.
+    it("test-fires a webhook without asking whether the channel is enabled", async () => {
+      await caller
+        .testFireTemplate({
+          projectId: "proj_123",
+          channel: "webhook",
+          trigger: { name: "Webhook", alertType: null },
+          draft: {},
+          webhook: null,
+          webhookDestination: {
+            url: "https://receiver.example/hook",
+            method: "POST",
+            headers: {},
+            bodyTemplate: null,
+          },
+          botDestination: null,
+          graphAlert: null,
+          report: null,
+        })
+        .catch(() => undefined);
+
+      expect(mockFeatureFlagIsEnabled).not.toHaveBeenCalled();
+    });
   });
 
   describe("upsert with graph-alert variant", () => {

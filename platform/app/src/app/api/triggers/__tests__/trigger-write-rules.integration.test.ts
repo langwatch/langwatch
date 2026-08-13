@@ -51,22 +51,6 @@ describe("Feature: the API saves what the dashboard would accept", () => {
   const countNamed = (name: string) =>
     prisma.trigger.count({ where: { projectId: projectId(), name } });
 
-  const withWebhookChannel = async <T>(
-    on: boolean,
-    run: () => Promise<T>,
-  ): Promise<T> => {
-    const previous = process.env.FEATURE_FLAG_FORCE_ENABLE;
-    if (on)
-      process.env.FEATURE_FLAG_FORCE_ENABLE = "release_webhook_automations";
-    else delete process.env.FEATURE_FLAG_FORCE_ENABLE;
-    try {
-      return await run();
-    } finally {
-      if (previous === undefined) delete process.env.FEATURE_FLAG_FORCE_ENABLE;
-      else process.env.FEATURE_FLAG_FORCE_ENABLE = previous;
-    }
-  };
-
   beforeAll(async () => {
     organization = await prisma.organization.create({
       data: { name: "Triggers Rules Org", slug: `--test-org-${ns}` },
@@ -121,34 +105,14 @@ describe("Feature: the API saves what the dashboard would accept", () => {
     /** @scenario "A destination that is not https is refused" */
     it("refuses the save and creates nothing", async () => {
       const name = `Insecure destination ${ns}`;
-      const response = await withWebhookChannel(true, () =>
-        createTrigger({
-          name,
-          action: TriggerAction.SEND_WEBHOOK,
-          actionParams: { url: "http://example.com/hooks/langwatch" },
-        }),
-      );
+      const response = await createTrigger({
+        name,
+        action: TriggerAction.SEND_WEBHOOK,
+        actionParams: { url: "http://example.com/hooks/langwatch" },
+      });
 
       expect(response.status).toBe(422);
       expect((await response.json()).error).toBe("invalid_action_params");
-      expect(await countNamed(name)).toBe(0);
-    });
-  });
-
-  describe("when the project does not have the webhook channel", () => {
-    /** @scenario "The webhook channel stays closed until the project has it" */
-    it("refuses the save and creates nothing", async () => {
-      const name = `Channel closed ${ns}`;
-      const response = await withWebhookChannel(false, () =>
-        createTrigger({
-          name,
-          action: TriggerAction.SEND_WEBHOOK,
-          actionParams: { url: "https://example.com/hooks/langwatch" },
-        }),
-      );
-
-      expect(response.status).toBe(403);
-      expect((await response.json()).error).toBe("trigger_channel_not_enabled");
       expect(await countNamed(name)).toBe(0);
     });
   });

@@ -17,13 +17,7 @@ import { DeliveryPicker } from "../DeliveryPicker";
  * The channel choice itself is ADR-037's Notification-versus-Action picker,
  * unchanged and merely relocated into this step.
  */
-export function DeliveryStep({
-  isEdit,
-  webhookEnabled,
-}: {
-  isEdit: boolean;
-  webhookEnabled: boolean;
-}) {
+export function DeliveryStep({ isEdit }: { isEdit: boolean }) {
   const draft = useDraft();
   const dispatch = useAutomationStore((s) => s.dispatch);
 
@@ -33,8 +27,6 @@ export function DeliveryStep({
         value={draft.action}
         onChange={(value) => dispatch({ type: "SET_ACTION", value })}
         source={draft.source}
-        webhookEnabled={webhookEnabled}
-        preserveHiddenWebhook={isEdit}
       />
       {draft.source === "trace" ? (
         <CadenceSection isEdit={isEdit} title="When it sends" />

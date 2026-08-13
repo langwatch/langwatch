@@ -1703,13 +1703,6 @@ const presentations = {
       "in the same request as the new URL.",
   },
 
-  trigger_channel_not_enabled: {
-    title: "This project does not have that channel yet",
-    describe: () =>
-      "The automation was not saved. Pick a channel this project already " +
-      "delivers on, or ask us to turn this one on for you.",
-  },
-
   trigger_filters_required: {
     title: "This automation needs a condition",
     describe: () =>

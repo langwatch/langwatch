@@ -54420,7 +54420,15 @@
                               "string",
                               "null"
                             ],
-                            "description": "A Liquid template for the JSON body. Absent sends the standard LangWatch envelope."
+                            "description": "A Liquid template for the body. Absent sends the standard LangWatch envelope for a `json` body, and an empty body for a `text` one."
+                          },
+                          "bodyFormat": {
+                            "type": "string",
+                            "enum": [
+                              "json",
+                              "text"
+                            ],
+                            "description": "What the body is, and so the `Content-Type` the delivery carries: `json` is checked and re-serialised and sends `application/json`, `text` sends the rendered template verbatim as `text/plain; charset=utf-8`. Absent means `json`."
                           },
                           "signingSecret": {
                             "type": [
@@ -54434,7 +54442,7 @@
                           "url"
                         ],
                         "additionalProperties": true,
-                        "description": "Delivery to a customer endpoint over HTTP."
+                        "description": "Delivery to a customer endpoint over HTTP, as JSON or as plain text."
                       },
                       "name": {
                         "type": "string",
@@ -56390,7 +56398,15 @@
                               "string",
                               "null"
                             ],
-                            "description": "A Liquid template for the JSON body. Absent sends the standard LangWatch envelope."
+                            "description": "A Liquid template for the body. Absent sends the standard LangWatch envelope for a `json` body, and an empty body for a `text` one."
+                          },
+                          "bodyFormat": {
+                            "type": "string",
+                            "enum": [
+                              "json",
+                              "text"
+                            ],
+                            "description": "What the body is, and so the `Content-Type` the delivery carries: `json` is checked and re-serialised and sends `application/json`, `text` sends the rendered template verbatim as `text/plain; charset=utf-8`. Absent means `json`."
                           },
                           "signingSecret": {
                             "type": [
@@ -56404,7 +56420,7 @@
                           "url"
                         ],
                         "additionalProperties": true,
-                        "description": "Delivery to a customer endpoint over HTTP."
+                        "description": "Delivery to a customer endpoint over HTTP, as JSON or as plain text."
                       },
                       {
                         "type": "object",

@@ -146,16 +146,8 @@ Feature: Automations over the public API
 
     @integration
     Scenario: A destination that is not https is refused
-      Given the project has the webhook channel
       When an automation is created over the API delivering to an http destination
       Then the save is refused as an unusable delivery configuration
-      And no automation is created
-
-    @integration
-    Scenario: The webhook channel stays closed until the project has it
-      Given the project does not have the webhook channel
-      When an automation is created over the API delivering to a customer endpoint
-      Then the save is refused as a channel this project does not have
       And no automation is created
 
     @integration
@@ -367,26 +359,6 @@ Feature: Automations over the public API
       When it is paused and then resumed over the API
       Then each call answers with the state it is now in
       And the automation no longer claims it was paused
-
-  Rule: A channel a project no longer has stays readable
-
-    Turning a delivery channel off for a project stops new configuration on it.
-    The automations already saved on that channel stay listed, readable and
-    manageable, because taking them away would leave an operator unable to
-    pause or delete something that is still delivering.
-
-    @integration
-    Scenario: An existing webhook automation stays readable and manageable
-      Given an automation that delivers to a customer endpoint
-      And the project no longer has the webhook channel
-      Then it is still listed, readable, renameable, pausable and deletable
-
-    @integration
-    Scenario: Changing an existing webhook automation's delivery is refused
-      Given an automation that delivers to a customer endpoint
-      And the project no longer has the webhook channel
-      When the integrator states a new delivery configuration for it
-      Then the save is refused as a channel this project does not have
 
   Rule: The automation an id names is the caller's own
 

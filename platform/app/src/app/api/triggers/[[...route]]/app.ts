@@ -140,8 +140,18 @@ const webhookActionParamsWireSchema = z
       .nullable()
       .optional()
       .describe(
-        "A Liquid template for the JSON body. Absent sends the standard " +
-          "LangWatch envelope.",
+        "A Liquid template for the body. Absent sends the standard " +
+          "LangWatch envelope for a `json` body, and an empty body for a " +
+          "`text` one.",
+      ),
+    bodyFormat: z
+      .enum(["json", "text"])
+      .optional()
+      .describe(
+        "What the body is, and so the `Content-Type` the delivery carries: " +
+          "`json` is checked and re-serialised and sends `application/json`, " +
+          "`text` sends the rendered template verbatim as " +
+          "`text/plain; charset=utf-8`. Absent means `json`.",
       ),
     signingSecret: z
       .string()
@@ -154,7 +164,9 @@ const webhookActionParamsWireSchema = z
       ),
   })
   .passthrough()
-  .describe("Delivery to a customer endpoint over HTTP.");
+  .describe(
+    "Delivery to a customer endpoint over HTTP, as JSON or as plain text.",
+  );
 
 const datasetActionParamsWireSchema = z
   .object({

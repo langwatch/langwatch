@@ -315,13 +315,9 @@ export const FEATURE_FLAGS = [
     description:
       "Minimising Langy sinks the panel to an edge peek of itself — a sliver of the card at the bottom edge (floating) or of the dock's spine at the right edge (sidebar) that rises on pointer proximity and opens on click (spec: specs/langy/langy-peek-dock.feature). Off = the classic corner launcher orb. Only the closed-state affordance changes; the panel and its Cmd/Ctrl+I activation are the same either way. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_ui_langy_peek_dock_enabled.",
   },
-  {
-    key: "release_webhook_automations",
-    scope: "PRODUCT",
-    defaultValue: false,
-    description:
-      "Offers the Webhook (generic HTTP request) delivery channel for automations (ADR-040). Gates the delivery-picker card, the save route accepting SEND_WEBHOOK, and the test-fire path. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_webhook_automations.",
-  },
+  // NOTE: `release_webhook_automations` (ADR-040) was retired — the webhook
+  // delivery channel is offered to every project, so there is no picker card,
+  // save route, or test-fire path left to gate.
 ] as const satisfies readonly FeatureFlagDefinition[];
 
 export const FEATURE_FLAG_FAMILIES = [

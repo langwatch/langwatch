@@ -768,10 +768,47 @@ describe("dispatchGraphAlertAction", () => {
       const call = sendWebhook.mock.calls[0]?.[0] as {
         url: string;
         body: string;
+        contentType?: string;
       };
       expect(call.url).toBe("https://example.com/hook");
       const body = JSON.parse(call.body) as { event: string };
       expect(body.event).toBe("alert.fired");
+      // A row saved before body formats existed states none, and still sends
+      // JSON, announced as JSON.
+      expect(call.contentType).toBe("application/json");
+    });
+
+    describe("when the alert's body format is plain text", () => {
+      it("sends the rendered template verbatim, announced as text", async () => {
+        const { deps, sendWebhook } = makeDeps();
+
+        await dispatchGraphAlertAction({
+          deps,
+          input: {
+            trigger: makeTrigger({
+              action: TriggerAction.SEND_WEBHOOK,
+              actionParams: {
+                url: "https://example.com/hook",
+                method: "POST",
+                bodyFormat: "text",
+                bodyTemplate: "ALERT {{ trigger.name }}",
+              },
+            }),
+            project: makeProject(),
+            context: makeContext(),
+            recipients: [],
+            slackWebhook: null,
+            fireDigest: FIRE_DIGEST,
+          },
+        });
+
+        const call = sendWebhook.mock.calls[0]?.[0] as {
+          body: string;
+          contentType?: string;
+        };
+        expect(call.body).toBe("ALERT High latency");
+        expect(call.contentType).toBe("text/plain; charset=utf-8");
+      });
     });
 
     describe("when header secrets are stored encrypted", () => {

@@ -119,3 +119,61 @@ describe("webhook signing", () => {
     });
   });
 });
+
+/**
+ * `content-type` is a reserved header: a customer cannot set it, so it always
+ * describes the body actually sent. The parameter exists for the automations
+ * channel, whose body can be JSON or plain text; the webhook endpoints
+ * platform passes nothing and keeps the JSON it always sent.
+ */
+describe("webhook content type", () => {
+  describe("when the caller states nothing", () => {
+    it("sends the JSON type every delivery carried before the parameter existed", async () => {
+      await sendWebhook(base);
+
+      expect(sentHeaders()["Content-Type"]).toBe("application/json");
+    });
+  });
+
+  describe("when the caller states a plain-text body", () => {
+    it("announces it as text, so the receiver does not try to parse JSON", async () => {
+      await sendWebhook({
+        ...base,
+        body: "plain words",
+        contentType: "text/plain; charset=utf-8",
+      });
+
+      expect(sentHeaders()["Content-Type"]).toBe("text/plain; charset=utf-8");
+    });
+
+    it("signs the body it sends, unchanged by the type", async () => {
+      await sendWebhook({
+        ...base,
+        body: "plain words",
+        contentType: "text/plain; charset=utf-8",
+        signingSecrets: ["whsec_automations"],
+      });
+
+      expect(
+        verifyWebhookSignature({
+          secret: "whsec_automations",
+          body: "plain words",
+          header: sentHeaders()[WEBHOOK_SIGNATURE_HEADER]!,
+          nowSeconds: Math.floor(Date.now() / 1000),
+        }),
+      ).toBe(true);
+    });
+  });
+
+  describe("when a customer header tries to override it", () => {
+    it("drops the customer header and keeps the derived type", async () => {
+      await sendWebhook({
+        ...base,
+        headers: { "Content-Type": "application/xml" },
+        contentType: "text/plain; charset=utf-8",
+      });
+
+      expect(sentHeaders()["Content-Type"]).toBe("text/plain; charset=utf-8");
+    });
+  });
+});

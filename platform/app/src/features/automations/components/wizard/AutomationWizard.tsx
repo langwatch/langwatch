@@ -23,7 +23,6 @@ export function AutomationWizard({
   isEdit,
   prefilledGraphId,
   subjectLocked,
-  webhookEnabled,
   graphName,
   seriesLabel,
   onCreateNew,
@@ -33,7 +32,6 @@ export function AutomationWizard({
   prefilledGraphId?: string;
   /** What a saved automation watches cannot change (ADR-093 §1). */
   subjectLocked: boolean;
-  webhookEnabled: boolean;
   graphName?: string | null;
   seriesLabel?: string | null;
   onCreateNew?: () => void;
@@ -51,7 +49,7 @@ export function AutomationWizard({
           onCreateNew={onCreateNew}
         />
       ) : step === "delivery" ? (
-        <DeliveryStep isEdit={isEdit} webhookEnabled={webhookEnabled} />
+        <DeliveryStep isEdit={isEdit} />
       ) : (
         <ReviewStep
           projectId={projectId}

@@ -108,7 +108,6 @@ const renderWizard = (
       projectId="project-1"
       isEdit={false}
       subjectLocked={false}
-      webhookEnabled={false}
       {...props}
     />,
     { wrapper: Wrapper },

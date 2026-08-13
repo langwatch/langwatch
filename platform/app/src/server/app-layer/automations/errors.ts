@@ -147,24 +147,6 @@ export class TriggerFiltersUnsupportedError extends HandledError {
 }
 
 /**
- * The automation names a delivery channel the project does not have — the
- * webhook channel ships behind a release flag (ADR-040 §7), and the save path
- * is gated as well as the picker so the flag holds for API callers too.
- */
-export class TriggerChannelNotEnabledError extends HandledError {
-  declare readonly code: "trigger_channel_not_enabled";
-
-  constructor(channel: string) {
-    super(
-      "trigger_channel_not_enabled",
-      `This project does not deliver on the ${channel} channel.`,
-      { meta: { field: "action" }, httpStatus: 403 },
-    );
-    this.name = "TriggerChannelNotEnabledError";
-  }
-}
-
-/**
  * The channel an automation delivers on is fixed when it is created.
  *
  * This is not a limitation waiting to be lifted: the credential rules that let

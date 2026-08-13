@@ -26,8 +26,6 @@ const renderPicker = (
       value={null}
       onChange={vi.fn()}
       source="trace"
-      webhookEnabled={false}
-      preserveHiddenWebhook={false}
       {...props}
     />,
     { wrapper: Wrapper },
@@ -87,30 +85,35 @@ describe("DeliveryPicker", () => {
     });
   });
 
-  describe("given webhook delivery is flag-hidden", () => {
-    it("does not mention or offer webhooks for a new automation", () => {
-      renderPicker({ webhookEnabled: false });
+  describe("given a trace automation", () => {
+    /** @scenario "The webhook card appears among the notify channels" */
+    it("offers the webhook card alongside email and Slack, ready to pick", async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+      renderPicker({ onChange });
 
-      expect(screen.queryByText(/webhook/i)).not.toBeInTheDocument();
       expect(
-        screen.queryByRole("button", { name: /webhook/i }),
-      ).not.toBeInTheDocument();
+        screen.getByRole("button", { name: /email/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /slack/i }),
+      ).toBeInTheDocument();
+      // Slack's own description names a Slack webhook, so anchor on the label.
+      const webhook = screen.getByRole("button", { name: /^Webhook/ });
+      expect(webhook).not.toHaveAttribute("aria-disabled");
+
+      await user.click(webhook);
+
+      expect(onChange).toHaveBeenCalledWith(TriggerAction.SEND_WEBHOOK);
     });
+  });
 
-    it("shows an existing webhook selection read-only with a clear notice", () => {
-      renderPicker({
-        value: TriggerAction.SEND_WEBHOOK,
-        webhookEnabled: false,
-        preserveHiddenWebhook: true,
-      });
+  describe("given a report draft", () => {
+    it("does not offer the webhook card, which reports cannot deliver on", () => {
+      renderPicker({ source: "report" });
 
-      expect(screen.getByRole("button", { name: /webhook/i })).toHaveAttribute(
-        "aria-disabled",
-        "true",
-      );
-      expect(screen.getByText(/saved setup is read-only/i)).toBeInTheDocument();
       expect(
-        screen.queryByRole("button", { name: /edit setup/i }),
+        screen.queryByRole("button", { name: /^Webhook/ }),
       ).not.toBeInTheDocument();
     });
   });

@@ -108,35 +108,17 @@ describe("Feature: automations over the public API express what the dashboard ex
       }),
     );
 
-  const withWebhookChannel = async <T>(
-    on: boolean,
-    run: () => Promise<T>,
-  ): Promise<T> => {
-    const previous = process.env.FEATURE_FLAG_FORCE_ENABLE;
-    if (on)
-      process.env.FEATURE_FLAG_FORCE_ENABLE = "release_webhook_automations";
-    else delete process.env.FEATURE_FLAG_FORCE_ENABLE;
-    try {
-      return await run();
-    } finally {
-      if (previous === undefined) delete process.env.FEATURE_FLAG_FORCE_ENABLE;
-      else process.env.FEATURE_FLAG_FORCE_ENABLE = previous;
-    }
-  };
-
   const webhookAutomation = async (name: string) =>
-    withWebhookChannel(true, async () =>
-      created(
-        await createTrigger({
-          name,
-          action: TriggerAction.SEND_WEBHOOK,
-          actionParams: {
-            url: WEBHOOK_URL,
-            headers: { Authorization: HEADER_VALUE },
-          },
-          filters: CONDITION,
-        }),
-      ),
+    created(
+      await createTrigger({
+        name,
+        action: TriggerAction.SEND_WEBHOOK,
+        actionParams: {
+          url: WEBHOOK_URL,
+          headers: { Authorization: HEADER_VALUE },
+        },
+        filters: CONDITION,
+      }),
     );
 
   const storedRow = (id: string) =>
@@ -677,14 +659,12 @@ describe("Feature: automations over the public API express what the dashboard ex
     it("saves the new destination and the values sent with it", async () => {
       const created = await webhookAutomation(`Retarget ${ns}`);
 
-      const response = await withWebhookChannel(true, () =>
-        patch(`/api/triggers/${created.id}`, {
-          actionParams: {
-            url: RETARGETED_URL,
-            headers: { Authorization: RETARGETED_HEADER_VALUE },
-          },
-        }),
-      );
+      const response = await patch(`/api/triggers/${created.id}`, {
+        actionParams: {
+          url: RETARGETED_URL,
+          headers: { Authorization: RETARGETED_HEADER_VALUE },
+        },
+      });
 
       expect(response.status).toBe(200);
       const stored = await storedRow(created.id);
@@ -698,14 +678,12 @@ describe("Feature: automations over the public API express what the dashboard ex
     it("says the values have to travel with the new destination", async () => {
       const created = await webhookAutomation(`Retarget kept ${ns}`);
 
-      const response = await withWebhookChannel(true, () =>
-        patch(`/api/triggers/${created.id}`, {
-          actionParams: {
-            url: RETARGETED_URL,
-            headers: { Authorization: REDACTED },
-          },
-        }),
-      );
+      const response = await patch(`/api/triggers/${created.id}`, {
+        actionParams: {
+          url: RETARGETED_URL,
+          headers: { Authorization: REDACTED },
+        },
+      });
 
       expect(response.status).toBe(422);
       expect((await response.json()).error).toBe(
@@ -751,59 +729,6 @@ describe("Feature: automations over the public API express what the dashboard ex
 
       expect(response.status).toBe(422);
       expect((await response.json()).error).toBe("trigger_kind_immutable");
-    });
-  });
-
-  describe("when the project no longer has the webhook channel", () => {
-    /** @scenario "An existing webhook automation stays readable and manageable" */
-    it("still lists, reads, renames, pauses and deletes it", async () => {
-      const created = await webhookAutomation(`Grandfathered ${ns}`);
-
-      await withWebhookChannel(false, async () => {
-        const listed = (await (
-          await app.request("/api/triggers", { headers: headers() })
-        ).json()) as { id: string }[];
-        expect(listed.some((row) => row.id === created.id)).toBe(true);
-
-        expect(
-          (
-            await app.request(`/api/triggers/${created.id}`, {
-              headers: headers(),
-            })
-          ).status,
-        ).toBe(200);
-
-        const renamed = await patch(`/api/triggers/${created.id}`, {
-          name: `Grandfathered renamed ${ns}`,
-        });
-        expect(renamed.status).toBe(200);
-
-        const paused = await post(`/api/triggers/${created.id}/disable`);
-        expect(paused.status).toBe(200);
-
-        const deleted = await app.request(`/api/triggers/${created.id}`, {
-          method: "DELETE",
-          headers: headers(),
-        });
-        expect(deleted.status).toBe(200);
-      });
-    });
-
-    /** @scenario "Changing an existing webhook automation's delivery is refused" */
-    it("refuses a save that states its delivery configuration", async () => {
-      const created = await webhookAutomation(`Gated update ${ns}`);
-
-      const response = await withWebhookChannel(false, () =>
-        patch(`/api/triggers/${created.id}`, {
-          actionParams: {
-            url: RETARGETED_URL,
-            headers: { Authorization: RETARGETED_HEADER_VALUE },
-          },
-        }),
-      );
-
-      expect(response.status).toBe(403);
-      expect((await response.json()).error).toBe("trigger_channel_not_enabled");
     });
   });
 });

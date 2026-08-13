@@ -6,7 +6,6 @@ import type { SlackActionParams } from "@langwatch/automations/providers/slack";
 import type { AlertType, Prisma, Trigger } from "@prisma/client";
 import { TriggerAction, TriggerKind } from "@prisma/client";
 import { nanoid } from "nanoid";
-import { featureFlagService } from "~/server/featureFlag";
 import { hasActionableTriggerFilters } from "~/server/filters/triggerFilter.matcher";
 import {
   sanitizeTriggerFilters,
@@ -24,7 +23,6 @@ import {
   TestFireUnavailableError,
   TriggerActionImmutableError,
   TriggerActionParamsUnknownFieldsError,
-  TriggerChannelNotEnabledError,
   TriggerFilterQueryInvalidError,
   TriggerFiltersRequiredError,
   TriggerFiltersUnsupportedError,
@@ -89,9 +87,9 @@ const RULE_FIELD_NAMES: Record<"graphAlert" | "report", Set<string>> = {
  * the same row the dispatcher reads, so it is held to the same rules rather
  * than to whatever the wire schema happened to accept: a delivery
  * configuration its channel recognises, a destination that is safe to send to,
- * a channel this project has, conditions that select something, a trace query
- * the platform can read, a graph that belongs to this project, and the cadence
- * a new notification starts on.
+ * conditions that select something, a trace query the platform can read, a
+ * graph that belongs to this project, and the cadence a new notification starts
+ * on.
  *
  * Two things about an automation are fixed once it exists.
  *
@@ -139,7 +137,6 @@ export class PublicApiTriggerService {
     projectId: string;
     input: PublicApiCreateInput;
   }): Promise<Trigger> {
-    await this.assertChannelEnabled({ action: input.action, projectId });
     if (input.templates) validateTemplateDraft(input.templates);
 
     const isGraphAlert = !!input.customGraphId;
@@ -471,7 +468,6 @@ export class PublicApiTriggerService {
       // configuration for the channel this automation already delivers on, and
       // is held to that channel's fields rather than to whichever shape the
       // payload resembles.
-      await this.assertChannelEnabled({ action: stored.action, projectId });
       this.assertActionParamsFieldsAreThisChannels({
         action: stored.action,
         actionParams: input.actionParams,
@@ -592,7 +588,6 @@ export class PublicApiTriggerService {
     triggerId: string;
   }): Promise<TestFireResult> {
     const trigger = await this.getById({ projectId, triggerId });
-    await this.assertChannelEnabled({ action: trigger.action, projectId });
     await this.assertTestFireAllowed({ action: trigger.action, projectId });
     const project = await this.deps.resolveProject(projectId);
     const graphAlert = extractGraphAlertFromTriggerRow(trigger.actionParams);
@@ -714,6 +709,7 @@ export class PublicApiTriggerService {
         method: stored.method ?? "POST",
         headers: decryptWebhookHeaders(stored),
         bodyTemplate: stored.bodyTemplate ?? null,
+        bodyFormat: stored.bodyFormat ?? "json",
         signingSecrets: decryptWebhookSigningSecrets(stored),
       },
     };
@@ -1025,25 +1021,6 @@ export class PublicApiTriggerService {
     });
     if (!limit.allowed)
       throw new TriggerTestFireRateLimitedError(limit.resetAt);
-  }
-
-  /** The webhook channel ships behind a release flag (ADR-040 §7). Gating the
-   *  save and not only the picker is what makes the flag hold for a caller who
-   *  never sees the picker. Resolved per project, like every other gate on
-   *  this channel, so the dashboard and the API agree during a rollout. */
-  private async assertChannelEnabled({
-    action,
-    projectId,
-  }: {
-    action: TriggerAction;
-    projectId: string;
-  }): Promise<void> {
-    if (action !== TriggerAction.SEND_WEBHOOK) return;
-    const enabled = await featureFlagService.isEnabled(
-      "release_webhook_automations",
-      { distinctId: projectId, projectId },
-    );
-    if (!enabled) throw new TriggerChannelNotEnabledError("webhook");
   }
 }
 

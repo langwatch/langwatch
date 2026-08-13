@@ -74,7 +74,8 @@ export const FRONTEND_FEATURE_FLAGS = [
   // launcher orb. Swaps only the CLOSED-state affordance; opening, the
   // panel and Cmd/Ctrl+I are identical either way.
   "release_ui_langy_peek_dock_enabled",
-  "release_webhook_automations",
+  // NOTE: `release_webhook_automations` (ADR-040) was retired — the webhook
+  // delivery channel is offered to every project, so the frontend never asks.
   // Pins the Ops section into the main sidebar for a user who already has ops
   // access, so it shows on every route instead of only under /ops. Deliberately
   // NOT a PostHog flag — it resolves false server-side (unknown flag) and is

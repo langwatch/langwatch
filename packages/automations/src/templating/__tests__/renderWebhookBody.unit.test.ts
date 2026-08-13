@@ -144,4 +144,81 @@ describe("renderWebhookBody", () => {
       expect(() => JSON.parse(rendered.body)).not.toThrow();
     });
   });
+
+  describe("given the body format is text", () => {
+    /** @scenario "A plain-text body is sent exactly as it renders" */
+    it("sends the render output verbatim, without JSON normalising it", async () => {
+      const rendered = await renderWebhookBody({
+        template: "Trigger {{ trigger.name }} matched  {{ digest.count }}\n",
+        context: makeContext(),
+        format: "text",
+      });
+
+      expect(rendered.body).toBe("Trigger High latency matched  1\n");
+      expect(rendered.usedDefault).toBe(false);
+      expect(rendered.errors).toEqual([]);
+    });
+
+    it("keeps content that would break a JSON template intact", async () => {
+      const rendered = await renderWebhookBody({
+        template: "{{ matches[0].trace.input }}",
+        context: makeContext({
+          matches: [
+            makeMatch({
+              trace: {
+                id: "trace_1",
+                input: JSON_BREAKOUT,
+                output: JSON_BREAKOUT,
+                url: "https://app.langwatch.ai/acme/traces/trace_1",
+                metadata: {},
+              },
+            }),
+          ],
+        }),
+        format: "text",
+      });
+
+      expect(rendered.body).toBe(JSON_BREAKOUT);
+    });
+
+    it("reports the author's missing variables without failing the render", async () => {
+      const rendered = await renderWebhookBody({
+        template: "value: {{ trigger.nmae }}",
+        context: makeContext(),
+        format: "text",
+      });
+
+      expect(rendered.missingVariables.length).toBeGreaterThan(0);
+      expect(rendered.errors).toEqual([]);
+    });
+
+    describe("when no template is written", () => {
+      it("sends an empty body rather than a JSON envelope the endpoint cannot read", async () => {
+        const rendered = await renderWebhookBody({
+          template: null,
+          context: makeContext(),
+          format: "text",
+        });
+
+        expect(rendered.body).toBe("");
+        expect(rendered.usedDefault).toBe(false);
+        expect(rendered.errors).toEqual([]);
+      });
+    });
+
+    describe("when the template throws at render", () => {
+      /** @scenario "A plain-text body that fails to render sends nothing" */
+      it("sends an empty body and surfaces the error", async () => {
+        const rendered = await renderWebhookBody({
+          template: "{% unknown_tag %}",
+          context: makeContext(),
+          format: "text",
+        });
+
+        expect(rendered.body).toBe("");
+        expect(rendered.usedDefault).toBe(false);
+        expect(rendered.errors.length).toBeGreaterThan(0);
+      });
+    });
+  });
 });

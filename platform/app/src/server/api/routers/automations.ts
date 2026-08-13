@@ -6,7 +6,10 @@ import {
 } from "@langwatch/automations/cadences";
 import { EMAIL_RX } from "@langwatch/automations/providers/email";
 import type { SlackActionParams } from "@langwatch/automations/providers/slack";
-import { WEBHOOK_HEADER_VALUE_KEPT } from "@langwatch/automations/providers/webhook";
+import {
+  WEBHOOK_HEADER_VALUE_KEPT,
+  webhookBodyFormatSchema,
+} from "@langwatch/automations/providers/webhook";
 import { HandledError } from "@langwatch/handled-error";
 import { generate as ksuid } from "@langwatch/ksuid";
 import { TRPCError } from "@trpc/server";
@@ -69,7 +72,6 @@ import { WebhookDeliveryService } from "~/server/app-layer/automations/webhook-d
 import { MonitorService } from "~/server/app-layer/monitors/monitor.service";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
 import { isDispatchError } from "~/server/event-sourcing/queues/dispatchError";
-import { featureFlagService } from "~/server/featureFlag";
 import { hasActionableTriggerFilters } from "~/server/filters/triggerFilter.matcher";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
@@ -132,6 +134,7 @@ const actionParamsSchema = z.object({
   method: z.enum(["POST", "PUT", "PATCH"]).optional(),
   headers: z.record(z.string(), z.string()).optional(),
   bodyTemplate: z.string().nullable().optional(),
+  bodyFormat: webhookBodyFormatSchema.optional(),
 });
 
 type TRPCErrorCode = ConstructorParameters<typeof TRPCError>[0]["code"];
@@ -811,6 +814,7 @@ export const automationRouter = createTRPCRouter({
             method: z.enum(["POST", "PUT", "PATCH"]).default("POST"),
             headers: z.record(z.string(), z.string()).default({}),
             bodyTemplate: z.string().nullable().default(null),
+            bodyFormat: webhookBodyFormatSchema.default("json"),
           })
           .nullable()
           .default(null),
@@ -864,24 +868,6 @@ export const automationRouter = createTRPCRouter({
       // and intentionally exempt from the rate limit — it fires to the
       // customer's own webhook, not our mail provider.
       try {
-        // The webhook channel ships dark (ADR-040 §7): the type picker is
-        // flag-gated client-side, and the server refuses the channel too so
-        // the flag can't be bypassed by calling the API directly. The flag is
-        // resolved per PROJECT — whether a project has this channel cannot
-        // depend on which teammate is asking, and the public API, which has no
-        // user at all, has to reach the same answer.
-        if (input.channel === "webhook") {
-          const allowed = await featureFlagService.isEnabled(
-            "release_webhook_automations",
-            { distinctId: input.projectId, projectId: input.projectId },
-          );
-          if (!allowed) {
-            throw new TRPCError({
-              code: "FORBIDDEN",
-              message: "Webhook automations are not enabled for this project.",
-            });
-          }
-        }
         // Email shares the mail provider; webhook fires at an ARBITRARY
         // customer URL from our worker IPs, so an uncapped test button would
         // be an outbound request-flood primitive (ADR-040 §4). Slack stays
@@ -1054,22 +1040,6 @@ export const automationRouter = createTRPCRouter({
       let parsedActionParams: Record<string, unknown> = {};
       try {
         validateTemplateDraft(input.templates);
-        // The webhook channel ships dark (ADR-040 §7): gate the save route as
-        // well as the picker, so the flag can't be bypassed via the API.
-        // Resolved per PROJECT, like every other gate on this channel, so the
-        // dashboard and the public API agree during a partial rollout.
-        if (input.action === TriggerAction.SEND_WEBHOOK) {
-          const allowed = await featureFlagService.isEnabled(
-            "release_webhook_automations",
-            { distinctId: input.projectId, projectId: input.projectId },
-          );
-          if (!allowed) {
-            throw new TRPCError({
-              code: "FORBIDDEN",
-              message: "Webhook automations are not enabled for this project.",
-            });
-          }
-        }
         if (isGraphAlert) {
           // Graph alerts only support notify channels — there is no
           // "ADD_TO_DATASET on a metric crossing a threshold" UX.

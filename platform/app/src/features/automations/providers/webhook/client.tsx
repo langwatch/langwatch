@@ -12,9 +12,11 @@ import type { SavedTriggerRow } from "@langwatch/automations/providers/types";
 import {
   isReservedWebhookHeader,
   validateWebhookUrlShape,
+  WEBHOOK_BODY_FORMATS,
   WEBHOOK_HEADER_VALUE_KEPT,
   WEBHOOK_METHODS,
   type WebhookActionParams,
+  type WebhookBodyFormat,
   type WebhookMethod,
   type WebhookPreview,
 } from "@langwatch/automations/providers/webhook";
@@ -24,7 +26,10 @@ import { Plus, Trash2, Webhook } from "lucide-react";
 import { useMemo } from "react";
 import { SegmentedControl } from "~/components/ui/segmented-control";
 import { VariableInfoIcon } from "~/features/automations/components/VariableInfoIcon";
-import { LIQUID_JSON_LANGUAGE_ID } from "~/features/automations/editors/liquidMonaco";
+import {
+  LIQUID_JSON_LANGUAGE_ID,
+  LIQUID_LANGUAGE_ID,
+} from "~/features/automations/editors/liquidMonaco";
 import {
   FieldHeader,
   LiquidEditor,
@@ -81,6 +86,9 @@ export interface WebhookSlice {
   headers: HeaderRow[];
   signingSecret: SecretDraft;
   template: FieldDraft;
+  /** What the body is: JSON (validated and re-serialized) or plain text (sent
+   *  exactly as it renders). Decides the request's Content-Type too. */
+  bodyFormat: WebhookBodyFormat;
 }
 
 const EMPTY_FIELD: FieldDraft = { value: "", usingDefault: true };
@@ -93,6 +101,7 @@ function initialSlice(): WebhookSlice {
     headers: [],
     signingSecret: EMPTY_SECRET,
     template: EMPTY_FIELD,
+    bodyFormat: "json",
   };
 }
 
@@ -135,6 +144,11 @@ function fromTriggerRow(row: SavedTriggerRow): WebhookSlice {
       value: params.bodyTemplate ?? "",
       usingDefault: params.bodyTemplate == null,
     },
+    bodyFormat: WEBHOOK_BODY_FORMATS.includes(
+      params.bodyFormat as WebhookBodyFormat,
+    )
+      ? (params.bodyFormat as WebhookBodyFormat)
+      : "json",
   };
 }
 
@@ -168,6 +182,7 @@ function toActionParams(slice: WebhookSlice): WebhookActionParams {
     method: slice.method,
     headers: headersRecord(slice.headers),
     bodyTemplate: bodyTemplateOf(slice),
+    bodyFormat: slice.bodyFormat,
     signingSecret: signingSecretOf(slice),
   };
 }
@@ -180,6 +195,7 @@ function testFireTarget(slice: WebhookSlice) {
       method: slice.method,
       headers: headersRecord(slice.headers),
       bodyTemplate: bodyTemplateOf(slice),
+      bodyFormat: slice.bodyFormat,
     },
   };
 }
@@ -372,6 +388,121 @@ function SigningSecretField({
 
 const METHOD_ITEMS = WEBHOOK_METHODS.map((m) => ({ value: m, label: m }));
 
+const BODY_FORMAT_LABELS: Record<WebhookBodyFormat, string> = {
+  json: "JSON",
+  text: "Plain text",
+};
+const BODY_FORMAT_ITEMS = WEBHOOK_BODY_FORMATS.map((format) => ({
+  value: format,
+  label: BODY_FORMAT_LABELS[format],
+}));
+
+/**
+ * The body the endpoint receives: the Liquid template that renders it and a
+ * preview of what the next fire would post.
+ *
+ * A JSON body keeps the framework default and its reset affordance; plain text
+ * has neither — there is no envelope to guess at for an endpoint that asked for
+ * something else, so an empty text body sends nothing at all.
+ */
+function BodyEditor({
+  slice,
+  onChange,
+  ctx,
+}: ConfigFormProps<WebhookSlice, WebhookPreview>) {
+  const isTextBody = slice.bodyFormat === "text";
+  const defaults = defaultsForSourceKind(ctx.sourceKind);
+  const templateValue = isTextBody
+    ? slice.template.value
+    : slice.template.value || defaults.webhookBody;
+  const variables = useMemo(
+    () => filterVariablesForCadence(ctx.variables, ctx.cadenceMode),
+    [ctx.variables, ctx.cadenceMode],
+  );
+  const preview = ctx.preview;
+
+  return (
+    <VStack align="stretch" gap={2}>
+      {isTextBody ? (
+        <HStack gap={2}>
+          <Text textStyle="sm" fontWeight="semibold">
+            Body
+          </Text>
+          <VariableInfoIcon variables={variables} />
+        </HStack>
+      ) : (
+        <FieldHeader
+          label="Body"
+          usingDefault={slice.template.usingDefault}
+          onReset={() => onChange({ ...slice, template: EMPTY_FIELD })}
+          trailing={<VariableInfoIcon variables={variables} />}
+        />
+      )}
+      <Text textStyle="xs" color="fg.muted">
+        Write the body your endpoint receives. Values in braces fill in from
+        your trace or metric when the request sends.
+      </Text>
+      <Box data-testid="webhook-body-editor">
+        <LiquidEditor
+          variables={variables}
+          height="280px"
+          language={isTextBody ? LIQUID_LANGUAGE_ID : LIQUID_JSON_LANGUAGE_ID}
+          value={templateValue}
+          onChange={(value) =>
+            onChange({ ...slice, template: { value, usingDefault: false } })
+          }
+        />
+      </Box>
+      {preview ? (
+        <BodyPreview preview={preview} isTextBody={isTextBody} />
+      ) : null}
+    </VStack>
+  );
+}
+
+/** What the next fire would post, shown under the editor. */
+function BodyPreview({
+  preview,
+  isTextBody,
+}: {
+  preview: WebhookPreview;
+  isTextBody: boolean;
+}) {
+  return (
+    <Box
+      borderWidth="1px"
+      borderColor="border.muted"
+      borderRadius="md"
+      bg="bg.subtle"
+      padding={3}
+      data-testid="webhook-preview"
+    >
+      <Text textStyle="xs" fontWeight="medium" color="fg.muted" mb={1}>
+        {preview.payload.method} {preview.payload.url || "(no URL yet)"}
+      </Text>
+      <Text
+        as="pre"
+        textStyle="xs"
+        fontFamily="mono"
+        whiteSpace="pre-wrap"
+        wordBreak="break-word"
+      >
+        {isTextBody
+          ? preview.payload.body
+          : formatPreviewBody(preview.payload.body)}
+      </Text>
+      {preview.errors.length > 0 ? (
+        <Text textStyle="xs" color="fg.error" mt={1}>
+          {preview.errors[0]}
+          {isTextBody
+            ? " — an empty body will be sent instead."
+            : " — the default body will be sent instead."}
+        </Text>
+      ) : null}
+    </Box>
+  );
+}
+
 function WebhookConfigForm({
   slice,
   onChange,
@@ -379,13 +510,7 @@ function WebhookConfigForm({
 }: ConfigFormProps<WebhookSlice, WebhookPreview>) {
   const urlProblem =
     slice.url.trim() === "" ? null : validateWebhookUrlShape(slice.url.trim());
-  const defaults = defaultsForSourceKind(ctx.sourceKind);
-  const templateValue = slice.template.value || defaults.webhookBody;
-  const variables = useMemo(
-    () => filterVariablesForCadence(ctx.variables, ctx.cadenceMode),
-    [ctx.variables, ctx.cadenceMode],
-  );
-  const preview = ctx.preview;
+  const complete = isComplete(slice);
 
   return (
     <VStack align="stretch" gap={4}>
@@ -399,9 +524,7 @@ function WebhookConfigForm({
         {urlProblem ? (
           <Field.ErrorText>{urlProblem}</Field.ErrorText>
         ) : (
-          <Field.HelperText>
-            An https endpoint you control. The request body is JSON.
-          </Field.HelperText>
+          <Field.HelperText>An https endpoint you control.</Field.HelperText>
         )}
       </Field.Root>
       <Field.Root>
@@ -415,6 +538,22 @@ function WebhookConfigForm({
           items={METHOD_ITEMS}
         />
       </Field.Root>
+      <Field.Root>
+        <Field.Label>Body format</Field.Label>
+        <SegmentedControl
+          size="sm"
+          value={slice.bodyFormat}
+          onValueChange={({ value }) => {
+            if (value)
+              onChange({ ...slice, bodyFormat: value as WebhookBodyFormat });
+          }}
+          items={BODY_FORMAT_ITEMS}
+        />
+        <Field.HelperText>
+          JSON is checked before it sends. Plain text is sent exactly as you
+          write it, for endpoints that expect anything else.
+        </Field.HelperText>
+      </Field.Root>
       <HeadersEditor slice={slice} onChange={onChange} />
       <SigningSecretField slice={slice} onChange={onChange} />
       {/* Try the real request straight from the destination section; the
@@ -423,62 +562,12 @@ function WebhookConfigForm({
         <TestFireButton
           onTestFire={ctx.onTestFire}
           loading={ctx.testFireLoading}
-          disabled={!isComplete(slice)}
-          hint={isComplete(slice) ? undefined : "Add a valid https URL first"}
+          disabled={!complete}
+          hint={complete ? undefined : "Add a valid https URL first"}
         />
         <LastTestResult attempt={ctx.lastTestAttempt} />
       </VStack>
-      <FieldHeader
-        label="JSON body"
-        usingDefault={slice.template.usingDefault}
-        onReset={() => onChange({ ...slice, template: EMPTY_FIELD })}
-        trailing={<VariableInfoIcon variables={variables} />}
-      />
-      <VStack align="stretch" gap={2}>
-        <Text textStyle="xs" color="fg.muted">
-          Write the JSON your endpoint receives. Values in braces fill in from
-          your trace or metric when the request sends.
-        </Text>
-        <Box data-testid="webhook-body-editor">
-          <LiquidEditor
-            variables={variables}
-            height="280px"
-            language={LIQUID_JSON_LANGUAGE_ID}
-            value={templateValue}
-            onChange={(value) =>
-              onChange({ ...slice, template: { value, usingDefault: false } })
-            }
-          />
-        </Box>
-        {preview ? (
-          <Box
-            borderWidth="1px"
-            borderColor="border.muted"
-            borderRadius="md"
-            bg="bg.subtle"
-            padding={3}
-            data-testid="webhook-preview"
-          >
-            <Text textStyle="xs" fontWeight="medium" color="fg.muted" mb={1}>
-              {preview.payload.method} {preview.payload.url || "(no URL yet)"}
-            </Text>
-            <Text
-              as="pre"
-              textStyle="xs"
-              fontFamily="mono"
-              whiteSpace="pre-wrap"
-              wordBreak="break-word"
-            >
-              {formatPreviewBody(preview.payload.body)}
-            </Text>
-            {preview.errors.length > 0 ? (
-              <Text textStyle="xs" color="fg.error" mt={1}>
-                {preview.errors[0]} — the default body will be sent instead.
-              </Text>
-            ) : null}
-          </Box>
-        ) : null}
-      </VStack>
+      <BodyEditor slice={slice} onChange={onChange} ctx={ctx} />
     </VStack>
   );
 }
