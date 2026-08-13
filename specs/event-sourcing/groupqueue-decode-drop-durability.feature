@@ -13,13 +13,13 @@ Feature: GroupQueue decode-drop durability and attribution
   #   Every discarding path in this module is justified by "recover via event
   #   replay". For reactor-bearing folds that claim is FALSE. The replay service
   #   rebuilds fold projections and never invokes reactors (projectionRouter.ts
-  #   :61-71); replay's only reactor references (replayMarkers.ts:117,
-  #   replayMapPath.ts:408) exist to SUPPRESS re-fires. governanceOcsfEventsSync
+  #   :61-71); replay's only reactor references (replayMarkers.ts, the done
+  #   markers) exist to SUPPRESS re-fires. governanceOcsfEventsSync
   #   (OCSF security/audit) and governanceKpisSync are both registered
   #   via builder.withReactor("traceSummary", ...) — on a fold, where replay
   #   never reaches them. So a dropped audit event is permanently
-  #   lost. Scoped honestly: fold/map drops ARE replay-covered (replayService.ts
-  #   :74,105 drives mapProjections) — the falsity is reactor-specific.
+  #   lost. Scoped honestly: fold/map drops ARE replay-covered (the fold/map
+  #   engine in replayEngine.ts drives both) — the falsity is reactor-specific.
   #
   #   Do not confuse this with idempotency. Those reactors cite a
   #   ReplacingMergeTree key as their "idempotency" — that makes a SECOND firing
