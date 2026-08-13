@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -217,25 +218,43 @@ func statusText(resp *http.Response) string {
 
 const redactedHeaderValue = "[REDACTED]"
 
-// credentialResponseHeaders hand out a session rather than describe one. The
-// name survives, so the author still sees that their endpoint set a cookie,
-// which is usually the thing they are checking. The value does not, because
-// these diagnostics travel into a workflow's execution state and onto the
-// screen of whoever opens it next.
-var credentialResponseHeaders = map[string]bool{
-	"Set-Cookie":  true,
-	"Set-Cookie2": true,
+// credentialHeaderNames hand out access rather than describe it, whichever
+// direction they travel in. A response carries whatever the upstream chose to
+// send, so being request headers by convention does not keep them out of one.
+var credentialHeaderNames = map[string]bool{
+	"Set-Cookie":          true,
+	"Set-Cookie2":         true,
+	"Authorization":       true,
+	"Proxy-Authorization": true,
+}
+
+// credentialHeaderWord matches names built around a credential, so
+// X-Amz-Security-Token and X-Api-Key lose their values while X-Api-Version and
+// X-Idempotency-Key keep theirs. Whole words only: half the value of reporting
+// headers at all is the ones an author came to read.
+var credentialHeaderWord = regexp.MustCompile(
+	`(?i)(^|[-_])(api[-_]?key|token|secret|password|credential)s?([-_]|$)`,
+)
+
+func isCredentialHeader(name string) bool {
+	return credentialHeaderNames[http.CanonicalHeaderKey(name)] ||
+		credentialHeaderWord.MatchString(name)
 }
 
 // flattenHeaders joins repeated headers the way they appeared on the wire, so
 // two Vary lines read as two rather than silently becoming one.
+//
+// A credential keeps its name and loses its value: the author still sees that
+// their endpoint set a cookie, which is usually the thing they are checking,
+// while the value stays out of a workflow's execution state and off the screen
+// of whoever opens it next.
 func flattenHeaders(h http.Header) map[string]string {
 	if len(h) == 0 {
 		return nil
 	}
 	out := make(map[string]string, len(h))
 	for name, values := range h {
-		if credentialResponseHeaders[http.CanonicalHeaderKey(name)] {
+		if isCredentialHeader(name) {
 			out[name] = redactedHeaderValue
 			continue
 		}

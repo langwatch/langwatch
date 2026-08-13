@@ -310,8 +310,15 @@ func TestExecute_RedactsCredentialResponseHeaders(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("X-Request-Id", "req-42")
+		w.Header().Set("X-Api-Version", "2026-08-01")
+		w.Header().Set("X-Idempotency-Key", "req-42")
 		w.Header().Add("Set-Cookie", "session=super-secret; HttpOnly")
 		w.Header().Add("Set-Cookie", "refresh=also-secret")
+		// Convention says these are request headers. An upstream can send them
+		// anyway, and Go hands us whatever arrived.
+		w.Header().Set("Authorization", "Bearer super-secret-echo")
+		w.Header().Set("X-Amz-Security-Token", "super-secret-sts")
+		w.Header().Set("X-Api-Key", "super-secret-key")
 		_, _ = io.WriteString(w, `{"result":"pong"}`)
 	}))
 	defer srv.Close()
@@ -326,10 +333,18 @@ func TestExecute_RedactsCredentialResponseHeaders(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	assert.Equal(t, "[REDACTED]", res.ResponseHeaders["Set-Cookie"],
-		"a session handed out by the endpoint is not a diagnostic")
-	assert.Equal(t, "req-42", res.ResponseHeaders["X-Request-Id"],
-		"the headers an author came to read are still readable")
+	for _, name := range []string{
+		"Set-Cookie", "Authorization", "X-Amz-Security-Token", "X-Api-Key",
+	} {
+		assert.Equal(t, "[REDACTED]", res.ResponseHeaders[name],
+			"%s hands out access rather than describing it", name)
+	}
+
+	// Half the value of reporting headers at all is the ones an author came to
+	// read, and neither a version nor an idempotency key is a credential.
+	assert.Equal(t, "req-42", res.ResponseHeaders["X-Request-Id"])
+	assert.Equal(t, "2026-08-01", res.ResponseHeaders["X-Api-Version"])
+	assert.Equal(t, "req-42", res.ResponseHeaders["X-Idempotency-Key"])
 	assert.Equal(t, "application/json", res.ResponseHeaders["Content-Type"])
 
 	for name, value := range res.ResponseHeaders {
