@@ -1,17 +1,35 @@
 import type { z } from "zod";
-import type { TraceWithGuardrail } from "~/components/messages/MessageCard";
 import type { sharedFiltersInputSchema } from "~/server/analytics/types";
 import type {
   ChatMessage,
   Evaluation,
+  EvaluationResult,
   LLMSpan,
   Span,
   SpanTimestamps,
+  Trace,
 } from "~/server/tracer/types";
 import type { ProjectionPlan } from "./projection/types";
 
 /** Time axis that `startDate`/`endDate` and the keyset cursor apply to. */
 export type TraceDateField = "occurred" | "updated";
+
+/**
+ * A trace as the list/search read returns it: the stored trace plus the two
+ * things that read joins on — the guardrail that blocked it, if one did, and
+ * whether it carries annotations.
+ *
+ * Lived in a React component until the legacy Traces UI was removed, which
+ * meant server code imported a component file for a type. It is shaped by the
+ * read, not by any view, so it belongs here beside the result that carries it.
+ */
+export type TraceWithGuardrail = Trace & {
+  lastGuardrail: (EvaluationResult & { name?: string }) | undefined;
+  annotations?: {
+    hasAnnotation: boolean;
+    count: number;
+  };
+};
 
 /**
  * Options for getAllTracesForProject, shared by the TraceService facade and the

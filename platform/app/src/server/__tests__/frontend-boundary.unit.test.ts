@@ -508,11 +508,26 @@ describe("browser-only UI never reaches the backend", () => {
     });
   });
 
+  // Both halves are pinned, the same way the workspace-package cases below
+  // are: the import has to still be there, AND still be excluded. Asserting
+  // only the exclusion passes just as happily when the import is deleted —
+  // which is exactly what happened when this case pointed at a component that
+  // the legacy Traces removal took away with it.
   describe("given a type-only import of a component", () => {
-    it("does not count it, because types are erased", () => {
-      const specs = valueImportsOf(path.join(SRC, "server/traces/types.ts"));
+    const server = path.join(
+      SRC,
+      "server/app-layer/reports/report-chart.service.ts",
+    );
+    const component = "~/components/analytics/CustomGraph";
 
-      expect(specs).not.toContain("~/components/messages/MessageCard");
+    it("still makes that import, so the case has a subject", () => {
+      expect(fs.readFileSync(server, "utf-8")).toContain(
+        `import type { CustomGraphInput } from "${component}";`,
+      );
+    });
+
+    it("does not count it, because types are erased", () => {
+      expect(valueImportsOf(server)).not.toContain(component);
     });
   });
 
