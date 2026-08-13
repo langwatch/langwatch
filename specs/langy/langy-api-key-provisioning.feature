@@ -154,3 +154,13 @@ Feature: Dedicated Langy API key provisioning
       Given the caller holds every access the assistant uses
       When the turn is prepared for the assistant
       Then the turn carries no "access you lack" note at all
+
+    # Degraded, not broken. The key still refuses the action when the assistant
+    # reaches for it, so the worst case is the old attempt-then-retry chat —
+    # losing the whole turn to a read blip would be strictly worse.
+    @unit
+    Scenario: The access cannot be looked up and the turn runs anyway
+      Given the caller's access cannot be looked up right now
+      When the turn is prepared for the assistant
+      Then the turn still starts
+      And it carries no "access you lack" note

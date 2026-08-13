@@ -163,6 +163,40 @@ describe("langyRecoveryPolicy", () => {
     });
   });
 
+  describe("when a reply was stopped to avoid a loop", () => {
+    const policy = langyRecoveryPolicy("langy_turn_step_limit");
+
+    /** @scenario "A reply stuck in a loop is stopped, and never retried on its own" */
+    it("is TERMINAL — an auto-retry re-drives the identical loop", () => {
+      // The whole reason the reply was stopped is that it was not making
+      // progress. Starting it again on the user's behalf spends another full
+      // wall-clock reaching the same wall, so the card offers a manual retry
+      // and nothing retries on its own.
+      expect(policy.disposition).toBe("terminal");
+      expect(policy.retry).toBe(false);
+      expect(policy.attempts).toBe(0);
+      expect(
+        canAutoRecover({
+          kind: policy.kind,
+          attemptsUsed: 0,
+          sideEffectsObserved: false,
+        }),
+      ).toBe(false);
+    });
+
+    it("still explains itself as a card the user can retry by hand", () => {
+      const presentation = explainLangyError({
+        code: "langy_turn_step_limit",
+        httpStatus: 508,
+        meta: {},
+      });
+
+      expect(presentation.render).toBe("card");
+      expect(presentation.action?.kind).toBe("retry");
+      expect(presentation.action?.label).toBe("Try again");
+    });
+  });
+
   describe("when the failure is unknown", () => {
     it("never auto-retries — we do not guess at what we cannot name", () => {
       expect(langyRecoveryPolicy("unknown").retry).toBe(false);

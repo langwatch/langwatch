@@ -308,16 +308,17 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     Then only the first terminal is recorded
     And the second is collapsed as a duplicate, like a tool call's terminals
 
-  # A turn stuck in a tool-call loop — classically re-running a command a 401/403
-  # already refused — is stopped by the manager's step-limit gate before it burns
-  # the whole wall-clock filling the panel with identical failing cards. Covered
-  # by the Go gate (steplimitgate_test.go) and the TS recovery/explainer tests;
-  # untagged here because its binding lives across both layers, not one TS test.
-  Scenario: A turn stuck in a loop is stopped, and NOT auto-retried
-    Given a turn ran too many commands without finishing
-    When the manager's step-limit gate stops it
-    Then the failure is terminal — the client never silently retries it
-    And the user sees a card that explains it stopped to avoid a loop
+  # A reply that keeps running commands without finishing — classically
+  # re-running a command it was already refused — burns the whole wall-clock
+  # filling the panel with identical failing cards. Langy stops it, and does NOT
+  # quietly start over: a fresh attempt walks into the same loop, so the user is
+  # the one who decides whether to try again.
+  @unit
+  Scenario: A reply stuck in a loop is stopped, and never retried on its own
+    Given a reply kept running commands without finishing
+    When Langy stops it to avoid a loop
+    Then the reply is never retried on its own
+    And the user sees a card explaining it stopped to avoid a loop
     And the card offers a manual "Try again"
 
   # A provider rate limit is retryable by every SDK's book, and for a burst

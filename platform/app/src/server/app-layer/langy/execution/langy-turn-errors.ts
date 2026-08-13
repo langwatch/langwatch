@@ -237,10 +237,13 @@ export class LangyTurnStepLimitError extends HandledError {
   constructor() {
     super(
       "langy_turn_step_limit",
-      "agent exceeded the per-turn tool-call limit",
+      "Langy stopped this reply to prevent a loop",
       {
         // 508 Loop Detected — the one HTTP status that names exactly this.
         httpStatus: 508,
+        // A turn that loops is ours to answer for, not the caller's: they asked
+        // a normal question and the agent failed to make progress on it.
+        fault: "platform",
         ...remediation("langy_turn_step_limit"),
       },
     );
