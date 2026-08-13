@@ -4,7 +4,6 @@
  * itself: every verb answers through one response mapper, and what a client
  * receives is what that mapper emitted after Hono serialised it.
  */
-
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
