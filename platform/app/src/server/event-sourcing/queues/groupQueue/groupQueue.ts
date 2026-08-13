@@ -102,7 +102,7 @@ import {
   type DrainedJob,
   GroupStagingScripts,
   readBisectionSplitBudget,
-  readClaimStrikeThreshold,
+  readConfirmedDeathThreshold,
   readGroupQuarantineThreshold,
   WORKER_LIVENESS_REFRESH_MS,
 } from "./scripts";
@@ -337,6 +337,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    */
   private readonly bisectionSplitBudget = readBisectionSplitBudget();
 
+  /**
+   * Confirmed worker deaths tolerated before a group is parked. Read once at
+   * construction, like the two thresholds above; 0 disables the poison guard.
+   * See {@link readConfirmedDeathThreshold}.
+   */
+  private readonly deathThreshold = readConfirmedDeathThreshold();
+
   private shutdownRequested = false;
   /** Tracks in-flight jobs for active count metrics. */
   private activeJobCount = 0;
@@ -352,6 +359,18 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
 
   /** Beacon refresh timer; stopped before the retirement write in {@link close}. */
   private livenessTimer: ReturnType<typeof setInterval> | undefined;
+
+  /**
+   * Whether this worker's beacon is known to have reached Redis.
+   *
+   * The guard reads a missing beacon as a death, so a worker that stamps claim
+   * markers it cannot vouch for hands every peer a false death — the exact
+   * failure this design removes, re-entered through the beacon write instead of
+   * the release. While the beacon is unconfirmed the guard sits out entirely:
+   * a real death then goes uncounted, which is the cheap direction to be wrong
+   * in. Parking a healthy group is the expensive one.
+   */
+  private beaconLive = false;
 
   /**
    * Resolves once this worker's beacon exists in Redis. Claims await it, so a
@@ -904,14 +923,15 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   private async processWithRetries(dispatched: DispatchResult): Promise<void> {
     const { stagedJobId, groupId, jobDataJson, originalScore } = dispatched;
 
-    const deathThreshold = readClaimStrikeThreshold();
-    const guardEnabled = deathThreshold > 0;
+    // The beacon must exist before this worker owns a marker, or a peer would
+    // read our live claim as an abandoned one.
+    await this.livenessReady;
+
+    const { deathThreshold } = this;
+    const guardEnabled = deathThreshold > 0 && this.beaconLive;
     if (guardEnabled) {
       let deaths = 0;
       try {
-        // The beacon must exist before this worker owns a marker, or a peer
-        // would read our live claim as an abandoned one.
-        await this.livenessReady;
         deaths = await this.scripts.recordClaim({
           groupId,
           workerId: this.workerId,
@@ -2120,7 +2140,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     const publish = async () => {
       try {
         await this.scripts.recordWorkerAlive(this.workerId);
+        this.beaconLive = true;
       } catch (err) {
+        // Stand the guard down until a refresh lands: claims made without a
+        // beacon behind them would be read as deaths by every peer.
+        this.beaconLive = false;
         this.logger.warn(
           {
             queueName: this.queueName,

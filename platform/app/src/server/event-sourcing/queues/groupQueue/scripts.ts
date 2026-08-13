@@ -1502,13 +1502,12 @@ return 1
  * parks in exactly the same number of laps as before.
  */
 const CLAIM_GUARD_LUA = `
-local keyPrefix   = ARGV[1]
-local groupId     = ARGV[2]
-local workerId    = ARGV[3]
-local stagedJobId = ARGV[4]
-local ttlSec      = tonumber(ARGV[5])
+local claimKey = KEYS[1]
 
-local claimKey = keyPrefix .. "group:" .. groupId .. ":claim"
+local keyPrefix   = ARGV[1]
+local workerId    = ARGV[2]
+local stagedJobId = ARGV[3]
+local ttlSec      = tonumber(ARGV[4])
 
 local previous  = redis.call("HMGET", claimKey, "owner", "deaths")
 local prevOwner = previous[1]
@@ -1737,7 +1736,7 @@ export function readTenantCap(): number {
  * graceful shutdown). A leftover marker is only booked as a death when its
  * owner is in neither state.
  */
-export const DEFAULT_CLAIM_STRIKE_THRESHOLD = 3;
+export const DEFAULT_CONFIRMED_DEATH_THRESHOLD = 3;
 
 /**
  * The claim marker self-expires so a group cannot be parked by evidence from
@@ -1769,14 +1768,14 @@ export const WORKER_RETIRED_TTL_SECONDS = CLAIM_MARKER_TTL_SECONDS * 2;
  * Read the poison-guard strike threshold from the environment.
  *
  * Semantics (mirrors readTenantCap):
- *   - env unset / empty / non-numeric / negative → DEFAULT_CLAIM_STRIKE_THRESHOLD
+ *   - env unset / empty / non-numeric / negative → DEFAULT_CONFIRMED_DEATH_THRESHOLD
  *   - env = "0" → 0 (explicit kill switch - guard disabled)
  *   - env = positive integer → that integer
  */
-export function readClaimStrikeThreshold(): number {
+export function readConfirmedDeathThreshold(): number {
   return readNonNegativeIntEnv({
     name: "LANGWATCH_GQ_POISON_STRIKE_THRESHOLD",
-    fallback: DEFAULT_CLAIM_STRIKE_THRESHOLD,
+    fallback: DEFAULT_CONFIRMED_DEATH_THRESHOLD,
   });
 }
 
@@ -1830,7 +1829,7 @@ export function readBisectionSplitBudget(): number {
 
 /**
  * Read the group-quarantine failure-streak threshold from the environment.
- * Mirrors {@link readClaimStrikeThreshold}:
+ * Mirrors {@link readConfirmedDeathThreshold}:
  *   - unset / empty / non-numeric / negative → DEFAULT_GROUP_QUARANTINE_THRESHOLD
  *   - "0" → 0 (explicit kill switch — the breaker is disabled)
  *   - positive integer → that integer
@@ -2493,9 +2492,13 @@ export class GroupStagingScripts {
   }): Promise<number> {
     const deaths = await claimGuardScript.run(
       this.redis,
-      0,
+      // Declared as a KEY, not derived in Lua: ioredis routes a cluster EVAL by
+      // its KEYS, so a zero-key script lands on an arbitrary node and the
+      // derived accesses can fall outside the slot that node owns. The beacon
+      // key stays derived from `keyPrefix`, which carries the same hash tag.
+      1,
+      this.claimMarkerKey(groupId),
       this.keyPrefix,
-      groupId,
       workerId,
       stagedJobId,
       String(CLAIM_MARKER_TTL_SECONDS),

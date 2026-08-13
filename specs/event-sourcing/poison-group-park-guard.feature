@@ -110,6 +110,14 @@ Feature: GroupQueue poison-group park guard
     And the group is dispatched and processed instead of being parked
 
   @integration
+  Scenario: a worker that cannot publish its own beacon does not enforce the guard
+    Given a worker whose liveness beacon write to Redis fails
+    When it claims a group already one death short of the threshold
+    Then it records no claim and parks nothing
+    And the group is dispatched and processed normally
+    And the guard resumes for that worker once its beacon lands
+
+  @integration
   Scenario: a release that never reaches Redis does not park a healthy group
     Given a group whose job completed but whose claim release was lost
     When the group is claimed repeatedly beyond the poison threshold
@@ -147,7 +155,7 @@ Feature: GroupQueue poison-group park guard
     And the group is never parked into the blocked set by the failure-streak guard
 
   @integration
-  Scenario: graceful shutdown mid-job does not count as a poison strike
+  Scenario: graceful shutdown mid-job does not count as a confirmed death
     Given a group whose job is in flight when the worker begins a graceful shutdown
     When the shutdown drains or abandons the in-flight job with the event loop alive
     Then the worker has published a retirement tombstone before the drain begins

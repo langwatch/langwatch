@@ -31,16 +31,14 @@ import {
   withJobAttempt,
 } from "../jobEnvelope";
 import { gqJobsDroppedTotal } from "../metrics";
-import {
-  DEFAULT_CLAIM_STRIKE_THRESHOLD,
-  GroupStagingScripts,
-} from "../scripts";
+import { GroupStagingScripts } from "../scripts";
 import { TieredBlobStore } from "../tieredBlobStore";
 import {
   InMemoryJobBlobStore,
   InMemoryObjectStore,
   incompressible,
 } from "./blobTestDoubles";
+import { seedDeadOwner as sharedSeedDeadOwner } from "./poisonGuardFixtures";
 
 // Skip outside testcontainers (e.g. plain unit runs) — mirrors the other
 // groupQueue integration suites (groupQueue.poisonGuard/decodeDrop).
@@ -153,20 +151,8 @@ describe.skipIf(!hasTestcontainers)(
       `${name}:gq:group:${groupId}:attempt`;
     const failStreakKey = (name: string, groupId: string) =>
       `${name}:gq:group:${groupId}:failstreak`;
-    const claimKey = (name: string, groupId: string) =>
-      `${name}:gq:group:${groupId}:claim`;
-    /**
-     * The marker of a worker that claimed this group and then died — no
-     * liveness beacon, no retirement tombstone — one death short of the
-     * threshold, so the next claim confirms the last one and parks.
-     */
-    const seedDeadOwner = async (name: string, groupId: string) => {
-      await redis.hset(claimKey(name, groupId), {
-        owner: `dead-worker-${crypto.randomUUID().slice(0, 8)}`,
-        deaths: String(DEFAULT_CLAIM_STRIKE_THRESHOLD - 1),
-        stagedJobId: "staged-from-the-dead-claim",
-      });
-    };
+    const seedDeadOwner = (name: string, groupId: string) =>
+      sharedSeedDeadOwner({ redis, queueName: name, groupId });
     const activeKey = (name: string, groupId: string) =>
       `${name}:gq:group:${groupId}:active`;
 

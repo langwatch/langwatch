@@ -19,9 +19,15 @@ import type { EventSourcedQueueDefinition } from "../../queue.types";
 import { MAX_BLOB_BYTES } from "../blobConstants";
 import { GroupQueueProcessor } from "../groupQueue";
 import {
-  DEFAULT_CLAIM_STRIKE_THRESHOLD,
+  DEFAULT_CONFIRMED_DEATH_THRESHOLD,
   GroupStagingScripts,
 } from "../scripts";
+import {
+  beaconKey,
+  claimKey,
+  confirmedDeaths as sharedConfirmedDeaths,
+  seedDeadOwner as sharedSeedDeadOwner,
+} from "./poisonGuardFixtures";
 
 // Skip when running without testcontainers (unit-only test runs)
 const hasTestcontainers = !!(
@@ -65,6 +71,11 @@ describe.skipIf(!hasTestcontainers)(
     });
 
     afterEach(async () => {
+      // Before anything else: a suite that spies on GroupStagingScripts.prototype
+      // (the beacon and release paths both do) would otherwise leave every later
+      // queue in this file with a broken collaborator, and the failures land in
+      // whichever test happens to run next rather than the one that set it up.
+      vi.restoreAllMocks();
       await Promise.all(queues.map((q) => q.close().catch(() => {})));
       // Scoped to this suite's own namespace, never flushdb(). flushdb empties
       // the whole logical database, so it does not just reset this suite — it
@@ -91,33 +102,15 @@ describe.skipIf(!hasTestcontainers)(
       return { queue, name: definition.name };
     }
 
-    const claimKey = (name: string, groupId: string) =>
-      `${name}:gq:group:${groupId}:claim`;
-    const beaconKey = (name: string, workerId: string) =>
-      `${name}:gq:worker:${workerId}`;
-    const confirmedDeaths = async (name: string, groupId: string) =>
-      await redis.hget(claimKey(name, groupId), "deaths");
+    const confirmedDeaths = (name: string, groupId: string) =>
+      sharedConfirmedDeaths({ redis, queueName: name, groupId });
     const blockedMembers = (name: string) =>
       redis.smembers(`${name}:gq:blocked`);
     const storedError = (name: string, groupId: string) =>
       redis.hget(`${name}:gq:group:${groupId}:error`, "message");
 
-    /**
-     * Leave behind the marker of a worker that claimed this group and then
-     * died — no beacon, no retirement tombstone. `deaths` is seeded one short
-     * of the threshold so the claim under test observes the last one.
-     */
-    const seedDeadOwner = async (
-      name: string,
-      groupId: string,
-      deaths = DEFAULT_CLAIM_STRIKE_THRESHOLD - 1,
-    ) => {
-      await redis.hset(claimKey(name, groupId), {
-        owner: `dead-worker-${crypto.randomUUID().slice(0, 8)}`,
-        deaths: String(deaths),
-        stagedJobId: "staged-from-the-dead-claim",
-      });
-    };
+    const seedDeadOwner = (name: string, groupId: string, deaths?: number) =>
+      sharedSeedDeadOwner({ redis, queueName: name, groupId, deaths });
 
     describe("given a group at the confirmed-death threshold", () => {
       describe("when a worker claims the group again", () => {
@@ -193,7 +186,7 @@ describe.skipIf(!hasTestcontainers)(
             await seedDeadOwner(
               name,
               "poisoned",
-              DEFAULT_CLAIM_STRIKE_THRESHOLD + 5,
+              DEFAULT_CONFIRMED_DEATH_THRESHOLD + 5,
             );
 
             await queue.send({ id: "job-1", groupId: "poisoned", value: "x" });
@@ -212,7 +205,7 @@ describe.skipIf(!hasTestcontainers)(
             // the threshold is 0, so the pre-seeded count is left untouched
             // (never incremented past it, never released to a fresh value).
             expect(await confirmedDeaths(name, "poisoned")).toBe(
-              String(DEFAULT_CLAIM_STRIKE_THRESHOLD + 5),
+              String(DEFAULT_CONFIRMED_DEATH_THRESHOLD + 5),
             );
           } finally {
             if (previous === undefined) {
@@ -259,7 +252,7 @@ describe.skipIf(!hasTestcontainers)(
 
     describe("given a graceful shutdown with a job in flight", () => {
       describe("when close() begins while the handler is still running", () => {
-        /** @scenario graceful shutdown mid-job does not count as a poison strike */
+        /** @scenario graceful shutdown mid-job does not count as a confirmed death */
         it("publishes the retirement tombstone before the drain begins", async () => {
           let releaseHandler!: () => void;
           const handlerGate = new Promise<void>((resolve) => {
@@ -319,7 +312,7 @@ describe.skipIf(!hasTestcontainers)(
           // the very next claim would park the group.
           await redis.hset(claimKey(name, "inherited"), {
             owner: retiredWorkerId,
-            deaths: String(DEFAULT_CLAIM_STRIKE_THRESHOLD - 1),
+            deaths: String(DEFAULT_CONFIRMED_DEATH_THRESHOLD - 1),
             stagedJobId: "staged-before-the-retirement",
           });
 
@@ -345,6 +338,50 @@ describe.skipIf(!hasTestcontainers)(
             { timeout: 5000, interval: 50 },
           );
           expect(await blockedMembers(name)).not.toContain("inherited");
+        });
+      });
+    });
+
+    describe("given a worker whose own beacon write fails", () => {
+      describe("when it claims a group one death short of the threshold", () => {
+        // A worker that cannot publish its beacon cannot be vouched for. If it
+        // stamped markers anyway, every peer inheriting one would read this
+        // live worker as dead — the same false-park class this guard removes,
+        // re-entered through the beacon write instead of the release. It sits
+        // the guard out instead: a real death goes uncounted, which is the
+        // cheap direction to be wrong in.
+        /** @scenario a worker that cannot publish its own beacon does not enforce the guard */
+        it("records no claim and parks nothing", async () => {
+          vi.spyOn(
+            GroupStagingScripts.prototype,
+            "recordWorkerAlive",
+          ).mockRejectedValue(new Error("redis unavailable"));
+          const recordClaim = vi.spyOn(
+            GroupStagingScripts.prototype,
+            "recordClaim",
+          );
+
+          const processed = vi.fn<(payload: TestPayload) => Promise<void>>();
+          processed.mockResolvedValue(undefined);
+          const { queue, name } = createQueue(processed);
+          await queue.waitUntilReady();
+
+          await seedDeadOwner(name, "beaconless");
+          await queue.send({ id: "job-1", groupId: "beaconless", value: "x" });
+
+          await vi.waitFor(
+            () => {
+              expect(processed).toHaveBeenCalledTimes(1);
+            },
+            { timeout: 5000, interval: 50 },
+          );
+          expect(await blockedMembers(name)).not.toContain("beaconless");
+          expect(recordClaim).not.toHaveBeenCalled();
+          // The seeded marker is untouched: the worker neither took ownership
+          // of it nor counted a death against it.
+          expect(await confirmedDeaths(name, "beaconless")).toBe(
+            String(DEFAULT_CONFIRMED_DEATH_THRESHOLD - 1),
+          );
         });
       });
     });
@@ -376,7 +413,7 @@ describe.skipIf(!hasTestcontainers)(
           await seedDeadOwner(
             name,
             "dying",
-            DEFAULT_CLAIM_STRIKE_THRESHOLD - 1,
+            DEFAULT_CONFIRMED_DEATH_THRESHOLD - 1,
           );
           await queue.send({ id: "job-2", groupId: "dying", value: "x" });
 
@@ -454,7 +491,7 @@ describe.skipIf(!hasTestcontainers)(
           await redis.set(beaconKey(name, livePeer), "alive", "EX", 90);
           await redis.hset(claimKey(name, "shared"), {
             owner: livePeer,
-            deaths: String(DEFAULT_CLAIM_STRIKE_THRESHOLD - 1),
+            deaths: String(DEFAULT_CONFIRMED_DEATH_THRESHOLD - 1),
             stagedJobId: "staged-by-the-live-peer",
           });
 
@@ -482,7 +519,7 @@ describe.skipIf(!hasTestcontainers)(
 
           await redis.hset(claimKey(name, "self"), {
             owner: workerIdOf(queue),
-            deaths: String(DEFAULT_CLAIM_STRIKE_THRESHOLD - 1),
+            deaths: String(DEFAULT_CONFIRMED_DEATH_THRESHOLD - 1),
             stagedJobId: "staged-under-the-lapsed-lease",
           });
 
@@ -520,7 +557,7 @@ describe.skipIf(!hasTestcontainers)(
             undefined,
           );
 
-          const jobs = DEFAULT_CLAIM_STRIKE_THRESHOLD * 3;
+          const jobs = DEFAULT_CONFIRMED_DEATH_THRESHOLD * 3;
           for (let i = 0; i < jobs; i++) {
             await queue.send({
               id: `job-${i}`,
