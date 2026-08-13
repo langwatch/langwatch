@@ -1044,7 +1044,7 @@ function AutomationsPage() {
         }
         confirmLabel="Delete"
         tone="danger"
-        loading={deleteTriggerMutation.isLoading}
+        loading={deleteTriggerMutation.isPending}
         onConfirm={() => {
           if (pendingDelete) deleteTrigger(pendingDelete);
         }}
