@@ -49,11 +49,12 @@ const projectInPayload = async (
   const project = projects.find((candidate) => candidate.id === projectId);
   // Every claim below is about what a field CONTAINS, and every one of them is
   // satisfied by a project that is not in the payload at all.
-  expect(
-    project,
-    "the project is missing from the payload — the redaction assertions would be vacuous",
-  ).toBeDefined();
-  return project!;
+  if (!project) {
+    throw new Error(
+      "the project is missing from the payload — the redaction assertions would be vacuous",
+    );
+  }
+  return project;
 };
 
 const projectApiKeyFor = async (
