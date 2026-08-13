@@ -349,6 +349,95 @@ describe.skipIf(!hasTestcontainers)(
       });
     });
 
+    describe("given a claim marker whose owner vanished without retiring", () => {
+      describe("when another worker claims the same group", () => {
+        /** @scenario a claim left behind by a worker that vanished without retiring is a death */
+        it("books one death, and accumulates to the threshold", async () => {
+          const processed = vi.fn<(payload: TestPayload) => Promise<void>>();
+          processed.mockResolvedValue(undefined);
+          const { queue, name } = createQueue(processed);
+          await queue.waitUntilReady();
+
+          // Well below the threshold, so this claim confirms a death but must
+          // still run the job: the guard counts, it does not park on the first.
+          await seedDeadOwner(name, "dying", 0);
+          await queue.send({ id: "job-1", groupId: "dying", value: "x" });
+
+          await vi.waitFor(
+            () => {
+              expect(processed).toHaveBeenCalledTimes(1);
+            },
+            { timeout: 5000, interval: 50 },
+          );
+          expect(await blockedMembers(name)).not.toContain("dying");
+
+          // One more death on top of a count already at the threshold's edge
+          // tips it over — the accumulation the guard exists to detect.
+          await seedDeadOwner(
+            name,
+            "dying",
+            DEFAULT_CLAIM_STRIKE_THRESHOLD - 1,
+          );
+          await queue.send({ id: "job-2", groupId: "dying", value: "x" });
+
+          await vi.waitFor(
+            async () => {
+              expect(await blockedMembers(name)).toContain("dying");
+            },
+            { timeout: 5000, interval: 50 },
+          );
+          expect(processed).toHaveBeenCalledTimes(1);
+        });
+      });
+    });
+
+    describe("given a worker that retired while holding a claim", () => {
+      describe("when the claim marker is still within its own lifetime", () => {
+        /** @scenario the retirement tombstone outlives the claim markers it answers for */
+        it("keeps the tombstone alive longer than the marker it answers for", async () => {
+          // Hold the job in flight so its marker is still there to measure —
+          // a completed job releases the marker, which is the whole point of it.
+          let releaseHandler!: () => void;
+          const handlerGate = new Promise<void>((resolve) => {
+            releaseHandler = resolve;
+          });
+          let signalEntered!: () => void;
+          const handlerEntered = new Promise<void>((resolve) => {
+            signalEntered = resolve;
+          });
+          const { queue, name } = createQueue(async () => {
+            signalEntered();
+            await handlerGate;
+          });
+          await queue.waitUntilReady();
+          const workerId = workerIdOf(queue);
+
+          // A real claim marker, written by the real claim path.
+          await queue.send({ id: "job-1", groupId: "outlived", value: "x" });
+          await handlerEntered;
+          const markerTtl = await redis.ttl(claimKey(name, "outlived"));
+
+          const closing = queue.close();
+          await vi.waitFor(
+            async () => {
+              expect(await redis.get(beaconKey(name, workerId))).toBe(
+                "retired",
+              );
+            },
+            { timeout: 5000, interval: 50 },
+          );
+          const tombstoneTtl = await redis.ttl(beaconKey(name, workerId));
+          releaseHandler();
+          await closing;
+
+          // If the tombstone expired first, a marker still naming this worker
+          // would decay from "retired" into "no beacon" — a false death.
+          expect(await redis.get(beaconKey(name, workerId))).toBe("retired");
+          expect(tombstoneTtl).toBeGreaterThan(markerTtl);
+        });
+      });
+    });
+
     describe("given a claim marker whose owner is still running", () => {
       describe("when another worker claims the same group", () => {
         /** @scenario a claim left behind by a worker that is still running is not a death */
@@ -412,15 +501,12 @@ describe.skipIf(!hasTestcontainers)(
 
     describe("given a worker whose claim release never reaches Redis", () => {
       describe("when it processes far more jobs for one group than the threshold", () => {
-        /**
-         * The regression that motivated the rewrite. Under the count-and-
-         * subtract guard every dropped release was indistinguishable from a
-         * worker death, so a healthy high-fan-out group parked itself after
-         * `threshold` of them. Here the releases are dropped outright and the
-         * group still has to survive, because the owner never stops being alive.
-         *
-         * @scenario a release that never reaches Redis does not park a healthy group
-         */
+        // The regression that motivated the rewrite. Under the count-and-
+        // subtract guard every dropped release was indistinguishable from a
+        // worker death, so a healthy high-fan-out group parked itself after
+        // `threshold` of them. Here the releases are dropped outright and the
+        // group still has to survive, because the owner never stops being alive.
+        /** @scenario a release that never reaches Redis does not park a healthy group */
         it("never parks the group", async () => {
           const processed = vi.fn<(payload: TestPayload) => Promise<void>>();
           processed.mockResolvedValue(undefined);

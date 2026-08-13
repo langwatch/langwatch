@@ -393,7 +393,6 @@ const LEGACY_INERT: string[] = [
   "specs/event-sourcing/oversized-attribute-value-preview.feature",
   "specs/event-sourcing/payload-envelope.feature",
   "specs/event-sourcing/pipeline-model.feature",
-  "specs/event-sourcing/poison-group-park-guard.feature",
   "specs/event-sourcing/process-roles.feature",
   "specs/event-sourcing/reactors.feature",
   "specs/event-sourcing/redis-fold-cache.feature",

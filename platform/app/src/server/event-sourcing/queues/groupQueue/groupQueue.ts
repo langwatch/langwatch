@@ -2133,6 +2133,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     };
 
     await publish();
+
+    // close() may have run during that first publish, in which case it found no
+    // timer to stop and has already written the tombstone. Arming one now would
+    // put a refresh AFTER the retirement — restoring a short-lived `alive` that
+    // expires into exactly the false death the tombstone exists to prevent.
+    if (this.shutdownRequested) return;
+
     this.livenessTimer = setInterval(() => {
       void publish();
     }, WORKER_LIVENESS_REFRESH_MS);

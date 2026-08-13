@@ -12,6 +12,7 @@ import { Redis as IORedis } from "ioredis";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { EventSourcedQueueDefinition } from "../../queue.types";
 import { GroupQueueProcessor } from "../groupQueue";
+import { GroupStagingScripts } from "../scripts";
 
 vi.mock("../dispatcher", () => ({
   GroupQueueDispatcher: class {
@@ -101,6 +102,59 @@ describe("GroupQueueProcessor worker liveness beacon", () => {
           internals.workerId,
         );
         expect(order.at(-1)).toBe("retired");
+      });
+    });
+  });
+
+  describe("given a shutdown that begins during the first beacon publish", () => {
+    describe("when the beacon publish finishes after the tombstone is written", () => {
+      /** @scenario the liveness beacon stops before the retirement tombstone is written */
+      it("arms no refresh timer, so nothing can overwrite the tombstone", async () => {
+        const conn = new IORedis({
+          lazyConnect: true,
+          maxRetriesPerRequest: 0,
+        });
+        connections.push(conn);
+        vi.spyOn(conn, "duplicate").mockReturnValue(conn as never);
+
+        // Hold the very first publish open so close() runs while the beacon is
+        // still starting: it finds no timer to clear, writes the tombstone, and
+        // the constructor's beacon setup resumes afterwards. The stub goes on
+        // the prototype because the publish is issued from the constructor.
+        let releasePublish!: () => void;
+        const publishGate = new Promise<void>((resolve) => {
+          releasePublish = resolve;
+        });
+        vi.spyOn(
+          GroupStagingScripts.prototype,
+          "recordWorkerAlive",
+        ).mockImplementation(async () => {
+          await publishGate;
+        });
+        vi.spyOn(
+          GroupStagingScripts.prototype,
+          "retireWorker",
+        ).mockResolvedValue(undefined);
+
+        const processor = new GroupQueueProcessor<TestPayload>(
+          makeDefinition(),
+          conn,
+          { consumerEnabled: true },
+        );
+        const internals = processor as unknown as {
+          livenessReady: Promise<void>;
+          livenessTimer: ReturnType<typeof setInterval> | undefined;
+          drainAndDisconnect: () => Promise<void>;
+        };
+        internals.drainAndDisconnect = async () => {};
+
+        await processor.close();
+        releasePublish();
+        await internals.livenessReady;
+
+        // Without the post-publish shutdown check, the constructor's setInterval
+        // lands here — after the tombstone — and refreshes `alive` over it.
+        expect(internals.livenessTimer).toBeUndefined();
       });
     });
   });
