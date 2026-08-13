@@ -39,6 +39,7 @@ import {
 import { closeClickHouseClient } from "~/server/clickhouse/client";
 import { prisma as globalPrisma } from "~/server/db";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
+import { bindProcessFleetMetricsSource } from "~/server/event-sourcing/process-manager/metrics";
 import { BillableEventsMeterClickHouseRepository } from "~/server/event-sourcing/projections/global/repositories/billable-events.clickhouse.repository";
 import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
 import { FilterService } from "~/server/filters/filter.service";
@@ -232,14 +233,24 @@ import { MonitorService } from "./monitors/monitor.service";
 import { PrismaMonitorRepository } from "./monitors/repositories/monitor.prisma.repository";
 import { BlobStoreService } from "./ops/blob-store.service";
 import { EventExplorerService } from "./ops/event-explorer.service";
-import { ManagerExplorerService } from "./ops/manager-explorer.service";
+import {
+  ManagerExplorerService,
+  OVERDUE_PENDING_MS,
+  OVERDUE_WAKE_MS,
+} from "./ops/manager-explorer.service";
 import { getOpsMetricsCollector } from "./ops/metrics-collector";
+import {
+  NullProcessAuditSink,
+  ProcessAuditRepository,
+} from "./ops/process-audit.repository";
 import { QueueService } from "./ops/queue.service";
 import { ReplayService } from "./ops/replay.service";
 import { BlobStoreRedisRepository } from "./ops/repositories/blob-store.redis.repository";
 import { NullBlobStoreRepository } from "./ops/repositories/blob-store.repository";
 import { EventExplorerClickHouseRepository } from "./ops/repositories/event-explorer.clickhouse.repository";
 import { NullEventExplorerRepository } from "./ops/repositories/event-explorer.repository";
+import { ProcessOpsPrismaRepository } from "./ops/repositories/process-ops.prisma.repository";
+import { NullProcessOpsRepository } from "./ops/repositories/process-ops.repository";
 import { QueueRedisRepository } from "./ops/repositories/queue.redis.repository";
 import { NullQueueRepository } from "./ops/repositories/queue.repository";
 import { ReplayRedisRepository } from "./ops/repositories/replay.redis.repository";
@@ -1558,7 +1569,23 @@ export function initializeDefaultApp(options?: {
       },
     }),
     eventExplorer: new EventExplorerService(eventExplorerRepo),
-    managerExplorer: new ManagerExplorerService(repositories.processStore),
+    managerExplorer: (() => {
+      const fleet = new ProcessOpsPrismaRepository(prisma);
+      // The pm_* gauges read the same counts the fleet table shows, on
+      // scrape, so alerting watches what the operator would see.
+      bindProcessFleetMetricsSource(() =>
+        fleet.countByProcessName({
+          now: Date.now(),
+          overdueWakeMs: OVERDUE_WAKE_MS,
+          overduePendingMs: OVERDUE_PENDING_MS,
+        }),
+      );
+      return new ManagerExplorerService({
+        store: repositories.processStore,
+        fleet,
+        audit: new ProcessAuditRepository(prisma),
+      });
+    })(),
     replay: new ReplayService(replayRepo),
     blobStore: new BlobStoreService(
       redis
@@ -2060,7 +2087,11 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       eventExplorer: new EventExplorerService(
         new NullEventExplorerRepository(),
       ),
-      managerExplorer: new ManagerExplorerService(new InMemoryProcessStore()),
+      managerExplorer: new ManagerExplorerService({
+        store: new InMemoryProcessStore(),
+        fleet: new NullProcessOpsRepository(),
+        audit: new NullProcessAuditSink(),
+      }),
       replay: new ReplayService(new NullReplayRepository()),
       blobStore: new BlobStoreService(new NullBlobStoreRepository()),
       metricsCollector: null,

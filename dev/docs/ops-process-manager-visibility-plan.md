@@ -1,8 +1,39 @@
 # Plan: process-manager visibility in ops
 
-Status: PROPOSED (plan only — nothing here is built)
+Status: BUILT (all three phases; alert routes remain infra-side)
 Date: 2026-08-13
-Spec skeleton: [specs/ops/process-manager-visibility.feature](../../specs/ops/process-manager-visibility.feature)
+Spec: [specs/ops/process-manager-visibility.feature](../../specs/ops/process-manager-visibility.feature),
+[specs/ops/event-subscriber-visibility.feature](../../specs/ops/event-subscriber-visibility.feature)
+
+**What shipped** (same day): `/ops/processes` — fleet strip + per-name table
+(`listProcessFleet`), instance list with process-key search, instance drawer
+(state JSON, paged outbox, per-message trace links from the stored carrier),
+the audited actions (wake now, redrive dead — per message and per instance —
+and release lapsed lease, every one landing in `AuditLog` under
+`targetKind: "process_instance"` with a recent-actions list on the page), and
+the `pm_*` Prometheus gauges (`process-manager/metrics.ts`, scrape-time
+collect off the same fleet counts; per-pod global values — aggregate with
+`max()`). The same page carries the **event subscribers** card: the registry
+(`getEventSubscriberMetadata`) joined to the live pipeline tree and paused
+keys, with pause/unpause through the existing pipeline controls at
+`<pipeline>/subscriber/<name>`.
+
+Implementation notes that differ from the sketch below:
+- The fleet reads live in `ProcessOpsPrismaRepository` behind
+  `ManagerExplorerService` (the existing PM ops home), not a new service.
+- The cross-tenant aggregates use raw SQL with the tenancy guard's explicit
+  `-- @tenancy` opt-out — the same posture as the substrate's own wake
+  scanner. Keyed reads and every write stay on guarded queries carrying
+  projectId (actions take the full ref for exactly this reason).
+- **Deliberately no new index.** The model itself forbids casual index adds
+  (a deploy-time CREATE INDEX share-locks the hottest write table — see the
+  `ProcessManagerOutbox` schema comment); the existing
+  `(status, nextAttemptAt, leasedUntil)` and per-ref indexes carry the
+  queries at retention-bounded volumes. If the per-name groupBy ever hurts,
+  the index is ops-managed via CREATE INDEX CONCURRENTLY per the
+  table-purge runbook.
+- Grafana alert routes on the `pm_*` gauges are a saas-infra change, tracked
+  there, not here.
 
 The `/ops` surface covers queues (groups, blocked, DLQ, parked), projections,
 blobs, and the scheduler. The process-manager substrate (ADR-049) has **no

@@ -505,6 +505,133 @@ export const opsRouter = createTRPCRouter({
       });
     }),
 
+  // ── Process-manager fleet (specs/ops/process-manager-visibility.feature) ──
+
+  /** One row per process name: registry identity + live trouble counts. */
+  listProcessFleet: protectedProcedure.use(opsViewPermission).query(() => {
+    return requireOps().managerExplorer.getFleetSummary();
+  }),
+
+  listProcessInstances: protectedProcedure
+    .use(opsViewPermission)
+    .input(
+      z.object({
+        processName: z.string().min(1).max(200),
+        page: z.number().int().min(1).default(1),
+        pageSize: z.number().int().min(1).max(100).default(25),
+        search: z.string().max(500).optional(),
+      }),
+    )
+    .query(async ({ input }) => {
+      return requireOps().managerExplorer.getInstances(input);
+    }),
+
+  getProcessInstance: protectedProcedure
+    .use(opsViewPermission)
+    .input(
+      z.object({
+        processName: z.string().min(1).max(200),
+        projectId: z.string().min(1).max(200),
+        processKey: z.string().min(1).max(500),
+      }),
+    )
+    .query(async ({ input }) => {
+      return requireOps().managerExplorer.getInstanceDetail({ ref: input });
+    }),
+
+  listProcessOutbox: protectedProcedure
+    .use(opsViewPermission)
+    .input(
+      z.object({
+        processName: z.string().min(1).max(200),
+        projectId: z.string().min(1).max(200),
+        processKey: z.string().min(1).max(500),
+        page: z.number().int().min(1).default(1),
+        pageSize: z.number().int().min(1).max(100).default(20),
+      }),
+    )
+    .query(async ({ input }) => {
+      const { page, pageSize, ...ref } = input;
+      return requireOps().managerExplorer.getOutbox({ ref, page, pageSize });
+    }),
+
+  listProcessActions: protectedProcedure
+    .use(opsViewPermission)
+    .input(z.object({ limit: z.number().int().min(1).max(100).default(20) }))
+    .query(async ({ input }) => {
+      return requireOps().managerExplorer.listRecentActions(input);
+    }),
+
+  processWakeNow: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        processName: z.string().min(1).max(200),
+        projectId: z.string().min(1).max(200),
+        processKey: z.string().min(1).max(500),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      return requireOps().managerExplorer.wakeNow({
+        ref: input,
+        actorUserId: ctx.session.user.id,
+      });
+    }),
+
+  processRedriveDeadInstance: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        processName: z.string().min(1).max(200),
+        projectId: z.string().min(1).max(200),
+        processKey: z.string().min(1).max(500),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      return requireOps().managerExplorer.redriveDeadInstance({
+        ref: input,
+        actorUserId: ctx.session.user.id,
+      });
+    }),
+
+  processRedriveDeadMessage: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        processName: z.string().min(1).max(200),
+        projectId: z.string().min(1).max(200),
+        processKey: z.string().min(1).max(500),
+        messageId: z.string().min(1).max(64),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { messageId, ...ref } = input;
+      return requireOps().managerExplorer.redriveDeadMessage({
+        ref,
+        messageId,
+        actorUserId: ctx.session.user.id,
+      });
+    }),
+
+  processReleaseLapsedLease: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        processName: z.string().min(1).max(200),
+        projectId: z.string().min(1).max(200),
+        processKey: z.string().min(1).max(500),
+        messageId: z.string().min(1).max(64),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { messageId, ...ref } = input;
+      return requireOps().managerExplorer.releaseLapsedLease({
+        ref,
+        messageId,
+        actorUserId: ctx.session.user.id,
+      });
+    }),
+
   discoverAggregates: protectedProcedure
     .use(opsViewPermission)
     .input(

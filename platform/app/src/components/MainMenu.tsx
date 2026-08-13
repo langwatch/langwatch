@@ -8,6 +8,7 @@ import {
   Flag,
   History,
   Shield,
+  Workflow,
 } from "lucide-react";
 import React, { useState } from "react";
 import type { Project } from "~/generated/prisma/client";
@@ -404,6 +405,13 @@ const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
         label="Scheduler"
         href="/ops/scheduler"
         isActive={router.pathname.startsWith("/ops/scheduler")}
+        showLabel={showExpanded}
+      />
+      <SideMenuLink
+        icon={Workflow}
+        label="Processes"
+        href="/ops/processes"
+        isActive={router.pathname.startsWith("/ops/processes")}
         showLabel={showExpanded}
       />
       <SideMenuLink

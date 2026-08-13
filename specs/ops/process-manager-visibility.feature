@@ -1,7 +1,6 @@
-# Plan: dev/docs/ops-process-manager-visibility-plan.md — nothing here is
-# built yet. Every scenario is @unimplemented on purpose: this file marks the
-# contract the plan proposes, and each scenario graduates to a binding tag
-# (@unit/@integration) as its slice lands.
+# Plan: dev/docs/ops-process-manager-visibility-plan.md. Phase 1 (read-only
+# fleet + instance drawer) and the phase-2 safe actions are built; the
+# remaining @unimplemented scenarios are phase 3 (signals/alerting).
 
 Feature: Process-manager visibility in ops
   As an operator during an incident
@@ -9,61 +8,78 @@ Feature: Process-manager visibility in ops
   So that a dead intent or a starved wake is seen before a customer reports its symptom
 
   Context: eight pipelines run durable processes through the ADR-049
-  substrate, and none of it is visible under /ops. A dead outbox message is
+  substrate, and none of it was visible under /ops. A dead outbox message is
   an effect that silently never happened; an overdue wake is a process
-  frozen mid-flow; today both are found with psql or not at all.
+  frozen mid-flow; both were found with psql or not at all.
 
   Background:
     Given an operator is viewing the processes page
 
-  # ── Read-only surface (phase 1) ───────────────────────────────────────
+  # ── Read-only surface ─────────────────────────────────────────────────
 
-  @unimplemented
+  @unit
   Scenario: Each process name reports its trouble counts on one row
     Given processes with pending, lapsed, and dead outbox messages
-    When the processes table renders
-    Then each process name shows instance, overdue-wake, pending, lapsed, and dead counts
-    And rows with trouble sort above healthy ones
+    When the fleet is summarized
+    Then each process name carries instance, overdue-wake, pending, lapsed, and dead counts
+    And names with trouble sort above healthy ones
 
-  @unimplemented
+  @unit
   Scenario: Dead intents are impossible to miss
     Given a process name with dead outbox messages
-    When the page renders
-    Then the dead count is presented as a failure demanding action
-    And it links to the messages themselves
+    When the fleet table renders
+    Then the dead count is presented as a failure
+    And the row leads to the instances that hold them
 
-  @unimplemented
+  @unit
   Scenario: A lapsed lease does not accuse a live dispatcher
     Given a pending message whose lease expired
-    When it is listed
-    Then it reads as "dispatcher died or still delivering", not as a confirmed death
+    When its card renders
+    Then it reads as dispatcher died or still delivering, not as a confirmed death
 
-  @unimplemented
+  @unit
   Scenario: An instance drawer answers what the process is doing
     Given an operator opens one process instance
     When the drawer renders
-    Then it shows the state structurally with JSON on demand
-    And its outbox messages with status, attempts, and next attempt
-    And each message links to its producing trace via its stored carrier
+    Then it shows the state as JSON alongside revision and next wake
+    And its outbox messages with intent type, status, attempts, and next attempt
+    And a message with a stored carrier links to its producing trace
 
-  @unimplemented
+  @unit
   Scenario: Overdue wakes are surfaced with their age
-    Given instances whose next wake is long past due
-    When the page renders
-    Then each is listed with how long overdue the wake is
+    Given an instance whose next wake is long past due
+    When its wake is described
+    Then it reads as due with how long ago, never as a bare countdown
 
-  # ── Actions (phase 2) ─────────────────────────────────────────────────
+  # ── Actions ───────────────────────────────────────────────────────────
 
-  @unimplemented
+  @integration
   Scenario: An operator wakes a stuck process now
-    Given an instance with an overdue wake
-    When the operator confirms the wake-now action
-    Then the instance's next wake is set to now
-    And the action lands in the ops audit trail
+    Given an instance with a far-future wake
+    When the operator triggers wake now
+    Then the instance's next wake is now
+    And the action lands in the audit trail with the previous wake time
 
-  @unimplemented
-  Scenario: A dead message is redriven, idempotently
+  @integration
+  Scenario: A dead message is redriven, once
     Given a dead outbox message
-    When the operator confirms the redrive
-    Then it returns to pending with an immediate next attempt
-    And a duplicate delivery is absorbed by the message key
+    When the operator redrives it
+    Then it returns to pending with an immediate next attempt and a fresh budget
+    And redriving it again is a no-op
+    And the redrive lands in the audit trail
+
+  # ── Signals ───────────────────────────────────────────────────────────
+
+  @unit
+  Scenario: The fleet's trouble counts reach Prometheus
+    Given dead messages and overdue wakes exist
+    When the metrics endpoint is scraped
+    Then gauges report dead messages and overdue wakes per process name
+    And each gauge states it must be aggregated with max across pods
+
+  @unit
+  Scenario: An operator releases a lapsed lease knowingly
+    Given a pending message whose lease expired
+    When the operator releases the lease
+    Then the message becomes due immediately
+    And a live lease cannot be released from under its delivery
