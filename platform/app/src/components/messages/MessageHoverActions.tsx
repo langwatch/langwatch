@@ -5,7 +5,6 @@ import { useState } from "react";
 import { Edit } from "react-feather";
 import { AnnotationPopover } from "~/features/traces-v2/components/TraceDrawer/conversationView/AnnotationPopover";
 import { shouldShowGenericTranslateError } from "~/features/traces-v2/utils/translationError";
-import { useDrawer } from "~/hooks/useDrawer";
 import { useTraceDetailsDrawer } from "~/hooks/useTraceDetailsDrawer";
 import { stringifyIfObject } from "~/utils/stringifyIfObject";
 import { useAnnotationCommentStore } from "../../hooks/useAnnotationCommentStore";
@@ -144,7 +143,6 @@ export const MessageHoverActions = ({
   const { setCommentState } = useAnnotationCommentStore();
   const [isSuggestingCorrection, setIsSuggestingCorrection] = useState(false);
 
-  const { drawerOpen } = useDrawer();
   const { openTraceDetailsDrawer } = useTraceDetailsDrawer();
 
   return (
@@ -159,16 +157,7 @@ export const MessageHoverActions = ({
           tooltipContent="View Trace"
           onClick={() => {
             if (!trace) return;
-            if (drawerOpen("traceDetails")) {
-              openTraceDetailsDrawer({
-                traceId: trace.trace_id,
-                selectedTab: "traceDetails",
-              });
-            } else {
-              openTraceDetailsDrawer({
-                traceId: trace.trace_id,
-              });
-            }
+            openTraceDetailsDrawer({ traceId: trace.trace_id });
           }}
         >
           <Bug size={"20px"} />

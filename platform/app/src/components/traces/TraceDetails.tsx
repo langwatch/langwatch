@@ -9,7 +9,6 @@ import {
 } from "@chakra-ui/react";
 import qs from "qs";
 import { useCallback, useEffect, useState } from "react";
-import { Maximize2, Minimize2 } from "react-feather";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useRouter } from "~/utils/compat/next-router";
 import { useAnnotationCommentStore } from "../../hooks/useAnnotationCommentStore";
@@ -20,7 +19,6 @@ import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import { api } from "../../utils/api";
 import { AddAnnotationQueueDrawer } from "../AddAnnotationQueueDrawer";
 import { Conversation } from "../messages/Conversation";
-import { Drawer } from "../ui/drawer";
 import { Link } from "../ui/link";
 import { Popover } from "../ui/popover";
 import { toaster } from "../ui/toaster";
@@ -40,9 +38,7 @@ import { TraceSummary } from "./Summary";
 export function TraceDetails(props: {
   traceId: string;
   selectedTab?: string;
-  traceView?: "span" | "full";
   showMessages?: boolean;
-  onToggleView?: () => void;
 }) {
   const { project, hasPermission } = useOrganizationTeamProject();
   const dejaView = useDejaViewLink({
@@ -328,26 +324,6 @@ export function TraceDetails(props: {
                     DejaView
                   </Button>
                 </Link>
-              )}
-              {props.onToggleView && (
-                <>
-                  <Button data-scope="header" colorPalette="gray">
-                    {props.traceView === "span" ? (
-                      <Maximize2
-                        size={16}
-                        onClick={props.onToggleView}
-                        cursor={"pointer"}
-                      />
-                    ) : (
-                      <Minimize2
-                        size={16}
-                        onClick={props.onToggleView}
-                        cursor={"pointer"}
-                      />
-                    )}
-                  </Button>
-                  <Drawer.CloseTrigger />
-                </>
               )}
             </HStack>
           </HStack>

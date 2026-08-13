@@ -40,9 +40,11 @@ describe("routeTraceDrawerForV2()", () => {
     });
   });
 
+  // There is nothing to route to without an id, so the request passes through
+  // to the legacy name and its redirect dismisses the drawer — covered by
+  // LegacyTraceDrawerRedirect's own test.
   describe("when opening a trace's details without a trace id", () => {
-    /** @scenario "A trace request without a trace id is left on the legacy drawer" */
-    it("leaves it on the legacy drawer", () => {
+    it("passes the request through untouched", () => {
       const props = { selectedTab: "traceDetails" };
 
       const routed = routeTraceDrawerForV2("traceDetails", props);

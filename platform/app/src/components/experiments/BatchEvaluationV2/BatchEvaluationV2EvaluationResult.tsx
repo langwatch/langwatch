@@ -331,10 +331,7 @@ export function BatchEvaluationV2EvaluationResult({
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  openDrawer("traceDetails", {
-                    traceId,
-                    selectedTab: "traceDetails",
-                  });
+                  openDrawer("traceV2Details", { traceId });
                 }}
               >
                 View

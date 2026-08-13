@@ -12,10 +12,12 @@ import type { DrawerType } from "../components/drawerRegistry";
  * open; every other drawer — and a trace open with no id — passes through
  * untouched.
  *
- * There is no longer an exception: the legacy Traces page, which used to keep
- * the legacy drawer so that view stayed coherent, has been removed. The legacy
- * drawer is still registered so a link shared before the change (one naming
- * `drawer.open=traceDetails` outright) resolves, but nothing routes to it.
+ * Both legacy surfaces are gone — the Traces page and the drawer it opened —
+ * and every call site now names `traceV2Details` outright. This stays as the
+ * funnel it always was: a `traceDetails` open reaching `openDrawer` from
+ * anywhere lands on the Trace Explorer drawer directly, rather than on the
+ * redirect that serves links naming the old drawer in the address bar. Those
+ * links have to round-trip through the URL; a call in code does not.
  *
  * Kept pure (the only import is a type) so the branch logic is testable
  * without touching a router or the drawer component registry.

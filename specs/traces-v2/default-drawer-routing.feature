@@ -1,8 +1,8 @@
 # Trace Explorer default routing — Gherkin Spec
 # Implementation: platform/app/src/hooks/useDrawer.ts (routeTraceDrawerForV2 +
 # the openDrawer interception), the legacy path redirects under
-# platform/app/src/pages/[project]/messages/, and the legacy deprecation
-# banner in platform/app/src/components/LegacyTracesDeprecationBanner.tsx
+# platform/app/src/pages/[project]/messages/, and the legacy drawer redirect
+# in platform/app/src/components/LegacyTraceDrawerRedirect.tsx
 #
 # The Trace Explorer is the default trace experience. The former per-device
 # opt-in is gone: every request to open a trace's details (no matter which
@@ -10,10 +10,15 @@
 # bar, a feedback row) goes through the same open-drawer call, which routes to
 # the Trace Explorer drawer.
 #
-# The legacy Traces page has been removed. Its path survives only as a
-# redirect, so old bookmarks and shared links keep working. The legacy trace
-# drawer is still registered, because links shared before the change name it
-# explicitly, and it warns that it is going away.
+# Both legacy surfaces are gone. The legacy Traces page path survives as a
+# redirect to the Trace Explorer, and the legacy trace drawer name survives as
+# a redirect to the Trace Explorer drawer — links shared before the change name
+# `drawer.open=traceDetails` outright, and the drawer shell is resolved straight
+# from the address, so the name has to keep resolving to something.
+#
+# The trace DETAIL view those links used to render is not gone: the simulation
+# run drawer renders the same component, so removing the legacy drawer removes
+# the drawer shell around it, not the view.
 
 Feature: Trace Explorer is the default trace experience from every entry point
   As an operator viewing traces
@@ -60,13 +65,38 @@ Feature: Trace Explorer is the default trace experience from every entry point
       When I look at the project sidebar
       Then Trace Explorer is the only traces entry
 
-  Rule: The legacy trace drawer stays reachable for links that name it
+  Rule: The legacy trace drawer is gone and links naming it redirect
 
     @integration
-    Scenario: The legacy trace drawer warns that it is going away
+    Scenario: A link naming the legacy trace drawer opens the Trace Explorer drawer
       Given I opened a link that names the legacy trace drawer
-      Then the legacy drawer shows a notice that this view is going away soon
-      And the notice can open the same trace in the Trace Explorer
+      Then the Trace Explorer drawer opens for that trace
+      And the legacy trace view is not rendered
+
+    # The Trace Explorer drawer is mounted on every page, so there is no reason
+    # to move the reader to the traces list to show them the trace they asked
+    # for. A legacy drawer link opened from an annotation queue stays there.
+    @integration
+    Scenario: The redirect leaves the reader on the page the link was opened on
+      Given I am on a page that is not the Trace Explorer
+      When I open a link that names the legacy trace drawer
+      Then the Trace Explorer drawer opens for that trace
+      And I am still on the page I opened the link on
+
+    @integration
+    Scenario: A legacy drawer link naming a span keeps the span selected
+      Given I opened a link that names the legacy trace drawer and a span
+      Then the Trace Explorer drawer opens for that trace
+      And the linked span is selected
+
+    # Replacing rather than pushing: a pushed redirect puts the legacy address
+    # in history, so going back would land on it and be redirected forward
+    # again, trapping the reader.
+    @integration
+    Scenario: Going back from a redirected legacy link does not return to it
+      Given I opened a link that names the legacy trace drawer
+      When I close the Trace Explorer drawer
+      Then the legacy drawer does not reopen
 
   Rule: Non-trace drawers and incomplete requests are never rerouted
 
@@ -75,10 +105,12 @@ Feature: Trace Explorer is the default trace experience from every entry point
       When a screen opens a drawer that is not a trace drawer
       Then that drawer opens unchanged
 
+    # There is nothing to show and nothing to redirect to, so the drawer is
+    # dismissed rather than left as an empty shell the reader has to close.
     @integration
-    Scenario: A trace request without a trace id is left on the legacy drawer
+    Scenario: A trace request without a trace id opens no drawer
       When a screen requests the trace drawer without a trace id
-      Then the legacy trace drawer opens
+      Then no trace drawer is left open
 
   Rule: Old trace links land on the Trace Explorer
 

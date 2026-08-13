@@ -184,7 +184,7 @@ export function handleRecentItemSelect(
     const traceId = lastSegment.split("?")[0]?.split("#")[0];
     if (traceId) {
       ctx.close();
-      openDrawer("traceDetails", { traceId });
+      openDrawer("traceV2Details", { traceId });
     }
   } else {
     navigate(item.path);

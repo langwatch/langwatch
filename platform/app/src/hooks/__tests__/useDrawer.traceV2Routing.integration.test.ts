@@ -59,14 +59,16 @@ describe("openDrawer Trace Explorer default routing", () => {
     });
 
     describe("when opening a trace from the evaluation results View action", () => {
-      it("routes to the Trace Explorer and drops the legacy-only tab param", () => {
+      it("routes to the Trace Explorer drawer", () => {
         const { result } = renderHook(() => useDrawer());
 
-        // Mirrors the exact payload the eval results "View" button sends.
+        // Mirrors the payload the eval results "View" button sends. The
+        // legacy-only `selectedTab` it used to carry is gone from the call
+        // site AND from the type; that the funnel drops any such leftover is
+        // covered in traceDrawerV2Routing.unit.test.ts, which can pass one.
         act(() => {
-          result.current.openDrawer("traceDetails", {
+          result.current.openDrawer("traceV2Details", {
             traceId: "trace-eval",
-            selectedTab: "traceDetails",
           });
         });
 

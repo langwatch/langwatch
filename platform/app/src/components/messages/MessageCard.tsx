@@ -109,12 +109,7 @@ export function MessageCard({
           position="relative"
           zIndex="popover"
           borderRadius="full"
-          onClick={() =>
-            openTraceDetailsDrawer({
-              traceId: trace.trace_id,
-              selectedTab: "annotations",
-            })
-          }
+          onClick={() => openTraceDetailsDrawer({ traceId: trace.trace_id })}
         >
           <Tag.Label>
             <HStack>
@@ -146,10 +141,7 @@ export function MessageCard({
       onClick={(e) => {
         if (!linkActive) e.preventDefault();
         if (linkActive) {
-          openTraceDetailsDrawer({
-            traceId: trace.trace_id,
-            selectedTab: "messages",
-          });
+          openTraceDetailsDrawer({ traceId: trace.trace_id });
         }
       }}
     >
