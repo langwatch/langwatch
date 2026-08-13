@@ -4,6 +4,11 @@ import { prisma } from "../db";
 import { _getSharedClickHouseClient } from "./client";
 import { createManagedClickHouseClient } from "./managedClient";
 import { unregisterClickHouseLimiter } from "./metrics";
+import {
+  PRIVATE_CH_ENV_PREFIX,
+  type PrivateRoute,
+  parseRouteKey,
+} from "./privateRouteKey";
 
 const logger = createLogger("langwatch:clickhouse:routing");
 
@@ -23,18 +28,9 @@ export type ClickHouseClientResolver = (
 ) => Promise<ClickHouseClient>;
 
 /**
- * Env var format: CLICKHOUSE_URL__<label>__<orgId>=<connectionUrl>
+ * Map of orgId → route, parsed from env vars at module load. The format and its
+ * parsing live in `./privateRouteKey`.
  *
- * The <label> is a human-readable customer name (e.g., "acme"), ignored by code.
- * The <orgId> is the organization ID used for routing.
- *
- * Example:
- *   CLICKHOUSE_URL__acme__dv0uZFgPfenFvzg2qKNQa=http://default:pass@acme-ch:8123/langwatch
- */
-const PRIVATE_CH_ENV_PREFIX = "CLICKHOUSE_URL__";
-
-/**
- * Map of orgId → connectionUrl, parsed from env vars at module load.
  * Zero runtime overhead — no DB queries, no decryption.
  */
 const privateClickHouseUrls = parsePrivateEnvVars(
@@ -45,8 +41,8 @@ const privateClickHouseUrls = parsePrivateEnvVars(
 function parsePrivateEnvVars(
   prefix: string,
   label: string,
-): Map<string, string> {
-  const map = new Map<string, string>();
+): Map<string, PrivateRoute & { url: string }> {
+  const map = new Map<string, PrivateRoute & { url: string }>();
   for (const [key, value] of Object.entries(process.env)) {
     if (!key.startsWith(prefix)) continue;
 
@@ -58,13 +54,9 @@ function parsePrivateEnvVars(
       continue;
     }
 
-    // Format: <PREFIX><label>__<orgId>
-    // Strip prefix, then take the last segment after "__" as orgId
-    const suffix = key.slice(prefix.length);
-    const lastSep = suffix.lastIndexOf("__");
-    const orgId = lastSep >= 0 ? suffix.slice(lastSep + 2) : suffix;
-
-    if (!orgId) continue;
+    const parsed = parseRouteKey({ key, prefix });
+    if (!parsed) continue;
+    const { orgId, cluster } = parsed;
 
     if (map.has(orgId)) {
       throw new Error(
@@ -72,9 +64,9 @@ function parsePrivateEnvVars(
       );
     }
 
-    map.set(orgId, value);
+    map.set(orgId, { cluster, url: value });
     logger.info(
-      { orgId, envVar: key },
+      { orgId, cluster, envVar: key },
       `Loaded private ${label} URL from env var`,
     );
   }
@@ -127,8 +119,8 @@ export async function getClickHouseClientForProject(
 export async function getClickHouseClientForOrganization(
   organizationId: string,
 ): Promise<ClickHouseClient> {
-  const privateUrl = privateClickHouseUrls.get(organizationId);
-  if (!privateUrl) {
+  const route = privateClickHouseUrls.get(organizationId);
+  if (!route) {
     const shared = _getSharedClickHouseClient();
     if (!shared) {
       throw new Error(
@@ -139,7 +131,7 @@ export async function getClickHouseClientForOrganization(
     return shared;
   }
 
-  return getOrCreateCustomClient(organizationId, privateUrl);
+  return getOrCreateCustomClient(organizationId, route);
 }
 
 /**
@@ -163,18 +155,20 @@ export async function getAllClickHouseInstances(): Promise<
   }
 
   const seenUrls = new Set<string>();
-  for (const [orgId, url] of privateClickHouseUrls) {
-    if (seenUrls.has(url)) {
+  for (const [orgId, route] of privateClickHouseUrls) {
+    if (seenUrls.has(route.url)) {
+      // The cluster name, never the URL: a private ClickHouse URL embeds
+      // `user:password@host`, and this line put it in the log sink verbatim.
       logger.info(
-        { orgId, url },
+        { orgId, cluster: route.cluster },
         "Skipping duplicate private ClickHouse URL (already included for another org)",
       );
       continue;
     }
-    seenUrls.add(url);
+    seenUrls.add(route.url);
     instances.push({
       target: orgId,
-      client: getOrCreateCustomClient(orgId, url),
+      client: getOrCreateCustomClient(orgId, route),
     });
   }
 
@@ -200,7 +194,7 @@ export { _getSharedClickHouseClient as getSharedClickHouseClient } from "./clien
  */
 function getOrCreateCustomClient(
   organizationId: string,
-  url: string,
+  route: PrivateRoute & { url: string },
 ): ClickHouseClient {
   const cached = customClientCache.get(organizationId);
   if (cached) {
@@ -213,8 +207,9 @@ function getOrCreateCustomClient(
   // server than the shared one, so it is the last place that should have had
   // the weaker limits.
   const client = createManagedClickHouseClient({
-    url,
+    url: route.url,
     instance: organizationId,
+    cluster: route.cluster,
   });
   customClientCache.set(organizationId, client);
   return client;

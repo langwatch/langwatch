@@ -160,11 +160,13 @@ function logFailure({
   error,
   durationMs,
   params,
+  cluster,
 }: {
   operation: "query" | "insert";
   error: unknown;
   durationMs: number;
   params: unknown;
+  cluster: string;
 }): void {
   try {
     const meta = safeQueryMeta(params);
@@ -172,6 +174,14 @@ function logFailure({
     queryLogger.warn(
       {
         source: "clickhouse",
+        // Which ClickHouse refused it. Not every deployment has one cluster:
+        // an organization can be routed to its own, so without this field a
+        // rejection from a customer's dedicated instance is indistinguishable
+        // from one on the shared cluster. On 2026-08-13 that ambiguity is what
+        // made a three-hour saturation take an afternoon to attribute — the
+        // answer had to be inferred from a concurrency limit quoted in the
+        // vendor's error text and matched against terraform.
+        cluster,
         operation,
         durationMs: Math.round(durationMs),
         queryId: meta.queryId,
@@ -315,10 +325,12 @@ function guardInbandException<
   result,
   startMs,
   params,
+  cluster,
 }: {
   result: T;
   startMs: number;
   params: unknown;
+  cluster: string;
 }): T {
   if (typeof result?.json !== "function") return result;
   const queryType = extractQueryType(params);
@@ -330,7 +342,7 @@ function guardInbandException<
       if (exception !== undefined) {
         const durationMs = performance.now() - startMs;
         const error = inbandExceptionError({ message: exception, durationMs });
-        logFailure({ operation: "query", error, durationMs, params });
+        logFailure({ operation: "query", error, durationMs, params, cluster });
         // Dedicated outcome, and no second duration sample: the transport
         // outcome (success + one histogram observation) was already
         // recorded when the query resolved. Counting this as "error" too
@@ -375,11 +387,17 @@ function guardInbandException<
  */
 export function createResilientClickHouseClient({
   client,
+  cluster = "shared",
   maxRetries = 3,
   baseDelayMs = 500,
   maxDelayMs = 10_000,
 }: {
   client: ClickHouseClient;
+  /**
+   * Which ClickHouse this client talks to, stamped on every failure line.
+   * Defaults to "shared" because that is what a caller naming nothing has.
+   */
+  cluster?: string;
   maxRetries?: number;
   baseDelayMs?: number;
   maxDelayMs?: number;
@@ -399,10 +417,10 @@ export function createResilientClickHouseClient({
       logSuccess({ operation: "query", durationMs, params });
       observeClickHouseQueryDuration(queryType, table, durationMs / 1000);
       incrementClickHouseQueryCount(queryType, "success");
-      return guardInbandException({ result, startMs: start, params });
+      return guardInbandException({ result, startMs: start, params, cluster });
     } catch (error) {
       const durationMs = performance.now() - start;
-      logFailure({ operation: "query", error, durationMs, params });
+      logFailure({ operation: "query", error, durationMs, params, cluster });
       observeClickHouseQueryDuration(queryType, table, durationMs / 1000);
       incrementClickHouseQueryCount(queryType, "error");
       // Retries are exhausted at this point: translate known ClickHouse
@@ -429,7 +447,7 @@ export function createResilientClickHouseClient({
       return result;
     } catch (error) {
       const durationMs = performance.now() - start;
-      logFailure({ operation: "insert", error, durationMs, params });
+      logFailure({ operation: "insert", error, durationMs, params, cluster });
       observeClickHouseQueryDuration("INSERT", insertTable, durationMs / 1000);
       incrementClickHouseQueryCount("INSERT", "error");
       throw error;

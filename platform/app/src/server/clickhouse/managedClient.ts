@@ -58,6 +58,7 @@ export const CLICKHOUSE_REQUEST_TIMEOUT_MS = 30_000;
 export function createManagedClickHouseClient({
   url,
   instance,
+  cluster = instance,
 }: {
   /** Connection URL. Passed through as a string if it will not parse. */
   url: string;
@@ -66,6 +67,17 @@ export function createManagedClickHouseClient({
    * private instance. Not the URL - that carries credentials.
    */
   instance: string;
+  /**
+   * Human name of the cluster this client talks to, for the LOGS: "shared", or
+   * the label from `CLICKHOUSE_URL__<label>__<orgId>`.
+   *
+   * Deliberately separate from `instance` rather than replacing it. `instance`
+   * is a metrics label, and repointing it would move every existing series and
+   * break the dashboards built on them; this only has to be readable by a
+   * person looking at one error line. Defaults to `instance` so a caller with
+   * no better name still gets a populated field rather than an absent one.
+   */
+  cluster?: string;
 }): ResilientClickHouseClient {
   let parsedUrl: URL | string = url;
   try {
@@ -106,7 +118,7 @@ export function createManagedClickHouseClient({
 
   return wrapWithDefaultSettings(
     withStatementLimit({
-      client: createResilientClickHouseClient({ client: raw }),
+      client: createResilientClickHouseClient({ client: raw, cluster }),
       // The pool size, so this bounds where the pool used to and capacity is
       // unchanged. The difference is that the queue in front of it is finite,
       // timed and counted.
