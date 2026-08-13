@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("~/server/app-layer/app", () => ({
   getApp: vi.fn(),
+  // Reached through the TtlCache these paths read; null keeps it in-memory.
+  tryGetApp: () => null,
 }));
 
 vi.mock("@langwatch/observability", () => ({

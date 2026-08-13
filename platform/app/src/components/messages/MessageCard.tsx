@@ -10,7 +10,6 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import type { Project } from "@prisma/client";
 import numeral from "numeral";
 import {
   CheckCircle,
@@ -21,6 +20,7 @@ import {
   Shield,
   XCircle,
 } from "react-feather";
+import type { Project } from "~/generated/prisma/client";
 import { useTraceDetailsDrawer } from "~/hooks/useTraceDetailsDrawer";
 import type {
   ElasticSearchEvaluation,

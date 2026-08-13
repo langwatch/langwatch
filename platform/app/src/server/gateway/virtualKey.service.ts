@@ -12,16 +12,16 @@
  */
 
 import { emitVkLifecycle } from "@ee/governance/services/governanceSignals.service";
+import { TRPCError } from "@trpc/server";
+import { randomBytes } from "crypto";
+import { z } from "zod";
 import type {
   GatewayBudget,
   Prisma,
   PrismaClient,
   VirtualKey,
   VirtualKeyRoutingMode,
-} from "@prisma/client";
-import { TRPCError } from "@trpc/server";
-import { randomBytes } from "crypto";
-import { z } from "zod";
+} from "~/generated/prisma/client";
 import { GatewayAuditAdapter } from "./auditLog.repository";
 import { serializeRowForAudit } from "./auditSerializer";
 import { nextResetAt } from "./budgetWindow";

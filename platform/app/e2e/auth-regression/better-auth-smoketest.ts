@@ -27,8 +27,9 @@
  *     npx tsx scripts/better-auth-smoketest.ts
  */
 
-import { PrismaClient } from "@prisma/client";
 import { hash } from "bcrypt";
+import { PrismaClient } from "../../src/generated/prisma/client";
+import { createPrismaPgAdapter } from "../../src/server/prismaPgAdapter";
 import { assertLocalhostDatabaseUrl } from "./_smoketest-guard";
 
 const check = (label: string, condition: boolean, detail?: string): void => {
@@ -67,7 +68,9 @@ const parseSetCookie = (
 async function main() {
   assertLocalhostDatabaseUrl();
 
-  const prisma = new PrismaClient();
+  const prisma = new PrismaClient({
+    adapter: createPrismaPgAdapter(process.env.DATABASE_URL ?? ""),
+  });
 
   // Clean up any prior smoketest runs so the script is idempotent.
   await prisma.session.deleteMany({

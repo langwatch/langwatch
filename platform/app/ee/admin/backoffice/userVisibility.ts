@@ -1,4 +1,9 @@
-import type { Organization, Project, Team, User } from "@prisma/client";
+import type {
+  Organization,
+  Project,
+  Team,
+  User,
+} from "~/generated/prisma/client";
 
 /**
  * Prisma `include` shape used by the Backoffice Users list to resolve every

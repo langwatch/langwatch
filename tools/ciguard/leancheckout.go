@@ -18,6 +18,9 @@ var LeanCheckoutWorkflows = []string{
 	// that timeout mid-clone, at 297-298s in checkout against a 22.8s average
 	// for the runs that finished.
 	".github/workflows/migration-order.yml",
+	// readme-links builds the checker from source, so it takes a working tree
+	// — and the media is the one part of it no link check ever opens.
+	".github/workflows/readme-links.yml",
 }
 
 // RequiredExclusions are the repository's marketing media: 165 MB of .gif and

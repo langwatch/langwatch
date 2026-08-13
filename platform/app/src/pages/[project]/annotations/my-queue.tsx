@@ -219,7 +219,7 @@ export default function TraceAnnotations() {
     allQueueItems: true,
   });
   const { project, hasPermission } = useOrganizationTeamProject();
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
   const { openDrawer, drawerOpen } = useDrawer();
 
   const pendingQueueItems = useMemo(
@@ -285,13 +285,13 @@ export default function TraceAnnotations() {
   // here for, so once the read has settled on nothing the trace is handed over
   // as the single turn instead.
   // The read keeps the previous thread's turns while the next one loads, so
-  // `isPreviousData` is what tells "this thread holds nothing" apart from
+  // `isPlaceholderData` is what tells "this thread holds nothing" apart from
   // "these turns belong to the item before this one".
   const conversationTurns = useConversationTurns(conversationId);
   const threadResolvedEmpty =
     !!conversationId &&
     !conversationTurns.isLoading &&
-    !conversationTurns.isPreviousData &&
+    !conversationTurns.isPlaceholderData &&
     (conversationTurns.data?.items.length ?? 0) === 0;
 
   // A trace that belongs to no thread has no conversation to query, so it is
@@ -496,7 +496,7 @@ export default function TraceAnnotations() {
             <UnavailableTraceCard
               canRemove={hasPermission("annotations:update")}
               canSkip={!!nextPendingItemId}
-              isRemoving={deleteQueueItems.isLoading}
+              isRemoving={deleteQueueItems.isPending}
               onRemove={removeCurrentItemFromQueue}
               onSkip={() => void advanceToNextItem()}
             />
@@ -546,7 +546,7 @@ export default function TraceAnnotations() {
               queueItems={pendingQueueItems}
               currentQueueItem={currentQueueItem}
               isTraceAvailable={!!currentQueueItem.trace}
-              isFinishing={markQueueItemDone.isLoading}
+              isFinishing={markQueueItemDone.isPending}
               sessionCount={sessionIds.length}
               handoffWanted={handoffWanted}
               onHandoffWantedChange={setHandoffWanted}

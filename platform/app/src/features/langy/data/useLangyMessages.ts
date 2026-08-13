@@ -1,4 +1,5 @@
 import type { LangyEventCursor } from "@langwatch/langy";
+import { keepPreviousData } from "@tanstack/react-query";
 import { useEffect } from "react";
 
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -100,12 +101,8 @@ export function useLangyMessages(
       enabled: !!project?.id && !!conversationId,
       staleTime: 30_000,
       refetchOnWindowFocus: false,
-      keepPreviousData: true,
-      // Wrapped, not passed by reference: handing the helper straight to
-      // react-query lets its narrow `{ isTurnInFlight }` param type win the
-      // inference for the query's TData, collapsing `query.data` to that shape
-      // (CI typecheck caught it). The arrow keeps `data` contextually typed.
-      refetchInterval: (data) => langyMessagesPollInterval(data),
+      placeholderData: keepPreviousData,
+      refetchInterval: (query) => langyMessagesPollInterval(query.state.data),
     },
   );
 

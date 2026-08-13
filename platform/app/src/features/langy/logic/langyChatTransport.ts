@@ -112,33 +112,12 @@ export function createLangyChatTransport(
         ...(ctx.skills?.length ? { skills: ctx.skills } : {}),
       };
 
-      // The vanilla client's proxy inference collapses on this router (see
-      // api.tsx / the onTurnStream call below), so invoke the mutation by dotted
-      // path and cast — the same escape hatch the subscription path uses.
-      //
-      // The call MUST stay attached to `trpcClient`. `TRPCUntypedClient.mutation`
-      // runs `this.requestAsPromise(...)`, so a detached `const mutate =
-      // trpcClient.mutation` drops `this` and throws "Cannot read properties of
-      // undefined (reading 'requestAsPromise')" synchronously — before any
-      // request leaves the browser. The arrow keeps the property access inline
-      // (like the api.tsx sibling and the onTurnStream call below), so `this` is
-      // bound to the client.
-      const mutate = (
-        path: string,
-        input: unknown,
-      ): Promise<StartTurnResponse> =>
-        (
-          trpcClient.mutation as (
-            path: string,
-            input: unknown,
-          ) => Promise<StartTurnResponse>
-        )(path, input);
-      const { conversationId, turnId } = ctx.conversationId
-        ? await mutate("langy.continueConversation", {
+      const { conversationId, turnId }: StartTurnResponse = ctx.conversationId
+        ? await trpcClient.langy.continueConversation.mutate({
             ...turnInput,
             conversationId: ctx.conversationId,
           })
-        : await mutate("langy.createConversation", turnInput);
+        : await trpcClient.langy.createConversation.mutate(turnInput);
       deps.onIds({ conversationId, turnId });
 
       return subscribeTurnStream({
@@ -267,24 +246,10 @@ function subscribeTurnStream({
         }
       };
 
-      // The vanilla client's proxy inference collapses on this router (see
-      // api.tsx), so call the subscription by dotted path and cast — the same
-      // escape hatch the mutation path uses.
-      sub = (
-        trpcClient.subscription as (
-          path: string,
-          input: unknown,
-          opts: {
-            onData: (entry: LangyStreamEntry) => void;
-            onError: (err: unknown) => void;
-            onComplete: () => void;
-          },
-        ) => Unsubscribable
-      )(
-        "langy.onTurnStream",
+      sub = trpcClient.langy.onTurnStream.subscribe(
         { projectId, conversationId, turnId },
         {
-          onData: onEntry,
+          onData: (entry) => onEntry(entry as LangyStreamEntry),
           onError: (err) => {
             if (closed) return;
             controller.enqueue({

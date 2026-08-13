@@ -1,10 +1,10 @@
-import type { PrismaClient } from "@prisma/client";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+} from "~/generated/prisma/client";
 import { createInnerTRPCContext } from "../../trpc";
 import { evaluatorsRouter } from "../evaluators";
 

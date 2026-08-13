@@ -143,21 +143,21 @@ images:
   ## @param images.app.pullPolicy [string] App image pull policy.
   app:
     repository: langwatch/langwatch
-    tag: 3.12.0 # x-release-please-version
+    tag: 3.13.0 # x-release-please-version
     pullPolicy: IfNotPresent
   ## @param images.langwatch_nlp.repository [string] NLP image repository (Go nlpgo binary, published as langwatch_nlp).
   ## @param images.langwatch_nlp.tag [string] NLP image tag.
   ## @param images.langwatch_nlp.pullPolicy [string] NLP image pull policy.
   langwatch_nlp:
     repository: langwatch/langwatch_nlp
-    tag: 3.12.0 # x-release-please-version
+    tag: 3.13.0 # x-release-please-version
     pullPolicy: IfNotPresent
   ## @param images.langevals.repository [string] Langevals image repository.
   ## @param images.langevals.tag [string] Langevals image tag.
   ## @param images.langevals.pullPolicy [string] Langevals image pull policy.
   langevals:
     repository: langwatch/langevals
-    tag: 3.12.0 # x-release-please-version
+    tag: 3.13.0 # x-release-please-version
     pullPolicy: IfNotPresent
 
 # =============================================================================
@@ -401,6 +401,8 @@ app:
           value: ""
           ## @param app.dataplane.providers.azureBlob.container.secretKeyRef [object] Secret ref for the Azure Blob container name.
           secretKeyRef: { name: "", key: "" }
+        ## @param app.dataplane.providers.azureBlob.spoolRetentionConfirmed [boolean] Confirms the container has a lifecycle rule deleting `trace-blobs/spool/` blobs after 3 days. The ADR-022 trace spool refuses to write to Azure until this is true, because a crash between the spool write and its delete is bounded only by that rule and the app cannot verify a management-plane policy with a data-plane key. Leave false unless you have created the policy.
+        spoolRetentionConfirmed: false
         # Optional. Override the blob endpoint for sovereign clouds
         # (*.usgovcloudapi.net, *.chinacloudapi.cn), private endpoints, or an
         # emulator. Defaults to https://{accountName}.blob.core.windows.net.

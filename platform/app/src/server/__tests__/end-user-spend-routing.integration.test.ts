@@ -20,13 +20,13 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import { generate } from "@langwatch/ksuid";
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+} from "~/generated/prisma/client";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
 import { GatewayVirtualKeySpendRepository } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
@@ -34,6 +34,8 @@ import { GatewayVirtualKeySpendRepository } from "~/server/gateway/virtualKeySpe
 // Same environment shims the app-direct suite uses: the billing plan gate
 // and the ClickHouse resolution, both pointed at the test substrate.
 vi.mock("~/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   // Built per call rather than once: the routes now take their ClickHouse
   // repositories from the App, and `chClient` is only assigned once the test
   // containers are up - after this factory runs.
