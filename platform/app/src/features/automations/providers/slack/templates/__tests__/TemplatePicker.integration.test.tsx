@@ -92,11 +92,11 @@ describe("SlackBlockKitTemplatePicker", () => {
       renderPicker();
 
       expect(
-        screen.getByRole("button", { name: /use compact alert template/i }),
+        screen.getByRole("button", { name: /use compact notice template/i }),
       ).toBeInTheDocument();
       expect(
         screen.queryByRole("button", {
-          name: /use alert — compact template/i,
+          name: /use metric — compact template/i,
         }),
       ).not.toBeInTheDocument();
     });
@@ -153,7 +153,7 @@ describe("SlackBlockKitTemplatePicker", () => {
       renderPicker({ deliveryMethod: "webhook" });
 
       expect(
-        screen.getByRole("button", { name: /use compact alert template/i }),
+        screen.getByRole("button", { name: /use compact notice template/i }),
       ).toBeEnabled();
     });
   });
@@ -178,27 +178,27 @@ describe("SlackBlockKitTemplatePicker", () => {
       renderPicker({ kind: "graphAlert" });
 
       expect(
-        screen.getByRole("button", { name: /use alert — compact template/i }),
+        screen.getByRole("button", { name: /use metric — compact template/i }),
       ).toBeInTheDocument();
       expect(
-        screen.getByRole("button", { name: /use alert — detailed template/i }),
+        screen.getByRole("button", { name: /use metric — detailed template/i }),
       ).toBeInTheDocument();
       expect(
         screen.getByRole("button", { name: /use one-liner template/i }),
       ).toBeInTheDocument();
       expect(
-        screen.queryByRole("button", { name: /use compact alert template/i }),
+        screen.queryByRole("button", { name: /use compact notice template/i }),
       ).not.toBeInTheDocument();
       expect(
         screen.queryByRole("button", { name: /use digest/i }),
       ).not.toBeInTheDocument();
     });
 
-    it("marks the compact alert as the default", () => {
+    it("marks the compact notice as the default", () => {
       renderPicker({ kind: "graphAlert" });
 
       const compactCard = screen.getByRole("button", {
-        name: /use alert — compact template/i,
+        name: /use metric — compact template/i,
       });
       expect(compactCard.textContent).toContain("Default");
     });
@@ -223,7 +223,7 @@ describe("SlackBlockKitTemplatePicker", () => {
       // The immediate-cadence layouts render first, in this order, per the
       // registry — captured before any pick to compare against after.
       expect(namesBefore).toEqual([
-        "Use Compact alert template",
+        "Use Compact notice template",
         "Use One-liner template",
         "Use Eval failure detail template",
         "Use Rich trace card template",
@@ -276,7 +276,7 @@ describe("SlackBlockKitTemplatePicker", () => {
         screen.getByRole("button", { name: /use digest — compact template/i }),
       ).toBeInTheDocument();
       expect(
-        screen.queryByRole("button", { name: /use compact alert template/i }),
+        screen.queryByRole("button", { name: /use compact notice template/i }),
       ).not.toBeInTheDocument();
 
       const namesAfterExternalChange = screen
@@ -291,7 +291,7 @@ describe("SlackBlockKitTemplatePicker", () => {
         screen.getByText(/more layouts for the immediate cadence/i),
       );
       await user.click(
-        screen.getByRole("button", { name: /use compact alert template/i }),
+        screen.getByRole("button", { name: /use compact notice template/i }),
       );
 
       const namesAfterInPickerPick = screen
@@ -328,7 +328,7 @@ describe("SlackBlockKitTemplatePicker", () => {
       // Neither in-picker pick should have regrouped the gallery on its own
       // — same contract as the sibling test above.
       expect(
-        screen.getByRole("button", { name: /use compact alert template/i }),
+        screen.getByRole("button", { name: /use compact notice template/i }),
       ).toBeInTheDocument();
 
       // Now the cadence changes externally, twice: once back to "immediate"
@@ -347,7 +347,7 @@ describe("SlackBlockKitTemplatePicker", () => {
       // layouts lead the PRIMARY grid (the first 4 buttons — digest cadence
       // has exactly 4 trace templates). The disclosure is still open from
       // the setup above and now holds the immediate layouts instead, so
-      // "Compact alert" is still somewhere in the document — checked by
+      // "Compact notice" is still somewhere in the document — checked by
       // POSITION, not presence.
       const primaryNames = screen
         .getAllByRole("button", { name: /^use .+ template$/i })
@@ -359,7 +359,7 @@ describe("SlackBlockKitTemplatePicker", () => {
           "Use Digest — inline rich template",
         ]),
       );
-      expect(primaryNames).not.toContain("Use Compact alert template");
+      expect(primaryNames).not.toContain("Use Compact notice template");
     });
   });
 });

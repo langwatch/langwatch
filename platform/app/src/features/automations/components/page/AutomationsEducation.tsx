@@ -42,7 +42,7 @@ const USE_CASES: Record<AutomationKind, UseCase[]> = {
       icon: AlertTriangle,
       prefill: {
         initialSource: "customGraph",
-        initialName: "Error spike alert",
+        initialName: "Error spike",
         initialAction: "SEND_SLACK_MESSAGE",
       },
     },
@@ -52,7 +52,7 @@ const USE_CASES: Record<AutomationKind, UseCase[]> = {
       icon: TrendingDown,
       prefill: {
         initialSource: "customGraph",
-        initialName: "Traffic drop alert",
+        initialName: "Traffic drop",
         initialAction: "SEND_EMAIL",
       },
     },
@@ -62,7 +62,7 @@ const USE_CASES: Record<AutomationKind, UseCase[]> = {
       icon: DollarSign,
       prefill: {
         initialSource: "customGraph",
-        initialName: "Cost spike alert",
+        initialName: "Cost spike",
         initialAction: "SEND_EMAIL",
       },
     },

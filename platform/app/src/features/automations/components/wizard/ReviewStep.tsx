@@ -2,6 +2,7 @@ import { Text, VStack } from "@chakra-ui/react";
 import { CADENCE_LABELS } from "@langwatch/automations/cadences";
 import {
   configurationSummary,
+  filtersAreSet,
   isNotifyAction,
   OPERATOR_LABELS,
   TIME_PERIOD_LABELS,
@@ -54,7 +55,9 @@ export function ReviewStep({
     watchesGraph,
     graphName,
     filterQuery: draft.filterQuery,
-    hasStructuredFilters: Object.keys(draft.filters).length > 0,
+    // The same predicate the rail summarises with, so the overview and the
+    // rail cannot disagree about a filter object whose keys are all empty.
+    hasStructuredFilters: filtersAreSet(draft.filters),
   });
 
   return (

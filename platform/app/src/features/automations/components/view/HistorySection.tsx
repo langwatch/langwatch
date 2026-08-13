@@ -232,8 +232,8 @@ function EmptyHistory({
   if (isGraphAlert) {
     return (
       <Text textStyle="sm" color="fg.muted">
-        This alert has not fired yet, and has not been checked yet either. It is
-        checked as data arrives for the graph it watches.
+        This automation has not fired yet, and has not been checked yet either.
+        It is checked as data arrives for the graph it watches.
       </Text>
     );
   }

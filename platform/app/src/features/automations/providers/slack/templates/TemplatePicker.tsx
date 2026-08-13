@@ -58,7 +58,7 @@ function introFor({
       : "Your report sends the traces that match, so every layout lists them. The thumbnail shows structure, not the final look.";
   }
   if (kind === "graphAlert") {
-    return "Each layout sends one message when the alert fires. The thumbnail shows structure, not the final look.";
+    return "Each layout sends one message when the automation fires. The thumbnail shows structure, not the final look.";
   }
   return cadence === "digest"
     ? "Your cadence bundles every trace matched in the window into one digest message. Pick a starting layout — the thumbnail shows structure, not the final look."

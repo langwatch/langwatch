@@ -40,12 +40,12 @@ const OUTCOME: Record<
   string,
   { text: string; tone: EvaluationPresentation["tone"] }
 > = {
-  fired: { text: "The alert fired", tone: "fired" },
-  already_firing: { text: "The alert was already firing", tone: "fired" },
-  resolved: { text: "The alert recovered", tone: "quiet" },
-  not_breached: { text: "The alert did not fire", tone: "quiet" },
+  fired: { text: "The automation fired", tone: "fired" },
+  already_firing: { text: "The automation was already firing", tone: "fired" },
+  resolved: { text: "The metric recovered", tone: "quiet" },
+  not_breached: { text: "The automation did not fire", tone: "quiet" },
   not_delivered: {
-    text: "The alert could not reach its destination",
+    text: "The automation could not reach its destination",
     tone: "attention",
   },
   skipped: { text: "The check was skipped", tone: "attention" },
@@ -58,14 +58,14 @@ const OUTCOME: Record<
  */
 const SKIP_EXPLANATION: Record<string, string> = {
   subject_missing:
-    "The graph this alert watches no longer exists. Edit the alert and choose a graph that does.",
+    "The graph this automation watches no longer exists. Edit the automation and choose a graph that does.",
   incomplete_configuration:
-    "This alert is missing part of its condition. Edit it and set the metric, the comparison, and the threshold.",
+    "This automation is missing part of its condition. Edit it and set the metric, the comparison, and the threshold.",
   result_too_large:
-    "The graph this alert watches groups by a field with too many distinct values to check against a threshold. Edit the graph to group by fewer values, or remove the grouping.",
+    "The graph this automation watches groups by a field with too many distinct values to check against a threshold. Edit the graph to group by fewer values, or remove the grouping.",
   series_percentage_unsupported:
-    "The series this alert watches cannot be shown as a percentage. Edit the graph and turn off the percentage option for this series, or watch a different series.",
-  inactive: "This alert is paused, so nothing is being checked.",
+    "The series this automation watches cannot be shown as a percentage. Edit the graph and turn off the percentage option for this series, or watch a different series.",
+  inactive: "This automation is paused, so nothing is being checked.",
 };
 
 export function describeEvaluation(
@@ -73,12 +73,12 @@ export function describeEvaluation(
 ): EvaluationPresentation {
   const outcome = OUTCOME[evaluation.verdict];
   return {
-    outcome: outcome?.text ?? "The alert was checked",
+    outcome: outcome?.text ?? "The automation was checked",
     observation: describeObservation(evaluation),
     explanation:
       evaluation.verdict === "skipped"
         ? (SKIP_EXPLANATION[evaluation.skipCode ?? ""] ??
-          "This check could not run as the alert is configured. Edit the alert and check its graph, metric, and threshold.")
+          "This check could not run as the automation is configured. Edit the automation and check its graph, metric, and threshold.")
         : null,
     tone: outcome?.tone ?? "quiet",
   };

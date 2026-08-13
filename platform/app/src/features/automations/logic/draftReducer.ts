@@ -532,7 +532,7 @@ export const TIME_PERIOD_LABELS: Record<GraphAlertTimePeriod, string> = {
 };
 
 export function configurationSummary(draft: AutomationDraft): string {
-  if (!draft.action) return "Choose a type first";
+  if (!draft.action) return "Choose where it delivers";
   const provider = CLIENT_PROVIDERS[draft.action];
   return provider.client.summary(draft.slices[draft.action], {
     name: draft.name,

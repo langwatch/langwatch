@@ -159,8 +159,10 @@ describe("AutomationWizard", () => {
 
   describe("given a saved automation being edited", () => {
     describe("when the wizard opens", () => {
-      /** @scenario "Editing an automation opens the review overview" */
-      it("opens on the review overview with every section summarised", () => {
+      // The binding for "Editing an automation opens the review overview"
+      // lives on the drawer test that lets the drawer choose the step; this
+      // one hand-sets it, so it pins the overview's CONTENT, not the landing.
+      it("shows every section summarised on the review overview", () => {
         useAutomationStore.getState().hydrate(persistDraft);
         useAutomationStore.getState().setStep("review");
         renderWizard({ isEdit: true, subjectLocked: true });
@@ -209,11 +211,19 @@ describe("AutomationWizard", () => {
         ).toBeInTheDocument();
         // The filter itself stays editable.
         expect(screen.getByText("Which traces")).toBeInTheDocument();
-        // And the way out is offered.
-        await user.click(
-          screen.getByRole("button", { name: "New automation" }),
-        );
-        expect(onCreateNew).toHaveBeenCalled();
+        // And the way out is offered — as the create entry point the drawer
+        // wires it to. That the transition genuinely resets the draft (rather
+        // than carrying this saved automation into the new one) is pinned on
+        // the drawer itself, where the store and the hydration latches live:
+        // AutomationDrawer.integration.test.tsx, "opens a pristine create
+        // instead of carrying the edited draft into it".
+        const offer = screen.getByRole("button", { name: "New automation" });
+        expect(offer).toBeEnabled();
+        await user.click(offer);
+        expect(onCreateNew).toHaveBeenCalledTimes(1);
+        // The lock is not a dead end: the automation being edited is left
+        // exactly as it was by asking for a new one.
+        expect(useAutomationStore.getState().draft).toEqual(persistDraft);
       });
     });
   });

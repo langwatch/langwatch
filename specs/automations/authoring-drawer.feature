@@ -19,12 +19,14 @@ Feature: Staged automation authoring drawer
 
   Rule: The drawer reveals sections progressively
 
-    Scenario: A new automation starts at identity, then picks a type
+    # The merged wizard replaced this opening (ADR-093 §1, §4): there is no
+    # identity row and no kind picker, and the first step asks what to watch.
+    # Its own scenarios live in source-merge.feature, bound.
+    Scenario: A new automation opens on what it should watch
       When the user opens the automation drawer
-      Then the identity row (name + alert type) is visible at the top
-      And the When section is visible
-      And the type picker is visible
-      And Setup, Cadence, and Test sections are not yet available
+      Then the name field is visible at the top
+      And the first step asks what the automation should watch
+      And delivery and review are steps the author has not reached yet
 
     Scenario: Choosing a category offers the matching types
       Given the user is creating an automation
