@@ -25,7 +25,7 @@ import {
 import type { StorageRegistry } from "./storage-registry";
 import type { StoredObject } from "./stored-object";
 import type { StoredObjectsRepository } from "./stored-objects.repository";
-import { mintAzureBlobUri, mintFileUri, mintS3Uri } from "./uri";
+import { mintUriForDestination } from "./uri";
 
 const tracer = getLangWatchTracer("langwatch.stored-objects.service");
 const logger = createLogger("langwatch:stored-objects:service");
@@ -84,18 +84,10 @@ export async function defaultMintStorageUri({
   sha256: string;
 }): Promise<string> {
   const destination = await resolveProjectStorageDestination(projectId);
-  if (destination.kind === "s3") {
-    return mintS3Uri({ bucket: destination.bucket, projectId, sha256 });
-  }
-  if (destination.kind === "azure") {
-    return mintAzureBlobUri({
-      accountName: destination.accountName,
-      container: destination.container,
-      projectId,
-      sha256,
-    });
-  }
-  return mintFileUri({ root: destination.root, projectId, sha256 });
+  return mintUriForDestination({
+    destination,
+    objectPath: `${projectId}/${sha256}`,
+  });
 }
 
 /**

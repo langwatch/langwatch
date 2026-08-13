@@ -342,6 +342,31 @@ describe("customEvaluationSync reactor", () => {
       expect(call.status).toBe("processed");
     });
 
+    it("drops the verdict when the evaluation reports an error", async () => {
+      const reactor = createCustomEvaluationSyncReactor(deps);
+      const span = makeOtlpSpan([
+        {
+          name: "toxicity",
+          score: 0.1,
+          passed: false,
+          label: "bad",
+          error: { message: "provider timeout" },
+        },
+      ]);
+
+      await reactor.handle(
+        createSpanReceivedEvent(span),
+        createContext(createFoldState()),
+      );
+
+      const call = vi.mocked(deps.reportEvaluation).mock.calls[0]![0];
+      expect(call.status).toBe("error");
+      expect(call.passed).toBeNull();
+      expect(call.score).toBeNull();
+      expect(call.label).toBeNull();
+      expect(call.error).toBe("provider timeout");
+    });
+
     it("uses provided evaluation_id when present", async () => {
       const reactor = createCustomEvaluationSyncReactor(deps);
       const span = makeOtlpSpan([

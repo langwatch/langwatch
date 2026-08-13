@@ -7,9 +7,10 @@
  * about is dropped in silence and the column just goes blank; that is how
  * ATTRIBUTED_USER rows shipped nameless.
  */
-import type { PrismaClient } from "@prisma/client";
-import { Prisma } from "@prisma/client";
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
+import { Prisma } from "~/generated/prisma/client";
 import {
   nanoUsdToDecimalString,
   usdToNanoUsd,
@@ -161,7 +162,7 @@ describe("gatewayBudgets.list for a per-person template", () => {
     expect(budgets[0]?.endUsersOver).toBe(0);
   });
 
-  /** @scenario "Budget list Scope column resolves target name with VK link" */
+  /** @scenario "Budget list Scope column renders the shared scope chip on one line" */
   it("names the virtual key a template anchors on", async () => {
     const { budgets } = await callerFor([template()]).list({
       organizationId: ORG_ID,
@@ -175,7 +176,7 @@ describe("gatewayBudgets.list for a per-person template", () => {
     });
   });
 
-  /** @scenario "Budget list Scope column resolves target name with VK link" */
+  /** @scenario "Budget list Scope column renders the shared scope chip on one line" */
   it("names the project a template anchors on", async () => {
     const { budgets } = await callerFor([
       template({ scopeId: ANCHOR_PROJECT_ID }),

@@ -1,7 +1,7 @@
 import type { api } from "~/utils/api";
 import type { TargetConfig } from "../types";
 
-type TrpcUtils = ReturnType<typeof api.useContext>;
+type TrpcUtils = ReturnType<typeof api.useUtils>;
 
 /**
  * Synchronously resolve a target's display name from the tRPC query cache.

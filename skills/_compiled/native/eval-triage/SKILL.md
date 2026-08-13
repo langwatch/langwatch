@@ -9,7 +9,7 @@ metadata:
 
 # Triage Failing Experiments and Evaluations
 
-From "the run failed" to the specific rows, evaluators, and inputs responsible — then to a root cause. Work the steps in order.
+From "the run failed" to the specific rows, evaluators, and inputs responsible, then to a root cause. Work the steps in order.
 
 ## Prerequisites
 
@@ -27,7 +27,7 @@ Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. L
 
 If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
-If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team. No login needed, secrets and personal data are redacted locally, and it directly shapes what gets fixed. `npx langwatch report --help` explains the options.
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`, so preview with `--dry-run` when the session touched sensitive data. `npx langwatch report --help` explains the options.
 
 ## Step 1: Find the Failing Run
 
@@ -40,8 +40,8 @@ langwatch experiment status <slug> --run-id <id> -o json
 
 A run can fail two ways, and they triage differently:
 
-- **Execution failure** — the run errored out or stalled. `status` shows the error; jump to Step 4.
-- **Score regression** — the run completed but evaluator scores dropped or rows failed. Continue to Step 2.
+- **Execution failure**: the run errored out or stalled. `status` shows the error; jump to Step 4.
+- **Score regression**: the run completed but evaluator scores dropped or rows failed. Continue to Step 2.
 
 ## Step 2: Isolate the Failing Rows
 
@@ -51,7 +51,7 @@ langwatch experiment results <slug> --filter failed --evaluator <name> -o json
 langwatch experiment results <slug> --run-id <id> --limit 50 -o json
 ```
 
-- `--filter failed` keeps only the rows that failed at least one evaluator — start there, not with the full result set.
+- `--filter failed` keeps only the rows that failed at least one evaluator. Start there, not with the full result set.
 - `--evaluator <name>` shows one evaluator's column when several ran: is the regression concentrated in one evaluator (a scoring problem) or spread across all of them (a real behavior regression)?
 
 For each failing row, note the input, the expected output (from the dataset), and the actual output. Rows that fail the SAME way point at one root cause; rows that fail differently suggest flakiness or a noisy evaluator.
@@ -65,15 +65,15 @@ langwatch evaluator get <idOrSlug> -o json
 
 Before blaming the agent, rule out the scorer:
 
-- **LLM-judge evaluators** — check the model in `settings`. A judge model that changed, is rate-limited, or is too weak for the rubric produces score swings that have nothing to do with the agent.
-- **Thresholds** — a score of 0.49 vs a pass threshold of 0.5 is a borderline judge, not a regression. Look at the score distribution across rows, not just pass/fail.
-- **Deterministic evaluators** (exact match, JSON validity) — these don't drift; failures here are real.
+- **LLM-judge evaluators**: check the model in `settings`. A judge model that changed, is rate-limited, or is too weak for the rubric produces score swings that have nothing to do with the agent.
+- **Thresholds**: a score of 0.49 vs a pass threshold of 0.5 is a borderline judge, not a regression. Look at the score distribution across rows, not just pass/fail.
+- **Deterministic evaluators** (exact match, JSON validity): these don't drift; failures here are real.
 
 ## Step 4: Root Cause
 
-1. Compare the failing run against the last passing one: what changed — prompt version, model, dataset, code? `git log` on prompts and agent code usually answers this directly.
-2. If rows fail on retrieval or context: inspect a production trace of the same path (`langwatch trace search` / `langwatch trace get` — see the `debug-with-langwatch` recipe).
-3. If the dataset itself looks wrong (stale expected outputs, bad rows), fix the dataset — `langwatch dataset get <slugOrId>` to inspect it.
+1. Compare the failing run against the last passing one: what changed (prompt version, model, dataset, code)? `git log` on prompts and agent code usually answers this directly.
+2. If rows fail on retrieval or context: inspect a production trace of the same path (`langwatch trace search` / `langwatch trace get`; see the `debug-with-langwatch` recipe).
+3. If the dataset itself looks wrong (stale expected outputs, bad rows), fix the dataset. Use `langwatch dataset get <slugOrId>` to inspect it.
 4. Apply the fix and re-run:
 
 ```bash

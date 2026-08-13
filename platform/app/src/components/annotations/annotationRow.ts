@@ -1,4 +1,4 @@
-import type { Annotation } from "@prisma/client";
+import type { Annotation } from "~/generated/prisma/client";
 import { readableAnnotationAnchor } from "~/server/annotations/annotationAnchor";
 import { describeAnnotationAnchor } from "~/server/annotations/annotationAnchorLabel";
 import type { Trace } from "~/server/tracer/types";

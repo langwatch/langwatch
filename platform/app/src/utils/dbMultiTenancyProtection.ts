@@ -1,5 +1,4 @@
-import type { Prisma } from "@prisma/client";
-
+import type { GuardMiddleware, GuardParams } from "./dbGuardMiddleware";
 import { ORG_BEARING_MODEL_NAMES } from "./dbOrganizationIdProtection";
 
 // Looks for `projectId`, `organizationId`, or `tenantId` anywhere in
@@ -22,6 +21,9 @@ function extractRawSql(args: unknown): string | null {
   // depending on Prisma version and call site.
   if (typeof a.query === "string") return a.query;
   if (Array.isArray(a.strings)) return a.strings.join(" ? ");
+  // The query-extension era adds one more shape: `$queryRawUnsafe` /
+  // `$executeRawUnsafe` deliver `[sql, ...values]`.
+  if (Array.isArray(args) && typeof args[0] === "string") return args[0];
   return null;
 }
 
@@ -681,7 +683,7 @@ const EXEMPT_MODELS = new Set<string>([
   ...ORG_DERIVED_EXEMPT,
 ]);
 
-const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
+const _guardProjectId = ({ params }: { params: GuardParams }) => {
   const action = params.action;
 
   // Raw queries (`$queryRaw`, `$executeRaw`) carry their tenancy scope
@@ -820,7 +822,7 @@ const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
   }
 };
 
-export const guardProjectId: Prisma.Middleware = async (params, next) => {
+export const guardProjectId: GuardMiddleware = async (params, next) => {
   _guardProjectId({ params });
   return next(params);
 };

@@ -61,7 +61,7 @@ export function subscribeToModelProvidersUpdated(
 }
 
 type ModelProviderUtils = Pick<
-  ReturnType<typeof api.useContext>,
+  ReturnType<typeof api.useUtils>,
   "modelProvider"
 >;
 

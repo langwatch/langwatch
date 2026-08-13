@@ -29,7 +29,7 @@ export function InviteMemberDrawer({
 }): React.ReactElement | null {
   const { organization, hasPermission } = useOrganizationTeamProject();
   const { closeDrawer } = useDrawer();
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
   const publicEnv = usePublicEnv();
   const hasEmailProvider = publicEnv.data?.HAS_EMAIL_PROVIDER_KEY ?? false;
 

@@ -4,9 +4,10 @@
  * strings and lists the dependency factory produces, so they are exercised
  * against stub collaborators rather than a database.
  */
-import type { PrismaClient } from "@prisma/client";
+
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { ProjectService } from "../../projects/project.service";
 import type { EmailSuppressionService } from "../emailSuppression.service";

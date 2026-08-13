@@ -1,6 +1,6 @@
-import type { Project } from "@prisma/client";
 import type { MiddlewareHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
+import type { Project } from "~/generated/prisma/client";
 import { getServerAuthSession } from "~/server/auth";
 import { authMiddleware } from "./auth";
 

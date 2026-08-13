@@ -148,6 +148,18 @@ export default defineConfig(async (): Promise<UserConfig> => {
   plugins: [react(), patchObjectInspectBrowserStub(), havenHmrGate()],
   resolve: {
     alias: {
+      // The generated Prisma client's `client.ts` entry hard-imports the node
+      // runtime (`@prisma/client/runtime/client` → `node:url`), which vite
+      // externalizes — evaluating it in the browser throws and blanks every
+      // page. Frontend files import it for enums and types; the old
+      // `@prisma/client` package routed those through its `browser` package
+      // field, but the generated client is plain source with no package.json,
+      // so the browser bundle is pointed at the generated browser entry here.
+      // Must precede the bare "~" alias — vite matches aliases in order.
+      "~/generated/prisma/client": path.resolve(
+        __dirname,
+        "./src/generated/prisma/browser.ts",
+      ),
       // Path aliases (matching tsconfig paths)
       "~": path.resolve(__dirname, "./src"),
       "@app": path.resolve(__dirname, "./src/server/app-layer"),

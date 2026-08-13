@@ -29,7 +29,7 @@ export function CustomDashboardsSection({
   const projectId = project?.id ?? "";
   const currentDashboardId = router.query.dashboard as string | undefined;
   const { openDrawer } = useDrawer();
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
 
   const [editingDashboardId, setEditingDashboardId] = useState<string | null>(
     null,
@@ -168,7 +168,7 @@ export function CustomDashboardsSection({
         message="Are you sure you want to delete this dashboard? All graphs on this dashboard will be deleted."
         confirmLabel="Delete"
         tone="danger"
-        loading={deleteDashboard.isLoading}
+        loading={deleteDashboard.isPending}
         onConfirm={() => {
           if (!dashboardToDelete) return;
           const dashboardId = dashboardToDelete;

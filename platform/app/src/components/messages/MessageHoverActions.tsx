@@ -180,7 +180,7 @@ export const MessageHoverActions = ({
         tooltipContent="Translate message to English"
         onClick={translate}
       >
-        {translateAPI.isLoading ? (
+        {translateAPI.isPending ? (
           <Spinner size="sm" />
         ) : translationActive ? (
           <Image
