@@ -787,11 +787,12 @@ export class OpsMetricsCollector {
     }
   }
 
-  private async readLatencyWindows(): Promise<LatencyWindows> {
-    const nowMs = Date.now();
+  private buildLatencyReadPlan(nowMs: number): {
+    pipeline: ReturnType<IORedis["pipeline"]>;
+    plan: Array<"minute" | "hour" | "all">;
+  } {
     const pipeline = this.redis.pipeline();
     const plan: Array<"minute" | "hour" | "all"> = [];
-
     for (const queueName of this.groupQueueNames) {
       for (let i = 0; i < 60; i++) {
         pipeline.hgetall(
@@ -811,8 +812,13 @@ export class OpsMetricsCollector {
       pipeline.hgetall(latencyAllTimeKey(queueName));
       plan.push("all");
     }
+    return { pipeline, plan };
+  }
 
+  private async readLatencyWindows(): Promise<LatencyWindows> {
+    const { pipeline, plan } = this.buildLatencyReadPlan(Date.now());
     const results = (await pipeline.exec()) ?? [];
+
     const minuteHashes: Array<Record<string, string>> = [];
     const dayHashes: Array<Record<string, string>> = [];
     const weekHashes: Array<Record<string, string>> = [];
@@ -820,22 +826,19 @@ export class OpsMetricsCollector {
     let hourIndex = 0;
     for (let i = 0; i < plan.length; i++) {
       const hash = (results[i]?.[1] as Record<string, string>) ?? {};
-      switch (plan[i]) {
-        case "minute":
-          minuteHashes.push(hash);
-          break;
-        case "hour": {
-          // Hour buckets are emitted newest-first per queue; the first 24 of
-          // each queue's 168 belong to the day window as well as the week's.
-          if (hourIndex % 168 < 24) dayHashes.push(hash);
-          weekHashes.push(hash);
-          hourIndex++;
-          break;
-        }
-        case "all":
-          allHashes.push(hash);
-          break;
+      if (plan[i] === "minute") {
+        minuteHashes.push(hash);
+        continue;
       }
+      if (plan[i] === "all") {
+        allHashes.push(hash);
+        continue;
+      }
+      // Hour buckets are emitted newest-first per queue; the first 24 of
+      // each queue's 168 belong to the day window as well as the week's.
+      if (hourIndex % 168 < 24) dayHashes.push(hash);
+      weekHashes.push(hash);
+      hourIndex++;
     }
 
     return {

@@ -857,35 +857,52 @@ export class QueueRedisRepository implements QueueRepository {
       await Promise.all(
         jobIds.map(async (_, i) => {
           const raw = dataResults?.[i]?.[1] as string | null;
-          if (raw) {
-            // Storage shape from the header alone — survives a body the
-            // decode below cannot read, which is exactly when an operator
-            // most wants to know where the body was supposed to be.
-            jobs[i]!.envelope = isEnvelope(raw)
-              ? readEnvelopeDescriptor(raw)
-              : null;
-            jobs[i]!.payloadBytes = this.readDisplayPayloadBytes(raw);
-            try {
-              // Ops-dashboard inspection: DO NOT refresh the blob TTL on read
-              // (2026-06-24 review). A repeatedly-viewed blocked group would
-              // otherwise keep its orphan blobs alive indefinitely. readMode
-              // "peek" routes BOTH the GQ1 blobs.get AND the tieredBlobs.get
-              // to their peek variants.
-              jobs[i]!.data = await decodeJobEnvelope({
-                value: raw,
-                blobs,
-                tieredBlobs,
-                readMode: "peek",
-              });
-            } catch {
-              // ignore undecodable values
-            }
-          }
+          if (!raw) return;
+          await this.decorateJobFromRaw({
+            job: jobs[i]!,
+            raw,
+            blobs,
+            tieredBlobs,
+          });
         }),
       );
     }
 
     return { jobs, total };
+  }
+
+  /** Fill one job's envelope descriptor, payload size, and decoded body. */
+  private async decorateJobFromRaw({
+    job,
+    raw,
+    blobs,
+    tieredBlobs,
+  }: {
+    job: JobEntry;
+    raw: string;
+    blobs: RedisJobBlobStore;
+    tieredBlobs: TieredBlobStore;
+  }): Promise<void> {
+    // Storage shape from the header alone — survives a body the decode below
+    // cannot read, which is exactly when an operator most wants to know where
+    // the body was supposed to be.
+    job.envelope = isEnvelope(raw) ? readEnvelopeDescriptor(raw) : null;
+    job.payloadBytes = this.readDisplayPayloadBytes(raw);
+    try {
+      // Ops-dashboard inspection: DO NOT refresh the blob TTL on read
+      // (2026-06-24 review). A repeatedly-viewed blocked group would
+      // otherwise keep its orphan blobs alive indefinitely. readMode
+      // "peek" routes BOTH the GQ1 blobs.get AND the tieredBlobs.get
+      // to their peek variants.
+      job.data = await decodeJobEnvelope({
+        value: raw,
+        blobs,
+        tieredBlobs,
+        readMode: "peek",
+      });
+    } catch {
+      // ignore undecodable values
+    }
   }
 
   // ── Blocked Group Analysis ─────────────────────────────────────
