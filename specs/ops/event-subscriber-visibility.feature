@@ -1,6 +1,6 @@
 # Companion to process-manager-visibility: the lightweight event subscribers
 # (TriggerSpec handlers riding GroupQueue) get the registry-times-live-health
-# treatment on the same /ops/processes page.
+# treatment on the /ops/event-sourcing page's subscribers section.
 
 Feature: Event-subscriber visibility in ops
   As an operator during an incident
@@ -14,7 +14,7 @@ Feature: Event-subscriber visibility in ops
   exists; joining it to the live tree makes absence visible.
 
   Background:
-    Given an operator is viewing the processes page
+    Given an operator is viewing the event sourcing page
 
   @unit
   Scenario: Every registered subscriber is listed, idle or not

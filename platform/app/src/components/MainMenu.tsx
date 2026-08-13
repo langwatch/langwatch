@@ -1,15 +1,5 @@
 import { Box, VStack } from "@chakra-ui/react";
-import {
-  Activity,
-  Anvil,
-  CalendarClock,
-  Database,
-  Film,
-  Flag,
-  History,
-  Shield,
-  Workflow,
-} from "lucide-react";
+import { Activity, Anvil, Flag, History, Shield, Workflow } from "lucide-react";
 import React, { useState } from "react";
 import type { Project } from "~/generated/prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
@@ -380,10 +370,13 @@ const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
         showLabel={showExpanded}
       />
       <SideMenuLink
-        icon={Film}
-        label="Projection Replay"
-        href="/ops/projections"
-        isActive={router.pathname.startsWith("/ops/projections")}
+        icon={Workflow}
+        label="Event Sourcing"
+        href="/ops/event-sourcing"
+        isActive={
+          router.pathname.startsWith("/ops/event-sourcing") ||
+          router.pathname.startsWith("/ops/projections")
+        }
         showLabel={showExpanded}
       />
       <SideMenuLink
@@ -398,27 +391,6 @@ const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
         label="Deja View"
         href="/ops/dejaview"
         isActive={router.pathname.startsWith("/ops/dejaview")}
-        showLabel={showExpanded}
-      />
-      <SideMenuLink
-        icon={CalendarClock}
-        label="Scheduler"
-        href="/ops/scheduler"
-        isActive={router.pathname.startsWith("/ops/scheduler")}
-        showLabel={showExpanded}
-      />
-      <SideMenuLink
-        icon={Workflow}
-        label="Processes"
-        href="/ops/processes"
-        isActive={router.pathname.startsWith("/ops/processes")}
-        showLabel={showExpanded}
-      />
-      <SideMenuLink
-        icon={Database}
-        label="Payload store"
-        href="/ops/blobs"
-        isActive={router.pathname.startsWith("/ops/blobs")}
         showLabel={showExpanded}
       />
       <SideMenuLink

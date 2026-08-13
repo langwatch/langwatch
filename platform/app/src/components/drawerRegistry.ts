@@ -110,6 +110,10 @@ const ProcessInstanceDrawer = lazyDefault({
   factory: () => import("./ops/processes/instanceDrawer/ProcessInstanceDrawer"),
   key: "ProcessInstanceDrawer",
 });
+const OpsBlobsDrawer = lazyDefault({
+  factory: () => import("./ops/blobs/OpsBlobsDrawer"),
+  key: "OpsBlobsDrawer",
+});
 const EditModelProviderDrawer = lazyDefault({
   factory: () => import("./EditModelProviderDrawer"),
   key: "EditModelProviderDrawer",
@@ -303,6 +307,7 @@ export const drawers = {
   foundry: FoundryDrawer,
   opsGroupDetail: GroupDetailDrawer,
   opsProcessInstance: ProcessInstanceDrawer,
+  opsBlobs: OpsBlobsDrawer,
   // Coding agents
   pullRequestDetail: PullRequestDetailDrawer,
 } satisfies Record<string, React.FC<any>>;

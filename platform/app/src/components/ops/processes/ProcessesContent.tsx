@@ -5,7 +5,6 @@ import { ProcessFleetCard } from "./ProcessFleetCard";
 import { ProcessFleetStrip } from "./ProcessFleetStrip";
 import { ProcessInstancesCard } from "./ProcessInstancesCard";
 import { ProcessRecentActions } from "./ProcessRecentActions";
-import { SubscribersCard } from "./SubscribersCard";
 
 /** strip → structure → detail, per best_practices/ops-dashboard.md. */
 export function ProcessesContent() {
@@ -33,7 +32,6 @@ export function ProcessesContent() {
         onSelect={(name) => setSelected(name === selected ? null : name)}
       />
       {selected && <ProcessInstancesCard processName={selected} />}
-      <SubscribersCard />
       <ProcessRecentActions />
     </VStack>
   );

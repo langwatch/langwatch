@@ -13,7 +13,7 @@ Feature: Process-manager visibility in ops
   frozen mid-flow; both were found with psql or not at all.
 
   Background:
-    Given an operator is viewing the processes page
+    Given an operator is viewing the event sourcing page
 
   # ── Read-only surface ─────────────────────────────────────────────────
 
