@@ -147,7 +147,9 @@ describe("given a Bedrock span whose messages sit under canonical gen_ai keys", 
             "gen_ai.prompt": JSON.stringify([
               {
                 role: "user",
-                content: [{ type: "text", text: "summarise this consult note" }],
+                content: [
+                  { type: "text", text: "summarise this consult note" },
+                ],
               },
             ]),
             "gen_ai.completion": JSON.stringify([
@@ -179,10 +181,16 @@ describe("given a Bedrock span whose messages sit under canonical gen_ai keys", 
             // The AWS Converse API wire shape: content blocks are a union
             // discriminated by WHICH KEY IS PRESENT, not by a `type` field.
             "gen_ai.prompt": JSON.stringify([
-              { role: "user", content: [{ text: "summarise this consult note" }] },
+              {
+                role: "user",
+                content: [{ text: "summarise this consult note" }],
+              },
             ]),
             "gen_ai.completion": JSON.stringify([
-              { role: "assistant", content: [{ text: "The patient reports ..." }] },
+              {
+                role: "assistant",
+                content: [{ text: "The patient reports ..." }],
+              },
             ]),
           },
         }),
@@ -263,7 +271,10 @@ describe("given a Bedrock span whose messages sit under aws.bedrock.* keys", () 
           "rpc.method": "Converse",
           "aws.bedrock.model_id": "anthropic.claude-3-5-sonnet",
           "aws.bedrock.request.messages": JSON.stringify([
-            { role: "user", content: [{ text: "summarise this consult note" }] },
+            {
+              role: "user",
+              content: [{ text: "summarise this consult note" }],
+            },
           ]),
           "aws.bedrock.response.output": JSON.stringify({
             message: {
@@ -297,7 +308,10 @@ describe("given a Bedrock span whose messages sit under aws.bedrock.* keys", () 
             "http.target": "/model/anthropic.claude-3-5-sonnet/converse",
             "http.status_code": 200,
             "aws.bedrock.request.messages": JSON.stringify([
-              { role: "user", content: [{ text: "summarise this consult note" }] },
+              {
+                role: "user",
+                content: [{ text: "summarise this consult note" }],
+              },
             ]),
           },
         }),
@@ -308,6 +322,25 @@ describe("given a Bedrock span whose messages sit under aws.bedrock.* keys", () 
       // still falls back to the HTTP status because this span carries no
       // aws.bedrock.response.output.
       expect(input).toBe("summarise this consult note");
+      expect(output).toBe("200");
+    });
+  });
+
+  describe("when a non-Bedrock span carries none of the Bedrock signals", () => {
+    it("leaves the span alone (extractor does not fire)", () => {
+      const { input, output, appliedRules } = computeTraceIO(
+        makeSpan({
+          spanAttributes: {
+            "rpc.service": "DynamoDB",
+            "http.method": "POST",
+            "http.status_code": 200,
+          },
+        }),
+      );
+
+      expect(appliedRules.some((r) => r.startsWith("bedrock:"))).toBe(false);
+      // Ordinary fallback behaviour, untouched: span name in, status out.
+      expect(input).toBe("bedrock.converse");
       expect(output).toBe("200");
     });
   });

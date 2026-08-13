@@ -87,7 +87,8 @@ export class BedrockExtractor implements CanonicalAttributesExtractor {
       if (raw !== undefined) {
         let parsed = safeJsonParse(raw);
         if (isRecord(parsed) && isRecord(parsed.output)) parsed = parsed.output;
-        if (isRecord(parsed) && isRecord(parsed.message)) parsed = parsed.message;
+        if (isRecord(parsed) && isRecord(parsed.message))
+          parsed = parsed.message;
         if (isRecord(parsed) || Array.isArray(parsed)) {
           const messages = Array.isArray(parsed) ? parsed : [parsed];
           ctx.setAttr(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, messages);
