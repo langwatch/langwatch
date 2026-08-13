@@ -1,6 +1,6 @@
 /**
  * tRPC router for Org Settings > Webhooks. Session-auth sibling of the
- * org-key REST surface at /api/webhooks/v1: same service, same RBAC
+ * org-key RPC surface at /api/webhooks: same service, same RBAC
  * scopes (webhookEndpoints:view|manage), same enterprise plan gate.
  *
  * The signing secret crosses to the client exactly once, in the create and
