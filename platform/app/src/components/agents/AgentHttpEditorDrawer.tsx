@@ -439,6 +439,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
     headers,
     auth,
     outputPath,
+    bodyTemplate,
   });
 
   return (

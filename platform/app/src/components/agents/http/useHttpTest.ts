@@ -9,9 +9,12 @@ import { api } from "~/utils/api";
 import type { HttpTestResult } from "./HttpTestPanel";
 
 /**
- * Hook that provides an HTTP test handler using the httpProxy API.
- * Extracts the repeated test pattern from HttpPropertiesPanel, AgentPropertiesPanel,
- * and AgentHttpEditorDrawer.
+ * Runs the agent against its endpoint the way an evaluation will.
+ *
+ * The body template and its variables are sent as they are configured, not as
+ * a body rendered here: the workflow engine renders it, so what the endpoint
+ * receives during a test is what it receives during a run. Shared by
+ * HttpPropertiesPanel, AgentPropertiesPanel and AgentHttpEditorDrawer.
  */
 export function useHttpTest({
   url,
@@ -19,18 +22,24 @@ export function useHttpTest({
   headers,
   auth,
   outputPath,
+  bodyTemplate,
+  timeoutMs,
 }: {
   url: string;
   method: HttpMethod;
   headers: HttpHeader[];
   auth: HttpAuth | undefined;
   outputPath: string;
+  bodyTemplate: string;
+  timeoutMs?: number;
 }) {
   const { project } = useOrganizationTeamProject();
   const httpProxyMutation = api.httpProxy.execute.useMutation();
 
   const handleTest = useCallback(
-    async (requestBody: string): Promise<HttpTestResult> => {
+    async (
+      templateVariables: Record<string, string>,
+    ): Promise<HttpTestResult> => {
       if (!project?.id) {
         return { success: false, error: "No project selected" };
       }
@@ -41,18 +50,11 @@ export function useHttpTest({
           url,
           method,
           headers: headers.map((h) => ({ key: h.key, value: h.value })),
-          auth: auth
-            ? {
-                type: auth.type,
-                token: auth.type === "bearer" ? auth.token : undefined,
-                headerName: auth.type === "api_key" ? auth.header : undefined,
-                apiKeyValue: auth.type === "api_key" ? auth.value : undefined,
-                username: auth.type === "basic" ? auth.username : undefined,
-                password: auth.type === "basic" ? auth.password : undefined,
-              }
-            : undefined,
-          body: requestBody,
+          auth,
+          bodyTemplate,
+          templateVariables,
           outputPath,
+          timeoutMs,
         });
 
         return {
@@ -61,8 +63,11 @@ export function useHttpTest({
           extractedOutput: result.extractedOutput,
           error: result.error,
           status: result.status,
+          statusText: result.statusText,
           duration: result.duration,
           responseHeaders: result.responseHeaders,
+          renderedBody: result.renderedBody,
+          warnings: result.warnings,
         };
       } catch (err) {
         return {
@@ -71,7 +76,17 @@ export function useHttpTest({
         };
       }
     },
-    [project?.id, url, method, headers, auth, outputPath, httpProxyMutation],
+    [
+      project?.id,
+      url,
+      method,
+      headers,
+      auth,
+      outputPath,
+      bodyTemplate,
+      timeoutMs,
+      httpProxyMutation,
+    ],
   );
 
   return { handleTest, isPending: httpProxyMutation.isPending };

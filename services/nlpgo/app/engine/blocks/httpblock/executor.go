@@ -96,12 +96,20 @@ type Auth struct {
 }
 
 // Result is the executor's output.
+//
+// StatusText and ResponseHeaders are diagnostics rather than workflow data:
+// nothing downstream binds to them, and they exist so the person configuring
+// an agent can see what the endpoint actually answered. They are populated on
+// success and on a non-2xx alike, since the failing case is the one worth
+// looking at.
 type Result struct {
-	Output       any
-	StatusCode   int
-	UpstreamBody []byte
-	RenderedBody string
-	Warnings     []string
+	Output          any
+	StatusCode      int
+	StatusText      string
+	ResponseHeaders map[string]string
+	UpstreamBody    []byte
+	RenderedBody    string
+	Warnings        []string
 }
 
 // Execute runs the request, performs SSRF check, sends, and extracts.
@@ -163,13 +171,18 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	if readErr != nil && resp.StatusCode/100 == 2 {
 		return nil, fmt.Errorf("httpblock: read response body: %w", readErr)
 	}
+
+	result := &Result{
+		StatusCode:      resp.StatusCode,
+		StatusText:      statusText(resp),
+		ResponseHeaders: flattenHeaders(resp.Header),
+		UpstreamBody:    bodyBytes,
+		RenderedBody:    rendered,
+		Warnings:        warnings,
+	}
+
 	if resp.StatusCode/100 != 2 {
-		return &Result{
-			StatusCode:   resp.StatusCode,
-			UpstreamBody: bodyBytes,
-			RenderedBody: rendered,
-			Warnings:     warnings,
-		}, &UpstreamError{Status: resp.StatusCode, Body: bodyBytes}
+		return result, &UpstreamError{Status: resp.StatusCode, Body: bodyBytes}
 	}
 
 	var data any
@@ -181,30 +194,37 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	}
 
 	if req.OutputPath == "" {
-		return &Result{
-			Output:       data,
-			StatusCode:   resp.StatusCode,
-			UpstreamBody: bodyBytes,
-			RenderedBody: rendered,
-			Warnings:     warnings,
-		}, nil
+		result.Output = data
+		return result, nil
 	}
 	out, err := ExtractJSONPath(data, req.OutputPath)
 	if err != nil {
-		return &Result{
-			StatusCode:   resp.StatusCode,
-			UpstreamBody: bodyBytes,
-			RenderedBody: rendered,
-			Warnings:     warnings,
-		}, err
+		return result, err
 	}
-	return &Result{
-		Output:       out,
-		StatusCode:   resp.StatusCode,
-		UpstreamBody: bodyBytes,
-		RenderedBody: rendered,
-		Warnings:     warnings,
-	}, nil
+	result.Output = out
+	return result, nil
+}
+
+// statusText pulls the reason phrase out of the status line ("200 OK" -> "OK"),
+// falling back to the canonical text for the code when the upstream sent none.
+func statusText(resp *http.Response) string {
+	if _, phrase, ok := strings.Cut(resp.Status, " "); ok && phrase != "" {
+		return phrase
+	}
+	return http.StatusText(resp.StatusCode)
+}
+
+// flattenHeaders renders the response headers one line each, joining repeats
+// the way they would have appeared on the wire.
+func flattenHeaders(h http.Header) map[string]string {
+	if len(h) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(h))
+	for name, values := range h {
+		out[name] = strings.Join(values, ", ")
+	}
+	return out
 }
 
 // applyAuth attaches credentials to the request based on the Auth.Type.

@@ -43,10 +43,21 @@ export type HttpTestResult = {
   statusText?: string;
   duration?: number;
   responseHeaders?: Record<string, string>;
+  /** The body the engine rendered and sent, as opposed to the local preview. */
+  renderedBody?: string;
+  /** Variables the template referenced that the test did not supply. */
+  warnings?: string[];
 };
 
 export type HttpTestPanelProps = {
-  onTest: (requestBody: string) => Promise<HttpTestResult>;
+  /**
+   * Runs the request. Takes the template variables rather than a rendered
+   * body: the workflow engine renders the template, so the endpoint sees the
+   * same body during a test that it sees during a run.
+   */
+  onTest: (
+    templateVariables: Record<string, string>,
+  ) => Promise<HttpTestResult>;
   disabled?: boolean;
   /** Current URL being tested (for preview) */
   url?: string;
@@ -60,8 +71,16 @@ export type HttpTestPanelProps = {
   bodyTemplate?: string;
 };
 
+const escapeRegExp = (value: string): string =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 /**
- * Renders a body template by replacing {{variable}} placeholders
+ * Previews a body template so invalid JSON is caught before sending.
+ *
+ * Whitespace inside the braces is ignored, the way the engine reads it:
+ * `{{ threadId }}` and `{{threadId}}` are the same variable. This is only the
+ * preview. The body that reaches the endpoint is rendered by the engine and
+ * comes back on the result, so the two can never quietly disagree.
  */
 export function renderTemplate(
   template: string,
@@ -69,7 +88,10 @@ export function renderTemplate(
 ): string {
   let result = template;
   for (const [key, value] of Object.entries(variables)) {
-    result = result.replace(new RegExp(`\\{\\{${key}\\}\\}`, "g"), value);
+    result = result.replace(
+      new RegExp(`\\{\\{\\s*${escapeRegExp(key)}\\s*\\}\\}`, "g"),
+      value,
+    );
   }
   return result;
 }
@@ -285,6 +307,45 @@ function ResponseDisplay({ result }: { result: HttpTestResult }) {
         </Alert.Root>
       )}
 
+      {/* Variables the template asked for and the test did not supply. Worth
+          saying out loud: the endpoint received an empty value where the
+          author expected content, which otherwise looks like an endpoint bug. */}
+      {result.warnings && result.warnings.length > 0 && (
+        <Alert.Root status="warning">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>Some variables had no value</Alert.Title>
+            <Alert.Description>
+              <VStack align="start" gap={1}>
+                {result.warnings.map((warning) => (
+                  <Text key={warning} fontSize="sm">
+                    {warning}
+                  </Text>
+                ))}
+              </VStack>
+            </Alert.Description>
+          </Alert.Content>
+        </Alert.Root>
+      )}
+
+      {/* What the endpoint actually received, rendered by the engine rather
+          than previewed locally. */}
+      {result.renderedBody && (
+        <CollapsibleSection title="Request Body Sent">
+          <Box
+            as="pre"
+            fontSize="xs"
+            fontFamily="mono"
+            bg="bg.subtle"
+            padding={2}
+            borderRadius="md"
+            overflow="auto"
+          >
+            {result.renderedBody}
+          </Box>
+        </CollapsibleSection>
+      )}
+
       {/* Response Headers */}
       {result.responseHeaders &&
         Object.keys(result.responseHeaders).length > 0 && (
@@ -437,7 +498,7 @@ export function HttpTestPanel({
     setIsLoading(true);
     setResult(null);
     try {
-      const response = await onTest(renderedBody);
+      const response = await onTest({ threadId, messages: messagesJson });
       setResult(response);
     } catch (err) {
       setResult({
@@ -447,7 +508,7 @@ export function HttpTestPanel({
     } finally {
       setIsLoading(false);
     }
-  }, [renderedBody, onTest]);
+  }, [threadId, messagesJson, onTest]);
 
   return (
     <VStack align="stretch" gap={4} width="full">

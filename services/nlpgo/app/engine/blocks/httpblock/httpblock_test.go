@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -502,4 +503,100 @@ func TestDefaultTimeoutAccommodatesSlowAgents(t *testing.T) {
 		t.Errorf("httpblock.DefaultTimeout = %s; want 12m (slow agents take 10+ min, Lambda capped at 15min so 3min margin)",
 			httpblock.DefaultTimeout)
 	}
+}
+
+// BLOCK_LOCAL_HTTP_CALLS=false reaches the engine as AllowLocal. A self-hosted
+// install whose agent runs on its own network is the case it exists for, and
+// the engine refusing it regardless of the setting is what made an HTTP agent
+// pass its test button and then fail the evaluation with ssrf_blocked.
+func TestSSRF_WhenLocalDestinationsArePermitted(t *testing.T) {
+	permissive := httpblock.SSRFOptions{
+		AllowLocal: true,
+		Resolver: func(_ string) ([]net.IP, error) {
+			return []net.IP{net.ParseIP("127.0.0.1")}, nil
+		},
+	}
+
+	t.Run("permits the private and loopback set", func(t *testing.T) {
+		for _, u := range []string{
+			"http://127.0.0.1/x",
+			"http://localhost/",
+			"http://0.0.0.0/x",
+			"http://[::1]/",
+			"http://10.0.0.1/x",
+			"http://192.168.0.1/x",
+			"http://172.16.4.9/x",
+		} {
+			t.Run(u, func(t *testing.T) {
+				assert.NoError(t, httpblock.CheckURL(u, permissive))
+			})
+		}
+	})
+
+	t.Run("permits a hostname that resolves to a private address", func(t *testing.T) {
+		err := httpblock.CheckURL("http://agent.internal/", httpblock.SSRFOptions{
+			AllowLocal: true,
+			Resolver: func(_ string) ([]net.IP, error) {
+				return []net.IP{net.ParseIP("10.0.0.5")}, nil
+			},
+		})
+		assert.NoError(t, err)
+	})
+
+	t.Run("still refuses cloud metadata", func(t *testing.T) {
+		for _, u := range []string{
+			"http://169.254.169.254/latest/meta-data/",
+			"http://metadata.google.internal/",
+			"http://168.63.129.16/x",
+		} {
+			t.Run(u, func(t *testing.T) {
+				require.Error(t, httpblock.CheckURL(u, permissive),
+					"%s stays refused however permissive the deployment is", u)
+			})
+		}
+	})
+
+	t.Run("strict egress overrides the permission", func(t *testing.T) {
+		err := httpblock.CheckURL("http://10.0.0.1/x", httpblock.SSRFOptions{
+			AllowLocal:       true,
+			StrictPublicOnly: true,
+		})
+		require.ErrorIs(t, err, httpblock.ErrSSRFBlocked,
+			"strict egress means globally routable only, which a private address is not")
+	})
+
+	t.Run("holds at dial time, not just at the check", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer srv.Close()
+
+		dial := httpblock.SafeDialer(httpblock.SSRFOptions{AllowLocal: true})
+		conn, err := dial(context.Background(), "tcp", strings.TrimPrefix(srv.URL, "http://"))
+		require.NoError(t, err, "the dialer must permit what CheckURL permitted")
+		require.NoError(t, conn.Close())
+	})
+}
+
+// The end-to-end shape a customer reported: an HTTP agent pointed at a service
+// on their own network, which the engine refused while the rest of the product
+// reached it happily.
+func TestExecute_ReachesALocalEndpointWhenPermitted(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"answer":"from the internal service"}`))
+	}))
+	defer srv.Close()
+
+	exec := httpblock.New(httpblock.Options{
+		SSRF: httpblock.SSRFOptions{AllowLocal: true},
+	})
+	res, err := exec.Execute(context.Background(), httpblock.Request{
+		URL:        srv.URL,
+		Method:     http.MethodGet,
+		OutputPath: "$.answer",
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "from the internal service", res.Output)
 }
