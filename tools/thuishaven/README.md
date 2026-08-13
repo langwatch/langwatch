@@ -243,6 +243,18 @@ registry, and dashboard stay the same.
   server once no stack is running (opt-in: native-mode tests and
   `haven db url clickhouse` reach it with no stack up) — the next `up`
   restarts it over the same data in seconds.
+- **tsgo can never take the machine down.** The daemon watches every tsgo
+  process on the machine — however it was spawned — and reclaims runaways: a
+  whole-tree run past `HAVEN_TSGO_RUN_MAX_RSS_MB` (default 12 GiB), a language
+  server past `HAVEN_TSGO_LSP_MAX_RSS_MB` (default 4 GiB) or idle past
+  `HAVEN_TSGO_LSP_IDLE_TTL` (default 45m), and — over
+  `HAVEN_TSGO_TOTAL_BUDGET_MB` (default two thirds of RAM) — the youngest run
+  until the rest fits. The check queue also sets `GOMEMLIMIT` on the runs it
+  spawns so the common case degrades to "slower", not "10 GiB resident". The
+  same watch observes gopls, biome, vitest workers, node, bun and claude
+  agents (never touched — observed only) and ships every class's footprint to
+  the local Grafana as `haven_proc_*` metrics. See
+  `dev/docs/adr/095-haven-tsgo-governor.md`.
 - **Leaked test containers are reaped.** An interrupted integration-test run
   leaves its Testcontainers (a stray ClickHouse, a Redis) running in the shared
   VM forever — the library's own reaper (Ryuk) dies with the run, and reused

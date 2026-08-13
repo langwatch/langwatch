@@ -344,6 +344,20 @@ async function waitForTurn({
   }
 }
 
+/**
+ * Soft memory cap for the Go-runtime tools this queue wraps (tsgo is a Go
+ * binary): GOMEMLIMIT makes the runtime collect harder to stay under the
+ * limit instead of ballooning — a whole-tree typecheck degrades to "slower",
+ * not "10 GiB resident" (ADR-095). Half the machine, clamped to [4,10] GiB;
+ * an operator's explicit GOMEMLIMIT always wins. The haven daemon's process
+ * watch is the hard backstop above this.
+ */
+function goMemLimit() {
+  if (process.env.GOMEMLIMIT) return process.env.GOMEMLIMIT;
+  const gib = Math.max(4, Math.min(10, Math.floor(os.totalmem() / 2 ** 31)));
+  return `${gib}GiB`;
+}
+
 /** Runs the command with stdio inherited, forwarding signals, resolving its exit code. */
 function runCommand(commandArgv) {
   return new Promise((resolve) => {
@@ -353,7 +367,7 @@ function runCommand(commandArgv) {
       // the only slot queues behind itself the moment it reaches a bin shim
       // (`pnpm typecheck` spawns .bin/tsgo, which is one) or a nested package
       // script, and waits out the whole maximum wait before starting.
-      env: { ...process.env, CHECK_SLOTS: "0" },
+      env: { ...process.env, CHECK_SLOTS: "0", GOMEMLIMIT: goMemLimit() },
     });
     // Handling these keeps the wrapper alive through a Ctrl-C so it releases its
     // slot after the child is done, instead of dying first and leaving an entry

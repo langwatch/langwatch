@@ -160,6 +160,7 @@ func (o *Orchestrator) monitorLoop(ctx context.Context) {
 				o.log.Info("reaped stack", zap.String("slug", s.Slug), zap.Bool("dead", dead), zap.Bool("stale", stale))
 			}
 			o.governPressure()
+			o.governProcesses()
 			o.refreshObservability(ctx)
 			o.reapClickHouse()
 		}
