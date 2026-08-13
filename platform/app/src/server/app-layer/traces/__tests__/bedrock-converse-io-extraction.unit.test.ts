@@ -27,6 +27,14 @@
  * this pipeline does with each candidate Bedrock shape, so the observed
  * signature in production can be matched against a named shape.
  *
+ * OUTCOME (production data hydrated 2026-08-13, issue #1040): none of these
+ * rows describes Healify. Their empty Bedrock spans carry NO payload attribute
+ * under any key — mapped or unmapped — so there is nothing for stage 2 to read
+ * and no mapping change would populate them. The content is never emitted;
+ * AWS's botocore instrumentation omits message content unless
+ * OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true. This file therefore
+ * stands as a characterisation of the pipeline, NOT as a live bug report.
+ *
  * `describe` titles say which shapes are expected to work; the assertions are
  * the record of what the pipeline actually does today.
  */
