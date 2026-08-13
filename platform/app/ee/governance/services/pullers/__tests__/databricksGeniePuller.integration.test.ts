@@ -47,11 +47,11 @@ vi.hoisted(() => {
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import { createPulledUsageProcessingPipeline } from "@ee/event-sourcing/pipelines/pulled-usage-processing";
-import type { Prisma } from "~/generated/prisma/client";
 import http from "http";
 import { nanoid } from "nanoid";
 import type { AddressInfo } from "net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { Prisma } from "~/generated/prisma/client";
 
 import { prisma } from "~/server/db";
 import { getTestClickHouseClient } from "~/server/event-sourcing/__tests__/integration/testContainers";
