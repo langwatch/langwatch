@@ -56,7 +56,7 @@
     "prisma:generate:typescript": "pnpm prisma generate",
     "prisma:generate:migration": "pnpm prisma migrate dev --create-only",
     "prisma:migrate": "sh -c 'if [ \"$SKIP_PRISMA_MIGRATE\" != \"true\" ]; then pnpm prisma migrate deploy; else echo \"Skipping Prisma migrations\"; fi'",
-    "prisma:seed": "tsx prisma/seed.ts",
+    "prisma:seed": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.portless prisma/seed.ts",
     "seed:sample-traces": "tsx scripts/seed-sample-traces.ts",
     "seed:realistic-platform": "tsx scripts/seed-realistic-platform-data.ts",
     "seed:mass": "tsx scripts/seed-mass.ts",
