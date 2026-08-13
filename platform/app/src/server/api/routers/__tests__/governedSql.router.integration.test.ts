@@ -34,13 +34,18 @@ vi.mock("~/server/featureFlag", () => ({
   featureFlagService: { isEnabled: mockFeatureFlagIsEnabled },
 }));
 
-vi.mock("~/server/analytics/governed-sql", () => ({
-  getGovernedSqlService: () => ({
-    available: deployment.provisioned,
-    describeSchema: mockDescribeSchema,
-    execute: mockExecute,
-  }),
-}));
+vi.mock("~/server/analytics/governed-sql", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("~/server/analytics/governed-sql")>();
+  return {
+    ...actual,
+    getGovernedSqlService: () => ({
+      available: deployment.provisioned,
+      describeSchema: mockDescribeSchema,
+      execute: mockExecute,
+    }),
+  };
+});
 
 vi.mock("../../rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../rbac")>();
@@ -88,19 +93,15 @@ function createTestCaller() {
 }
 
 /**
- * The procedure is named `query`, which collides with the caller's own legacy
- * `caller.query(path)` interop method — property access resolves to the
- * interop, not the procedure. The interop form reaches it unambiguously.
+ * tRPC 11.18 dropped the caller's legacy `caller.query(path)`/
+ * `caller.mutation(path)` interop, so property access now reaches the
+ * procedure named `query` directly.
  */
 function runQuery(
   caller: ReturnType<typeof createTestCaller>,
   input: { projectId: string; sql: string },
 ) {
-  return (
-    caller as unknown as {
-      mutation: (path: string, input: unknown) => Promise<unknown>;
-    }
-  ).mutation("query", input);
+  return caller.query(input);
 }
 
 describe("the governed SQL router's feature switch", () => {

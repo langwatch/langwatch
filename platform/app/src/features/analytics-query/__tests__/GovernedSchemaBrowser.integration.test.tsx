@@ -31,19 +31,22 @@ function renderBrowser(onInsert = vi.fn()) {
   return { onInsert };
 }
 
+const escapeRegExp = (value: string) =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 /**
  * The dataset toggle's accessible name is its visible row — the mono dataset
  * name plus the column count beside it — so it is matched by prefix.
  */
 function datasetToggle(datasetName: string) {
   return screen.getByRole("button", {
-    name: new RegExp(`^${datasetName.replace(/\./g, "\\.")}`),
+    name: new RegExp(`^${escapeRegExp(datasetName)}`),
   });
 }
 
 function queryDatasetToggle(datasetName: string) {
   return screen.queryByRole("button", {
-    name: new RegExp(`^${datasetName.replace(/\./g, "\\.")}`),
+    name: new RegExp(`^${escapeRegExp(datasetName)}`),
   });
 }
 
