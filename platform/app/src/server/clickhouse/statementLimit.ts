@@ -1,7 +1,6 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import {
-  type ConcurrencyLimiter,
-  createConcurrencyLimiter,
+  ConcurrencyLimiter,
   QueueFullError,
 } from "@langwatch/clickhouse-client";
 import { createLogger } from "@langwatch/observability";
@@ -99,7 +98,7 @@ export function withStatementLimit<T extends ClickHouseClient>({
     MIN_QUEUE_DEPTH,
     maxConcurrent * QUEUE_DEPTH_PER_SLOT,
   );
-  const limiter = createConcurrencyLimiter({ maxConcurrent, maxQueued });
+  const limiter = new ConcurrencyLimiter({ maxConcurrent, maxQueued });
 
   registerClickHouseLimiter(instance, () => limiter.stats());
 
