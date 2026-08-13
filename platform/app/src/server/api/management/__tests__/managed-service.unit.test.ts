@@ -160,4 +160,60 @@ describe("createManagementService", () => {
       ).toThrow(/declares no access policy/);
     });
   });
+
+  /**
+   * The one way to hold this factory wrong. `guard()` returns the policy AND
+   * the chain that enforces it, so an endpoint that supplies its own middleware
+   * by writing `{ ...guard(p), middleware: [mine] }` replaces the chain instead
+   * of extending it. Nothing downstream notices: `meta.policy` survives, so the
+   * route-policy registry — and the authorization audit that reads it — still
+   * report the endpoint as guarded while the permission check and the plan gate
+   * no longer run. Passing the extra middleware THROUGH guard is the fix, and
+   * this pins it.
+   */
+  describe("given a guarded endpoint supplies its own middleware", () => {
+    it("keeps the permission check and the plan gate ahead of it", async () => {
+      const { service, guard } = createManagementService({
+        name: "toy-extra",
+        basePath: "/api/toy-extra",
+        feature: "MANAGEMENT_API",
+      });
+      const ownMiddleware: MiddlewareHandler = async (_c, next) => {
+        executionOrder.push("endpoint-own");
+        await next();
+      };
+      const app = service
+        .version(MANAGEMENT_API_VERSION, (v) => {
+          v.get(
+            "/things",
+            {
+              ...guard("organization:manage", [ownMiddleware]),
+              output: z.object({ ok: z.boolean() }),
+            },
+            async () => ({ ok: true }),
+          );
+        })
+        .build();
+      executionOrder.length = 0;
+
+      const response = await app.request("/api/toy-extra/things");
+
+      expect(response.status).toBe(200);
+      expect(executionOrder).toEqual([
+        "auth",
+        "permission:organization:manage",
+        "plan:MANAGEMENT_API",
+        "endpoint-own",
+      ]);
+    });
+
+    it("still registers the declared policy", () => {
+      const registered = getRoutePolicy("GET", "/api/toy-extra/things");
+
+      expect(registered?.policy).toEqual({
+        kind: "permission",
+        permission: "organization:manage",
+      });
+    });
+  });
 });

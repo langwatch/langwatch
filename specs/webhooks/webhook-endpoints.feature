@@ -256,6 +256,60 @@ Feature: Webhook endpoints, signed outbound event delivery
       Given an organization whose plan lacks webhook endpoints
       When it calls the webhook endpoints api
       Then the request is rejected as an enterprise feature
+      And error.code = "enterprise_plan_required"
+      And the refusal names the feature and how to obtain it
+
+    @integration
+    Scenario: A caller without the permission is refused before the plan is considered
+      Given an organization whose plan lacks webhook endpoints
+      And a credential that also lacks the webhook management permission
+      When it calls the webhook endpoints api
+      Then the refusal is about the missing permission, not the plan
+      And error.code = "insufficient_permissions"
+
+  Rule: The management surface is RPC-named and date-versioned
+
+    # ADR-094. The operation lives in the endpoint name, not the HTTP method, so
+    # roll-secret, test, enable and disable stop pretending to be resources and
+    # every argument becomes a validated field of one body.
+
+    @integration
+    Scenario: Operations are named, not implied by the method
+      When an endpoint is created through the management api
+      Then the call is a POST to a dotted operation name
+      And the same name identifies the operation in both SDKs and the CLI
+
+    @integration
+    Scenario: An identifier that names nothing is refused as a validation error
+      When an operation is called with an identifier of the wrong shape
+      Then the response status is 422
+      And error.code = "validation_error"
+      And the refusal names the offending field
+
+    @integration
+    Scenario: An operation taking no arguments accepts a call with no body
+      When an argument-free operation is called with no request body at all
+      Then the response status is 200
+
+    @integration
+    Scenario: A pinned version, the latest alias and the bare path all serve
+      When an operation is called on its pinned date, on latest, and on the bare path
+      Then all three answer the same result
+      And the dated and latest calls report the version they served
+      And the bare call reports itself as unversioned
+
+    @integration
+    Scenario: An unknown version segment is refused rather than falling through
+      When an operation is called on a version the surface never published
+      Then the response status is 404
+
+    # The v1 surface served no successful request in its lifetime, so it is
+    # removed outright rather than carried as an alias.
+
+    @integration
+    Scenario: The retired v1 paths are gone
+      When a caller uses the retired v1 path for any operation
+      Then the response status is 404
 
   Rule: The emitted events log is the primitive, webhooks ride it
 

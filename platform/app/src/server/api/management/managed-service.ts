@@ -16,8 +16,12 @@
  * serves nothing but a 404 for unknown version segments.
  */
 import { createService, type MountedRoute } from "@langwatch/api";
+import type { MiddlewareHandler } from "hono";
 
-import { requireEnterprisePlanRest } from "~/app/api/middleware/enterprise-gate";
+import {
+  type PlanEntitlementFlag,
+  requireEnterprisePlanRest,
+} from "~/app/api/middleware/enterprise-gate";
 import { requireOrgPermissionOrThrow } from "~/app/api/middleware/org-auth";
 import type { EnterpriseFeature } from "~/server/api/enterprise";
 import type { Permission } from "~/server/api/rbac";
@@ -70,11 +74,17 @@ export function createManagementService({
   name,
   basePath,
   feature,
+  entitlement,
 }: {
   name: string;
   /** Spelled out at the call site so the route-coverage gate can read it. */
   basePath: string;
   feature: EnterpriseFeature;
+  /**
+   * Admit on a per-feature plan flag rather than on the Enterprise tier, for a
+   * feature that is licensable on its own. Omit for the usual tier gate.
+   */
+  entitlement?: PlanEntitlementFlag;
 }) {
   const family = familyFromBasePath(basePath);
 
@@ -85,11 +95,28 @@ export function createManagementService({
     onRouteMounted: (route) => registerMountedRoute({ route, family }),
   });
 
-  const guard = (permission: Permission) => ({
+  /**
+   * Both halves of one endpoint's contract: the policy the registry records
+   * and the chain that enforces it.
+   *
+   * `extra` exists so an endpoint that needs its own middleware — idempotency,
+   * a rate limiter — can have it WITHOUT hand-writing the spread. Passing it
+   * here is the only safe spelling. Writing
+   * `{ ...guard(p), middleware: [mine] }` at the call site replaces this array
+   * instead of extending it, which silently drops the permission check and the
+   * plan gate while `meta.policy` still reports the endpoint as guarded — so
+   * the route-policy registry, and the authorization test that reads it, stay
+   * green over an endpoint that authenticates and then admits anyone.
+   */
+  const guard = (
+    permission: Permission,
+    extra: MiddlewareHandler[] = [],
+  ) => ({
     meta: { policy: requires(permission) } satisfies ManagementEndpointMeta,
     middleware: [
       requireOrgPermissionOrThrow(permission),
-      requireEnterprisePlanRest(feature),
+      requireEnterprisePlanRest(feature, { entitlement }),
+      ...extra,
     ],
   });
 

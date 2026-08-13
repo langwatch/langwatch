@@ -24,6 +24,7 @@ import { getApp } from "~/server/app-layer/app";
  */
 export function requireEnterprisePlanRest(
   feature: EnterpriseFeature,
+  options: { entitlement?: PlanEntitlementFlag } = {},
 ): MiddlewareHandler {
   return async (c, next) => {
     const organization = c.get("organization") as Organization | undefined;
@@ -39,10 +40,26 @@ export function requireEnterprisePlanRest(
       organizationId: organization.id,
     });
 
-    if (!isEnterpriseTier(plan.type)) {
+    const admitted = options.entitlement
+      ? plan[options.entitlement] === true
+      : isEnterpriseTier(plan.type);
+    if (!admitted) {
       throw new EnterprisePlanRequiredError(feature);
     }
 
     await next();
   };
 }
+
+/**
+ * A per-feature plan flag, for features sold separately from the tier.
+ *
+ * Most features here are tier-gated: Enterprise or nothing. Webhook endpoints
+ * are not — `webhookEndpointsEnabled` is licensable on its own, so a Pro or
+ * Custom contract can legitimately carry it (see
+ * `components/license/planFormDefaults.ts`). Naming the flag keeps THAT
+ * admission condition while still refusing through the one shared gate; gating
+ * such a feature on the tier instead would refuse every organization that
+ * bought it below Enterprise.
+ */
+export type PlanEntitlementFlag = "webhookEndpointsEnabled";

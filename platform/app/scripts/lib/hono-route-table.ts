@@ -14,10 +14,11 @@
  * `c.get("project")` or `cache.delete(key)`, which are far more common in these
  * files than route registrations are.
  *
- * Services built on `@langwatch/api` spell two more shapes. `v.sse("/x", ...)`
- * is a GET once mounted, so it is read as one. `v.withdraw("get", "/x")` is a
- * 410 tombstone for a path an earlier version served, so it is read as a route
- * that exists and can never be documented.
+ * Services built on `@langwatch/api` spell three more shapes. `v.sse("/x", ...)`
+ * is a GET once mounted and `v.rpc("/x.y", ...)` is a POST (ADR-094), so each is
+ * read as the method it mounts. `v.withdraw("get", "/x")` is a 410 tombstone for
+ * a path an earlier version served, so it is read as a route that exists and can
+ * never be documented.
  *
  * The parse is textual on purpose. A route registered through a helper, a loop,
  * or a computed path is invisible to it — the repo has none today, and a check
@@ -114,6 +115,18 @@ interface RouteMatch {
 }
 
 /**
+ * Builder methods that are not HTTP methods but mount as one. `v.sse` mounts a
+ * GET and `v.rpc` (ADR-094) mounts a POST, so the route table has to record the
+ * method the router will actually answer on — otherwise the coverage gate looks
+ * for a method nothing serves and reports the route as absent from the spec
+ * while the ratchet stays green.
+ */
+const PSEUDO_METHOD_MOUNTS: Record<string, string> = {
+  sse: "get",
+  rpc: "post",
+};
+
+/**
  * Every registration in a file, in source order.
  *
  * The two shapes are matched by separate patterns and merged by index before
@@ -126,7 +139,7 @@ interface RouteMatch {
  */
 function routeMatches(source: string): RouteMatch[] {
   const registrations = new RegExp(
-    `\\.(${[...HTTP_METHODS, "sse"].join("|")})\\(\\s*"(/[^"]*)"`,
+    `\\.(${[...HTTP_METHODS, "sse", "rpc"].join("|")})\\(\\s*"(/[^"]*)"`,
     "g",
   );
   const withdrawals = new RegExp(
@@ -140,7 +153,7 @@ function routeMatches(source: string): RouteMatch[] {
     const [, method, path] = match;
     if (method === undefined || path === undefined) continue;
     matches.push({
-      method: method === "sse" ? "get" : method,
+      method: PSEUDO_METHOD_MOUNTS[method] ?? method,
       path,
       index: match.index,
       sse: method === "sse",

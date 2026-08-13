@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import type { WebhookUrlProblemCode } from "@langwatch/automations/providers/webhook";
 import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
@@ -11,6 +11,10 @@ import type {
   WebhookEndpoint,
 } from "~/generated/prisma/client";
 import { pruneWebhookDeliveries } from "~/server/webhooks/deliveryLog";
+import {
+  sendWebhook,
+  WEBHOOK_DELIVERY_ID_HEADER,
+} from "~/server/webhooks/sendWebhook";
 import { WEBHOOK_PREVIOUS_SECRET_TTL_MS } from "~/server/webhooks/signature";
 import {
   allowsInsecureLocalUrls,
@@ -83,6 +87,57 @@ export function assertValidDeliveryControls(
       controls.maxInFlight,
       WEBHOOK_IN_FLIGHT_BOUNDS,
     );
+  }
+}
+
+/** The delivery-log page cursor, as callers carry it. */
+export interface WebhookDeliveryCursor {
+  firedAt: Date;
+  id: string;
+}
+
+/**
+ * `getDeliveries` pages on `(firedAt desc, id desc)`, so its cursor is a pair,
+ * but a caller can only carry one opaque string. Encoding and decoding live
+ * here, next to the query whose ordering defines them: the transport used to
+ * split on `~` and rebuild a Date inline, which put the paging contract in the
+ * route and made a second caller a second implementation.
+ */
+export function encodeDeliveryCursor(cursor: WebhookDeliveryCursor): string {
+  return `${cursor.firedAt.getTime()}~${cursor.id}`;
+}
+
+/**
+ * Returns undefined for an absent cursor and throws for a malformed one — the
+ * caller cannot fix a cursor it did not mint, so a bad one is a client error
+ * rather than an empty page.
+ */
+export function decodeDeliveryCursor(
+  encoded: string | undefined,
+): WebhookDeliveryCursor | undefined {
+  if (encoded === undefined) return undefined;
+
+  const [firedAtMs, id] = encoded.split("~");
+  const parsedMs = Number(firedAtMs);
+  if (!Number.isInteger(parsedMs) || !id) {
+    throw new InvalidWebhookDeliveryCursorError();
+  }
+  return { firedAt: new Date(parsedMs), id };
+}
+
+/**
+ * A delivery-log cursor this surface did not mint. Handled rather than plain:
+ * the caller's remedy is to drop the cursor and re-walk from the first page.
+ */
+export class InvalidWebhookDeliveryCursorError extends HandledError {
+  declare readonly code: "validation_error";
+
+  constructor() {
+    super("validation_error", "The delivery cursor is not one this API issued", {
+      httpStatus: 422,
+      fault: "customer",
+      meta: { target: "input", fields: ["cursor"] },
+    });
   }
 }
 
@@ -206,6 +261,21 @@ function assertValidEvents(enabledEvents: string[]): void {
   }
 }
 
+/** The single-envelope batch a test fire sends. */
+function testFireBody(now: Date): string {
+  return JSON.stringify({
+    batch: [
+      {
+        id: `evt_test_${randomUUID()}`,
+        type: "test.ping",
+        created: now.toISOString(),
+        schema_version: "1",
+        data: { message: "LangWatch webhook test delivery" },
+      },
+    ],
+  });
+}
+
 function newSecret(): string {
   return `whsec_${randomBytes(32).toString("base64url")}`;
 }
@@ -317,6 +387,51 @@ export class WebhookEndpointService {
       },
     });
     return toView(updated);
+  }
+
+  /**
+   * Apply one edit to an endpoint: field changes, a status change, or both.
+   *
+   * The status half is a TRANSITION, not an assignment — `enable` and `disable`
+   * carry their own side effects (clearing the failure streak, recording the
+   * disable reason), so asking for the status an endpoint already has must do
+   * nothing rather than re-run them. That reasoning used to sit in the REST
+   * PATCH handler, which meant the transport decided when a domain transition
+   * fired and the tRPC router reached the same methods by a different route.
+   */
+  async applyEdit(params: {
+    organizationId: string;
+    endpointId: string;
+    url?: string;
+    enabledEvents?: string[];
+    maxBatchSize?: number;
+    maxBatchDelayMs?: number;
+    maxInFlight?: number;
+    status?: "ACTIVE" | "DISABLED";
+  }): Promise<WebhookEndpointView> {
+    const { status, ...fields } = params;
+    const hasFieldUpdate =
+      fields.url !== undefined ||
+      fields.enabledEvents !== undefined ||
+      fields.maxBatchSize !== undefined ||
+      fields.maxBatchDelayMs !== undefined ||
+      fields.maxInFlight !== undefined;
+
+    const endpoint = hasFieldUpdate
+      ? await this.update(fields)
+      : await this.getById(fields);
+
+    const ref = {
+      organizationId: params.organizationId,
+      endpointId: params.endpointId,
+    };
+    if (status === "DISABLED" && endpoint.status === "ACTIVE") {
+      return await this.disable(ref);
+    }
+    if (status === "ACTIVE" && endpoint.status === "DISABLED") {
+      return await this.enable(ref);
+    }
+    return endpoint;
   }
 
   /**
@@ -458,6 +573,103 @@ export class WebhookEndpointService {
         ? [decrypt(endpoint.previousSecretEncrypted as string)]
         : []),
     ];
+  }
+
+  /**
+   * Fire one signed test envelope through the real delivery path and report
+   * what the receiver said.
+   *
+   * The contract callers depend on: this RESOLVES whenever the test itself ran.
+   * A receiver that refuses, or an address that never answers, is a result
+   * (`delivered: false`), not a thrown error — so the transport answers 200 and
+   * the verdict is read from the body. Only a failure to look the endpoint up
+   * throws.
+   *
+   * The envelope, the dispatch id and the delivery-log write all live here
+   * rather than in the transport, so the test path cannot drift from real
+   * delivery the way it did when `allowInsecureLocal` was passed by the
+   * delivery worker and forgotten by the test button.
+   */
+  async sendTestFire(params: {
+    organizationId: string;
+    endpointId: string;
+    now?: Date;
+  }): Promise<{
+    delivered: boolean;
+    responseStatus: number | null;
+    responseBody?: string;
+    error?: string;
+  }> {
+    const { organizationId, endpointId } = params;
+    const now = params.now ?? new Date();
+    const endpoint = await this.requireEndpoint(params);
+    const signingSecrets = await this.getSigningSecrets(params);
+    const dispatchId = `test:${randomUUID()}`;
+
+    const recordAttempt = async (attempt: {
+      outcome: "success" | "terminal";
+      responseStatus?: number;
+      error?: string;
+    }): Promise<void> => {
+      try {
+        await this.recordDeliveryAttempt({
+          organizationId,
+          endpointId,
+          dispatchId,
+          attempt: 1,
+          eventCount: 1,
+          ...attempt,
+        });
+      } catch (logError) {
+        // The test ran; a delivery-log hiccup must not turn the documented
+        // result contract into a failure.
+        logger.warn(
+          { endpointId, error: logError },
+          "test-fire delivery log write failed",
+        );
+      }
+    };
+
+    try {
+      const result = await sendWebhook({
+        url: endpoint.url,
+        body: testFireBody(now),
+        triggerName: endpointId,
+        contextLabel: `Webhook endpoint ${endpointId} (test)`,
+        testFire: true,
+        eventId: dispatchId,
+        dispatchIdHeader: WEBHOOK_DELIVERY_ID_HEADER,
+        signingSecrets,
+        attempt: 1,
+        // The test button has to reach exactly what real delivery reaches.
+        allowInsecureLocal: allowsInsecureLocalUrls(),
+      });
+      const delivered = result.status >= 200 && result.status < 300;
+      await recordAttempt({
+        outcome: delivered ? "success" : "terminal",
+        responseStatus: result.status,
+      });
+      return {
+        delivered,
+        responseStatus: result.status,
+        responseBody: result.body.slice(0, 500),
+      };
+    } catch (error) {
+      // The full message goes to the delivery log for the operator; the
+      // returned summary is sanitized so internal dispatch wording and
+      // transport details never reach the caller verbatim.
+      await recordAttempt({
+        outcome: "terminal",
+        error:
+          error instanceof Error ? error.message.slice(0, 500) : String(error),
+      });
+      return {
+        delivered: false,
+        responseStatus: null,
+        error:
+          "The test delivery could not reach the receiver; see the endpoint's delivery log for details.",
+      };
+    }
   }
 
   /**
