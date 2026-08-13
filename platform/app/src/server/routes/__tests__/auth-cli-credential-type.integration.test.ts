@@ -2,7 +2,7 @@
  * @vitest-environment node
  *
  * Integration coverage for the no-paste convergence — `credential_type`
- * discriminator that lets `langwatch login` mint either:
+ * discriminator that lets `langwatch login` obtain either:
  *
  *   - a device session (existing behavior, default for back-compat) → returns
  *     access+refresh tokens + personal VK; CLI persists to ~/.langwatch/config.json

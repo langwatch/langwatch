@@ -28,7 +28,7 @@ vi.mock("~/utils/api", () => ({
       getById: { useQuery: () => ({ data: undefined }) },
       validateDatasetName: { useQuery: () => ({ data: undefined }) },
     },
-    useContext: () => ({ dataset: { getAll: { invalidate: vi.fn() } } }),
+    useUtils: () => ({ dataset: { getAll: { invalidate: vi.fn() } } }),
   },
 }));
 

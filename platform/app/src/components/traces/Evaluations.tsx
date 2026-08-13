@@ -1,7 +1,7 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import type { Project } from "@prisma/client";
 import type { ReactNode } from "react";
 import { useState } from "react";
+import type { Project } from "~/generated/prisma/client";
 import type { ElasticSearchEvaluation } from "~/server/tracer/types";
 import { evaluationPassed } from "../checks/EvaluationStatus";
 import { Link } from "../ui/link";
@@ -148,27 +148,45 @@ export const EvaluationsCount = (
 
   const groups = groupEvaluationsByEvaluator(evaluations);
 
-  const totalErrors = groups.filter(
-    (group) =>
-      group.latest.status === "error" ||
-      evaluationPassed(group.latest) === false,
+  // A fail is a verdict; a crashed evaluator is not (#6835). Keep the two
+  // apart so an infrastructure error never reads as "the output failed".
+  const totalFailed = groups.filter(
+    (group) => evaluationPassed(group.latest) === false,
+  ).length;
+  const totalErrored = groups.filter(
+    (group) => group.latest.status === "error",
   ).length;
 
-  if (totalErrors > 0) {
+  if (totalFailed > 0 || totalErrored > 0) {
     if (trace.countGuardrails) {
       return null;
     }
 
     return (
-      <Text
-        borderRadius={"md"}
-        paddingX={2}
-        backgroundColor={"red.solid"}
-        color={"white"}
-        fontSize={"sm"}
-      >
-        {totalErrors} failed
-      </Text>
+      <HStack gap={1}>
+        {totalFailed > 0 && (
+          <Text
+            borderRadius={"md"}
+            paddingX={2}
+            backgroundColor={"red.solid"}
+            color={"white"}
+            fontSize={"sm"}
+          >
+            {totalFailed} failed
+          </Text>
+        )}
+        {totalErrored > 0 && (
+          <Text
+            borderRadius={"md"}
+            paddingX={2}
+            backgroundColor={"orange.solid"}
+            color={"white"}
+            fontSize={"sm"}
+          >
+            {totalErrored} errored
+          </Text>
+        )}
+      </HStack>
     );
   }
 
@@ -196,8 +214,11 @@ export const Blocked = (trace: TraceEval) => {
   const guardrails = trace.evaluations?.filter((x) => x.is_guardrail);
   const groups = groupEvaluationsByEvaluator(guardrails);
 
+  // Status-aware: only a guardrail that ran to completion can have blocked —
+  // an errored guardrail's stray `passed: false` is not a block (#6833).
   const totalBlocked = groups.filter(
-    (group) => group.latest.passed === false,
+    (group) =>
+      group.latest.status === "processed" && group.latest.passed === false,
   ).length;
 
   if (totalBlocked === 0) return null;

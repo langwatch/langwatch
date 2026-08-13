@@ -39,7 +39,7 @@ Feature: `langwatch copilot` defaults to direct OTLP so Copilot seat billing is 
       And stdin and stdout are a TTY
       When the user runs `langwatch copilot`
       Then the select prompt's pre-selected choice is "Direct OTLP"
-      And the gateway choice explains that LLM usage is billed per token
+      And the gateway choice explains that calls route through LangWatch on a virtual key
 
   Rule: explicit choices win over the copilot exception
 

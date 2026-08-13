@@ -35,11 +35,10 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
-import type { Organization, Project, Team } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-
 import { projectFactory } from "~/factories/project.factory";
+import type { Organization, Project, Team } from "~/generated/prisma/client";
 import {
   createGovernedSqlExecutor,
   GovernedSqlService,

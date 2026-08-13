@@ -1,4 +1,4 @@
-import type { PrismaClient, ShareLink } from "@prisma/client";
+import type { PrismaClient, ShareLink } from "~/generated/prisma/client";
 import type {
   CreateShareLinkParams,
   ShareRepository,

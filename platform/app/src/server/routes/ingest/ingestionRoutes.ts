@@ -50,8 +50,8 @@ import type {
   IExportTraceServiceRequest,
   IKeyValue,
 } from "@opentelemetry/otlp-transformer";
-import type { IngestionSource } from "@prisma/client";
 import type { Context } from "hono";
+import type { IngestionSource } from "~/generated/prisma/client";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";

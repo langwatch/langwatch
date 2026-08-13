@@ -35,7 +35,7 @@ export function useConversationPrefetch(
 ): void {
   const { project } = useOrganizationTeamProject();
   const { turns } = useConversationContext(conversationId, currentTraceId);
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const projectId = project?.id;
 
   useEffect(() => {

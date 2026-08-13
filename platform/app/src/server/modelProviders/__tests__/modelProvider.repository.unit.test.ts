@@ -10,7 +10,10 @@ vi.mock("../../../utils/encryption", () => ({
   }),
 }));
 
-import type { ModelProviderScope, PrismaClient } from "@prisma/client";
+import type {
+  ModelProviderScope,
+  PrismaClient,
+} from "~/generated/prisma/client";
 import { decrypt, encrypt } from "../../../utils/encryption";
 import {
   ModelProviderRepository,

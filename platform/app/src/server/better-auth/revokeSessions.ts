@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { connection as redisConnection } from "~/server/redis";
 
 const logger = createLogger("langwatch:better-auth:revoke");

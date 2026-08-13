@@ -2,7 +2,7 @@ import {
   type Prisma,
   type PrismaClient,
   RoleBindingScopeType,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 
 import { PersonalWorkspaceNotManagedHereError } from "~/server/app-layer/teams/team.service";
 

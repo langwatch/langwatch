@@ -14,6 +14,10 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  ENTERPRISE_PLAN_FEATURES,
+  WEBHOOK_FEATURE_LABEL,
+} from "../billing-plans";
 import { SubscriptionPage } from "../SubscriptionPage";
 import {
   createMockPlan,
@@ -119,7 +123,7 @@ vi.mock("~/utils/api", async () => {
           useQuery: () => setup.mockGetLastSubscription(),
         },
       },
-      useContext: vi.fn(() => ({
+      useUtils: vi.fn(() => ({
         organization: {
           getOrganizationWithMembersAndTheirTeams: { invalidate: vi.fn() },
         },
@@ -398,6 +402,156 @@ describe("<SubscriptionPage/>", () => {
 
       expect(
         screen.queryByTestId("upgrade-plan-block"),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  // ============================================================================
+  // A plan resolved from a license is still the plan the customer is on
+  // ============================================================================
+
+  describe("when an org on an enterprise license views subscription page", () => {
+    beforeEach(() => {
+      setMockOrganization({
+        id: "test-org-id",
+        name: "Test Org",
+        pricingModel: "TIERED",
+      });
+      mockGetActivePlan.mockReturnValue({
+        data: createMockPlan({
+          planSource: "license",
+          type: "ENTERPRISE",
+          name: "Enterprise",
+          free: false,
+          maxMembers: 10000,
+          maxMembersLite: 10000,
+          maxMessagesPerMonth: 10_000_000_000,
+        }),
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+    });
+
+    /** @scenario A licensed enterprise plan is not offered an upgrade */
+    it("names the plan without asking the customer to upgrade to it", async () => {
+      renderSubscriptionPage();
+
+      const block = await screen.findByTestId("current-plan-block");
+
+      expect(
+        within(block).getByText("License: Enterprise"),
+      ).toBeInTheDocument();
+      expect(screen.queryByText("Upgrade required")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("upgrade-plan-block"),
+      ).not.toBeInTheDocument();
+    });
+
+    /** @scenario A licensed enterprise plan lists enterprise features */
+    it("lists the enterprise features, not a smaller plan's allowances", async () => {
+      renderSubscriptionPage();
+
+      const features = await screen.findByTestId("current-plan-features-grid");
+
+      expect(
+        within(features).getByText(ENTERPRISE_PLAN_FEATURES[0]!),
+      ).toBeInTheDocument();
+      expect(
+        within(features).queryByText("Up to 20 core users"),
+      ).not.toBeInTheDocument();
+      expect(
+        within(features).queryByText("200,000 events included"),
+      ).not.toBeInTheDocument();
+    });
+
+    /** @scenario A licensed enterprise plan is not asked to contact sales about upgrading */
+    it("offers no way to contact sales about upgrading", async () => {
+      renderSubscriptionPage();
+
+      await screen.findByTestId("current-plan-block");
+
+      expect(
+        screen.queryByTestId("contact-sales-button"),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when the enterprise license withholds webhook endpoints", () => {
+    beforeEach(() => {
+      setMockOrganization({
+        id: "test-org-id",
+        name: "Test Org",
+        pricingModel: "TIERED",
+      });
+      mockGetActivePlan.mockReturnValue({
+        data: createMockPlan({
+          planSource: "license",
+          type: "ENTERPRISE",
+          name: "Enterprise",
+          free: false,
+          maxMembers: 10000,
+          maxMembersLite: 10000,
+          maxMessagesPerMonth: 10_000_000_000,
+          webhookEndpointsEnabled: false,
+        }),
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+    });
+
+    /** @scenario A capability the contract withholds is not advertised as included */
+    it("leaves the withheld capability off the list and keeps the rest", async () => {
+      renderSubscriptionPage();
+
+      const features = await screen.findByTestId("current-plan-features-grid");
+
+      expect(
+        within(features).queryByText(WEBHOOK_FEATURE_LABEL),
+      ).not.toBeInTheDocument();
+      for (const label of ENTERPRISE_PLAN_FEATURES.filter(
+        (feature) => feature !== WEBHOOK_FEATURE_LABEL,
+      )) {
+        expect(within(features).getByText(label)).toBeInTheDocument();
+      }
+    });
+  });
+
+  describe("when an org on a license below enterprise views subscription page", () => {
+    beforeEach(() => {
+      setMockOrganization({
+        id: "test-org-id",
+        name: "Test Org",
+        pricingModel: "TIERED",
+      });
+      mockGetActivePlan.mockReturnValue({
+        data: createMockPlan({
+          planSource: "license",
+          type: "PRO",
+          name: "Pro",
+          free: false,
+          maxMembers: 10,
+          maxMembersLite: 5,
+          maxMessagesPerMonth: 100_000,
+        }),
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+    });
+
+    /** @scenario A licensed plan below enterprise lists what it actually grants */
+    it("lists what the license itself grants", async () => {
+      renderSubscriptionPage();
+
+      const features = await screen.findByTestId("current-plan-features-grid");
+
+      expect(
+        within(features).getByText("Up to 10 core users"),
+      ).toBeInTheDocument();
+      expect(
+        within(features).getByText("100,000 events included"),
+      ).toBeInTheDocument();
+      expect(
+        within(features).queryByText("Up to 20 core users"),
       ).not.toBeInTheDocument();
     });
   });

@@ -1,7 +1,7 @@
 ARG CLICKHOUSE_VERSION=25.10.2.65
 
 # Stage 1: Build Go config generator
-FROM golang:1.26-alpine AS builder
+FROM golang:1.26.5-alpine AS builder
 WORKDIR /build
 COPY go.mod go.sum ./
 RUN go mod download

@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
@@ -158,6 +160,38 @@ func TestWriteSelectionStatesEveryService(t *testing.T) {
 			}
 			if got != on {
 				t.Errorf("read back %+v, want %+v", got, on)
+			}
+		})
+	})
+}
+
+// The durations file holds every command's estimate in one map, and each
+// writer publishes the whole map. Without a lock across the read and the
+// write, two runs finishing together each write a map built before the other's
+// update, and the later writer drops the earlier one's key — which reads back
+// as a command nobody has ever timed.
+//
+// @scenario "Timings survive several runs finishing at once"
+func TestObserveDurationKeepsEveryKeyWhenRunsFinishTogether(t *testing.T) {
+	t.Run("given many runs recording different commands at the same moment", func(t *testing.T) {
+		store := New(t.TempDir())
+		keys := []string{"unit", "integration", "typecheck", "lint", "biome", "tsgo"}
+
+		var wg sync.WaitGroup
+		for _, key := range keys {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				store.ObserveDuration(key, 30*time.Second)
+			}()
+		}
+		wg.Wait()
+
+		t.Run("every one of them is still there afterwards", func(t *testing.T) {
+			for _, key := range keys {
+				if store.ObservedDuration(key) == 0 {
+					t.Fatalf("%q was overwritten by another writer, so it reads as never observed", key)
+				}
 			}
 		})
 	})

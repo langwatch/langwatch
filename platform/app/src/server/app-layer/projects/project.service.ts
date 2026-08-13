@@ -1,7 +1,7 @@
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import type { Project } from "@prisma/client";
 import { nanoid } from "nanoid";
+import type { Project } from "~/generated/prisma/client";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import { generateApiKey } from "~/server/utils/apiKeyGenerator";
 import { KSUID_RESOURCES } from "~/utils/constants";

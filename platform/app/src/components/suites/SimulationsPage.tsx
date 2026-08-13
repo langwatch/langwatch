@@ -12,7 +12,6 @@
  */
 
 import { Box, EmptyState, HStack, VStack } from "@chakra-ui/react";
-import type { SimulationSuite } from "@prisma/client";
 import { subDays } from "date-fns";
 import { Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -42,6 +41,7 @@ import {
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { toaster } from "~/components/ui/toaster";
 import { HandledErrorAlert, showErrorToast } from "~/features/errors";
+import type { SimulationSuite } from "~/generated/prisma/client";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useScenarioTabFollow } from "~/hooks/useScenarioTabFollow";
@@ -55,7 +55,7 @@ import { NowProvider } from "./NowProvider";
 export default function SimulationsPage() {
   const { project } = useOrganizationTeamProject();
   const { openDrawer, setFlowCallbacks } = useDrawer();
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const { selectedSuiteSlug, navigateToSuite, highlightBatchId } =
     useSuiteRouting();
 

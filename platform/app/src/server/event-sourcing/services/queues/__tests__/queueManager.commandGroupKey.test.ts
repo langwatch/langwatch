@@ -314,7 +314,7 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
 
   describe("given a serialized producer registered without coalescing", () => {
     describe("when the command queue is initialized", () => {
-      /** @scenario 'an un-coalesced high-fan-in producer is visible, not silent' */
+      /** @scenario 'an un-coalesced producer that declares its grouping is visible, not silent' */
       it("emits a record naming the producer and its pipeline", () => {
         const { manager } = buildManager();
         const infoSpy = loggerInfoSpyOf(manager);
@@ -370,7 +370,7 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
   // producer shape, so the same gap has to be visible.
   describe("given a group-keyed producer registered without coalescing", () => {
     describe("when the group key comes from the command class", () => {
-      /** @scenario 'an un-coalesced high-fan-in producer is visible, not silent' */
+      /** @scenario 'an un-coalesced producer that declares its grouping is visible, not silent' */
       it("emits a record naming the producer and its pipeline", () => {
         const { manager } = buildManager();
         const infoSpy = loggerInfoSpyOf(manager);
@@ -395,7 +395,7 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
     });
 
     describe("when the group key comes from the registration options", () => {
-      /** @scenario 'an un-coalesced high-fan-in producer is visible, not silent' */
+      /** @scenario 'an un-coalesced producer that declares its grouping is visible, not silent' */
       it("emits a record naming the producer and its pipeline", () => {
         const { manager } = buildManager();
         const infoSpy = loggerInfoSpyOf(manager);

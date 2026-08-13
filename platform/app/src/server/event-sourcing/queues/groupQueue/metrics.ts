@@ -369,7 +369,7 @@ export const gqJobsUnroutableTotal = new Counter({
  */
 export const gqBlobReleaseGraceTotal = new Counter({
   name: "gq_blob_release_grace_total",
-  help: "Blobs whose last lease was retired via terminal retirement, moving them from the 4-day backstop onto the release grace window (excludes the dedup-squash release path — a floor, not a total)",
+  help: 'Blobs whose last lease was retired via terminal retirement, moving them from the 4-day backstop onto the release grace window (excludes the dedup-squash release path — a floor, not a total). The "tier" label is where the blob lived, not which provider stored it: "redis" or "s3", where "s3" means the durable object store whatever its scheme — an Azure Blob deployment reports "s3" here.',
   labelNames: ["queue_name", "tier"] as const,
 });
 
