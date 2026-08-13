@@ -192,9 +192,14 @@ export class RetryPolicy {
     }: { signal?: AbortSignalLike | undefined; request?: QueryRequest | undefined } = {},
   ): Promise<T> {
     const onRetry = this.onRetry;
+    // Falls back to the request's own signal. A caller that passes a request
+    // carrying a signal and no explicit `signal` means for it to be honoured;
+    // reading only the explicit one would silently retry work nobody is
+    // waiting for, which is the exact failure this option exists to prevent.
+    const abortSignal = signal ?? request?.signal;
     return runWithRetry(task, {
       ...this.options,
-      isAborted: () => signal?.aborted === true,
+      isAborted: () => abortSignal?.aborted === true,
       ...(onRetry === undefined
         ? {}
         : {
