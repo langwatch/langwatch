@@ -106,10 +106,10 @@ function StepRailItem({
       borderWidth="1px"
       colorPalette="orange"
       // The rail must not change height when a step gains its first summary
-      // (typing a name would make the whole bar hop): every item reserves the
-      // two-line height up front — 8px of padding twice, a 20px title line
-      // and a 16px summary line — and a summary-less item centers its title
-      // in it instead of sitting on a blank line.
+      // (typing a name would make the whole bar hop): every item reserves at
+      // least the two-line height — padding, title line, 12px summary line
+      // and the border land at 50px — and a summary-less item centers its
+      // title in it instead of sitting on a blank line.
       minHeight="52px"
       display="flex"
       alignItems="center"
