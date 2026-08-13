@@ -141,6 +141,20 @@ Feature: Operator control over the scheduler
     Then exactly one of the two claims proceeds
     And the other stands down without invoking the target
 
+  @unit
+  Scenario: A schedule that is already running refuses to run again
+    Given a schedule whose slot a worker has claimed and is executing
+    When an operator runs it now
+    Then the attempt is refused with a reason naming the run in progress
+    And the schedule is not made due again
+    And the target is delivered exactly once
+
+  @unit
+  Scenario: Run now is not offered while a run is in progress
+    Given a schedule showing as running or retrying
+    When an operator opens its actions
+    Then run now is not offered at all
+
   @integration
   Scenario: An inactive schedule refuses to run
     Given a paused schedule

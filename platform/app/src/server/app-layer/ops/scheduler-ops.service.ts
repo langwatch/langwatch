@@ -8,6 +8,7 @@ import {
   ScheduleAlreadyInFlightError,
   ScheduleInactiveError,
   ScheduleNotFoundError,
+  ScheduleRunInProgressError,
   ScheduleSlotNotStaleError,
 } from "./scheduler-control.errors";
 
@@ -248,6 +249,14 @@ export class SchedulerOpsService {
     if (!row.active) {
       this.refuse({ error: new ScheduleInactiveError(), scheduleId });
     }
+    // A claimed slot means a worker is executing this schedule RIGHT NOW.
+    // Making it due again would hand the same slot to a second worker and
+    // deliver the target twice — the one outcome ADR-091 refuses to offer even
+    // behind a confirmation. The repository carries the same predicate, so a
+    // slot claimed between this read and the write is refused there.
+    if (row.currentSlot) {
+      this.refuse({ error: new ScheduleRunInProgressError(), scheduleId });
+    }
 
     const queued = await this.repo.requestImmediateRunForOps({
       id: scheduleId,
@@ -256,14 +265,17 @@ export class SchedulerOpsService {
       now,
     });
     if (!queued) {
-      // The update carries two predicates, so a miss has two possible causes
-      // and they call for different actions: re-read the row and report the one
-      // that actually happened. Telling an operator "already in flight" when
-      // another operator has just paused the schedule sends them to look for a
-      // worker that is not there.
+      // The update carries several predicates, so a miss has several possible
+      // causes and they call for different actions: re-read the row and report
+      // the one that actually happened. Telling an operator "already in flight"
+      // when another operator has just paused the schedule sends them to look
+      // for a worker that is not there.
       const current = await this.repo.findByIdForOps({ id: scheduleId });
       if (current && !current.active) {
         this.refuse({ error: new ScheduleInactiveError(), scheduleId });
+      }
+      if (current?.currentSlot) {
+        this.refuse({ error: new ScheduleRunInProgressError(), scheduleId });
       }
       this.refuse({ error: new ScheduleAlreadyInFlightError(), scheduleId });
     }

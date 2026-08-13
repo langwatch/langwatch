@@ -149,6 +149,20 @@ Feature: Shared ops snapshot with a single elected writer
     And the payload reports how stale it is
 
   @unit
+  Scenario: A stale snapshot is visible to the operator, not just present in the payload
+    Given the numbers on the page have not been refreshed for some time
+    When the operator looks at the page status
+    Then it says how long ago the numbers were last updated
+    And it does not report the page as live
+
+  @unit
+  Scenario: A healthy connection does not vouch for stale numbers
+    Given the operator's connection to the page is healthy
+    And no writer has refreshed the numbers
+    When the operator looks at the page status
+    Then the staleness is what they are shown
+
+  @unit
   Scenario: No snapshot yet renders the loading state, not an error
     Given no snapshot has ever been written
     When a viewer opens the ops dashboard

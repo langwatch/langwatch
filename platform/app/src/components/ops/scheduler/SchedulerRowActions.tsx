@@ -5,7 +5,7 @@ import { ConfirmDialog } from "~/components/ops/shared/ConfirmDialog";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
-import type { SchedulerJobStatus } from "./schedulerStatus";
+import { canRunNow, type SchedulerJobStatus } from "./schedulerStatus";
 
 type PendingAction = "pause" | "resume" | "clear" | "run" | null;
 
@@ -60,16 +60,10 @@ export function SchedulerRowActions({
 
   const isPaused = status === "paused";
 
-  // ADR-091's one human guard: the risk here is the right action on the wrong
-  // tenant, and a ksuid an operator cannot verify at a glance does not guard
-  // against that. With no resolved name, run-now — the only control that can
-  // deliver something to a customer — is withheld rather than confirmed
-  // against an identifier nobody can read.
-  // A paused schedule refuses run-now server-side, so offering it here would
-  // be a control the operator cannot use — the same rule that hides mutations
-  // from a view-only operator rather than letting them error on press.
+  // Hidden rather than offered-and-refused, the same rule that hides mutations
+  // from a view-only operator. `canRunNow` carries what each refusal costs.
   const tenant = projectName;
-  const canRunNow = tenant !== null && !isPaused;
+  const isRunNowOffered = canRunNow({ projectName, status });
 
   return (
     <>
@@ -87,7 +81,7 @@ export function SchedulerRowActions({
         <Portal>
           <Menu.Positioner>
             <Menu.Content>
-              {canRunNow && (
+              {isRunNowOffered && (
                 <Menu.Item value="run" onClick={() => setPending("run")}>
                   Run now
                 </Menu.Item>

@@ -363,6 +363,17 @@ export class PrismaScheduledJobRepository implements ScheduledJobRepository {
     // the slot, running the handler, retrying, settling the calendar — stays
     // with the loop, so a manual run is the same event as a scheduled one with
     // a different reason for being due.
+    //
+    // `currentSlot IS NULL` is the guard that stops a DOUBLE DELIVERY, and it
+    // has to live here rather than only in the service. Once `claim()` leases a
+    // slot, `nextRunAt` holds the lease instant — a perfectly ordinary-looking
+    // future timestamp. An operator reading the row sees it, run-now's
+    // `nextRunAt = expected` guard matches, and the row becomes due again while
+    // its worker is still executing. `claim()` guards only on `nextRunAt` too,
+    // and its `COALESCE("currentSlot", …)` preserves the pinned slot rather
+    // than refusing, so a second worker takes the same slot and the target
+    // fires twice. That COALESCE is right for a retry wake or a crash-refire,
+    // where the first worker is gone; it is not a defence against this.
     const affected = await this.prisma.$executeRaw`
       UPDATE "ScheduledJob"
       SET "nextRunAt" = ${toPgTimestampUtc(now)}::timestamp,
@@ -370,6 +381,7 @@ export class PrismaScheduledJobRepository implements ScheduledJobRepository {
       WHERE "id" = ${id}
         AND "projectId" = ${projectId}
         AND "active" = true
+        AND "currentSlot" IS NULL
         AND "nextRunAt" = ${toPgTimestampUtc(expectedNextRunAt)}::timestamp
       -- @tenancy: scheduler cross-tenant ops control (system-owned, ops:manage)
     `;

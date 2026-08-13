@@ -213,6 +213,7 @@ export const APP_ERROR_CODES = [
   "schedule_already_in_flight",
   "schedule_inactive",
   "schedule_not_found",
+  "schedule_run_in_progress",
   "schedule_slot_not_stale",
   "schema_failure",
   "scim_managed_group",

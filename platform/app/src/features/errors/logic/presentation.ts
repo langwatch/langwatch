@@ -931,6 +931,14 @@ const presentations = {
     describe: () =>
       "This slot was claimed while you were looking at it, so nothing was changed. Reload to see its current state.",
   },
+  schedule_run_in_progress: {
+    // Distinct from `schedule_already_in_flight`: nothing raced the operator,
+    // the schedule is simply mid-run. Re-arming it would hand the same slot to
+    // a second worker and deliver the target twice.
+    title: "That schedule is already running",
+    describe: () =>
+      "Wait for the current run to finish before starting another. Running it now would deliver the same work twice.",
+  },
   schedule_slot_not_stale: {
     title: "That run is still current",
     describe: () =>

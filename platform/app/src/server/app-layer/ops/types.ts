@@ -197,7 +197,11 @@ export interface SnapshotProvenance {
   detailComputedAt: number | null;
   /** Which writer produced it — the pod to look at when something is stuck. */
   writerId: string | null;
-  /** Changes exactly when the writer changes. */
+  /**
+   * Increments on every lease acquisition, including a re-acquisition by the
+   * pod that just lost it. It separates a stuck writer from a churning one; it
+   * is not a fleet-wide ordering of writers.
+   */
   leaseEpoch: number | null;
 }
 

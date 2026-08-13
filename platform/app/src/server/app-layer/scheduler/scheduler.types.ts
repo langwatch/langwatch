@@ -244,6 +244,11 @@ export interface ScheduledJobRepository {
     now: Date;
   }): Promise<boolean>;
 
+  // Refuses while a slot is claimed — see the note on the implementation. A
+  // leased `nextRunAt` looks like an ordinary future timestamp, so without that
+  // predicate an operator can re-arm a schedule whose worker is mid-run and the
+  // target delivers twice.
+
   /**
    * Cross-tenant read for the ops dashboard: the most-imminent scheduled jobs
    * (active first, soonest `nextRunAt` first), bounded by `limit`. Read-only

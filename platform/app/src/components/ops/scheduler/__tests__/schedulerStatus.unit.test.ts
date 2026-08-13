@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { SLOT_STALE_AFTER_MS } from "~/shared/ops/schedulerControl";
 import {
+  canRunNow,
   compareForAttention,
   deriveLoopHealth,
   deriveStatus,
@@ -316,6 +317,44 @@ describe("isSlotStale", () => {
       expect(isSlotStale({ job: job({ currentSlot: null }), now: NOW })).toBe(
         false,
       );
+    });
+  });
+});
+
+describe("canRunNow", () => {
+  describe("given a schedule whose slot a worker has claimed", () => {
+    /** @scenario "Run now is not offered while a run is in progress" */
+    it("withholds run now while it is running", () => {
+      // Re-arming a claimed slot hands the SAME slot to a second worker,
+      // because claim() preserves an existing currentSlot rather than refusing.
+      expect(canRunNow({ projectName: "Acme", status: "running" })).toBe(false);
+    });
+
+    it("withholds it while it is retrying too", () => {
+      expect(canRunNow({ projectName: "Acme", status: "retrying" })).toBe(
+        false,
+      );
+    });
+  });
+
+  describe("given a paused schedule", () => {
+    it("withholds run now, because pausing means nothing runs", () => {
+      expect(canRunNow({ projectName: "Acme", status: "paused" })).toBe(false);
+    });
+  });
+
+  describe("given a schedule whose project name could not be resolved", () => {
+    it("withholds run now rather than confirming against a ksuid", () => {
+      expect(canRunNow({ projectName: null, status: "scheduled" })).toBe(false);
+    });
+  });
+
+  describe("given an idle schedule with a resolved project", () => {
+    it("offers run now", () => {
+      expect(canRunNow({ projectName: "Acme", status: "scheduled" })).toBe(
+        true,
+      );
+      expect(canRunNow({ projectName: "Acme", status: "overdue" })).toBe(true);
     });
   });
 });

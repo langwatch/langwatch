@@ -79,6 +79,33 @@ export function needsAttention(status: SchedulerJobStatus): boolean {
   return status === "overdue" || status === "retrying";
 }
 
+/**
+ * Whether run-now should be offered at all (ADR-091).
+ *
+ * Three refusals, each of which the server also enforces — this decides only
+ * whether the operator is shown a control they could use.
+ *
+ * - No resolved project name: run-now is the one control that can deliver
+ *   something to a customer, and a ksuid is not a target an operator can check
+ *   a confirmation against.
+ * - Paused: the point of pausing is that nothing runs.
+ * - Running or retrying: a slot is claimed and a worker is executing it. Making
+ *   the schedule due again hands the SAME slot to a second worker, because
+ *   `claim()` preserves an existing `currentSlot` rather than refusing — so the
+ *   target is delivered twice. This is the outcome ADR-091 declines to offer
+ *   even behind a confirmation.
+ */
+export function canRunNow({
+  projectName,
+  status,
+}: {
+  projectName: string | null;
+  status: SchedulerJobStatus;
+}): boolean {
+  if (projectName === null) return false;
+  return status !== "paused" && status !== "running" && status !== "retrying";
+}
+
 /** Whether a slot has been held long enough that clearing it is a repair. */
 export function isSlotStale({
   job,

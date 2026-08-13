@@ -62,6 +62,26 @@ export class ScheduleAlreadyInFlightError extends HandledError {
   }
 }
 
+/**
+ * A run is already in flight. Re-arming would hand the SAME slot to a second
+ * worker — the double-delivery ADR-091 exists to prevent.
+ */
+export class ScheduleRunInProgressError extends HandledError {
+  declare readonly code: "schedule_run_in_progress";
+
+  constructor() {
+    super(
+      "schedule_run_in_progress",
+      "That schedule is already running, so it was not started again.",
+      {
+        httpStatus: 409,
+        fault: "customer",
+      },
+    );
+    this.name = "ScheduleRunInProgressError";
+  }
+}
+
 export class ScheduleSlotNotStaleError extends HandledError {
   declare readonly code: "schedule_slot_not_stale";
 

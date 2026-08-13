@@ -22,7 +22,13 @@ export default function OpsPage() {
         <PageLayout.Header>
           <PageLayout.Heading>Ops Dashboard</PageLayout.Heading>
           <Spacer />
-          <ConnectionStatusIndicator status={status} />
+          {/* The snapshot's own age, not just the socket's health: this page
+              can hold a live connection to a pod that is serving numbers no
+              writer has refreshed. */}
+          <ConnectionStatusIndicator
+            status={status}
+            computedAtMs={data?.snapshot.computedAt ?? null}
+          />
         </PageLayout.Header>
         <PageLayout.Container>
           {data ? (

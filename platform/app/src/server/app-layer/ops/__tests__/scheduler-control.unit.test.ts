@@ -104,6 +104,49 @@ describe("SchedulerOpsService controls", () => {
         });
       });
 
+      /** @scenario "A schedule that is already running refuses to run again" */
+      it("refuses while a worker is executing the schedule", async () => {
+        // A claimed slot leaves `nextRunAt` holding the LEASE instant, which
+        // looks like an ordinary future timestamp — so the fencing guard alone
+        // waves this through. `claim()` then re-claims (its COALESCE preserves
+        // rather than refuses) and a second worker delivers the same slot.
+        const { service, repo } = makeService(
+          record({ currentSlot: at(-30_000) }),
+        );
+
+        expect(
+          await codeOf(() =>
+            service.runNow({
+              scheduleId: "sched_1",
+              actorUserId: "u1",
+              now: NOW,
+            }),
+          ),
+        ).toBe("schedule_run_in_progress");
+        expect(repo.requestImmediateRunForOps).not.toHaveBeenCalled();
+      });
+
+      it("reports the run in progress when a slot is claimed mid-flight", async () => {
+        // The service read an idle row, a worker claimed it before the write
+        // landed, and the repository predicate refused. The re-read is what
+        // turns that into the right words.
+        const { service, repo } = makeService(record());
+        repo.requestImmediateRunForOps.mockResolvedValue(false);
+        repo.findByIdForOps
+          .mockResolvedValueOnce(record())
+          .mockResolvedValueOnce(record({ currentSlot: at(-1_000) }));
+
+        expect(
+          await codeOf(() =>
+            service.runNow({
+              scheduleId: "sched_1",
+              actorUserId: "u1",
+              now: NOW,
+            }),
+          ),
+        ).toBe("schedule_run_in_progress");
+      });
+
       it("guards the write on the fencing value it read", async () => {
         const { service, repo } = makeService(record());
 
@@ -336,33 +379,38 @@ describe("SchedulerOpsService controls", () => {
   describe("given any control writing to a schedule", () => {
     /** @scenario "A control names its project in the write, not only in the copy" */
     it("scopes every write to the row's project", async () => {
-      const { service, repo } = makeService(
-        record({
-          currentSlot: at(-SLOT_STALE_AFTER_MS - 60_000),
-          updatedAt: at(-SLOT_STALE_AFTER_MS - 60_000),
-        }),
-      );
+      // Each control gets the row shape it is legal against: clearing needs a
+      // stale claimed slot, run-now needs an idle one.
+      const wedged = record({
+        currentSlot: at(-SLOT_STALE_AFTER_MS - 60_000),
+        updatedAt: at(-SLOT_STALE_AFTER_MS - 60_000),
+      });
 
-      await service.setActive({
+      const paused = makeService(record());
+      await paused.service.setActive({
         scheduleId: "sched_1",
         active: false,
         actorUserId: "u1",
       });
-      await service.clearStuckSlot({
+
+      const cleared = makeService(wedged);
+      await cleared.service.clearStuckSlot({
         scheduleId: "sched_1",
         actorUserId: "u1",
         now: NOW,
       });
-      await service.runNow({
+
+      const ran = makeService(record());
+      await ran.service.runNow({
         scheduleId: "sched_1",
         actorUserId: "u1",
         now: NOW,
       });
 
       for (const write of [
-        repo.setActiveForOps,
-        repo.releaseSlotForOps,
-        repo.requestImmediateRunForOps,
+        paused.repo.setActiveForOps,
+        cleared.repo.releaseSlotForOps,
+        ran.repo.requestImmediateRunForOps,
       ]) {
         expect(write).toHaveBeenCalledWith(
           expect.objectContaining({ projectId: "project_acme" }),
