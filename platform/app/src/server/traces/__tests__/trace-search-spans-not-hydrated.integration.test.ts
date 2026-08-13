@@ -42,11 +42,11 @@ const now = Date.now();
  */
 const BEDROCK_INPUT = JSON.stringify({
   type: "text",
-  value: 'Bedrock Converse input: [{"text":"summarise this consult note"}]',
+  value: 'Bedrock Converse input: [{"text":"summarise this shipping manifest"}]',
 });
 const BEDROCK_OUTPUT = JSON.stringify({
   type: "text",
-  value: 'Bedrock Converse output: [{"text":"The patient reports ..."}]',
+  value: 'Bedrock Converse output: [{"text":"The shipment contains ..."}]',
 });
 
 function makeTraceSummaryRow(overrides: Record<string, unknown> = {}) {
@@ -223,8 +223,8 @@ describe("given a trace whose spans carry real Bedrock content", () => {
 
       // Emptiness measured on THESE fields would be real. Emptiness measured on
       // `spans` would not — that is the whole distinction branch 2 turns on.
-      expect(trace!.input?.value).toContain("summarise this consult note");
-      expect(trace!.output?.value).toContain("The patient reports");
+      expect(trace!.input?.value).toContain("summarise this shipping manifest");
+      expect(trace!.output?.value).toContain("The shipment contains");
     });
   });
 
