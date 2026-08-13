@@ -1,13 +1,15 @@
 @traces @saved-views
-Feature: Saved Views on Traces List
+Feature: Saved Views on Analytics
   As a LangWatch user
-  I want quick-access filter presets on the traces page
+  I want quick-access filter presets on the Analytics page
   So that I can switch between common views with one click
 
-  # All scenarios describe the saved-views UI on the Traces page (chips,
-  # save dialog, URL sync, persistence). Need a JSDOM render of the
-  # saved-views component + tRPC procedure tests for the views router.
-  # Aspirational pending those harnesses.
+  # All scenarios describe the saved-views UI — chips, save dialog, URL sync,
+  # persistence. It was built for the legacy Traces page; Analytics is the
+  # surface that still renders it, and the Trace Explorer has its own lens
+  # system instead (specs/traces-v2/). Need a JSDOM render of the saved-views
+  # component + tRPC procedure tests for the views router. Aspirational
+  # pending those harnesses.
 
   # ─── Design Decisions ───────────────────────────────────────────────
   #
@@ -64,7 +66,7 @@ Feature: Saved Views on Traces List
   # ─────────────────────────────────────────────────────────────────────
 
   Background:
-    Given I am on the traces list page for my project
+    Given I am on the Analytics page for my project
     And the project has ClickHouse enabled for traces
 
   # ─── Step 0: Origin Filter Infrastructure ───────────────────────────

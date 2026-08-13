@@ -89,12 +89,12 @@ export const projectRoutes = {
     parent: "traces_v2",
   },
   message_open_tab: {
-    path: "/[project]/messages/[trace]/[opentab]",
+    path: "/[project]/messages/[trace]/[openTab]",
     title: "trace",
     parent: "traces_v2",
   },
   message_open_tab_span: {
-    path: "/[project]/messages/[trace]/[opentab]/[span]",
+    path: "/[project]/messages/[trace]/[openTab]/[span]",
     title: "trace",
     parent: "traces_v2",
   },

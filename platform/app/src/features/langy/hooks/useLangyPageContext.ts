@@ -163,6 +163,10 @@ function routeChips(pathname: string): LangyContextChip[] {
   if (!surface || rest.length === 0) return [];
 
   switch (surface) {
+    // `messages` is the legacy path. It still redirects rather than 404s, so
+    // it can be the pathname for the moment before the redirect lands, and a
+    // routed trace should keep its chip across that moment.
+    case "traces":
     case "messages":
       // Shared with the trace rows / trace drawer that register themselves as
       // context targets, so a clicked trace and a routed one are the same chip.
