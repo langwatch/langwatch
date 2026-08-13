@@ -38,7 +38,7 @@ export function useHttpTest({
 
   const handleTest = useCallback(
     async (
-      templateVariables: Record<string, string>,
+      templateVariables: Record<string, unknown>,
     ): Promise<HttpTestResult> => {
       if (!project?.id) {
         return { success: false, error: "No project selected" };
@@ -62,6 +62,7 @@ export function useHttpTest({
           response: result.response,
           extractedOutput: result.extractedOutput,
           error: result.error,
+          errorCode: result.errorCode,
           status: result.status,
           statusText: result.statusText,
           duration: result.duration,

@@ -30,7 +30,9 @@ Feature: Testing an HTTP agent exercises the same path that runs it
       And an HTTP agent whose URL points at an internal address
       When the agent is tested
       Then the test fails with a blocked-address error
-      And the error names the address that was refused
+      And the failure reads as a refused address, not as an unreachable service
+      # Telling the author to check that their service is running sends them to
+      # debug an endpoint that is running and was never dialed.
 
     # Refusing the destination is the engine's, so the covering test is Go's
     # (httpblock: TestSSRF_WhenLocalDestinationsArePermitted, "still refuses

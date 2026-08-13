@@ -573,6 +573,15 @@ func (e *Engine) runHTTP(ctx context.Context, node *dsl.Node, inputs map[string]
 		if errors.As(err, &ue) {
 			return nil, &NodeError{Type: "upstream_http_error", Message: msg, Status: ue.Status}
 		}
+		// A refused destination is its own failure, not a failure to reach one.
+		// Reported as http_error it presented as "couldn't reach the agent,
+		// check the URL and that the service is running" — advice that sends
+		// the author to debug an endpoint which is running and was never
+		// dialed. The code has copy of its own saying the address is not
+		// permitted.
+		if errors.Is(err, httpblock.ErrSSRFBlocked) {
+			return nil, &NodeError{Type: "ssrf_blocked", Message: msg}
+		}
 		return nil, &NodeError{Type: "http_error", Message: msg}
 	}
 	out := make(map[string]any, 1)

@@ -5,6 +5,7 @@ import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-even
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import {
   type BaseComponent,
+  type Field,
   HTTP_METHODS,
   httpAuthSchema,
   httpHeaderSchema,
@@ -27,6 +28,8 @@ const logger = createLogger("langwatch:httpProxy");
 type HttpProxyResult = {
   success: boolean;
   error?: string;
+  /** The engine's stable failure code, which the panel presents copy from. */
+  errorCode?: string;
   response?: unknown;
   extractedOutput?: string;
   status?: number;
@@ -102,7 +105,7 @@ export const httpProxyRouter = createTRPCRouter({
       const nodeId = "http_agent_test";
       const workflow = buildAgentTestWorkflow({
         nodeId,
-        variableNames: Object.keys(templateVariables),
+        variables: templateVariables,
         parameters: buildHttpNodeParameters({ ...call, headers, bodyTemplate }),
       });
 
@@ -144,11 +147,11 @@ export const httpProxyRouter = createTRPCRouter({
 const buildAgentTestWorkflow = ({
   nodeId,
   parameters,
-  variableNames,
+  variables,
 }: {
   nodeId: string;
   parameters: ReturnType<typeof buildHttpNodeParameters>;
-  variableNames: string[];
+  variables: Record<string, unknown>;
 }): Workflow => ({
   spec_version: LATEST_SPEC_VERSION,
   workflow_id: `agent_test_${nanoid(8)}`,
@@ -167,9 +170,9 @@ const buildAgentTestWorkflow = ({
       position: { x: 0, y: 0 },
       data: {
         name: "HTTP agent",
-        inputs: variableNames.map((identifier) => ({
+        inputs: Object.entries(variables).map(([identifier, value]) => ({
           identifier,
-          type: "str" as const,
+          type: fieldTypeFor(value),
         })),
         outputs: [{ identifier: "output", type: "str" as const }],
         parameters,
@@ -179,6 +182,21 @@ const buildAgentTestWorkflow = ({
   edges: [],
   state: {},
 });
+
+/**
+ * The field type matching a value's shape.
+ *
+ * It decides how the engine interpolates the variable: a string is escaped to
+ * sit inside a JSON string literal, while structured data is written as JSON.
+ * Declaring a list of messages as text would send the endpoint a body with
+ * every quote backslashed, which is the sort of thing that reads as "the agent
+ * is broken" rather than "the variable was the wrong type".
+ */
+const fieldTypeFor = (value: unknown): Field["type"] => {
+  if (Array.isArray(value)) return "list";
+  if (value !== null && typeof value === "object") return "dict";
+  return "str";
+};
 
 /** Dispatches the node and returns the state the engine finished it in. */
 const runNode = async ({
@@ -262,6 +280,10 @@ const toProxyResult = ({
     return {
       ...detail,
       success: false,
+      // Both: the code is what the customer reads copy from, the message is
+      // the engine's own words, which is what the person debugging their own
+      // endpoint is actually looking for.
+      errorCode: state.error_type,
       error: state.error ?? "The request failed",
     };
   }
