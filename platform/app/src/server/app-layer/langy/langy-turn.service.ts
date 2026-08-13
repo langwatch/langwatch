@@ -276,7 +276,9 @@ export function renderLangyMissingPermissionsNote(
   missing: readonly string[],
 ): string {
   if (missing.length === 0) return "";
-  const phrases = missing.map((p) => `${humanizeLangyPermission(p)} (\`${p}\`)`);
+  const phrases = missing.map(
+    (p) => `${humanizeLangyPermission(p)} (\`${p}\`)`,
+  );
   return [
     "ACCESS THE PERSON YOU ACT FOR DOES NOT HOLD IN THIS PROJECT —",
     "they cannot:",
