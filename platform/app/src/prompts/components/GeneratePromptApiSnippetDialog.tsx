@@ -1,5 +1,6 @@
 import { VStack } from "@chakra-ui/react";
 import type React from "react";
+import { useMemo } from "react";
 import { GenerateApiSnippetDialog } from "~/components/GenerateApiSnippetDialog";
 import { Link } from "~/components/ui/link";
 import { getGetPromptSnippets } from "../utils/snippets/getGetPromptSnippets";
@@ -26,13 +27,22 @@ export function GeneratePromptApiSnippetDialog({
   label,
   children,
 }: GeneratePromptApiSnippetButtonProps) {
-  const snippets = getGetPromptSnippets({
-    promptHandle: promptHandle ?? undefined,
-    apiKey,
-    label,
-  });
+  // Memoized: a fresh array identity on every render re-armed the snippet
+  // sync effect in GenerateApiSnippetDialog, causing infinite re-render loops.
+  const snippets = useMemo(
+    () =>
+      getGetPromptSnippets({
+        promptHandle: promptHandle ?? undefined,
+        apiKey,
+        label,
+      }),
+    [promptHandle, apiKey, label],
+  );
 
-  const targets = snippets.map((snippet) => snippet.target);
+  const targets = useMemo(
+    () => snippets.map((snippet) => snippet.target),
+    [snippets],
+  );
 
   if (!snippets) {
     return children;
