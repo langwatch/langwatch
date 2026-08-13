@@ -146,6 +146,28 @@ type Child struct {
 	LogPath string
 }
 
+// ProcessSample is one live process as the tsgo governor's sampler sees it.
+type ProcessSample struct {
+	PID      int
+	RSSBytes int64
+	CPUTime  time.Duration // total CPU clock, for idle detection across ticks
+	Elapsed  time.Duration // wall-clock age
+	Command  string
+}
+
+// ProcTelemetry ships the process watch's observations to the local
+// observability stack, so "how big does tsgo get", "how many vitest workers
+// run at once" and "what did the governor kill" become queryable history
+// instead of anecdotes. Implementations must be fire-and-forget: when the
+// stack is down, observations are dropped silently, never buffered or logged
+// into a spam stream.
+type ProcTelemetry interface {
+	// RecordSample publishes the current footprint of every watched class.
+	RecordSample(procs []domain.WatchedProcess)
+	// RecordKill counts one governor enforcement, by class and reason.
+	RecordKill(class, reason string)
+}
+
 // System is the set of OS facts the app needs, behind a port so it can be faked.
 type System interface {
 	FreePorts(n int) ([]int, error)
@@ -177,6 +199,15 @@ type System interface {
 	// already running has to be walked.
 	DemoteGroup(pid int)
 	RestoreGroup(pid int)
+	// ProcessSamples lists every live process with the facts the tsgo governor
+	// needs (ADR-095): resident set, CPU clock, elapsed age, command line.
+	// Filtering to tsgo is the caller's job via domain.IsTsgoCommand — the
+	// sampler stays generic and the selection rule stays in one testable place.
+	ProcessSamples() []ProcessSample
+	// Kill SIGKILLs one process — never its group. The tsgo governor's targets
+	// are children of queue wrappers and daemons whose process group includes
+	// exactly the supervisors that must survive the kill.
+	Kill(pid int)
 	// OrphanedWorkers lists processes matching marker whose parent is PID 1 —
 	// test workers an interrupted run left behind, owned by nobody.
 	OrphanedWorkers(marker string) []int

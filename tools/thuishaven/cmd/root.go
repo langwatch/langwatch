@@ -29,6 +29,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/otellgtm"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/portlessproxy"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/postgresbrew"
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/procmetrics"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/procsupervisor"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/redisbrew"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/semaphore"
@@ -36,6 +37,24 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/app"
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
+
+// tsgoLimits resolves the tsgo governor's knobs (ADR-095) from the machine
+// with env overrides; a knob set to 0 disables its rule, and
+// HAVEN_TSGO_RUN_MAX_RSS_MB=0 disables the governor entirely.
+func tsgoLimits(ram uint64) domain.TsgoLimits {
+	l := domain.DefaultTsgoLimits(ram)
+	if mb := envInt("HAVEN_TSGO_RUN_MAX_RSS_MB", -1); mb >= 0 {
+		l.RunMaxRSS = int64(mb) << 20
+	}
+	if mb := envInt("HAVEN_TSGO_LSP_MAX_RSS_MB", -1); mb >= 0 {
+		l.LSPMaxRSS = int64(mb) << 20
+	}
+	if mb := envInt("HAVEN_TSGO_TOTAL_BUDGET_MB", -1); mb >= 0 {
+		l.TotalBudget = int64(mb) << 20
+	}
+	l.LSPIdleTTL = envDuration("HAVEN_TSGO_LSP_IDLE_TTL", l.LSPIdleTTL)
+	return l
+}
 
 // Root parses the global flags, wires the object graph, and dispatches. The three
 // steps are separate so none of them grows the others: meta commands answer
@@ -181,6 +200,7 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		DBIdleTTL:               envDuration("HAVEN_DB_TTL", 4*24*time.Hour),
 		TestContainerTTL:        envDuration("HAVEN_TESTCONTAINER_TTL", domain.DefaultTestContainerTTL),
 		RunningTestContainerTTL: envDuration("HAVEN_TESTCONTAINER_RUNNING_TTL", domain.DefaultRunningTestContainerTTL),
+		Tsgo:                    tsgoLimits(ram),
 		HeartbeatEvery:          30 * time.Second,
 		DaemonArgv:              selfArgv(trustedRepoRoot(), "daemon"),
 		IsAgent:                 isAgent,
@@ -205,7 +225,9 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		orch: app.New(app.Deps{
 			Cfg: cfg, Proxy: proxy, Store: store, Sup: sup, Sys: sys,
 			CH: ch, PG: pg, RDS: rds, Obs: obs, Hyg: hyg, Sem: sem,
-			Container: rt, Janitor: dockerjanitor.New(rt), Claude: claudesettings.New(), Log: logger,
+			Container: rt, Janitor: dockerjanitor.New(rt),
+			ProcTel: procmetrics.New(observabilityEndpoints().OTLPHTTPPort),
+			Claude:  claudesettings.New(), Log: logger,
 		}),
 		dash: dashboard.New(store.Stacks, sharedURL, dashboard.Probes{
 			PortInUse:    sys.PortInUse,
