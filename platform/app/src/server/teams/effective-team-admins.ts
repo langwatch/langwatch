@@ -2,7 +2,7 @@ import {
   type Prisma,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 
 /**
  * Who effectively administers a team.

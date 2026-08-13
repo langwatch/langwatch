@@ -1,4 +1,3 @@
-import type { PrismaClient } from "@prisma/client";
 import {
   afterAll,
   beforeAll,
@@ -12,6 +11,7 @@ import {
   llmPromptConfigFactory,
   llmPromptConfigVersionFactory,
 } from "~/factories/llm-config.factory";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { LlmConfigRepository } from "./llm-config.repository";
 import { LATEST_SCHEMA_VERSION } from "./llm-config-version-schema";
 

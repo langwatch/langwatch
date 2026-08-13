@@ -18,7 +18,6 @@ import {
   httpLink,
   loggerLink,
   splitLink,
-  TRPCClientError,
   wsLink,
 } from "@trpc/client";
 import { createTRPCReact } from "@trpc/react-query";
@@ -36,6 +35,7 @@ import {
   invalidateModelProviderQueries,
   subscribeToModelProvidersUpdated,
 } from "./modelProviderSync";
+import { shouldRetryQuery } from "./queryRetryPolicy";
 import { sseLink } from "./sseLink";
 import {
   extractAiCallFailedInfo,
@@ -77,9 +77,6 @@ function getOrCreateWSClient(): ReturnType<typeof createWSClient> | null {
   return cachedWSClient;
 }
 
-const MAX_RETRIES = 4;
-const HTTP_STATUS_TO_NOT_RETRY = [400, 401, 403, 404, 422, 431];
-
 function createTRPCLinks() {
   const wsClient = getOrCreateWSClient();
 
@@ -91,10 +88,12 @@ function createTRPCLinks() {
     },
     true: httpLink({
       url: `${getBaseUrl()}/api/trpc`,
+      transformer: superjson,
     }),
     false: httpBatchLink({
       url: `${getBaseUrl()}/api/trpc`,
       maxURLLength: 4000,
+      transformer: superjson,
     }),
   });
 
@@ -106,7 +105,7 @@ function createTRPCLinks() {
         condition(op) {
           return op.context.useWS === true;
         },
-        true: wsLink({ client: wsClient }),
+        true: wsLink({ client: wsClient, transformer: superjson }),
         false: httpRouting,
       })
     : httpRouting;
@@ -159,13 +158,7 @@ function providerDisabledSwapHandler(
   if (info.resolvedScope !== "project") return undefined;
   if (!info.alternate?.providerEnabled) return undefined;
   return async () => {
-    // v10 path-type inference collapses on this router (the `subscription`
-    // sub-router collides with the client's built-in method, poisoning the
-    // whole path union to `never`). The runtime call is the plain dotted-path
-    // mutation the non-proxy client supports; cast past the broken inference.
-    await (
-      trpcClient.mutation as (path: string, input: unknown) => Promise<unknown>
-    )("modelProvider.setFeatureOverrideForScope", {
+    await trpcClient.modelProvider.setFeatureOverrideForScope.mutate({
       scopeType: "PROJECT",
       scopeId: info.projectId,
       featureKey: info.featureKey,
@@ -306,20 +299,7 @@ function createQueryClientConfig() {
           process.env.NODE_ENV !== "production"
             ? ("always" as const)
             : ("online" as const),
-        retry(failureCount: number, error: unknown) {
-          if (failureCount >= MAX_RETRIES) {
-            return false;
-          }
-
-          if (
-            error instanceof TRPCClientError &&
-            HTTP_STATUS_TO_NOT_RETRY.includes(error.data?.httpStatus ?? 0)
-          ) {
-            return false;
-          }
-
-          return true;
-        },
+        retry: shouldRetryQuery,
       },
     },
   };
@@ -328,15 +308,9 @@ function createQueryClientConfig() {
 /** A set of type-safe react-query hooks for your tRPC API. */
 export const api = createTRPCReact<AppRouter>();
 
-/**
- * Vanilla tRPC client for use outside of React components. Non-proxy
- * variant calling via dotted paths — `createTRPCProxyClient` can't be
- * used on this router because the `subscription` router name collides
- * with the proxy client's built-in method in tRPC v10.
- */
+/** Vanilla tRPC client for use outside of React components. */
 export const trpcClient = createTRPCClient<AppRouter>({
   links: createTRPCLinks(),
-  transformer: superjson,
 });
 
 /**
@@ -347,7 +321,7 @@ export const trpcClient = createTRPCClient<AppRouter>({
  * tab's cache immediately, rather than waiting on a window-focus event.
  */
 function ModelProviderCrossTabSync() {
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   useEffect(
     () =>
@@ -371,7 +345,6 @@ export function TRPCProvider({ children }: { children: ReactNode }) {
   const [trpcClientInstance] = useState(() =>
     api.createClient({
       links: createTRPCLinks(),
-      transformer: superjson,
     }),
   );
 

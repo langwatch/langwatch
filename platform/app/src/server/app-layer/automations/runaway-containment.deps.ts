@@ -1,6 +1,9 @@
 import { createLogger } from "@langwatch/observability";
-import { OrganizationUserRole, type PrismaClient } from "@prisma/client";
 import { nanoid } from "nanoid";
+import {
+  OrganizationUserRole,
+  type PrismaClient,
+} from "~/generated/prisma/client";
 
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { sendAutomationLimitEmail } from "~/server/mailer/automationLimitEmail";

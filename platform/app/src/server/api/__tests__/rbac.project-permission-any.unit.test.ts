@@ -7,12 +7,13 @@
  * screen. Where the caller stands is the same for every permission in the
  * list, so it is read once.
  */
+
+import { describe, expect, it, vi } from "vitest";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { describe, expect, it, vi } from "vitest";
+} from "~/generated/prisma/client";
 import type { Session } from "~/server/auth";
 import { checkProjectPermissionAny, type Permission } from "../rbac";
 

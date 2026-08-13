@@ -10,11 +10,6 @@
  * when it has no email provider.
  */
 import { generate } from "@langwatch/ksuid";
-import {
-  OrganizationUserRole,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "@prisma/client";
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -25,6 +20,11 @@ import {
   it,
   vi,
 } from "vitest";
+import {
+  OrganizationUserRole,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "~/generated/prisma/client";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { PrismaOrganizationRepository } from "~/server/app-layer/organizations/repositories/organization.prisma.repository";

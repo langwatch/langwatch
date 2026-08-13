@@ -13,13 +13,13 @@
  */
 
 import { generate } from "@langwatch/ksuid";
+import { vi } from "vitest";
 import {
   OrganizationUserRole,
   type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { vi } from "vitest";
+} from "~/generated/prisma/client";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { cleanupTestRows } from "../../../../test-utils/cleanupTestRows";

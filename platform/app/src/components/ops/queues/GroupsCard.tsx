@@ -30,7 +30,7 @@ const GROUPS_ROW_HEIGHT = 36;
 
 export function GroupsCard({ queueNames }: { queueNames: string[] }) {
   const { hasAccess } = useOpsPermission();
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [search, setSearch] = useState("");

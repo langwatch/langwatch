@@ -64,7 +64,7 @@ export const useRunEvalution = () => {
       { enabled: !!project?.id },
     );
 
-  const trpc = api.useContext();
+  const trpc = api.useUtils();
 
   const [triggerTimeout, setTriggerTimeout] = useState<{
     run_id: string;
@@ -280,6 +280,6 @@ export const useRunEvalution = () => {
     runEvaluation,
     stopEvaluation,
     isLoading:
-      isLoading || generateCommitMessage.isLoading || commitVersion.isLoading,
+      isLoading || generateCommitMessage.isPending || commitVersion.isPending,
   };
 };

@@ -1,5 +1,5 @@
-import type { Organization } from "@prisma/client";
 import type { MiddlewareHandler } from "hono";
+import type { Organization } from "~/generated/prisma/client";
 import {
   type EnterpriseFeature,
   EnterprisePlanRequiredError,

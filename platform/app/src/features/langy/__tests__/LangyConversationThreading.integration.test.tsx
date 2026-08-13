@@ -93,11 +93,18 @@ const subscription = vi.fn(
 
 vi.mock("~/utils/api", () => ({
   trpcClient: {
-    mutation(path: string, input: unknown) {
-      return mutation(path, input);
-    },
-    subscription(path: string, input: unknown, options: unknown) {
-      return subscription(path, input, options);
+    langy: {
+      createConversation: {
+        mutate: (input: unknown) => mutation("langy.createConversation", input),
+      },
+      continueConversation: {
+        mutate: (input: unknown) =>
+          mutation("langy.continueConversation", input),
+      },
+      onTurnStream: {
+        subscribe: (input: unknown, options: unknown) =>
+          subscription("langy.onTurnStream", input, options),
+      },
     },
   },
   api: {
@@ -160,9 +167,9 @@ vi.mock("~/utils/api", () => ({
       list: {
         useInfiniteQuery: () => ({
           data: { pages: [{ items: [], nextCursor: null }] },
-          isInitialLoading: false,
+          isLoading: false,
           isFetching: false,
-          isPreviousData: false,
+          isPlaceholderData: false,
           isFetched: true,
           isError: false,
           error: null,

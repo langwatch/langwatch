@@ -4,9 +4,10 @@
  * registration in `app.ts` bound to it, and answers the wire shape declared
  * beside it in `wire.ts`.
  */
-import type { OrganizationUserRole } from "@prisma/client";
+
 import type { Context } from "hono";
 import type { z } from "zod";
+import type { OrganizationUserRole } from "~/generated/prisma/client";
 import { emitManagementAudit } from "~/server/api/management/audit";
 import { buildInviteAcceptUrl } from "~/server/invites/invite-link";
 import {

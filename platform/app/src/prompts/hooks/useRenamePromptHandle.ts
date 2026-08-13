@@ -27,7 +27,7 @@ export const useRenamePromptHandle = ({
 }: UseRenamePromptHandleOptions) => {
   const { triggerChangeHandle } = usePromptConfigContext();
   const { project } = useOrganizationTeamProject();
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   const { data: permission } = api.prompts.checkModifyPermission.useQuery(
     {
