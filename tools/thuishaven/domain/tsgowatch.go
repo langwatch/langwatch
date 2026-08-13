@@ -19,6 +19,8 @@ import (
 // nothing.
 type TsgoClass string
 
+// The two classes: a compile run (whole-tree or targeted) and a long-lived
+// --lsp language server.
 const (
 	TsgoRun TsgoClass = "run"
 	TsgoLSP TsgoClass = "lsp"
@@ -142,25 +144,52 @@ func ParsePSDuration(s string) (time.Duration, bool) {
 	if s == "" {
 		return 0, false
 	}
-	var days int64
-	if before, after, found := strings.Cut(s, "-"); found {
-		n, err := strconv.ParseInt(before, 10, 64)
-		if err != nil || n < 0 {
-			return 0, false
-		}
-		days, s = n, after
+	days, s, ok := cutPSDays(s)
+	if !ok {
+		return 0, false
 	}
-	var fraction time.Duration
-	if before, after, found := strings.Cut(s, "."); found {
-		n, err := strconv.ParseInt(after, 10, 64)
-		if err != nil || n < 0 || len(after) == 0 || len(after) > 2 {
-			return 0, false
-		}
-		for i := len(after); i < 2; i++ {
-			n *= 10
-		}
-		fraction, s = time.Duration(n)*10*time.Millisecond, before
+	fraction, s, ok := cutPSFraction(s)
+	if !ok {
+		return 0, false
 	}
+	clock, ok := parsePSClock(s)
+	if !ok {
+		return 0, false
+	}
+	return time.Duration(days)*24*time.Hour + clock + fraction, true
+}
+
+// cutPSDays strips the optional leading "dd-" prefix.
+func cutPSDays(s string) (days int64, rest string, ok bool) {
+	before, after, found := strings.Cut(s, "-")
+	if !found {
+		return 0, s, true
+	}
+	n, err := strconv.ParseInt(before, 10, 64)
+	if err != nil || n < 0 {
+		return 0, "", false
+	}
+	return n, after, true
+}
+
+// cutPSFraction strips the optional trailing ".cc" centiseconds.
+func cutPSFraction(s string) (fraction time.Duration, rest string, ok bool) {
+	before, after, found := strings.Cut(s, ".")
+	if !found {
+		return 0, s, true
+	}
+	n, err := strconv.ParseInt(after, 10, 64)
+	if err != nil || n < 0 || len(after) == 0 || len(after) > 2 {
+		return 0, "", false
+	}
+	for i := len(after); i < 2; i++ {
+		n *= 10
+	}
+	return time.Duration(n) * 10 * time.Millisecond, before, true
+}
+
+// parsePSClock parses the "[[hh:]mm:]ss" colon groups.
+func parsePSClock(s string) (time.Duration, bool) {
 	parts := strings.Split(s, ":")
 	if len(parts) > 3 {
 		return 0, false
@@ -173,7 +202,7 @@ func ParsePSDuration(s string) (time.Duration, bool) {
 		}
 		total = total*60 + time.Duration(n)*time.Second
 	}
-	return time.Duration(days)*24*time.Hour + total + fraction, true
+	return total, true
 }
 
 // TsgoKill is one enforcement decision, with the reason it carries into the log.
@@ -198,30 +227,44 @@ func GovernTsgo(procs []TsgoProcess, l TsgoLimits) []TsgoKill {
 	var kills []TsgoKill
 	var survivors []TsgoProcess
 	for _, p := range procs {
-		switch {
-		case p.Class == TsgoRun && p.RSS > l.RunMaxRSS:
-			kills = append(kills, TsgoKill{PID: p.PID, Class: p.Class, RSS: p.RSS, Reason: "run exceeds the per-run memory ceiling"})
-		case p.Class == TsgoLSP && l.LSPMaxRSS > 0 && p.RSS > l.LSPMaxRSS:
-			kills = append(kills, TsgoKill{PID: p.PID, Class: p.Class, RSS: p.RSS, Reason: "language server exceeds its memory ceiling"})
-		case p.Class == TsgoLSP && l.LSPIdleTTL > 0 && p.IdleFor >= l.LSPIdleTTL:
-			kills = append(kills, TsgoKill{PID: p.PID, Class: p.Class, RSS: p.RSS, Reason: "language server idle past the eviction period"})
-		default:
+		if reason, over := overOwnLimit(p, l); over {
+			kills = append(kills, TsgoKill{PID: p.PID, Class: p.Class, RSS: p.RSS, Reason: reason})
+		} else {
 			survivors = append(survivors, p)
 		}
 	}
-	if l.TotalBudget <= 0 {
-		return kills
+	if l.TotalBudget > 0 {
+		kills = append(kills, reclaimOverBudget(survivors, l.TotalBudget)...)
 	}
+	return kills
+}
+
+// overOwnLimit is the per-process rule: the reason a process is reclaimed on
+// its own, independent of the aggregate budget.
+func overOwnLimit(p TsgoProcess, l TsgoLimits) (string, bool) {
+	switch {
+	case p.Class == TsgoRun && p.RSS > l.RunMaxRSS:
+		return "run exceeds the per-run memory ceiling", true
+	case p.Class == TsgoLSP && l.LSPMaxRSS > 0 && p.RSS > l.LSPMaxRSS:
+		return "language server exceeds its memory ceiling", true
+	case p.Class == TsgoLSP && l.LSPIdleTTL > 0 && p.IdleFor >= l.LSPIdleTTL:
+		return "language server idle past the eviction period", true
+	}
+	return "", false
+}
+
+// reclaimOverBudget stops the youngest surviving runs until the remainder
+// fits the budget. Surviving LSPs are active and stay — an active LSP is
+// somebody's editor session, and the budget pressure is almost always a run.
+func reclaimOverBudget(survivors []TsgoProcess, budget int64) []TsgoKill {
 	var total int64
 	for _, p := range survivors {
 		total += p.RSS
 	}
-	// Youngest-first among runs; surviving LSPs are active and stay — an
-	// active LSP is somebody's editor session, and the budget pressure is
-	// almost always a run.
 	sort.Slice(survivors, func(i, j int) bool { return survivors[i].Started.After(survivors[j].Started) })
+	var kills []TsgoKill
 	for _, p := range survivors {
-		if total <= l.TotalBudget {
+		if total <= budget {
 			break
 		}
 		if p.Class != TsgoRun {

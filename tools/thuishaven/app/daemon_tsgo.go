@@ -32,9 +32,27 @@ func (o *Orchestrator) governProcesses() {
 	if o.procActivity == nil {
 		o.procActivity = map[int]tsgoSeen{}
 	}
-	now := o.sys.Now()
-	var watched []domain.WatchedProcess
-	var tsgo []domain.TsgoProcess
+	watched, tsgo := o.sampleWatched(o.sys.Now())
+	if o.procTel != nil {
+		o.procTel.RecordSample(watched)
+	}
+	for _, k := range domain.GovernTsgo(tsgo, o.cfg.Tsgo) {
+		o.sys.Kill(k.PID)
+		if o.procTel != nil {
+			o.procTel.RecordKill("tsgo", k.Reason)
+		}
+		o.log.Warn("process governor reclaimed tsgo",
+			zap.Int("pid", k.PID),
+			zap.String("role", string(k.Class)),
+			zap.String("rss", domain.HumanBytes(k.RSS)),
+			zap.String("reason", k.Reason))
+	}
+}
+
+// sampleWatched classifies the live process listing and maintains the
+// cross-tick idle memory. Returns every watched process plus the tsgo subset
+// the governor rules on.
+func (o *Orchestrator) sampleWatched(now time.Time) (watched []domain.WatchedProcess, tsgo []domain.TsgoProcess) {
 	live := map[int]bool{}
 	for _, s := range o.sys.ProcessSamples() {
 		w, ok := domain.ClassifyWatchedProcess(s.Command)
@@ -56,23 +74,15 @@ func (o *Orchestrator) governProcesses() {
 			})
 		}
 	}
+	o.pruneDeadActivity(live)
+	return watched, tsgo
+}
+
+// pruneDeadActivity forgets idle-tracking state for processes no longer alive.
+func (o *Orchestrator) pruneDeadActivity(live map[int]bool) {
 	for pid := range o.procActivity {
 		if !live[pid] {
 			delete(o.procActivity, pid)
 		}
-	}
-	if o.procTel != nil {
-		o.procTel.RecordSample(watched)
-	}
-	for _, k := range domain.GovernTsgo(tsgo, o.cfg.Tsgo) {
-		o.sys.Kill(k.PID)
-		if o.procTel != nil {
-			o.procTel.RecordKill("tsgo", k.Reason)
-		}
-		o.log.Warn("process governor reclaimed tsgo",
-			zap.Int("pid", k.PID),
-			zap.String("role", string(k.Class)),
-			zap.String("rss", domain.HumanBytes(k.RSS)),
-			zap.String("reason", k.Reason))
 	}
 }
