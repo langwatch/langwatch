@@ -248,7 +248,7 @@ reviews:
         `dev/docs/best_practices/typescript.md` § Named parameters.
 
     # soft-delete-vs-archive.md: archivedAt, not deletedAt.
-    - path: "langwatch/{prisma/schema.prisma,src/server/**/*.{ts,tsx}}"
+    - path: "platform/app/{prisma/schema.prisma,src/server/**/*.{ts,tsx}}"
       instructions: |
         Flag ONLY on newly added or modified lines.
 
