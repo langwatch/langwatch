@@ -85,8 +85,8 @@ export class FlakyObjectStore extends InMemoryObjectStore {
 
 /**
  * Serves objects, but fails the first N gets for each URI listed in
- * `failures`. Unlike {@link FlakyObjectStore} (which fails the first N gets
- * across all URIs), this lets a test inject a transient failure on one
+ * `failureCounts`. Unlike {@link FlakyObjectStore} (which fails the first N
+ * gets across all URIs), this lets a test inject a transient failure on one
  * specific sibling while leaving the dispatched job and other siblings
  * intact -- needed to exercise the mixed transient-plus-corrupt-sibling
  * race in `restageDrainedSiblings` (#5883 P1).
