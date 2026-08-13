@@ -9,8 +9,12 @@ Feature: Provider fallback chain
   When a primary provider fails for a reason that indicates "try again
   elsewhere" (5xx, timeout, 429, network, and 404 because in a multi-provider
   chain it usually means this provider does not serve that model), the gateway
-  walks the VK's fallback chain. Terminal client-fault errors (400/401/403)
-  are returned as-is so the customer sees the real problem.
+  walks the VK's fallback chain, as far as the key's attempt budget allows: a
+  key with no chain gets one attempt and the error reaches the caller.
+  Terminal errors (400/401/403) are returned as-is so the real problem is
+  visible. Terminal is not the same as the caller's fault: a 401 or 403 is
+  usually the operator's provider credential, and switching credentials would
+  hide the thing they have to fix.
 
   See contract.md §7.
 
@@ -50,7 +54,7 @@ Feature: Provider fallback chain
       When I POST /v1/chat/completions
       Then the gateway falls back to secondary immediately (no honor of Retry-After before fallback)
 
-  Rule: Fallback does NOT trigger on client-fault errors
+  Rule: Fallback does NOT trigger on a terminal upstream error
 
     @integration @unimplemented
     Scenario: primary 400 returns as-is without fallback

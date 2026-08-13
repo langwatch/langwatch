@@ -1761,7 +1761,7 @@ curl https://gateway.langwatch.ai/v1/chat/completions \
 
 Per-VK rate limits are configurable (`rate_limits.rpm|tpm|rpd`) and enforced at the gateway before the request leaves for the provider. Breaches return `429 rate_limit_exceeded` with a `Retry-After` header in seconds.
 
-Upstream provider rate limits are opaque to the VK owner and always trigger fallback: an upstream 429 walks the VK's chain to the next credential. A `Retry-After` from upstream is surfaced to the client when no fallback remains.
+Upstream provider rate limits are opaque to the VK owner. An upstream 429 is fallback-eligible: the gateway moves to the next credential in the VK's chain when there is one and the attempt budget allows it. A `Retry-After` from upstream is surfaced to the client when no fallback remains.
 
 ## Observability
 
@@ -4744,7 +4744,7 @@ Ordered list of **ModelProvider** ids (not models) the VK may dispatch through. 
 
 **Does not** trigger fallback:
 
-- Upstream `400 / 401 / 403`, those are client-fault errors; masking them would confuse the caller.
+- Upstream `400 / 401 / 403`. These are terminal: a `400` is the request, and a `401` or `403` is usually the provider credential. Switching credentials would hide the thing that has to be fixed.
 - A caller that disconnected or ran out its own deadline, which says nothing about the provider.
 - Any LangWatch-internal error (`invalid_api_key`, `permission_denied`, etc).
 

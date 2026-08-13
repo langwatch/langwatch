@@ -654,13 +654,13 @@ All errors OpenAI-compatible:
 Triggers are **fixed, not per key**. The classification lives in one function, `classifyProviderError` in `services/aigateway/app/dispatch.go`, and is derived from the real upstream outcome; the retry engine's trigger set is `defaultTriggers` in `pkg/retry/retry.go`. A per-key trigger list could only ever narrow the set, and every narrowing turns a failure the gateway would have recovered from into a customer-visible one, so the wire carries no such field (§4.2).
 
 - `5xx`: any upstream 5xx, and any provider error the adapter could not classify more precisely.
-- `timeout`: upstream timed out (provider-reported 504, or no status at all from the provider adapter).
+- `timeout`: the provider adapter reports the upstream never answered. A provider-reported `504` arrives as a status and classifies as `5xx`, which is retryable either way; the two differ only in the reason recorded on the attempt.
 - `rate_limit_exceeded`: upstream 429.
 - `network_error`: connection reset / DNS / TLS.
 - `404 Not Found`: in a multi-provider chain this usually means "this provider does not serve that model" (common with custom and OpenAI-compatible providers), and the next slot may.
 - `circuit_breaker`: gateway-internal circuit breaker trips after N consecutive failures against a provider in the last M seconds. Not a response trigger, it preempts attempts.
 
-**Does NOT trigger fallback** (these are client-fault and returned as-is):
+**Does NOT trigger fallback** (terminal, and returned as-is). Terminal is not the same as the caller's fault: a `401` or `403` is usually the operator's provider credential, and the point of not masking it is that switching credentials would hide the thing they have to fix.
 
 - `400 Bad Request` from upstream (malformed payload).
 - `401 Unauthorized` from upstream (provider credential bad: surface to customer so they fix their provider creds; don't mask by silently switching).
