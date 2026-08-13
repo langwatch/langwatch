@@ -535,6 +535,10 @@ const LEGACY_INERT: string[] = [
   "specs/ops/dejaview-impersonation-access.feature",
   "specs/ops/internal-feature-flags.feature",
   "specs/ops/local-observability-stack.feature",
+  // Planned surface, not built: dev/docs/ops-process-manager-visibility-plan.md.
+  // Every scenario is @unimplemented by design and graduates to a binding tag
+  // as its slice lands — remove this entry with the first one.
+  "specs/ops/process-manager-visibility.feature",
   "specs/ops/production-bundle-integrity.feature",
   "specs/otlp/canonical-log-ingestion.feature",
   "specs/projects/create-project-drawer.feature",
