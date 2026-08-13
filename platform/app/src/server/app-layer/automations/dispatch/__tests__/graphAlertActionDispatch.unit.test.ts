@@ -746,6 +746,7 @@ describe("dispatchGraphAlertAction", () => {
         actionParams: { url: "https://example.com/hook", method: "POST" },
       });
 
+    /** @scenario "A JSON body is checked and sent as JSON" */
     it("renders the alert body and sends it to the configured URL", async () => {
       const { deps, sendWebhook, sendEmail, sendSlack } = makeDeps();
       const result = await dispatchGraphAlertAction({
@@ -779,6 +780,7 @@ describe("dispatchGraphAlertAction", () => {
     });
 
     describe("when the alert's body format is plain text", () => {
+      /** @scenario "A plain-text body is sent exactly as it renders" */
       it("sends the rendered template verbatim, announced as text", async () => {
         const { deps, sendWebhook } = makeDeps();
 
@@ -884,6 +886,7 @@ describe("dispatchGraphAlertAction", () => {
     });
 
     describe("when the same fire is retried after a successful post", () => {
+      /** @scenario "A retry of a graph alert does not re-send to an endpoint already reached" */
       it("does not re-post to an endpoint already reached", async () => {
         const { deps, sendWebhook } = makeDeps();
         const input = {

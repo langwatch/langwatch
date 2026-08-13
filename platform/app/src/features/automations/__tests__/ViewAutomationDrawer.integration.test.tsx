@@ -289,6 +289,7 @@ describe("ViewAutomationDrawer", () => {
     });
 
     describe("when the user expands the attempt", () => {
+      /** @scenario "The recent deliveries list shows what the endpoint answered" */
       it("renders the response body and headers as literal text, not markup", async () => {
         renderDrawer();
 

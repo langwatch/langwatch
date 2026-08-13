@@ -140,6 +140,7 @@ describe("WebhookConfigForm URL validation", () => {
   });
 
   describe("when the author types a non-https URL", () => {
+    /** @scenario "Only https URLs are accepted" */
     it("shows the https-only error", () => {
       renderForm();
 
@@ -155,6 +156,7 @@ describe("WebhookConfigForm URL validation", () => {
   });
 
   describe("when the author types a non-default port", () => {
+    /** @scenario "Non-standard ports are rejected" */
     it("shows the default-port-only error", () => {
       renderForm();
 
@@ -190,8 +192,138 @@ describe("WebhookConfigForm URL validation", () => {
   });
 });
 
+describe("WebhookConfigForm setup fields", () => {
+  afterEach(() => cleanup());
+
+  describe("given a fresh webhook draft", () => {
+    /** @scenario "A webhook automation configures a URL, method, headers, and a body" */
+    it("offers the destination, method, headers and body a delivery needs", async () => {
+      const user = userEvent.setup();
+      const onChangeSpy = vi.fn();
+      renderForm({ onChangeSpy });
+
+      fireEvent.change(
+        screen.getByPlaceholderText("https://example.com/hooks/langwatch"),
+        { target: { value: "https://example.com/hooks/langwatch" } },
+      );
+      await user.click(screen.getByText("PUT"));
+      fireEvent.click(screen.getByRole("button", { name: /add header/i }));
+      fireEvent.change(screen.getByPlaceholderText("Authorization"), {
+        target: { value: "Authorization" },
+      });
+      fireEvent.change(screen.getByPlaceholderText("Bearer …"), {
+        target: { value: "Bearer token" },
+      });
+
+      const params = webhookClient.toActionParams(
+        onChangeSpy.mock.calls.at(-1)![0],
+      ) as WebhookActionParams;
+      expect(params).toMatchObject({
+        url: "https://example.com/hooks/langwatch",
+        method: "PUT",
+        headers: { Authorization: "Bearer token" },
+      });
+      // The body is authored as a Liquid template, seeded with the framework
+      // default; leaving it untouched stores null, which is what makes each
+      // fire render that default rather than a frozen copy of it.
+      expect(bodyTextbox()).toHaveValue(DEFAULT_WEBHOOK_BODY_TEMPLATE);
+      expect(params.bodyTemplate).toBeNull();
+    });
+  });
+});
+
+describe("WebhookConfigForm test-fire outcome", () => {
+  afterEach(() => cleanup());
+
+  describe("when the last test fire succeeded", () => {
+    /** @scenario "A successful test shows the real status code inline" */
+    it("shows the endpoint's status next to the test button", () => {
+      renderForm({
+        ctx: makeCtx({
+          lastTestAttempt: {
+            at: Date.now(),
+            channel: "webhook",
+            status: "success",
+            httpStatus: 202,
+          },
+        }),
+      });
+
+      expect(screen.getByTestId("webhook-test-result")).toHaveTextContent(
+        "Delivered — HTTP 202",
+      );
+    });
+  });
+
+  describe("when the last test fire failed", () => {
+    /** @scenario "A failing test shows the error inline next to the test button" */
+    it("names what went wrong and the status or transport failure", () => {
+      renderForm({
+        ctx: makeCtx({
+          lastTestAttempt: {
+            at: Date.now(),
+            channel: "webhook",
+            status: "failure",
+            errorTitle: "Test request failed",
+            errorDetail: 'received HTTP 500: {"error":"boom"}',
+          },
+        }),
+      });
+
+      const result = screen.getByTestId("webhook-test-result");
+      expect(result).toHaveTextContent("Test request failed");
+      expect(result).toHaveTextContent("received HTTP 500");
+    });
+  });
+
+  describe("when the last test fire was on another channel", () => {
+    it("shows nothing, so a Slack outcome never reads as this endpoint's", () => {
+      renderForm({
+        ctx: makeCtx({
+          lastTestAttempt: {
+            at: Date.now(),
+            channel: "slack",
+            status: "success",
+          },
+        }),
+      });
+
+      expect(
+        screen.queryByTestId("webhook-test-result"),
+      ).not.toBeInTheDocument();
+    });
+  });
+});
+
 describe("webhookClient kept-header sentinel round-trip", () => {
   describe("given a saved trigger row with a kept header value", () => {
+    /** @scenario "Saved header values never return to the browser" */
+    it("shows the header name behind a masked value and re-sends the sentinel untouched", () => {
+      const slice = webhookClient.fromTriggerRow(
+        savedRowWith({
+          url: "https://example.com/hooks",
+          method: "POST",
+          headers: { Authorization: WEBHOOK_HEADER_VALUE_KEPT },
+          bodyTemplate: null,
+        }),
+      );
+      renderForm({ initial: slice });
+
+      // The name is on screen; the saved value is nowhere on it.
+      expect(screen.getByPlaceholderText("Authorization")).toHaveValue(
+        "Authorization",
+      );
+      expect(screen.getByPlaceholderText("•••••• (saved)")).toHaveValue("");
+      expect(
+        screen.queryByDisplayValue(WEBHOOK_HEADER_VALUE_KEPT),
+      ).not.toBeInTheDocument();
+
+      // Saving with the value left untouched sends the sentinel, which is what
+      // makes the server keep the stored secret instead of clearing it.
+      const params = webhookClient.toActionParams(slice) as WebhookActionParams;
+      expect(params.headers.Authorization).toBe(WEBHOOK_HEADER_VALUE_KEPT);
+    });
+
     it("marks the header row as kept, dropping the sentinel from its value", () => {
       const slice = webhookClient.fromTriggerRow(
         savedRowWith({

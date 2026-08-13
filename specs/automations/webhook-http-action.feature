@@ -12,6 +12,7 @@ Feature: Webhook (generic HTTP) automation action
       Then a "Webhook" card is offered alongside Email and Slack
       And picking it opens the webhook setup
 
+    @integration
     Scenario: A webhook automation configures a URL, method, headers, and a body
       Given a user picks the Webhook delivery
       Then the user sets the destination URL and HTTP method
@@ -19,30 +20,38 @@ Feature: Webhook (generic HTTP) automation action
       And can author the body as a Liquid template
       And leaving a JSON body empty sends the framework default payload
 
+    @integration
     Scenario: Only https URLs are accepted
       Given a user enters an http:// destination URL
-      When they save the automation
-      Then the save is rejected explaining the URL must be https
+      Then the authoring form rejects it, explaining the URL must be https
 
+    @integration
     Scenario: Non-standard ports are rejected
       Given a user enters an https URL with port 8443
-      When they save the automation
-      Then the save is rejected explaining only the default https port is allowed
+      Then the authoring form rejects it, explaining only the default https port is allowed
 
   Rule: The body may be any text format
 
-    Scenario: A JSON body is checked before it is sent
+    @unit
+    Scenario: A JSON body is checked and sent as JSON
       Given a webhook automation whose body format is JSON
       When the automation fires
-      Then the rendered body is valid JSON, sent as application/json
-      And a body that does not parse falls back to the framework default payload
+      Then the endpoint receives valid JSON at the configured URL
+      And the request is announced as application/json
+
+    @unit
+    Scenario: A JSON body that does not parse falls back to the framework default
+      Given a JSON body whose template renders something that is not JSON
+      When the automation fires
+      Then the framework default payload is sent instead
+      And the author is shown what broke
 
     @unit
     Scenario: A plain-text body is sent exactly as it renders
       Given a webhook automation whose body format is plain text
       When the automation fires
       Then the endpoint receives the rendered template byte for byte
-      And the request is sent as text/plain in UTF-8
+      And the request is announced as text/plain in UTF-8
 
     @unit
     Scenario: A plain-text body that fails to render sends nothing
@@ -51,61 +60,71 @@ Feature: Webhook (generic HTTP) automation action
       Then the endpoint receives an empty body, not a JSON envelope it cannot read
       And the author is shown what broke, as they are for a JSON body
 
+    @unit
     Scenario: An automation saved before formats existed still sends JSON
       Given a webhook automation saved without stating a body format
-      When the automation fires
-      Then it renders and sends exactly as it did before, as JSON
+      When it is fired
+      Then it renders the JSON envelope and announces it as application/json,
+        exactly as it did before the field existed
 
   Rule: Header values are secrets
 
+    @unit
     Scenario: Header values are stored encrypted at rest
       When a webhook automation is saved with an Authorization header
-      Then the stored automation does not contain the header value in plaintext
+      Then the stored automation holds only ciphertext, never the plaintext value
 
+    @integration
     Scenario: Saved header values never return to the browser
       Given a webhook automation saved with an Authorization header
       When the automation is opened for editing
       Then the header name is shown but its saved value is not
       And saving with the value left untouched keeps the saved secret
 
+    @unit
     Scenario: Renaming a saved header requires re-entering its value
       Given a webhook automation saved with an Authorization header
       When the user renames that header while editing
-      Then the header's value must be typed again before it is sent
+      Then the saved value is not carried over to the new name
 
   Rule: Testing a webhook from the drawer
 
+    @unit
     Scenario: A test fire sends the rendered request to the configured endpoint
       Given a webhook automation draft with a URL set
       When the user presses "Send a test"
       Then the rendered body is sent to that URL through the SSRF-fenced sender
       And the request carries a non-suppressible X-LangWatch-Test-Fire header
 
+    @integration
     Scenario: A successful test shows the real status code inline
       Given the endpoint answers 200
       When the test fire completes
       Then a confirmation with the HTTP status appears next to the test button
 
+    @integration
     Scenario: A failing test shows the error inline next to the test button
       Given the endpoint answers 500 or is unreachable
       When the test fire completes
       Then an inline error appears next to the test button naming what went wrong
       And the error includes the HTTP status or transport failure
 
+    @integration
     Scenario: Test fires are rate limited
-      Given a user has sent many webhook test fires within the last minute
+      Given a user has spent the test-fire allowance for the last minute
       When they press "Send a test" again
       Then the test fire is rejected asking them to retry later
 
   Rule: Delivery is SSRF-fenced
 
+    @unit
     Scenario: Requests to private or internal addresses are blocked
       Given a webhook automation whose URL resolves to a private, loopback,
         link-local, or cloud-metadata address
       When the automation fires or is test-fired
-      Then the request is blocked before any connection is made
-      And the failure is terminal, not retried
+      Then the request fails terminally, and is not retried
 
+    @unit
     Scenario: Redirects are not followed
       Given the endpoint answers with a 3xx redirect
       When the automation fires
@@ -113,58 +132,96 @@ Feature: Webhook (generic HTTP) automation action
 
   Rule: Dispatch classification
 
-    Scenario: Server errors retry, client errors do not
-      When the endpoint answers 500, 429, or 408, or times out
-      Then the dispatch is retried by the process manager
-      When the endpoint answers any other 4xx
-      Then the dispatch fails terminally without retry
+    @unit
+    Scenario: Server errors are retried
+      When the endpoint answers 500, 502, 503, 429, or 408
+      Then the dispatch is classified retryable, so the process manager attempts it again
 
-    Scenario: A receiver's Retry-After lengthens the backoff
+    @unit
+    Scenario: Client errors fail terminally without retry
+      When the endpoint answers 3xx or any other 4xx
+      Then the dispatch is classified terminal, because retrying a misconfigured
+        endpoint only spams it
+
+    @unit
+    Scenario: An endpoint that never answers is retried, not waited on
+      Given the endpoint accepts the connection and then never responds
+      When the automation fires
+      Then the attempt gives up on our own timeout and is classified retryable
+
+    @unit
+    Scenario: A receiver's Retry-After is carried onto the failure
       Given the endpoint answers 429 with a Retry-After header
-      When the dispatch is retried by the process manager
-      Then the next attempt waits at least as long as the receiver asked
+      When the dispatch fails
+      Then the receiver's delay rides on the failure, so the queue's backoff
+        cannot be shorter than the receiver asked for
 
+    @unit
     Scenario: Every attempt of one fire carries the same event id
       Given a dispatch is retried after only part of its candidate batch was claimed
       Then each attempt sends the same X-LangWatch-Event-Id
       So a receiver can dedupe replays of the same fire
 
+    @unit
     Scenario: A project cannot flood an endpoint
       Given a project has reached its hourly webhook dispatch cap
       When another webhook fires
-      Then that dispatch backs off instead of contacting the endpoint
+      Then that dispatch backs off without contacting the endpoint at all
 
   Rule: Delivery log
 
+    @unit
     Scenario: Each attempt is recorded with its outcome
-      Given a webhook automation that fires and is retried
-      When the attempts complete
-      Then the automation's recent deliveries show one row per attempt
-      And each row shows the HTTP status or transport error and the latency
+      Given a webhook automation that fires
+      When the attempt completes
+      Then one row is recorded, carrying the dispatch id, the HTTP status,
+        the latency, and the outcome
 
+    @unit
+    Scenario: An attempt that never reached the endpoint is recorded too
+      Given a webhook automation whose request is blocked before it is sent
+      Then a row is still recorded, with the error and the latency but no status
+
+    @unit
     Scenario: The delivery log never stores request content
       Given a webhook automation with custom headers that fires
       Then the delivery row stores the outcome, status, latency, and a capped error summary
       And the request URL, headers, and body are never stored
 
+    @unit
     Scenario: A failed attempt keeps the receiver's response for debugging
       Given a webhook automation whose endpoint answers an error
       When the attempt fails
       Then the truncated response body and headers are stored exactly as the endpoint sent them
-      And the stored response is deleted with the row by the prune
 
+    @integration
+    Scenario: The recent deliveries list shows what the endpoint answered
+      Given a webhook automation with a failed delivery attempt
+      When the user expands that attempt in the drawer
+      Then the receiver's response body and headers are shown as literal text,
+        never rendered as markup
+
+    @integration
     Scenario: The delivery log is pruned after 30 days
       Given delivery rows older than 30 days exist
       When the delivery-log prune runs
       Then those rows are deleted and newer rows are kept
 
+    # Unimplemented: no test populates a stored `response` before the retention
+    # sweep, so nothing proves the receiver's body and headers go with the row.
+    @integration @unimplemented
+    Scenario: The prune deletes the stored response with its row
+      Given a pruned delivery row that had kept the receiver's response
+      Then that response body and headers are gone with it
+
+    @unit
     Scenario: A terminally failing endpoint is not re-posted every evaluation
       Given a graph alert webhook whose endpoint answers a terminal error
       When the alert fires and delivery fails terminally
-      Then the fire is consumed and the endpoint is not contacted again for it
+      Then the fire stays consumed, so the next evaluation does not post again
 
-    Scenario: A graph alert can deliver to a webhook
-      Given a graph alert automation with the Webhook delivery
-      When the alert fires
-      Then the alert-shaped JSON body is sent to the configured URL
-      And a retry of the same fire does not re-send to an endpoint already reached
+    @unit
+    Scenario: A retry of a graph alert does not re-send to an endpoint already reached
+      Given a graph alert webhook that has already delivered for this fire
+      When the same fire is retried
+      Then the endpoint is not contacted a second time

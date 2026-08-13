@@ -64,6 +64,7 @@ const send = (path: string) =>
 
 describe("sendHttpDestination with a strict validator", () => {
   describe("when the endpoint answers a redirect toward cloud metadata", () => {
+    /** @scenario "Redirects are not followed" */
     it("refuses the redirect terminally without following it", async () => {
       seenPaths.length = 0;
       let caught: unknown;

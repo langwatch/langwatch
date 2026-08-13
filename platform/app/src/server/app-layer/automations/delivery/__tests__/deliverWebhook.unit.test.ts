@@ -31,6 +31,7 @@ function sendResolvingWith(
 
 describe("deliverWebhook", () => {
   describe("when the endpoint answers 2xx", () => {
+    /** @scenario "Each attempt is recorded with its outcome" */
     it("records a success row with the eventId as dispatchId", async () => {
       const rows: WebhookDeliveryInput[] = [];
       await deliverWebhook({
@@ -51,6 +52,7 @@ describe("deliverWebhook", () => {
       expect(rows[0]!.latencyMs).toBeGreaterThanOrEqual(0);
     });
 
+    /** @scenario "The delivery log never stores request content" */
     it("stores no request content — URL, headers, and body never persist", async () => {
       const rows: WebhookDeliveryInput[] = [];
       await deliverWebhook({
@@ -92,6 +94,7 @@ describe("deliverWebhook", () => {
       expect(JSON.stringify(rows[0])).not.toContain("Bearer secret");
     });
 
+    /** @scenario "A failed attempt keeps the receiver's response for debugging" */
     it("stores the receiver's response verbatim, even when it echoes a configured header value", async () => {
       const rows: WebhookDeliveryInput[] = [];
       await expect(
@@ -139,6 +142,7 @@ describe("deliverWebhook", () => {
   });
 
   describe("when the sender throws before responding", () => {
+    /** @scenario "An attempt that never reached the endpoint is recorded too" */
     it("records a classified row with the error message and no status", async () => {
       const rows: WebhookDeliveryInput[] = [];
       const send = (async () => {
@@ -162,6 +166,9 @@ describe("deliverWebhook", () => {
         response: null,
         outcome: "terminal",
       });
+      // The row is still an attempt, so it still says how long it took —
+      // otherwise a transport failure reads as a gap in the log.
+      expect(rows[0]!.latencyMs).toBeGreaterThanOrEqual(0);
     });
   });
 

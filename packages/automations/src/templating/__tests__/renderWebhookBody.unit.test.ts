@@ -121,6 +121,7 @@ describe("renderWebhookBody", () => {
   });
 
   describe("when the custom template renders invalid JSON", () => {
+    /** @scenario "A JSON body that does not parse falls back to the framework default" */
     it("falls back to the default envelope and surfaces the error", async () => {
       const rendered = await renderWebhookBody({
         template: "not json at all {{ trigger.name }}",
@@ -146,7 +147,6 @@ describe("renderWebhookBody", () => {
   });
 
   describe("given the body format is text", () => {
-    /** @scenario "A plain-text body is sent exactly as it renders" */
     it("sends the render output verbatim, without JSON normalising it", async () => {
       const rendered = await renderWebhookBody({
         template: "Trigger {{ trigger.name }} matched  {{ digest.count }}\n",

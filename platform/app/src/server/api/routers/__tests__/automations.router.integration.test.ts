@@ -286,6 +286,37 @@ describe("automationRouter", () => {
       });
     });
 
+    /** @scenario "Test fires are rate limited" */
+    it("declines a test fire once the window's allowance is spent", async () => {
+      mockRateLimit.mockResolvedValueOnce({
+        allowed: false,
+        remaining: 0,
+        resetAt: Date.now() + 42_000,
+      });
+
+      await expect(
+        caller.testFireTemplate({
+          projectId: "proj_123",
+          channel: "webhook",
+          trigger: { name: "Webhook", alertType: null },
+          draft: {},
+          webhook: null,
+          webhookDestination: {
+            url: "https://receiver.example/hook",
+            method: "POST",
+            headers: {},
+            bodyTemplate: null,
+          },
+          botDestination: null,
+          graphAlert: null,
+          report: null,
+        }),
+      ).rejects.toMatchObject({
+        code: "TOO_MANY_REQUESTS",
+        message: expect.stringMatching(/too many test fires/i),
+      });
+    });
+
     // The webhook channel is no longer gated: a flag read per test fire bought
     // nothing once every project had the channel, and leaving the call in
     // invites the OFF branch growing back.
