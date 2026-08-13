@@ -11,13 +11,13 @@ import (
 // fakeRuntime scripts one exec.Cmd per docker invocation (printf/true/false
 // stand in for the docker CLI) and records every argv it was asked for.
 type fakeRuntime struct {
-	running       bool
+	isRunning     bool
 	dockerHostErr error
 	cmds          []*exec.Cmd
 	dockerCalls   [][]string
 }
 
-func (f *fakeRuntime) IsRunning(context.Context) bool { return f.running }
+func (f *fakeRuntime) IsRunning(context.Context) bool { return f.isRunning }
 func (f *fakeRuntime) DockerHost(context.Context) (string, error) {
 	return "unix:///fake.sock", f.dockerHostErr
 }
@@ -50,10 +50,10 @@ func expectArgv(t *testing.T, got, want []string) {
 // @scenario "A test container past the grace period is removed"
 func TestReapRemovesLeakedContainers(t *testing.T) {
 	t.Run("given a listing with one stale and one fresh container", func(t *testing.T) {
-		rt := &fakeRuntime{running: true, cmds: []*exec.Cmd{
+		rt := &fakeRuntime{isRunning: true, cmds: []*exec.Cmd{
 			listing("abc123\texited\t2026-08-11 14:23:45 +0200 CEST\tlucid_goodall\torg.testcontainers=true\n" +
 				"def456\texited\t2026-08-13 11:58:00 +0200 CEST\tfresh_one\torg.testcontainers=true\n"),
-			exec.Command("true"), // the rm
+			exec.Command("true"),
 		}}
 		cutoff := time.Date(2026, 8, 13, 9, 0, 0, 0, time.UTC)
 
@@ -81,7 +81,7 @@ func TestReapToleratesPartialFailures(t *testing.T) {
 	cutoff := time.Date(2026, 8, 13, 9, 0, 0, 0, time.UTC)
 
 	t.Run("given two leaked containers where the first rm fails", func(t *testing.T) {
-		rt := &fakeRuntime{running: true, cmds: []*exec.Cmd{
+		rt := &fakeRuntime{isRunning: true, cmds: []*exec.Cmd{
 			listing("abc123\texited\t2026-08-11 14:23:45 +0200 CEST\tone\torg.testcontainers=true\n" +
 				"def456\texited\t2026-08-11 14:23:45 +0200 CEST\ttwo\torg.testcontainers=true\n"),
 			exec.Command("false"),
@@ -104,7 +104,7 @@ func TestReapToleratesPartialFailures(t *testing.T) {
 	})
 
 	t.Run("given a container already gone by removal time", func(t *testing.T) {
-		rt := &fakeRuntime{running: true, cmds: []*exec.Cmd{
+		rt := &fakeRuntime{isRunning: true, cmds: []*exec.Cmd{
 			listing("abc123\texited\t2026-08-11 14:23:45 +0200 CEST\tgone\torg.testcontainers=true\n"),
 			exec.Command("sh", "-c", "echo 'Error: No such container: abc123' >&2; exit 1"),
 		}}
@@ -126,21 +126,21 @@ func TestReapPropagatesFailures(t *testing.T) {
 	cutoff := time.Date(2026, 8, 13, 9, 0, 0, 0, time.UTC)
 
 	t.Run("when the docker host cannot be resolved", func(t *testing.T) {
-		rt := &fakeRuntime{running: true, dockerHostErr: errors.New("no socket")}
+		rt := &fakeRuntime{isRunning: true, dockerHostErr: errors.New("no socket")}
 		if _, err := New(rt).ReapTestContainers(context.Background(), cutoff, cutoff); err == nil {
 			t.Fatal("expected the DockerHost error to propagate")
 		}
 	})
 
 	t.Run("when the listing command fails", func(t *testing.T) {
-		rt := &fakeRuntime{running: true, cmds: []*exec.Cmd{exec.Command("false")}}
+		rt := &fakeRuntime{isRunning: true, cmds: []*exec.Cmd{exec.Command("false")}}
 		if _, err := New(rt).ReapTestContainers(context.Background(), cutoff, cutoff); err == nil {
 			t.Fatal("expected the ps failure to propagate")
 		}
 	})
 
 	t.Run("when every listed row is undateable", func(t *testing.T) {
-		rt := &fakeRuntime{running: true, cmds: []*exec.Cmd{
+		rt := &fakeRuntime{isRunning: true, cmds: []*exec.Cmd{
 			listing("abc123\trunning\tSOME NEW FORMAT\tone\torg.testcontainers=true\n"),
 		}}
 		if _, err := New(rt).ReapTestContainers(context.Background(), cutoff, cutoff); err == nil {
@@ -152,7 +152,7 @@ func TestReapPropagatesFailures(t *testing.T) {
 // @scenario "The sweep never boots the container VM"
 func TestReapDoesNothingWhenTheVMIsDown(t *testing.T) {
 	t.Run("given the container VM is not running", func(t *testing.T) {
-		rt := &fakeRuntime{running: false}
+		rt := &fakeRuntime{isRunning: false}
 
 		t.Run("when the sweep runs", func(t *testing.T) {
 			names, err := New(rt).ReapTestContainers(context.Background(), time.Now(), time.Now())
@@ -172,7 +172,7 @@ func TestReapDoesNothingWhenTheVMIsDown(t *testing.T) {
 // @scenario "Only containers a test library marked as its own are candidates"
 func TestReapListsOnlyLabeledContainers(t *testing.T) {
 	t.Run("when the VM is running and the listing is empty", func(t *testing.T) {
-		rt := &fakeRuntime{running: true}
+		rt := &fakeRuntime{isRunning: true}
 
 		if _, err := New(rt).ReapTestContainers(context.Background(), time.Now(), time.Now()); err != nil {
 			t.Fatalf("unexpected error: %v", err)

@@ -77,7 +77,7 @@ export const TEST_CLICKHOUSE_TUNING = {
     <query_metric_log remove="1"/>
 </clickhouse>
 `,
-};
+} as const;
 
 /**
  * Label stamped on every tuned test container. Reuse (`withReuse`) matches an
