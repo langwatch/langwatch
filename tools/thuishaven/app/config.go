@@ -25,7 +25,11 @@ type Config struct {
 	// RunningTestContainerTTL is the same rule for containers still running,
 	// whose age says nothing about current use (reused containers keep their
 	// original creation time across runs). Clamped to at least TestContainerTTL.
-	RunningTestContainerTTL  time.Duration
+	RunningTestContainerTTL time.Duration
+	// Tsgo bounds what tsgo may take from the machine (ADR-095); the daemon's
+	// tick enforces it over every live tsgo process regardless of who spawned
+	// it. Tsgo.RunMaxRSS == 0 disables the governor.
+	Tsgo                     domain.TsgoLimits
 	HeartbeatEvery           time.Duration // launcher heartbeat cadence
 	DaemonArgv               []string      // how to (re)launch `haven daemon`
 	IsAgent                  bool          // token-free plain output for AI drivers (no color/TUI)
