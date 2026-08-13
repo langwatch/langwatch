@@ -17,11 +17,22 @@
  *   5. actor row still exists         → else 403
  *   6. shared `startConversationTurn` → 202
  *
- * The flag is checked AFTER authentication on purpose: an unauthenticated
- * caller learns only that the token is bad, never whether the surface exists.
- * It is checked BEFORE the ceiling for the same reason — a key without
- * `langy:create` must not get a 403 out of a surface that is supposed to be
- * dark, because no unmounted route can answer 403.
+ * The flag is checked AFTER authentication because it has to be: it is
+ * evaluated per project, so there is no project to evaluate it against until a
+ * credential resolves. What the dark surface hides is therefore scoped, and
+ * worth stating exactly. A caller holding a real project API key cannot tell
+ * whether Langy exists here — that is the rollback property this route is
+ * built around. A caller holding no credential, or a bad one, still gets a 401
+ * rather than a 404, and so can tell that SOME authenticated route is mounted
+ * at this path. That is true of every guarded route on this API and reveals
+ * nothing Langy-specific, but it does mean this mechanism is not a defence
+ * against anonymous route enumeration, and should not be read as one.
+ *
+ * The flag is checked BEFORE the ceiling, and that ordering is load-bearing —
+ * a key without `langy:create` must not get a 403 out of a surface that is
+ * supposed to be dark, because no unmounted route can answer 403. Both this
+ * ordering and the byte-parity below are pinned by
+ * `__tests__/langy-api-refusal-chain.unit.test.ts`.
  *
  * Every refusal is THROWN, never a hand-built `c.json({...})` —
  * `createServiceApp`'s `onError` owns the wire shape, so this family publishes
