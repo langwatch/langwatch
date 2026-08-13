@@ -116,7 +116,8 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
   }
 
   async findInstances(params: {
-    processName: string;
+    /** Omit to list instances across EVERY process manager. */
+    processName?: string;
     page: number;
     pageSize: number;
     search?: string;
@@ -124,6 +125,9 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
     const search = params.search?.trim();
     const searchFilter = search
       ? Prisma.sql`AND "processKey" ILIKE ${`%${escapeLike(search)}%`}`
+      : Prisma.empty;
+    const nameFilter = params.processName
+      ? Prisma.sql`AND "processName" = ${params.processName}`
       : Prisma.empty;
 
     const [rows, totals] = await Promise.all([
@@ -142,7 +146,8 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
         SELECT "processName", "projectId", "processKey", "tenantId",
                "revision", "nextWakeAt", "updatedAt"
         FROM "ProcessManagerInstance"
-        WHERE "processName" = ${params.processName}
+        WHERE 1 = 1
+        ${nameFilter}
         ${searchFilter}
         ORDER BY "updatedAt" DESC
         LIMIT ${params.pageSize}
@@ -152,37 +157,43 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
         -- @tenancy: cross-tenant ops listing; rows carry their project identity
         SELECT COUNT(*)::int AS "total"
         FROM "ProcessManagerInstance"
-        WHERE "processName" = ${params.processName}
+        WHERE 1 = 1
+        ${nameFilter}
         ${searchFilter}
       `),
     ]);
 
-    // Per-row outbox trouble for just this page's instances.
+    // Per-row outbox trouble for just this page's instances. The tuple filter
+    // carries processName so an all-process page can never mix up two
+    // processes sharing a (projectId, processKey) pair.
     const counts = new Map<string, { pending: number; dead: number }>();
     if (rows.length > 0) {
       const pairs = Prisma.join(
-        rows.map((r) => Prisma.sql`(${r.projectId}, ${r.processKey})`),
+        rows.map(
+          (r) =>
+            Prisma.sql`(${r.processName}, ${r.projectId}, ${r.processKey})`,
+        ),
       );
       const outbox = await this.prisma.$queryRaw<
         Array<{
+          processName: string;
           projectId: string;
           processKey: string;
           pending: number;
           dead: number;
         }>
       >(Prisma.sql`
-        -- @tenancy: scoped to the page's (projectId, processKey) pairs above
-        SELECT "projectId", "processKey",
+        -- @tenancy: scoped to the page's (processName, projectId, processKey) tuples above
+        SELECT "processName", "projectId", "processKey",
                COUNT(*) FILTER (WHERE "status" = 'pending')::int AS "pending",
                COUNT(*) FILTER (WHERE "status" = 'dead')::int AS "dead"
         FROM "ProcessManagerOutbox"
-        WHERE "processName" = ${params.processName}
-          AND "status" IN ('pending', 'dead')
-          AND ("projectId", "processKey") IN (${pairs})
-        GROUP BY "projectId", "processKey"
+        WHERE "status" IN ('pending', 'dead')
+          AND ("processName", "projectId", "processKey") IN (${pairs})
+        GROUP BY "processName", "projectId", "processKey"
       `);
       for (const o of outbox) {
-        counts.set(`${o.projectId} ${o.processKey}`, {
+        counts.set(`${o.processName} ${o.projectId} ${o.processKey}`, {
           pending: o.pending,
           dead: o.dead,
         });
@@ -192,7 +203,7 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
     return {
       total: totals[0]?.total ?? 0,
       instances: rows.map((r) => {
-        const c = counts.get(`${r.projectId} ${r.processKey}`);
+        const c = counts.get(`${r.processName} ${r.projectId} ${r.processKey}`);
         return {
           processName: r.processName,
           projectId: r.projectId,
@@ -206,6 +217,32 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
         };
       }),
     };
+  }
+
+  async findUpcomingWakes(params: {
+    limit: number;
+  }): Promise<ProcessWakeRow[]> {
+    const rows = await this.prisma.$queryRaw<
+      Array<{
+        processName: string;
+        projectId: string;
+        processKey: string;
+        nextWakeAt: Date;
+      }>
+    >(Prisma.sql`
+      -- @tenancy: cross-tenant ops listing; rows carry their project identity
+      SELECT "processName", "projectId", "processKey", "nextWakeAt"
+      FROM "ProcessManagerInstance"
+      WHERE "nextWakeAt" IS NOT NULL
+      ORDER BY "nextWakeAt" ASC
+      LIMIT ${Math.min(Math.max(params.limit, 1), 200)}
+    `);
+    return rows.map((r) => ({
+      processName: r.processName,
+      projectId: r.projectId,
+      processKey: r.processKey,
+      nextWakeAt: r.nextWakeAt.getTime(),
+    }));
   }
 
   async findOutboxMessages(params: {

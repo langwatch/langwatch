@@ -1,4 +1,13 @@
-import { Badge, Box, Card, HStack, Table, Text } from "@chakra-ui/react";
+import {
+  Badge,
+  Box,
+  Button,
+  Card,
+  HStack,
+  Spacer,
+  Table,
+  Text,
+} from "@chakra-ui/react";
 import type { ProcessFleetSummary } from "~/server/app-layer/ops/manager-explorer.service";
 import { hasFleetTrouble } from "./processFleet";
 
@@ -17,30 +26,24 @@ function CountCell({ value, color }: { value: number; color?: string }) {
   );
 }
 
-function fleetRowTint(
-  row: ProcessFleetSummary,
-  selected: string | null,
-): string | undefined {
+function fleetRowTint(row: ProcessFleetSummary): string | undefined {
   if (row.deadMessages > 0) return "red.subtle";
   if (hasFleetTrouble(row)) return "orange.subtle";
-  if (selected === row.processName) return "bg.emphasized";
   return undefined;
 }
 
 function FleetRow({
   row,
-  selected,
   onSelect,
 }: {
   row: ProcessFleetSummary;
-  selected: string | null;
   onSelect: (processName: string) => void;
 }) {
   return (
     <Table.Row
       cursor="pointer"
       data-testid={`process-row-${row.processName}`}
-      bg={fleetRowTint(row, selected)}
+      bg={fleetRowTint(row)}
       _hover={{ bg: "bg.subtle" }}
       onClick={() => onSelect(row.processName)}
     >
@@ -73,16 +76,16 @@ function FleetRow({
 
 /**
  * One row per process name: registry identity + live trouble counts, trouble
- * sorted first by the server. Clicking a row opens its instances.
+ * sorted first by the server. Clicking a row opens its instances drawer.
  */
 export function ProcessFleetCard({
   rows,
-  selected,
   onSelect,
+  onOpenAll,
 }: {
   rows: ProcessFleetSummary[];
-  selected: string | null;
   onSelect: (processName: string) => void;
+  onOpenAll?: () => void;
 }) {
   return (
     <Card.Root>
@@ -96,6 +99,12 @@ export function ProcessFleetCard({
           <Text textStyle="sm" fontWeight="medium">
             Process Managers
           </Text>
+          <Spacer />
+          {onOpenAll && (
+            <Button size="2xs" variant="outline" onClick={onOpenAll}>
+              All instances
+            </Button>
+          )}
         </HStack>
         {rows.length === 0 ? (
           <Box padding={4}>
@@ -127,12 +136,7 @@ export function ProcessFleetCard({
             </Table.Header>
             <Table.Body>
               {rows.map((row) => (
-                <FleetRow
-                  key={row.processName}
-                  row={row}
-                  selected={selected}
-                  onSelect={onSelect}
-                />
+                <FleetRow key={row.processName} row={row} onSelect={onSelect} />
               ))}
             </Table.Body>
           </Table.Root>

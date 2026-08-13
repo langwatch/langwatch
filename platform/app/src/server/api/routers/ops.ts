@@ -516,7 +516,8 @@ export const opsRouter = createTRPCRouter({
     .use(opsViewPermission)
     .input(
       z.object({
-        processName: z.string().min(1).max(200),
+        /** Omit to list instances across every process manager. */
+        processName: z.string().min(1).max(200).optional(),
         page: z.number().int().min(1).default(1),
         pageSize: z.number().int().min(1).max(100).default(25),
         search: z.string().max(500).optional(),
@@ -524,6 +525,18 @@ export const opsRouter = createTRPCRouter({
     )
     .query(async ({ input }) => {
       return requireOps().managerExplorer.getInstances(input);
+    }),
+
+  /** The soonest-due process wakes, for the dashboard's timed-work table. */
+  listUpcomingWakes: protectedProcedure
+    .use(opsViewPermission)
+    .input(
+      z.object({
+        limit: z.number().int().min(1).max(200).default(20),
+      }),
+    )
+    .query(async ({ input }) => {
+      return requireOps().managerExplorer.getUpcomingWakes(input);
     }),
 
   getProcessInstance: protectedProcedure

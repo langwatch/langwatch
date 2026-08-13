@@ -35,7 +35,6 @@ describe("ProcessFleetCard", () => {
         <ChakraProvider value={defaultSystem}>
           <ProcessFleetCard
             rows={[makeRow({ deadMessages: 7 })]}
-            selected={null}
             onSelect={onSelect}
           />
         </ChakraProvider>,
@@ -56,7 +55,6 @@ describe("ProcessFleetCard", () => {
       <ChakraProvider value={defaultSystem}>
         <ProcessFleetCard
           rows={[makeRow({ scheduled: true })]}
-          selected={null}
           onSelect={() => undefined}
         />
       </ChakraProvider>,

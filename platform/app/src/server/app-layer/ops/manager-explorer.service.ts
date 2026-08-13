@@ -10,6 +10,7 @@ import type {
   ProcessInstanceRow,
   ProcessOpsRepository,
   ProcessOutboxMessageView,
+  ProcessWakeRow,
 } from "./repositories/process-ops.repository";
 
 /**
@@ -168,12 +169,18 @@ export class ManagerExplorerService {
   }
 
   async getInstances(params: {
-    processName: string;
+    /** Omit to list instances across EVERY process manager. */
+    processName?: string;
     page: number;
     pageSize: number;
     search?: string;
   }): Promise<{ instances: ProcessInstanceRow[]; total: number }> {
     return this.fleet.findInstances(params);
+  }
+
+  /** The soonest-due instance wakes across every process, for the dashboard. */
+  async getUpcomingWakes(params: { limit: number }): Promise<ProcessWakeRow[]> {
+    return this.fleet.findUpcomingWakes(params);
   }
 
   async getInstanceDetail(params: {

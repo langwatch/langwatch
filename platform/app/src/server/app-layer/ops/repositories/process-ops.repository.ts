@@ -30,6 +30,14 @@ export interface ProcessInstanceRow {
   deadMessages: number;
 }
 
+/** One upcoming instance wake, for the dashboard's timed-work table. */
+export interface ProcessWakeRow {
+  processName: string;
+  projectId: string;
+  processKey: string;
+  nextWakeAt: number;
+}
+
 export interface ProcessOutboxMessageView {
   id: string;
   messageKey: string;
@@ -53,12 +61,16 @@ export interface ProcessOpsRepository {
   }): Promise<ProcessNameCounts[]>;
 
   findInstances(params: {
-    processName: string;
+    /** Omit to list instances across EVERY process manager. */
+    processName?: string;
     page: number;
     pageSize: number;
     /** Case-insensitive contains-match on the process key. */
     search?: string;
   }): Promise<{ instances: ProcessInstanceRow[]; total: number }>;
+
+  /** The soonest-due instance wakes across every process, for the dashboard. */
+  findUpcomingWakes(params: { limit: number }): Promise<ProcessWakeRow[]>;
 
   findOutboxMessages(params: {
     ref: ProcessRef;
@@ -111,6 +123,9 @@ export class NullProcessOpsRepository implements ProcessOpsRepository {
     total: number;
   }> {
     return { instances: [], total: 0 };
+  }
+  async findUpcomingWakes(): Promise<ProcessWakeRow[]> {
+    return [];
   }
   async findOutboxMessages(): Promise<{
     messages: ProcessOutboxMessageView[];

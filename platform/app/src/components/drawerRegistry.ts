@@ -110,6 +110,10 @@ const ProcessInstanceDrawer = lazyDefault({
   factory: () => import("./ops/processes/instanceDrawer/ProcessInstanceDrawer"),
   key: "ProcessInstanceDrawer",
 });
+const ProcessInstancesDrawer = lazyDefault({
+  factory: () => import("./ops/processes/ProcessInstancesDrawer"),
+  key: "ProcessInstancesDrawer",
+});
 const OpsBlobsDrawer = lazyDefault({
   factory: () => import("./ops/blobs/OpsBlobsDrawer"),
   key: "OpsBlobsDrawer",
@@ -311,6 +315,7 @@ export const drawers = {
   foundry: FoundryDrawer,
   opsGroupDetail: GroupDetailDrawer,
   opsProcessInstance: ProcessInstanceDrawer,
+  opsProcessInstances: ProcessInstancesDrawer,
   opsBlobs: OpsBlobsDrawer,
   opsReplay: OpsReplayDrawer,
   // Coding agents

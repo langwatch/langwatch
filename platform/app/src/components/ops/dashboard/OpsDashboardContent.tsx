@@ -15,6 +15,7 @@ import { ReplayHistorySection } from "./ReplayHistorySection";
 import { StatStrip } from "./StatStrip";
 import { ThroughputChart } from "./ThroughputChart";
 import { TopErrorsCard } from "./TopErrorsCard";
+import { UpcomingWorkCard } from "./UpcomingWorkCard";
 
 /**
  * The ops landing page, read top to bottom as strip → health → chart →
@@ -77,6 +78,8 @@ export function OpsDashboardContent({ data }: { data: DashboardData }) {
       </Card.Root>
 
       <LatencyWindowsCard windows={data.latencyWindows} />
+
+      <UpcomingWorkCard />
 
       <PipelineTreeCard
         pipelineTree={data.pipelineTree}
