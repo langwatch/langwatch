@@ -34,7 +34,8 @@ async function main() {
         isCustom: true,
         url,
         method: "POST",
-        bodyTemplate: '{"thread": "{{ threadId }}", "messages": {{ messages }}}',
+        bodyTemplate:
+          '{"thread": "{{ threadId }}", "messages": {{ messages }}}',
         outputPath: "$.answer",
       },
     },
