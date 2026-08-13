@@ -136,6 +136,21 @@ jobs:
       - name: "assert rendered worker count and memory ceiling"
         run: ./tests/langevals-sizing.sh
 
+  restricted-rbac:
+    name: "restricted rbac"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: charts/langwatch
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # No helm, on purpose. Every `lookup` in the matrix above renders against
+      # no cluster and so returns empty, which is exactly what a lookup the
+      # installer is FORBIDDEN to make does not do — that one aborts the render.
+      # The templates have to be read to see it.
+      - name: "assert no template needs cluster-scoped read access"
+        run: ./tests/restricted-rbac.sh
+
   email-gateway:
     name: "email gateway"
     runs-on: ubuntu-latest

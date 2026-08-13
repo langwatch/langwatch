@@ -214,8 +214,11 @@ export const Blocked = (trace: TraceEval) => {
   const guardrails = trace.evaluations?.filter((x) => x.is_guardrail);
   const groups = groupEvaluationsByEvaluator(guardrails);
 
+  // Status-aware: only a guardrail that ran to completion can have blocked —
+  // an errored guardrail's stray `passed: false` is not a block (#6833).
   const totalBlocked = groups.filter(
-    (group) => group.latest.passed === false,
+    (group) =>
+      group.latest.status === "processed" && group.latest.passed === false,
   ).length;
 
   if (totalBlocked === 0) return null;

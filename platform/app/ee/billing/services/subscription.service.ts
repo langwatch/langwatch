@@ -131,6 +131,7 @@ export class EESubscriptionService implements SubscriptionService {
     upgradeTraces,
     totalMembers,
     totalTraces,
+    quotedAt,
   }: {
     organizationId: string;
     plan: PlanType;
@@ -138,6 +139,7 @@ export class EESubscriptionService implements SubscriptionService {
     upgradeTraces: boolean;
     totalMembers: number;
     totalTraces: number;
+    quotedAt?: number;
   }): Promise<{ success: boolean }> {
     const effectiveMembers = upgradeMembers ? totalMembers : 0;
     const effectiveTraces = upgradeTraces ? totalTraces : 0;
@@ -149,6 +151,7 @@ export class EESubscriptionService implements SubscriptionService {
         return this.seatEventFns.updateSeatEventItems({
           organizationId,
           totalMembers: effectiveMembers,
+          quotedAt,
         });
       }
     }
@@ -292,9 +295,12 @@ export class EESubscriptionService implements SubscriptionService {
     organizationId: string;
     newTotalSeats: number;
   }): Promise<{
+    amountDueCents: number;
     formattedAmountDue: string;
+    formattedCreditApplied: string | null;
     formattedRecurringTotal: string;
     billingInterval: string;
+    quotedAt: number;
   }> {
     if (!this.seatEventFns) {
       throw new SeatBillingUnavailableError();

@@ -1870,10 +1870,10 @@ secured.access(CLI_POLICY).get("/lookup", async (c: Context) => {
       status: record.status,
       created_at: record.created_at,
       expires_at: record.expires_at,
-      // The browser approval page branches its UX on this — `device_session`
-      // shows today's approve-only flow, `project_api_key` shows a project
-      // picker + "Generate" CTA. Defaults to device_session for back-compat
-      // with records minted before this field existed.
+      // The browser approval page branches its UX on this: `device_session`
+      // shows the approve-only flow, `project_api_key` shows a project picker
+      // whose key is sent to the CLI. Defaults to device_session for
+      // back-compat with records minted before this field existed.
       credential_type: record.credential_type ?? "device_session",
     },
     200,
