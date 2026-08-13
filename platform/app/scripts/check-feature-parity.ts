@@ -168,7 +168,6 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
  */
 const DEFAULT_PYTHON_TEST_ROOTS: string[] = [
   "services/langevals",
-  "langwatch_server",
   "sdks/python",
 ];
 
