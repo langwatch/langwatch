@@ -177,6 +177,26 @@ Feature: Redis is an owned client, never a module singleton
       When every construction of an ioredis client is located
       Then each one is inside the Redis client package or a test fixture
 
+    @unit
+    Scenario: The source guard scans every directory under platform/app
+      Given the platform source tree
+      When the ownership guard walks source files
+      Then it includes files from scripts, e2e, vendor, and specs
+      And only an explicit allowlist of directories is excluded
+      And the allowlist contains exactly node_modules, dist, .next, .next-saas, coverage, and public
+
+    @unit
+    Scenario: The source guard scans JavaScript files alongside TypeScript
+      Given the platform source tree
+      When the ownership guard walks source files
+      Then it includes .js, .mjs, and .cjs files
+
+    @unit
+    Scenario: Standalone operational scripts that own their process are allowlisted
+      Given the platform source tree
+      When every construction of an ioredis client is located
+      Then scripts on the operational allowlist are excluded from the violation check
+
   Rule: Consumers reach Redis by injection or from the application
 
     @unit

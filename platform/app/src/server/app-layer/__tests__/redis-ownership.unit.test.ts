@@ -27,7 +27,15 @@ const APP_ROOT = path.resolve(HERE, "../../../..");
 /** Repo root — where the `packages/*` workspace tree lives (ADR-076). */
 const REPO_ROOT = path.resolve(APP_ROOT, "../..");
 
-const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".mts", ".cts"]);
+const SOURCE_EXTENSIONS = new Set([
+  ".ts",
+  ".tsx",
+  ".mts",
+  ".cts",
+  ".js",
+  ".mjs",
+  ".cjs",
+]);
 
 /**
  * Every way an ioredis client gets constructed.
@@ -52,12 +60,32 @@ const IOREDIS_CONSTRUCTION =
  */
 const RETIRED_REDIS_MODULE =
   /["'][^"']*(?:~\/server\/redis|\.\.\/redis|\.\/redis)["']/;
+
+/**
+ * Standalone operational scripts that run their own process and legitimately
+ * own their Redis connection. Each entry is relative to the repo root.
+ *
+ * Adding a path here is an explicit decision — the reviewer sees it in the
+ * diff and can ask whether the script really needs a standalone client.
+ */
+const STANDALONE_SCRIPT_ALLOWLIST = new Set([
+  "platform/app/scripts/_dogfood_cli_mint_demo.ts",
+  "platform/app/scripts/dogfood/governance/sergey-relogin-as.ts",
+]);
+/**
+ * Directories under `platform/app` that are never source code.
+ *
+ * This is an ALLOWLIST of exclusions — anything NOT listed here IS scanned.
+ * Adding a directory to dodge the guard requires updating the snapshot
+ * assertion below, which is the point.
+ */
 const SKIP_DIRECTORIES = new Set([
   "node_modules",
   "dist",
   ".next",
   ".next-saas",
   "coverage",
+  "public",
 ]);
 
 function shouldDescend(entry: fs.Dirent): boolean {
@@ -88,8 +116,7 @@ function* walkSourceFiles(root: string): Generator<string> {
 /** Every source file in the app tree plus the workspace packages. */
 function allSourceFiles(): string[] {
   return [
-    ...walkSourceFiles(path.join(APP_ROOT, "src")),
-    ...walkSourceFiles(path.join(APP_ROOT, "ee")),
+    ...walkSourceFiles(APP_ROOT),
     ...walkSourceFiles(path.join(REPO_ROOT, "packages")),
   ];
 }
@@ -257,6 +284,7 @@ describe("Redis ownership", () => {
       const offenders = allSourceFiles()
         .filter((file) => !file.startsWith(clientPackage))
         .filter((file) => !isTestFile(file))
+        .filter((file) => !STANDALONE_SCRIPT_ALLOWLIST.has(relative(file)))
         .filter((file) =>
           IOREDIS_CONSTRUCTION.test(fs.readFileSync(file, "utf8")),
         );
@@ -291,6 +319,58 @@ describe("Redis ownership", () => {
         "new RedisReadinessService({ logger })",
       ]) {
         expect(IOREDIS_CONSTRUCTION.test(innocent)).toBe(false);
+      }
+    });
+
+    /** @scenario The source guard scans every directory under platform/app */
+    it("walks all of platform/app, not just src and ee", () => {
+      const files = allSourceFiles();
+      const relFiles = files.map(relative);
+
+      // Files from directories that the old walker missed must now appear.
+      expect(relFiles.some((f) => f.startsWith("platform/app/scripts/"))).toBe(
+        true,
+      );
+      // The specs directory is also scanned (feature files are not source, but
+      // .ts helpers inside specs/ are).
+      const hasSpecsOrE2eOrVendor = relFiles.some(
+        (f) =>
+          f.startsWith("platform/app/e2e/") ||
+          f.startsWith("platform/app/vendor/") ||
+          f.startsWith("platform/app/specs/"),
+      );
+      expect(hasSpecsOrE2eOrVendor).toBe(true);
+    });
+
+    /** @scenario The allowlist contains exactly the expected directories */
+    it("excludes only the pinned allowlist of directories", () => {
+      expect([...SKIP_DIRECTORIES].sort()).toEqual([
+        ".next",
+        ".next-saas",
+        "coverage",
+        "dist",
+        "node_modules",
+        "public",
+      ]);
+    });
+
+    /** @scenario The source guard scans JavaScript files alongside TypeScript */
+    it("includes .js, .mjs, and .cjs files in the scan", () => {
+      const files = allSourceFiles().map(relative);
+
+      // These three files exist under src/ and were previously invisible.
+      expect(files).toContain("platform/app/src/env.mjs");
+      expect(files).toContain("platform/app/src/env-create.mjs");
+      expect(files).toContain("platform/app/src/noop-css.cjs");
+    });
+
+    /** @scenario Standalone operational scripts that own their process are allowlisted */
+    it("allowlists standalone scripts that all exist on disk", () => {
+      for (const rel of STANDALONE_SCRIPT_ALLOWLIST) {
+        expect(
+          fs.existsSync(path.join(REPO_ROOT, rel)),
+          `allowlisted script missing: ${rel}`,
+        ).toBe(true);
       }
     });
 
