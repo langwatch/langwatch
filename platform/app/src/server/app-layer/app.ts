@@ -69,6 +69,12 @@ export class App {
   readonly gateway: AppDependencies["gateway"];
   readonly filters: AppDependencies["filters"];
   readonly clickhouse: AppDependencies["clickhouse"];
+  /**
+   * The process's one Redis connection, or `null` when none is configured.
+   * See {@link AppDependencies.redis} — inject where you can, read it here
+   * inside the handler where you cannot.
+   */
+  readonly redis: AppDependencies["redis"];
   readonly billing: AppDependencies["billing"];
   readonly usageStats: AppDependencies["usageStats"];
   readonly scenarios: AppDependencies["scenarios"];
@@ -148,6 +154,7 @@ export class App {
     this.gateway = deps.gateway;
     this.filters = deps.filters;
     this.clickhouse = deps.clickhouse;
+    this.redis = deps.redis;
     this.billing = deps.billing;
     this.usageStats = deps.usageStats;
     this.scenarios = deps.scenarios;
@@ -268,6 +275,31 @@ export function getApp(): App {
   if (!globalForApp.__langwatch_app) {
     throw new Error("App not initialized. Call initializeDefaultApp() first.");
   }
+  return globalForApp.__langwatch_app;
+}
+
+/**
+ * The App if one has been initialized, otherwise `null`.
+ *
+ * **Use {@link getApp} unless absence is a supported outcome you can name.** A
+ * path that needs the App and cannot run without it should fail loudly, not
+ * read `null` and quietly take a lesser branch.
+ *
+ * Redis consumers are the main legitimate users, because Redis has always been
+ * optional here: nearly all of them already branch on `if (!redis)` and have a
+ * documented fallback — an in-memory counter, a skipped dedupe, an open-failed
+ * rate limit, a 503. For those, "no App" and "no Redis" mean the same thing,
+ * and raising would turn a working fallback into a crash on a path that was
+ * built to survive exactly this.
+ *
+ * The consumers that keep {@link getApp} are the ones where doing less is not
+ * a degraded success but a wrong answer — session revocation, where skipping
+ * the Redis clear leaves a revoked user logged in.
+ *
+ * Never reach for this to avoid initializing an App. Nothing outside this
+ * module should read {@link globalForApp} directly.
+ */
+export function tryGetApp(): App | null {
   return globalForApp.__langwatch_app;
 }
 

@@ -28,6 +28,8 @@ const { mockScheduleTrace } = vi.hoisted(() => ({
   mockScheduleTrace: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock("~/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: () => ({
     traces: {
       recordSpan: (...args: unknown[]) => mockScheduleTrace(...args),

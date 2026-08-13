@@ -47,7 +47,9 @@ isolation for speed.
 ## Rules that still stand
 
 - Never hand-roll a throwaway config or run bare `npx vitest` — you drop
-  `maxWorkers`/`vmMemoryLimit` and spawn a fork per core. Go through
+  `maxWorkers`/`vmMemoryLimit` and fall back to vitest's own defaults: in run
+  mode `availableParallelism - 1` workers (10 on an 11-core laptop), and in
+  watch mode half that parallelism. Go through
   `pnpm test:unit run <path>` / `pnpm test:integration run <path>`.
 - Scope the run to a path instead of reaching for `--maxWorkers=1` (which
   serialises and keeps memory resident far longer).
