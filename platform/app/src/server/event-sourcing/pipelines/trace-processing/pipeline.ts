@@ -47,6 +47,12 @@ import {
 } from "./schemas/constants";
 import type { TraceProcessingEvent } from "./schemas/events";
 import type { NormalizedSpan } from "./schemas/spans";
+import {
+  CUSTOM_EVAL_SYNC_DEDUP_TTL_MS,
+  CUSTOM_EVAL_SYNC_DELAY_MS,
+  customEvaluationSyncDedupId,
+  hasSyncableEvaluations,
+} from "./subscribers/customEvaluationSync.subscriber";
 import { TraceRequestUtils } from "./utils/traceRequest.utils";
 
 export interface TraceProcessingPipelineDeps {
@@ -61,10 +67,10 @@ export interface TraceProcessingPipelineDeps {
     TraceProcessingEvent,
     TraceSummaryData
   >;
-  customEvaluationSyncReactor: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
+  customEvaluationSyncHandler: (
+    event: TraceProcessingEvent,
+    context: TriggerContext<TraceSummaryData>,
+  ) => Promise<void>;
   trackedEventSyncReactor: ReactorDefinition<
     TraceProcessingEvent,
     TraceSummaryData
@@ -96,10 +102,6 @@ export interface TraceProcessingPipelineDeps {
     ) => Promise<void>;
   };
   spanStorageBroadcastReactor: ReactorDefinition<TraceProcessingEvent>;
-  customerIoTraceSyncReactor?: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
   /**
    * ADR-022: BlobStore injected so RecordSpanCommand can reconstitute oversized
    * commands (fetch from S3 spool) and best-effort delete the spool after
@@ -173,11 +175,20 @@ export function createTraceProcessingPipeline(
       "evaluationTrigger",
       deps.evaluationTriggerReactor,
     )
-    .withReactor(
-      "traceSummary",
-      "customEvaluationSync",
-      deps.customEvaluationSyncReactor,
-    )
+    // Custom SDK evaluations reported on spans. Stake-sensitive but idempotent
+    // (deterministic evaluation IDs), and the queue's redelivery covers the
+    // post-enqueue path; keeps the reactor-era name so jobs staged before a
+    // deploy dispatch into this registration after it.
+    .withSubscriber("customEvaluationSync", {
+      fold: "traceSummary",
+      events: [SPAN_RECEIVED_EVENT_TYPE],
+      when: hasSyncableEvaluations,
+      delay: CUSTOM_EVAL_SYNC_DELAY_MS,
+      ttl: CUSTOM_EVAL_SYNC_DEDUP_TTL_MS,
+      dedupId: customEvaluationSyncDedupId,
+      handler: (event, context) =>
+        deps.customEvaluationSyncHandler(event, context),
+    })
     .withReactor(
       "traceSummary",
       "trackedEventSync",
@@ -229,14 +240,6 @@ export function createTraceProcessingPipeline(
       "spanStorageBroadcast",
       deps.spanStorageBroadcastReactor,
     );
-
-  if (deps.customerIoTraceSyncReactor) {
-    builder = builder.withReactor(
-      "traceSummary",
-      "customerIoTraceSync",
-      deps.customerIoTraceSyncReactor,
-    );
-  }
 
   if (deps.governanceKpisSyncReactor) {
     builder = builder.withReactor(

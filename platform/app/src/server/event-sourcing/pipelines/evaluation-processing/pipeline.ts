@@ -7,7 +7,6 @@ import { definePipeline } from "../../";
 import type { TriggerContext } from "../../pipeline/processManagerDefinition";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
 import type { AppendStore } from "../../projections/mapProjection.types";
-import type { ReactorDefinition } from "../../reactors/reactor.types";
 import {
   CompleteEvaluationCommand,
   ReportEvaluationCommand,
@@ -48,10 +47,6 @@ export interface EvaluationProcessingPipelineDeps {
       context: { tenantId: string },
     ) => Promise<void>;
   };
-  customerIoEvaluationSyncReactor?: ReactorDefinition<
-    EvaluationProcessingEvent,
-    EvaluationRunData
-  >;
 }
 
 /**
@@ -69,7 +64,7 @@ export interface EvaluationProcessingPipelineDeps {
 export function createEvaluationProcessingPipeline(
   deps: EvaluationProcessingPipelineDeps,
 ) {
-  let builder = definePipeline<EvaluationProcessingEvent>()
+  return definePipeline<EvaluationProcessingEvent>()
     .withName("evaluation_processing")
     .withAggregateType("evaluation")
     .withFoldProjection(
@@ -114,17 +109,7 @@ export function createEvaluationProcessingPipeline(
       groupKeyFn: graphTriggerActivityGroupKey,
       handler: (event, context) =>
         deps.automations.graphActivityHandler(event, context),
-    });
-
-  if (deps.customerIoEvaluationSyncReactor) {
-    builder = builder.withReactor(
-      "evaluationRun",
-      "customerIoEvaluationSync",
-      deps.customerIoEvaluationSyncReactor,
-    );
-  }
-
-  return builder
+    })
     .withCommandInstance(
       "executeEvaluation",
       ExecuteEvaluationCommand,

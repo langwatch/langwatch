@@ -183,7 +183,7 @@ import type { TraceAnalyticsData } from "./pipelines/trace-processing/projection
 import { TraceAnalyticsStore } from "./pipelines/trace-processing/projections/traceAnalytics.store";
 import { TraceAnalyticsRollupAppendStore } from "./pipelines/trace-processing/projections/traceAnalyticsRollup.store";
 import { TraceSummaryStore } from "./pipelines/trace-processing/projections/traceSummary.store";
-import { createCustomEvaluationSyncReactor } from "./pipelines/trace-processing/reactors/customEvaluationSync.reactor";
+import { createCustomEvaluationSyncHandler } from "./pipelines/trace-processing/subscribers/customEvaluationSync.subscriber";
 import { createEvaluationTriggerReactor } from "./pipelines/trace-processing/reactors/evaluationTrigger.reactor";
 import { createExperimentMetricsSyncReactor } from "./pipelines/trace-processing/reactors/experimentMetricsSync.reactor";
 import {
@@ -438,12 +438,12 @@ export class PipelineRegistry {
   }
 
   registerAll() {
-    // TODO: Customer.io subscribers are implemented but not yet registered.
-    // Counting strategy needs to be finalised (per-event ClickHouse queries)
-    // before enabling.
-    // See: customerIoTraceSyncReactor, customerIoEvaluationSyncReactor,
-    //      customerIoSimulationSyncSubscriber
-
+    // TODO: The Customer.io simulation subscriber is implemented but not yet
+    // registered — the counting strategy needs finalising (per-event
+    // ClickHouse queries) before enabling. See
+    // customerIoSimulationSync.subscriber.ts. Its trace and evaluation
+    // siblings were deleted with the reactor retirement (ADR-094) and return
+    // as subscribers if nurturing sync expands again.
     const traceSummaryStore = this.cached<TraceSummaryData>(
       new TraceSummaryStore(this.deps.repositories.traceSummaryFold),
       "trace_summaries",
@@ -1095,7 +1095,7 @@ export class PipelineRegistry {
       evaluation: evalCommands.executeEvaluation,
     });
 
-    const customEvaluationSyncReactor = createCustomEvaluationSyncReactor({
+    const customEvaluationSyncHandler = createCustomEvaluationSyncHandler({
       reportEvaluation: evalCommands.reportEvaluation,
     });
 
@@ -1186,7 +1186,7 @@ export class PipelineRegistry {
         originGateReactor,
         evaluationTriggerReactor,
         automations,
-        customEvaluationSyncReactor,
+        customEvaluationSyncHandler,
         trackedEventSyncReactor,
         traceUpdateBroadcastReactor,
         projectMetadataReactor,

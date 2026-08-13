@@ -23,7 +23,7 @@ export function buildTraceDeps(
     traceAnalyticsRollupAppendStore: store,
     originGateReactor: reactorStub("originGate"),
     evaluationTriggerReactor: reactorStub("evaluationTrigger"),
-    customEvaluationSyncReactor: reactorStub("customEvaluationSync"),
+    customEvaluationSyncHandler: async () => {},
     trackedEventSyncReactor: reactorStub("trackedEventSync"),
     traceUpdateBroadcastReactor: reactorStub("traceUpdateBroadcast"),
     projectMetadataReactor: reactorStub("projectMetadata"),

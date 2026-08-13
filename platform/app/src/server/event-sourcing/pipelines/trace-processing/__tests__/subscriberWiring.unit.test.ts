@@ -34,7 +34,7 @@ function buildTraceDeps(
     traceAnalyticsRollupAppendStore: store,
     originGateReactor: reactorStub("originGate"),
     evaluationTriggerReactor: reactorStub("evaluationTrigger"),
-    customEvaluationSyncReactor: reactorStub("customEvaluationSync"),
+    customEvaluationSyncHandler: vi.fn().mockResolvedValue(undefined),
     trackedEventSyncReactor: reactorStub("trackedEventSync"),
     traceUpdateBroadcastReactor: reactorStub("traceUpdateBroadcast"),
     projectMetadataReactor: reactorStub("projectMetadata"),
@@ -127,6 +127,47 @@ describe("trace-processing pipeline subscriber wiring", () => {
         aggregateId: "t-2",
         state: foldState,
       });
+    });
+  });
+
+  describe("given the customEvaluationSync subscriber", () => {
+    const definition = createTraceProcessingPipeline(buildTraceDeps());
+    const customEvaluationSync = definition.foldReactors.get(
+      "customEvaluationSync",
+    );
+
+    it("attaches to the traceSummary fold with the reactor-era 5s delay and 30s dedup ttl", () => {
+      expect(customEvaluationSync).toBeDefined();
+      expect(customEvaluationSync!.projectionName).toBe("traceSummary");
+      expect(customEvaluationSync!.definition.options?.delay).toBe(5_000);
+      expect(
+        customEvaluationSync!.definition.options?.deduplication?.ttlMs,
+      ).toBe(30_000);
+    });
+
+    it("derives the dedup id from tenant + aggregate + event id, scoped to this subscriber", () => {
+      const makeId =
+        customEvaluationSync!.definition.options?.deduplication?.makeId;
+      expect(makeId).toBeDefined();
+      const event = fakeEvent({
+        id: "ev-9",
+        tenantId: "project-9",
+        aggregateId: "t-9",
+      });
+      expect(makeId!({ event, foldState: undefined })).toBe(
+        "subscriber:customEvaluationSync:project-9:t-9:ev-9",
+      );
+    });
+
+    it("rejects events without syncable evaluations before enqueue", () => {
+      const shouldReact = customEvaluationSync!.definition.shouldReact!;
+      const context = {} as never;
+      expect(
+        shouldReact(fakeEvent({ type: SPAN_RECEIVED_EVENT_TYPE }), context),
+      ).toBe(false);
+      expect(
+        shouldReact(fakeEvent({ type: ORIGIN_RESOLVED_EVENT_TYPE }), context),
+      ).toBe(false);
     });
   });
 
