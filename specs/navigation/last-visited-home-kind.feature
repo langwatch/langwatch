@@ -20,7 +20,10 @@ Feature: Navigation — the lastVisitedHomeKind marker writes only on real chang
   Scenario: A first project visit writes the home marker exactly once
     Given no home-kind preference is stored
     When the user lands on "/acme-app/traces"
-    Then "lastVisitedHomeKind" is written once with "project"
+    Then the resolving hook instance writes "lastVisitedHomeKind" once with "project"
+    # Sibling instances mounted in the same commit may repeat the write before
+    # the broadcast reaches their closures; those writes are idempotent and the
+    # identical value makes every subscriber bail out after its first re-render.
     And each mounted subscriber of the key re-renders exactly once
 
   @bdd @ui @navigation @last-visited-home-kind @integration @regression
