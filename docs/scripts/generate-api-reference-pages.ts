@@ -417,7 +417,9 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
   {
     name: "Webhooks",
     dirName: "webhooks",
-    pathPrefixes: ["/api/webhooks/v1"],
+    // RPC-named and date-versioned (ADR-094): the published paths are the bare
+    // alias, `/api/webhooks/endpoints.create`, with no version segment.
+    pathPrefixes: ["/api/webhooks"],
     overviewDescription:
       "Register endpoints that receive signed, retried batches of LangWatch events, and inspect their delivery log, health, and the events the organization emitted.",
   },

@@ -56,7 +56,10 @@ def paged(handler_pages: List[Dict[str, Any]]):
     seen_cursors: List[Optional[str]] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
-        seen_cursors.append(request.url.params.get("cursor"))
+        # The webhooks surface is RPC-named, so its cursor rides the body;
+        # the spend-events surface still carries one in the query string.
+        body = json.loads(request.content) if request.content else {}
+        seen_cursors.append(body.get("cursor") or request.url.params.get("cursor"))
         return httpx.Response(200, json=handler_pages[len(seen_cursors) - 1])
 
     return handler, seen_cursors
@@ -65,35 +68,35 @@ def paged(handler_pages: List[Dict[str, Any]]):
 def test_webhooks_facade_routes_and_envelopes():
     handler, calls = recorder(
         {
-            ("GET", "/api/webhooks/v1/endpoints"): {"data": [{"id": "we_1"}]},
-            ("POST", "/api/webhooks/v1/endpoints"): {
+            ("POST", "/api/webhooks/endpoints.list"): {"data": [{"id": "we_1"}]},
+            ("POST", "/api/webhooks/endpoints.create"): {
                 "data": {"id": "we_1", "secret": "whsec_x"}
             },
-            ("GET", "/api/webhooks/v1/endpoints/we_1"): {"data": {"id": "we_1"}},
-            ("PATCH", "/api/webhooks/v1/endpoints/we_1"): {
+            ("POST", "/api/webhooks/endpoints.get"): {"data": {"id": "we_1"}},
+            ("POST", "/api/webhooks/endpoints.update"): {
                 "data": {"id": "we_1", "max_batch_size": 50}
             },
-            ("DELETE", "/api/webhooks/v1/endpoints/we_1"): {
+            ("POST", "/api/webhooks/endpoints.archive"): {
                 "data": {"archived": True}
             },
-            ("POST", "/api/webhooks/v1/endpoints/we_1/roll-secret"): {
+            ("POST", "/api/webhooks/endpoints.rollSecret"): {
                 "data": {"id": "we_1", "secret": "whsec_y"}
             },
-            ("GET", "/api/webhooks/v1/endpoints/we_1/health"): {
+            ("POST", "/api/webhooks/endpoints.getHealth"): {
                 "data": {"oldest_undelivered_age_ms": 0, "dlq_depth": 0}
             },
-            ("GET", "/api/webhooks/v1/endpoints/we_1/deliveries"): {
+            ("POST", "/api/webhooks/endpoints.listDeliveries"): {
                 "data": [],
                 "next_cursor": None,
             },
-            ("POST", "/api/webhooks/v1/endpoints/we_1/test"): {
+            ("POST", "/api/webhooks/endpoints.test"): {
                 "data": {"delivered": True, "response_status": 200}
             },
-            ("GET", "/api/webhooks/v1/event-types"): {
+            ("POST", "/api/webhooks/eventTypes.list"): {
                 "data": [{"type": "gateway.request.completed"}]
             },
-            ("GET", "/api/webhooks/v1/events"): {"data": [], "next_cursor": None},
-            ("GET", "/api/webhooks/v1/events/evt_1"): {
+            ("POST", "/api/webhooks/events.list"): {"data": [], "next_cursor": None},
+            ("POST", "/api/webhooks/events.get"): {
                 "data": {"id": "evt_1", "type": "gateway.request.completed"}
             },
         }
@@ -109,7 +112,7 @@ def test_webhooks_facade_routes_and_envelopes():
         max_in_flight=4,
     )
     assert created["secret"] == "whsec_x"
-    create_call = next(c for c in calls if c[0] == "POST" and c[1].endswith("/endpoints"))
+    create_call = next(c for c in calls if c[1].endswith("/endpoints.create"))
     assert create_call[2]["max_batch_size"] == 25
     assert create_call[2]["max_batch_delay_ms"] == 500
     assert create_call[2]["max_in_flight"] == 4
@@ -129,14 +132,20 @@ def test_webhooks_facade_routes_and_envelopes():
     )
     assert facade.get_event("evt_1")["id"] == "evt_1"
     # The range is required by the route, so a facade that dropped either bound
-    # would 422 against a real server while this fake happily answered.
-    events_call = next(c for c in calls if "/v1/events?" in c[1])
-    assert "from=1" in events_call[1]
-    assert "to=2" in events_call[1]
+    # would 422 against a real server while this fake happily answered. Under
+    # RPC naming the bounds ride the body rather than the query string.
+    events_call = next(c for c in calls if c[1].endswith("/events.list"))
+    assert events_call[2] is not None
+    assert events_call[2]["from"] == 1
+    assert events_call[2]["to"] == 2
 
     # Archiving is a soft delete: nothing to hand back, only the route to hit.
     assert facade.archive("we_1") is None
-    assert ("DELETE", "http://langwatch.test/api/webhooks/v1/endpoints/we_1", None) in calls
+    assert (
+        "POST",
+        "http://langwatch.test/api/webhooks/endpoints.archive",
+        {"id": "we_1"},
+    ) in calls
 
 
 def test_webhooks_update_sends_only_the_keys_passed():
@@ -146,15 +155,18 @@ def test_webhooks_update_sends_only_the_keys_passed():
     cannot accidentally send nulls for the rest.
     """
     handler, calls = recorder(
-        {("PATCH", "/api/webhooks/v1/endpoints/we_1"): {"data": {"id": "we_1"}}}
+        {("POST", "/api/webhooks/endpoints.update"): {"data": {"id": "we_1"}}}
     )
     facade = WebhooksFacade(FakeRestClient(handler))
 
     facade.update("we_1", status="disabled")
-    assert calls[-1][2] == {"status": "disabled"}
+    # The id names the endpoint and rides the body like every other argument;
+    # what must NOT appear is a null for a control the caller left alone.
+    assert calls[-1][2] == {"id": "we_1", "status": "disabled"}
 
     facade.update("we_1", url="https://receiver.example/v2", max_in_flight=8)
     assert calls[-1][2] == {
+        "id": "we_1",
         "url": "https://receiver.example/v2",
         "max_in_flight": 8,
     }
@@ -235,11 +247,12 @@ def test_iter_events_sends_the_required_range_on_every_page():
     ]
 
     def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content) if request.content else {}
         seen.append(
             {
-                "from": request.url.params.get("from"),
-                "to": request.url.params.get("to"),
-                "cursor": request.url.params.get("cursor"),
+                "from": body.get("from"),
+                "to": body.get("to"),
+                "cursor": body.get("cursor"),
             }
         )
         return httpx.Response(200, json=pages[len(seen) - 1])
@@ -248,8 +261,8 @@ def test_iter_events_sends_the_required_range_on_every_page():
     rows = list(facade.iter_events(from_ms=1, to_ms=2))
 
     assert [r["id"] for r in rows] == ["evt_1", "evt_2"]
-    assert [p["from"] for p in seen] == ["1", "1"]
-    assert [p["to"] for p in seen] == ["2", "2"]
+    assert [p["from"] for p in seen] == [1, 1]
+    assert [p["to"] for p in seen] == [2, 2]
     assert [p["cursor"] for p in seen] == [None, "c1"]
 
 

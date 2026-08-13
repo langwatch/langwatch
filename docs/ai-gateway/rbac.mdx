@@ -118,8 +118,8 @@ The billing and webhook surfaces authenticate with an **organization API key** a
 
 | Endpoint | Permission |
 |---|---|
-| `POST/PATCH/DELETE /api/webhooks/v1/endpoints*`, `/roll-secret`, `/test` | `webhookEndpoints:manage` |
-| `GET /api/webhooks/v1/endpoints*`, `/deliveries`, `/health`, `/events`, `/event-types` | `webhookEndpoints:view` |
+| `POST /api/webhooks/endpoints.{create,update,archive,rollSecret,test}` | `webhookEndpoints:manage` |
+| `POST /api/webhooks/endpoints.{list,get,listDeliveries,getHealth}`, `events.{list,get}`, `eventTypes.list` | `webhookEndpoints:view` |
 | `GET /api/gateway/v1/spend-events`, `GET /api/gateway/v1/spend-summaries` | `gatewaySpend:view` |
 | `GET /api/gateway/v1/end-users/:id/spend` | `gatewaySpend:view` |
 | `POST /api/gateway/v1/spend-events/replay` | `gatewaySpend:manage` |

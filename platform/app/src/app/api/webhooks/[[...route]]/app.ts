@@ -85,7 +85,11 @@ const registerEndpointEndpoints = (v: WebhooksVersion): void => {
       status: 201,
       description:
         "Create a webhook endpoint. The signing secret is returned ONCE in this response and never again; roll it to get a new one. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
-      docs: { operationId: "createWebhookEndpoint", tags: ["Webhooks"] },
+      docs: {
+        operationId: "createWebhookEndpoint",
+        summary: "Create a webhook endpoint",
+        tags: ["Webhooks"],
+      },
     },
     createEndpoint,
   );
@@ -97,7 +101,11 @@ const registerEndpointEndpoints = (v: WebhooksVersion): void => {
       output: z.object({ data: z.array(endpointDtoSchema) }),
       description:
         "List the organization's webhook endpoints. Archived endpoints are excluded.",
-      docs: { operationId: "listWebhookEndpoints", tags: ["Webhooks"] },
+      docs: {
+        operationId: "listWebhookEndpoints",
+        summary: "List webhook endpoints",
+        tags: ["Webhooks"],
+      },
     },
     listEndpoints,
   );
@@ -109,7 +117,11 @@ const registerEndpointEndpoints = (v: WebhooksVersion): void => {
       input: endpointRefSchema,
       output: z.object({ data: endpointDtoSchema }),
       description: "Read one webhook endpoint.",
-      docs: { operationId: "getWebhookEndpoint", tags: ["Webhooks"] },
+      docs: {
+        operationId: "getWebhookEndpoint",
+        summary: "Get a webhook endpoint",
+        tags: ["Webhooks"],
+      },
     },
     getEndpoint,
   );
@@ -122,7 +134,11 @@ const registerEndpointEndpoints = (v: WebhooksVersion): void => {
       output: z.object({ data: endpointDtoSchema }),
       description:
         "Update a webhook endpoint's url, event subscriptions, or status (`active` re-enables, `disabled` pauses; re-enabling does not re-send the gap, replay covers it). Partial: only the fields present are written.",
-      docs: { operationId: "updateWebhookEndpoint", tags: ["Webhooks"] },
+      docs: {
+        operationId: "updateWebhookEndpoint",
+        summary: "Update a webhook endpoint",
+        tags: ["Webhooks"],
+      },
     },
     updateEndpoint,
   );
@@ -135,7 +151,11 @@ const registerEndpointEndpoints = (v: WebhooksVersion): void => {
       output: z.object({ data: archivedDtoSchema }),
       description:
         "Archive a webhook endpoint: it disappears from every read and delivers nothing further.",
-      docs: { operationId: "archiveWebhookEndpoint", tags: ["Webhooks"] },
+      docs: {
+        operationId: "archiveWebhookEndpoint",
+        summary: "Archive a webhook endpoint",
+        tags: ["Webhooks"],
+      },
     },
     archiveEndpoint,
   );
@@ -148,7 +168,11 @@ const registerEndpointEndpoints = (v: WebhooksVersion): void => {
       output: z.object({ data: endpointWithSecretDtoSchema }),
       description:
         "Roll the endpoint's signing secret. The new secret is returned ONCE; deliveries sign with it immediately, and the previous secret stays valid for a short window so a receiver can swap on its own schedule.",
-      docs: { operationId: "rollWebhookEndpointSecret", tags: ["Webhooks"] },
+      docs: {
+        operationId: "rollWebhookEndpointSecret",
+        summary: "Roll an endpoint's signing secret",
+        tags: ["Webhooks"],
+      },
     },
     rollEndpointSecret,
   );
@@ -161,7 +185,11 @@ const registerEndpointEndpoints = (v: WebhooksVersion): void => {
       output: z.object({ data: testFireResultSchema }),
       description:
         "Send a signed test event through the full delivery path. Contract: this answers 200 whenever the test itself ran; `data.delivered` says whether the receiver accepted it, so clients must read the body, not the status code.",
-      docs: { operationId: "sendWebhookEndpointTest", tags: ["Webhooks"] },
+      docs: {
+        operationId: "sendWebhookEndpointTest",
+        summary: "Send a test event to an endpoint",
+        tags: ["Webhooks"],
+      },
     },
     testEndpoint,
   );
@@ -179,6 +207,7 @@ const registerEndpointEndpoints = (v: WebhooksVersion): void => {
         "The endpoint's delivery log: every attempt with the receiver's HTTP status, latency, and error. Cursor-paged, newest first.",
       docs: {
         operationId: "listWebhookEndpointDeliveries",
+        summary: "List an endpoint's delivery attempts",
         tags: ["Webhooks"],
       },
     },
@@ -193,7 +222,11 @@ const registerEndpointEndpoints = (v: WebhooksVersion): void => {
       output: z.object({ data: healthDtoSchema }),
       description:
         "Delivery health. The headline number is `oldest_undelivered_age_ms`, the feed's staleness: age of the oldest envelope still buffered or retrying. Also: DLQ depth, failure streak, sends per minute, success rate, and p95 latency over the last hour.",
-      docs: { operationId: "getWebhookEndpointHealth", tags: ["Webhooks"] },
+      docs: {
+        operationId: "getWebhookEndpointHealth",
+        summary: "Read an endpoint's delivery health",
+        tags: ["Webhooks"],
+      },
     },
     getEndpointHealth,
   );
@@ -207,7 +240,11 @@ const registerEventEndpoints = (v: WebhooksVersion): void => {
       output: z.object({ data: z.array(eventTypeDtoSchema) }),
       description:
         "The event catalog: every subscribable type, grouped by family. Types marked `is_emitting: false` are declared contracts whose producers have not shipped yet.",
-      docs: { operationId: "listWebhookEventTypes", tags: ["Webhooks"] },
+      docs: {
+        operationId: "listWebhookEventTypes",
+        summary: "List subscribable event types",
+        tags: ["Webhooks"],
+      },
     },
     listEventTypes,
   );
@@ -223,7 +260,11 @@ const registerEventEndpoints = (v: WebhooksVersion): void => {
       }),
       description:
         "The organization's emitted-events log for the request families: cursor-paged, newest first, filter by type. `from` and `to` bound the created range in epoch milliseconds, are REQUIRED, and `from` must not be later than `to` — a range that ends before it starts is rejected rather than answered with an empty page. They are required because the log is a ranged read over the 13-month spend table and an unbounded walk sorts all of it on every page. Webhooks are push over this log, never the only copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page rather than an error, so a client can probe forward-compatibly.",
-      docs: { operationId: "listWebhookEvents", tags: ["Webhooks"] },
+      docs: {
+        operationId: "listWebhookEvents",
+        summary: "List emitted events",
+        tags: ["Webhooks"],
+      },
     },
     listEvents,
   );
@@ -236,7 +277,11 @@ const registerEventEndpoints = (v: WebhooksVersion): void => {
       output: z.object({ data: webhookEventEnvelopeSchema }),
       description:
         "One emitted event by its id, as it was delivered. Serves the same families the events log serves. A 404 covers every reason the log cannot answer — never emitted, past the retention horizon, or belonging to another organization — because telling those apart would confirm the existence of another tenant's request ids.",
-      docs: { operationId: "getWebhookEvent", tags: ["Webhooks"] },
+      docs: {
+        operationId: "getWebhookEvent",
+        summary: "Get one emitted event",
+        tags: ["Webhooks"],
+      },
     },
     getEvent,
   );

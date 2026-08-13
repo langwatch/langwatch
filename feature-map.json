@@ -932,8 +932,8 @@
           "surfaces": {
             "code": {
               "sdk": {
-                "python": null,
-                "typescript": null
+                "python": "langwatch.webhooks",
+                "typescript": "client.webhooks"
               },
               "cli": [
                 "webhooks list",
@@ -951,15 +951,15 @@
                 "webhooks events"
               ],
               "skill": null,
-              "docs": null
+              "docs": "/features/webhooks"
             },
             "platform": {
               "ui": "/settings/gateway/webhooks",
               "mcp": null,
               "skill": null,
-              "docs": null
+              "docs": "/features/webhooks"
             },
-            "api": "/api/webhooks/v1/endpoints",
+            "api": "/api/webhooks/endpoints.list",
             "docs": null
           },
           "sync": null,
