@@ -156,10 +156,12 @@ describe("the governed SQL workbench", () => {
         await renderWorkbench();
 
         expect(screen.getByText("Query")).toBeInTheDocument();
+        const escapeRegExp = (value: string) =>
+          value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         for (const name of SCHEMA_DATASET_NAMES) {
           expect(
             screen.getByRole("button", {
-              name: new RegExp(`^${name.replace(/\./g, "\\.")}`),
+              name: new RegExp(`^${escapeRegExp(name)}`),
             }),
           ).toBeInTheDocument();
         }
