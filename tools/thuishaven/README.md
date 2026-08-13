@@ -239,7 +239,16 @@ registry, and dashboard stay the same.
   no zero-copy). The server lifecycle is automatic; `haven db url clickhouse`
   prints this stack's URL, `haven db reset` gives it a fresh database, and the
   daemon prunes databases whose worktree hasn't been up for `HAVEN_DB_TTL`
-  (default 14 days).
+  (default 4 days), and stops the server itself once no stack is running
+  (`LANGWATCH_HAVEN_CH_STOP_IDLE=0` keeps it always-on) — the next `up`
+  restarts it over the same data in seconds.
+- **Leaked test containers are reaped.** An interrupted integration-test run
+  leaves its testcontainers (a stray ClickHouse, a Redis) running in the shared
+  VM forever — the library's own reaper dies with the run. The daemon removes
+  testcontainers-labelled containers older than `HAVEN_TESTCONTAINER_TTL`
+  (default 1h; 0 disables); fresh ones are left alone, and the sweep never
+  boots the VM just to clean it. See
+  `specs/setup/haven-testcontainer-reaper.feature`.
 - **Always migrate + seed, fully static identity.** Every `up` migrates *and*
   seeds idempotently. Nothing about the local dev identity is ever randomly
   generated — the same admin login, org/team/project/user IDs, and API

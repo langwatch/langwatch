@@ -16,7 +16,11 @@ type Config struct {
 	// daemon prunes them in the background (0 disables pruning). Only databases
 	// haven itself tracked (via the activity clock) are ever touched, and the
 	// protected main database is always kept.
-	DBIdleTTL                time.Duration
+	DBIdleTTL time.Duration
+	// TestContainerTTL is how old a testcontainers-labeled container must be
+	// before the daemon reaps it as leaked (0 disables the sweep). Fresh ones are
+	// left alone — a live test run may still be using them.
+	TestContainerTTL         time.Duration
 	HeartbeatEvery           time.Duration // launcher heartbeat cadence
 	DaemonArgv               []string      // how to (re)launch `haven daemon`
 	IsAgent                  bool          // token-free plain output for AI drivers (no color/TUI)

@@ -31,6 +31,9 @@ type Orchestrator struct {
 	// container is the colima VM the langyagent worker runs on in its container
 	// tiers (see domain.LangyTier). May be nil in tests that never launch it.
 	container ContainerRuntime
+	// janitor sweeps leaked testcontainers off that same VM. Nil in tests that
+	// never reap.
+	janitor ContainerJanitor
 	// claude edits Claude Code's own settings, which only `haven setup` does.
 	// Nil everywhere else, including in tests that never install a feature.
 	claude ClaudeSettings
@@ -59,6 +62,7 @@ type Deps struct {
 	Hyg       Hygiene
 	Sem       Semaphore
 	Container ContainerRuntime
+	Janitor   ContainerJanitor
 	Claude    ClaudeSettings
 	Log       *zap.Logger
 }
@@ -68,7 +72,7 @@ func New(d Deps) *Orchestrator {
 	return &Orchestrator{
 		cfg: d.Cfg, proxy: d.Proxy, store: d.Store, sup: d.Sup, sys: d.Sys,
 		ch: d.CH, pg: d.PG, rds: d.RDS, obs: d.Obs, hyg: d.Hyg, sem: d.Sem,
-		container: d.Container, claude: d.Claude, log: d.Log,
+		container: d.Container, janitor: d.Janitor, claude: d.Claude, log: d.Log,
 	}
 }
 

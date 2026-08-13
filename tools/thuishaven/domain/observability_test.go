@@ -103,17 +103,17 @@ func TestDefaultObservabilityLimitsStayWithinTheirBounds(t *testing.T) {
 
 	// A big one does not get to hand the stack an unbounded slice of it.
 	big := DefaultObservabilityLimits(128*gib, 32)
-	if big.MemoryMB != 2560 {
-		t.Errorf("128 GiB machine: MemoryMB = %d, want the 2560 ceiling", big.MemoryMB)
+	if big.MemoryMB != 3072 {
+		t.Errorf("128 GiB machine: MemoryMB = %d, want the 3072 ceiling", big.MemoryMB)
 	}
-	if big.CPUs != 2 {
-		t.Errorf("32-core machine: CPUs = %v, want the ceiling of 2", big.CPUs)
+	if big.CPUs != 2.5 {
+		t.Errorf("32-core machine: CPUs = %v, want the ceiling of 2.5", big.CPUs)
 	}
 
-	// An eighth of the machine in between.
-	mid := DefaultObservabilityLimits(16*gib, 8)
+	// A seventh of the machine in between.
+	mid := DefaultObservabilityLimits(14*gib, 8)
 	if mid.MemoryMB != 2048 {
-		t.Errorf("16 GiB machine: MemoryMB = %d, want 2048 (an eighth)", mid.MemoryMB)
+		t.Errorf("14 GiB machine: MemoryMB = %d, want 2048 (a seventh)", mid.MemoryMB)
 	}
 }
 
@@ -234,7 +234,7 @@ func TestDefaultColimaLimitsStayWithinTheirBounds(t *testing.T) {
 	}
 
 	big := DefaultColimaLimits(128*gib, 32)
-	if big.CPUs != 4 || big.MemoryGiB != 8 {
-		t.Errorf("128 GiB / 32-core: got %d cpus / %d GiB, want the 4 / 8 ceilings", big.CPUs, big.MemoryGiB)
+	if big.CPUs != 6 || big.MemoryGiB != 8 {
+		t.Errorf("128 GiB / 32-core: got %d cpus / %d GiB, want the 6 / 8 ceilings", big.CPUs, big.MemoryGiB)
 	}
 }

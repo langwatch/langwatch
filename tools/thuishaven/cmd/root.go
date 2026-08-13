@@ -23,6 +23,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/clickhousedocker"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/colima"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/dashboard"
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/dockerjanitor"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/fileregistry"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/hygiene"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/otellgtm"
@@ -171,15 +172,23 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 	disableDLP, disableDLPSet := operatorEnvLookup("LANGWATCH_DISABLE_GOOGLE_DLP")
 
 	cfg := app.Config{
-		Naming:                   naming,
-		Home:                     havenHome(),
-		IdleTTL:                  envDuration("HAVEN_IDLE_TTL", 4*time.Hour),
-		DBIdleTTL:                envDuration("HAVEN_DB_TTL", 14*24*time.Hour),
-		HeartbeatEvery:           30 * time.Second,
-		DaemonArgv:               selfArgv(trustedRepoRoot(), "daemon"),
-		IsAgent:                  isAgent,
-		ShouldManageClickHouse:   devEnv("LANGWATCH_HAVEN_CH") != "0",
-		ShouldStopClickHouseIdle: devEnv("LANGWATCH_HAVEN_CH_STOP_IDLE") == "1",
+		Naming:  naming,
+		Home:    havenHome(),
+		IdleTTL: envDuration("HAVEN_IDLE_TTL", 4*time.Hour),
+		// Four days spans a long weekend away from a worktree; a fortnight (the
+		// old default) meant a dozen dead stacks' databases sat on the shared
+		// ClickHouse's small memory cap before the first prune ever fired.
+		DBIdleTTL:              envDuration("HAVEN_DB_TTL", 4*24*time.Hour),
+		TestContainerTTL:       envDuration("HAVEN_TESTCONTAINER_TTL", domain.DefaultTestContainerTTL),
+		HeartbeatEvery:         30 * time.Second,
+		DaemonArgv:             selfArgv(trustedRepoRoot(), "daemon"),
+		IsAgent:                isAgent,
+		ShouldManageClickHouse: devEnv("LANGWATCH_HAVEN_CH") != "0",
+		// Default ON: with no stack registered nothing is querying, and the next
+		// `up` restarts the container over the same data dir in seconds.
+		// LANGWATCH_HAVEN_CH_STOP_IDLE=0 keeps it always-on for out-of-band use
+		// (e.g. querying stack databases directly between runs).
+		ShouldStopClickHouseIdle: devEnv("LANGWATCH_HAVEN_CH_STOP_IDLE") != "0",
 		ShouldManagePostgres:     devEnv("LANGWATCH_HAVEN_PG") != "0",
 		ShouldManageRedis:        devEnv("LANGWATCH_HAVEN_REDIS") != "0",
 		// Observability shares CH's colima VM, so it defaults ON now — the VM is
@@ -195,7 +204,7 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		orch: app.New(app.Deps{
 			Cfg: cfg, Proxy: proxy, Store: store, Sup: sup, Sys: sys,
 			CH: ch, PG: pg, RDS: rds, Obs: obs, Hyg: hyg, Sem: sem,
-			Container: rt, Claude: claudesettings.New(), Log: logger,
+			Container: rt, Janitor: dockerjanitor.New(rt), Claude: claudesettings.New(), Log: logger,
 		}),
 		dash: dashboard.New(store.Stacks, sharedURL, dashboard.Probes{
 			PortInUse:    sys.PortInUse,

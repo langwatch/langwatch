@@ -335,6 +335,15 @@ type ContainerRuntime interface {
 	Profile() string
 }
 
+// ContainerJanitor sweeps containers a testcontainers run left behind in the
+// shared VM (specs/setup/haven-testcontainer-reaper.feature). ReapTestContainers
+// removes every testcontainers-labeled container created before cutoff and
+// returns the removed containers' names; when the VM is down it does nothing
+// rather than boot it.
+type ContainerJanitor interface {
+	ReapTestContainers(ctx context.Context, cutoff time.Time) ([]string, error)
+}
+
 // DaemonInfo is the little record `up` reads to find (or spawn) the daemon.
 type DaemonInfo struct {
 	PID  int    `json:"pid"`
