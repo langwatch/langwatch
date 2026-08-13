@@ -63,6 +63,7 @@ interface ApiErrorBody {
   kind?: string;
   meta?: Record<string, unknown>;
   reasons?: Array<{ code: string; meta?: { field?: string } }>;
+  tips?: string[];
 }
 
 async function expectApiError(
@@ -324,8 +325,16 @@ describe("Feature: Webhook endpoints management API", () => {
         enabled_events: ["gateway.request.completed"],
         max_batch_size: 1000,
       });
-    const error = await expectApiError(res, { status: 400, code: "bad_request" });
-    expect(JSON.stringify(error)).toContain("between 1 and 100");
+    const error = await expectApiError(res, {
+      status: 400,
+      code: "webhook_endpoint_invalid",
+    });
+    // One code answers four different rules, so the caller needs to know
+    // WHICH it broke. That used to live in the message; the framework
+    // publishes the code there now, so it travels in meta with the sentence
+    // in tips.
+    expect(error.meta?.reason).toBe("delivery_controls");
+    expect(error.tips?.join(" ")).toContain("between 1 and 100");
   });
 
   describe("the URL admission policy is the one the sender enforces", () => {
@@ -355,8 +364,12 @@ describe("Feature: Webhook endpoints management API", () => {
           url: "https://example.com:6379/hooks",
           enabled_events: ["gateway.request.completed"],
         });
-      const error = await expectApiError(res, { status: 400, code: "bad_request" });
-      expect(JSON.stringify(error)).toContain("443");
+      const error = await expectApiError(res, {
+        status: 400,
+        code: "webhook_endpoint_invalid",
+      });
+      expect(error.meta?.reason).toBe("port");
+      expect(error.tips?.join(" ")).toContain("443");
     });
 
     it("rejects credentials in the URL", async () => {
@@ -365,8 +378,12 @@ describe("Feature: Webhook endpoints management API", () => {
           url: "https://user:pass@example.com/hooks",
           enabled_events: ["gateway.request.completed"],
         });
-      const error = await expectApiError(res, { status: 400, code: "bad_request" });
-      expect(JSON.stringify(error)).toContain("credentials");
+      const error = await expectApiError(res, {
+        status: 400,
+        code: "webhook_endpoint_invalid",
+      });
+      expect(error.meta?.reason).toBe("credentials");
+      expect(error.tips?.join(" ")).toContain("credentials");
     });
 
     it("still rejects plain http when the escape hatch is off", async () => {
@@ -375,8 +392,12 @@ describe("Feature: Webhook endpoints management API", () => {
           url: "http://example.com/hooks",
           enabled_events: ["gateway.request.completed"],
         });
-      const error = await expectApiError(res, { status: 400, code: "bad_request" });
-      expect(JSON.stringify(error)).toContain("https");
+      const error = await expectApiError(res, {
+        status: 400,
+        code: "webhook_endpoint_invalid",
+      });
+      expect(error.meta?.reason).toBe("scheme");
+      expect(error.tips?.join(" ")).toContain("https");
     });
   });
 
@@ -508,17 +529,26 @@ describe("Feature: Webhook endpoints management API", () => {
       });
     const { data } = (await createRes.json()) as { data: { id: string } };
 
-    const res = await rpc("endpoints.update", { id: data.id, status: "DISABLED" });
-    expect(res.status).toBe(400);
+    const res = await rpc("endpoints.update", {
+      id: data.id,
+      status: "DISABLED",
+    });
+    await expectValidationError(res);
   });
 
   /** @scenario Without the plan flag the surface refuses politely */
-  it("returns 403 with an enterprise message when the plan lacks the flag", async () => {
+  it("returns 402 enterprise_plan_required when the plan lacks the flag", async () => {
     planHasWebhookEndpoints = false;
     try {
       const res = await rpc("endpoints.list");
-      const error = await expectApiError(res, { status: 403, code: "permission_denied" });
-      expect(error.message).toContain("enterprise");
+      const error = await expectApiError(res, {
+        status: 402,
+        code: "enterprise_plan_required",
+      });
+      // Not the message: the framework publishes the CODE there. The words a
+      // customer reads are the remediation channel, and `meta.feature` is what
+      // a client branches on.
+      expect(error.meta?.feature).toBe("WEBHOOKS");
     } finally {
       planHasWebhookEndpoints = true;
     }
@@ -643,7 +673,7 @@ describe("Feature: Webhook endpoints management API", () => {
       planHasWebhookEndpoints = true;
       const now = Date.now();
       const res = await rpc("events.list", { from: now, to: now - 60_000 });
-      const error = await expectApiError(res, { status: 400, code: "validation_error" });
+      const error = await expectValidationError(res);
       // Without this the case passes for a validation error about anything at
       // all, including a body the route does not take.
           });

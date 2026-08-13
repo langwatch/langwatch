@@ -60,6 +60,7 @@ function assertControlInBounds(
   if (!Number.isInteger(value) || value < bounds.min || value > bounds.max) {
     throw new WebhookEndpointValidationError(
       `${name} must be an integer between ${bounds.min} and ${bounds.max}`,
+      "delivery_controls",
     );
   }
 }
@@ -150,14 +151,38 @@ export class InvalidWebhookDeliveryCursorError extends HandledError {
 export class WebhookEndpointValidationError extends HandledError {
   declare readonly code: "webhook_endpoint_invalid";
 
-  constructor(message: string) {
+  /**
+   * `reason` is what makes this refusal actionable, and it has to travel
+   * OUTSIDE the message.
+   *
+   * Four different rules answer this one code — the scheme, the port, embedded
+   * credentials, a private host — and a caller has to know which one it broke
+   * to fix it. The message used to carry that, and on an API-boundary error it
+   * no longer can: the framework publishes the CODE as the message, because a
+   * HandledError's message is server copy that may name internals (ADR-045).
+   * So the discriminator goes in `meta`, which is a client contract, and the
+   * prose goes in `tips`, which is authored to be read.
+   */
+  constructor(message: string, reason?: WebhookEndpointProblem) {
     super("webhook_endpoint_invalid", message, {
       httpStatus: 400,
       fault: "customer",
+      ...(reason ? { meta: { reason } } : {}),
+      tips: [message],
     });
     this.name = "WebhookEndpointValidationError";
   }
 }
+
+/**
+ * Which rule an endpoint broke. `url_*` mirror the admission policy's own
+ * codes; `delivery_controls` covers a batch-size, delay or in-flight value
+ * outside its server bound; `events` an unknown event selector.
+ */
+export type WebhookEndpointProblem =
+  | WebhookUrlProblemCode
+  | "delivery_controls"
+  | "events";
 
 /**
  * No live endpoint in this organization has that id.
@@ -242,6 +267,7 @@ function assertValidUrl(url: string): void {
   if (problem) {
     throw new WebhookEndpointValidationError(
       URL_PROBLEM_MESSAGES[problem.code],
+      problem.code,
     );
   }
 }
@@ -250,12 +276,14 @@ function assertValidEvents(enabledEvents: string[]): void {
   if (enabledEvents.length === 0) {
     throw new WebhookEndpointValidationError(
       "enabled_events must select at least one event type",
+      "events",
     );
   }
   for (const selector of enabledEvents) {
     if (!isValidEventSelector(selector)) {
       throw new WebhookEndpointValidationError(
         `unknown event selector "${selector}"`,
+        "events",
       );
     }
   }
