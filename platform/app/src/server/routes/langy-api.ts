@@ -45,9 +45,24 @@
  * The dark-surface 404 is the one deliberate exception, and it does not throw
  * at all: the envelope that makes every other refusal legible is itself the
  * leak here. A thrown 404 comes back as canonical JSON carrying `trace_id` and
- * `span_id`; an unmounted path comes back as plain-text `404 Not Found` from
- * Hono's default handler. So the dark refusal returns `c.notFound()` — that
- * same default handler — and matches an unmounted route in status, body and
+ * `span_id` — a shape no unmounted path can produce. So the dark refusal
+ * returns `c.notFound()`, Hono's default handler, which is the same handler an
+ * unmounted path falls through to.
+ *
+ * What that pair actually puts on the wire is worth stating precisely, because
+ * it is not Hono's default and it is decided in another file. `honoFetchForNode`
+ * (`src/start.ts`) intercepts every 404 leaving the app and, when the body is
+ * exactly Hono's `404 Not Found` sentinel, rewrites it to
+ * `{"error":"Not Found"}` with `Content-Type: application/json`. Production
+ * therefore serves JSON here, not plain text. Parity survives because the
+ * rewrite keys off that sentinel body and so applies identically to the dark
+ * refusal and to an unmounted path — but note the carve-out: a 404 carrying any
+ * OTHER body is passed through untouched. That is exactly why this refusal must
+ * stay `c.notFound()` and must never hand-build its own 404 JSON; a bespoke body
+ * would skip the rewrite and become distinguishable, even at an identical
+ * status. The parity assertion in
+ * `__tests__/langy-api-refusal-chain.unit.test.ts` compares the two responses at
+ * the Hono layer, upstream of that bridge, and covers status, body and
  * Content-Type.
  *
  * Create and continue are the same service call — `conversationId` present or

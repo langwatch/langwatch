@@ -16,6 +16,14 @@
  *     status, body and Content-Type an unmounted path returns. A thrown 404
  *     would come back as the canonical JSON envelope carrying `trace_id`, and
  *     that envelope is itself the leak the dark surface exists to prevent.
+ *     This comparison is made at the Hono layer. In the Node server a further
+ *     hop, `honoFetchForNode` in `src/start.ts`, rewrites Hono's `404 Not
+ *     Found` sentinel body to `{"error":"Not Found"}` JSON — keyed off that
+ *     exact body, so it rewrites both sides of this pair identically and
+ *     parity carries through. The carve-out is why the assertion below
+ *     compares BODY and not just status: a 404 with any other body skips the
+ *     rewrite, so a hand-built `c.json(..., 404)` here would survive to the
+ *     wire looking different from an unmounted path.
  *   - The flag is checked BEFORE the `langy:create` ceiling. Behind it, a key
  *     lacking the permission got a 403 while the surface was supposed to be
  *     dark — a refusal no unmounted route can produce.
@@ -31,6 +39,7 @@
  */
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { LangyIdentityDenialReason } from "~/server/app-layer/langy/langyApiKeyIdentity";
 
 // ─── Auth mocks ───────────────────────────────────────────────────────────────
 // The route builds a module-scope `tokenResolver = TokenResolver.create(prisma)`,
@@ -112,9 +121,12 @@ const fakeResolved = {
   project: { id: "project-123", team: { organizationId: "org-1" } },
 };
 
+// `parts`, not `content`: the schema takes `parts` and defaults it to `[]`, so
+// a `content` key is stripped as unknown and a wrong-shaped fixture would still
+// reach a 202 — passing for the wrong reason.
 const VALID_TURN_BODY = {
   idempotencyKey: "idem-1",
-  messages: [{ role: "user", content: "hi" }],
+  messages: [{ role: "user", parts: [{ type: "text", text: "hi" }] }],
 };
 
 function postTurn(body: unknown = VALID_TURN_BODY) {
@@ -162,6 +174,7 @@ describe("/api/langy refusal chain", () => {
       mockIsEnabled.mockResolvedValue(false);
     });
 
+    /** @scenario "A switched-off surface answers exactly as a route that does not exist" */
     it("answers a valid credential with the SAME response an unmounted path gives", async () => {
       const dark = await describeResponse(await postTurn());
       const unmounted = await describeResponse(
@@ -176,6 +189,7 @@ describe("/api/langy refusal chain", () => {
       expect(dark.body).not.toContain("trace_id");
     });
 
+    /** @scenario "A switched-off surface answers exactly as a route that does not exist" */
     it("does not reach the ceiling, the identity bridge, or the turn service", async () => {
       await postTurn();
 
@@ -186,6 +200,7 @@ describe("/api/langy refusal chain", () => {
       expect(mockStartConversationTurn).not.toHaveBeenCalled();
     });
 
+    /** @scenario "The rollback switch is checked before the caller's permissions" */
     it("stays dark for a key that would fail the langy:create ceiling", async () => {
       // The exact case that used to leak: ceiling first meant a 403 escaped a
       // surface that is supposed to be indistinguishable from unmounted.
@@ -239,10 +254,11 @@ describe("/api/langy refusal chain", () => {
       expect(mockEnforceApiKeyCeiling).toHaveBeenCalled();
     });
 
+    /** @scenario "A key owned by no user is refused rather than evaluated on project alone" */
     it("refuses a key with no owning user as 403", async () => {
       mockResolveLangyKeyIdentity.mockResolvedValue({
         ok: false,
-        reason: "unowned",
+        reason: "unowned" satisfies LangyIdentityDenialReason,
         message: "no owner",
       });
 
@@ -254,10 +270,15 @@ describe("/api/langy refusal chain", () => {
       );
     });
 
+    /** @scenario "A key owned by a user without Langy access is refused" */
     it("refuses an owner without Langy access as 403", async () => {
+      // `satisfies` is load-bearing: the double is untyped, and the route
+      // reads this through a `reason === "unowned" ? … : …` ternary, so a
+      // bogus value would silently land in the else-branch and pass the
+      // assertion below without ever exercising the real one.
       mockResolveLangyKeyIdentity.mockResolvedValue({
         ok: false,
-        reason: "no_langy_access",
+        reason: "no-access" satisfies LangyIdentityDenialReason,
         message: "no access",
       });
 
@@ -269,6 +290,7 @@ describe("/api/langy refusal chain", () => {
       );
     });
 
+    /** @scenario "A key whose owning user no longer exists is refused" */
     it("refuses a vanished actor row as 403", async () => {
       mockResolveLangyActorSession.mockResolvedValue({
         ok: false,
@@ -303,6 +325,72 @@ describe("/api/langy refusal chain", () => {
       expect(res.status).toBe(202);
       expect(await res.json()).toEqual({ conversationId: "conv-1" });
       expect(mockMarkUsed).toHaveBeenCalledWith({ apiKeyId: "key-1" });
+    });
+
+    // The tenancy argument. A 202 alone would still pass if the route handed
+    // the service someone else's project, or dropped the resolved session —
+    // so assert the values the credential resolved to actually arrive.
+    it("passes the credential's project and session to the turn service", async () => {
+      await postTurn();
+
+      expect(mockStartConversationTurn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectId: "project-123",
+          session: { user: { id: "user-1" } },
+          idempotencyKey: "idem-1",
+          requestedConversationId: null,
+        }),
+      );
+    });
+
+    // The continue route is the same handler with `conversationId` present;
+    // `null` vs a real id is the entire difference, and nothing covered the
+    // populated side.
+    it("forwards the path conversationId when continuing a turn", async () => {
+      const res = await testApp.request(
+        "http://localhost/api/langy/conversations/conv-existing/messages",
+        {
+          method: "POST",
+          headers: {
+            "X-Auth-Token": "test-token",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(VALID_TURN_BODY),
+        },
+      );
+
+      expect(res.status).toBe(202);
+      expect(mockStartConversationTurn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectId: "project-123",
+          requestedConversationId: "conv-existing",
+        }),
+      );
+    });
+
+    // The continue route must be dark on the same terms as create — a route
+    // that stayed reachable with the flag off would defeat the rollback.
+    it("keeps the continue route dark when the flag is off", async () => {
+      mockIsEnabled.mockResolvedValue(false);
+
+      const res = await testApp.request(
+        "http://localhost/api/langy/conversations/conv-existing/messages",
+        {
+          method: "POST",
+          headers: {
+            "X-Auth-Token": "test-token",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(VALID_TURN_BODY),
+        },
+      );
+
+      expect(await describeResponse(res)).toEqual(
+        await describeResponse(
+          await testApp.request(UNMOUNTED_URL, { method: "POST" }),
+        ),
+      );
+      expect(mockStartConversationTurn).not.toHaveBeenCalled();
     });
   });
 });
