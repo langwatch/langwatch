@@ -58,7 +58,8 @@ exposure window is dominated by idle time, when no turn is even running. This is
 acknowledged as the deliberate trade in the relay's own `SECURITY POSTURE NOTE`
 (top of `otelrelay.go`); this ADR revisits whether the *window* and *fan-in* can
 be cut without giving up the property that motivated the relay — keeping the
-OTLP credential and the LLM virtual key out of the prompt-injectable worker.
+OTLP export credential and, in mediated mode, the LLM virtual key out of the
+prompt-injectable worker.
 
 ## Decision
 
@@ -163,9 +164,11 @@ relay exists to prevent.
   memory, which Go does not offer.
 - Per-entry non-secret state (the turn trace context, `LastLLMError`) is
   unaffected — it is not a customer credential.
-- No change to the worker-isolation story (kernel UID + 0700 + 128-bit token +
-  secrets-out-of-worker), which already contains the likely threat; this ADR
-  only narrows the manager-side concentration behind it.
+- No change to the worker-isolation story — kernel UID + 0700 + 128-bit routing
+  token, with the OTLP export credential and the mediated LLM virtual key kept
+  out of the worker while the session key stays in it by design. That story
+  already contains the likely threat; this ADR only narrows the manager-side
+  concentration behind it.
 
 ## References
 
