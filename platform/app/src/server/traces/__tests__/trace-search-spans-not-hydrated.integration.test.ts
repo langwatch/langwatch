@@ -42,7 +42,8 @@ const now = Date.now();
  */
 const BEDROCK_INPUT = JSON.stringify({
   type: "text",
-  value: 'Bedrock Converse input: [{"text":"summarise this shipping manifest"}]',
+  value:
+    'Bedrock Converse input: [{"text":"summarise this shipping manifest"}]',
 });
 const BEDROCK_OUTPUT = JSON.stringify({
   type: "text",
