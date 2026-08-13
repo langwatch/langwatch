@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "@prisma/client";
-import { Prisma } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
+import { Prisma } from "~/generated/prisma/client";
 import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
 import { LANGY_VK_SECRET_NAME } from "~/server/projects/reserved-secret-names";
 import { decrypt, encrypt } from "~/utils/encryption";

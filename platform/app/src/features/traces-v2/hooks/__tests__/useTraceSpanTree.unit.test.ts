@@ -20,6 +20,7 @@ const capturedQueryOptions: CapturedQueryOptions[] = [];
 let previewTraceId = false;
 
 vi.mock("@tanstack/react-query", () => ({
+  keepPreviousData: (previousData: unknown) => previousData,
   useQuery: (options: CapturedQueryOptions) => {
     capturedQueryOptions.push(options);
     return { data: [], isLoading: false };

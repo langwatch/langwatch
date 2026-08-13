@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { batchProjectPermissions, type Permission } from "~/server/api/rbac";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { LANGY_SESSION_API_KEY_NAME } from "~/server/api-key/reserved-names";

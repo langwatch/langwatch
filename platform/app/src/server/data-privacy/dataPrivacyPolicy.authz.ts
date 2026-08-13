@@ -1,5 +1,5 @@
-import type { PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
+import type { PrismaClient } from "~/generated/prisma/client";
 import {
   hasOrganizationPermission,
   hasProjectPermission,

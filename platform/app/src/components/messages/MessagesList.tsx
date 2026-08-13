@@ -11,10 +11,10 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { Project } from "@prisma/client";
 import React, { createRef, useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, Maximize2 } from "react-feather";
 import { LuLayers, LuRefreshCw } from "react-icons/lu";
+import type { Project } from "~/generated/prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
 import { formatMilliseconds } from "~/utils/formatMilliseconds";
 import { Menu } from "../../components/ui/menu";
@@ -43,7 +43,8 @@ export function MessagesList() {
   >();
   const [groupBy] = useGroupBy();
   const { filterParams, queryOpts } = useFilterParams();
-  const navigationFooter = useNavigationFooter();
+  // Trace search pages by scrollId only — a non-zero pageOffset is rejected.
+  const navigationFooter = useNavigationFooter("cursor");
 
   // Live endDate that gets bumped to "now" on SSE events so the query
   // window extends to include newly-arrived traces.
@@ -60,7 +61,6 @@ export function MessagesList() {
       endDate: liveEndDate,
       query: getSingleQueryParam(router.query.query),
       groupBy,
-      pageOffset: navigationFooter.pageOffset,
       pageSize: navigationFooter.pageSize,
       scrollId: urlScrollId,
     },

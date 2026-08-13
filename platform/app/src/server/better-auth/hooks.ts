@@ -2,13 +2,13 @@ import { extractEmailDomain, isSsoProviderMatch } from "@ee/sso/matching";
 import { platformSSOAllowed } from "@ee/sso/sso-gate";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
+import { APIError } from "better-auth/api";
 import {
   Prisma,
   type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { APIError } from "better-auth/api";
+} from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
 import { InviteService } from "~/server/invites/invite.service";
 import { trackServerEvent } from "~/server/posthog";

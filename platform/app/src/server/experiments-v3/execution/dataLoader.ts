@@ -6,7 +6,7 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import type { Evaluator } from "@prisma/client";
+import type { Evaluator } from "~/generated/prisma/client";
 import type { Workflow } from "~/optimization_studio/types/dsl";
 import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/utils/datasetUtils";
 import type { TypedAgent } from "~/server/agents/agent.repository";

@@ -7,6 +7,13 @@ permissions:
   contents: write
   pages: write
 
+# Shared with release-langwatch-chart — see the note there. Both push the same
+# gh-pages index.yaml, so they serialize against each other under one group
+# rather than one group each.
+concurrency:
+  group: helm-chart-index
+  cancel-in-progress: false
+
 jobs:
   validate:
     runs-on: ubuntu-latest

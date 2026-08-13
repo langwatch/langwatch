@@ -5,15 +5,16 @@
  * These run against the real route and the real database because the defect
  * lived in the wire schema, which a service-level test never sees.
  */
+
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   type Organization,
   type Project,
   type Team,
   TriggerAction,
   TriggerKind,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+} from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 
 // The route invalidates the active-triggers cache after a successful write.

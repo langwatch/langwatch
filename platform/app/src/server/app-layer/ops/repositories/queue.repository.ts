@@ -139,6 +139,17 @@ export interface QueueRepository {
   }): Promise<DrainPreview>;
 
   reconcileTotalPending(queueName: string): Promise<ReconcileResult | null>;
+
+  /**
+   * The drift the most recent reconcile pass published for each named queue,
+   * summed as absolute values.
+   *
+   * Every instance reads this, including the ones that won no marker and so
+   * computed nothing themselves. `null` for a queue with no live figure (never
+   * reconciled, or the last one has aged out) is skipped rather than counted as
+   * zero, so a queue that has stopped reconciling does not read as healthy.
+   */
+  readPublishedPendingDrift(queueNames: string[]): Promise<number>;
 }
 
 export class NullQueueRepository implements QueueRepository {
@@ -240,5 +251,9 @@ export class NullQueueRepository implements QueueRepository {
 
   async reconcileTotalPending(): Promise<ReconcileResult | null> {
     return null;
+  }
+
+  async readPublishedPendingDrift(): Promise<number> {
+    return 0;
   }
 }

@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { IngestionSource, PrismaClient } from "@prisma/client";
+import type { IngestionSource, PrismaClient } from "~/generated/prisma/client";
 import {
   ensureHiddenGovernanceProject,
   PROJECT_KIND,

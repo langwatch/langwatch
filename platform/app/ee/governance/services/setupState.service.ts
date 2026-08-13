@@ -17,7 +17,7 @@
  * Spec: specs/ai-gateway/governance/feature-flag-gating.feature
  *       (persona detection sub-scenario, added next iter as we wire)
  */
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { PROJECT_KIND } from "./governanceProject.service";
 import type { GovernanceTraceActivityClickHouseRepository } from "./governanceTraceActivity.clickhouse.repository";
 

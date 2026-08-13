@@ -110,6 +110,28 @@ describe("evaluationAnalyticsRollup map projection — per-event row", () => {
       ).toBe(0);
     });
 
+    it("never counts the same event into FailCount and ErrorCount (verdict requires processed status)", () => {
+      const row = map.mapEvaluationCompleted(
+        makeCompleted({ status: "error", passed: false, score: 0.1 }),
+      );
+      expect(row.errorCount).toBe(1);
+      expect(row.failCount).toBe(0);
+      expect(row.passCount).toBe(0);
+      expect(row.scoreSum).toBe(0);
+      expect(row.scoreCount).toBe(0);
+    });
+
+    it("ignores a verdict on a skipped event", () => {
+      const row = map.mapEvaluationCompleted(
+        makeCompleted({ status: "skipped", passed: true, score: 1 }),
+      );
+      expect(row.skippedCount).toBe(1);
+      expect(row.passCount).toBe(0);
+      expect(row.failCount).toBe(0);
+      expect(row.scoreSum).toBe(0);
+      expect(row.scoreCount).toBe(0);
+    });
+
     it("decodes ScoreSum/ScoreCount with null-aware divisor", () => {
       const a = map.mapEvaluationCompleted(makeCompleted({ score: 0.85 }));
       expect(a.scoreSum).toBe(0.85);
@@ -125,6 +147,17 @@ describe("evaluationAnalyticsRollup map projection — per-event row", () => {
     it("carries the real evaluatorType (identity is on the event)", () => {
       const row = map.mapEvaluationReported(makeReported());
       expect(row.evaluatorType).toBe("langevals/atomic");
+    });
+
+    it("never counts the same event into FailCount and ErrorCount (verdict requires processed status)", () => {
+      const row = map.mapEvaluationReported(
+        makeReported({ status: "error", passed: false, score: 0.1 }),
+      );
+      expect(row.errorCount).toBe(1);
+      expect(row.failCount).toBe(0);
+      expect(row.passCount).toBe(0);
+      expect(row.scoreSum).toBe(0);
+      expect(row.scoreCount).toBe(0);
     });
   });
 });

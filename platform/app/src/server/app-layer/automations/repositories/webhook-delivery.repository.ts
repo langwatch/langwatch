@@ -1,4 +1,4 @@
-import type { WebhookDeliveryOutcome } from "@prisma/client";
+import type { WebhookDeliveryOutcome } from "~/generated/prisma/client";
 
 /**
  * The automations channel's read + write access to the shared webhook delivery

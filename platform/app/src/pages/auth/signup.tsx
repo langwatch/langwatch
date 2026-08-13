@@ -300,7 +300,7 @@ function SignUpForm() {
                 <Button
                   colorPalette="orange"
                   type="submit"
-                  loading={register.isLoading || signInLoading}
+                  loading={register.isPending || signInLoading}
                 >
                   Sign up
                 </Button>

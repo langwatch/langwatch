@@ -1,5 +1,6 @@
-import { PromptScope } from "@prisma/client";
 import { HTTPException } from "hono/http-exception";
+import { PromptScope } from "~/generated/prisma/client";
+import { uniqueConstraintTargets } from "~/server/utils/prismaErrors";
 
 /**
  * Handles a conflict error by throwing a 409 error with a message
@@ -13,7 +14,7 @@ export const handlePossibleConflictError = (
   error: any,
   scope: PromptScope = PromptScope.PROJECT,
 ) => {
-  if (error.code === "P2002" && error.meta?.target?.includes("handle")) {
+  if (uniqueConstraintTargets(error).some((t) => t.includes("handle"))) {
     throw new HTTPException(409, {
       message: `Prompt handle already exists for scope ${scope}`,
       cause: error,

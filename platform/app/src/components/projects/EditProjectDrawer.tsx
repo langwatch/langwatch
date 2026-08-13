@@ -41,7 +41,7 @@ export function EditProjectDrawer({
 }) {
   const { organization } = useOrganizationTeamProject();
   const { closeDrawer } = useDrawer();
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
 
   const teams = api.team.getTeamsWithMembers.useQuery(
     { organizationId: organization?.id ?? "" },
@@ -208,8 +208,8 @@ export function EditProjectDrawer({
                 <Button
                   colorPalette="orange"
                   type="submit"
-                  loading={updateProject.isLoading}
-                  disabled={!isDirty || updateProject.isLoading}
+                  loading={updateProject.isPending}
+                  disabled={!isDirty || updateProject.isPending}
                 >
                   Save
                 </Button>

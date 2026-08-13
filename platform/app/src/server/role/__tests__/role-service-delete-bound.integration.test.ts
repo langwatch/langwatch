@@ -9,14 +9,14 @@
  * guard and failed (or dangled) at the storage layer instead of being named.
  */
 import { generate } from "@langwatch/ksuid";
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   type Organization,
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+} from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 import { RoleService } from "~/server/role";
 import { RoleInUseError } from "~/server/role/errors";

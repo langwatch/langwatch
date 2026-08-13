@@ -79,6 +79,10 @@ const DEFAULT_TEST_ROOTS: string[] = [
   // assistant's rules are tested here (and nowhere else), so scenarios about
   // what an instruction teaches can only bind from this root.
   "skills/_tests",
+  // CI guards run under `node --test` from the workflow that uses them, not
+  // vitest, and their tests live beside them. Without this root, a scenario
+  // describing what a guard refuses could only ever be @unimplemented.
+  ".github/scripts",
 ];
 
 /**
@@ -138,9 +142,20 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // this root those scenarios could only ever be @unimplemented or bound to a
   // TS stub that proves nothing.
   "services/langyagent",
+  // The Go SDK. Its span-attribute scenarios (typed input/output envelopes,
+  // binary content parts, metadata hoisting, data capture) are satisfied by Go
+  // tests and by nothing else, so without this root those scenarios could only
+  // ever be @unimplemented or bound to a TS test that exercises a different
+  // SDK — a binding that reads green while proving nothing about Go.
+  "sdks/go",
   "pkg",
   "tools/thuishaven",
   "tools/herrgen",
+  // CI's own behaviour is behaviour too — how a job checks out, which
+  // toolchain it compiles with. The ciguard tests are the only thing that
+  // asserts it, so scenarios under specs/ci/ can only bind from this root.
+  // Without it those feature files report "all bound" while binding nothing.
+  "tools/ciguard",
 ];
 
 /**
@@ -365,7 +380,6 @@ const LEGACY_INERT: string[] = [
   "specs/data-retention/trace-pinning.feature",
   "specs/data-retention/ttl-activation.feature",
   "specs/data-retention/visibility-window-teaser-redaction.feature",
-  "specs/datasets/add-to-dataset-span-mapping.feature",
   "specs/dependencies/supply-chain-age-gates.feature",
   "specs/evaluations/evaluation-payload-offload.feature",
   "specs/evaluations/experiments-online-evaluations-separation.feature",
@@ -383,9 +397,7 @@ const LEGACY_INERT: string[] = [
   "specs/event-sourcing/oversized-attribute-value-preview.feature",
   "specs/event-sourcing/payload-envelope.feature",
   "specs/event-sourcing/pipeline-model.feature",
-  "specs/event-sourcing/poison-group-park-guard.feature",
   "specs/event-sourcing/process-roles.feature",
-  "specs/event-sourcing/producer-append-coalescing.feature",
   "specs/event-sourcing/reactors.feature",
   "specs/event-sourcing/redis-fold-cache.feature",
   "specs/event-sourcing/work-conserving-fair-dispatch.feature",
@@ -401,7 +413,6 @@ const LEGACY_INERT: string[] = [
   "specs/experiments-v3/runner-configuration.feature",
   "specs/experiments-v3/table-display.feature",
   "specs/experiments-v3/undo-redo.feature",
-  "specs/experiments/comparison.feature",
   "specs/features/agent-cli.feature",
   "specs/features/analytics-cli.feature",
   "specs/features/annotation-cli.feature",
@@ -446,7 +457,6 @@ const LEGACY_INERT: string[] = [
   "specs/langy/langy-composer-feedback-and-cards.feature",
   "specs/langy/langy-context-awareness.feature",
   "specs/langy/langy-conversation-title.feature",
-  "specs/langy/langy-deploy-hardening.feature",
   "specs/langy/langy-derived-cards.feature",
   "specs/langy/langy-dogfood-scenarios.feature",
   "specs/langy/langy-empty-state-suggestions.feature",
@@ -469,7 +479,6 @@ const LEGACY_INERT: string[] = [
   "specs/licensing/license-status-ui.feature",
   "specs/licensing/notification-coverage-gaps.feature",
   "specs/licensing/resource-limit-notifications.feature",
-  "specs/licensing/subscription-page.feature",
   "specs/licensing/usage-page-navigation.feature",
   "specs/mcp-server/analytics-tool.feature",
   "specs/mcp-server/api-key-tools.feature",
@@ -500,7 +509,6 @@ const LEGACY_INERT: string[] = [
   "specs/monitors/workflow-evaluator-mappings.feature",
   "specs/navigation/child-drawer-nesting.feature",
   "specs/navigation/home-navigation.feature",
-  "specs/navigation/shared-section-navigation-layout.feature",
   "specs/nlp-go/dataset-block.feature",
   "specs/nlp-go/http-block.feature",
   "specs/nlp-go/proxy.feature",

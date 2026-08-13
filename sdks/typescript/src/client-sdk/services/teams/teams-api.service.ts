@@ -3,8 +3,6 @@
  *
  * Teams group projects and members; membership is a team-scoped role binding,
  * which is why adding a member takes the role they get on the team.
- *
- * CLI-only, and deliberately not exported from the client SDK's public index.
  */
 import { resolveEndpoint } from "@/internal/endpoint";
 import {

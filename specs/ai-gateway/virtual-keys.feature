@@ -115,6 +115,24 @@ Feature: AI Gateway — Virtual Keys
     And the Anthropic fallback icon at 60% opacity after a "→" separator
     And hovering the chain exposes a tooltip reading "openai → anthropic"
 
+  @integration
+  Scenario: Virtual key list Routing column states its three modes
+    Given a key with a pinned routing policy, a key that falls back to any
+      provider, and a key that falls back nowhere
+    When I open the virtual keys list
+    Then the pinned key's Routing cell names its policy
+    And the falling-back key's cell reads "fallback"
+    And the third key's cell is the null glyph, with no wording around it
+
+  @integration
+  Scenario: Virtual key list shows a key's own budget under its month spend
+    Given a key with a $1.00 daily budget that has spent $0.50 today
+      and $2.50 across the month
+    When I open the virtual keys list
+    Then its Spent this month cell shows the month total
+    And a bar under it reads $0.50 of $1.00 for the day, naming when the day resets
+    And a key with no budget of its own gets no bar and no space reserved for one
+
   @visual
   Scenario: Virtual key list Last-used column shows relative time
     Given virtual key "prod-openai" was last used 3 hours ago
@@ -122,6 +140,43 @@ Feature: AI Gateway — Virtual Keys
     When I open the virtual keys list
     Then the prod-openai row shows "about 3 hours ago" with the exact timestamp on hover
     And the dev-sandbox-legacy row shows "never" in muted text
+
+  # ============================================================================
+  # Reading a key's traces
+  #
+  # The gateway stamps the virtual key id on every span it proxies and the
+  # trace fold hoists it onto the trace summary, so the destination project's
+  # Trace Explorer can filter to one key. The action is only offered when it
+  # leads somewhere the reader can actually open.
+  # ============================================================================
+
+  @integration
+  Scenario: View traces opens the key's destination filtered to that key
+    Given virtual key "prod-key" files its traces into the project "web-app"
+    And I am a member of the team that holds "web-app"
+    When I choose "View traces" for "prod-key"
+    Then the Trace Explorer for "web-app" opens
+    And it lists only the traces that key produced, over the last 30 days
+
+  @integration
+  Scenario: View traces is absent when the key has no trace destination
+    Given virtual key "legacy-key" has no trace destination
+    When I look at the actions for "legacy-key"
+    Then "View traces" is not offered
+
+  @integration
+  Scenario: View traces is absent when the trace destination was deleted
+    Given virtual key "prod-key" files its traces into a project that was deleted
+    When I look at the actions for "prod-key"
+    Then "View traces" is not offered
+    And the trace destination is still badged as deleted
+
+  @integration
+  Scenario: View traces is absent when the destination sits on a team I cannot open
+    Given virtual key "prod-key" files its traces into the project "web-app"
+    And I am not a member of the team that holds "web-app"
+    When I look at the actions for "prod-key"
+    Then "View traces" is not offered
 
   # ============================================================================
   # Create-drawer capability preview (Lane B iter 23) — minimum-viable

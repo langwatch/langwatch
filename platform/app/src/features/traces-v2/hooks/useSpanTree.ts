@@ -1,4 +1,8 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useEffect, useMemo, useRef } from "react";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import { applyOverlayToSpanTreeNodes } from "~/server/traces/edit-overlay/applyTraceEditOverlayToViews";
@@ -52,8 +56,8 @@ export function useSpanTreeCanonical() {
     // authenticated endpoint to walk it with.
     enabled: isReady && !shared,
     staleTime: 300_000,
-    cacheTime: 1_800_000,
-    keepPreviousData: true,
+    gcTime: 1_800_000,
+    placeholderData: keepPreviousData,
     refetchOnWindowFocus: true,
   });
 
@@ -63,11 +67,12 @@ export function useSpanTreeCanonical() {
   // exists for. This is the single update path for both SSE states; only the
   // trigger differs (SSE event vs. interval, see `refetchInterval` below).
   //
-  // `keepPreviousData` means `data` can briefly be the PREVIOUS trace's tree
-  // right after a trace switch — its high-water mark would make the delta
-  // poll skip this trace's spans, so wait for current data.
-  const tree = treeQuery.isPreviousData ? undefined : treeQuery.data;
-  api.tracesV2.spanTreeDelta.useQuery(
+  // `placeholderData: keepPreviousData` means `data` can briefly be the
+  // PREVIOUS trace's tree right after a trace switch — its high-water mark
+  // would make the delta poll skip this trace's spans, so wait for current
+  // data.
+  const tree = treeQuery.isPlaceholderData ? undefined : treeQuery.data;
+  const deltaQuery = api.tracesV2.spanTreeDelta.useQuery(
     {
       ...queryArgs,
       sinceUpdatedAtMs: tree !== undefined ? spanTreeDeltaSinceMs(tree) : 0,
@@ -91,16 +96,25 @@ export function useSpanTreeCanonical() {
       refetchInterval: sseConnected ? false : LIVE_REFETCH_MS,
       // Deltas are throwaway transport into the spanTree cache entry —
       // don't retain per-poll entries of their own.
-      cacheTime: 0,
-      onSuccess: (delta) => {
-        const queryKey = spanTreeQueryKey(queryArgs);
-        const existing = queryClient.getQueryData<SpanTreeNode[]>(queryKey);
-        if (!existing) return;
-        const merged = mergeSpanTreeDelta(existing, delta);
-        if (merged !== existing) queryClient.setQueryData(queryKey, merged);
-      },
+      gcTime: 0,
     },
   );
+
+  // Per-fetch merge of the delta into the assembled tree. Keyed on
+  // `dataUpdatedAt`, not on `data`: structural sharing keeps `data` identity
+  // stable when a poll returns the same spans, and re-merging an already
+  // merged delta is a no-op (`merged === existing`), so a spurious run cannot
+  // corrupt the tree.
+  const { data: delta, dataUpdatedAt: deltaUpdatedAt } = deltaQuery;
+  useEffect(() => {
+    if (!deltaUpdatedAt || delta === undefined) return;
+    const queryKey = spanTreeQueryKey(queryArgs);
+    const existing = queryClient.getQueryData<SpanTreeNode[]>(queryKey);
+    if (!existing) return;
+    const merged = mergeSpanTreeDelta(existing, delta);
+    if (merged !== existing) queryClient.setQueryData(queryKey, merged);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deltaUpdatedAt]);
 
   // One catch-up delta when SSE comes back. While it was down the interval
   // was doing the polling; once it reconnects the interval stops and updates
@@ -159,7 +173,27 @@ export function useSpanTreeWithCaptured() {
     [captured, data, nodes],
   );
 
-  return useMemo(() => ({ captured, corrected }), [captured, corrected]);
+  // The same tree with the removed rows still on it, for the waterfall to show
+  // struck through. It is what the correction did, not what the trace now is,
+  // so it never stands in for `corrected`.
+  const displayData = useMemo(
+    () =>
+      nodes
+        ? applyOverlayToSpanTreeNodes({ nodes, patch, shouldKeepDeleted: true })
+        : nodes,
+    [nodes, patch],
+  );
+
+  const display = useMemo(
+    () =>
+      displayData === nodes ? captured : { ...captured, data: displayData },
+    [captured, displayData, nodes],
+  );
+
+  return useMemo(
+    () => ({ captured, corrected, display }),
+    [captured, corrected, display],
+  );
 }
 
 /**

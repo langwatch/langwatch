@@ -1,4 +1,4 @@
-import type { PrismaClient, Team } from "@prisma/client";
+import type { PrismaClient, Team } from "~/generated/prisma/client";
 import type {
   CreateTeamInput,
   PaginatedResult,

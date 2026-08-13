@@ -61,20 +61,39 @@ function createMockRepo(
       .fn()
       .mockResolvedValue({ groupsDrained: 0, jobsDrained: 0 }),
     reconcileTotalPending: vi.fn().mockResolvedValue(null),
+    readPublishedPendingDrift: vi.fn().mockResolvedValue(0),
     ...overrides,
   };
 }
 
+/**
+ * Drive the private reconcile through the public discovery path, then read the
+ * dashboard the way the UI does.
+ */
+const runReconcile = async (queueRepo: QueueRepository) => {
+  const collector = new OpsMetricsCollector({
+    redis: createMockRedis(),
+    queueRepo,
+  });
+  await collector.discoverQueues();
+  // Access via bracket notation to avoid exposing a test-only public API.
+  await (
+    collector as unknown as { reconcilePending(): Promise<void> }
+  ).reconcilePending();
+  return collector.getDashboardData().pendingDrift;
+};
+
 describe("OpsMetricsCollector", () => {
   describe("reconcilePending()", () => {
-    describe("given two queues with opposing drifts", () => {
+    describe("given this instance measured the drift itself", () => {
       describe("when reconcilePending runs", () => {
         /**
-         * Opposing per-queue drifts (+30 and -10) must not cancel each other.
-         * The health signal accumulates absolute values so the dashboard tile
-         * always shows total magnitude of drift regardless of direction.
+         * The published figure and the locally measured one are deliberately
+         * different here. Reporting the local sum (40) would pass on a test
+         * that used matching numbers, so they are kept apart to make the two
+         * outcomes distinguishable.
          */
-        it("accumulates absolute drift values so opposing drifts do not cancel", async () => {
+        it("reports the published drift rather than its own measurement", async () => {
           const queueRepo = createMockRepo({
             discoverQueueNames: vi
               .fn()
@@ -91,23 +110,45 @@ describe("OpsMetricsCollector", () => {
                 groundTruth: 50,
                 drift: -10,
               }),
+            readPublishedPendingDrift: vi.fn().mockResolvedValue(97),
           });
 
-          const collector = new OpsMetricsCollector({
-            redis: createMockRedis(),
-            queueRepo,
+          expect(await runReconcile(queueRepo)).toBe(97);
+        });
+      });
+    });
+
+    // The reconcile is single-flighted, so on any cycle most instances win no
+    // marker and measure nothing. Reporting what they measured would report 0
+    // drift for a queue that has plenty.
+    describe("given this instance won no single-flight marker", () => {
+      describe("when reconcilePending runs", () => {
+        it("still reports the drift another instance published", async () => {
+          const queueRepo = createMockRepo({
+            discoverQueueNames: vi
+              .fn()
+              .mockResolvedValue(["queue-alpha", "queue-beta"]),
+            reconcileTotalPending: vi.fn().mockResolvedValue(null),
+            readPublishedPendingDrift: vi.fn().mockResolvedValue(42),
           });
 
-          // Populate groupQueueNames via the public discovery path
-          await collector.discoverQueues();
+          expect(await runReconcile(queueRepo)).toBe(42);
+        });
+      });
+    });
 
-          // Call the private method through the public reconcile path.
-          // Access via bracket notation to avoid exposing a test-only public API.
-          await (
-            collector as unknown as { reconcilePending(): Promise<void> }
-          ).reconcilePending();
+    describe("given every queue reports no drift", () => {
+      describe("when reconcilePending runs", () => {
+        it("reports zero", async () => {
+          const queueRepo = createMockRepo({
+            discoverQueueNames: vi.fn().mockResolvedValue(["queue-alpha"]),
+            reconcileTotalPending: vi
+              .fn()
+              .mockResolvedValue({ counter: 5, groundTruth: 5, drift: 0 }),
+            readPublishedPendingDrift: vi.fn().mockResolvedValue(0),
+          });
 
-          expect(collector.getDashboardData().pendingDrift).toBe(40);
+          expect(await runReconcile(queueRepo)).toBe(0);
         });
       });
     });
