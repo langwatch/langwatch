@@ -73,10 +73,10 @@ turn settles (success, failure, or stop). An idle pooled worker then holds **no
 live credential reference in the manager** — its routing token and workspace
 survive idle, so warm reuse is preserved.
 
-**Supply, authorization, and drop must key off the same turn identity**, which
+**Supply, authorisation, and drop must key off the same turn identity**, which
 today does not exist at this seam: `Relay.SetTurnContext` takes a routing token
 and a `trace.SpanContext` and nothing else, and a mediated LLM call is
-authorized by the routing token against whatever credentials the entry currently
+authorised by the routing token against whatever credentials the entry currently
 holds. So the supply call gains a turn id, the entry records which turn its
 credentials belong to, and a forward whose turn id does not match the entry's is
 rejected rather than served with the successor turn's key. A late retry from a
