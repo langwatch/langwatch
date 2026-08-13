@@ -102,6 +102,10 @@ const FeatureFlagsDrawer = lazyDefault({
   factory: () => import("./drawers/FeatureFlagsDrawer"),
   key: "FeatureFlagsDrawer",
 });
+const GroupDetailDrawer = lazyDefault({
+  factory: () => import("./ops/queues/groupDetail/GroupDetailDrawer"),
+  key: "GroupDetailDrawer",
+});
 const EditModelProviderDrawer = lazyDefault({
   factory: () => import("./EditModelProviderDrawer"),
   key: "EditModelProviderDrawer",
@@ -293,6 +297,7 @@ export const drawers = {
   featureFlags: FeatureFlagsDrawer,
   // Ops
   foundry: FoundryDrawer,
+  opsGroupDetail: GroupDetailDrawer,
   // Coding agents
   pullRequestDetail: PullRequestDetailDrawer,
 } satisfies Record<string, React.FC<any>>;

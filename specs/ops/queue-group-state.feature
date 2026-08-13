@@ -55,22 +55,50 @@ Feature: Queue group state visibility
     Then blocked groups come first
     And retrying groups come before all healthy work
 
-  # ── The detail dialog ─────────────────────────────────────────────────
+  # ── The detail drawer ─────────────────────────────────────────────────
 
   @unit
-  Scenario: A vanished group is reported, not rendered as an empty dialog
+  Scenario: A vanished group is reported, not rendered as an empty drawer
     Given the operator opens a group that has since completed and been cleaned up
-    When the detail dialog finishes loading
+    When the detail drawer finishes loading
     Then it says the group no longer exists
     And it does not render an empty body
 
   @unit
-  Scenario: The dialog states the next attempt and the age of the last error
+  Scenario: The drawer states the next attempt and the age of the last error
     Given a retrying group with a recorded error
-    When the operator opens its detail dialog
-    Then the dialog shows the attempt count
+    When the operator opens its detail drawer
+    Then the drawer shows the attempt count
     And when the next attempt becomes eligible
     And how long ago the last error was recorded
+
+  @unit
+  Scenario: A job reads structurally before it reads as JSON
+    Given a staged job carrying its type, name, and request context
+    When its card renders
+    Then the job's type and name are visible
+    And the request's trace, project, and user are visible
+    And the full payload JSON appears only when asked for
+
+  @unit
+  Scenario: A job offloaded to the payload store names its blob
+    Given a staged job whose body lives in the payload store
+    When its card renders
+    Then the storage tier and blob hash are visible on the card
+
+  @unit
+  Scenario: The jobs list pages rather than truncating
+    Given a group holding more jobs than one page shows
+    When the jobs section renders
+    Then it states which slice of the total is on screen
+    And offers the next page
+
+  @unit
+  Scenario: The drawer links to the group's traces and logs
+    Given Grafana is configured
+    When a group's observability links are built
+    Then the traces link queries spans by the group's id
+    And the logs link filters log lines to the group's id
 
   # ── The latency tiles ─────────────────────────────────────────────────
 

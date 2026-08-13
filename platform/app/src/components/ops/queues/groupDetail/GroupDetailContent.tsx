@@ -1,7 +1,6 @@
 import {
   Badge,
   Box,
-  Button,
   Card,
   Center,
   HStack,
@@ -10,18 +9,16 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { formatTimeAgo } from "~/components/ops/shared/formatters";
-import { Dialog } from "~/components/ui/dialog";
 import type { JobEntry } from "~/server/app-layer/ops/repositories/queue.repository";
 import type { GroupInfo } from "~/server/app-layer/ops/types";
-import { api } from "~/utils/api";
-import { GroupStateBadge } from "./GroupStateBadge";
+import type { GrafanaDeepLinkConfig } from "~/utils/grafanaLinks";
+import { GroupStateBadge } from "../GroupStateBadge";
 import {
   classifyGroup,
   describeNextRun,
   type GroupClassification,
-} from "./pipelineUtils";
-
-type GroupTarget = { queueName: string; groupId: string };
+} from "../pipelineUtils";
+import { GroupJobsSection } from "./GroupJobsSection";
 
 function DetailField({
   label,
@@ -167,80 +164,8 @@ function GroupErrorSection({
   );
 }
 
-function GroupJobCard({ job, now }: { job: JobEntry; now: number }) {
-  return (
-    <Card.Root variant="outline">
-      <Card.Body padding={3}>
-        <HStack gap={3} marginBottom={job.data ? 2 : 0}>
-          <DetailField label="Job ID">
-            <Text textStyle="xs" fontFamily="mono" wordBreak="break-all">
-              {job.jobId}
-            </Text>
-          </DetailField>
-          <DetailField label="Runs at">
-            <Text textStyle="xs" fontFamily="mono">
-              {formatTimeAgo(job.score, now)}
-            </Text>
-          </DetailField>
-        </HStack>
-        {job.data && (
-          <Box
-            bg="bg.subtle"
-            borderRadius="sm"
-            padding={2}
-            maxHeight="200px"
-            overflow="auto"
-          >
-            <Text
-              as="pre"
-              textStyle="xs"
-              fontFamily="mono"
-              whiteSpace="pre-wrap"
-              wordBreak="break-word"
-              fontSize="11px"
-            >
-              {JSON.stringify(job.data, null, 2)}
-            </Text>
-          </Box>
-        )}
-      </Card.Body>
-    </Card.Root>
-  );
-}
-
-function GroupJobsSection({
-  jobs,
-  jobsLoading,
-  now,
-}: {
-  jobs: { jobs: JobEntry[]; total: number } | null;
-  jobsLoading: boolean;
-  now: number;
-}) {
-  return (
-    <VStack align="stretch" gap={1}>
-      <Text textStyle="xs" color="fg.muted">
-        Jobs {jobs ? `(${jobs.total})` : ""}
-      </Text>
-      {jobsLoading ? (
-        <Spinner size="xs" />
-      ) : jobs && jobs.jobs.length > 0 ? (
-        <VStack align="stretch" gap={2}>
-          {jobs.jobs.map((job) => (
-            <GroupJobCard key={job.jobId} job={job} now={now} />
-          ))}
-        </VStack>
-      ) : (
-        <Text textStyle="xs" color="fg.muted">
-          No jobs in queue.
-        </Text>
-      )}
-    </VStack>
-  );
-}
-
 /**
- * The dialog body, separated from the queries so it can be rendered (and
+ * The drawer body, separated from the queries so it can be rendered (and
  * tested) against plain data. `now` is injectable for the same reason the
  * table pins it to the fetch instant: countdowns must be derived from a fixed
  * point, not from whenever the component happens to re-render.
@@ -250,12 +175,24 @@ export function GroupDetailContent({
   isLoading,
   jobs,
   jobsLoading,
+  jobsPage = 1,
+  jobsPageSize = 20,
+  onJobsPageChange,
+  jobFilter = "",
+  onJobFilterChange,
+  grafana,
   now = Date.now(),
 }: {
   detail: GroupInfo | null;
   isLoading: boolean;
   jobs: { jobs: JobEntry[]; total: number } | null;
   jobsLoading: boolean;
+  jobsPage?: number;
+  jobsPageSize?: number;
+  onJobsPageChange?: (page: number) => void;
+  jobFilter?: string;
+  onJobFilterChange?: (filter: string) => void;
+  grafana?: GrafanaDeepLinkConfig | null;
   now?: number;
 }) {
   if (isLoading) {
@@ -283,121 +220,17 @@ export function GroupDetailContent({
       <GroupStatusRow detail={detail} c={c} now={now} />
       <GroupTimingRow detail={detail} now={now} />
       <GroupErrorSection detail={detail} now={now} />
-      <GroupJobsSection jobs={jobs} jobsLoading={jobsLoading} now={now} />
+      <GroupJobsSection
+        jobs={jobs}
+        jobsLoading={jobsLoading}
+        now={now}
+        page={jobsPage}
+        pageSize={jobsPageSize}
+        onPageChange={onJobsPageChange}
+        filter={jobFilter}
+        onFilterChange={onJobFilterChange}
+        grafana={grafana}
+      />
     </VStack>
-  );
-}
-
-function GroupDetailFooter({
-  group,
-  showRetry,
-  onRetry,
-  retryLoading,
-  onDrain,
-}: {
-  group: GroupTarget;
-  showRetry: boolean;
-  onRetry?: (target: GroupTarget) => void;
-  retryLoading?: boolean;
-  onDrain?: (target: GroupTarget) => void;
-}) {
-  return (
-    <Dialog.Footer>
-      {showRetry && onRetry && (
-        <Button
-          variant="outline"
-          size="sm"
-          colorPalette="green"
-          loading={retryLoading}
-          onClick={() => onRetry(group)}
-        >
-          Retry now
-        </Button>
-      )}
-      {onDrain && (
-        <Button
-          variant="outline"
-          size="sm"
-          colorPalette="red"
-          onClick={() => onDrain(group)}
-        >
-          Drain
-        </Button>
-      )}
-    </Dialog.Footer>
-  );
-}
-
-export function GroupDetailDialog({
-  group,
-  onClose,
-  onRetry,
-  retryLoading,
-  onDrain,
-}: {
-  group: GroupTarget | null;
-  onClose: () => void;
-  /** Present only when the operator may mutate; gates the footer entirely. */
-  onRetry?: (target: GroupTarget) => void;
-  retryLoading?: boolean;
-  onDrain?: (target: GroupTarget) => void;
-}) {
-  const detailQuery = api.ops.getGroupDetail.useQuery(
-    { queueName: group?.queueName ?? "", groupId: group?.groupId ?? "" },
-    { enabled: !!group },
-  );
-  const jobsQuery = api.ops.getGroupJobs.useQuery(
-    {
-      queueName: group?.queueName ?? "",
-      groupId: group?.groupId ?? "",
-      page: 1,
-      pageSize: 20,
-    },
-    { enabled: !!group },
-  );
-
-  const detail = detailQuery.data ?? null;
-  const jobs = jobsQuery.data ?? null;
-  const showRetry = !!onRetry && !!detail?.isBlocked;
-  const showFooter = !!detail && !!group && (showRetry || !!onDrain);
-
-  return (
-    <Dialog.Root
-      open={!!group}
-      onOpenChange={(e) => !e.open && onClose()}
-      size="lg"
-    >
-      <Dialog.Content bg="bg">
-        <Dialog.Header>
-          <Dialog.Title>
-            <Text textStyle="sm" fontFamily="mono" wordBreak="break-all">
-              {group?.groupId}
-            </Text>
-          </Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body>
-          <GroupDetailContent
-            detail={detail}
-            // isPending, not isLoading: a disabled query reports isLoading
-            // false, which would flash the "no longer exists" state in the
-            // render between the dialog opening and the fetch starting.
-            isLoading={detailQuery.isPending}
-            jobs={jobs}
-            jobsLoading={jobsQuery.isPending}
-            now={detailQuery.dataUpdatedAt || undefined}
-          />
-        </Dialog.Body>
-        {showFooter && group && (
-          <GroupDetailFooter
-            group={group}
-            showRetry={showRetry}
-            onRetry={onRetry}
-            retryLoading={retryLoading}
-            onDrain={onDrain}
-          />
-        )}
-        <Dialog.CloseTrigger />
-      </Dialog.Content>
-    </Dialog.Root>
   );
 }

@@ -19,10 +19,14 @@ import { VirtualizedTableRows } from "~/components/ops/shared/VirtualizedTableRo
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import type { GroupInfo } from "~/server/app-layer/ops/types";
 import { api } from "~/utils/api";
-import { GroupDetailDialog } from "./GroupDetailDialog";
+import {
+  grafanaGroupLogsUrl,
+  grafanaGroupTracesUrl,
+} from "~/utils/grafanaLinks";
 import { GroupStateBadge } from "./GroupStateBadge";
 import {
   classifyGroup,
@@ -105,10 +109,14 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
 
   const isLoading = !!primaryQueue && groupsQuery.isLoading;
 
-  const [selectedGroup, setSelectedGroup] = useState<{
-    queueName: string;
-    groupId: string;
-  } | null>(null);
+  const { openDrawer } = useDrawer();
+  // One config fetch serves every row's Grafana links; the pure builders in
+  // ~/utils/grafanaLinks turn it into per-group hrefs client-side.
+  const grafanaQuery = api.ops.getGrafanaLinkConfig.useQuery(undefined, {
+    staleTime: 10 * 60 * 1000,
+  });
+  const grafana = grafanaQuery.data ?? null;
+
   const [drainTarget, setDrainTarget] = useState<{
     queueName: string;
     groupId: string;
@@ -492,7 +500,7 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
                           bg={tint}
                           _hover={{ bg: tint ?? "bg.subtle" }}
                           onClick={() =>
-                            setSelectedGroup({
+                            openDrawer("opsGroupDetail", {
                               queueName: group.queueName,
                               groupId: group.groupId,
                             })
@@ -595,6 +603,40 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
                                   >
                                     Copy group ID
                                   </Menu.Item>
+                                  {grafana && (
+                                    <Menu.Item value="grafana-traces" asChild>
+                                      <a
+                                        href={
+                                          grafanaGroupTracesUrl(
+                                            group.groupId,
+                                            grafana,
+                                          ) ?? undefined
+                                        }
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        View traces in Grafana
+                                      </a>
+                                    </Menu.Item>
+                                  )}
+                                  {grafana && (
+                                    <Menu.Item value="grafana-logs" asChild>
+                                      <a
+                                        href={
+                                          grafanaGroupLogsUrl(
+                                            group.groupId,
+                                            grafana,
+                                          ) ?? undefined
+                                        }
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        View logs in Grafana
+                                      </a>
+                                    </Menu.Item>
+                                  )}
                                   <Menu.Item
                                     value="move-to-dlq"
                                     onClick={(e) => {
@@ -634,16 +676,6 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
           )}
         </Card.Body>
       </Card.Root>
-
-      <GroupDetailDialog
-        group={selectedGroup}
-        onClose={() => setSelectedGroup(null)}
-        onRetry={
-          hasAccess ? (target) => unblockMutation.mutate(target) : undefined
-        }
-        retryLoading={unblockMutation.isPending}
-        onDrain={hasAccess ? (target) => setDrainTarget(target) : undefined}
-      />
 
       <ConfirmDialog
         open={!!drainTarget}
