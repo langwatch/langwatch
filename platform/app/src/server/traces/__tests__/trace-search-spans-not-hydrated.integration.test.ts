@@ -108,7 +108,7 @@ function makeSpanRow({
     DurationMs: 5,
     SpanName: spanName,
     SpanKind: 1,
-    ServiceName: "healify-repro",
+    ServiceName: "converse-repro",
     ResourceAttributes: {},
     SpanAttributes: spanAttributes,
     StatusCode: 1,
@@ -192,7 +192,7 @@ beforeAll(async () => {
         },
       }),
       makeSpanRow({
-        spanName: "healify.pipeline",
+        spanName: "converse.pipeline",
         spanAttributes: { "langwatch.span.type": "chain" },
       }),
     ],
@@ -239,7 +239,7 @@ describe("given a trace whose spans carry real Bedrock content", () => {
       expect(trace!.spans).toHaveLength(2);
       expect(trace!.spans!.map((s) => s.name).sort()).toEqual([
         "bedrock.converse",
-        "healify.pipeline",
+        "converse.pipeline",
       ]);
     });
   });
