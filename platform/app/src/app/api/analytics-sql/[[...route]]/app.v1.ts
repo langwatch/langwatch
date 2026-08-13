@@ -37,6 +37,7 @@ import {
   GOVERNED_SQL_CLEAN_DIAGNOSTICS_MEANING,
   GOVERNED_SQL_DIAGNOSTIC_CODES,
   getGovernedSqlService,
+  MAX_GOVERNED_SQL_LENGTH,
 } from "~/server/analytics/governed-sql";
 import { GovernedSqlNotEnabledError } from "~/server/analytics/governed-sql/errors";
 import { type createProjectApp, requires } from "~/server/api/security";
@@ -47,16 +48,6 @@ import { featureFlagService } from "~/server/featureFlag";
 import { baseResponses } from "../../shared/base-responses";
 
 const logger = createLogger("langwatch:api:analytics-sql");
-
-/**
- * Longest statement the endpoint accepts.
- *
- * A request-shape ceiling rather than a cost one — the cost ceilings are pinned
- * server-side by the settings profile. It exists so that pathological input is
- * refused before it reaches a parser fed attacker-controlled text, and it sits
- * far above any query the issue's analytical shapes produce.
- */
-const MAX_SQL_LENGTH = 50_000;
 
 /**
  * A bound parameter's value.
@@ -75,7 +66,7 @@ const governedSqlQuerySchema = z.object({
   // Deliberately not `.trim()`: the statement the database runs must be the one
   // that was submitted, and normalising it here — however harmlessly — is the
   // first step of the rewriting this API promises never to do.
-  sql: z.string().min(1).max(MAX_SQL_LENGTH),
+  sql: z.string().min(1).max(MAX_GOVERNED_SQL_LENGTH),
   parameters: z.record(z.string(), parameterValueSchema).optional(),
 });
 

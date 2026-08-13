@@ -2,10 +2,11 @@
  * Chart and Specification: the chart the specification describes, and the
  * editor for the specification itself.
  *
- * This is the whole of what the result pane mounts for both views. It owns
- * the specification text — in memory, for as long as the member is looking at
- * this result — and nothing else. It holds no query hook and cannot cause a
- * request: switching views or editing a chart never re-runs SQL.
+ * This is the whole of what the result pane mounts for both views. It renders
+ * the specification text and reports every edit upward; the text itself is the
+ * workbench's, because this component is unmounted by a refused query and
+ * anything it held would be lost with it. It holds no query hook and cannot
+ * cause a request: switching views or editing a chart never re-runs SQL.
  *
  * The query result is registered as a dataset named `query_result`, which is
  * the only name a specification may read here. It is registered by name rather
@@ -27,7 +28,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 import { GOVERNED_QUERY_RESULT_DATASET } from "../visualization/governedDatasetNames";
 import { starterVegaLiteSpecText } from "../visualization/starterVegaLiteSpec";
@@ -35,6 +36,7 @@ import {
   parseVegaLiteSpecText,
   validateVegaLiteSpec,
 } from "../visualization/validateVegaLiteSpec";
+import { ALLOWED_VEGA_LITE_TRANSFORMS } from "../visualization/vegaLitePolicy";
 import type {
   GovernedDatasetColumn,
   VegaValidationError,
@@ -62,24 +64,29 @@ export interface GovernedSqlChartModeProps {
   /** Switches the result pane to the Specification view. */
   readonly onOpenSpecification?: () => void;
   /**
-   * A saved chart's specification, when one has been opened. Read once, at
-   * mount, and treated as the member's own work — so a result with different
-   * columns never replaces what they saved.
+   * What the member wrote, or `null` while the specification still follows the
+   * starter for the result on screen.
+   *
+   * Held by the owner rather than here, because this component is unmounted by
+   * things that have nothing to do with the chart: a refused query takes the
+   * whole result body off the page, and a specification stored here would go
+   * with it — the member would fix the SQL, run again, and find their chart
+   * silently replaced by the example.
    */
-  readonly initialSpecText?: string;
+  readonly editedSpecText: string | null;
+  /** Receives what they wrote, or `null` when they ask for the example back. */
+  readonly onEditedSpecTextChange: (text: string | null) => void;
   /**
    * Hands the owner a way to read the specification on screen, so Save can
    * store it. The same shape the workbench already uses to reach into Monaco:
-   * a registration, not a lift of this component's state, because the
-   * starter-follows-the-result-shape rule lives here and belongs here.
-   *
-   * Answers the *parsed* specification rather than its text, and `undefined`
-   * while the text is not valid JSON. Parsing here rather than in the caller is
-   * what keeps the Vega-Lite modules behind the lazy boundary — a workbench
-   * that imported the parser would put the whole runtime in the entry chunk
+   * a registration rather than a parse in the caller, because parsing is what
+   * keeps the Vega-Lite modules behind the lazy boundary — a workbench that
+   * imported the parser would put the whole runtime in the entry chunk
    * (`vegaLazyBoundary.unit.test.ts` is what would notice).
    *
-   * Called with `null` on unmount so nothing keeps reading a dead view.
+   * Answers the *parsed* specification rather than its text, and `undefined`
+   * while the text is not valid JSON. Called with `null` on unmount so nothing
+   * keeps reading a dead view.
    */
   readonly registerSpecReader?: (
     read: (() => Record<string, unknown> | undefined) | null,
@@ -93,33 +100,22 @@ const starterFor = (result: GovernedSqlChartResult): string =>
   });
 
 /**
- * What the starter follows: the shape of the result, not its rows. A Reload
- * with the same columns changes nothing here; a new query with different
- * columns is a new shape.
- */
-const shapeOf = (result: GovernedSqlChartResult): string =>
-  result.columns.map((column) => `${column.name} ${column.type}`).join("\n");
-
-/**
  * What a member can rely on the policy accepting, said next to where they type.
  *
  * A reference, not the rulebook: the validator's refusals each name their own
  * rule and JSON pointer, so this list only has to orient. Every line states a
  * fact the policy modules enforce — marks in `vegaLitePolicy.ts` (image is the
- * one refusal), transforms in `ALLOWED_VEGA_LITE_TRANSFORMS`, the dataset name
- * in this file.
+ * one refusal), the dataset name in this file — and the transforms are read
+ * straight off the allowlist, which is the only way a member's copy of it
+ * cannot fall behind what the policy accepts.
  */
 function SpecPolicyPanel({
   errors,
   summaryLine,
-  onViewChart,
 }: {
   errors: readonly VegaValidationError[];
   summaryLine: string;
-  onViewChart?: (() => void) | undefined;
 }) {
-  const valid = errors.length === 0;
-
   return (
     <Box
       width="304px"
@@ -131,27 +127,10 @@ function SpecPolicyPanel({
       padding={4}
       data-testid="vega-spec-policy-panel"
     >
-      {valid ? (
+      {errors.length === 0 ? (
         <SpecValidSummary summaryLine={summaryLine} />
       ) : (
         <SpecRefusals errors={errors} />
-      )}
-
-      {valid && onViewChart && (
-        <Button
-          variant="plain"
-          size="xs"
-          height="auto"
-          padding={0}
-          marginTop={1}
-          fontSize="12px"
-          fontWeight="600"
-          color="orange.fg"
-          textDecoration="underline"
-          onClick={onViewChart}
-        >
-          View the chart
-        </Button>
       )}
 
       <PolicyAcceptsReference />
@@ -253,8 +232,7 @@ function PolicyAcceptsReference() {
           , which loads remote resources.
         </Text>
         <Text>
-          Reviewed transforms — filter, calculate, aggregate, bin, timeUnit,
-          stack, fold, flatten, lookup, joinaggregate, window.
+          Reviewed transforms — {ALLOWED_VEGA_LITE_TRANSFORMS.join(", ")}.
         </Text>
         <Text>
           Expressions over{" "}
@@ -286,14 +264,18 @@ export function GovernedSqlChartMode({
   submittedLabel,
   view = "chart",
   onOpenSpecification,
-  initialSpecText,
+  editedSpecText,
+  onEditedSpecTextChange,
   registerSpecReader,
 }: GovernedSqlChartModeProps) {
-  const { specText, setSpecText, resetSpecText } = useFollowingSpecText({
-    result,
-    initialSpecText,
-  });
+  // Until the member writes one of their own, the specification is the starter
+  // for whatever result is on screen — so a new result with different columns
+  // redraws, and a specification they have written never does.
+  const starter = useMemo(() => starterFor(result), [result]);
+  const specText = editedSpecText ?? starter;
+
   useRegisteredSpecReader({ specText, registerSpecReader });
+
   const { datasets, columnsByDataset, parsed, errors } = useSpecValidation({
     result,
     specText,
@@ -303,8 +285,8 @@ export function GovernedSqlChartMode({
     return (
       <SpecificationView
         specText={specText}
-        onSpecTextChange={setSpecText}
-        onReset={resetSpecText}
+        onSpecTextChange={onEditedSpecTextChange}
+        onReset={() => onEditedSpecTextChange(null)}
         errors={errors}
         rowCount={result.rows.length}
       />
@@ -350,42 +332,6 @@ export function GovernedSqlChartMode({
       )}
     </VStack>
   );
-}
-
-/**
- * The specification text, following each new result shape until the member
- * edits it. An edited specification is their work and is never replaced behind
- * their back; reset hands the current result's starter back and resumes
- * following. A specification restored from a saved chart starts out `edited`
- * for the same reason: it is the member's work too.
- */
-function useFollowingSpecText({
-  result,
-  initialSpecText,
-}: {
-  result: GovernedSqlChartResult;
-  initialSpecText: string | undefined;
-}) {
-  const [specState, setSpecState] = useState(() => ({
-    shape: shapeOf(result),
-    text: initialSpecText ?? starterFor(result),
-    edited: initialSpecText !== undefined,
-  }));
-
-  const shape = shapeOf(result);
-  if (!specState.edited && specState.shape !== shape) {
-    // Adjusting state during render is React's sanctioned shape for state
-    // that derives from a changed prop: it re-renders before painting.
-    setSpecState({ shape, text: starterFor(result), edited: false });
-  }
-
-  return {
-    specText: specState.text,
-    setSpecText: (text: string) =>
-      setSpecState((current) => ({ ...current, text, edited: true })),
-    resetSpecText: () =>
-      setSpecState({ shape, text: starterFor(result), edited: false }),
-  };
 }
 
 /**
@@ -518,7 +464,6 @@ function SpecificationView({
       <SpecPolicyPanel
         errors={errors}
         summaryLine={`Describes a chart over the ${rowCount} returned rows. Edits apply as you type.`}
-        onViewChart={undefined}
       />
     </HStack>
   );

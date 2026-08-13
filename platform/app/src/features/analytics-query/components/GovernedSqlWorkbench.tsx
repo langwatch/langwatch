@@ -34,7 +34,10 @@ import {
 
 import { GovernedSchemaBrowser } from "./GovernedSchemaBrowser";
 import { GovernedSqlEditor } from "./GovernedSqlEditor";
-import { GovernedSqlParametersEditor } from "./GovernedSqlParametersEditor";
+import {
+  type GovernedSqlParametersChange,
+  GovernedSqlParametersEditor,
+} from "./GovernedSqlParametersEditor";
 import {
   GovernedSqlResultPane,
   type GovernedSqlResultView,
@@ -225,12 +228,35 @@ export function GovernedSqlWorkbench({ projectId }: GovernedSqlWorkbenchProps) {
   const query = useGovernedSqlQuery({ projectId });
 
   const [schemaVisible, setSchemaVisible] = useState(true);
+  const { parameters, parametersSendable } = useParameterState(query);
   const { registerInsert, handleInsert, insertExample } = useDraftInsert({
     query,
     exampleSql: schema.model.datasets[0]?.exampleSql,
   });
   const failure = useMemo(() => failureView(query.state), [query.state]);
   const wiring = useSavedChartWiring({ projectId, query });
+
+  // The chart specification lives here rather than in chart mode, which a
+  // refused query unmounts. A member who edits a chart, hits a refusal, fixes
+  // the SQL and runs again finds the chart they wrote, not the example.
+  //
+  // Scoped to the opened chart's revision: opening a saved chart shows that
+  // chart's specification, not an edit made against the previous one.
+  const [specDraft, setSpecDraft] = useState<{
+    revision: number;
+    text: string | null;
+  }>({ revision: wiring.openedRevision, text: null });
+  const editedSpecText =
+    specDraft.revision === wiring.openedRevision ? specDraft.text : null;
+  const openedRevision = wiring.openedRevision;
+  const setEditedSpecText = useCallback(
+    (text: string | null) => setSpecDraft({ revision: openedRevision, text }),
+    [openedRevision],
+  );
+  // What the chart is handed: the member's edit, else the opened chart's
+  // saved specification, else `null` — which chart mode reads as "follow the
+  // starter for the result on screen".
+  const shownSpecText = editedSpecText ?? wiring.openedSpecText ?? null;
 
   return (
     <HStack
@@ -265,6 +291,8 @@ export function GovernedSqlWorkbench({ projectId }: GovernedSqlWorkbenchProps) {
           schemaVisible={schemaVisible}
           onToggleSchema={() => setSchemaVisible((visible) => !visible)}
           wiring={wiring}
+          onParametersChange={parameters}
+          parametersSendable={parametersSendable}
         />
 
         <Box
@@ -287,7 +315,8 @@ export function GovernedSqlWorkbench({ projectId }: GovernedSqlWorkbenchProps) {
               state: query.state,
               registerSpecReader: wiring.registerSpecReader,
               openedRevision: wiring.openedRevision,
-              openedSpecText: wiring.openedSpecText,
+              editedSpecText: shownSpecText,
+              onEditedSpecTextChange: setEditedSpecText,
             })}
           />
         </Box>
@@ -322,6 +351,29 @@ function SchemaSidebar({
   );
 }
 
+/**
+ * The parameters form's two answers, which are computed together and must not
+ * disagree: the values to send, and whether every row can be sent at all.
+ *
+ * A row the form cannot send is dropped from the values — so without the second
+ * answer, Run stays lit and the round-trip comes back naming a parameter the
+ * member is looking at, filled in.
+ */
+function useParameterState(query: ReturnType<typeof useGovernedSqlQuery>) {
+  const [parametersSendable, setParametersSendable] = useState(true);
+  const { setParameters } = query;
+
+  const parameters = useCallback(
+    ({ parameters: values, sendable }: GovernedSqlParametersChange) => {
+      setParameters(values);
+      setParametersSendable(sendable);
+    },
+    [setParameters],
+  );
+
+  return { parameters, parametersSendable };
+}
+
 function QueryCard({
   query,
   schemaModel,
@@ -330,6 +382,8 @@ function QueryCard({
   schemaVisible,
   onToggleSchema,
   wiring,
+  onParametersChange,
+  parametersSendable,
 }: {
   query: ReturnType<typeof useGovernedSqlQuery>;
   schemaModel: ReturnType<typeof useGovernedSqlSchema>["model"];
@@ -338,6 +392,8 @@ function QueryCard({
   schemaVisible: boolean;
   onToggleSchema: () => void;
   wiring: ReturnType<typeof useSavedChartWiring>;
+  onParametersChange: (change: GovernedSqlParametersChange) => void;
+  parametersSendable: boolean;
 }) {
   const { draft } = query.state;
 
@@ -355,7 +411,11 @@ function QueryCard({
         schemaVisible={schemaVisible}
         onToggleSchema={onToggleSchema}
         actionLabel={query.actionLabel}
-        runnable={draft.sql.trim().length > 0 && !query.state.inFlight}
+        runnable={
+          draft.sql.trim().length > 0 &&
+          parametersSendable &&
+          !query.state.inFlight
+        }
         inFlight={query.state.inFlight}
         // Always the draft, under either label. When the label reads
         // "Reload" the draft is byte-identical to what produced the visible
@@ -390,7 +450,7 @@ function QueryCard({
       >
         <GovernedSqlParametersEditor
           key={`parameters-${wiring.openedRevision}`}
-          onChange={query.setParameters}
+          onChange={onParametersChange}
           missingParameters={failure.missingParameters}
           {...(wiring.openedParameters
             ? { initialParameters: wiring.openedParameters }
@@ -444,7 +504,8 @@ function chartArea({
   state,
   registerSpecReader,
   openedRevision,
-  openedSpecText,
+  editedSpecText,
+  onEditedSpecTextChange,
 }: {
   state: GovernedSqlRequestState;
   registerSpecReader: (
@@ -452,7 +513,8 @@ function chartArea({
   ) => void;
   /** Changes when a saved chart is opened, remounting the chart with its spec. */
   openedRevision: number;
-  openedSpecText: string | undefined;
+  editedSpecText: string | null;
+  onEditedSpecTextChange: (text: string | null) => void;
 }):
   | ((view: GovernedSqlResultView, openSpecification: () => void) => ReactNode)
   | undefined {
@@ -473,9 +535,8 @@ function chartArea({
       view={view === "specification" ? "specification" : "chart"}
       onOpenSpecification={openSpecification}
       registerSpecReader={registerSpecReader}
-      {...(openedSpecText === undefined
-        ? {}
-        : { initialSpecText: openedSpecText })}
+      editedSpecText={editedSpecText}
+      onEditedSpecTextChange={onEditedSpecTextChange}
     />
   );
   return renderArea;

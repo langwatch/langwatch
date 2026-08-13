@@ -229,6 +229,11 @@ const presentations = {
     describe: () =>
       "Narrow the time range, add a filter, or select fewer fields.",
   },
+  query_scan_limit_exceeded: {
+    title: "This query read too much data",
+    describe: () =>
+      "Narrow the time range or add filters so the query reads less.",
+  },
   time_range_too_wide: {
     title: "Time range is too wide",
     describe: () => "Pick a shorter range and try again.",

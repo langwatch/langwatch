@@ -200,15 +200,23 @@ export function screenVegaExpression(
 }
 
 /**
- * Collects every expression string a spec node carries. Vega-Lite writes
- * expressions at `expr`, at `calculate`, and as the string form of `filter`
- * (including inside `and`/`or`/`not` predicate composition). `signal` is
+ * Every key whose value Vega-Lite hands to the expression evaluator.
+ *
+ * `expr`, `calculate`, and the string form of `filter` (including inside
+ * `and`/`or`/`not` predicate composition) are the documented three. `signal` is
  * screened too — it is Vega's spelling, and a spec that smuggles one in should
- * not get a free pass.
+ * not get a free pass. `labelExpr` is the fourth: axes, legends and headers each
+ * carry one and it is evaluated exactly like the rest, so leaving it off this
+ * list let a spec run an unscreened expression under a tick label, past both
+ * expression byte ceilings as well.
+ *
+ * A key missing here is not a lesser refusal — it is no screening at all, which
+ * is why this list is the one place the set is written.
  */
 export const EXPRESSION_BEARING_KEYS = [
   "expr",
   "calculate",
   "filter",
   "signal",
+  "labelExpr",
 ] as const;

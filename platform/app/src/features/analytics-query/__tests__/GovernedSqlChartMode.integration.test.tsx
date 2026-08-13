@@ -14,10 +14,13 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { GovernedSqlChartMode } from "../components/GovernedSqlChartMode";
+import {
+  GovernedSqlChartMode,
+  type GovernedSqlChartResult,
+} from "../components/GovernedSqlChartMode";
 import type { GovernedDatasetColumn } from "../visualization/visualization.types";
 
 const vega = vi.hoisted(() => {
@@ -86,14 +89,40 @@ const RESULT = {
   ],
 };
 
+/**
+ * The owner's half of the specification state, which in the product is the
+ * workbench. Chart mode never holds the text itself — a refused query unmounts
+ * it — so anything exercising an edit has to supply the half that does.
+ */
+function ChartModeHost({
+  result = RESULT,
+  view,
+  submittedLabel,
+}: {
+  result?: GovernedSqlChartResult;
+  view?: "chart" | "specification";
+  submittedLabel?: string;
+}) {
+  const [editedSpecText, setEditedSpecText] = useState<string | null>(null);
+
+  return (
+    <GovernedSqlChartMode
+      result={result}
+      {...(view ? { view } : {})}
+      {...(submittedLabel ? { submittedLabel } : {})}
+      editedSpecText={editedSpecText}
+      onEditedSpecTextChange={setEditedSpecText}
+    />
+  );
+}
+
 const withChakra = (element: ReactElement) =>
   render(<ChakraProvider value={defaultSystem}>{element}</ChakraProvider>);
 
 /**
- * Re-renders the same mounted component with a different view, the way the
- * result pane's tabs do. Same element type in the same position, so the
- * specification state survives the switch — which is the point of the shared
- * component.
+ * Re-renders the same mounted host with a different view, the way the result
+ * pane's tabs do. Same element type in the same position, so the specification
+ * state survives the switch — which is the point of the shared component.
  */
 const switchView = (
   rerender: (element: ReactElement) => void,
@@ -101,7 +130,7 @@ const switchView = (
 ) => {
   rerender(
     <ChakraProvider value={defaultSystem}>
-      <GovernedSqlChartMode result={RESULT} view={view} />
+      <ChartModeHost view={view} />
     </ChakraProvider>,
   );
 };
@@ -144,9 +173,7 @@ describe("chart mode", () => {
   describe("given a successful governed SQL result", () => {
     describe("when chart mode opens", () => {
       it("starts from a specification that draws the result it is given", async () => {
-        const { rerender } = withChakra(
-          <GovernedSqlChartMode result={RESULT} />,
-        );
+        const { rerender } = withChakra(<ChartModeHost result={RESULT} />);
 
         await waitFor(() => expect(vega.state.embeds).toBe(1));
         expect(screen.queryByTestId("governed-chart-failure")).toBeNull();
@@ -160,9 +187,7 @@ describe("chart mode", () => {
       });
 
       it("describes the chart by the query it came from when the pane says so", async () => {
-        withChakra(
-          <GovernedSqlChartMode result={RESULT} submittedLabel="run 4" />,
-        );
+        withChakra(<ChartModeHost result={RESULT} submittedLabel="run 4" />);
 
         await screen.findByRole("img", {
           name: "Chart of the result of run 4",
@@ -173,9 +198,7 @@ describe("chart mode", () => {
     describe("when the member edits the specification", () => {
       /** @scenario "Editing the chart specification never reruns SQL" */
       it("revalidates and redraws without issuing a single request", async () => {
-        const { rerender } = withChakra(
-          <GovernedSqlChartMode result={RESULT} />,
-        );
+        const { rerender } = withChakra(<ChartModeHost result={RESULT} />);
         await waitFor(() => expect(vega.state.embeds).toBe(1));
 
         switchView(rerender, "specification");
@@ -202,7 +225,7 @@ describe("chart mode", () => {
       /** @scenario "Editing the chart specification never reruns SQL" */
       it("reports what is wrong as it is typed, and keeps reporting nothing when it is fixed", async () => {
         const { rerender } = withChakra(
-          <GovernedSqlChartMode result={RESULT} view="specification" />,
+          <ChartModeHost result={RESULT} view="specification" />,
         );
         const editor = await findEditor();
 
@@ -249,7 +272,7 @@ describe("chart mode", () => {
       /** @scenario "The workbench ships no polling, browser-side persistence, export, or agent surface" */
       it("writes the specification nowhere: it lives as long as the result is on screen", async () => {
         const { unmount } = withChakra(
-          <GovernedSqlChartMode result={RESULT} view="specification" />,
+          <ChartModeHost result={RESULT} view="specification" />,
         );
         const editor = await findEditor();
 
@@ -264,9 +287,7 @@ describe("chart mode", () => {
       });
 
       it("gives the starting specification back on request", async () => {
-        withChakra(
-          <GovernedSqlChartMode result={RESULT} view="specification" />,
-        );
+        withChakra(<ChartModeHost result={RESULT} view="specification" />);
         const editor = await findEditor();
         const starter = (editor as HTMLTextAreaElement).value;
 
@@ -284,9 +305,7 @@ describe("chart mode", () => {
     describe("when the member reads the specification view's policy panel", () => {
       /** @scenario "The specification view names what the chart policy accepts" */
       it("says where the specification stands and what the policy accepts", async () => {
-        withChakra(
-          <GovernedSqlChartMode result={RESULT} view="specification" />,
-        );
+        withChakra(<ChartModeHost result={RESULT} view="specification" />);
 
         const panel = screen.getByTestId("vega-spec-policy-panel");
         // The starter specification is valid, and the panel says so.
@@ -310,14 +329,12 @@ describe("chart mode", () => {
     describe("when a new query returns a result with different columns", () => {
       /** @scenario "A new result reshapes the starter specification until it is edited" */
       it("redraws from a starter specification over the new columns", async () => {
-        const { rerender } = withChakra(
-          <GovernedSqlChartMode result={RESULT} />,
-        );
+        const { rerender } = withChakra(<ChartModeHost result={RESULT} />);
         await waitFor(() => expect(vega.state.embeds).toBe(1));
 
         rerender(
           <ChakraProvider value={defaultSystem}>
-            <GovernedSqlChartMode
+            <ChartModeHost
               result={{
                 columns: [
                   { name: "status", type: "String" },
@@ -339,7 +356,7 @@ describe("chart mode", () => {
       /** @scenario "A new result reshapes the starter specification until it is edited" */
       it("never replaces a specification the member has edited", async () => {
         const { rerender } = withChakra(
-          <GovernedSqlChartMode result={RESULT} view="specification" />,
+          <ChartModeHost result={RESULT} view="specification" />,
         );
         const editor = await findEditor();
         const edited = JSON.stringify({
@@ -351,7 +368,7 @@ describe("chart mode", () => {
 
         rerender(
           <ChakraProvider value={defaultSystem}>
-            <GovernedSqlChartMode
+            <ChartModeHost
               result={{
                 columns: [{ name: "status", type: "String" }],
                 rows: [{ status: "ok" }],
@@ -368,14 +385,12 @@ describe("chart mode", () => {
     describe("when a Reload returns different rows", () => {
       /** @scenario "A data-only Reload updates the chart through the live view" */
       it("feeds them to the running chart rather than rebuilding it", async () => {
-        const { rerender } = withChakra(
-          <GovernedSqlChartMode result={RESULT} />,
-        );
+        const { rerender } = withChakra(<ChartModeHost result={RESULT} />);
         await waitFor(() => expect(vega.state.embeds).toBe(1));
 
         rerender(
           <ChakraProvider value={defaultSystem}>
-            <GovernedSqlChartMode
+            <ChartModeHost
               result={{
                 columns: COLUMNS,
                 rows: [{ model: "gpt-5-mini", total: 41 }],

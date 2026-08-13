@@ -51,3 +51,4 @@ export type {
   GovernedSchemaDataset,
 } from "./schema";
 export { describeGovernedSchema, governedExampleSql } from "./schema";
+export { MAX_GOVERNED_SQL_LENGTH } from "./sqlText";

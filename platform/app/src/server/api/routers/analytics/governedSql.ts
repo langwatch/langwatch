@@ -23,7 +23,10 @@
 import { NotFoundError } from "@langwatch/handled-error";
 import { z } from "zod";
 
-import { getGovernedSqlService } from "~/server/analytics/governed-sql";
+import {
+  getGovernedSqlService,
+  MAX_GOVERNED_SQL_LENGTH,
+} from "~/server/analytics/governed-sql";
 import { workbenchEnabled } from "~/server/analytics/workbenchFeatureGate";
 
 import { checkProjectPermission } from "../../rbac";
@@ -31,15 +34,6 @@ import { createTRPCRouter, protectedProcedure } from "../../trpc";
 import { getUserProtectionsForProject } from "../../utils";
 
 import { enforceWorkbenchEnabled } from "./workbenchAccessMiddleware";
-
-/**
- * Longest statement this router accepts.
- *
- * Mirrors the REST ceiling deliberately: it is a request-shape bound, not a
- * cost one, and a workbench that accepted a statement the API would reject
- * would be teaching its own dialect.
- */
-const MAX_SQL_LENGTH = 50_000;
 
 /**
  * A bound parameter's value. Scalars only — a parameter is a *value*, and
@@ -56,7 +50,24 @@ const parameterValueSchema = z.union([
 const projectScopeSchema = z.object({ projectId: z.string() });
 
 /**
- * Whether the governed query path is provisioned on this deployment.
+ * Which gate closed, when one did.
+ *
+ * `disabled` is the project's own switch being off, which its administrator can
+ * change; `unprovisioned` is a deployment with no governed identity to run as,
+ * which they cannot. They read as different refusals, so the page has to be
+ * able to tell them apart.
+ */
+export type GovernedSqlUnavailableReason = "disabled" | "unprovisioned";
+
+export interface GovernedSqlAvailability {
+  /** What the navigation entry and the page gate on. */
+  readonly available: boolean;
+  /** Absent when available. */
+  readonly reason?: GovernedSqlUnavailableReason;
+}
+
+/**
+ * Whether the governed query path is switched on and provisioned.
  *
  * Separate from `schema` because the schema is answerable without an executor
  * (it is the catalog), so a deployment with no governed identity would describe
@@ -66,18 +77,27 @@ const projectScopeSchema = z.object({ projectId: z.string() });
  * whole job is to answer "off" out loud, so `enforceWorkbenchEnabled` — which
  * every other procedure on this surface chains — would refuse the very question
  * being asked.
+ *
+ * The shape is one object with an optional reason rather than a union, so a
+ * consumer that only cares whether the surface is on keeps reading `available`
+ * and nothing else.
  */
 const availability = protectedProcedure
   .input(projectScopeSchema)
   .use(checkProjectPermission("analytics:view"))
-  .query(async ({ ctx, input }) => ({
-    available:
-      (await workbenchEnabled({
-        prisma: ctx.prisma,
-        userId: ctx.session.user.id,
-        projectId: input.projectId,
-      })) && getGovernedSqlService().available,
-  }));
+  .query(async ({ ctx, input }): Promise<GovernedSqlAvailability> => {
+    const enabled = await workbenchEnabled({
+      prisma: ctx.prisma,
+      userId: ctx.session.user.id,
+      projectId: input.projectId,
+    });
+    if (!enabled) return { available: false, reason: "disabled" };
+
+    if (!getGovernedSqlService().available) {
+      return { available: false, reason: "unprovisioned" };
+    }
+    return { available: true };
+  });
 
 /** The governed datasets and columns this member's permissions unlock. */
 const schema = protectedProcedure
@@ -106,7 +126,7 @@ const query = protectedProcedure
     projectScopeSchema.extend({
       // Deliberately not `.trim()`: the statement the database runs must be the
       // one that was submitted.
-      sql: z.string().min(1).max(MAX_SQL_LENGTH),
+      sql: z.string().min(1).max(MAX_GOVERNED_SQL_LENGTH),
       parameters: z.record(z.string(), parameterValueSchema).optional(),
     }),
   )
