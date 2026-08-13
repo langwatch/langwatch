@@ -83,6 +83,52 @@ describe("buildAnthropicAdminPullConfig", () => {
     ).toBeNull();
   });
 
+  it("given a bucket width on a cost report, refuses to build", () => {
+    // The puller sends COST_REPORT_BUCKET_WIDTH and ignores config.bucketWidth,
+    // so saving one on a cost source records a setting that never applies —
+    // which is the opposite of what the field's own hint promises.
+    expect(
+      buildAnthropicAdminPullConfig(
+        composer({
+          credentialsToken: "sk-ant-admin-test",
+          report: "cost",
+          bucketWidth: "1h",
+        }),
+      ),
+    ).toBeNull();
+  });
+
+  it("given a start date that is impossible or timezone-less, refuses to build", () => {
+    const base = { credentialsToken: "sk-ant-admin-test", report: "usage" };
+    // Date.parse rolls this forward to March 2 rather than failing, which would
+    // backfill from a date nobody chose.
+    expect(
+      buildAnthropicAdminPullConfig(
+        composer({ ...base, startingAt: "2026-02-30" }),
+      ),
+    ).toBeNull();
+    // Spec'd as local time, so the same typed value means a different instant
+    // for an admin in Amsterdam than one in Tokyo.
+    expect(
+      buildAnthropicAdminPullConfig(
+        composer({ ...base, startingAt: "2026-08-01T00:00" }),
+      ),
+    ).toBeNull();
+  });
+
+  it("given an instant carrying a timezone, keeps it as the same moment", () => {
+    const config = buildAnthropicAdminPullConfig(
+      composer({
+        credentialsToken: "sk-ant-admin-test",
+        report: "usage",
+        startingAt: "2026-08-01T02:00:00+02:00",
+      }),
+    );
+
+    const parsed = anthropicAdminPullConfigSchema.parse(config);
+    expect(parsed.startingAt).toBe("2026-08-01T00:00:00.000Z");
+  });
+
   it("given the same form state, keeps the secret and adapter-owned fields out of parserConfig", () => {
     const state = composer({
       credentialsToken: "sk-ant-admin-test",

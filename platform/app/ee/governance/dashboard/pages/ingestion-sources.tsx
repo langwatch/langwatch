@@ -361,7 +361,7 @@ function IngestionSourcesPage() {
       toaster.create({
         title: "Missing or invalid Anthropic fields",
         description:
-          "Admin API key is required, report must be `usage` or `cost`, bucket width (if set) must be 1m/1h/1d, and the backfill start must be a parseable date.",
+          "Admin API key is required, report must be `usage` or `cost`, bucket width is usage-only and must be 1m/1h/1d, and the backfill start must be a calendar date (2026-08-01) or an instant carrying a timezone (2026-08-01T00:00:00Z).",
         type: "error",
       });
       return;
@@ -1118,7 +1118,7 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       key: "startingAt",
       label: "Backfill start (optional)",
       placeholder: "2026-08-01",
-      hint: "Date or ISO instant the first run reads from. Empty = 24 hours back.",
+      hint: "The date the first run reads from: `2026-08-01`, or an instant carrying a timezone (`2026-08-01T00:00:00Z`). A time without a timezone is rejected rather than read as yours. Empty = 24 hours back.",
     },
   ],
   databricks_genie: [
@@ -1351,8 +1351,8 @@ export function buildAnthropicAdminPullConfig(
   if (!token) return null;
   if (report !== "usage" && report !== "cost") return null;
 
-  const bucketWidth = trimmedField(p, "bucketWidth");
-  if (bucketWidth && !["1m", "1h", "1d"].includes(bucketWidth)) return null;
+  const bucketWidth = validBucketWidth(trimmedField(p, "bucketWidth"), report);
+  if (bucketWidth === null) return null;
 
   const startingAt = normalizeStartingAt(trimmedField(p, "startingAt"));
   if (startingAt === null) return null;
@@ -1376,13 +1376,66 @@ function trimmedField(p: Record<string, string>, key: string): string {
 }
 
 /**
- * ISO-normalizes an admin-typed date for the adapter's `z.string().datetime()`.
+ * The bucket width to store, or null when it is one the adapter will not honour.
+ *
+ * Only the usage report reads this. The cost report pins `1d` — the puller sends
+ * `COST_REPORT_BUCKET_WIDTH` and deliberately ignores `config.bucketWidth` — so
+ * saving `1m` on a cost source writes a setting that silently never applies, and
+ * the form's own hint already promises the opposite.
+ *
+ * Empty yields undefined (the field is optional); rejected yields null.
+ */
+function validBucketWidth(
+  raw: string,
+  report: string,
+): string | null | undefined {
+  if (!raw) return undefined;
+  if (report !== "usage") return null;
+  return ["1m", "1h", "1d"].includes(raw) ? raw : null;
+}
+
+/** Whether y-m-d is a date that exists, rather than one Date would roll forward. */
+function isRealCalendarDate(year: number, month: number, day: number): boolean {
+  const probe = new Date(Date.UTC(year, month - 1, day));
+  return (
+    probe.getUTCFullYear() === year &&
+    probe.getUTCMonth() === month - 1 &&
+    probe.getUTCDate() === day
+  );
+}
+
+/**
+ * A bare `YYYY-MM-DD`, or a timestamp carrying an explicit offset. Anything else
+ * is rejected rather than guessed.
+ *
+ * The two shapes are the ones `Date.parse` reads unambiguously. An offset-less
+ * `2026-08-01T00:00` is spec'd as *local* time, so the same typed value would
+ * mean a different instant for an admin in Amsterdam than one in Tokyo.
+ */
+const STARTING_AT =
+  /^(\d{4})-(\d{2})-(\d{2})(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2}))?$/;
+
+/**
+ * ISO-normalizes an admin-typed backfill start for the adapter's
+ * `z.string().datetime()`.
+ *
+ * Strict on purpose: `Date.parse` rolls `2026-02-30` forward to March 2 instead
+ * of failing, which would silently backfill from a date nobody chose.
  *
  * Empty is not an error — the field is optional — so it yields undefined, while
- * text Date cannot parse yields null for the caller to reject.
+ * anything rejected yields null for the caller to turn into a toast.
  */
 function normalizeStartingAt(raw: string): string | null | undefined {
   if (!raw) return undefined;
+
+  const match = STARTING_AT.exec(raw);
+  if (!match) return null;
+  if (
+    !isRealCalendarDate(Number(match[1]), Number(match[2]), Number(match[3]))
+  ) {
+    return null;
+  }
+
   const parsed = Date.parse(raw);
   return Number.isNaN(parsed) ? null : new Date(parsed).toISOString();
 }
