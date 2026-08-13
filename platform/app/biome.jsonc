@@ -334,7 +334,18 @@
 						// rule picked rather than the subject did.
 						// `noExcessiveNestedTestSuites` above is the rule that
 						// actually governs the shape of a suite.
-						"noExcessiveLinesPerFunction": "off"
+						"noExcessiveLinesPerFunction": "off",
+
+						// Off for the same reason, one level down. A test body is
+						// an arrange/act/assert table: inline mocks, a fixture
+						// row per case, a branch per scenario. Cognitive
+						// complexity counts exactly those and scores a thorough
+						// test high without it being hard to follow — the number
+						// grows with coverage, which is the thing a test is
+						// supposed to add. In production code the same score is a
+						// real refactor signal; in a test it just pushes logic
+						// into helpers that hide what the case is exercising.
+						"noExcessiveCognitiveComplexity": "off"
 					}
 				}
 			}
