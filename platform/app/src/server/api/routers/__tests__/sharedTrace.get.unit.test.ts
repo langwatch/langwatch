@@ -49,6 +49,8 @@ const {
 }));
 
 vi.mock("~/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: () => ({
     share: { resolveForViewer: mockResolveForViewer },
     // No cache in unit tests: every call assembles, so the assertions below

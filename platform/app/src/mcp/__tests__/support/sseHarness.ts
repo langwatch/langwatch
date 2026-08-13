@@ -7,6 +7,8 @@
 import { createHash } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import type { Cluster, Redis } from "ioredis";
+import { globalForApp } from "../../../server/app-layer/app";
+import { createTestApp } from "../../../server/app-layer/presets";
 import { createMcpHandler, type McpHandler } from "../../handler";
 
 export const SSE_SESSION_PREFIX = "mcp:sse:session:";
@@ -112,23 +114,44 @@ export async function startReplicaPair({
     await clearRecordedSessions({ redis, apiKey });
   }
 
+  // `createMcpHandler` reads its connection from the App at construction
+  // (ADR-093), so the App has to hold the one this suite opened before the
+  // replicas are built. Both replicas share it: a single connection is
+  // precisely the "only Redis in common" the pair is meant to model, and each
+  // handler still duplicates its own relay subscriber.
+  const previousApp = globalForApp.__langwatch_app;
+  globalForApp.__langwatch_app = createTestApp({ redis });
+
   const handlers: McpHandler[] = [];
   const servers: Server[] = [];
   const urls: string[] = [];
-  for (let i = 0; i < 2; i++) {
-    const handler = createMcpHandler();
-    const server = createServer((req, res) => handler.handleRequest(req, res));
-    await new Promise<void>((resolve) =>
-      server.listen(0, "127.0.0.1", resolve),
-    );
-    const address = server.address();
-    if (typeof address !== "object" || !address) {
-      throw new Error("a replica reported no address after listening");
+  try {
+    for (let i = 0; i < 2; i++) {
+      const handler = createMcpHandler();
+      const server = createServer((req, res) =>
+        handler.handleRequest(req, res),
+      );
+      await new Promise<void>((resolve) =>
+        server.listen(0, "127.0.0.1", resolve),
+      );
+      const address = server.address();
+      if (typeof address !== "object" || !address) {
+        throw new Error("a replica reported no address after listening");
+      }
+      const port = address.port;
+      handlers.push(handler);
+      servers.push(server);
+      urls.push(`http://127.0.0.1:${port}`);
     }
-    const port = address.port;
-    handlers.push(handler);
-    servers.push(server);
-    urls.push(`http://127.0.0.1:${port}`);
+  } catch (err) {
+    // Failing here returns no `stop()`, so nothing would ever put the previous
+    // App back and every later suite in this worker would read the one
+    // installed above. Undo it on the way out.
+    for (const server of servers) {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+    globalForApp.__langwatch_app = previousApp;
+    throw err;
   }
 
   return {
@@ -142,6 +165,7 @@ export async function startReplicaPair({
       for (const apiKey of apiKeys) {
         await clearRecordedSessions({ redis, apiKey });
       }
+      globalForApp.__langwatch_app = previousApp;
     },
   };
 }

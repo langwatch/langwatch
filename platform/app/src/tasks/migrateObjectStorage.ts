@@ -22,11 +22,12 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 import { createLogger } from "@langwatch/observability";
+import { RedisConnectionService } from "@langwatch/redis-client";
 import { Cluster } from "ioredis";
 import { z } from "zod";
+import { env } from "~/env.mjs";
 import { getPrivateS3Configs } from "~/server/dataplane-s3";
 import { prisma } from "~/server/db";
-import { connection } from "~/server/redis";
 import { AzureBlobDriver } from "~/server/stored-objects/azure-blob-driver";
 import {
   type AzureCredentials,
@@ -369,6 +370,14 @@ function createMigrationInventory(
 }
 
 async function auditQueuesForCutover() {
+  // `task.ts` boots no App, so this task owns the connection it needs and
+  // closes it below (ADR-093). It used to read the `~/server/redis` module
+  // singleton, which no longer exists.
+  const connection = new RedisConnectionService({ logger }).connect({
+    url: env.REDIS_URL,
+    clusterEndpoints: env.REDIS_CLUSTER_ENDPOINTS,
+    dbIndex: env.REDIS_DB_INDEX,
+  });
   if (!connection) {
     throw new Error(
       "Redis is required to audit GroupQueue before migration finalization",
@@ -384,6 +393,7 @@ async function auditQueuesForCutover() {
     );
   } finally {
     cleanup();
+    connection.disconnect();
   }
 }
 

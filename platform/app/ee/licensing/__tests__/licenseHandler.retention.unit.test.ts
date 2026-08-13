@@ -4,6 +4,8 @@ const mockSetForScope = vi.fn().mockResolvedValue(undefined);
 const mockListOrganizationRules = vi.fn().mockResolvedValue([]);
 
 vi.mock("../../../src/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: () => ({
     dataRetention: {
       policy: {
