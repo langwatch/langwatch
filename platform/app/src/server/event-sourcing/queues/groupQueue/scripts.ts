@@ -1470,6 +1470,69 @@ end
 return 1
 `;
 
+/**
+ * Poison guard, claim side (specs/event-sourcing/poison-group-park-guard.feature).
+ *
+ * Records this worker's ownership of a group's claim and returns the number of
+ * CONFIRMED worker deaths the group has caused.
+ *
+ * The guard this replaced counted claims and subtracted a delete: a strike was
+ * written before decode and deleted on every path where the process survived,
+ * so a surviving strike WAS the death signal. That inference is only sound if
+ * the delete is guaranteed, and it is not — it is issued fire-and-forget, and
+ * `process.exit(0)` discards whatever Redis has not yet read. Prod ran ~10
+ * groups a day into the blocked set that way, every one of them healthy: the
+ * park logs sat hours from the nearest deploy, on pods with zero restarts,
+ * for jobs whose p99 is 25ms and which had never once retried.
+ *
+ * So the evidence is positive here. The marker names the process that holds
+ * the claim; that process publishes `alive` on a heartbeat and overwrites it
+ * with `retired` when it shuts down gracefully. A leftover marker resolves to:
+ *
+ *   owner is this worker  -> our own lapsed lease under a slow job. Not a death.
+ *   owner is `alive`      -> still running; its clear is late or its lease
+ *                            lapsed while it works. Not a death.
+ *   owner is `retired`    -> shut down on purpose. Not a death.
+ *   owner has no beacon   -> was claiming, never retired, no longer heartbeats.
+ *                            THAT is a death, and the only thing counted.
+ *
+ * A dropped clear, a torn-down connection and an abandoned drain all land in
+ * the middle three branches, so none of them can park a healthy group; a pod
+ * the job actually killed lands in the fourth, so a genuine poison group still
+ * parks in exactly the same number of laps as before.
+ */
+const CLAIM_GUARD_LUA = `
+local keyPrefix   = ARGV[1]
+local groupId     = ARGV[2]
+local workerId    = ARGV[3]
+local stagedJobId = ARGV[4]
+local ttlSec      = tonumber(ARGV[5])
+
+local claimKey = keyPrefix .. "group:" .. groupId .. ":claim"
+
+local previous  = redis.call("HMGET", claimKey, "owner", "deaths")
+local prevOwner = previous[1]
+local deaths    = tonumber(previous[2] or "0") or 0
+
+if prevOwner and prevOwner ~= workerId then
+  -- GET returns false for a missing key: no beacon at all is the death.
+  -- Either state ("alive" or "retired") is an ordinary outcome.
+  if not redis.call("GET", keyPrefix .. "worker:" .. prevOwner) then
+    deaths = deaths + 1
+  end
+end
+
+redis.call(
+  "HSET", claimKey,
+  "owner", workerId,
+  "deaths", tostring(deaths),
+  "stagedJobId", stagedJobId
+)
+redis.call("EXPIRE", claimKey, ttlSec)
+
+return deaths
+`;
+
 const RETRY_RESTAGE_LUA =
   PENDING_INDEX_HELPER_LUA +
   BLOB_LEASE_HELPER_LUA +
@@ -1664,21 +1727,43 @@ export function readTenantCap(): number {
 
 /**
  * Poison guard (specs/event-sourcing/poison-group-park-guard.feature): a group
- * is parked once this many consecutive claims ended with the process dying
- * before the strike could be cleared. Deaths tolerated = threshold; the claim
- * after that parks. Kept small: every extra strike is another fleet-wide
- * worker crash. Interleaved victims of someone else's poison clear their
- * single strike on their next healthy claim, so only the group that keeps
- * killing workers ever reaches the threshold.
+ * is parked once this many claims found their predecessor's worker dead.
+ * Deaths tolerated = threshold; the claim that observes the last one parks.
+ * Kept small: every extra death is another fleet-wide worker crash.
+ *
+ * A death is CONFIRMED, never inferred. See {@link CLAIM_GUARD_LUA}: the claim
+ * marker names the process that owns it, and that process publishes its own
+ * liveness (`alive`, heartbeated) and its own exit (`retired`, written by the
+ * graceful shutdown). A leftover marker is only booked as a death when its
+ * owner is in neither state.
  */
 export const DEFAULT_CLAIM_STRIKE_THRESHOLD = 3;
 
 /**
- * Strikes self-expire so a burst of unrelated worker deaths (node eviction,
- * OOM of a neighbour) can't park a healthy group hours later. Refreshed on
- * every claim, so an actively-crash-looping group never loses its count.
+ * The claim marker self-expires so a group cannot be parked by evidence from
+ * an outage hours in the past. Refreshed on every claim, so an actively
+ * crash-looping group never loses its count.
  */
-export const CLAIM_STRIKE_TTL_SECONDS = 60 * 60;
+export const CLAIM_MARKER_TTL_SECONDS = 60 * 60;
+
+/**
+ * How long a worker's `alive` beacon survives without a refresh. Must exceed
+ * {@link WORKER_LIVENESS_REFRESH_MS} by enough that a couple of lost writes (a
+ * Redis blip, a GC pause) do not read as a death — an absent beacon is the one
+ * piece of evidence that CAN park a group, so it has to mean the process is
+ * genuinely gone rather than briefly unlucky.
+ */
+export const WORKER_LIVENESS_TTL_SECONDS = 90;
+
+/** Beacon refresh interval. Three refreshes fit inside the TTL above. */
+export const WORKER_LIVENESS_REFRESH_MS = 30_000;
+
+/**
+ * How long a graceful shutdown's `retired` tombstone survives. Must outlive the
+ * claim marker: a marker left by a pod that retired an hour ago must still
+ * resolve to "shut down cleanly" rather than decaying into "died".
+ */
+export const WORKER_RETIRED_TTL_SECONDS = CLAIM_MARKER_TTL_SECONDS * 2;
 
 /**
  * Read the poison-guard strike threshold from the environment.
@@ -1808,6 +1893,7 @@ const completeScript = new CachedLuaScript(COMPLETE_LUA);
 const refreshScript = new CachedLuaScript(REFRESH_LUA);
 const restageAndBlockScript = new CachedLuaScript(RESTAGE_AND_BLOCK_LUA);
 const retryRestageScript = new CachedLuaScript(RETRY_RESTAGE_LUA);
+const claimGuardScript = new CachedLuaScript(CLAIM_GUARD_LUA);
 
 export class GroupStagingScripts {
   private readonly keyPrefix: string;
@@ -2345,36 +2431,91 @@ export class GroupStagingScripts {
     await this.redis.srem(`${this.keyPrefix}paused-jobs`, key);
   }
 
-  private claimStrikesKey(groupId: string): string {
-    return `${this.keyPrefix}group:${groupId}:strikes`;
+  private claimMarkerKey(groupId: string): string {
+    return `${this.keyPrefix}group:${groupId}:claim`;
+  }
+
+  private workerBeaconKey(workerId: string): string {
+    return `${this.keyPrefix}worker:${workerId}`;
   }
 
   /**
-   * Poison-guard claim strike (specs/event-sourcing/poison-group-park-guard.feature).
-   * Recorded when a worker claims a group's job, cleared on every code path
-   * where the process survives - so only groups whose jobs kill the process
-   * (event-loop seizure → liveness kill) accumulate a count. The TTL keeps an
-   * old strike from parking a healthy group long after an unrelated death.
-   *
-   * @returns the strike count including this claim
+   * Publish this worker's liveness beacon. Called once before the worker takes
+   * its first claim and refreshed on {@link WORKER_LIVENESS_REFRESH_MS}: the
+   * beacon is what stops another worker booking this one's leftover claim
+   * markers as deaths, so it has to exist before the claims do.
    */
-  async recordClaimStrike(groupId: string): Promise<number> {
-    const key = this.claimStrikesKey(groupId);
-    const results = await this.redis
-      .multi()
-      .incr(key)
-      .expire(key, CLAIM_STRIKE_TTL_SECONDS)
-      .exec();
-    const count = results?.[0]?.[1];
-    return typeof count === "number" ? count : 0;
+  async recordWorkerAlive(workerId: string): Promise<void> {
+    await this.redis.set(
+      this.workerBeaconKey(workerId),
+      "alive",
+      "EX",
+      WORKER_LIVENESS_TTL_SECONDS,
+    );
   }
 
-  async clearClaimStrikes(groupId: string): Promise<void> {
-    await this.redis.del(this.claimStrikesKey(groupId));
+  /**
+   * Replace this worker's beacon with a retirement tombstone. A planned exit is
+   * not a worker death, and the tombstone is what says so to whoever inherits
+   * the claim markers this process leaves behind. Outlives the marker itself
+   * (see {@link WORKER_RETIRED_TTL_SECONDS}), so the answer cannot decay from
+   * "retired" into "died" while a marker still refers to it.
+   *
+   * The caller MUST stop the liveness heartbeat first, or a refresh landing
+   * after this write would restore a short-lived `alive` that then expires.
+   */
+  async retireWorker(workerId: string): Promise<void> {
+    await this.redis.set(
+      this.workerBeaconKey(workerId),
+      "retired",
+      "EX",
+      WORKER_RETIRED_TTL_SECONDS,
+    );
   }
 
-  async getClaimStrikes(groupId: string): Promise<number> {
-    const raw = await this.redis.get(this.claimStrikesKey(groupId));
+  /**
+   * Take ownership of a group's claim and report how many worker deaths this
+   * group has now confirmably caused. See {@link CLAIM_GUARD_LUA} for why the
+   * count is derived from the previous owner's beacon rather than from the
+   * absence of a delete.
+   *
+   * @returns the confirmed-death count for the group, including any death this
+   *   claim just observed
+   */
+  async recordClaim({
+    groupId,
+    workerId,
+    stagedJobId,
+  }: {
+    groupId: string;
+    workerId: string;
+    stagedJobId: string;
+  }): Promise<number> {
+    const deaths = await claimGuardScript.run(
+      this.redis,
+      0,
+      this.keyPrefix,
+      groupId,
+      workerId,
+      stagedJobId,
+      String(CLAIM_MARKER_TTL_SECONDS),
+    );
+    return typeof deaths === "number" ? deaths : 0;
+  }
+
+  /**
+   * Release the claim marker. Unlike the strike delete this replaced, losing
+   * this write is harmless: the marker it would have removed still names a live
+   * (or cleanly retired) owner, so the next claim reads it as ordinary rather
+   * than as a death.
+   */
+  async clearClaim(groupId: string): Promise<void> {
+    await this.redis.del(this.claimMarkerKey(groupId));
+  }
+
+  /** Confirmed worker deaths recorded against a group. */
+  async getConfirmedDeaths(groupId: string): Promise<number> {
+    const raw = await this.redis.hget(this.claimMarkerKey(groupId), "deaths");
     const n = raw === null ? 0 : Number.parseInt(raw, 10);
     return Number.isFinite(n) ? n : 0;
   }

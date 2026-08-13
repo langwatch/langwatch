@@ -153,8 +153,20 @@ describe.skipIf(!hasTestcontainers)(
       `${name}:gq:group:${groupId}:attempt`;
     const failStreakKey = (name: string, groupId: string) =>
       `${name}:gq:group:${groupId}:failstreak`;
-    const strikesKey = (name: string, groupId: string) =>
-      `${name}:gq:group:${groupId}:strikes`;
+    const claimKey = (name: string, groupId: string) =>
+      `${name}:gq:group:${groupId}:claim`;
+    /**
+     * The marker of a worker that claimed this group and then died — no
+     * liveness beacon, no retirement tombstone — one death short of the
+     * threshold, so the next claim confirms the last one and parks.
+     */
+    const seedDeadOwner = async (name: string, groupId: string) => {
+      await redis.hset(claimKey(name, groupId), {
+        owner: `dead-worker-${crypto.randomUUID().slice(0, 8)}`,
+        deaths: String(DEFAULT_CLAIM_STRIKE_THRESHOLD - 1),
+        stagedJobId: "staged-from-the-dead-claim",
+      });
+    };
     const activeKey = (name: string, groupId: string) =>
       `${name}:gq:group:${groupId}:active`;
 
@@ -510,12 +522,9 @@ describe.skipIf(!hasTestcontainers)(
           });
           await queue.waitUntilReady();
 
-          // Strikes left by prior claims whose process died — the crash-loop
+          // The marker left by a prior claim whose process died — the crash-loop
           // signature the claim-side guard parks on.
-          await redis.set(
-            strikesKey(name, groupId),
-            String(DEFAULT_CLAIM_STRIKE_THRESHOLD),
-          );
+          await seedDeadOwner(name, groupId);
 
           const payload: TestPayload = {
             id: "event_parked",
@@ -1530,15 +1539,12 @@ describe.skipIf(!hasTestcontainers)(
           );
           expect(await stagedIds(name, groupId)).toEqual([LEGACY_ID]);
 
-          // Step 3 — a poison park. Stop the consumer first so the strikes are
-          // in place before any claim can race them.
+          // Step 3 — a poison park. Stop the consumer first so the marker is
+          // in place before any claim can race it.
           await consumer.close();
           const ops = new QueueRedisRepository(redis);
           await ops.unblockGroup({ queueName: name, groupId });
-          await redis.set(
-            strikesKey(name, groupId),
-            String(DEFAULT_CLAIM_STRIKE_THRESHOLD),
-          );
+          await seedDeadOwner(name, groupId);
 
           const parker = newQueue({
             name,

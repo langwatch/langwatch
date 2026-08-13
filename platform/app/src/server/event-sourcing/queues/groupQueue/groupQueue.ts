@@ -1,6 +1,13 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
 
+import { randomUUID } from "node:crypto";
+import { hostname } from "node:os";
 import { performance } from "node:perf_hooks";
+// Imported rather than read off the global: the constructor destructures a
+// `process` handler out of the queue definition, and a class field initializer
+// runs inside that same scope — so a bare `process.pid` here resolves to the
+// handler's binding and dies in its temporal dead zone.
+import { pid } from "node:process";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -97,6 +104,7 @@ import {
   readBisectionSplitBudget,
   readClaimStrikeThreshold,
   readGroupQuarantineThreshold,
+  WORKER_LIVENESS_REFRESH_MS,
 } from "./scripts";
 import { type ObjectStore, TransientBlobStoreError } from "./tieredBlobStore";
 
@@ -332,12 +340,26 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   private shutdownRequested = false;
   /** Tracks in-flight jobs for active count metrics. */
   private activeJobCount = 0;
+
   /**
-   * Groups whose claim strike is currently outstanding (recorded at claim,
-   * cleared in the processing finally). {@link close} sweeps these so a
-   * planned shutdown never leaves a strike behind as a fake worker death.
+   * Identity this process stamps onto every claim it takes, and the subject of
+   * the liveness beacon the poison guard reads. Unique per process INSTANCE —
+   * a restarted pod must never inherit the identity of the one it replaced, or
+   * its predecessor's death would resolve to "that's me, still running".
    */
-  private readonly inFlightStrikeGroups = new Set<string>();
+  private readonly workerId =
+    `${hostname()}-${pid}-${randomUUID().slice(0, 8)}`;
+
+  /** Beacon refresh timer; stopped before the retirement write in {@link close}. */
+  private livenessTimer: ReturnType<typeof setInterval> | undefined;
+
+  /**
+   * Resolves once this worker's beacon exists in Redis. Claims await it, so a
+   * worker can never own a claim marker before the beacon that vouches for it —
+   * the window in between is exactly the one where a peer would misread this
+   * live process as a dead one.
+   */
+  private readonly livenessReady: Promise<void>;
 
   constructor(
     definition: EventSourcedQueueDefinition<Payload>,
@@ -457,6 +479,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         "Processing queue saturated",
       );
     };
+
+    // Publish the liveness beacon before anything can claim. A consumer that
+    // never claims still needs no beacon, so producers skip it entirely.
+    this.livenessReady = this.consumerEnabled
+      ? this.startLivenessBeacon()
+      : Promise.resolve();
 
     // Start dispatcher and metrics collection in consumer mode
     if (this.consumerEnabled) {
@@ -858,74 +886,62 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   /**
    * fastq worker function: poison guard, then the real job processing.
    *
-   * The guard records a claim strike BEFORE any decode/parse work and clears
-   * it on every code path where the process survives (the finally below -
-   * success, retry, exhausted-park, drop-to-replay, graceful drain all pass
-   * through it). A job that seizes the event loop never reaches the finally:
-   * the liveness probe kills the process, the strike stays behind, and after
-   * enough consecutive deaths the next claim parks the group instead of
-   * re-running the killer (specs/event-sourcing/poison-group-park-guard.feature).
+   * The guard stamps this worker's identity onto the group's claim BEFORE any
+   * decode/parse work, and releases it on every path where the process survives
+   * (the finally below — success, retry, exhausted-park, drop-to-replay and
+   * graceful drain all pass through it). A job that seizes the event loop never
+   * reaches the finally: the liveness probe kills the process, its beacon stops,
+   * and the next worker to claim the group finds a marker whose owner is
+   * provably gone. Enough confirmed deaths and the claim parks the group instead
+   * of re-running the killer (specs/event-sourcing/poison-group-park-guard.feature).
    *
-   * A claim made after a graceful shutdown was requested records NO strike:
-   * the process is about to exit on purpose, and dying with that job in
-   * flight must not read as the job killing the worker. Pre-shutdown strikes
-   * are swept in {@link close} while the event loop is provably alive. A group
-   * already at the threshold is therefore parked at most one claim early: a
-   * claim that begins after the shutdown records no strike and parks on the next
-   * boot's claim instead, while a claim already awaiting its strike record when
-   * the shutdown flips can still cross the threshold and park during the drain —
-   * but only on its real prior-death strikes, never on a shutdown-born one.
+   * Nothing here has to special-case shutdown. A claim held by a process that
+   * exits gracefully resolves through that process's retirement tombstone, and
+   * a release that never reaches Redis resolves through its still-live beacon —
+   * so neither needs the strike to be withheld, swept, or re-checked the way the
+   * count-and-subtract guard did.
    */
   private async processWithRetries(dispatched: DispatchResult): Promise<void> {
     const { stagedJobId, groupId, jobDataJson, originalScore } = dispatched;
 
-    const strikeThreshold = readClaimStrikeThreshold();
-    const recordStrikes = strikeThreshold > 0 && !this.shutdownRequested;
-    if (recordStrikes) {
-      let strikes = 0;
+    const deathThreshold = readClaimStrikeThreshold();
+    const guardEnabled = deathThreshold > 0;
+    if (guardEnabled) {
+      let deaths = 0;
       try {
-        strikes = await this.scripts.recordClaimStrike(groupId);
+        // The beacon must exist before this worker owns a marker, or a peer
+        // would read our live claim as an abandoned one.
+        await this.livenessReady;
+        deaths = await this.scripts.recordClaim({
+          groupId,
+          workerId: this.workerId,
+          stagedJobId,
+        });
       } catch {
-        // Strike accounting is protective, never load-bearing: an unreadable
-        // counter must not stop the queue.
+        // Poison accounting is protective, never load-bearing: an unreadable
+        // marker must not stop the queue.
       }
-      if (strikes > strikeThreshold) {
+      if (deaths >= deathThreshold) {
         await this.parkPoisonGroup({
           groupId,
           stagedJobId,
           jobDataJson,
           originalScore,
           reason: "claim_strikes",
-          errorMessage: `Poison guard: ${strikes - 1} consecutive worker deaths while this group was in flight (threshold ${strikeThreshold}). Inspect the staged jobs, then unblock the group to retry.`,
+          errorMessage: `Poison guard: ${deaths} confirmed worker deaths while this group was in flight (threshold ${deathThreshold}). Each was a worker that claimed this group and then stopped heartbeating without shutting down. Inspect the staged jobs, then unblock the group to retry.`,
         });
         return;
-      }
-      this.inFlightStrikeGroups.add(groupId);
-
-      // close() may have flipped shutdownRequested and taken its sweep snapshot
-      // during the recordClaimStrike await above — before this group was in the
-      // set, so the sweep would miss it and an abandoned drain would leave the
-      // strike behind: exactly the false worker-death this guard must not book.
-      // Re-check on the synchronous heels of the add (no await between them, so
-      // close() cannot interleave here) and clear our own strike if the shutdown
-      // began mid-claim. The add and this check are jointly exhaustive: either
-      // close()'s snapshot already saw the group and swept it, or it did not and
-      // we clear it here.
-      if (this.shutdownRequested) {
-        this.inFlightStrikeGroups.delete(groupId);
-        await this.scripts.clearClaimStrikes(groupId).catch(() => {
-          // Protective accounting only; the strike key's TTL bounds a failed clear.
-        });
       }
     }
 
     try {
       await this.processClaimedJob(dispatched);
     } finally {
-      if (recordStrikes) {
-        this.inFlightStrikeGroups.delete(groupId);
-        this.scripts.clearClaimStrikes(groupId).catch(() => {
-          // The TTL on the strike key bounds the damage of a failed clear.
+      if (guardEnabled) {
+        this.scripts.clearClaim(groupId).catch(() => {
+          // Safe to lose: the marker it would have removed still names this
+          // worker, which is alive (and will retire rather than vanish), so the
+          // next claim reads it as ordinary rather than as a death.
         });
       }
     }
@@ -2092,6 +2108,39 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   }
 
   /**
+   * Publishes this worker's liveness beacon and keeps refreshing it.
+   *
+   * The beacon is the poison guard's only evidence of a worker death: a claim
+   * marker whose owner has no beacon is a process that was working and is now
+   * gone. Refresh failures are logged and otherwise tolerated — the TTL is
+   * several refreshes wide precisely so a transient Redis error cannot make a
+   * live worker look dead.
+   */
+  private async startLivenessBeacon(): Promise<void> {
+    const publish = async () => {
+      try {
+        await this.scripts.recordWorkerAlive(this.workerId);
+      } catch (err) {
+        this.logger.warn(
+          {
+            queueName: this.queueName,
+            workerId: this.workerId,
+            error: err instanceof Error ? err.message : String(err),
+          },
+          "Failed to publish worker liveness beacon; the poison guard may read this worker as dead if this persists",
+        );
+      }
+    };
+
+    await publish();
+    this.livenessTimer = setInterval(() => {
+      void publish();
+    }, WORKER_LIVENESS_REFRESH_MS);
+    // Never hold the process open for a beacon refresh.
+    this.livenessTimer.unref?.();
+  }
+
+  /**
    * Starts a periodic heartbeat that refreshes the active key TTL during
    * processing. This prevents the safety-net TTL from expiring when a single
    * job attempt takes longer than activeTtlSec.
@@ -2401,6 +2450,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       jobDataJson,
       errorMessage,
     });
+    // Release the marker as the group is parked. Leaving it meant the death
+    // count survived the park, so an operator who unblocked inside the marker's
+    // TTL had the group re-park on its very next claim — and whether it did
+    // depended on how long they took to press the button.
+    await this.scripts.clearClaim(groupId).catch(() => {
+      // The marker's TTL bounds a failed clear; unblock clears it outright.
+    });
     gqGroupsPoisonParkedTotal.inc({
       queue_name: this.queueName,
       reason,
@@ -2599,23 +2655,33 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         // best-effort wake; a failed signal only delays dispatcher exit
       });
 
-    // A planned shutdown is not a worker death (poison-group-park-guard
-    // spec: "graceful shutdown mid-job does not count as a poison strike").
-    // Sweep the in-flight claim strikes NOW, before the drain below, while
-    // the event loop is provably alive — a worker whose loop a poison job
-    // seized can never reach this sweep, so real crash-loops keep their
-    // count. Jobs that complete during the drain re-clear harmlessly; jobs
-    // the drain budget (or the platform's SIGKILL) abandons leave no strike
-    // behind and re-dispatch cleanly on the next boot.
-    const inFlight = [...this.inFlightStrikeGroups];
-    if (inFlight.length > 0) {
-      await Promise.allSettled(
-        inFlight.map((groupId) => this.scripts.clearClaimStrikes(groupId)),
-      );
-      this.logger.info(
-        { queueName: this.queueName, groups: inFlight.length },
-        "Cleared in-flight claim strikes for graceful shutdown",
-      );
+    // A planned shutdown is not a worker death (poison-group-park-guard spec:
+    // "graceful shutdown mid-job does not count as a poison strike"). One
+    // tombstone answers for every claim this worker holds, however the drain
+    // ends: jobs it completes, jobs the shutdown budget abandons, and jobs the
+    // platform's SIGKILL cuts short all leave markers that resolve to "retired".
+    //
+    // Stop the beacon FIRST — a refresh landing after the tombstone would
+    // restore a short-lived `alive` that then expires into a false death. And
+    // do this while the event loop is provably alive: a worker whose loop a
+    // poison job seized never reaches here, so real crash-loops still count.
+    if (this.livenessTimer) {
+      clearInterval(this.livenessTimer);
+      this.livenessTimer = undefined;
+    }
+    if (this.consumerEnabled) {
+      try {
+        await this.scripts.retireWorker(this.workerId);
+      } catch (err) {
+        this.logger.warn(
+          {
+            queueName: this.queueName,
+            workerId: this.workerId,
+            error: err instanceof Error ? err.message : String(err),
+          },
+          "Failed to record worker retirement; groups this worker held may book a spurious death",
+        );
+      }
     }
 
     this.logger.debug(
