@@ -273,6 +273,11 @@ const presentations = {
     describe: () =>
       "This project doesn't have the SQL workbench enabled yet. Ask your administrator to switch it on.",
   },
+  saved_workbench_chart_already_exists: {
+    title: "That chart id is already taken",
+    describe: () =>
+      "A saved chart with this id already exists in this project. Save again with a different id, or leave the id out to have one chosen for you.",
+  },
   saved_workbench_chart_not_found: {
     title: "That saved chart isn't here",
     describe: () =>
@@ -289,9 +294,12 @@ const presentations = {
       "We can't read what was stored for it. Rebuild the chart in the workbench and save it again.",
   },
   governed_sql_unavailable: {
+    // Names the workspace administrator first: on a self-hosted deployment
+    // the reader's own operator controls whether this is provisioned, and
+    // LangWatch support cannot switch it on there.
     title: "Analytics SQL isn't available here",
     describe: () =>
-      "This feature isn't switched on for this workspace yet. Contact support to have it enabled.",
+      "This feature isn't switched on for this workspace yet. Ask your workspace administrator to enable it, or contact support.",
   },
   clickhouse_unavailable: {
     title: "Search is temporarily unavailable",

@@ -58,7 +58,10 @@ const MAX_PARAMETER_VALUE_LENGTH = 4_000;
  */
 const parameterValueSchema = z.union([
   z.string().max(MAX_PARAMETER_VALUE_LENGTH),
-  z.number(),
+  // Finite only: `NaN` and `±Infinity` survive validation but not
+  // `JSON.stringify`, so the stored value would be `null` rather than the
+  // number that was accepted.
+  z.number().finite(),
   z.boolean(),
   z.null(),
 ]);

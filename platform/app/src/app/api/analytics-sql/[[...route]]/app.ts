@@ -20,6 +20,9 @@ patchZodOpenapi();
 
 const secured = createProjectApp({
   basePath: "/api/v1/projects",
+  // A new route family, so it publishes the canonical error envelope from the
+  // start rather than joining the legacy families a consumer already parses.
+  errorEnvelope: "canonical",
 });
 
 registerGovernedSqlRoutes(secured);

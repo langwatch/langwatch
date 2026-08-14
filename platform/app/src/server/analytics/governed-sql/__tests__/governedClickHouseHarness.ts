@@ -1269,6 +1269,12 @@ export interface GovernedPostgresHarness {
   /** The approved view over it. The reader's only relation for that dataset. */
   approvedView: string;
   readerRole: string;
+  /**
+   * The reader role's password, the live value the role was provisioned with —
+   * exposed so a leak assertion searches for the string that would actually
+   * leak rather than a hand-copy that can drift and go vacuous.
+   */
+  readerPassword: string;
   /** Runs SQL as the PostgreSQL superuser, over the local socket. */
   asAdmin(sql: string): Promise<PostgresExecResult>;
   /** Runs SQL as the restricted `ch_reader` role, over TCP with its password. */
@@ -1617,6 +1623,7 @@ export async function startGovernedPostgres(): Promise<GovernedPostgresHarness> 
     baseTable: mapped.postgres.baseRelation,
     approvedView: mapped.postgres.approvedView,
     readerRole: PG_READER_ROLE,
+    readerPassword: PG_READER_PASSWORD,
     asAdmin,
     asReader,
     readLog: () => readContainerLog(container.logs()),

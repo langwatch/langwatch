@@ -31,6 +31,7 @@
 import { ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
+import { z } from "zod";
 import { GOVERNED_QUERY_RESULT_DATASET } from "~/features/analytics-query/visualization/governedDatasetNames";
 import { validateVegaLiteSpecStructure } from "~/features/analytics-query/visualization/validateVegaLiteSpec";
 import type {
@@ -45,7 +46,9 @@ import {
   getGovernedSqlService,
 } from "../governed-sql/governedSql.service";
 
+import { isUniqueConstraintError } from "../../utils/prismaErrors";
 import {
+  SavedWorkbenchChartAlreadyExistsError,
   SavedWorkbenchChartDefinitionInvalidError,
   SavedWorkbenchChartNotFoundError,
   SavedWorkbenchChartSpecificationRefusedError,
@@ -60,6 +63,20 @@ import {
 } from "./workbenchChartDefinition";
 
 const logger = createLogger("langwatch:analytics:saved-workbench-charts");
+
+/**
+ * The identity fields a caller supplies alongside the definition. Bounded here
+ * because {@link SavedWorkbenchChartService.governed} speaks only for the
+ * definition, this service is the sole write path, and Prisma is not a
+ * validator.
+ */
+const chartNameSchema = z.string().trim().min(1).max(255);
+const chartIdSchema = z
+  .string()
+  .regex(
+    /^[A-Za-z0-9_-]{1,64}$/,
+    "id must be 1-64 characters of letters, digits, '_' or '-'",
+  );
 
 /** A saved chart as every caller above this layer sees it. */
 export interface SavedWorkbenchChart {
@@ -149,18 +166,33 @@ export class SavedWorkbenchChartService {
       definition: unknown;
     };
   }): Promise<SavedWorkbenchChart> {
+    const identity = z
+      .object({ id: chartIdSchema.optional(), name: chartNameSchema })
+      .safeParse({ id: input.id, name: input.name });
+    if (!identity.success) throw ValidationError.fromZodError(identity.error);
+
     const definition = this.governed({
       projectId,
       protections,
       definition: input.definition,
     });
 
-    const row = await this.deps.repository.create({
-      id: input.id ?? nanoid(),
-      projectId,
-      name: input.name,
-      definition: definition as Prisma.InputJsonValue,
-    });
+    let row: CustomGraph;
+    try {
+      row = await this.deps.repository.create({
+        id: identity.data.id ?? nanoid(),
+        projectId,
+        name: identity.data.name,
+        definition: definition as Prisma.InputJsonValue,
+      });
+    } catch (error) {
+      // The id is caller input, so a collision is theirs to act on rather
+      // than an unknown 500.
+      if (isUniqueConstraintError(error)) {
+        throw new SavedWorkbenchChartAlreadyExistsError();
+      }
+      throw error;
+    }
 
     logger.info(
       {
@@ -203,6 +235,11 @@ export class SavedWorkbenchChartService {
     const existing = await this.deps.repository.findById({ id, projectId });
     if (!existing) throw new SavedWorkbenchChartNotFoundError();
 
+    const identity = z
+      .object({ name: chartNameSchema.optional() })
+      .safeParse({ name: input.name });
+    if (!identity.success) throw ValidationError.fromZodError(identity.error);
+
     const definition =
       input.definition === undefined
         ? undefined
@@ -215,7 +252,7 @@ export class SavedWorkbenchChartService {
     const row = await this.deps.repository.update({
       id,
       projectId,
-      ...(input.name === undefined ? {} : { name: input.name }),
+      ...(identity.data.name === undefined ? {} : { name: identity.data.name }),
       ...(definition === undefined
         ? {}
         : { definition: definition as Prisma.InputJsonValue }),

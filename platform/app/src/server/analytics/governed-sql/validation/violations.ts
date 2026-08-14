@@ -108,9 +108,19 @@ export interface GovernedSqlViolation {
  */
 const MAX_ECHOED_IDENTIFIER = 80;
 
+/**
+ * Characters that survive `\s` flattening but have no business in an echoed
+ * identifier: C0/C1 controls (ANSI escapes), zero-width characters, and the
+ * bidi override range — any of which a backtick-quoted ClickHouse identifier
+ * can carry, and which would otherwise ride back into terminals and agent
+ * logs through `message` and `meta.violations`.
+ */
+const UNPRINTABLE =
+  /[\u0000-\u0008\u000e-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069]/gu;
+
 /** Quotes a caller-supplied identifier back at them, bounded and single-line. */
 export function echoIdentifier(raw: string): string {
-  const flattened = raw.replace(/\s+/gu, " ").trim();
+  const flattened = raw.replace(UNPRINTABLE, "").replace(/\s+/gu, " ").trim();
   return flattened.length > MAX_ECHOED_IDENTIFIER
     ? `${flattened.slice(0, MAX_ECHOED_IDENTIFIER)}…`
     : flattened;

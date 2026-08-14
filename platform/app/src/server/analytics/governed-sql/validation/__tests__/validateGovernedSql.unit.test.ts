@@ -263,6 +263,27 @@ describe("validateGovernedSql", () => {
     ])("refuses %s", (_case, sql) => {
       expect(codesOf(validate(sql))).toContain("TABLE_NOT_ALLOWED");
     });
+
+    /**
+     * The refusal echoes the identifier the caller wrote, and a backtick-quoted
+     * ClickHouse identifier can carry anything — so the echo must shed the
+     * characters that would ride an ANSI escape or a bidi override back into
+     * terminals and agent logs through `message` and `meta.violations`.
+     */
+    it("strips control characters and bidi overrides from the echoed name", () => {
+      const result = validate(
+        "SELECT id FROM `evil\u001b[31m\u202ename\u200b`",
+      );
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      const messages = result.violations.map((violation) => violation.message);
+      expect(messages.join(" ")).toContain("evil");
+      for (const message of messages) {
+        expect(message).not.toMatch(
+          /[\u0000-\u0008\u000e-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069]/u,
+        );
+      }
+    });
   });
 
   describe("given a table function", () => {
@@ -360,10 +381,12 @@ describe("validateGovernedSql", () => {
      * the walk, so the gate has nothing to match and ClickHouse substitutes
      * the name after every check has passed.
      *
-     * Asserted per gated column rather than once, because the defect is not
-     * about a particular name: any withheld column is reachable by the same
-     * shape, so a single case would pass while the hole stayed open for the
-     * rest.
+     * The bound-identifier SQL is the same on every iteration on purpose: the
+     * parameter shape is refused regardless of which column it would resolve
+     * to, since the reference never reaches the walk. What varies per gated
+     * column is the control — the literal spelling of that column staying
+     * refused is what keeps the refusal above about the shape rather than
+     * about a gate that quietly stopped working.
      */
     it.each(
       POLICY.gatedColumns,

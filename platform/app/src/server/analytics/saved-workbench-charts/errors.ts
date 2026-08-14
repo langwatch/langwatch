@@ -38,6 +38,31 @@ export class SavedWorkbenchChartNotFoundError extends HandledError {
 }
 
 /**
+ * A chart with the caller-supplied id already exists in this project.
+ *
+ * The id is optional client input — a UI saving optimistically supplies its
+ * own — so a collision is the caller's to act on: pick another id, or let the
+ * server mint one. Mapping Prisma's unique-constraint failure here is what
+ * keeps caller-controlled input from surfacing as an unknown 500.
+ */
+export class SavedWorkbenchChartAlreadyExistsError extends HandledError {
+  declare readonly code: "saved_workbench_chart_already_exists";
+
+  constructor() {
+    super(
+      "saved_workbench_chart_already_exists",
+      "A saved chart with this id already exists.",
+      {
+        httpStatus: 409,
+        fault: "customer",
+        ...remediation("saved_workbench_chart_already_exists"),
+      },
+    );
+    this.name = "SavedWorkbenchChartAlreadyExistsError";
+  }
+}
+
+/**
  * The chart policy refused the specification on the way in.
  *
  * Refusing at write is what stops the database becoming a way around the
