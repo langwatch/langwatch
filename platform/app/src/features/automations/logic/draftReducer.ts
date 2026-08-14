@@ -300,10 +300,13 @@ export interface PresetLabels {
  * changes. The storage enum (`REPORT`, which already agreed) and the wire
  * discriminator are untouched; this is vocabulary.
  */
-export function presetLabels(
-  source: ConditionSource,
-  isEdit: boolean,
-): PresetLabels {
+export function presetLabels({
+  source,
+  isEdit,
+}: {
+  source: ConditionSource;
+  isEdit: boolean;
+}): PresetLabels {
   switch (source) {
     case "report":
       return {

@@ -19,19 +19,12 @@ import {
   isAutomationPauseReason,
   RUNAWAY_PAUSE_EXPLANATION,
 } from "~/features/automations/logic/pauseReasons";
+import type { RouterOutputs } from "~/utils/api";
 import { formatWindow } from "./evaluationPresentation";
 
-/** The `automation.getNextFiring` result, as the drawer receives it. */
-export type NextFiringResult =
-  | {
-      kind: "paused";
-      subject: "schedule" | "alert" | "automation";
-      pausedReason: string | null;
-    }
-  | { kind: "schedule"; nextRunAt: string | Date | null }
-  | { kind: "digest"; cadence: string; windowClosesAt: string | Date }
-  | { kind: "immediate"; traceDebounceMs: number }
-  | { kind: "alert"; sweepIntervalMs: number };
+/** The `automation.getNextFiring` result, derived from the router so the
+ *  drawer can never drift from what the procedure actually answers. */
+export type NextFiringResult = RouterOutputs["automation"]["getNextFiring"];
 
 export interface NextFiringPresentation {
   /** The headline answer. */

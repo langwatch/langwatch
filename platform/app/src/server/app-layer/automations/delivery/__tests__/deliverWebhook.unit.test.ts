@@ -110,9 +110,11 @@ describe("deliverWebhook", () => {
           },
         }),
       ).rejects.toBeInstanceOf(DispatchError);
-      // ADR-040 §6: no redaction of the receiver's output — what they echo
-      // is their own response, stored as-is (truncated) so operators see
-      // exactly what the endpoint said. Only our REQUEST is never stored.
+      // ADR-040 §6: what the receiver ECHOES is their own response, stored
+      // as-is (truncated) so operators see exactly what the endpoint said —
+      // only our REQUEST is never stored, and only the standard
+      // credential-bearing response headers (set-cookie, www-authenticate…)
+      // are masked at capture, a layer below this one.
       expect(rows[0]!.response?.body).toBe('auth failed for "Bearer secret"');
       expect(rows[0]!.response?.headers).toEqual({
         "x-echo": "Bearer secret",

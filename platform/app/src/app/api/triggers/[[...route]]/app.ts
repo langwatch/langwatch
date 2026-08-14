@@ -308,7 +308,8 @@ const createCommonFields = {
   // No default. An omitted condition used to become `{}`, which matches every
   // trace forever, so the easiest possible create call produced the most
   // expensive possible automation. Omitting it is now the same as sending an
-  // empty one, and both are refused below with a typed 422.
+  // empty one, and the trigger service the route calls refuses both with a
+  // typed 422.
   filters: triggerFiltersPermissiveSchema.optional(),
   filterQuery: filterQuerySchema.optional(),
   message: z.string().optional(),

@@ -1371,13 +1371,13 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       active: z.boolean().optional().describe("Resume or pause it"),
       actionParams: actionParamsSchema.optional().describe("The delivery configuration this automation should have from now on"),
       filters: z.string().optional().describe("Trace conditions as a JSON object string"),
-      filterQuery: z.string().optional().describe("Trace query in the syntax the traces view uses"),
+      filterQuery: z.string().nullable().optional().describe("Trace query in the syntax the traces view uses. null clears the saved query"),
       graphAlert: graphAlertSchema.optional().describe("Only for an automation that is already a graph alert"),
       report: reportSchema.optional().describe("Only for an automation that is already a scheduled report"),
       templates: templatesSchema.optional(),
       notificationCadence: notificationCadenceSchema.optional(),
-      message: z.string().optional().describe("New alert message"),
-      alertType: alertTypeSchema.optional().describe("New alert severity"),
+      message: z.string().nullable().optional().describe("New alert message. null removes the custom message"),
+      alertType: alertTypeSchema.nullable().optional().describe("New alert severity. null clears it"),
     },
     withToolLogging("platform_update_trigger", async (params) => {
       requireApiKey();

@@ -1,15 +1,25 @@
 import { Field, HStack, NativeSelect, Stack, Text } from "@chakra-ui/react";
-import type { NotificationCadence } from "@langwatch/automations/cadences";
+import {
+  NOTIFICATION_CADENCES,
+  type NotificationCadence,
+} from "@langwatch/automations/cadences";
 import { useState } from "react";
 import { Radio, RadioGroup } from "~/components/ui/radio";
 
 type DigestCadence = Exclude<NotificationCadence, "immediate">;
 
-const WINDOW_OPTIONS: Array<{ value: DigestCadence; label: string }> = [
-  { value: "5min_digest", label: "every 5 minutes" },
-  { value: "15min_digest", label: "every 15 minutes" },
-  { value: "hourly_digest", label: "every hour" },
-];
+// Exhaustive over the cadence contract: a new digest cadence fails typecheck
+// here instead of silently missing from the window picker.
+const WINDOW_LABELS: Record<DigestCadence, string> = {
+  "5min_digest": "every 5 minutes",
+  "15min_digest": "every 15 minutes",
+  hourly_digest: "every hour",
+};
+
+const WINDOW_OPTIONS: Array<{ value: DigestCadence; label: string }> =
+  NOTIFICATION_CADENCES.filter(
+    (cadence): cadence is DigestCadence => cadence !== "immediate",
+  ).map((value) => ({ value, label: WINDOW_LABELS[value] }));
 
 /**
  * The notification cadence phrased as the question the author is answering:

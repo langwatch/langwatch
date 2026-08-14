@@ -137,7 +137,7 @@ describe("ConditionBuilder", () => {
       render(<Harness initial="trace.attribute.user_id:premium" />, {
         wrapper: Wrapper,
       });
-      expect(useAutomationStore.getState().conditionRowsInvalid).toBe(false);
+      expect(useAutomationStore.getState().hasInvalidConditionRows).toBe(false);
 
       // The row stays complete (value untouched) while its key turns into
       // something the query language would re-parse as two clauses — the
@@ -145,12 +145,12 @@ describe("ConditionBuilder", () => {
       fireEvent.change(screen.getByDisplayValue("user_id"), {
         target: { value: "user id" },
       });
-      expect(useAutomationStore.getState().conditionRowsInvalid).toBe(true);
+      expect(useAutomationStore.getState().hasInvalidConditionRows).toBe(true);
 
       fireEvent.change(screen.getByDisplayValue("user id"), {
         target: { value: "user_id" },
       });
-      expect(useAutomationStore.getState().conditionRowsInvalid).toBe(false);
+      expect(useAutomationStore.getState().hasInvalidConditionRows).toBe(false);
     });
   });
 });

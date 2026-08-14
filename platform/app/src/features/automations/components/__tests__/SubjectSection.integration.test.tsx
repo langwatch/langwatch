@@ -146,6 +146,13 @@ const previewReturns = (totalHits: number) => {
   };
 };
 
+/** The graph list request itself failed, with nothing ever cached. */
+const graphListFails = () => {
+  server.graphsError = true;
+  server.graphs = undefined;
+  seedFreshAlertDraft();
+};
+
 describe("SubjectSection", () => {
   beforeEach(() => {
     useAutomationStore.getState().reset();
@@ -262,9 +269,7 @@ describe("SubjectSection", () => {
     describe("when the graph list fails to load with no data ever cached", () => {
       /** @scenario "A failed graph list shows a retry, not the empty-project state" */
       it("shows a load failure, not the no-graphs-yet empty state", () => {
-        server.graphsError = true;
-        server.graphs = undefined;
-        seedFreshAlertDraft();
+        graphListFails();
         render(<SubjectSection />, { wrapper: Wrapper });
 
         expect(
@@ -276,14 +281,12 @@ describe("SubjectSection", () => {
       });
 
       it("does not name the underlying error", () => {
-        server.graphsError = true;
-        server.graphs = undefined;
+        graphListFails();
         // A recognizable message the failure state must never leak — without
         // one in the mocked query, this assertion could never fail.
         server.graphsErrorValue = new Error(
           "upstream exploded: connect ECONNREFUSED 10.0.0.7:8123",
         );
-        seedFreshAlertDraft();
         render(<SubjectSection />, { wrapper: Wrapper });
 
         expect(screen.queryByText(/upstream exploded/i)).toBeNull();
@@ -291,9 +294,7 @@ describe("SubjectSection", () => {
       });
 
       it("does not offer to create a graph the project may already have", () => {
-        server.graphsError = true;
-        server.graphs = undefined;
-        seedFreshAlertDraft();
+        graphListFails();
         render(<SubjectSection />, { wrapper: Wrapper });
 
         expect(
@@ -304,9 +305,7 @@ describe("SubjectSection", () => {
       describe("when the user retries", () => {
         it("re-runs the graph list query", async () => {
           const user = userEvent.setup();
-          server.graphsError = true;
-          server.graphs = undefined;
-          seedFreshAlertDraft();
+          graphListFails();
           render(<SubjectSection />, { wrapper: Wrapper });
 
           await user.click(screen.getByRole("button", { name: /try again/i }));

@@ -11,6 +11,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ViewAutomationDrawer } from "../ViewAutomationDrawer";
+import { fakeQuery } from "./viewDrawerTestKit";
 
 let mockTriggerRow: Record<string, unknown> | null = null;
 
@@ -37,32 +38,6 @@ vi.mock("~/components/automations/FilterDisplay", () => ({
   FilterDisplay: ({ filters }: { filters: string }) => (
     <div data-testid="filter-display">{filters}</div>
   ),
-}));
-
-/**
- * A faithful-enough stand-in for one react-query v4 hook result.
- *
- * `enabled: false` is the case that matters: such a query never resolves, so
- * it reports `isLoading` FOREVER. A mock that hard-codes `isLoading: false`
- * makes that state unrepresentable — which is how a permanent skeleton over
- * every non-alert automation's history shipped once already.
- *
- * `undefined` means "has not resolved"; `null` means "resolved, and the
- * answer is nothing" (an automation that was never evaluated), which is a
- * settled query with `data === null`.
- */
-const { fakeQuery } = vi.hoisted(() => ({
-  fakeQuery: (data: unknown, options?: { enabled?: boolean }) => {
-    const enabled = options?.enabled ?? true;
-    const settled = enabled && data !== undefined;
-    return {
-      data,
-      isLoading: !settled,
-      isFetching: enabled && !settled,
-      error: null,
-      refetch: vi.fn(),
-    };
-  },
 }));
 
 vi.mock("~/utils/api", () => ({

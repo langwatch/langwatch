@@ -102,7 +102,7 @@ describe("automationRouter in-depth view reads", () => {
     globalForApp.__langwatch_app = previousApp;
   });
 
-  describe("getFireHistory", () => {
+  describe("given the fire-history read", () => {
     describe("when there are more fires than the page holds", () => {
       it("returns one page and a cursor onto the next", async () => {
         const rows = Array.from({ length: 3 }, (_, index) => ({
@@ -200,7 +200,7 @@ describe("automationRouter in-depth view reads", () => {
     });
   });
 
-  describe("getLatestEvaluation", () => {
+  describe("given the latest-evaluation read", () => {
     describe("when the alert has been evaluated", () => {
       it("returns what the check observed and decided", async () => {
         const evaluatedAt = new Date(Date.UTC(2026, 7, 12, 12, 0, 0));
@@ -253,7 +253,7 @@ describe("automationRouter in-depth view reads", () => {
     });
   });
 
-  describe("getNextFiring", () => {
+  describe("given the next-firing read", () => {
     describe("when the automation is a report", () => {
       it("answers from the scheduler that owns the calendar entry", async () => {
         const nextRunAt = new Date(Date.UTC(2026, 7, 13, 9, 0, 0));

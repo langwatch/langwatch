@@ -44,12 +44,12 @@ export interface AutomationStore {
    *  key can't round-trip through the query language. The row is excluded
    *  from the emitted query, so without this flag Save would silently
    *  persist a wider automation than the one on screen. */
-  conditionRowsInvalid: boolean;
+  hasInvalidConditionRows: boolean;
 
   /** Drives the pure reducer. */
   dispatch: (action: DraftAction) => void;
   /** Reported by the condition builder as its rows change. */
-  setConditionRowsInvalid: (invalid: boolean) => void;
+  setHasInvalidConditionRows: (invalid: boolean) => void;
   /** Open or close a secondary drawer. */
   setSection: (section: Section) => void;
   /** Show a wizard step. Reaching a later step never un-reaches an earlier
@@ -77,11 +77,12 @@ export const useAutomationStore = create<AutomationStore>((set) => ({
   step: "watch",
   furthestStep: "watch",
   testHistory: [],
-  conditionRowsInvalid: false,
+  hasInvalidConditionRows: false,
 
   dispatch: (action) =>
     set((state) => ({ draft: reducer(state.draft, action) })),
-  setConditionRowsInvalid: (invalid) => set({ conditionRowsInvalid: invalid }),
+  setHasInvalidConditionRows: (invalid) =>
+    set({ hasInvalidConditionRows: invalid }),
   setSection: (section) => set({ section }),
   setStep: (step) =>
     set((state) => ({
@@ -103,6 +104,6 @@ export const useAutomationStore = create<AutomationStore>((set) => ({
       step: "watch",
       furthestStep: "watch",
       testHistory: [],
-      conditionRowsInvalid: false,
+      hasInvalidConditionRows: false,
     }),
 }));

@@ -825,7 +825,7 @@
           "docs": "/api-reference/triggers/overview"
         },
         "platform": {
-          "ui": "/alerts",
+          "ui": "/automations",
           "mcp": [
             "platform_list_triggers",
             "platform_get_trigger",

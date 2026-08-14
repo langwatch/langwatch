@@ -227,7 +227,9 @@ function Wire({ kind }: { kind: WireKind }) {
 
 function WireStack({ rows }: { rows: WireKind[] }) {
   return (
-    <Stack gap="1.5" align="stretch">
+    // Illustrative filler, not content — hidden from assistive technology so
+    // a screen reader hears the layout's name and description, not fake data.
+    <Stack gap="1.5" align="stretch" aria-hidden="true">
       {rows.map((kind, i) => (
         <Wire key={i} kind={kind} />
       ))}

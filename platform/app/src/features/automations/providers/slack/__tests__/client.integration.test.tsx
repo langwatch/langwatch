@@ -244,7 +244,7 @@ function CadenceHarness() {
 describe("SlackConfigForm authoring tiers", () => {
   afterEach(() => cleanup());
 
-  describe("the receive chooser beside the layouts", () => {
+  describe("given the receive chooser rendered beside the layouts", () => {
     /** @scenario "The receive choice decides which layouts are offered" */
     it("filters the layout list to the chosen mode", async () => {
       const user = userEvent.setup();
@@ -1024,8 +1024,9 @@ describe("Slack client slice contract", () => {
           slackTokenState({ slice, projectIntegrationConnected: false }),
         ).toBe("not_connected");
         expect(
-          slackClient.previewOptions?.(slice, {
-            projectSlackIntegrationConnected: false,
+          slackClient.previewOptions?.({
+            slice: slice,
+            context: { projectSlackIntegrationConnected: false },
           }),
         ).toEqual({ allowGatedBlocks: false });
       });
@@ -1039,8 +1040,9 @@ describe("Slack client slice contract", () => {
           slackTokenState({ slice, projectIntegrationConnected: true }),
         ).toBe("project_integration");
         expect(
-          slackClient.previewOptions?.(slice, {
-            projectSlackIntegrationConnected: true,
+          slackClient.previewOptions?.({
+            slice: slice,
+            context: { projectSlackIntegrationConnected: true },
           }),
         ).toEqual({ allowGatedBlocks: true });
       });
@@ -1061,8 +1063,9 @@ describe("Slack client slice contract", () => {
       };
 
       expect(
-        slackClient.previewOptions?.(slice, {
-          projectSlackIntegrationConnected: true,
+        slackClient.previewOptions?.({
+          slice: slice,
+          context: { projectSlackIntegrationConnected: true },
         }),
       ).toEqual({ allowGatedBlocks: false });
     });

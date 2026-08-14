@@ -115,6 +115,10 @@ function renderDrawer() {
 describe("ViewAutomationDrawer history", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Pinned clock: every test here builds relative instants from now and
+    // asserts relative wording, which must not ride the real wall clock.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-06-01T12:00:00.000Z"));
     mockTriggerRow = null;
     mockFires = [];
     mockLatestEvaluation = null;
@@ -123,6 +127,7 @@ describe("ViewAutomationDrawer history", () => {
 
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
   });
 
   describe("given an alert whose last check did not cross its threshold", () => {

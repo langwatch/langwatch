@@ -213,7 +213,8 @@ Feature: Webhook (generic HTTP) automation action
     Scenario: A failed attempt keeps the receiver's response for debugging
       Given a webhook automation whose endpoint answers an error
       When the attempt fails
-      Then the truncated response body and headers are stored exactly as the endpoint sent them
+      Then the truncated response body and headers are stored
+      And a response header that can carry the receiver's credentials keeps its name but not its value
 
     @integration
     Scenario: The recent deliveries list shows what the endpoint answered

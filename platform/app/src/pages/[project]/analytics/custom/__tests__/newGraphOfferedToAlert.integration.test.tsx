@@ -216,10 +216,16 @@ describe("Creating a custom graph then alerting on it", () => {
           wrapper: Wrapper,
         });
 
+        // An empty fixture would make the name filter `undefined`, which
+        // matches any option — assert the graph exists before using it.
+        const [createdGraph] = serverGraphs;
+        if (!createdGraph) {
+          throw new Error("expected the created graph in serverGraphs");
+        }
         await waitFor(() => {
           expect(
             within(graphSelect()).getByRole("option", {
-              name: serverGraphs[0]?.name,
+              name: createdGraph.name,
             }),
           ).toBeInTheDocument();
         });

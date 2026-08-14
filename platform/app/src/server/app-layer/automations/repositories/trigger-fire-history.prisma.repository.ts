@@ -7,8 +7,9 @@ import type {
   TriggerFireStats,
 } from "./trigger-fire-history.repository";
 
-/** Metadata-only projection shared by every fire read: no traceId and no
- *  trace content ever leaves this repository (see `TriggerFire`). */
+/** Metadata-only projection for every fire ROW this repository returns — no
+ *  traceId and no trace content (see `TriggerFire`). The stats reads
+ *  aggregate with `groupBy`/`_count` and project no row fields at all. */
 const FIRE_FIELDS = {
   id: true,
   triggerId: true,

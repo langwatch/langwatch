@@ -96,19 +96,19 @@ function LayoutOption({
   onHighlight: (id: SlackBlockKitTemplateId) => void;
   onApply: (row: LayoutRow) => void;
 }) {
-  const { option, locked, isSelected } = row;
+  const { option, isLocked, isSelected } = row;
   return (
     <chakra.button
       type="button"
       role="option"
       aria-selected={isSelected}
-      aria-disabled={locked ? true : undefined}
+      aria-disabled={isLocked ? true : undefined}
       aria-describedby={isHighlighted ? previewId : undefined}
       data-layout-id={option.id}
       tabIndex={isHighlighted ? 0 : -1}
       textAlign="left"
       width="full"
-      cursor={locked ? "not-allowed" : "pointer"}
+      cursor={isLocked ? "not-allowed" : "pointer"}
       borderWidth="1px"
       borderColor={isHighlighted ? "border.emphasized" : "transparent"}
       borderRadius="md"
@@ -120,7 +120,7 @@ function LayoutOption({
       onFocus={() => onHighlight(option.id)}
       onClick={() => {
         onHighlight(option.id);
-        if (!locked) onApply(row);
+        if (!isLocked) onApply(row);
       }}
     >
       <OptionLabel row={row} />
@@ -129,23 +129,23 @@ function LayoutOption({
 }
 
 function OptionLabel({ row }: { row: LayoutRow }) {
-  const { option, locked, isDefault, isSelected } = row;
+  const { option, isLocked, isDefault, isSelected } = row;
   return (
     <HStack gap={2}>
       <SelectionDot isSelected={isSelected} />
-      <Text textStyle="xs" opacity={locked ? 0.6 : 1} aria-hidden>
+      <Text textStyle="xs" opacity={isLocked ? 0.6 : 1} aria-hidden>
         {option.emoji}
       </Text>
       <Text
         textStyle="xs"
         flex="1"
         lineClamp={1}
-        color={locked ? "fg.muted" : "fg"}
+        color={isLocked ? "fg.muted" : "fg"}
         fontWeight={isSelected ? "medium" : "normal"}
       >
         {option.displayName}
       </Text>
-      {locked ? (
+      {isLocked ? (
         <>
           <Text srOnly>{GATED_NOTE}</Text>
           <Box color="fg.muted" flexShrink={0} aria-hidden>

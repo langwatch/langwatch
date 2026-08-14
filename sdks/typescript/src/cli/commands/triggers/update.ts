@@ -33,24 +33,40 @@ export const updateTriggerCommand = async (
 
   const spinner = createSpinner(`Updating trigger "${id}"...`).start();
 
+  // Parsed BEFORE the request, in their own narrow guard — the outer catch
+  // must not misread a non-JSON API response as a flag the user never passed.
+  let parsedFilters: Record<string, unknown> | undefined;
+  let parsedActionParams: Record<string, unknown> | undefined;
+  try {
+    if (options.filters) {
+      parsedFilters = JSON.parse(options.filters) as Record<string, unknown>;
+    }
+    if (options.actionParams) {
+      parsedActionParams = JSON.parse(options.actionParams) as Record<string, unknown>;
+    }
+  } catch {
+    failSpinner({
+      spinner,
+      error: commandValidationError("--filters and --action-params must be valid JSON"),
+      action: "update trigger",
+    });
+    process.exit(1);
+  }
+
   try {
     const body: Record<string, unknown> = {};
     if (options.name) body.name = options.name;
     if (options.active !== undefined) body.active = options.active === "true";
     if (options.message !== undefined) body.message = options.message || null;
     if (options.alertType) body.alertType = options.alertType;
-    if (options.filters) {
-      body.filters = JSON.parse(options.filters) as Record<string, unknown>;
-    }
+    if (parsedFilters) body.filters = parsedFilters;
     if (options.filterQuery !== undefined) {
       body.filterQuery = options.filterQuery || null;
     }
     // The delivery configuration this automation should have from now on: it
     // replaces the stored one rather than merging into it. A credential the
     // read hid comes back as `[redacted]`; send that to keep the stored value.
-    if (options.actionParams) {
-      body.actionParams = JSON.parse(options.actionParams) as Record<string, unknown>;
-    }
+    if (parsedActionParams) body.actionParams = parsedActionParams;
 
     if (Object.keys(body).length === 0) {
       failSpinner({
@@ -92,10 +108,7 @@ export const updateTriggerCommand = async (
   } catch (error) {
     failSpinner({
       spinner,
-      error:
-        error instanceof SyntaxError
-          ? commandValidationError("--filters and --action-params must be valid JSON")
-          : error,
+      error,
       action: "update trigger",
     });
     process.exit(1);

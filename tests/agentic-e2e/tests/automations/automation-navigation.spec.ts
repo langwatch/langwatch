@@ -30,8 +30,9 @@ test("automation overview keeps activity and setup guidance", async ({
   ).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("automations.png") });
 
-  // A link issued before the merge still lands on the row it pointed at: the
-  // old alerts path resolves to the one automations table.
+  // A link issued before the merge still lands somewhere useful: the old
+  // alerts path resolves to the one automations page (the path carries no
+  // row identity — that lives in the drawer parameters).
   await page.goto(`${basePath}/alerts`);
   await expect(page.locator("h1", { hasText: "Automations" })).toBeVisible();
   await expect(

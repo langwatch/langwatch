@@ -44,19 +44,31 @@ export const createTriggerCommand = async (
 
   const spinner = createSpinner(`Creating trigger "${name}"...`).start();
 
+  // Parsed BEFORE the request, in their own narrow guard — the outer catch
+  // must not misread a non-JSON API response as a flag the user never passed.
+  let filters: Record<string, unknown> | undefined;
+  let actionParams: Record<string, unknown> = {};
   try {
-    let filters: Record<string, unknown> | undefined;
     if (options.filters) {
       filters = JSON.parse(options.filters) as Record<string, unknown>;
     }
+    if (options.actionParams) {
+      actionParams = JSON.parse(options.actionParams) as Record<string, unknown>;
+    }
+  } catch {
+    failSpinner({
+      spinner,
+      error: commandValidationError("--filters and --action-params must be valid JSON"),
+      action: "create trigger",
+    });
+    process.exit(1);
+  }
+  // The delivery configuration the chosen channel reads. `--slack-webhook`
+  // is the shorthand for the one field a Slack automation most often needs;
+  // everything else is stated with `--action-params`.
+  if (options.slackWebhook) actionParams.slackWebhook = options.slackWebhook;
 
-    // The delivery configuration the chosen channel reads. `--slack-webhook`
-    // is the shorthand for the one field a Slack automation most often needs;
-    // everything else is stated with `--action-params`.
-    const actionParams: Record<string, unknown> = options.actionParams
-      ? (JSON.parse(options.actionParams) as Record<string, unknown>)
-      : {};
-    if (options.slackWebhook) actionParams.slackWebhook = options.slackWebhook;
+  try {
 
     const response = await fetch(`${endpoint}/api/triggers`, {
       signal: AbortSignal.timeout(TRIGGER_REQUEST_TIMEOUT_MS),
@@ -104,10 +116,7 @@ export const createTriggerCommand = async (
     // prints nothing in --json/--jq/agent mode (spinners are silent there).
     failSpinner({
       spinner,
-      error:
-        error instanceof SyntaxError
-          ? commandValidationError("--filters and --action-params must be valid JSON")
-          : error,
+      error,
       action: "create trigger",
     });
     process.exit(1);

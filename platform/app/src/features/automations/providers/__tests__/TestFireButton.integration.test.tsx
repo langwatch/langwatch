@@ -54,9 +54,12 @@ describe("TestFireButton", () => {
       );
 
       expect(screen.getByText("Add a webhook URL first")).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: /send a test/i }),
-      ).toBeDisabled();
+      const button = screen.getByRole("button", { name: /send a test/i });
+      expect(button).toBeDisabled();
+      // Exercised, not just attribute-checked: a click on the disabled
+      // control must not fire.
+      fireEvent.click(button);
+      expect(onTestFire).not.toHaveBeenCalled();
     });
   });
 });

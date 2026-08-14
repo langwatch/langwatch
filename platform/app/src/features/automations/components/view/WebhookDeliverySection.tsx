@@ -146,7 +146,10 @@ function DeliveryAttemptRow({
       _last={{ borderBottomWidth: 0 }}
     >
       <HStack
-        as="button"
+        // A row with nothing to expand is plain content, not a control; the
+        // expandable ones announce their state.
+        as={hasDetail ? "button" : "div"}
+        aria-expanded={hasDetail ? open : undefined}
         gap={2.5}
         paddingX={3}
         paddingY={2}

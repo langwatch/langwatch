@@ -41,9 +41,10 @@ export interface TriggerFire {
 /**
  * A page of one trigger's fire history, newest first.
  *
- * `nextCursor` is the `(createdAt, id)` pair of the row after the page —
- * paired because `createdAt` alone is not unique: a burst of matches inside
- * the same millisecond would otherwise drop or repeat rows across pages.
+ * `nextCursor` is the `(createdAt, id)` pair of the LAST row of the page —
+ * the next fetch resumes strictly after it. Paired because `createdAt` alone
+ * is not unique: a burst of matches inside the same millisecond would
+ * otherwise drop or repeat rows across pages.
  */
 export interface TriggerFirePage {
   fires: TriggerFire[];

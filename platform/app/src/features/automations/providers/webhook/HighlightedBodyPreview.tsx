@@ -63,7 +63,11 @@ export function HighlightedBodyPreview({
   const [, retokenize] = useState(0);
   useEffect(() => {
     if (isShikiLangReady(canonical)) return;
-    void ensureShikiLangLoaded(canonical).then(() => retokenize((n) => n + 1));
+    ensureShikiLangLoaded(canonical)
+      .then(() => retokenize((n) => n + 1))
+      // A grammar that fails to load is not an error state the reader needs:
+      // the preview simply stays on the plain-text fallback below.
+      .catch(() => undefined);
   }, [canonical]);
   const language = isShikiLangReady(canonical) ? canonical : "text";
 

@@ -89,10 +89,10 @@ import { useGraphAlertLabels } from "./logic/useGraphAlertLabels";
 import { nextStep, previousStep } from "./logic/wizardSteps";
 import { useAutomationStore } from "./state/automationStore";
 import {
-  useConditionRowsInvalid,
   useConditionsSet,
   useConfigComplete,
   useDraft,
+  useHasInvalidConditionRows,
   useSection,
   useWizardStep,
 } from "./state/selectors";
@@ -246,7 +246,7 @@ export function AutomationDrawer({
   const section = useSection();
   const step = useWizardStep();
   const conditionsSet = useConditionsSet();
-  const conditionRowsInvalid = useConditionRowsInvalid();
+  const hasInvalidConditionRows = useHasInvalidConditionRows();
   const configComplete = useConfigComplete();
   const isGraphAlert = draft.source === "customGraph";
   // A schedule keeps the single-pane composer — the wizard authors the two
@@ -257,10 +257,10 @@ export function AutomationDrawer({
   // Single source of truth for every heading / button / toast noun. A schedule
   // is read off the prefill too, so a fresh one never flashes the automation
   // heading before the prefill effect lands.
-  const labels = presetLabels(
-    isReport ? "report" : draft.source,
-    !!automationId,
-  );
+  const labels = presetLabels({
+    source: isReport ? "report" : draft.source,
+    isEdit: !!automationId,
+  });
   // What a saved automation watches never changes — the graph slot is one
   // automation per graph, so the conversion is a create plus a delete, which is
   // exactly what the public API already refuses (ADR-093 §1). A drawer opened
@@ -751,8 +751,11 @@ export function AutomationDrawer({
     const entry = draft.action ? CLIENT_PROVIDERS[draft.action] : undefined;
     const renderOptions =
       entry && isNotifyEntry(entry) && entry.client.previewOptions
-        ? entry.client.previewOptions(draft.slices[draft.action!] as never, {
-            projectSlackIntegrationConnected: slackIntegrationConnected,
+        ? entry.client.previewOptions({
+            slice: draft.slices[draft.action!] as never,
+            context: {
+              projectSlackIntegrationConnected: slackIntegrationConnected,
+            },
           })
         : {};
     void (async () => {
@@ -856,7 +859,7 @@ export function AutomationDrawer({
   const canSave =
     nameSet &&
     conditionsSet &&
-    !conditionRowsInvalid &&
+    !hasInvalidConditionRows &&
     configComplete &&
     !editLoading &&
     !editError;

@@ -163,16 +163,16 @@ function withMinimumRow(conditions: Condition[]): Condition[] {
  * Code mode (which owns raw text) never leaves Save stuck.
  */
 function useInvalidRowSaveGate(conditions: Condition[]) {
-  const setConditionRowsInvalid = useAutomationStore(
-    (s) => s.setConditionRowsInvalid,
+  const setHasInvalidConditionRows = useAutomationStore(
+    (s) => s.setHasInvalidConditionRows,
   );
   const hasInvalidRow = conditions.some(
     (condition) => !attributeFieldRoundTrips(condition),
   );
   useEffect(() => {
-    setConditionRowsInvalid(hasInvalidRow);
-    return () => setConditionRowsInvalid(false);
-  }, [hasInvalidRow, setConditionRowsInvalid]);
+    setHasInvalidConditionRows(hasInvalidRow);
+    return () => setHasInvalidConditionRows(false);
+  }, [hasInvalidRow, setHasInvalidConditionRows]);
 }
 
 export function ConditionBuilder({

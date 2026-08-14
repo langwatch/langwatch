@@ -16,6 +16,7 @@ import {
 import {
   type AutomationDraft,
   cadenceIsSet,
+  isNotifyAction,
   OPERATOR_LABELS,
   TIME_PERIOD_LABELS,
 } from "../logic/draftReducer";
@@ -93,7 +94,11 @@ export function CadenceSection({
         <ReportCadence isEdit={isEdit} />
       ) : (
         <VStack align="stretch" gap={4}>
-          {chooserHostedByChannel ? null : (
+          {/* Notify actions only: a persist action (dataset, annotation
+              queue) always writes per match — the router coerces its cadence
+              to immediate — so offering batch windows would promise behavior
+              the server discards. */}
+          {chooserHostedByChannel || !isNotifyAction(draft) ? null : (
             <ReceiveCadenceField
               value={draft.notificationCadence}
               onChange={(value) => dispatch({ type: "SET_CADENCE", value })}

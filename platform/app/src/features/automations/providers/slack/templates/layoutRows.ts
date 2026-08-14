@@ -15,7 +15,7 @@ export interface LayoutRow {
   option: SlackBlockKitTemplateOption;
   /** Shown, and previewable, but not applicable: the chosen connection can't
    *  render this layout in full. */
-  locked: boolean;
+  isLocked: boolean;
   isDefault: boolean;
   isSelected: boolean;
 }
@@ -43,7 +43,7 @@ export function buildLayoutRows({
 }): LayoutRow[] {
   return templateOptionsFor({ cadence, kind, reportSource }).map((option) => ({
     option,
-    locked: deliveryMethod === "webhook" && !!option.gatedBlock,
+    isLocked: deliveryMethod === "webhook" && !!option.gatedBlock,
     isDefault: option.id === defaultId,
     isSelected: option.source === currentSource,
   }));

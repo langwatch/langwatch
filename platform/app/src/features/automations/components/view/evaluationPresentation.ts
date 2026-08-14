@@ -84,7 +84,7 @@ export function describeEvaluation(
   };
 }
 
-/** "observed 42, threshold is greater than 100 over 1 hour" — the two numbers
+/** "observed 42, fires when greater than 100 over 1 hour" — the two numbers
  *  the reader came for, in the order they think about them. */
 function describeObservation({
   observedValue,

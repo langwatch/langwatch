@@ -46,9 +46,9 @@ describe("buildLayoutRows", () => {
 
       // "Eval failure banner" leads with a gated `alert` block; "Compact
       // notice" leads with an allowlisted one.
-      expect(rowFor(onWebhook, "eval_failure_rich")?.locked).toBe(true);
-      expect(rowFor(onWebhook, "trace_alert_compact")?.locked).toBe(false);
-      expect(rowFor(onBot, "eval_failure_rich")?.locked).toBe(false);
+      expect(rowFor(onWebhook, "eval_failure_rich")?.isLocked).toBe(true);
+      expect(rowFor(onWebhook, "trace_alert_compact")?.isLocked).toBe(false);
+      expect(rowFor(onBot, "eval_failure_rich")?.isLocked).toBe(false);
     });
 
     it("selects the layout whose source the draft carries, and nothing for a custom one", () => {

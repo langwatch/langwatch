@@ -537,11 +537,17 @@ describe("webhookClient Content-Type", () => {
     });
 
     it("rejects a value that is not a media type, where it is typed", () => {
-      renderForm();
+      const onChangeSpy = vi.fn();
+      renderForm({ onChangeSpy });
 
       fireEvent.change(contentTypeInput(), { target: { value: "banana" } });
 
       expect(screen.getByText(/media type/i)).toBeInTheDocument();
+      // Refused, not just flagged: the config reads incomplete, which is
+      // what holds Save and the test fire.
+      expect(
+        webhookClient.isComplete(onChangeSpy.mock.calls.at(-1)![0] as never),
+      ).toBe(false);
     });
   });
 
@@ -568,6 +574,29 @@ describe("webhookClient Content-Type", () => {
       expect(
         screen.queryByRole("button", { name: /reset to default/i }),
       ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when the Content-Type changes under an authored body", () => {
+    it("keeps the author's text instead of clearing it", () => {
+      renderForm({
+        initial: {
+          ...webhookClient.initialSlice(),
+          url: "https://example.com/hooks",
+          template: {
+            value: "custom body {{ trigger.name }}",
+            usingDefault: false,
+          },
+        },
+      });
+
+      fireEvent.change(contentTypeInput(), {
+        target: { value: "text/plain" },
+      });
+
+      // Only the framework default vanishes on a non-JSON type — an authored
+      // body is the author's and survives the switch.
+      expect(bodyTextbox()).toHaveValue("custom body {{ trigger.name }}");
     });
   });
 

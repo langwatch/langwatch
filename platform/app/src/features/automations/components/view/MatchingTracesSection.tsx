@@ -43,7 +43,7 @@ export function MatchingTracesSection({
   /** The automation's trace search query. */
   query: string;
 }) {
-  const [ran, setRan] = useState(false);
+  const [hasRun, setHasRun] = useState(false);
   // Anchored when the reader asks, not on every render: a window that slides
   // under the result would make two glances at the same panel disagree.
   const [timeRange, setTimeRange] = useState(() => {
@@ -61,7 +61,7 @@ export function MatchingTracesSection({
       query,
     },
     {
-      enabled: ran && !!projectId && query.trim().length > 0,
+      enabled: hasRun && !!projectId && query.trim().length > 0,
       retry: false,
       refetchOnWindowFocus: false,
     },
@@ -80,8 +80,9 @@ export function MatchingTracesSection({
           onClick={() => {
             const to = Date.now();
             setTimeRange({ from: to - MATCH_WINDOW_MS, to });
-            setRan(true);
-            if (ran) void matches.refetch();
+            // Re-anchoring the window changes the query key, and the key
+            // change is the refetch — no explicit one needed.
+            setHasRun(true);
           }}
         >
           Run the conditions now

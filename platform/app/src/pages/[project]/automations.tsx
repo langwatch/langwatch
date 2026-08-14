@@ -271,7 +271,10 @@ function AutomationsPage() {
     trigger: EnhancedTrigger;
     active: boolean;
   }) => {
-    const noun = presetLabels(triggerSource(trigger), false).noun;
+    const noun = presetLabels({
+      source: triggerSource(trigger),
+      isEdit: false,
+    }).noun;
     toggleTrigger.mutate(
       { triggerId: trigger.id, active, projectId: project?.id ?? "" },
       {
@@ -308,7 +311,10 @@ function AutomationsPage() {
   };
 
   const deleteTrigger = (trigger: EnhancedTrigger) => {
-    const noun = presetLabels(triggerSource(trigger), false).noun;
+    const noun = presetLabels({
+      source: triggerSource(trigger),
+      isEdit: false,
+    }).noun;
     deleteTriggerMutation.mutate(
       { triggerId: trigger.id, projectId: project?.id ?? "" },
       {
@@ -429,7 +435,10 @@ function AutomationsPage() {
   };
 
   const rowActionsMenu = (trigger: EnhancedTrigger) => {
-    const noun = presetLabels(triggerSource(trigger), false).noun;
+    const noun = presetLabels({
+      source: triggerSource(trigger),
+      isEdit: false,
+    }).noun;
     return (
       <Menu.Root>
         <Menu.Trigger asChild>
@@ -1040,7 +1049,7 @@ function AutomationsPage() {
         }}
         title={
           pendingDelete
-            ? `Delete ${presetLabels(triggerSource(pendingDelete), false).noun}`
+            ? `Delete ${presetLabels({ source: triggerSource(pendingDelete), isEdit: false }).noun}`
             : "Delete"
         }
         message={
@@ -1059,16 +1068,6 @@ function AutomationsPage() {
   );
 }
 
-/**
- * The "Notifies" cell for a Slack automation row. #6244: this used to show
- * "Webhook" (with an empty tooltip) for every Slack row, including
- * bot-token deliveries that never carry a webhook at all. Shared decision
- * with `ViewAutomationDrawer.tsx`'s destination cell via
- * `slackDestinationPresentation`, so the two surfaces can't drift apart
- * again. Extracted out of `actionItems`'s switch (rather than inlined as a
- * branch there) purely to keep that switch's own complexity down — each
- * case stays a single expression.
- */
 /** The subject cell of a trace-filter automation's row: which monitors apply
  *  and the saved search query (or the legacy structured filters). */
 function TraceFilterCell({
@@ -1105,6 +1104,16 @@ function TraceFilterCell({
   );
 }
 
+/**
+ * The "Notifies" cell for a Slack automation row. #6244: this used to show
+ * "Webhook" (with an empty tooltip) for every Slack row, including
+ * bot-token deliveries that never carry a webhook at all. Shared decision
+ * with `ViewAutomationDrawer.tsx`'s destination cell via
+ * `slackDestinationPresentation`, so the two surfaces can't drift apart
+ * again. Extracted out of `actionItems`'s switch (rather than inlined as a
+ * branch there) purely to keep that switch's own complexity down — each
+ * case stays a single expression.
+ */
 function SlackNotifyCell({
   actionParams,
 }: {

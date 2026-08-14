@@ -29,7 +29,12 @@ export class TriggerLatestEvaluationService {
           projectId: input.projectId,
           triggerId: input.triggerId,
           verdict: input.verdict,
-          error: error instanceof Error ? error.message : String(error),
+          // This log is the failure's only trace (record never rethrows), so
+          // it carries the stack, not just the message.
+          error:
+            error instanceof Error
+              ? { message: error.message, stack: error.stack }
+              : String(error),
         },
         "failed to record the alert's latest evaluation — the evaluation itself is unaffected",
       );

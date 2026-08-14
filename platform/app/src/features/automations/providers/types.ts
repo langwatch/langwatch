@@ -166,10 +166,9 @@ export interface NotifyClientDef<S = unknown, TPreview = unknown>
    *  a project with no Slack integration cannot send at all. `context` carries
    *  the project-level facts the slice does not hold. Omit when the provider's
    *  preview needs no delivery-specific options. */
-  previewOptions?(
-    slice: S,
-    context: PreviewDeliveryContext,
-  ): { allowGatedBlocks?: boolean };
+  previewOptions?(params: { slice: S; context: PreviewDeliveryContext }): {
+    allowGatedBlocks?: boolean;
+  };
 }
 
 // ---- Registry entries ---------------------------------------------------

@@ -272,6 +272,7 @@ function ContentTypeRow({
           size="sm"
           flex="2"
           data-testid="webhook-content-type"
+          aria-label="Content-Type value"
           value={slice.contentType}
           placeholder={DEFAULT_WEBHOOK_CONTENT_TYPE}
           onChange={(e) => onChange({ ...slice, contentType: e.target.value })}
@@ -583,7 +584,13 @@ function WebhookConfigForm({
           onTestFire={ctx.onTestFire}
           loading={ctx.testFireLoading}
           disabled={!complete}
-          hint={complete ? undefined : "Add a valid https URL first"}
+          hint={
+            complete
+              ? undefined
+              : validateWebhookUrlShape(slice.url.trim()) !== null
+                ? "Add a valid https URL first"
+                : "Fix the Content-Type header first"
+          }
         />
         <LastTestResult attempt={ctx.lastTestAttempt} />
       </VStack>

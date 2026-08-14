@@ -256,7 +256,8 @@ interface SeriesMetric extends MetricTranslation {
    * Only ever true when the series has a condition — matching the Elasticsearch
    * behaviour this replaces, where the percentage wrapper only existed inside
    * the per-series filter wrapper, so percentage mode on an unfiltered series
-   * was a no-op.
+   * was a no-op. Named without a boolean prefix on purpose: it mirrors the
+   * stored graph contract's own `series.asPercent` field.
    */
   asPercent: boolean;
   /**
@@ -268,7 +269,7 @@ interface SeriesMetric extends MetricTranslation {
    * bucket nothing matched would report a real-looking 0 where the row parser
    * and Elasticsearch both leave the series absent.
    */
-  zeroWhenAbsent: boolean;
+  shouldZeroWhenAbsent: boolean;
 }
 
 /**
@@ -545,13 +546,13 @@ function shapeSeriesExpression({
   alias,
   condition,
   asPercent,
-  zeroWhenAbsent,
+  shouldZeroWhenAbsent,
 }: {
   selectExpression: string;
   alias: string;
   condition: string | null;
   asPercent: boolean;
-  zeroWhenAbsent: boolean;
+  shouldZeroWhenAbsent: boolean;
 }): string {
   if (!condition) return selectExpression;
   const base = stripSelectExpressionAlias(selectExpression, alias);
@@ -563,7 +564,7 @@ function shapeSeriesExpression({
   if (asPercent) {
     return `if(${base} > 0, (${filtered}) / (${base}) * 100, 0) AS ${alias}`;
   }
-  if (zeroWhenAbsent) return `${filtered} AS ${alias}`;
+  if (shouldZeroWhenAbsent) return `${filtered} AS ${alias}`;
   return `if(countIf(${condition}) > 0, ${filtered}, NULL) AS ${alias}`;
 }
 
@@ -1186,7 +1187,7 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
         ? seriesConditionColumnName(i)
         : null,
       asPercent: series.asPercent === true && seriesCondition !== null,
-      zeroWhenAbsent: isZeroWhenAbsentSeries(series),
+      shouldZeroWhenAbsent: isZeroWhenAbsentSeries(series),
     });
     for (const join of translation.requiredJoins) {
       allJoins.add(join);
@@ -1430,7 +1431,7 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
         alias: metric.alias,
         condition: metric.seriesCondition,
         asPercent: metric.asPercent,
-        zeroWhenAbsent: metric.zeroWhenAbsent,
+        shouldZeroWhenAbsent: metric.shouldZeroWhenAbsent,
       }),
     );
   }
@@ -1590,7 +1591,7 @@ function buildMixedEvalTimeseriesQuery({
         alias: quoteIdentifier(metric.alias),
         condition: metric.seriesConditionColumn,
         asPercent: metric.asPercent,
-        zeroWhenAbsent: metric.zeroWhenAbsent,
+        shouldZeroWhenAbsent: metric.shouldZeroWhenAbsent,
       }),
     );
   };
@@ -1967,7 +1968,7 @@ function buildArrayJoinTimeseriesQuery({
         seriesCondition: translation.seriesCondition,
         seriesConditionColumn: translation.seriesConditionColumn,
         asPercent: translation.asPercent,
-        zeroWhenAbsent: translation.zeroWhenAbsent,
+        shouldZeroWhenAbsent: translation.shouldZeroWhenAbsent,
       });
     }
   }
@@ -2181,7 +2182,7 @@ function buildArrayJoinTimeseriesQuery({
           alias: quoteIdentifier(metric.alias),
           condition: metric.seriesConditionColumn,
           asPercent: metric.asPercent,
-          zeroWhenAbsent: metric.zeroWhenAbsent,
+          shouldZeroWhenAbsent: metric.shouldZeroWhenAbsent,
         }),
       );
       continue;
@@ -2199,7 +2200,7 @@ function buildArrayJoinTimeseriesQuery({
         alias: metric.alias,
         condition: metric.seriesConditionColumn,
         asPercent: metric.asPercent,
-        zeroWhenAbsent: metric.zeroWhenAbsent,
+        shouldZeroWhenAbsent: metric.shouldZeroWhenAbsent,
       }),
     );
   }
@@ -2584,7 +2585,7 @@ function buildSubqueryTimeseriesQuery(
       alias: metric.alias,
       condition: metric.seriesCondition,
       asPercent: metric.asPercent,
-      zeroWhenAbsent: metric.zeroWhenAbsent,
+      shouldZeroWhenAbsent: metric.shouldZeroWhenAbsent,
     });
     simpleSelectExprs.push(
       shaped.replace(` AS ${metric.alias}`, ` AS ${quotedAlias}`),
@@ -2822,7 +2823,7 @@ function buildDateBucketedPipelineQuery({
           alias: m.alias,
           condition: m.seriesCondition,
           asPercent: m.asPercent,
-          zeroWhenAbsent: m.zeroWhenAbsent,
+          shouldZeroWhenAbsent: m.shouldZeroWhenAbsent,
         });
         return shaped.replace(` AS ${m.alias}`, ` AS ${quotedAlias}`);
       }),

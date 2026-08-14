@@ -37,6 +37,7 @@ export const fakeQuery = (data: unknown, options?: { enabled?: boolean }) => {
 export const GRAPH_ALERT_ROW = {
   id: "trigger_1",
   name: "p95 latency alert",
+  active: true,
   action: "SEND_SLACK_MESSAGE",
   customGraphId: "graph_1",
   filters: "{}",
@@ -53,6 +54,7 @@ export const GRAPH_ALERT_ROW = {
 export const TRACE_AUTOMATION_ROW = {
   id: "trigger_1",
   name: "Errors to Slack",
+  active: true,
   action: "SEND_SLACK_MESSAGE",
   customGraphId: null,
   filters: "{}",

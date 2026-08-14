@@ -41,7 +41,7 @@ import {
   FieldHeader,
   LiquidEditor,
 } from "~/features/automations/editors/templateAuthoring";
-import { confirmSwitchToProjectIntegration } from "~/features/automations/logic/slackLegacyTokenCopy";
+import { useSwitchToProjectIntegration } from "~/features/automations/logic/useSwitchToProjectIntegration";
 import { describeError } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -597,10 +597,13 @@ function templatesFromSlice(slice: SlackSlice) {
  * the gate keys off token availability, not off the delivery method alone: the
  * automation's own token, or the project's Slack integration behind it.
  */
-function previewOptions(
-  slice: SlackSlice,
-  context: PreviewDeliveryContext,
-): { allowGatedBlocks: boolean } {
+function previewOptions({
+  slice,
+  context,
+}: {
+  slice: SlackSlice;
+  context: PreviewDeliveryContext;
+}): { allowGatedBlocks: boolean } {
   return {
     allowGatedBlocks:
       slice.deliveryMethod === "bot" &&
@@ -1032,19 +1035,13 @@ function OwnTokenNotice({
   workspaceName: string | null;
   onSwitched: () => void;
 }) {
-  const [confirming, setConfirming] = useState(false);
   const { hasPermission } = useOrganizationTeamProject();
-  const utils = api.useContext();
-  const switchOver = api.slackIntegration.switchToIntegration.useMutation({
-    onSuccess: () => {
-      setConfirming(false);
-      onSwitched();
-      void utils.slackIntegration.getLegacyTokenCensus.invalidate({
-        projectId,
-      });
-    },
+  const switchOver = useSwitchToProjectIntegration({
+    projectId,
+    automationId,
+    workspaceName,
+    onSwitched,
   });
-  const confirmation = confirmSwitchToProjectIntegration({ workspaceName });
   const canSwitch =
     !!workspaceName && !!automationId && hasPermission("project:update");
 
@@ -1080,7 +1077,7 @@ function OwnTokenNotice({
               variant="outline"
               alignSelf="flex-start"
               loading={switchOver.isPending}
-              onClick={() => setConfirming(true)}
+              onClick={() => switchOver.setIsConfirming(true)}
             >
               Use the project integration
             </Button>
@@ -1091,18 +1088,14 @@ function OwnTokenNotice({
         </HStack>
       </VStack>
       <ConfirmDialog
-        open={confirming}
-        onOpenChange={setConfirming}
-        title={confirmation.title}
-        message={confirmation.message}
-        confirmLabel={confirmation.confirmLabel}
+        open={switchOver.isConfirming}
+        onOpenChange={switchOver.setIsConfirming}
+        title={switchOver.confirmation.title}
+        message={switchOver.confirmation.message}
+        confirmLabel={switchOver.confirmation.confirmLabel}
         tone="danger"
         loading={switchOver.isPending}
-        onConfirm={() => {
-          if (automationId) {
-            switchOver.mutate({ projectId, automationIds: [automationId] });
-          }
-        }}
+        onConfirm={switchOver.confirmSwitch}
       />
     </Box>
   );

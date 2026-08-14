@@ -9,7 +9,7 @@ interface Props {
 }
 
 export function TemplateLayoutDetail({ row, id }: Props) {
-  const { option, locked, isDefault } = row;
+  const { option, isLocked, isDefault } = row;
   const { Wireframe } = option;
   return (
     <Stack
@@ -50,7 +50,7 @@ export function TemplateLayoutDetail({ row, id }: Props) {
         <Badge size="xs" variant="surface">
           {option.deliveryNote}
         </Badge>
-        {locked ? (
+        {isLocked ? (
           <Badge size="xs" variant="subtle" colorPalette="gray">
             {GATED_NOTE}
           </Badge>

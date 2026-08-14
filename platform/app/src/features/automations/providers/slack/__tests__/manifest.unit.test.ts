@@ -32,7 +32,11 @@ describe("Slack app manifest", () => {
           "channels:read",
           "groups:read",
         ]) {
-          expect(SLACK_APP_MANIFEST).toContain(scope);
+          // Anchored as a whole list item: a bare substring check on
+          // "chat:write" could never fail while "chat:write.public" exists.
+          expect(SLACK_APP_MANIFEST).toMatch(
+            new RegExp(`-\\s+${scope.replace(/\\./g, "\\\\.")}\\s*$`, "m"),
+          );
         }
       });
     });

@@ -648,16 +648,19 @@ async function runGraphTriggerEvaluation({
       const slackParams = (trigger.actionParams ?? {}) as SlackActionParams;
       if (slackDeliveryMethodOf(slackParams) === "bot") {
         // ADR-093 §5: the automation's own token wins; the project's Slack
-        // integration serves the rest.
-        const ownToken = decryptSlackBotToken(slackParams);
+        // integration serves the rest. The wired resolver owns the whole
+        // decision, so the row's own token is only decrypted on the fallback
+        // path that actually reads it.
+        const ownTokenFallback = (): ResolvedSlackToken | null => {
+          const ownToken = decryptSlackBotToken(slackParams);
+          return ownToken ? { token: ownToken, source: "automation" } : null;
+        };
         const resolved: ResolvedSlackToken | null = deps.resolveSlackToken
           ? await deps.resolveSlackToken({
               projectId,
               actionParams: slackParams,
             })
-          : ownToken
-            ? { token: ownToken, source: "automation" }
-            : null;
+          : ownTokenFallback();
         if (!resolved) {
           throw slackTokenMissingDispatchError({ triggerName: trigger.name });
         }
