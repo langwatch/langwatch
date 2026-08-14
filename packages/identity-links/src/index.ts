@@ -1,4 +1,13 @@
 export {
+  ACTOR_KINDS,
+  type ActorKind,
+  DEFAULT_ACTOR_KIND,
+  isActorKind,
+  OCSF_USER_TYPE_ID_BY_ACTOR_KIND,
+  ocsfActorType,
+  toActorKind,
+} from "./actor-kind";
+export {
   EMAIL_EXTERNAL_KINDS,
   EXTERNAL_KINDS_BY_PROVIDER,
   type ExternalKind,

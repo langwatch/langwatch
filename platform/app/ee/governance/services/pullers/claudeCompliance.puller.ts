@@ -48,6 +48,21 @@ export const CLAUDE_COMPLIANCE_PULL_CONFIG: HttpPollingConfig = {
     source_event_id: "$.id",
     event_timestamp: "$.created_at",
     actor: "$.actor.email",
+    // Anthropic's `member_id` namespace. The email is kept as the display
+    // value, but it is not the join key: emails get recycled, which is the
+    // failure this ADR exists to avoid in a money report.
+    actor_id: "$.actor.id",
+    // Anthropic names the principal type outright, so this is a value table
+    // rather than a presence check. Anything it does not list — including a
+    // type Anthropic adds later — is a person, and therefore a linkable row
+    // rather than one hidden as unattributable.
+    actor_kind: {
+      path: "$.actor.type",
+      byValue: {
+        api_key: "service_principal",
+        service_account: "service_principal",
+      },
+    },
     action: "$.event_type",
     target: "$.model",
     cost_usd: "$.usage.cost_usd",

@@ -37,6 +37,7 @@
  *
  * Spec: specs/ai-governance/puller-framework/puller-adapter-contract.feature
  */
+import { ACTOR_KINDS, DEFAULT_ACTOR_KIND } from "@langwatch/identity-links";
 import { z } from "zod";
 
 /**
@@ -76,6 +77,21 @@ export const normalizedPullEventSchema = z.object({
   event_timestamp: z.string(),
   /** User-identifying string (typically email). Empty string if unknown. */
   actor: z.string(),
+  /**
+   * The PROVIDER's own id for the actor — the join key a cost report matches
+   * against the link list (ADR-094). Not our user id, and not an email: it
+   * must come from the same id namespace as one of that provider's declared
+   * `externalKind`s, or the join silently never matches. Empty string when the
+   * provider does not expose one.
+   */
+  actor_id: z.string().default(""),
+  /**
+   * Which kind of principal acted, declared here at ingest from provider
+   * metadata (ADR-094 Decision 5). `person` when the provider says nothing:
+   * an unmarked person is a fixable "unattributed" row, an unmarked bot would
+   * hide a fixable row behind "can never resolve".
+   */
+  actor_kind: z.enum(ACTOR_KINDS).default(DEFAULT_ACTOR_KIND),
   /** Verb describing what happened (e.g. "completion", "tool_call"). */
   action: z.string(),
   /** Target of the action (e.g. model name, tool name, document id). */

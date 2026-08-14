@@ -131,6 +131,8 @@ When your identity provider **suspends** a user (`PATCH active: false`):
 
 <Info>
   Suspending and deleting act on the user's membership of **this** organization. A person who belongs to more than one organization keeps their account and their access everywhere else; only when their last active membership ends is the account itself deactivated.
+
+  The `active` attribute we return follows the same rule: it reports whether the user is active in the organization your SCIM token is scoped to, not whether their LangWatch account exists. A user suspended here reads back as `active: false` even though they are still working in another organization.
 </Info>
 
 Re-activating restores access, but it does **not** restore usage-attribution links —
