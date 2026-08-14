@@ -48,9 +48,29 @@ func TestAllocateRedisDBProbesPastTakenDatabases(t *testing.T) {
 		if other, clash := seen[db]; clash {
 			t.Fatalf("%q got db %d, already held by %q", slug, db, other)
 		}
+		// Uniqueness alone would also pass for an allocator that picked any
+		// free database. The contract is narrower: probe upward from the
+		// slug's own preferred index, so a stack's database stays a function
+		// of its slug plus whoever got there first.
+		if want := nextFreeFrom(RedisDBForSlug(slug), taken); db != want {
+			t.Fatalf("%q: want the next free db %d from preferred %d, got %d",
+				slug, want, RedisDBForSlug(slug), db)
+		}
 		seen[db] = slug
 		taken[db] = true
 	}
+}
+
+// nextFreeFrom mirrors the documented probe order independently of the
+// implementation: the first unheld database at or after `preferred`, wrapping.
+func nextFreeFrom(preferred int, taken map[int]bool) int {
+	for offset := range RedisDBCount {
+		candidate := (preferred + offset) % RedisDBCount
+		if !taken[candidate] {
+			return candidate
+		}
+	}
+	return preferred
 }
 
 func TestAllocateRedisDBReportsWhenNoneAreFree(t *testing.T) {
@@ -64,8 +84,13 @@ func TestAllocateRedisDBReportsWhenNoneAreFree(t *testing.T) {
 		t.Fatal("expected exclusive=false when every database is held")
 	}
 	// Still returns a usable index rather than a sentinel: the caller warns
-	// and carries on, it does not refuse to start.
+	// and carries on, it does not refuse to start. Which index matters — it
+	// falls back to the slug's preferred one, so a stack forced to share keeps
+	// the database it would have had, rather than landing somewhere arbitrary.
 	if db < 0 || db >= RedisDBCount {
 		t.Fatalf("db %d out of range", db)
+	}
+	if want := RedisDBForSlug("scenario-child-startup"); db != want {
+		t.Fatalf("want the preferred db %d when all are held, got %d", want, db)
 	}
 }

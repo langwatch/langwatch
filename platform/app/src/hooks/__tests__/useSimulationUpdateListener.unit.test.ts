@@ -270,25 +270,23 @@ describe("useSimulationUpdateListener()", () => {
         }),
       );
 
-      // Event fires while hidden — deferred, not run
       act(() => {
         simulateSSEEvent({ event: "simulation_updated" });
       });
       expect(refetchSpy).not.toHaveBeenCalled();
 
-      // Advance past the debounce window so next event can fire immediately
+      // Past the debounce window, so the later event is free to fire at once
+      // and the count below can only come from the flush.
       act(() => {
         vi.advanceTimersByTime(600);
       });
 
-      // Tab becomes visible again, which flushes what was deferred.
       mockIsVisible = true;
       act(() => {
         rerender();
       });
       expect(refetchSpy).toHaveBeenCalledTimes(1);
 
-      // And a later event still fires normally on top of that flush.
       act(() => {
         simulateSSEEvent({ event: "simulation_updated" });
       });
@@ -579,6 +577,46 @@ describe("useSimulationUpdateListener()", () => {
       expect(updater(undefined)).toBeUndefined();
     });
 
+    it("withholds the stamp while the refetch is still in flight", async () => {
+      // The test above cannot see the ordering it is named for: its invalidate
+      // mock resolves immediately, so stamping before the refetch would pass it
+      // just as well. Holding the promise open is what makes the order
+      // observable — and the order is the fix, since a stamp applied first
+      // would be overwritten by the refetch's own pre-terminal response.
+      let settleRefetch: (() => void) | undefined;
+      mockInvalidateRunState.mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            settleRefetch = resolve;
+          }),
+      );
+
+      renderHook(() =>
+        useSimulationUpdateListener({
+          projectId: "proj_1",
+          refetch: refetchSpy,
+        }),
+      );
+
+      await act(async () => {
+        simulateSSEEvent({
+          event: "simulation_updated",
+          scenarioRunId: "run_1",
+          status: "SUCCESS",
+        });
+        await vi.runAllTimersAsync();
+      });
+
+      expect(mockSetRunStateData).not.toHaveBeenCalled();
+
+      await act(async () => {
+        settleRefetch?.();
+        await vi.runAllTimersAsync();
+      });
+
+      expect(mockSetRunStateData).toHaveBeenCalledTimes(1);
+    });
+
     it("does not stamp anything for a non-terminal update", async () => {
       renderHook(() =>
         useSimulationUpdateListener({
@@ -614,7 +652,6 @@ describe("useSimulationUpdateListener()", () => {
         simulateSSEEvent({ event: "simulation_updated" });
       });
 
-      // Nothing yet — the tab is hidden.
       expect(refetchSpy).not.toHaveBeenCalled();
 
       mockIsVisible = true;

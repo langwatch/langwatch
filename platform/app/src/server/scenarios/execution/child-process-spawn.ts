@@ -28,9 +28,10 @@ export interface SpawnConfig {
 /**
  * Resolves the spawn command and args for the scenario child process.
  *
- * Production always uses the pre-compiled bundle. Every other value
- * (development, test, staging, undefined) uses it too while it is newer than
- * the child's sources, and tsx otherwise.
+ * Production uses the pre-compiled bundle whenever it is present, and falls
+ * back to tsx after logging remediation when it is not. Every other value
+ * (development, test, staging, undefined) uses the bundle too while it is
+ * newer than the child's sources, and tsx otherwise.
  *
  * @param packageRoot - Absolute path to the langwatch package root
  * @param nodeEnv - Current NODE_ENV value
@@ -107,7 +108,14 @@ function isBundleCurrent({
   }
 }
 
-/** Depth-first scan that stops at the first file newer than `thresholdMs`. */
+/**
+ * Whether any child source is newer than `thresholdMs`.
+ *
+ * The answer is a single boolean, so the scan stops at the first match rather
+ * than costing a full stat of the execution tree on every spawn — this runs on
+ * the path between a run being queued and its child starting. `__tests__` is
+ * skipped because editing a test never changes what the bundle would contain.
+ */
 function hasFileNewerThan(dir: string, thresholdMs: number): boolean {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     if (entry.name === "__tests__") continue;

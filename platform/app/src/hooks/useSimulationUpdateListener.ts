@@ -69,7 +69,14 @@ export function useSimulationUpdateListener({
 }: UseSimulationUpdateListenerOptions) {
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastFireRef = useRef<number>(0);
-  /** An update arrived while the tab was hidden; flush it on return. */
+  /**
+   * At least one update arrived while the tab was hidden.
+   *
+   * A boolean is enough because the flush refetches current state rather than
+   * replaying events: whether one update or fifty were missed, the work to
+   * catch up is the same single refresh, so there is nothing to count or
+   * queue.
+   */
   const missedWhileHiddenRef = useRef(false);
   const isVisible = usePageVisibility();
   const trpcUtils = api.useUtils();
@@ -132,7 +139,13 @@ export function useSimulationUpdateListener({
    * non-terminal cached value, so a settled read is never downgraded.
    */
   const applyRunUpdate = useCallback(
-    async (scenarioRunId: string, status: string | undefined) => {
+    async ({
+      scenarioRunId,
+      status,
+    }: {
+      scenarioRunId: string;
+      status: string | undefined;
+    }) => {
       await trpcUtils.scenarios.getRunState.invalidate({ scenarioRunId });
 
       if (!status || !isTerminalStatus(status as ScenarioRunStatus)) return;
@@ -240,7 +253,10 @@ export function useSimulationUpdateListener({
             // Selective invalidation: only the affected card refetches,
             // not all N cards like the old blanket invalidation did.
             if (payload.scenarioRunId) {
-              void applyRunUpdate(payload.scenarioRunId, payload.status);
+              void applyRunUpdate({
+                scenarioRunId: payload.scenarioRunId,
+                status: payload.status,
+              });
             }
 
             scheduleUpdate();

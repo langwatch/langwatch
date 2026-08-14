@@ -543,6 +543,22 @@ describe("simulationRunStateFoldProjection", () => {
       expect(state.DurationMs).toBeNull();
     });
 
+    it("leaves DurationMs null when the finish event precedes the start", () => {
+      // Events can arrive out of order. Subtracting these two timestamps would
+      // report a negative duration, so the derivation declines instead.
+      const state = foldEvents([
+        createRunStartedEvent({}, { occurredAt: 4000 }),
+        createRunFinishedEvent(
+          {
+            results: { verdict: "success", metCriteria: [], unmetCriteria: [] },
+          },
+          { occurredAt: 3000 },
+        ),
+      ]);
+
+      expect(state.DurationMs).toBeNull();
+    });
+
     it("sets FAILURE status for failure verdict", () => {
       const state = foldEvents([
         createRunStartedEvent(),
