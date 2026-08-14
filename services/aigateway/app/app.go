@@ -176,7 +176,22 @@ func (a *App) ListModels(ctx context.Context, bundle *domain.Bundle) ([]domain.M
 		models = append(models, m)
 	}
 
+	// Built once: the predicate reports an unreadable pattern when it is
+	// compiled, and an operator wants that said once per listing, not once
+	// per pass over the models.
+	//
+	// An alias is judged on what it resolves to, both here and at dispatch.
+	// Its own name is not a model, so the pass at the end cannot do it:
+	// that runs on the listed id, which for an alias is the alias name.
+	allowedByPolicy := modelPolicyFilter(cfg.PolicyRules, a.logger)
 	for name, alias := range cfg.ModelAliases {
+		target := domain.Model{ID: alias.Model, ProviderID: alias.ProviderID}
+		if !cfg.AllowsResolvedModel(alias.ProviderID, alias.Model) {
+			continue
+		}
+		if !allowedByPolicy(target) {
+			continue
+		}
 		add(domain.Model{ID: name, Name: name, ProviderID: alias.ProviderID})
 	}
 
@@ -216,7 +231,7 @@ func (a *App) ListModels(ctx context.Context, bundle *domain.Bundle) ([]domain.M
 		gaps = discoveredGaps
 	}
 
-	models = filterModelsByPolicy(models, cfg.PolicyRules, a.logger)
+	models = keepModels(models, allowedByPolicy)
 	sort.Slice(models, func(i, j int) bool { return models[i].ID < models[j].ID })
 	return models, gaps, nil
 }
@@ -236,7 +251,10 @@ func (a *App) addDiscovered(ctx context.Context, bundle *domain.Bundle, cfg doma
 		return nil, err
 	}
 	for _, m := range discovered {
-		if !cfg.AllowsModel(m.ID) {
+		// Both spellings, as dispatch judges them: an operator who allowed
+		// "openai/gpt-5-mini" allowed a model the catalog reports as
+		// "gpt-5-mini", and omitting it here would hide a model POST serves.
+		if !cfg.AllowsResolvedModel(m.ProviderID, m.ID) {
 			continue
 		}
 		add(m)
@@ -261,7 +279,7 @@ func soleCredentialProviderID(creds []domain.Credential) domain.ProviderID {
 	return providerID
 }
 
-// filterModelsByPolicy mirrors dispatch-time model policy: models matching
+// Mirrors dispatch-time model policy: models matching
 // a deny rule are dropped, and when any allow rule targets models, only
 // models matching one survive (the policy matcher rejects the rest with
 // "is not in allowlist"). Invalid patterns are skipped (not failed
@@ -270,8 +288,45 @@ func soleCredentialProviderID(creds []domain.Credential) domain.ProviderID {
 // still reject a request against a listed model if its pattern is bad.
 // The skip is logged so a typo'd rule doesn't silently fail to hide a
 // model from the list without a trace anywhere.
-func filterModelsByPolicy(models []domain.Model, rules []domain.PolicyRule, logger *zap.Logger) []domain.Model {
-	var deny, allow []*regexp.Regexp
+func keepModels(models []domain.Model, keep func(domain.Model) bool) []domain.Model {
+	kept := models[:0]
+	for _, m := range models {
+		if keep(m) {
+			kept = append(kept, m)
+		}
+	}
+	return kept
+}
+
+// modelPolicyFilter builds the "may this model be listed" predicate, so the
+// alias loop can apply it to a resolved target while the pass at the end
+// applies it to the listed id.
+func modelPolicyFilter(rules []domain.PolicyRule, logger *zap.Logger) func(domain.Model) bool {
+	deny, allow := compileModelRules(rules, logger)
+	if len(deny) == 0 && len(allow) == 0 {
+		return func(domain.Model) bool { return true }
+	}
+	return func(m domain.Model) bool {
+		// Every spelling of the model, the same set CheckModel judges at
+		// dispatch, so a rule written "openai/gpt-4.*" hides the same
+		// models it refuses.
+		spellings := domain.ModelSpellings(m.ProviderID, m.ID)
+		if matchesAnyPattern(deny, spellings) {
+			return false
+		}
+		return len(allow) == 0 || matchesAnyPattern(allow, spellings)
+	}
+}
+
+// compileModelRules compiles the model rules, skipping any pattern that will
+// not compile. Skipped rather than failed closed, unlike dispatch: the list is
+// discovery, and dispatch stays the authority that would refuse a request
+// against a listed model whose rule is broken. The skip is logged so a typo
+// does not silently stop hiding a model with no trace anywhere.
+func compileModelRules(
+	rules []domain.PolicyRule,
+	logger *zap.Logger,
+) (deny, allow []*regexp.Regexp) {
 	for _, r := range rules {
 		if r.Target != domain.PolicyTargetModel {
 			continue
@@ -291,26 +346,16 @@ func filterModelsByPolicy(models []domain.Model, rules []domain.PolicyRule, logg
 			allow = append(allow, re)
 		}
 	}
-	if len(deny) == 0 && len(allow) == 0 {
-		return models
-	}
-	matchesAny := func(id string, patterns []*regexp.Regexp) bool {
-		for _, re := range patterns {
-			if re.MatchString(id) {
+	return deny, allow
+}
+
+func matchesAnyPattern(patterns []*regexp.Regexp, candidates []string) bool {
+	for _, re := range patterns {
+		for _, candidate := range candidates {
+			if re.MatchString(candidate) {
 				return true
 			}
 		}
-		return false
 	}
-	kept := models[:0]
-	for _, m := range models {
-		if matchesAny(m.ID, deny) {
-			continue
-		}
-		if len(allow) > 0 && !matchesAny(m.ID, allow) {
-			continue
-		}
-		kept = append(kept, m)
-	}
-	return kept
+	return false
 }
