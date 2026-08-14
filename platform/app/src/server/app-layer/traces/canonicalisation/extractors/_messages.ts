@@ -2,8 +2,13 @@
  * Message Normalization & System Instruction Extraction
  */
 
-import { safeStringify } from "./_geminiContent";
-import { isMessageLike, isRecord, type MessageLike } from "./_guards";
+import {
+  isMessageLike,
+  isRecord,
+  isUnknownArray,
+  safeStringify,
+  type MessageLike,
+} from "./_guards";
 import { isReplyTextPart } from "./_parts";
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -80,7 +85,7 @@ const extractTextsFromParts = (parts: unknown[]): string[] => {
       } else if (p.type === "tool_use" && p.input != null) {
         const s = safeStringify(p.input);
         if (s !== null) texts.push(s);
-      } else if (p.type === "tool_result" && Array.isArray(p.content)) {
+      } else if (p.type === "tool_result" && isUnknownArray(p.content)) {
         const inner = extractTextsFromParts(p.content);
         if (inner.length > 0) texts.push(inner.join("\n"));
       } else if (isRecord(p.toolUse) && p.toolUse.input != null) {
@@ -88,7 +93,7 @@ const extractTextsFromParts = (parts: unknown[]): string[] => {
         if (s !== null) texts.push(s);
       } else if (
         isRecord(p.toolResult) &&
-        Array.isArray(p.toolResult.content)
+        isUnknownArray(p.toolResult.content)
       ) {
         // Converse tool-result content is a union; we handle the {text} and
         // {json} variants and ignore the rest (document, image, video,
