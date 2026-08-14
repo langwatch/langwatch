@@ -10,6 +10,8 @@ import {
   decryptWebhookHeaders,
   type WebhookStoredActionParams,
 } from "~/server/app-layer/automations/providers/webhook/server";
+import { PrismaTriggerRepository } from "~/server/app-layer/automations/repositories/trigger.prisma.repository";
+import { TriggerService } from "~/server/app-layer/automations/trigger.service";
 import { REDACTED_CREDENTIAL } from "~/server/app-layer/automations/trigger-redaction";
 import { prisma } from "~/server/db";
 import { decrypt, encrypt } from "~/utils/encryption";
@@ -22,11 +24,15 @@ import {
   WEBHOOK_SIGNING_SECRET,
 } from "./trigger-redaction-fixture";
 
-// The route invalidates the active-triggers cache after a successful write.
-// That is the only thing it needs the app layer for, and booting the whole app
-// to no-op one cache drop would buy nothing this suite asserts.
+// The route reads and writes through the app layer's trigger service. Wiring
+// that service over the real repository is what keeps this suite about the
+// route's own rules rather than about booting every other slice of the app.
 vi.mock("~/server/app-layer/app", () => ({
-  getApp: () => ({ triggers: { invalidate: async () => {} } }),
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
+  getApp: () => ({
+    triggers: new TriggerService(new PrismaTriggerRepository(prisma)),
+  }),
 }));
 
 import { app } from "../[[...route]]/app";

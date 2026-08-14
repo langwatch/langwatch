@@ -167,7 +167,6 @@ function GraphSubject({ prefilledGraphId }: { prefilledGraphId?: string }) {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
   const draft = useDraft();
-  const dispatch = useAutomationStore((s) => s.dispatch);
   const isPrefilled = !!prefilledGraphId;
 
   const graphs = api.graphs.getAll.useQuery(
