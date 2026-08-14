@@ -111,14 +111,26 @@ function blendedCostPerToken(entry: LLMModelEntry): number | null {
   const input = pricing.inputCostPerToken ?? 0;
   const output = pricing.outputCostPerToken ?? 0;
   // A zero or negative rate is the catalog saying it does not know, not that
-  // the model is free.
-  if (input <= 0 && output <= 0) return null;
+  // the model is free, and either half missing is enough to make the blend a
+  // fiction: an unknown input rate read as zero prices a model at a quarter
+  // of its output rate, which sorts it to the front of the cheapest tier.
+  if (input <= 0 || output <= 0) return null;
   return input * 0.75 + output * 0.25;
+}
+
+/**
+ * Whether the catalog prices a model well enough to rank it, and so whether
+ * it can be offered at all. Exported because it is the rule two tiers sort
+ * by from opposite ends, and the models that break it are ones the shipped
+ * catalog does not currently contain.
+ */
+export function isRankableByPrice(entry: LLMModelEntry): boolean {
+  return blendedCostPerToken(entry) !== null;
 }
 
 /** Models the catalog can price, which is the only set worth ranking. */
 function pricedCandidates(candidates: LLMModelEntry[]): LLMModelEntry[] {
-  return candidates.filter((entry) => blendedCostPerToken(entry) !== null);
+  return candidates.filter(isRankableByPrice);
 }
 
 /** Blended cost for a model already known to be priced. */

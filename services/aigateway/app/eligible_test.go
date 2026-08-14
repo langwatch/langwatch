@@ -79,14 +79,6 @@ func TestEligibleCredentials(t *testing.T) {
 			wantUnreachable: domain.ProviderBedrock,
 		},
 		{
-			// The inference is a guess from a short prefix table, so it keeps
-			// the whole chain rather than refusing a request the key could
-			// have served.
-			name:     "an inferred provider the key cannot reach leaves the chain untouched",
-			resolved: &domain.ResolvedModel{ProviderID: "", ModelID: "claude-3-5-sonnet"},
-			wantIDs:  []string{"anthropic_1", "anthropic_2"},
-		},
-		{
 			name:     "nil resolved leaves chain untouched",
 			resolved: nil,
 			wantIDs:  []string{"anthropic_1", "openai_1", "gemini_1", "anthropic_2"},
@@ -149,4 +141,28 @@ func equalSlices(a, b []string) bool {
 		}
 	}
 	return true
+}
+
+// The inference is a guess from a short prefix table, so a model name it
+// cannot match to any credential the key holds keeps the whole chain rather
+// than refusing a request the key could have served. The table-driven cases
+// above all run against a chain that HOLDS every provider they name, so none
+// of them reaches this branch.
+func TestEligibleCredentialsInferredProviderTheKeyCannotReach(t *testing.T) {
+	creds := []domain.Credential{
+		{ID: "openai_1", ProviderID: domain.ProviderOpenAI},
+		{ID: "gemini_1", ProviderID: domain.ProviderGemini},
+	}
+
+	got, unreachable := eligibleCredentials(creds, &domain.ResolvedModel{
+		ProviderID: "",
+		ModelID:    "claude-3-5-sonnet",
+	})
+
+	if unreachable != "" {
+		t.Errorf("an inferred provider must not refuse, got %q", unreachable)
+	}
+	if len(got) != len(creds) {
+		t.Errorf("got %d creds, want the untouched chain of %d", len(got), len(creds))
+	}
 }

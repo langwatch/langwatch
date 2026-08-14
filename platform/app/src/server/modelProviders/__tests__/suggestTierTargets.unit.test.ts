@@ -8,8 +8,11 @@
 import { describe, expect, it } from "vitest";
 
 import { MODEL_TIERS } from "~/utils/modelTierPresets";
+import { resolveLatestAlias } from "../latestAliases";
+import type { LLMModelEntry } from "../llmModels.types";
 import {
   isKnownModelId,
+  isRankableByPrice,
   partitionTierAliases,
   suggestTierTargets,
 } from "../suggestTierTargets";
@@ -66,10 +69,45 @@ describe("given the models the catalog cannot rank", () => {
     }
   });
 
-  it("leads the most capable tier with a real flagship", () => {
+  it("refuses to rank a model the catalog prices on one side only", () => {
+    // The shipped catalog has no such entry today, so the real-catalog tests
+    // above cannot reach this. A missing input rate read as zero prices a
+    // model at a quarter of its output rate, which sorts it to the front of
+    // the cheapest tier: exactly the wrong end.
+    const priced = (input: number, output: number): LLMModelEntry =>
+      ({
+        id: "acme/model",
+        name: "ACME model",
+        provider: "acme",
+        mode: "chat",
+        modality: "text->text",
+        pricing: { inputCostPerToken: input, outputCostPerToken: output },
+      }) as LLMModelEntry;
+
+    expect(isRankableByPrice(priced(1e-6, 2e-6))).toBe(true);
+    expect(isRankableByPrice(priced(0, 2e-6))).toBe(false);
+    expect(isRankableByPrice(priced(1e-6, 0))).toBe(false);
+    expect(isRankableByPrice(priced(0, 0))).toBe(false);
+  });
+
+  it("leads the most capable tier with the newest flagship", () => {
+    // Naming a provider is not enough: the point of leading with the
+    // latest-alias resolution is that a tier and a role default pre-fill with
+    // the same model, so the assertion is that exact id.
+    const flagship = resolveLatestAlias("openai/latest");
+    expect(flagship).toBeTruthy();
+
     const top = suggestTierTargets({ tier: "complex" })[0]!;
     expect(top.recommended).toBe(true);
-    expect(["openai", "anthropic", "gemini"]).toContain(top.provider);
+    expect(top.modelId).toBe(flagship);
+  });
+
+  it("leads the quick tier with the newest small model", () => {
+    const mini = resolveLatestAlias("openai/latest-mini");
+    expect(mini).toBeTruthy();
+
+    const top = suggestTierTargets({ tier: "fast" })[0]!;
+    expect(top.modelId).toBe(mini);
   });
 });
 

@@ -34,7 +34,8 @@
  *   DATABASE_URL=postgres://... pnpm tsx scripts/report-routing-policy-dead-fields.ts --json
  *   DATABASE_URL=postgres://... pnpm tsx scripts/report-routing-policy-dead-fields.ts --emit-sql
  */
-import { Prisma, PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "~/generated/prisma/client";
+import { createPrismaPgAdapter } from "~/server/prismaPgAdapter";
 
 const USAGE = [
   "usage: pnpm tsx scripts/report-routing-policy-dead-fields.ts [--json | --emit-sql]",
@@ -505,7 +506,9 @@ async function main(): Promise<void> {
   // A client of its own rather than the app's singleton: this runs against a
   // DATABASE_URL the operator points at, and must not pick up whatever the
   // surrounding environment had configured.
-  const prisma = new PrismaClient();
+  const prisma = new PrismaClient({
+    adapter: createPrismaPgAdapter(process.env.DATABASE_URL ?? ""),
+  });
   try {
     const report = buildReport(await readPolicies(prisma));
     if (mode === "sql") {

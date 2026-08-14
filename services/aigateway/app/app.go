@@ -168,35 +168,43 @@ func (a *App) ListModels(ctx context.Context, bundle *domain.Bundle) ([]domain.M
 	var models []domain.Model
 	var gaps []domain.ModelDiscoveryGap
 	seen := make(map[string]bool)
-	add := func(m domain.Model) {
-		if m.ID == "" || seen[m.ID] {
-			return
-		}
-		seen[m.ID] = true
-		models = append(models, m)
-	}
 
 	// Built once: the predicate reports an unreadable pattern when it is
 	// compiled, and an operator wants that said once per listing, not once
 	// per pass over the models.
-	//
-	// An alias is judged on what it resolves to, both here and at dispatch.
-	// Its own name is not a model, so the pass at the end cannot do it:
-	// that runs on the listed id, which for an alias is the alias name.
 	allowedByPolicy := modelPolicyFilter(cfg.PolicyRules, a.logger)
-	reachable := reachableProviders(bundle.Credentials)
-	for name, alias := range cfg.ModelAliases {
-		target := domain.Model{ID: alias.Model, ProviderID: alias.ProviderID}
-		if !cfg.AllowsResolvedModel(alias.ProviderID, alias.Model) {
-			continue
+	reachable := reachableProviders(bundle)
+
+	// Every name is judged on the model a request for it would reach, never
+	// on the name itself, because that is the only thing dispatch judges. An
+	// alias name is not a model at all, and a name is displayed under whatever
+	// spelling its source uses, so judging the displayed string asked a
+	// different question of every source and answered it differently.
+	//
+	// listed is the name a client sends; target is what it resolves to.
+	add := func(listed string, target domain.Model) {
+		if listed == "" || seen[listed] {
+			return
+		}
+		if !cfg.AllowsResolvedModel(target.ProviderID, target.ID) {
+			return
 		}
 		if !allowedByPolicy(target) {
-			continue
+			return
 		}
-		if !reachable(alias.ProviderID) {
-			continue
+		if !reachable(target.ProviderID) {
+			return
 		}
-		add(domain.Model{ID: name, Name: name, ProviderID: alias.ProviderID})
+		seen[listed] = true
+		models = append(models, domain.Model{
+			ID:         listed,
+			Name:       listed,
+			ProviderID: target.ProviderID,
+		})
+	}
+
+	for name, alias := range cfg.ModelAliases {
+		add(name, domain.Model{ID: alias.Model, ProviderID: alias.ProviderID})
 	}
 
 	if len(cfg.AllowedModels) > 0 {
@@ -219,33 +227,29 @@ func (a *App) ListModels(ctx context.Context, bundle *domain.Bundle) ([]domain.M
 				continue
 			}
 			// A qualified entry names its own provider, and outranks the
-			// chain-wide guess. Left in an allowlist after the provider it
-			// names is removed, it is a name no request can reach.
-			if qualified, _, ok := domain.SplitModelSpelling(id); ok {
-				if !reachable(qualified) {
-					continue
-				}
-				add(domain.Model{ID: id, Name: id, ProviderID: qualified})
+			// chain-wide guess, which is only there because a bare entry
+			// names no provider at all.
+			if qualified, model, ok := domain.SplitModelSpelling(id); ok {
+				add(id, domain.Model{ID: model, ProviderID: qualified})
 				continue
 			}
-			add(domain.Model{ID: id, Name: id, ProviderID: providerID})
+			add(id, domain.Model{ID: id, ProviderID: providerID})
 		}
 		if hasWildcards {
-			discoveredGaps, err := a.addDiscovered(ctx, bundle, cfg, add)
+			discoveredGaps, err := a.addDiscovered(ctx, bundle, add)
 			if err != nil {
 				return nil, nil, err
 			}
 			gaps = discoveredGaps
 		}
 	} else {
-		discoveredGaps, err := a.addDiscovered(ctx, bundle, cfg, add)
+		discoveredGaps, err := a.addDiscovered(ctx, bundle, add)
 		if err != nil {
 			return nil, nil, err
 		}
 		gaps = discoveredGaps
 	}
 
-	models = keepModels(models, allowedByPolicy)
 	sort.Slice(models, func(i, j int) bool { return models[i].ID < models[j].ID })
 	return models, gaps, nil
 }
@@ -256,7 +260,7 @@ func (a *App) ListModels(ctx context.Context, bundle *domain.Bundle) ([]domain.M
 // endpoint serves, so the allowlist is applied here too: dispatch rejects
 // anything outside it, and listing a model the VK cannot call is worse
 // than omitting it.
-func (a *App) addDiscovered(ctx context.Context, bundle *domain.Bundle, cfg domain.BundleConfig, add func(domain.Model)) ([]domain.ModelDiscoveryGap, error) {
+func (a *App) addDiscovered(ctx context.Context, bundle *domain.Bundle, add func(string, domain.Model)) ([]domain.ModelDiscoveryGap, error) {
 	if a.providers == nil {
 		return nil, nil
 	}
@@ -265,13 +269,9 @@ func (a *App) addDiscovered(ctx context.Context, bundle *domain.Bundle, cfg doma
 		return nil, err
 	}
 	for _, m := range discovered {
-		// Both spellings, as dispatch judges them: an operator who allowed
-		// "openai/gpt-5-mini" allowed a model the catalog reports as
-		// "gpt-5-mini", and omitting it here would hide a model POST serves.
-		if !cfg.AllowsResolvedModel(m.ProviderID, m.ID) {
-			continue
-		}
-		add(m)
+		// A discovered model is its own target: the catalog reports the id
+		// the provider serves it under, which is the id a client sends.
+		add(m.ID, m)
 	}
 	return gaps, nil
 }
@@ -288,12 +288,18 @@ func (a *App) addDiscovered(ctx context.Context, bundle *domain.Bundle, cfg doma
 // key at all, so singling out its provider-qualified names would not make the
 // list truer, only empty, and a key still being wired up keeps a model list
 // that shows what it is configured to reach.
-func reachableProviders(creds []domain.Credential) func(domain.ProviderID) bool {
+func reachableProviders(bundle *domain.Bundle) func(domain.ProviderID) bool {
+	creds := bundle.Credentials
 	if len(creds) == 0 {
 		return func(domain.ProviderID) bool { return true }
 	}
 	held := make(map[domain.ProviderID]bool, len(creds))
 	for _, cred := range creds {
+		// providers_allowed narrows the chain at dispatch too, so a
+		// credential it excludes serves nothing and makes no name reachable.
+		if !bundle.Config.AllowsProvider(cred.ID) {
+			continue
+		}
 		held[cred.ProviderID] = true
 	}
 	return func(providerID domain.ProviderID) bool {
@@ -327,19 +333,9 @@ func soleCredentialProviderID(creds []domain.Credential) domain.ProviderID {
 // still reject a request against a listed model if its pattern is bad.
 // The skip is logged so a typo'd rule doesn't silently fail to hide a
 // model from the list without a trace anywhere.
-func keepModels(models []domain.Model, keep func(domain.Model) bool) []domain.Model {
-	kept := models[:0]
-	for _, m := range models {
-		if keep(m) {
-			kept = append(kept, m)
-		}
-	}
-	return kept
-}
-
-// modelPolicyFilter builds the "may this model be listed" predicate, so the
-// alias loop can apply it to a resolved target while the pass at the end
-// applies it to the listed id.
+// modelPolicyFilter builds the "may this model be listed" predicate. It is
+// applied to the model a name resolves to, exactly once, which is the same
+// thing CheckModel judges at dispatch.
 func modelPolicyFilter(rules []domain.PolicyRule, logger *zap.Logger) func(domain.Model) bool {
 	deny, allow := compileModelRules(rules, logger)
 	if len(deny) == 0 && len(allow) == 0 {

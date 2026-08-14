@@ -236,9 +236,10 @@ Feature: Gateway span shape — mandatory attributes per completed request
   # ─────────────────────────────────────────────────────────────────────────
   # gen_ai.request.model carries the model that was dispatched. A routing
   # policy rewrites names before dispatch, so with model tiers the two are
-  # routinely different and the caller's own name is nowhere in the trace:
-  # a trace of a tier request says nothing about the tier, and repointing a
-  # tier changes what every past trace appears to have asked for.
+  # routinely different, and that attribute alone does not retain the name
+  # the client sent. Without it a trace of a tier request says nothing about
+  # the tier, and once a tier is repointed there is nothing left to recover
+  # which callers were using it.
 
   @unit
   Scenario: A rewritten model name reaches the customer span
@@ -253,7 +254,13 @@ Feature: Gateway span shape — mandatory attributes per completed request
     Given a client that names the model it is served
     When the request completes through the gateway
     Then the exported customer span carries no requested-name attribute
-    And either spelling of the dispatched model counts as naming it
+    And every accepted spelling of the dispatched model counts as naming it
+
+  @unit
+  Scenario: A provider spelling the gateway normalises is not a rewrite
+    Given a client that names a provider by one of its accepted spellings
+    When the request completes through the gateway
+    Then the exported customer span carries no requested-name attribute
 
   # ─────────────────────────────────────────────────────────────────────────
   # §10. Out of scope (for now)

@@ -187,10 +187,18 @@ func rewrittenFrom(req *domain.Request) string {
 	if req == nil || req.Resolved == nil || req.Model == "" {
 		return ""
 	}
-	for _, spelling := range domain.ModelSpellings(req.Resolved.ProviderID, req.Resolved.ModelID) {
-		if req.Model == spelling {
+	// A provider prefix has several accepted spellings, and the resolver
+	// normalises them, so comparing against the canonical form alone reads
+	// "azure_openai/gpt-5-mini" as a rewrite of itself. Split the sent name
+	// the same way the resolver did and compare what each side means.
+	if provider, model, ok := domain.SplitModelSpelling(req.Model); ok {
+		if provider == req.Resolved.ProviderID && model == req.Resolved.ModelID {
 			return ""
 		}
+		return req.Model
+	}
+	if req.Model == req.Resolved.ModelID {
+		return ""
 	}
 	return req.Model
 }

@@ -120,8 +120,10 @@ func TestTracePassesRequestedModelToEndParams(t *testing.T) {
 
 // @scenario "A model name that was not rewritten stamps nothing"
 func TestTraceLeavesRequestedModelEmptyWhenNothingWasRewritten(t *testing.T) {
-	// Either spelling of the dispatched model is the caller getting what they
-	// asked for, so neither is worth recording twice.
+	// Every spelling of the dispatched model is the caller getting what they
+	// asked for, so none is worth recording twice. The provider half has
+	// accepted aliases the resolver normalises, and comparing against the
+	// canonical form alone read "azure_openai/x" as a rewrite of itself.
 	for _, sent := range []string{"gpt-5.6-sol", "openai/gpt-5.6-sol"} {
 		captured := newCapturedEnd()
 		interceptor := Trace(passThroughBegin, captured.End)
@@ -143,4 +145,63 @@ func TestTraceLeavesRequestedModelEmptyWhenNothingWasRewritten(t *testing.T) {
 		captured.WaitForEnd(t)
 		assert.Empty(t, captured.params.RequestedModel, sent)
 	}
+}
+
+// @scenario "A provider spelling the gateway normalises is not a rewrite"
+func TestTraceTreatsANormalisedProviderSpellingAsNoRewrite(t *testing.T) {
+	captured := newCapturedEnd()
+	interceptor := Trace(passThroughBegin, captured.End)
+	next := func(context.Context, *Call) (*domain.Response, error) {
+		return &domain.Response{}, nil
+	}
+
+	request := &domain.Request{
+		Type:  domain.RequestTypeChat,
+		Model: "azure_openai/gpt-5-mini",
+		Resolved: &domain.ResolvedModel{
+			ModelID:    "gpt-5-mini",
+			ProviderID: domain.ProviderAzure,
+			Source:     domain.ModelSourceExplicit,
+		},
+	}
+
+	_, err := interceptor.Sync(next)(context.Background(), &Call{
+		Bundle:  tracedBundle(),
+		Request: request,
+		Meta:    &MetaAccumulator{},
+	})
+
+	require.NoError(t, err)
+	captured.WaitForEnd(t)
+	assert.Empty(t, captured.params.RequestedModel)
+}
+
+// A prefix that is not a provider is part of the model name, so a rewrite to
+// a different model still reads as one.
+func TestTraceRecordsARewriteAcrossProviders(t *testing.T) {
+	captured := newCapturedEnd()
+	interceptor := Trace(passThroughBegin, captured.End)
+	next := func(context.Context, *Call) (*domain.Response, error) {
+		return &domain.Response{}, nil
+	}
+
+	request := &domain.Request{
+		Type:  domain.RequestTypeChat,
+		Model: "openai/gpt-4o",
+		Resolved: &domain.ResolvedModel{
+			ModelID:    "gemini-3.5-flash",
+			ProviderID: domain.ProviderGemini,
+			Source:     domain.ModelSourceAlias,
+		},
+	}
+
+	_, err := interceptor.Sync(next)(context.Background(), &Call{
+		Bundle:  tracedBundle(),
+		Request: request,
+		Meta:    &MetaAccumulator{},
+	})
+
+	require.NoError(t, err)
+	captured.WaitForEnd(t)
+	assert.Equal(t, "openai/gpt-4o", captured.params.RequestedModel)
 }

@@ -200,10 +200,9 @@ Feature: AI Gateway — model disambiguation when a VK has multiple providers
   Rule: A model refusal says who can fix it, and names what was refused
 
     Every model the gateway turns away is the caller's to fix: they can send
-    a different name, or ask an admin to widen the key. The wire body only
-    carries that attribution when the refusal states it, and two of the three
-    refusal paths did not, so the same refusal reached one caller annotated
-    and another not.
+    a different name, or ask an admin to widen the key. A refusal that does
+    not say so leaves the caller reading it as a fault on our side, and the
+    same refusal has to read the same way however the name was written.
 
     A key can allow a model under one provider and not another, so a refusal
     that drops the provider half describes a rule the caller did not hit.
