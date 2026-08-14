@@ -20,6 +20,7 @@ import {
 import { ledgerActorFor } from "~/server/app-layer/authz/ledger-actor";
 import { findSharedTeamIds } from "~/server/role-bindings/personal-team-scope";
 import { projectAdminUserIdsWithoutDirectRole } from "~/server/teams/effective-team-admins";
+import { closeOpenLinksForMembership } from "~/server/users/close-open-links";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { encrypt } from "~/utils/encryption";
 import {
@@ -1263,10 +1264,27 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         }
       }
 
+      const now = new Date();
       await tx.organizationUser.update({
         where: { userId_organizationId: { userId, organizationId } },
-        data: { disabledAt: disabled ? new Date() : null },
+        data: { disabledAt: disabled ? now : null },
       });
+
+      // A disabled membership is an offboarding from this organization, so
+      // the person's open usage-attribution links here get their closing
+      // rows — in this transaction, beside the membership write and under
+      // the same last-admin lock, because appending after the commit is the
+      // loss window ADR-094 Decision 4 bans. Re-enabling never re-opens
+      // them: an admin relinks.
+      if (disabled) {
+        await closeOpenLinksForMembership({
+          tx,
+          organizationId,
+          userId,
+          actorUserId: null,
+          now,
+        });
+      }
     });
 
     if (disabled) {

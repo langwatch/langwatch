@@ -26,6 +26,7 @@ import { rateLimit } from "~/server/rateLimit";
 import { AvatarRateLimitedError } from "~/server/user-avatar/avatar";
 import { UserAvatarService } from "~/server/user-avatar/avatar.service";
 import { EmailAlreadyRegisteredError } from "~/server/users/errors";
+import { MembershipLifecycleService } from "~/server/users/membership-lifecycle.service";
 import { UserService } from "~/server/users/user.service";
 import { getClientIp } from "~/utils/getClientIp";
 import { isAdmin as checkIsAdmin } from "../../../../ee/admin/isAdmin";
@@ -486,9 +487,17 @@ export const userRouter = createTRPCRouter({
         throw new TRPCError({ code: "FORBIDDEN" });
       }
 
-      // UserService.deactivate also force-revokes all the user's sessions
-      // (Redis cache + DB) — see iter-24 progress notes for why.
-      await UserService.create(ctx.prisma).deactivate({ id: input.userId });
+      // The lifecycle hook is the single deactivation implementation
+      // (ADR-094 Decision 4): it force-revokes every session and CLI token
+      // (Redis cache + DB) and, in the same transaction as the account flag,
+      // closes the person's open usage-attribution links in every
+      // organization they were still active in. The actor is whoever pressed
+      // the button — the person themself, or the platform admin acting for
+      // them.
+      await MembershipLifecycleService.create(ctx.prisma).onUserDeactivated({
+        userId: input.userId,
+        actorUserId: user.id,
+      });
       return { success: true };
     }),
   reactivate: protectedProcedure
