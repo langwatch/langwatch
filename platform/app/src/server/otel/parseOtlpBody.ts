@@ -334,8 +334,64 @@ function parseWithFallback<T>(
     } catch (jsonErr) {
       return {
         ok: false,
-        error: `Failed to parse OTLP body: ${(firstErr as Error).message} (json fallback: ${(jsonErr as Error).message})`,
+        error:
+          `Failed to parse OTLP body: ${describeParseFailure(firstErr)}` +
+          ` (json fallback: ${describeParseFailure(jsonErr)})`,
       };
     }
   }
+}
+
+/** Long enough to keep a decoder's structural detail, short enough to log. */
+const MAX_FAILURE_DETAIL = 120;
+
+/**
+ * A parser's error message, reduced to the part that is ours to repeat.
+ *
+ * Nothing here logs the request body — and the body reached the log sink
+ * anyway, because V8's `JSON.parse` SyntaxError quotes about ten characters of
+ * its input inside the message and we passed that message straight through.
+ * Those characters are arbitrary bytes, so they were routinely not valid UTF-8,
+ * which broke consumers that parse a log record's own metadata.
+ *
+ * A JSON failure is therefore rebuilt rather than filtered: only a fixed phrase
+ * and, where the parser gives one, a numeric position. Nothing from the input
+ * can survive a construction that never reads it.
+ *
+ * A protobuf failure keeps its own words, because "index out of range: 57 +
+ * 1307648 > 2070" is the sentence that says whether the sender truncated the
+ * body or we mis-read it — and protobufjs describes structure, never content.
+ * It is still stripped of quoted spans and anything unprintable, so a future
+ * decoder that starts echoing bytes cannot reopen this.
+ */
+function describeParseFailure(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err);
+
+  if (err instanceof SyntaxError || /is not valid JSON/.test(message)) {
+    return describeJsonFailure(message);
+  }
+
+  return message
+    .replace(/"(?:[^"\\]|\\.)*"/g, '"…"')
+    .replace(/'(?:[^'\\]|\\.)*'/g, "'…'")
+    .replace(/`(?:[^`\\]|\\.)*`/g, "`…`")
+    .replace(/[^\x20-\x7e]/g, "")
+    .trim()
+    .slice(0, MAX_FAILURE_DETAIL);
+}
+
+/**
+ * Built from the parser's verdict, never from its quotation of the input.
+ * The position is the one detail worth keeping: it says how far into the body
+ * the sender got before the bytes stopped making sense.
+ */
+function describeJsonFailure(message: string): string {
+  if (/Unexpected end of JSON input/.test(message)) {
+    return "invalid JSON: unexpected end of input";
+  }
+
+  const position = /position (\d+)/.exec(message)?.[1];
+  return position
+    ? `invalid JSON at position ${position}`
+    : "invalid JSON: unexpected token";
 }
