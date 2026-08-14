@@ -473,21 +473,31 @@ secured.access(adminAuth).post("/admin/:resource", async (c) => {
           payload: { id: userId, reactivate: true },
         });
       } else if (typeof v === "string" || v instanceof Date) {
-        const pickedDate = v instanceof Date ? v : new Date(v);
-        const isValidPickedDate = !Number.isNaN(pickedDate.getTime());
         // The lifecycle hook is the single deactivation implementation
         // (ADR-094 Decision 4): the account flag, the closing link rows for
         // every organization the person was still active in, and the
-        // revocations. Passing the admin's picked date as the clock stamps
-        // both the flag and those rows with it, so the paper trail agrees
-        // with itself.
+        // revocations.
+        //
+        // It runs on the real clock, NOT on the admin's picked date. The
+        // picked date is a label on the account flag, which every reader
+        // null-checks; the closing rows are a money paper trail, and dating
+        // them in the past would silently move spend from an already-reported
+        // period out of the person's name (ADR-094 Decision 3 allows
+        // backdating, but never silently — that notice is the report batch's).
         await MembershipLifecycleService.create(prisma).onUserDeactivated({
           userId,
           actorUserId: user?.id ?? null,
-          ...(isValidPickedDate ? { now: pickedDate } : {}),
         });
         delete data.deactivatedAt;
         handledSideEffect = true;
+        const pickedDate = v instanceof Date ? v : new Date(v);
+        const isValidPickedDate = !Number.isNaN(pickedDate.getTime());
+        if (isValidPickedDate) {
+          await prisma.user.update({
+            where: { id: userId },
+            data: { deactivatedAt: pickedDate },
+          });
+        }
         sideEffectAudit.push({
           action: "update/user",
           payload: {
