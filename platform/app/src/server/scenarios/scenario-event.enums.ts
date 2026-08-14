@@ -59,3 +59,23 @@ export const CANCELLABLE_STATUSES = new Set<ScenarioRunStatus>([
 export function isCancellableStatus(status: ScenarioRunStatus): boolean {
   return CANCELLABLE_STATUSES.has(status);
 }
+
+/** Statuses a run cannot move out of. */
+export const TERMINAL_STATUSES = new Set<ScenarioRunStatus>([
+  ScenarioRunStatus.SUCCESS,
+  ScenarioRunStatus.FAILED,
+  ScenarioRunStatus.ERROR,
+  ScenarioRunStatus.CANCELLED,
+  ScenarioRunStatus.STALLED,
+]);
+
+/**
+ * Whether a run has reached a state it will never leave.
+ *
+ * Not the negation of `isCancellableStatus`: RUNNING is neither cancellable
+ * (it has no queued job to drop) nor terminal, so the two sets do not
+ * partition the enum between them.
+ */
+export function isTerminalStatus(status: ScenarioRunStatus): boolean {
+  return TERMINAL_STATUSES.has(status);
+}
