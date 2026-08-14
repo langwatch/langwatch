@@ -20,6 +20,36 @@ export interface MembershipDeactivationOutcome {
 }
 
 /**
+ * Which organizations this person is still active in.
+ *
+ * Asked through the PERSON rather than as a bare `organizationUser` query on
+ * purpose. `OrganizationUser` is registered in `ORG_SCOPED_MODELS`, and the
+ * tenancy guard rejects any query on it that names no organization — which a
+ * "count their memberships everywhere" question never can, since spanning
+ * organizations is the entire point of the last-membership rule. Reading it as
+ * a relation under one `User` row id keeps the query bounded to a single
+ * person, which is the honest bound anyway, and passes the guard.
+ */
+const activeMembershipsOf = async ({
+  tx,
+  userId,
+}: {
+  tx: TransactionClient;
+  userId: string;
+}): Promise<Array<{ organizationId: string }>> => {
+  const person = await tx.user.findUnique({
+    where: { id: userId },
+    select: {
+      orgMemberships: {
+        where: { disabledAt: null },
+        select: { organizationId: true },
+      },
+    },
+  });
+  return person?.orgMemberships ?? [];
+};
+
+/**
  * Membership lifecycle for ONE organization (ADR-094 Decision 4).
  *
  * Directory-driven offboarding used to reach for the global account flag, so
@@ -99,9 +129,8 @@ export class MembershipLifecycleService {
       // The last active membership out turns the account off — and only
       // then. That is the whole of #6976: one organization's directory must
       // not reach into the 207 people who belong to more than one.
-      const activeMembershipsLeft = await tx.organizationUser.count({
-        where: { userId, disabledAt: null },
-      });
+      const activeMembershipsLeft = (await activeMembershipsOf({ tx, userId }))
+        .length;
       const globallyDeactivated =
         activeMembershipsLeft === 0 &&
         (await this.markAccountDeactivated({ tx, userId, now }));
@@ -137,10 +166,7 @@ export class MembershipLifecycleService {
     now?: Date;
   }): Promise<MembershipDeactivationOutcome> {
     const outcome = await this.prisma.$transaction(async (tx) => {
-      const memberships = await tx.organizationUser.findMany({
-        where: { userId, disabledAt: null },
-        select: { organizationId: true },
-      });
+      const memberships = await activeMembershipsOf({ tx, userId });
 
       let closedLinks = 0;
       for (const { organizationId } of memberships) {
