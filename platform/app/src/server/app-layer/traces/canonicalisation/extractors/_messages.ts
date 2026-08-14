@@ -91,6 +91,9 @@ const extractTextsFromParts = (parts: unknown[]): string[] => {
         const inner = extractTextsFromParts(part.content);
         if (inner.length > 0) texts.push(inner.join("\n"));
       } else if (isRecord(part.toolUse) && part.toolUse.input != null) {
+        // `input` is a required field on the Converse ToolUseBlock struct, not
+        // a union tag, so a value check is correct here — unlike the
+        // toolResult content union below, where key presence discriminates.
         const s = safeStringify(part.toolUse.input);
         if (s !== null) texts.push(s);
       } else if (

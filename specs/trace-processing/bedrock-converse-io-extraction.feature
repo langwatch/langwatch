@@ -51,6 +51,6 @@ Feature: Bedrock Converse span I/O extraction
 
   @unit @canonicalisation
   Scenario: Converse toolResult block with empty content contributes nothing
-    Given a Bedrock trace whose user message carries a tool result with no content
+    Given a Bedrock trace whose user message carries a tool result whose content list is empty
     When trace I/O is extracted
     Then the input falls back to the span name
