@@ -103,8 +103,9 @@ type statView struct {
 }
 
 type barView struct {
-	DevPct, OtherPct int
-	Legend           string
+	DevPct, OtherPct     int
+	DevLabel, OtherLabel string
+	Breakdown            string
 }
 
 type wtRow struct {
@@ -317,10 +318,13 @@ func machineBar(s SummaryView) *barView {
 	if s.ToolingRSS > 0 {
 		parts = append(parts, "tooling ~"+humanBytesU(s.ToolingRSS))
 	}
-	if s.OtherRSS > 0 {
-		parts = append(parts, "other ~"+humanBytesU(s.OtherRSS))
+	return &barView{
+		DevPct:     devPct,
+		OtherPct:   otherPct,
+		DevLabel:   "dev work ~" + humanBytesU(s.DevRSS()),
+		OtherLabel: "everything else ~" + humanBytesU(s.OtherRSS),
+		Breakdown:  strings.Join(parts, " · "),
 	}
-	return &barView{DevPct: devPct, OtherPct: otherPct, Legend: strings.Join(parts, " · ")}
 }
 
 func sharedNote(servers map[string]uint64) string {
@@ -333,7 +337,7 @@ func sharedNote(servers map[string]uint64) string {
 	if len(parts) == 0 {
 		return ""
 	}
-	return "shared by every stack: " + strings.Join(parts, " · ")
+	return "Shared by every stack: " + strings.Join(parts, " · ")
 }
 
 func worktreeRows(worktrees []WorktreeView) []wtRow {
@@ -350,9 +354,9 @@ func worktreeRows(worktrees []WorktreeView) []wtRow {
 		note := ""
 		switch {
 		case w.IsPrimary:
-			note = "primary — protected"
+			note = "primary, protected"
 		case w.IsCurrent:
-			note = "current — protected"
+			note = "current, protected"
 		}
 		rows = append(rows, wtRow{Name: name, Branch: w.Branch, Dir: w.Dir, Note: note})
 	}
@@ -418,170 +422,3 @@ func hostFromURL(u string) string {
 }
 
 var pageTmpl = template.Must(template.New("page").Parse(pageTemplate))
-
-const pageTemplate = `<!doctype html><html lang="en"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>haven — LangWatch local stacks</title>
-<style>
-  :root { color-scheme: light dark;
-    --bg:#faf9f7; --fg:#1a1815; --dim:#6f6a62; --card:rgba(255,255,255,.72); --line:#e7e2da;
-    --accent:#ed8926; --accent-soft:rgba(237,137,38,.14); --violet:#7c3aed;
-    --live:#16a34a; --stale:#b45309; --down:#dc2626; }
-  @media (prefers-color-scheme: dark){ :root{
-    --bg:#0d0d10; --fg:#ece9e4; --dim:#98928a; --card:rgba(23,23,28,.66); --line:#26252c;
-    --accent:#f59e3f; --accent-soft:rgba(245,158,63,.16); --violet:#a78bfa; } }
-  * { box-sizing:border-box; }
-  body { margin:0; font:14px/1.5 ui-sans-serif,system-ui,-apple-system,sans-serif;
-    background:var(--bg); color:var(--fg); min-height:100vh; }
-  /* fluid gradient field behind everything */
-  body::before, body::after { content:""; position:fixed; z-index:-1; border-radius:50%;
-    filter:blur(90px); opacity:.35; pointer-events:none; }
-  body::before { width:52vw; height:52vw; background:radial-gradient(circle at center, var(--accent), transparent 65%);
-    top:-18vw; right:-12vw; animation:drift1 26s ease-in-out infinite alternate; }
-  body::after { width:44vw; height:44vw; background:radial-gradient(circle at center, var(--violet), transparent 65%);
-    bottom:-16vw; left:-10vw; opacity:.22; animation:drift2 32s ease-in-out infinite alternate; }
-  @keyframes drift1 { from{ transform:translate(0,0) scale(1);} to{ transform:translate(-6vw,5vh) scale(1.12);} }
-  @keyframes drift2 { from{ transform:translate(0,0) scale(1);} to{ transform:translate(5vw,-4vh) scale(1.08);} }
-  @media (prefers-reduced-motion: reduce){ body::before, body::after{ animation:none; } .dot.up::after{ animation:none; } }
-
-  header.top { position:sticky; top:0; z-index:10; padding:14px 30px; display:flex; align-items:center;
-    gap:14px; flex-wrap:wrap; background:color-mix(in oklab, var(--bg) 72%, transparent);
-    backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border-bottom:1px solid var(--line); }
-  header.top h1 { margin:0; font-size:19px; letter-spacing:.01em; font-weight:700; }
-  header.top h1 .mark { color:var(--accent); }
-  header.top .tag { color:var(--dim); font-size:13px; }
-  header.top .links { margin-left:auto; display:flex; gap:14px; align-items:center; font-size:12.5px; color:var(--dim); }
-  header.top .links a { color:var(--dim); border:1px solid var(--line); border-radius:999px; padding:3px 11px;
-    transition:color .15s ease, border-color .15s ease; }
-  header.top .links a:hover { color:var(--accent); border-color:color-mix(in oklab, var(--accent) 45%, var(--line)); text-decoration:none; }
-  #beat { width:7px; height:7px; border-radius:50%; background:var(--live); display:inline-block; }
-  #beat.off { background:var(--stale); }
-  .pressure { font-size:11px; padding:2px 10px; border-radius:999px; text-transform:uppercase; letter-spacing:.06em;
-    font-weight:700; background:color-mix(in oklab,var(--down) 16%,transparent); color:var(--down); }
-
-  .stats { display:flex; gap:12px; flex-wrap:wrap; padding:10px 30px 4px; }
-  .stat { background:var(--card); border:1px solid var(--line); border-radius:14px;
-    padding:12px 18px; min-width:132px; backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); }
-  .stat .n { display:block; font-size:22px; font-weight:700; font-variant-numeric:tabular-nums; }
-  .stat .l { color:var(--dim); font-size:11.5px; text-transform:uppercase; letter-spacing:.08em; }
-  .of { color:var(--dim); font-weight:500; font-size:.72em; }
-
-  .machine { padding:8px 30px 0; }
-  .bar { display:flex; height:10px; border-radius:999px; overflow:hidden; border:1px solid var(--line);
-    background:color-mix(in oklab, var(--fg) 5%, transparent); }
-  .bar .dev { background:var(--accent); }
-  .bar .other { background:var(--violet); opacity:.55; }
-  .legend { color:var(--dim); font-size:12px; padding:6px 2px 0; }
-  .legend .key { display:inline-block; width:9px; height:9px; border-radius:2px; margin:0 4px 0 10px; vertical-align:middle; }
-  .legend .key.dev { background:var(--accent); } .legend .key.other { background:var(--violet); opacity:.55; }
-
-  main { padding:18px 30px 8px; display:grid; grid-template-columns:repeat(auto-fill,minmax(360px,1fr)); gap:16px; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:16px 18px;
-    backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
-    transition:transform .22s ease, box-shadow .22s ease, border-color .22s ease; }
-  .card:hover { transform:translateY(-2px); box-shadow:0 12px 32px -16px color-mix(in oklab, var(--accent) 42%, transparent);
-    border-color:color-mix(in oklab, var(--accent) 36%, var(--line)); }
-  .card header { display:flex; align-items:center; gap:10px; margin-bottom:4px; }
-  .card header .spacer { flex:1; }
-  .slug { font-weight:700; font-size:15.5px; }
-  .branch { color:var(--dim); font-size:12px; margin-bottom:8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .open { font-size:12px; font-weight:600; color:var(--accent); border:1px solid color-mix(in oklab, var(--accent) 38%, var(--line));
-    background:var(--accent-soft); border-radius:999px; padding:2px 11px; transition:background .15s ease; }
-  .open:hover { background:color-mix(in oklab, var(--accent) 26%, transparent); text-decoration:none; }
-  .pill { font-size:11px; padding:2px 9px; border-radius:999px; text-transform:uppercase; letter-spacing:.06em; font-weight:600; }
-  .pill.live { background:color-mix(in oklab,var(--live) 18%,transparent); color:var(--live); }
-  .pill.stale { background:color-mix(in oklab,var(--stale) 18%,transparent); color:var(--stale); }
-
-  .chips { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
-  .chip { color:var(--dim); font-size:11.5px; background:color-mix(in oklab, var(--fg) 4%, transparent);
-    border:1px solid var(--line); border-radius:999px; padding:2px 9px; }
-  .chip code { background:none; padding:0; color:var(--fg); font-size:11.5px; }
-  .chip.baseline { color:var(--accent); border-color:color-mix(in oklab, var(--accent) 42%, var(--line));
-    background:var(--accent-soft); font-weight:600; }
-  .dir { color:var(--dim); font-size:11.5px; word-break:break-all; margin-bottom:10px; }
-
-  table { width:100%; border-collapse:collapse; } td { padding:3.5px 0; }
-  .dot-cell { width:16px; }
-  .dot { display:inline-block; width:8px; height:8px; border-radius:50%; position:relative; }
-  .dot.up { background:var(--live); }
-  .dot.up::after { content:""; position:absolute; inset:-3px; border-radius:50%;
-    border:1.5px solid var(--live); opacity:.5; animation:ping 2.2s ease-out infinite; }
-  @keyframes ping { 0%{ transform:scale(.6); opacity:.6; } 80%,100%{ transform:scale(1.5); opacity:0; } }
-  .dot.down { background:var(--down); opacity:.75; }
-  .svc { width:88px; color:var(--dim); }
-  a { color:var(--accent); text-decoration:none; } a:hover { text-decoration:underline; }
-  .dim { color:var(--dim); font-size:12px; } .mono { font-variant-numeric:tabular-nums; }
-  code { background:color-mix(in oklab,var(--fg) 8%,transparent); padding:1px 5px; border-radius:5px; font-size:12px; }
-  .empty { grid-column:1/-1; color:var(--dim); text-align:center; padding:56px 0 64px; }
-  .empty .glyph { font-size:40px; color:var(--accent); opacity:.8; }
-  .empty h2 { margin:10px 0 6px; color:var(--fg); font-size:17px; }
-  .empty code { font-size:13px; padding:5px 12px; }
-
-  .strip { padding:0 30px; color:var(--dim); font-size:12.5px; }
-  section.wide { margin:14px 30px; background:var(--card); border:1px solid var(--line); border-radius:16px;
-    padding:14px 18px; backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); }
-  section.wide h2 { margin:0 0 8px; font-size:12px; color:var(--dim); text-transform:uppercase; letter-spacing:.08em; }
-  section.wide td { padding:3px 14px 3px 0; vertical-align:top; }
-  .kind { color:var(--accent); font-weight:600; font-size:12px; }
-  footer { padding:16px 30px 30px; color:var(--dim); font-size:12px; display:flex; gap:8px; align-items:center; }
-</style></head><body>
-<header class="top">
-  <h1><span class="mark">●</span> haven</h1><span class="tag">LangWatch local stacks — hostname routing via portless</span>
-  {{if .Pressure}}<span class="pressure">pressure {{.Pressure}}</span>{{end}}
-  <span class="links">
-    <a href="{{.ObsURL}}">observability · {{.ObsHost}}</a>
-    <a href="{{.TelURL}}">telemetry · {{.TelHost}}</a>
-  </span>
-</header>
-<div id="live">
-<div class="stats">{{range .Stats}}
-    <div class="stat"><span class="n">{{.Value}}{{if .Of}}<span class="of"> / {{.Of}}</span>{{end}}</span><span class="l">{{.Label}}</span></div>{{end}}</div>
-{{with .Bar}}<div class="machine">
-  <div class="bar"><div class="dev" style="width:{{.DevPct}}%"></div><div class="other" style="width:{{.OtherPct}}%"></div></div>
-  <div class="legend"><span class="key dev"></span>dev work<span class="key other"></span>everything else — {{.Legend}}</div>
-</div>{{end}}
-<main>{{if .IsEmpty}}<div class="empty"><div class="glyph">⌂</div><h2>No stacks running</h2>
-      <p>Bring one up from any worktree and it appears here, on its own hostname.</p>
-      <code>haven up</code></div>{{end}}{{range .Cards}}
-      <section class="card">
-        <header><span class="slug">{{.Slug}}</span><span class="spacer"></span>{{if .OpenURL}}<a class="open" href="{{.OpenURL}}">open ↗</a>{{end}}<span class="pill {{.BadgeClass}}">{{.Badge}}</span></header>
-        <div class="branch">⎇ {{.Branch}}</div>
-        <div class="chips">{{range .Chips}}{{if .IsBaseline}}<span class="chip baseline">baseline</span>{{else}}<span class="chip">{{.Label}} <code>{{.Value}}</code></span>{{end}}{{end}}</div>
-        <div class="dir">{{.Dir}}</div>
-        <table>{{range .Rows}}{{if .IsSub}}<tr><td class="dot-cell"></td><td class="svc dim">{{.Name}}</td><td><a href="{{.URL}}">{{.Host}}</a></td><td class="dim mono">{{.Port}}</td></tr>{{else}}<tr><td class="dot-cell"><span class="dot {{.DotClass}}"></span></td><td class="svc">{{.Name}}</td><td><a href="{{.URL}}">{{.Host}}</a></td><td class="dim mono">{{.Port}}</td></tr>{{end}}{{end}}</table>
-      </section>{{end}}</main>
-{{if .SharedNote}}<div class="strip">{{.SharedNote}}</div>{{end}}
-{{if .Worktrees}}<section class="wide"><h2>worktrees — nothing running</h2>
-  <table>{{range .Worktrees}}<tr><td><b>{{.Name}}</b></td><td class="dim">⎇ {{.Branch}}</td><td class="dim">{{.Dir}}</td><td class="dim">{{.Note}}</td></tr>{{end}}</table>
-</section>{{end}}
-{{if .Events}}<section class="wide"><h2>the daemon's recent reaping</h2>
-  <table>{{range .Events}}<tr><td class="dim mono">{{.Age}}</td><td class="kind">{{.Kind}}</td><td>{{.Target}}</td><td class="dim">{{.Reason}}</td></tr>{{end}}</table>
-</section>{{end}}
-</div>
-<footer><span id="beat"></span><span id="stamp">live — refreshes every 3s</span></footer>
-<script>
-(() => {
-  let failures = 0;
-  const beat = document.getElementById('beat'), stamp = document.getElementById('stamp');
-  async function refresh() {
-    const live = document.getElementById('live');
-    // Skip the swap while the user is tabbing through it — replacing the
-    // subtree would destroy the focused link every three seconds.
-    if (document.hidden || live.contains(document.activeElement)) return;
-    try {
-      const res = await fetch('/', {cache: 'no-store'});
-      const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
-      const next = doc.getElementById('live');
-      if (next) live.replaceChildren(...next.children);
-      failures = 0;
-      beat.classList.remove('off');
-      stamp.textContent = 'live — updated ' + new Date().toLocaleTimeString();
-    } catch {
-      if (++failures >= 2) { beat.classList.add('off'); stamp.textContent = 'daemon unreachable — retrying'; }
-    }
-  }
-  setInterval(refresh, 3000);
-  document.addEventListener('visibilitychange', refresh);
-})();
-</script>
-</body></html>`

@@ -74,7 +74,7 @@ func TestRenderHTML(t *testing.T) {
 		})
 
 		t.Run("when rendered, the machine bar and its legend cover dev and other work", func(t *testing.T) {
-			for _, want := range []string{`class="bar"`, "dev work", "everything else", "agents ~3.0GB (2)", "other ~8.0GB", "pressure amber"} {
+			for _, want := range []string{`class="bar"`, "dev work ~10.5GB", "everything else ~8.0GB", "agents ~3.0GB (2)", "pressure amber"} {
 				if !strings.Contains(page, want) {
 					t.Errorf("machine picture should contain %q", want)
 				}
@@ -82,7 +82,7 @@ func TestRenderHTML(t *testing.T) {
 		})
 
 		t.Run("when rendered, the shared servers appear once, not on every card", func(t *testing.T) {
-			if !strings.Contains(page, "shared by every stack: clickhouse ~1.0GB") {
+			if !strings.Contains(page, "Shared by every stack: clickhouse ~1.0GB") {
 				t.Error("the shared strip should name the shared servers with their footprints")
 			}
 			if strings.Contains(page, "clickhouse.portless.langwatch.localhost") {
@@ -103,7 +103,7 @@ func TestRenderHTML(t *testing.T) {
 		})
 
 		t.Run("when rendered, the stackless worktrees and the reaping are sections", func(t *testing.T) {
-			for _, want := range []string{"worktrees — nothing running", "beta", "primary — protected", "recent reaping", "tc-ryuk", "left behind by an interrupted test run"} {
+			for _, want := range []string{"Worktrees", "nothing running from these", "beta", "primary, protected", "Recent reaping", "tc-ryuk", "left behind by an interrupted test run"} {
 				if !strings.Contains(page, want) {
 					t.Errorf("page should contain %q", want)
 				}
