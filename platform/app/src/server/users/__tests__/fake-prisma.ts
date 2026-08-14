@@ -131,12 +131,14 @@ export const createFakePrisma = (seed: {
   organizationUsers?: Row[];
   providerIdentityLinks?: Row[];
   ingestionSources?: Row[];
+  discoveredAgents?: Row[];
 }) => {
   const tables = {
     user: new Table(seed.users ?? []),
     organizationUser: new Table(seed.organizationUsers ?? []),
     providerIdentityLink: new Table(seed.providerIdentityLinks ?? []),
     ingestionSource: new Table(seed.ingestionSources ?? []),
+    discoveredAgent: new Table(seed.discoveredAgents ?? []),
     roleBinding: new Table([]),
     session: new Table([]),
   };

@@ -224,6 +224,151 @@ describe("MembershipLifecycleService", () => {
     });
   });
 
+  describe("given a handover an admin has dated into the FUTURE", () => {
+    // The close is decided at wall-clock now, not at the timeline's latest
+    // `effectiveFrom`. Those agreed until the admin surface allowed any
+    // effective date; once a row can sit in the future, evaluating at the
+    // latest one answers a question nobody asked — "who will own this next
+    // quarter" — and the person offboarding today walks out with their links
+    // still open, still collecting the money.
+    it("still closes the link the person holds today", async () => {
+      const prisma = createFakePrisma({
+        users: [{ id: "alice", deactivatedAt: null }],
+        organizationUsers: [
+          { userId: "alice", organizationId: "org-a", disabledAt: null },
+          { userId: "alice", organizationId: "org-b", disabledAt: null },
+        ],
+        ingestionSources: [{ id: "conn-a", organizationId: "org-a" }],
+        providerIdentityLinks: [
+          link({ seq: 1n, userId: "alice", effectiveFrom: JANUARY }),
+          link({
+            seq: 2n,
+            userId: "bob",
+            // Dated after the offboarding — not in force yet.
+            effectiveFrom: new Date("2026-09-01T00:00:00Z"),
+          }),
+        ],
+      });
+
+      const outcome = await serviceFor(prisma).onMembershipDeactivated({
+        organizationId: "org-a",
+        userId: "alice",
+        now: OFFBOARDED_AT,
+      });
+
+      expect(outcome.closedLinks).toBe(1);
+      expect(closingRows(prisma)[0]).toMatchObject({
+        userId: null,
+        effectiveFrom: OFFBOARDED_AT,
+      });
+      // The scheduled handover is left standing: closing what somebody holds
+      // today must not reach forward and cancel a decision already made.
+      expect(
+        prisma.providerIdentityLink.rows.some(
+          (row) => row.userId === "bob" && row.source === "manual",
+        ),
+      ).toBe(true);
+    });
+  });
+
+  describe("given the provider connection has since been deleted", () => {
+    // Connection-ownership validation guards rows that CLAIM a login. A
+    // closing row claims nothing, and offboarding must not be able to fail
+    // over a dangling id — the alternative is a person whose membership ended
+    // keeping their links open forever because a connection was tidied up.
+    it("still appends the closing row", async () => {
+      const prisma = createFakePrisma({
+        users: [{ id: "alice", deactivatedAt: null }],
+        organizationUsers: [
+          { userId: "alice", organizationId: "org-a", disabledAt: null },
+          { userId: "alice", organizationId: "org-b", disabledAt: null },
+        ],
+        // No IngestionSource row at all: the connection is gone.
+        ingestionSources: [],
+        providerIdentityLinks: [link({ providerConnectionId: "conn-deleted" })],
+      });
+
+      const outcome = await serviceFor(prisma).onMembershipDeactivated({
+        organizationId: "org-a",
+        userId: "alice",
+        now: OFFBOARDED_AT,
+      });
+
+      expect(outcome.closedLinks).toBe(1);
+      expect(closingRows(prisma)[0]).toMatchObject({
+        providerConnectionId: "conn-deleted",
+        userId: null,
+      });
+    });
+  });
+
+  describe("given two deactivations of the person's last two memberships race", () => {
+    // Under READ COMMITTED each transaction counts memberships before the
+    // other commits, so both can see one left and neither escalates — leaving
+    // a live account with no memberships, which is the exact state the
+    // last-membership rule exists to prevent. Modelled here by answering the
+    // in-transaction count with the stale view and the post-commit re-check
+    // with the true one.
+    it("settles after its own commit, so the account still goes off", async () => {
+      const prisma = seedTwoOrgs();
+      const trueFindUnique = prisma.user.findUnique.bind(prisma.user);
+      let call = 0;
+      vi.spyOn(prisma.user, "findUnique").mockImplementation(
+        (async (args: Parameters<typeof trueFindUnique>[0]) => {
+          call += 1;
+          if (call === 1) {
+            // The competing transaction has not committed yet.
+            return {
+              id: "alice",
+              orgMemberships: [{ organizationId: "org-b" }],
+            };
+          }
+          return await trueFindUnique(args);
+        }) as typeof trueFindUnique,
+      );
+      // The competing removal, already committed by the time we re-check.
+      prisma.organizationUser.rows = [];
+
+      const outcome = await serviceFor(prisma).onMembershipDeactivated({
+        organizationId: "org-a",
+        userId: "alice",
+        now: OFFBOARDED_AT,
+      });
+
+      expect(outcome.globallyDeactivated).toBe(true);
+      expect(prisma.user.rows[0]!.deactivatedAt).toEqual(OFFBOARDED_AT);
+      expect(revokeForUser).toHaveBeenCalledWith({ userId: "alice" });
+    });
+
+    it("writes nothing extra when the account was already turned off", async () => {
+      const prisma = seedTwoOrgs();
+      const service = serviceFor(prisma);
+      await service.onMembershipDeactivated({
+        organizationId: "org-a",
+        userId: "alice",
+        now: OFFBOARDED_AT,
+      });
+      await service.onMembershipDeactivated({
+        organizationId: "org-b",
+        userId: "alice",
+        now: OFFBOARDED_AT,
+      });
+      revokeForUser.mockClear();
+
+      // A third caller re-checking finds zero memberships and a flag already
+      // set — the conditional write is what stops the timestamp sliding.
+      const outcome = await service.onMembershipDeactivated({
+        organizationId: "org-a",
+        userId: "alice",
+        now: new Date("2026-07-01T00:00:00Z"),
+      });
+
+      expect(outcome.globallyDeactivated).toBe(false);
+      expect(prisma.user.rows[0]!.deactivatedAt).toEqual(OFFBOARDED_AT);
+      expect(revokeForUser).not.toHaveBeenCalled();
+    });
+  });
+
   describe("given the links have already been closed", () => {
     it("appends nothing on a repeat — the operation is idempotent", async () => {
       const prisma = seedTwoOrgs();
