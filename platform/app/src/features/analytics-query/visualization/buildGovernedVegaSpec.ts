@@ -116,10 +116,10 @@ export function buildGovernedVegaSpec({
   // it costs a governed chart nothing.
   delete clone.usermeta;
 
-  clone.config = mergeConfig(
-    isPlainObject(clone.config) ? clone.config : {},
-    pinnedConfig,
-  );
+  clone.config = mergeConfig({
+    base: isPlainObject(clone.config) ? clone.config : {},
+    override: pinnedConfig,
+  });
   clone.background = "transparent";
 
   applyContainerSizing(clone);
@@ -150,16 +150,19 @@ function cloneSpec(spec: unknown): Record<string, unknown> {
 }
 
 /** Deep merge where `override` wins, plain objects merging key by key. */
-export function mergeConfig(
-  base: Readonly<Record<string, unknown>>,
-  override: Readonly<Record<string, unknown>>,
-): Record<string, unknown> {
+export function mergeConfig({
+  base,
+  override,
+}: {
+  base: Readonly<Record<string, unknown>>;
+  override: Readonly<Record<string, unknown>>;
+}): Record<string, unknown> {
   const merged: Record<string, unknown> = { ...base };
   for (const [key, value] of Object.entries(override)) {
     const existing = merged[key];
     merged[key] =
       isPlainObject(existing) && isPlainObject(value)
-        ? mergeConfig(existing, value)
+        ? mergeConfig({ base: existing, override: value })
         : value;
   }
   return merged;

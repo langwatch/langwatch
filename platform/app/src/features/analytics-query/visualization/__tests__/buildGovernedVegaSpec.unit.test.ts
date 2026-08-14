@@ -171,10 +171,10 @@ describe("building the specification the chart runtime is given", () => {
   describe("given two configurations to merge", () => {
     it("merges plain objects key by key and lets the override win", () => {
       expect(
-        mergeConfig(
-          { axis: { labelColor: "a", gridColor: "b" }, font: "x" },
-          { axis: { labelColor: "c" }, background: "t" },
-        ),
+        mergeConfig({
+          base: { axis: { labelColor: "a", gridColor: "b" }, font: "x" },
+          override: { axis: { labelColor: "c" }, background: "t" },
+        }),
       ).toEqual({
         axis: { labelColor: "c", gridColor: "b" },
         font: "x",

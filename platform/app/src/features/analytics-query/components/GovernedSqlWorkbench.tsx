@@ -406,10 +406,10 @@ export function GovernedSqlWorkbench({ projectId }: GovernedSqlWorkbenchProps) {
 
   const [schemaVisible, setSchemaVisible] = useState(true);
   const wiring = useSavedChartWiring({ projectId, query });
-  const { parameters, parametersSendable } = useParameterState(
+  const { parameters, parametersSendable } = useParameterState({
     query,
-    wiring.openedRevision,
-  );
+    openedRevision: wiring.openedRevision,
+  });
   const { registerInsert, handleInsert, insertExample } = useDraftInsert({
     query,
     exampleSql: schema.model.datasets[0]?.exampleSql,
@@ -505,10 +505,13 @@ function SchemaSidebar({
  * answer, Run stays lit and the round-trip comes back naming a parameter the
  * member is looking at, filled in.
  */
-function useParameterState(
-  query: ReturnType<typeof useGovernedSqlQuery>,
-  openedRevision: number,
-) {
+function useParameterState({
+  query,
+  openedRevision,
+}: {
+  query: ReturnType<typeof useGovernedSqlQuery>;
+  openedRevision: number;
+}) {
   const [parametersSendable, setParametersSendable] = useState(true);
   const { setParameters } = query;
 

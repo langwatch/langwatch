@@ -107,10 +107,13 @@ function valueTyped(row: ParameterRow): boolean {
  * two rows called `limit` leave one entry and the later row silently wins. Read
  * one row at a time that is invisible — both rows look complete.
  */
-function rowProblem(
-  row: ParameterRow,
-  rows: readonly ParameterRow[],
-): string | undefined {
+function rowProblem({
+  row,
+  rows,
+}: {
+  row: ParameterRow;
+  rows: readonly ParameterRow[];
+}): string | undefined {
   const name = row.name.trim();
   if (name.length === 0) {
     return valueTyped(row) ? "Name this parameter." : undefined;
@@ -204,7 +207,7 @@ function ParameterRowFields({
   onPatch: (changes: Partial<Omit<ParameterRow, "id">>) => void;
   onRemove: () => void;
 }) {
-  const problem = rowProblem(row, rows);
+  const problem = rowProblem({ row, rows });
 
   return (
     <Stack gap={1}>
@@ -316,7 +319,9 @@ export function GovernedSqlParametersEditor({
       setRows(next);
       onChange({
         parameters: recordOf(next),
-        sendable: next.every((row) => rowProblem(row, next) === undefined),
+        sendable: next.every(
+          (row) => rowProblem({ row, rows: next }) === undefined,
+        ),
       });
     },
     [onChange],
