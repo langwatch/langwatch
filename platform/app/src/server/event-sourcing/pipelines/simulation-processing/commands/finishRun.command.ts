@@ -176,9 +176,13 @@ export class FinishRunCommand
     if (!result.scenarioId || !result.batchRunId || !result.scenarioSetId) {
       const queued = priorEvents.find(isSimulationRunQueuedEvent);
       if (queued) {
-        result.scenarioId ??= queued.data.scenarioId;
-        result.batchRunId ??= queued.data.batchRunId;
-        result.scenarioSetId ??= queued.data.scenarioSetId;
+        // `||=`, not `??=`, so this fills exactly what the check above counts
+        // as a gap. That check is falsy, so an empty-string id sends us here;
+        // `??=` would then decline to overwrite it and the event would ship
+        // with the empty id anyway, having paid for the lookup.
+        result.scenarioId ||= queued.data.scenarioId;
+        result.batchRunId ||= queued.data.batchRunId;
+        result.scenarioSetId ||= queued.data.scenarioSetId;
       } else {
         logger.warn(
           { tenantId, scenarioRunId },

@@ -5,8 +5,8 @@ Feature: Detect and display stalled scenario runs
 
   # Historical audit context lives in AUDIT_MANIFEST.md; the read-time
   # scenarios it mapped to stall-detection.unit.test.ts are gone with that
-  # file. The 2 remaining @unimplemented scenarios are pending rewrite/E2E
-  # coverage in PR #3458.
+  # file. The one remaining @unimplemented scenario is pending E2E coverage
+  # in PR #3458.
 
   # Context: When a worker dies (OOM, container kill, stalled job) the RUN_FINISHED
   # event never reaches the event store. Without detection, these runs appear as
@@ -34,16 +34,6 @@ Feature: Detect and display stalled scenario runs
     Then the run finishes with status ERROR and reason "stalled"
 
   # ============================================================================
-  # Batch Status Resolution - Unit Tests
-  # ============================================================================
-  # The batch query path surfaces the stored status consistently.
-
-  # ============================================================================
-  # UI Display - Integration Tests
-  # ============================================================================
-  # Verify that the legacy STALLED status renders with the correct visual treatment.
-
-  # ============================================================================
   # End-to-End - User Workflow
   # ============================================================================
   # Full user-visible flow: user sees a stalled run and understands what happened.
@@ -52,7 +42,7 @@ Feature: Detect and display stalled scenario runs
   Scenario: User sees a stalled run as errored, not spinning forever
     Given I am logged into project "my-project"
     And scenario "Flaky Agent" had a run that stopped making progress
-    And the stall watchdog finished it ERROR with reason "stalled"
+    And that run has since been recorded as errored
     When I view the run history for "Flaky Agent"
     Then I see the run displayed with an error indicator
     And the run is not shown as actively in progress

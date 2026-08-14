@@ -73,9 +73,10 @@ export const INITIAL_SIMULATION_RUN_EXECUTION_STATE: SimulationRunExecutionProce
   };
 
 /**
- * The execute intent payload — mirrors `ExecutionJobData` (execution-pool.ts)
- * so `pool.submit` can be called without further mapping. Identity and the
- * execution target only; no content.
+ * The execute intent payload — the identity and execution target `pool.submit`
+ * needs, and nothing else; no content. It is close to `ExecutionJobData`
+ * (execution-pool.ts) but not identical: the handler renames `scenarioSetId`
+ * to `setId` and `name` to `scenarioName` on the way through.
  */
 export const executeRunIntentSchema = z.object({
   scenarioRunId: z.string(),

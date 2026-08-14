@@ -119,6 +119,14 @@ describe("Pre-compiled Scenario Child Process", () => {
           timeout: 30000,
         });
 
+        // Pin the exit FIRST. Without it the absence checks below pass
+        // vacuously whenever the child never launched at all — a failed
+        // spawn, a timeout, a missing binary — all of which leave stderr
+        // empty. Exit 1 is the child having loaded its modules, read stdin
+        // and failed to parse the empty input, which is the only state in
+        // which "no transport error" means anything.
+        expect(boot.status).toBe(1);
+
         const stderr = boot.stderr?.toString() ?? "";
         expect(stderr).not.toContain("worker.js");
         expect(stderr).not.toContain("Cannot find module");

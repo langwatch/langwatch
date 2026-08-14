@@ -4,8 +4,8 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ExecutionJobData } from "../execution/execution-pool";
 import { buildOtelResourceAttributes } from "../execution/child-environment";
+import type { ExecutionJobData } from "../execution/execution-pool";
 import {
   handleCancelledJobResult,
   handleFailedJobResult,

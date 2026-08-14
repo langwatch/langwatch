@@ -114,9 +114,11 @@ export class ScenarioCancellationService {
 
     const now = Date.now();
 
-    // Dispatch cancel_requested event — the process manager broadcasts to
-    // all workers; queued runs are finished CANCELLED by the process manager
-    // itself since no worker will ever pick them up.
+    // Dispatch cancel_requested event — the process manager broadcasts to all
+    // workers and finishes a queued run CANCELLED itself rather than waiting
+    // out the grace window. Queued still gets the broadcast: a run is
+    // submitted to the pool the moment it is queued, so a worker may already
+    // be holding it behind a busy slot.
     await this.dispatchCancelRequested({
       tenantId: projectId,
       scenarioRunId,

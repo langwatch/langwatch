@@ -59,7 +59,19 @@ export class SimulationRunMetricsRepositoryClickHouse
     // Map-projection batches are tenant-scoped, so every row in one call
     // carries the same TenantId (stamped on the record itself, per the
     // BulkAppendContext contract).
+    //
+    // This one value chooses the ClickHouse the whole batch is written to, so
+    // a batch that ever broke that invariant would land one tenant's rows in
+    // another tenant's database. Cheap to check, and the only alternative is
+    // trusting a comment. A plain Error on purpose: it is a broken internal
+    // invariant, not something a caller can act on.
     const tenantId = rows[0]!.TenantId;
+    const foreign = rows.find((row) => row.TenantId !== tenantId);
+    if (foreign) {
+      throw new Error(
+        `simulation_run_metrics batch mixes tenants (${tenantId} and ${foreign.TenantId}); refusing to write`,
+      );
+    }
 
     const values: ClickHouseSimulationRunMetricsWriteRecord[] = rows.map(
       (row) => ({

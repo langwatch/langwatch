@@ -184,7 +184,7 @@ describe("FinishRunCommand", () => {
     });
   });
 
-  describe("statics", () => {
+  describe("when the caller uses the static routing helpers", () => {
     it("keeps the routing/idempotency contract of the old pure command", () => {
       const payload = makeCommand().data;
       expect(FinishRunCommand.getAggregateId(payload)).toBe("run-1");

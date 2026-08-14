@@ -668,7 +668,7 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
     });
   });
 
-  describe("data boundary", () => {
+  describe("when an event carries conversation content", () => {
     // Unique marker strings: if any of these survives into the view, the
     // process state, or an intent payload, conversation content crossed the
     // boundary and is about to be persisted into inbox/outbox rows.

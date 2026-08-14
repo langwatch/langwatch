@@ -130,8 +130,15 @@ export const handleRunQueued: EventHandler<
     projectId: ctx.projectId,
     scenarioRunId: ctx.key,
     phase: "queued",
+    // Business time: a record of when the run was queued, not a deadline.
     queuedAtMs: ctx.at,
-    lastActivityAtMs: ctx.at,
+    // Scheduling time, the same clock `handleRunActivity` stamps and the same
+    // one the wake measures against. Storing `ctx.at` here would reintroduce
+    // exactly what schedulingRef exists to stop: a backed-up subscriber
+    // delivers a queued event whose business time is already older than the
+    // stall threshold, and the first wake declares a run that just started
+    // stalled.
+    lastActivityAtMs: refMs,
     cancelRequestedAtMs: state.cancelRequestedAtMs,
   };
 

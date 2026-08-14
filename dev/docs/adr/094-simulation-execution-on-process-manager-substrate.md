@@ -43,7 +43,7 @@ Intents: `execute` (submit to the execution pool), `cancel` (broadcast to the
 `scenario:cancel` Redis channel), `finish` (dispatch `finishRun`). All intents
 ride the leased PG outbox with deterministic message keys
 (`execute:<runId>`, `cancel:<runId>`, `finish:<runId>:<reason>`), so dispatch
-is retried until it lands and redeliveries dedup.
+is retried up to the outbox's five attempts and redeliveries dedup.
 
 There is no `.schedule()` — wakes are per-run deadlines:
 
@@ -138,7 +138,7 @@ release cycle.
 
 - A queued run can no longer be silently dropped: the execute intent is a
   durable outbox row that survives worker restarts and is retried until the
-  pool accepts it.
+  pool accepts it or the outbox's five attempts are spent.
 - Cancellation is durable end to end. Redis pub/sub remains the low-latency
   broadcast, but a lost message is backstopped by the cancel-grace wake
   instead of a dual-write in the service layer.
