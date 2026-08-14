@@ -27,7 +27,7 @@ const withGuards = (
 ): Promise<unknown> => {
   const run: GuardNext = (p) =>
     guardProjectId(p, (q) => guardOrganizationId(q, (r) => execute(r.args)));
-  return withQueryTiming(params, () => guardEnMasse(params, run));
+  return withQueryTiming({ params, run: () => guardEnMasse(params, run) });
 };
 
 const createGuardedPrismaClient = (): PrismaClient => {

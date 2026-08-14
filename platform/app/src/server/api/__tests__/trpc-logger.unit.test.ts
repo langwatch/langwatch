@@ -3,7 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   handleTrpcCallLogging,
-  isSilencedCall,
+  recordTrpcCall,
   resetSlowCallThrottle,
 } from "../trpc";
 
@@ -383,11 +383,15 @@ describe("a call that succeeds slowly", () => {
   });
 
   describe("given a procedure that is slow on every call", () => {
-    const callSlowly = (
-      log: ReturnType<typeof createMockLog>,
-      times: number,
-      now: number,
-    ) => {
+    const callSlowly = ({
+      log,
+      times,
+      now,
+    }: {
+      log: ReturnType<typeof createMockLog>;
+      times: number;
+      now: number;
+    }) => {
       for (let i = 0; i < times; i++) {
         handleTrpcCallLogging({
           ...baseArgs,
@@ -407,7 +411,7 @@ describe("a call that succeeds slowly", () => {
       it("warns once and leaves the rest at info, so no record is lost", () => {
         const log = createMockLog();
 
-        callSlowly(log, 50, 0);
+        callSlowly({ log, times: 50, now: 0 });
 
         expect(log.warn).toHaveBeenCalledTimes(1);
         expect(log.info).toHaveBeenCalledTimes(49);
@@ -418,9 +422,9 @@ describe("a call that succeeds slowly", () => {
       /** @scenario "A call over the budget is raised to warning" */
       it("reports how many calls the throttle suppressed", () => {
         const log = createMockLog();
-        callSlowly(log, 50, 0);
+        callSlowly({ log, times: 50, now: 0 });
 
-        callSlowly(log, 1, THROTTLE_MS);
+        callSlowly({ log, times: 1, now: THROTTLE_MS });
 
         expect(log.warn).toHaveBeenCalledTimes(2);
         expect(log.warn.mock.calls[1]![0]).toMatchObject({
@@ -431,15 +435,68 @@ describe("a call that succeeds slowly", () => {
   });
 
   describe("given a silenced path", () => {
-    describe("when a presence heartbeat is slow", () => {
+    describe("when a presence heartbeat succeeds slowly", () => {
       /** @scenario "A silenced path stays silent even when slow" */
-      it("stays silent, because the middleware never reaches the logger", () => {
-        // isSilencedCall short-circuits in loggerMiddleware before this
-        // function is called, so the guarantee is the caller's. Asserting it
-        // here would test a call that never happens; the middleware test
-        // covers the short-circuit itself.
-        expect(isSilencedCall("presence.heartbeat", "query")).toBe(true);
-        expect(isSilencedCall("scenarios.getById", "query")).toBe(false);
+      it("logs nothing at all, warning included", () => {
+        const log = createMockLog();
+
+        recordTrpcCall({
+          ...baseArgs,
+          path: "presence.heartbeat",
+          duration: 9000,
+          result: { ok: true },
+          log,
+          capture: vi.fn(),
+          slowCallBudgetMs: BUDGET_MS,
+          now: 0,
+        });
+
+        expect(log.warn).not.toHaveBeenCalled();
+        expect(log.info).not.toHaveBeenCalled();
+        expect(log.error).not.toHaveBeenCalled();
+      });
+
+      /**
+       * Without this the test above passes on a `recordTrpcCall` that logs
+       * nothing for anyone.
+       */
+      it("still warns for an ordinary path that is equally slow", () => {
+        const log = createMockLog();
+
+        recordTrpcCall({
+          ...baseArgs,
+          path: "scenarios.getById",
+          duration: 9000,
+          result: { ok: true },
+          log,
+          capture: vi.fn(),
+          slowCallBudgetMs: BUDGET_MS,
+          now: 0,
+        });
+
+        expect(log.warn).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when a heartbeat fails", () => {
+      /** @scenario "A silenced path still reports its failures" */
+      it("reports it, because the volume that earns the silence is happy-path volume", () => {
+        const log = createMockLog();
+
+        recordTrpcCall({
+          ...baseArgs,
+          path: "presence.heartbeat",
+          result: {
+            ok: false,
+            error: new TRPCError({ code: "INTERNAL_SERVER_ERROR" }),
+          },
+          log,
+          capture: vi.fn(),
+          slowCallBudgetMs: BUDGET_MS,
+          now: 0,
+        });
+
+        expect(log.error).toHaveBeenCalledTimes(1);
       });
     });
   });

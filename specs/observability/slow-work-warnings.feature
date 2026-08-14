@@ -130,13 +130,20 @@ Feature: A slow database query or a slow API call names itself in the log
       When a call fails in 9000 milliseconds with a platform fault
       Then the record is logged at error level
 
-    # Presence heartbeats are silenced by path before the record is built, so a
-    # slow one raises nothing. That is deliberate: they fire every few seconds
-    # per open tab, and a degraded server would turn the warning into the flood
-    # it exists to avoid.
+    # Presence heartbeats say nothing on the happy path however long they take.
+    # That is deliberate: they fire every few seconds per open tab, so a
+    # degraded server would turn this warning into the flood it exists to
+    # avoid. A heartbeat that fails is still reported — the volume that earns
+    # the silence is happy-path volume.
     @unit
     Scenario: A silenced path stays silent even when slow
       Given the slow call budget is 3000 milliseconds
       When a presence heartbeat succeeds in 9000 milliseconds
-      Then the path is classified as silenced
-      And an ordinary path is not
+      Then nothing is logged for it
+      But an ordinary call of the same duration is warned about
+
+    @unit
+    Scenario: A silenced path still reports its failures
+      Given the slow call budget is 3000 milliseconds
+      When a presence heartbeat fails
+      Then the failure is logged

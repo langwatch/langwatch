@@ -1,4 +1,5 @@
 import {
+  Box,
   Button,
   Grid,
   GridItem,
@@ -14,6 +15,7 @@ import { type UseFormReturn, useWatch } from "react-hook-form";
 import {
   applyHandledErrorToForm,
   FormServerError,
+  HandledErrorState,
   showErrorToast,
 } from "~/features/errors";
 import type { Scenario } from "~/generated/prisma/client";
@@ -164,17 +166,27 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
 
   const isOpen = props.open !== false && props.open !== undefined;
   const onClose = props.onClose ?? closeDrawer;
-  const { data: scenario, isLoading: isScenarioLoading } =
-    api.scenarios.getById.useQuery(
-      { projectId: project?.id ?? "", id: scenarioId ?? "" },
-      { enabled: !!project && !!scenarioId },
-    );
+  const {
+    data: scenario,
+    isLoading: isScenarioLoading,
+    isError: isScenarioReadFailed,
+    error: scenarioReadError,
+    refetch: refetchScenario,
+  } = api.scenarios.getById.useQuery(
+    { projectId: project?.id ?? "", id: scenarioId ?? "" },
+    { enabled: !!project && !!scenarioId },
+  );
   // Editing an existing scenario means the fields are empty until the query
   // answers. Without this the drawer renders a complete, blank form, which
   // reads as "the scenario has no name and no criteria" rather than "not
   // loaded yet" — and the person who just asked an agent to write it cannot
   // tell the difference.
   const isHydrating = !!scenarioId && isScenarioLoading;
+  // A read that fails ends the wait without producing a record, so the form
+  // would come back with every field at its default. That is the blank form
+  // the skeleton exists to prevent, and worse: the fields are editable, so
+  // the person can fill in what looks like their scenario and save it.
+  const hasReadFailed = !!scenarioId && isScenarioReadFailed;
   const createMutation = api.scenarios.create.useMutation({
     onSuccess: (data: Scenario) => {
       void utils.scenarios.getAll.invalidate({ projectId: project?.id ?? "" });
@@ -311,16 +323,24 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       const projectId = project?.id;
       if (!projectId) return null;
 
-      return scenario
-        ? await updateExisting({
-            projectId,
-            scenarioId: scenario.id,
-            data,
-            models,
-          })
-        : await createScenario({ projectId, data, skipTransition, models });
+      // Branching on the loaded record alone made "we have not read it yet"
+      // and "there is nothing to read" the same condition, so a save during
+      // the read — or after one that failed — created a second scenario
+      // instead of updating the one being edited. Being pointed at a scenario
+      // is what decides this; the record only decides whether we can act yet.
+      if (scenarioId) {
+        if (!scenario) return null;
+        return await updateExisting({
+          projectId,
+          scenarioId: scenario.id,
+          data,
+          models,
+        });
+      }
+
+      return await createScenario({ projectId, data, skipTransition, models });
     },
-    [project?.id, scenario, updateExisting, createScenario],
+    [project?.id, scenarioId, scenario, updateExisting, createScenario],
   );
   const handleSaveAndRun = useCallback(
     async (target: TargetValue) => {
@@ -511,7 +531,12 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
               borderRightWidth="1px"
               borderColor="border"
             >
-              {isHydrating ? (
+              {hasReadFailed ? (
+                <ScenarioReadError
+                  error={scenarioReadError}
+                  onRetry={() => void refetchScenario()}
+                />
+              ) : isHydrating ? (
                 <ScenarioFormSkeleton />
               ) : (
                 <>
@@ -532,23 +557,28 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         </Drawer.Body>
         {/* Bottom Bar */}
         <Drawer.Footer borderTopWidth="1px" justifyContent="space-between">
-          {formInstance && !isHydrating && <FooterLabels form={formInstance} />}
+          {formInstance && !isHydrating && !hasReadFailed && (
+            <FooterLabels form={formInstance} />
+          )}
           <HStack gap={2} flexShrink={0}>
             <Button variant="outline" size="sm" onClick={onClose}>
               Cancel
             </Button>
-            {/* Saving before the scenario has been read would take `scenario`
-                as absent and create a second one instead of updating this
-                one, so the actions stay busy until it has arrived. */}
-            <SaveAndRunMenu
-              selectedTarget={selectedTarget}
-              onTargetChange={handleTargetChange}
-              onSaveAndRun={handleSaveAndRun}
-              onSaveWithoutRunning={handleSaveWithoutRunning}
-              onCreateAgent={handleCreateAgent}
-              onCreatePrompt={() => setPromptDrawerOpen(true)}
-              isLoading={isSubmitting || isHydrating}
-            />
+            {/* There is nothing to save while the scenario is still being read,
+                and nothing to save at all once the read has failed: the body
+                is an error state, not a form. `handleSave` refuses either way,
+                so this is what says so rather than what enforces it. */}
+            {!hasReadFailed && (
+              <SaveAndRunMenu
+                selectedTarget={selectedTarget}
+                onTargetChange={handleTargetChange}
+                onSaveAndRun={handleSaveAndRun}
+                onSaveWithoutRunning={handleSaveWithoutRunning}
+                onCreateAgent={handleCreateAgent}
+                onCreatePrompt={() => setPromptDrawerOpen(true)}
+                isLoading={isSubmitting || isHydrating}
+              />
+            )}
           </HStack>
         </Drawer.Footer>
       </Drawer.Content>
@@ -591,6 +621,36 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         }}
       />
     </Drawer.Root>
+  );
+}
+
+/**
+ * Stands in for the form when the scenario could not be read.
+ *
+ * The alternative is the form at its defaults, which invites the person to
+ * retype a scenario that already exists — and the save would have created a
+ * second copy of it. Copy comes from the code-keyed registry like every other
+ * error surface; the way forward is to read it again.
+ */
+function ScenarioReadError({
+  error,
+  onRetry,
+}: {
+  error: unknown;
+  onRetry: () => void;
+}) {
+  return (
+    <Box data-testid="scenario-read-error">
+      <HandledErrorState
+        error={error}
+        fallbackTitle="Couldn't load this scenario"
+        fullHeight={false}
+      >
+        <Button size="sm" onClick={onRetry}>
+          Try again
+        </Button>
+      </HandledErrorState>
+    </Box>
   );
 }
 

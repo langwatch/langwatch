@@ -114,6 +114,8 @@ const mocks = vi.hoisted(() => ({
     labels: string[];
   } | null,
   mockGetByIdLoading: false,
+  mockGetByIdError: false,
+  mockGetByIdRefetch: vi.fn(),
 }));
 
 vi.mock("~/utils/api", () => ({
@@ -165,6 +167,11 @@ vi.mock("~/utils/api", () => ({
         useQuery: () => ({
           data: mocks.mockGetByIdData,
           isLoading: mocks.mockGetByIdLoading,
+          isError: mocks.mockGetByIdError,
+          error: mocks.mockGetByIdError
+            ? new Error("scenario read failed")
+            : null,
+          refetch: mocks.mockGetByIdRefetch,
         }),
       },
     },
@@ -276,6 +283,7 @@ describe("<ScenarioFormDrawer/>", () => {
     mocks.mockComplexProps = {};
     mocks.mockGetByIdData = null;
     mocks.mockGetByIdLoading = false;
+    mocks.mockGetByIdError = false;
     mocks.mockCreateMutateAsync.mockResolvedValue({
       id: "new-scenario-id",
       name: "Refund Request Test",
@@ -416,7 +424,10 @@ describe("<ScenarioFormDrawer/>", () => {
     });
 
     it("displays 'Edit Scenario' heading", () => {
-      render(<ScenarioFormDrawer open={true} />, { wrapper: Wrapper });
+      render(
+        <ScenarioFormDrawer open={true} scenarioId="existing-scenario-id" />,
+        { wrapper: Wrapper },
+      );
 
       expect(screen.getByText("Edit Scenario")).toBeInTheDocument();
     });
@@ -426,9 +437,16 @@ describe("<ScenarioFormDrawer/>", () => {
         const user = userEvent.setup();
         const onClose = vi.fn();
 
-        render(<ScenarioFormDrawer open={true} onClose={onClose} />, {
-          wrapper: Wrapper,
-        });
+        render(
+          <ScenarioFormDrawer
+            open={true}
+            scenarioId="existing-scenario-id"
+            onClose={onClose}
+          />,
+          {
+            wrapper: Wrapper,
+          },
+        );
 
         const saveButton = screen.getByTestId("save-button");
         await user.click(saveButton);
@@ -461,9 +479,16 @@ describe("<ScenarioFormDrawer/>", () => {
       const user = userEvent.setup();
       const onClose = vi.fn();
 
-      render(<ScenarioFormDrawer open={true} onClose={onClose} />, {
-        wrapper: Wrapper,
-      });
+      render(
+        <ScenarioFormDrawer
+          open={true}
+          scenarioId="existing-scenario-id"
+          onClose={onClose}
+        />,
+        {
+          wrapper: Wrapper,
+        },
+      );
 
       const saveButton = screen.getByTestId("save-button");
       await user.click(saveButton);
@@ -479,9 +504,16 @@ describe("<ScenarioFormDrawer/>", () => {
     it("displays an error message", async () => {
       const user = userEvent.setup();
 
-      render(<ScenarioFormDrawer open={true} onClose={vi.fn()} />, {
-        wrapper: Wrapper,
-      });
+      render(
+        <ScenarioFormDrawer
+          open={true}
+          scenarioId="existing-scenario-id"
+          onClose={vi.fn()}
+        />,
+        {
+          wrapper: Wrapper,
+        },
+      );
 
       const saveButton = screen.getByTestId("save-button");
       await user.click(saveButton);
@@ -526,9 +558,16 @@ describe("<ScenarioFormDrawer/>", () => {
         const user = userEvent.setup();
         const onClose = vi.fn();
 
-        render(<ScenarioFormDrawer open={true} onClose={onClose} />, {
-          wrapper: Wrapper,
-        });
+        render(
+          <ScenarioFormDrawer
+            open={true}
+            scenarioId="existing-scenario-id"
+            onClose={onClose}
+          />,
+          {
+            wrapper: Wrapper,
+          },
+        );
 
         const saveAndRunButton = screen.getByTestId("save-and-run-button");
         await user.click(saveAndRunButton);
@@ -549,9 +588,16 @@ describe("<ScenarioFormDrawer/>", () => {
         const user = userEvent.setup();
         const onClose = vi.fn();
 
-        render(<ScenarioFormDrawer open={true} onClose={onClose} />, {
-          wrapper: Wrapper,
-        });
+        render(
+          <ScenarioFormDrawer
+            open={true}
+            scenarioId="existing-scenario-id"
+            onClose={onClose}
+          />,
+          {
+            wrapper: Wrapper,
+          },
+        );
 
         const saveAndRunButton = screen.getByTestId("save-and-run-button");
         await user.click(saveAndRunButton);
@@ -567,9 +613,16 @@ describe("<ScenarioFormDrawer/>", () => {
         const user = userEvent.setup();
         const onClose = vi.fn();
 
-        render(<ScenarioFormDrawer open={true} onClose={onClose} />, {
-          wrapper: Wrapper,
-        });
+        render(
+          <ScenarioFormDrawer
+            open={true}
+            scenarioId="existing-scenario-id"
+            onClose={onClose}
+          />,
+          {
+            wrapper: Wrapper,
+          },
+        );
 
         await user.click(screen.getByTestId("save-and-run-button"));
 
@@ -798,6 +851,82 @@ describe("<ScenarioFormDrawer/>", () => {
         "data-loading",
         "false",
       );
+    });
+  });
+
+  /**
+   * specs/scenarios/scenario-editor-loading-state.feature
+   *
+   * A failed read ends the wait without a record. Treated as loaded, the
+   * drawer hands back an editable blank form over a scenario that exists,
+   * and the save that follows creates a second one.
+   */
+  describe("when the existing scenario could not be read", () => {
+    beforeEach(() => {
+      mocks.mockDrawerParams = { scenarioId: "scenario-123" };
+      mocks.mockGetByIdData = null;
+      mocks.mockGetByIdLoading = false;
+      mocks.mockGetByIdError = true;
+    });
+
+    /** @scenario "A failed read says so instead of showing empty fields" */
+    it("says it could not load the scenario instead of offering the fields", () => {
+      render(<ScenarioFormDrawer open={true} scenarioId="scenario-123" />, {
+        wrapper: Wrapper,
+      });
+
+      expect(screen.getByTestId("scenario-read-error")).toBeInTheDocument();
+      expect(screen.queryByPlaceholderText("e.g., Angry refund request")).toBe(
+        null,
+      );
+      expect(screen.queryByTestId("scenario-form-skeleton")).toBe(null);
+    });
+
+    /** @scenario "A failed read offers the read again" */
+    it("reads the scenario again when asked to try again", async () => {
+      const user = userEvent.setup();
+      render(<ScenarioFormDrawer open={true} scenarioId="scenario-123" />, {
+        wrapper: Wrapper,
+      });
+
+      await user.click(screen.getByRole("button", { name: "Try again" }));
+
+      expect(mocks.mockGetByIdRefetch).toHaveBeenCalled();
+    });
+
+    /** @scenario "A failed read does not offer to save" */
+    it("does not offer the save actions over a scenario it never read", () => {
+      render(<ScenarioFormDrawer open={true} scenarioId="scenario-123" />, {
+        wrapper: Wrapper,
+      });
+
+      expect(screen.queryByTestId("save-and-run-menu")).toBe(null);
+    });
+  });
+
+  /**
+   * The duplicate this whole loading state exists to prevent. The UI gating
+   * above is what says so; this is the guarantee underneath it, asserted by
+   * driving the save with no record present.
+   */
+  describe("when a save is attempted before the scenario has been read", () => {
+    /** @scenario "Editing never creates a second scenario" */
+    it("creates nothing, because being pointed at a scenario means editing it", async () => {
+      const user = userEvent.setup();
+      mocks.mockDrawerParams = { scenarioId: "scenario-123" };
+      mocks.mockGetByIdData = null;
+      mocks.mockGetByIdLoading = false;
+
+      render(<ScenarioFormDrawer open={true} scenarioId="scenario-123" />, {
+        wrapper: Wrapper,
+      });
+
+      await user.click(screen.getByTestId("save-button"));
+
+      await waitFor(() => {
+        expect(mocks.mockCreateMutateAsync).not.toHaveBeenCalled();
+      });
+      expect(mocks.mockUpdateMutateAsync).not.toHaveBeenCalled();
     });
   });
 

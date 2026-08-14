@@ -50,10 +50,13 @@ export function resolveSlowQueryBudgetMs(
  * operations report no keys at all. Same rule the ClickHouse client follows
  * with `paramKeys`.
  */
-export function safeArgKeys(
-  action: string,
-  args: unknown,
-): string[] | undefined {
+export function safeArgKeys({
+  action,
+  args,
+}: {
+  action: string;
+  args: unknown;
+}): string[] | undefined {
   if (RAW_ACTIONS.has(action)) return undefined;
   if (!args || typeof args !== "object" || Array.isArray(args))
     return undefined;
@@ -90,7 +93,7 @@ export function reportQueryDuration({
 
   try {
     const key = `${model ?? "-"}.${action}`;
-    const suppressed = throttle.claim(key, now);
+    const suppressed = throttle.claim({ key, now });
     if (suppressed === undefined) return;
 
     logger.warn(
@@ -100,7 +103,7 @@ export function reportQueryDuration({
         operation: action,
         durationMs: Math.round(durationMs),
         budgetMs,
-        argKeys: safeArgKeys(action, args),
+        argKeys: safeArgKeys({ action, args }),
         // Reads as zero on the first warning, which is the honest answer: it
         // stands for itself alone.
         suppressedSincePrevious: suppressed,
@@ -119,10 +122,13 @@ export function reportQueryDuration({
  * which logs it with the cause attached, and a slow warning on top would
  * describe the same event a second time under a level that disagrees.
  */
-export async function withQueryTiming<T>(
-  params: { model?: string; action: string; args: unknown },
-  run: () => Promise<T>,
-): Promise<T> {
+export async function withQueryTiming<T>({
+  params,
+  run,
+}: {
+  params: { model?: string; action: string; args: unknown };
+  run: () => Promise<T>;
+}): Promise<T> {
   const startedAt = performance.now();
   const result = await run();
   reportQueryDuration({ ...params, durationMs: performance.now() - startedAt });

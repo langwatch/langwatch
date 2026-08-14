@@ -793,7 +793,7 @@ export const tracerMiddleware = t.middleware(
     // so the error span's duration matches the actual call.
     const parentContext = callerTraceContext({ req: ctx.req, type });
 
-    if (isSilencedCall(path, type)) {
+    if (isSilencedCall({ path, type })) {
       const startTime = Date.now();
       const result = await next();
       if (result.ok) return result;
@@ -1043,7 +1043,7 @@ export function handleTrpcCallLogging({
   // cause. It is raised only because the time it took is worth watching by
   // rate, which is what warning means here.
   if (slowCallBudgetMs > 0 && duration > slowCallBudgetMs) {
-    const suppressed = slowCallThrottle.claim(path, now);
+    const suppressed = slowCallThrottle.claim({ key: path, now });
     if (suppressed !== undefined) {
       log.warn(
         {
@@ -1080,8 +1080,36 @@ function isSilencedPath(path: string): boolean {
   return SILENCED_LOG_PATH_PREFIXES.some((p) => path.startsWith(p));
 }
 
-export function isSilencedCall(path: string, type: string): boolean {
+function isSilencedCall({
+  path,
+  type,
+}: {
+  path: string;
+  type: string;
+}): boolean {
   return isSilencedPath(path) || SILENCED_LOG_TYPES.has(type);
+}
+
+/**
+ * Records one finished tRPC call: decides whether it is logged at all, then
+ * how loudly.
+ *
+ * The two halves belong together. Silencing runs first and drops the record
+ * entirely, so "a slow presence heartbeat raises nothing" is a property of the
+ * pair and of neither alone — asserting it against the classifier proves only
+ * that a boolean is what it is, and asserting it against the logger tests a
+ * call the middleware never makes. This is the seam that can be asked the real
+ * question.
+ */
+export function recordTrpcCall(
+  args: Parameters<typeof handleTrpcCallLogging>[0],
+): void {
+  // Errors are still reported on a silenced path: the volume that earns the
+  // silence is happy-path volume, and a failing heartbeat is worth seeing.
+  if (isSilencedCall({ path: args.path, type: args.type }) && args.result.ok) {
+    return;
+  }
+  handleTrpcCallLogging(args);
 }
 
 export const loggerMiddleware = t.middleware(
@@ -1102,14 +1130,7 @@ export const loggerMiddleware = t.middleware(
       const result = await next();
       const duration = Date.now() - start;
 
-      // Silence happy-path logs for high-frequency, low-signal routes
-      // (presence heartbeats) — still log errors so real failures are
-      // visible.
-      if (isSilencedCall(path, type) && result.ok) {
-        return result;
-      }
-
-      handleTrpcCallLogging({
+      recordTrpcCall({
         result,
         path,
         type,

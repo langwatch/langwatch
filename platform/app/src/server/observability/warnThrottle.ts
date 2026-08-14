@@ -25,7 +25,7 @@ export type WarnThrottle = {
    * since this identity last warned, or undefined when it is still inside its
    * interval and must stay quiet.
    */
-  claim: (key: string, now: number) => number | undefined;
+  claim: (params: { key: string; now: number }) => number | undefined;
   /** Drops all state. Process-wide state must not leak between tests. */
   reset: () => void;
 };
@@ -34,7 +34,7 @@ export function createWarnThrottle(intervalMs: number): WarnThrottle {
   const state = new Map<string, ThrottleEntry>();
 
   return {
-    claim(key, now) {
+    claim({ key, now }) {
       const entry = state.get(key);
       if (entry && now - entry.lastWarnedAt < intervalMs) {
         entry.suppressed += 1;

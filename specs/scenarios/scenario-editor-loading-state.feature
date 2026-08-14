@@ -55,3 +55,35 @@ Feature: The scenario editor says when it is still reading
     When no scenario has been read
     Then the fields are offered immediately
     And no placeholder is shown
+
+  # A failed read ends the wait without producing a record. Treated as "loaded",
+  # it gives back the same blank form the placeholder exists to prevent, except
+  # now the fields are editable and saving them creates a second scenario.
+  Rule: A scenario that could not be read is not offered as a form
+
+    @integration
+    Scenario: A failed read says so instead of showing empty fields
+      Given the editor is opened on an existing scenario
+      When the scenario could not be read
+      Then the editor says it could not load the scenario
+      And no empty form field is offered
+
+    @integration
+    Scenario: A failed read offers the read again
+      Given the editor is opened on an existing scenario
+      When the scenario could not be read
+      And the person asks to try again
+      Then the scenario is read again
+
+    @integration
+    Scenario: A failed read does not offer to save
+      Given the editor is opened on an existing scenario
+      When the scenario could not be read
+      Then the save actions are not offered
+
+    @integration
+    Scenario: Editing never creates a second scenario
+      Given the editor is opened on an existing scenario
+      When the scenario has not been read yet
+      And a save is attempted anyway
+      Then no scenario is created

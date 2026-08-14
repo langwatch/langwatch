@@ -101,19 +101,21 @@ describe("the Postgres slow-query warning", () => {
     describe("when the operation rejects after exceeding the budget", () => {
       /** @scenario "A failing query is left to the caller to report" */
       it("re-raises the error and logs no warning", async () => {
-        // The two readings withQueryTiming takes: start, then finish.
-        vi.spyOn(performance, "now")
-          .mockReturnValueOnce(0)
-          .mockReturnValueOnce(900);
+        // One reading, not two: the rejection propagates out of the await, so
+        // the finish reading is never taken and nothing is reported. Counting
+        // the readings is what proves that, rather than inferring it from the
+        // absence of a warning — which a fast call would produce too.
+        const clock = vi.spyOn(performance, "now").mockReturnValue(0);
         const boom = new Error("connection reset");
 
         await expect(
-          withQueryTiming(
-            { model: "Scenario", action: "findFirst", args: {} },
-            () => Promise.reject(boom),
-          ),
+          withQueryTiming({
+            params: { model: "Scenario", action: "findFirst", args: {} },
+            run: () => Promise.reject(boom),
+          }),
         ).rejects.toBe(boom);
 
+        expect(clock).toHaveBeenCalledTimes(1);
         expect(warn).not.toHaveBeenCalled();
       });
     });
@@ -126,10 +128,10 @@ describe("the Postgres slow-query warning", () => {
           .mockReturnValueOnce(900);
 
         await expect(
-          withQueryTiming(
-            { model: "Scenario", action: "findFirst", args: {} },
-            () => Promise.resolve("ok"),
-          ),
+          withQueryTiming({
+            params: { model: "Scenario", action: "findFirst", args: {} },
+            run: () => Promise.resolve("ok"),
+          }),
         ).resolves.toBe("ok");
 
         expect(warn).toHaveBeenCalledTimes(1);
@@ -184,7 +186,15 @@ describe("the Postgres slow-query warning", () => {
   });
 
   describe("given a query that is slow on every call", () => {
-    const runSlowly = (times: number, now: number, model = "Scenario") => {
+    const runSlowly = ({
+      times,
+      now,
+      model = "Scenario",
+    }: {
+      times: number;
+      now: number;
+      model?: string;
+    }) => {
       for (let i = 0; i < times; i++) {
         reportQueryDuration({
           model,
@@ -200,7 +210,7 @@ describe("the Postgres slow-query warning", () => {
     describe("when it runs 50 times inside one throttle interval", () => {
       /** @scenario "The same slow query warns once per interval" */
       it("warns once", () => {
-        runSlowly(50, 0);
+        runSlowly({ times: 50, now: 0 });
 
         expect(warn).toHaveBeenCalledTimes(1);
       });
@@ -209,10 +219,10 @@ describe("the Postgres slow-query warning", () => {
     describe("when the interval elapses and it runs slowly again", () => {
       /** @scenario "A throttled warning states how many calls it stands for" */
       it("reports how many calls the throttle suppressed", () => {
-        runSlowly(50, 0);
+        runSlowly({ times: 50, now: 0 });
         warn.mockClear();
 
-        runSlowly(1, THROTTLE_MS);
+        runSlowly({ times: 1, now: THROTTLE_MS });
 
         expect(warn).toHaveBeenCalledTimes(1);
         // 50 calls, the first of which warned: 49 went unreported.
@@ -225,8 +235,8 @@ describe("the Postgres slow-query warning", () => {
     describe("when a different model is also slow inside the interval", () => {
       /** @scenario "A different query is not throttled by its neighbour" */
       it("warns for each identity separately", () => {
-        runSlowly(1, 0, "Scenario");
-        runSlowly(1, 0, "Project");
+        runSlowly({ times: 1, now: 0, model: "Scenario" });
+        runSlowly({ times: 1, now: 0, model: "Project" });
 
         expect(warn).toHaveBeenCalledTimes(2);
       });
