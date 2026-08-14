@@ -7,15 +7,15 @@ description: Reference project secrets from an HTTP target, and connect an API p
 
 # Testing Agents Behind Authentication
 
-Many production agents sit behind an API that requires authentication. A **static credential** (`bearer` / `api_key` / `basic`) is enough for most of them, and an HTTP target reads that credential straight from your project's secrets. An **OAuth2 client-credentials** flow (Auth0 "machine-to-machine" is the canonical example) is the case a static credential cannot cover, because a token has to be **exchanged** first.
+Many production agents sit behind an API that requires authentication. A **static credential** (`bearer` / `api_key` / `basic`) is sufficient for most of them, and an HTTP target reads that credential from your project's secrets. An **OAuth2 client-credentials** flow (Auth0 "machine-to-machine" is the usual example) needs more, because a token must be **exchanged** first.
 
-Start with the HTTP target below. When the credential has to be exchanged, a **custom code agent** closes that gap: a few lines of Python that fetch the token, call your API with it, and keep the credentials in your project's encrypted secret store, never in the agent's stored source.
+Start with the HTTP target below. When the credential must be exchanged, use a **custom code agent**. It is a few lines of Python that fetch the token and call your API with it. The credentials stay in your project's encrypted secret store, never in the agent's stored source.
 
 ## Referencing project secrets from an HTTP target
 
-An HTTP target reads a project secret as `{{ secrets.NAME }}`, so an API key never has to be typed into the target's configuration, where anyone who can open the target can read it back. Store the credential in **Settings → Secrets**, then reference it by name.
+An HTTP target reads a project secret as `{{ secrets.NAME }}`. You then do not type the API key into the target's configuration, where all users who can open the target can read it. Store the credential in **Settings → Secrets**, then reference it by name.
 
-References resolve in the places a credential belongs:
+References resolve in these fields:
 
 | Field | Resolves |
 |---|---|
@@ -26,15 +26,15 @@ References resolve in the places a credential belongs:
 | Auth: basic username and password | Yes |
 | Body template | No |
 
-The body template carries the conversation and is authored by whoever writes the scenario, not by whoever holds the credential, so a reference written there is sent on exactly as it appears. A reference to a name the project does not have stays verbatim too, rather than becoming an empty string, so the request fails as a missing secret instead of as an unauthenticated call.
+A reference in the body template is sent as written. A reference to a secret name the project does not have also stays as written, and does not become an empty string. The request then fails as a missing secret, and not as an unauthenticated call.
 
-Substitution happens when each request is built, so rotating a secret is honored on the next turn without touching the target. Resolved values are scrubbed from everything the run shows back: an error from a rejected request names the failure and carries `[redacted]` where the credential was.
+Substitution runs when each request is built. A secret that you rotate applies on the next turn, and you do not change the target. The run removes resolved values from everything it shows back. An error from a rejected request gives the failure and shows `[redacted]` where the credential was.
 
 Auth fields typed in directly still work exactly as typed. A value with no `{{ secrets.NAME }}` in it is sent unchanged.
 
-Code agents and workflow targets read the same `secrets.NAME` namespace, which is what the rest of this page builds on.
+Code agents and workflow targets read the same `secrets.NAME` namespace.
 
-A value that is not a credential, such as a tenant or a fixture id, belongs in a [run parameter](/agent-simulations/scenario-parameters) instead. Those are read as `{{ params.NAME }}`, can be changed when the run starts, and are recorded on the run.
+A value that is not a credential, for example a tenant or a fixture id, goes in a [run parameter](/agent-simulations/scenario-parameters). A run parameter is read as `{{ params.NAME }}`. You can change it when the run starts, and it is recorded on the run.
 
 ## How it fits together
 

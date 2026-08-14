@@ -246,7 +246,7 @@ langwatch suite run <suite-id>                # kicks off every scenario × targ
 
 ### Pass values into a run
 
-Every run command takes a repeatable `--param key=value`. The values are the constants a run shares: a fixture id, a tenant, a plan, a region.
+Every run command accepts a repeatable `--param key=value`. A parameter is a constant value that the whole run shares: a fixture id, a tenant, a plan, a region.
 
 ```bash
 langwatch suite run <suite-id> --param account_tier=platinum --param region=eu-central
@@ -255,13 +255,13 @@ langwatch experiment run <experiment-slug> --param model=gpt-5-mini
 langwatch workflow run <workflow-id> --input '{"question":"where is my order?"}' --param region=eu-central
 ```
 
-A value is read as the type it looks like. Exactly `true` or `false` is a boolean, and a number that renders back to exactly what you typed is a number. Everything else stays text, which is what keeps `007`, `1.50` and a long account number as the identifiers they are. Repeating a name keeps the last value.
+The value type follows the text you type. `true` and `false` are booleans. A value that parses as a number and prints back the same is a number. All other values stay text, so `007` and `1.50` stay text. When you repeat a name, the last value wins.
 
-Where the values land depends on the command:
+Each command uses the values differently:
 
-- `suite run` and `scenario run` supply the parameters the scenarios declare. A name no scenario in the run declares is rejected before anything is scheduled. See [Scenario run parameters](/agent-simulations/scenario-parameters).
-- `experiment run` merges them into every dataset row, the same as the `parameters` field of the [experiments run API](/evaluations/experiments/ci-cd#choosing-what-to-evaluate).
-- `workflow run` sends them as entry inputs, merged over `--input`, so a `--param` pair wins where both name the same key.
+- `suite run` and `scenario run` supply the parameters that the scenarios declare. A name that no scenario in the run declares is rejected before anything is scheduled. See [Scenario run parameters](/agent-simulations/scenario-parameters).
+- `experiment run` merges the values into every dataset row. See [Running experiments in CI/CD](/evaluations/experiments/ci-cd#choosing-what-to-evaluate).
+- `workflow run` sends the values as entry inputs. They are merged over `--input`, so a `--param` pair wins when both name the same key.
 
 ### Inspect simulation runs
 
@@ -810,7 +810,7 @@ Agents must ask the user for permission first, then pass `--user-approved`. Secr
 
 ## The background daemon
 
-Non-interactive invocations, an agent piping output, CI, any call whose stdin/stdout/stderr is not a TTY, are served by a warm background daemon instead of paying node's cold start on every call. Interactive (terminal) invocations always run in-process and are unaffected, as are commands that mutate auth or take over stdio (`login`, `logout`, `config`, `open`, `request-increase`, `init-shell`, `report`, the `claude`/`codex`/`cursor`/`gemini`/`opencode` wrappers, `daemon` itself) and long-running flags (`--follow`, `--watch`). Windows is excluded too, since the daemon is not supported there, so on Windows every invocation runs in-process.
+Non-interactive invocations are served by a warm background daemon instead of paying node's cold start on every call. An invocation is non-interactive when an agent pipes the output, when it runs in CI, or when its stdin, stdout or stderr is not a TTY. Interactive (terminal) invocations always run in-process and are unaffected, as are commands that mutate auth or take over stdio (`login`, `logout`, `config`, `open`, `request-increase`, `init-shell`, `report`, the `claude`/`codex`/`cursor`/`gemini`/`opencode` wrappers, `daemon` itself) and long-running flags (`--follow`, `--watch`). Windows is excluded too, since the daemon is not supported there, so on Windows every invocation runs in-process.
 
 What to know:
 

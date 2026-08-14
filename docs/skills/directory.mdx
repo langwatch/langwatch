@@ -1643,7 +1643,7 @@ Targets are written `<type>:<referenceId>`. Valid types: `prompt`, `http`, `code
 - `--target` is **required** and takes exactly **one** value. (`suite create` spells the same idea `--targets`, plural and variadic, see below.)
 - Bad references are caught when the run is scheduled, not when the scenario was created: `Invalid target references: …` means you invented an id. Go back to step 3 and read a real one.
 - Add `--wait` only when the caller can afford to block: it polls every 3s for up to 10 minutes and exits non-zero if any run failed, which is the point in CI. In an interactive turn, skip it, hand over the link, and let the page stream results in.
-- `--param name=value` is repeatable and supplies one value for a parameter the scenario **declares** (`langwatch scenario get <id> --format json` lists them under `parameters`). It overrides that parameter's default for this run only. Without any `--param`, the run uses the declared defaults. A name no scenario in the run declares is rejected before anything is scheduled, so do not invent one. Exactly `true`/`false` reads as a boolean and a plain number as a number; everything else stays text, which is what keeps `007` an id rather than the number 7.
+- `--param name=value` is repeatable and supplies one value for a parameter the scenario **declares** (`langwatch scenario get <id> --format json` lists them under `parameters`). It overrides that parameter's default for this run only. Without any `--param`, the run uses the declared defaults. A name no scenario in the run declares is rejected before anything is scheduled, so do not invent one. `true` and `false` read as booleans and a plain number reads as a number; all other values stay text, so `007` stays the id `007`.
 
 #### 6. Or create a run plan: reusable, and the only way to hit several targets
 
@@ -3905,7 +3905,7 @@ Targets are written `<type>:<referenceId>`. Valid types: `prompt`, `http`, `code
 - `--target` is **required** and takes exactly **one** value. (`suite create` spells the same idea `--targets`, plural and variadic, see below.)
 - Bad references are caught when the run is scheduled, not when the scenario was created: `Invalid target references: …` means you invented an id. Go back to step 3 and read a real one.
 - Add `--wait` only when the caller can afford to block: it polls every 3s for up to 10 minutes and exits non-zero if any run failed, which is the point in CI. In an interactive turn, skip it, hand over the link, and let the page stream results in.
-- `--param name=value` is repeatable and supplies one value for a parameter the scenario **declares** (`langwatch scenario get <id> --format json` lists them under `parameters`). It overrides that parameter's default for this run only. Without any `--param`, the run uses the declared defaults. A name no scenario in the run declares is rejected before anything is scheduled, so do not invent one. Exactly `true`/`false` reads as a boolean and a plain number as a number; everything else stays text, which is what keeps `007` an id rather than the number 7.
+- `--param name=value` is repeatable and supplies one value for a parameter the scenario **declares** (`langwatch scenario get <id> --format json` lists them under `parameters`). It overrides that parameter's default for this run only. Without any `--param`, the run uses the declared defaults. A name no scenario in the run declares is rejected before anything is scheduled, so do not invent one. `true` and `false` read as booleans and a plain number reads as a number; all other values stay text, so `007` stays the id `007`.
 
 #### 6. Or create a run plan: reusable, and the only way to hit several targets
 
@@ -4181,7 +4181,7 @@ Examples: an LLM-judge evaluator flagging stale-data answers, a monitor on refus
 
 ### Settle open questions with experiments
 
-When two approaches compete (two prompts, two models, two retrieval settings), run an experiment instead of arguing: build a dataset from real traces (`datasets` skill), then run it once per variant with `langwatch experiment run <slug> --param model=<variant>` and compare. A `--param name=value` pair is a constant merged into every row, so one experiment covers both sides. Numbers close debates.
+When two approaches compete (two prompts, two models, two retrieval settings), run an experiment instead of arguing: build a dataset from real traces (`datasets` skill), then run it once per variant with `langwatch experiment run <slug> --param model=<variant>` and compare. A `--param name=value` pair is a constant value merged into every dataset row, so one experiment covers both variants. Numbers close debates.
 
 LangWatch's free plan has limits on prompts, scenarios, evaluators, experiments, and datasets. When you hit a limit, the API returns `"Free plan limit of N reached..."` with an upgrade link.
 
