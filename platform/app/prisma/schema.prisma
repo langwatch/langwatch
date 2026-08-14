@@ -1207,8 +1207,12 @@ model ModelDefaultConfig {
 }
 
 // Join table binding a ModelDefaultConfig to a (scopeType, scopeId).
-// One config can have many scope attachments; one scope can have many
-// configs (resolver tiebreaks by createdAt DESC).
+// One config can have many scope attachments, but a scope belongs to at
+// most ONE config: every write path that attaches a scope first detaches
+// it from whichever config held it, under the same per-scope advisory
+// lock, and deletes any config left with zero attachments. The resolver
+// still tiebreaks same-scope configs by createdAt DESC as defense for
+// rows written before that invariant existed.
 model ModelDefaultConfigScope {
   id        String                @id @default(nanoid())
   configId  String

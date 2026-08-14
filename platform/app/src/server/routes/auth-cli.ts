@@ -201,7 +201,7 @@ interface DeviceCodeRecord {
 
 /**
  * Phase 8 — device metadata captured at /exchange time so users can
- * see "Bob's MacBook Pro" entries in the /me/devices inventory and
+ * see "Bob's MacBook Pro" entries in the devices inventory and
  * revoke them per-device. All fields optional to stay
  * backwards-compatible with older CLI versions that don't send
  * client_info; rendered as "Unknown device" in the UI when missing.
@@ -236,7 +236,7 @@ interface AccessTokenRecord {
   issued_at: number;
   expires_at: number;
   /** Phase 8 — mirror of refresh-token client_info; useful for the
-   * /me/devices UI which reads access tokens directly. */
+   * devices inventory, which reads access tokens directly. */
   client_info?: ClientInfo;
 }
 
@@ -602,7 +602,8 @@ const exchangeRequestSchema = z.object({
    * `{ hostname: os.hostname(), uname: os.userInfo().username,
    *    platform: process.platform, device_label: <user-set> }`.
    * Older CLI builds that don't send it get rendered as
-   * "Unknown device" in /me/devices; new builds get a friendly label.
+   * "Unknown device" in the devices inventory; new builds get a friendly
+   * label.
    */
   client_info: clientInfoSchema,
 });
@@ -826,7 +827,7 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
     const accessToken = generateAccessToken();
     const refreshToken = generateRefreshToken();
     const now = Date.now();
-    // Phase 8 — stamp client device info so /me/devices can show
+    // Phase 8 — stamp client device info so the devices inventory can show
     // "Bob's MacBook Pro" entries. session_started_at is preserved
     // through future /refresh rotations so the dashboard can show
     // "logged in 5 days ago" rather than the rotation timestamp.
@@ -1014,7 +1015,7 @@ secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
   const newAccessToken = generateAccessToken();
   const newRefreshToken = generateRefreshToken();
   const now = Date.now();
-  // Preserve session_started_at across rotations so /me/devices can
+  // Preserve session_started_at across rotations so the devices inventory can
   // accurately show "logged in N days ago" even after many refreshes.
   const carriedClientInfo = record.client_info;
   const newAccessRecord: AccessTokenRecord = {

@@ -183,7 +183,11 @@ seconds of wall clock. That is fine once and ruinous four times over, so
 `lint:plugins` and `format` all go through `dev/scripts/check-queue.mjs`. It
 counts the runs live across every worktree, terminal and agent on the machine
 against **one** counter (they compete for the same cores), and a run past the
-limit waits its turn instead of piling on. With a slot free it prints nothing
+limit waits its turn instead of piling on. With haven installed the wrapper
+delegates the run to `haven slot run`, which gates on the same flock semaphore
+`haven typecheck` holds — the queue's decisions are Go code in
+`tools/thuishaven`, and the JS queue is only the fallback for machines without
+haven (`CHECK_QUEUE_IMPL=js` forces it). With a slot free it prints nothing
 and is otherwise transparent (same stdio, same exit code). Queued, it says so on
 stderr, which is what tells you a slow run was waiting rather than hung.
 `CHECK_SLOTS=N` overrides the limit and `CHECK_SLOTS=0` turns the queue off;

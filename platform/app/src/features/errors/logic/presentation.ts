@@ -587,6 +587,13 @@ const presentations = {
     describe: () =>
       "Pick a different default model in your project's model settings, then try again.",
   },
+  model_default_scope_forbidden: {
+    // Same refusal shape as `model_provider_scope_forbidden`, aimed at the
+    // Default Models policies instead of the provider credentials.
+    title: "You can't change default models here",
+    describe: () =>
+      "They're managed above where you can act. Ask an admin on your team to change them.",
+  },
   model_not_configured: {
     // Distinct from `no_provider_configured` (nothing connected at all) and
     // from `llm_model_not_set` (a workflow node with an empty field): here a
@@ -975,6 +982,36 @@ const presentations = {
   group_member_already_added: {
     title: "They're already in this group",
     describe: () => "Nothing to do: the group already grants them its access.",
+  },
+  schedule_not_found: {
+    title: "That schedule no longer exists",
+    describe: () =>
+      "It was removed while this page was open. Reload to see what is scheduled now.",
+  },
+  schedule_inactive: {
+    title: "That schedule is paused",
+    describe: () =>
+      "Resume it before running it. Running a paused schedule would fire work you have switched off.",
+  },
+  schedule_already_in_flight: {
+    // The conditional update found a different fencing value, which means the
+    // loop moved the row between the operator reading it and acting on it.
+    title: "The scheduler got there first",
+    describe: () =>
+      "This slot was claimed while you were looking at it, so nothing was changed. Reload to see its current state.",
+  },
+  schedule_run_in_progress: {
+    // Distinct from `schedule_already_in_flight`: nothing raced the operator,
+    // the schedule is simply mid-run. Re-arming it would hand the same slot to
+    // a second worker and deliver the target twice.
+    title: "That schedule is already running",
+    describe: () =>
+      "Wait for the current run to finish before starting another. Running it now would deliver the same work twice.",
+  },
+  schedule_slot_not_stale: {
+    title: "That run is still current",
+    describe: () =>
+      "Clearing is only for a slot whose worker has stopped responding. Give this one time to finish, or wait until it goes stale.",
   },
   scim_managed_group: {
     // The group, its name and its membership come from the directory on every
@@ -1509,6 +1546,39 @@ const presentations = {
     title: "Langy is unavailable",
     describe: () =>
       "Langy can't be reached right now. Your message is safe, so send it again in a moment.",
+  },
+  // The `/api/langy` key-authed surface. These reach an API caller reading a
+  // JSON envelope, not a person reading a toast, so the copy names the
+  // credential and the fix rather than reassuring anyone about their message.
+  langy_api_credential_missing: {
+    title: "No auth token",
+    describe: () =>
+      "This request carried no project API key. Send one as X-Auth-Token or an Authorization header.",
+  },
+  langy_api_credential_invalid: {
+    title: "Auth token not accepted",
+    describe: () =>
+      "The token did not resolve to a project. Check it was copied whole and has not been revoked.",
+  },
+  langy_api_key_unowned: {
+    title: "Key has no owner",
+    describe: () =>
+      "A Langy turn acts as a user, and this key has no owning user to act as. Use a personal API key instead.",
+  },
+  langy_api_key_no_langy_access: {
+    title: "No Langy access",
+    describe: () =>
+      "The user who owns this key cannot use Langy in this project. A workspace admin can grant that access.",
+  },
+  langy_api_actor_missing: {
+    title: "Key owner is gone",
+    describe: () =>
+      "The user who owns this key no longer exists, so the turn has no one to act as. Mint a new key under a current user.",
+  },
+  langy_api_request_invalid: {
+    title: "Invalid request body",
+    describe: () =>
+      "Some fields in this request were not valid. The error details list each one that was rejected — correct those and send it again.",
   },
   langy_agent_errored: {
     title: "Langy's reply failed",

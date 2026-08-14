@@ -19,7 +19,7 @@ describe("sanitizeHeadersForTrace()", () => {
         "Content-Type": "application/json",
       };
 
-      const sanitized = sanitizeHeadersForTrace(headers);
+      const sanitized = sanitizeHeadersForTrace({ headers });
 
       expect(sanitized.Authorization).toBe("Bearer [REDACTED]");
       expect(sanitized["Content-Type"]).toBe("application/json");
@@ -33,7 +33,7 @@ describe("sanitizeHeadersForTrace()", () => {
         Authorization: `Basic ${encoded}`,
       };
 
-      const sanitized = sanitizeHeadersForTrace(headers);
+      const sanitized = sanitizeHeadersForTrace({ headers });
 
       expect(sanitized.Authorization).toBe("Basic [REDACTED]");
     });
@@ -46,7 +46,10 @@ describe("sanitizeHeadersForTrace()", () => {
         "Content-Type": "application/json",
       };
 
-      const sanitized = sanitizeHeadersForTrace(headers, "X-API-Key");
+      const sanitized = sanitizeHeadersForTrace({
+        headers,
+        customAuthHeaderName: "X-API-Key",
+      });
 
       expect(sanitized["X-API-Key"]).toBe("[REDACTED]");
       expect(sanitized["Content-Type"]).toBe("application/json");
@@ -60,7 +63,7 @@ describe("sanitizeHeadersForTrace()", () => {
         "Content-Type": "application/json",
       };
 
-      const sanitized = sanitizeHeadersForTrace(headers);
+      const sanitized = sanitizeHeadersForTrace({ headers });
 
       expect(sanitized.authorization).toBe("Bearer [REDACTED]");
       expect(sanitized["Content-Type"]).toBe("application/json");
@@ -73,7 +76,10 @@ describe("sanitizeHeadersForTrace()", () => {
         "x-api-key": "secret-key-789",
       };
 
-      const sanitized = sanitizeHeadersForTrace(headers, "X-API-Key");
+      const sanitized = sanitizeHeadersForTrace({
+        headers,
+        customAuthHeaderName: "X-API-Key",
+      });
 
       expect(sanitized["x-api-key"]).toBe("[REDACTED]");
     });
@@ -86,9 +92,46 @@ describe("sanitizeHeadersForTrace()", () => {
         Accept: "application/json",
       };
 
-      const sanitized = sanitizeHeadersForTrace(headers);
+      const sanitized = sanitizeHeadersForTrace({ headers });
 
       expect(sanitized).toEqual(headers);
+    });
+  });
+
+  // The Auth tab is not the only way a credential reaches a request. An author
+  // who types one on the Headers tab has configured a credential too, and a
+  // trace is a durable place for one to end up.
+  describe("when a credential is typed as a plain header", () => {
+    it.each([
+      "X-API-Key",
+      "X-Api-Key",
+      "X-Auth-Token",
+      "X-Authorization",
+      "X-Auth",
+      "X-Amz-Security-Token",
+      "Cookie",
+      "Set-Cookie",
+      "Proxy-Authorization",
+      "Db-Password",
+      "X-Client-Secret",
+    ])("redacts %s without being told it is auth", (name) => {
+      const sanitized = sanitizeHeadersForTrace({
+        headers: { [name]: "must-not-be-stored" },
+      });
+
+      expect(sanitized[name]).toBe("[REDACTED]");
+    });
+
+    it.each([
+      ["X-Api-Version", "2026-08-01"],
+      ["X-Idempotency-Key", "req-42"],
+      ["X-Request-Id", "req-42"],
+      ["WWW-Authenticate", 'Bearer realm="agents"'],
+      ["X-RateLimit-Remaining", "42"],
+    ])("keeps %s, which is not a credential", (name, value) => {
+      const sanitized = sanitizeHeadersForTrace({ headers: { [name]: value } });
+
+      expect(sanitized[name]).toBe(value);
     });
   });
 });

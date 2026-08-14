@@ -7,6 +7,13 @@
  * existed when the session ran"; it is "the first pull request on that branch
  * whose life had not ended yet when the session started".
  *
+ * A session also drives more than one branch over its life, so the rule is
+ * asked per branch and the answers are collected back onto the session. What
+ * the caller does with several answers depends on what it is counting:
+ * `assignDrivingSessionsToPullRequests` keeps one, because token totals cannot
+ * be divided; the sessions list keeps all of them, because a list of what a
+ * session touched divides nothing.
+ *
  * Pure, synchronous, and total: it decides from timestamps alone so the same
  * rule answers the same way in the usage rollup, in the sessions lens, and in a
  * test. Nothing here reads a store.
@@ -19,6 +26,13 @@ export interface AssignableSession {
   sessionId: string;
   startedAtMs: number;
   headBranch: string;
+}
+
+/** The same facts for a session that drove more than one branch. */
+export interface AssignableDrivingSession {
+  sessionId: string;
+  startedAtMs: number;
+  headBranches: readonly string[];
 }
 
 /** The pull-request facts the rule needs: its branch and its life span. */
@@ -78,15 +92,101 @@ export function assignSessionsToPullRequests({
   const assignments = new Map<string, number>();
 
   for (const session of sessions) {
-    const candidates = byBranch.get(session.headBranch);
-    if (!candidates) continue;
-    const match = candidates.find(
-      (pullRequest) => endOfLifeMs(pullRequest) >= session.startedAtMs,
-    );
+    const match = firstAliveAt({
+      candidates: byBranch.get(session.headBranch),
+      startedAtMs: session.startedAtMs,
+    });
     if (match) assignments.set(session.sessionId, match.prNumber);
   }
 
   return assignments;
+}
+
+/**
+ * Assign each session to at most one pull request, reading EVERY branch it
+ * drove rather than only the one it ended on.
+ *
+ * A session routinely drives several branches: you land one change, it merges,
+ * you start the next. Reading the last branch alone charges the whole session
+ * to the last pull request and leaves the one it opened first reading as free.
+ *
+ * Still at most one, and that is a limit of the data rather than of the rule.
+ * A session reports one set of token and cost totals for its whole life, and
+ * the per-call events carry no branch, so there is nothing to divide by. Giving
+ * every pull request the session drove that same full total would make a
+ * repository's pull requests sum to more than was ever spent, which on a page
+ * about cost is the one error worth refusing. The trade is named rather than
+ * hidden: a session that drove two pull requests counts toward one of them, and
+ * the sessions list is where all of them are shown.
+ *
+ * The winner is the earliest-created pull request the rule matched, tie-broken
+ * by number. A session is anchored on where it STARTED, so the pull request it
+ * opened first is the one it belongs to, and the choice reads the same however
+ * its branches arrived.
+ */
+export function assignDrivingSessionsToPullRequests({
+  sessions,
+  pullRequests,
+}: {
+  sessions: readonly AssignableDrivingSession[];
+  pullRequests: readonly AssignablePullRequest[];
+}): Map<string, number> {
+  const byBranch = groupPullRequestsByBranch(pullRequests);
+  const assignments = new Map<string, number>();
+
+  for (const session of sessions) {
+    let winner: AssignablePullRequest | undefined;
+    for (const headBranch of session.headBranches) {
+      const match = firstAliveAt({
+        candidates: byBranch.get(headBranch),
+        startedAtMs: session.startedAtMs,
+      });
+      if (match && (!winner || isEarlier(match, winner))) winner = match;
+    }
+    if (winner) assignments.set(session.sessionId, winner.prNumber);
+  }
+
+  return assignments;
+}
+
+/**
+ * Every branch a session drove, first seen first.
+ *
+ * `gitBranches` (migration 00077) is the whole history. A row folded before
+ * that column existed carries only `gitBranch`, so it falls back to that one:
+ * the session did drive it, and answering nothing would unlink every session in
+ * the dormant population.
+ */
+export function branchesOf(session: {
+  gitBranch: string;
+  gitBranches: readonly string[];
+}): string[] {
+  if (session.gitBranches.length > 0) return [...session.gitBranches];
+  return session.gitBranch ? [session.gitBranch] : [];
+}
+
+/** The branch's first pull request still alive when the session started. */
+function firstAliveAt({
+  candidates,
+  startedAtMs,
+}: {
+  candidates: AssignablePullRequest[] | undefined;
+  startedAtMs: number;
+}): AssignablePullRequest | undefined {
+  return candidates?.find(
+    (pullRequest) => endOfLifeMs(pullRequest) >= startedAtMs,
+  );
+}
+
+/** Creation order, with the number breaking a same-instant tie. */
+function isEarlier(
+  a: AssignablePullRequest,
+  b: AssignablePullRequest,
+): boolean {
+  return (
+    a.prCreatedAtMs < b.prCreatedAtMs ||
+    (a.prCreatedAtMs === b.prCreatedAtMs && a.prNumber < b.prNumber)
+  );
 }
 
 /**

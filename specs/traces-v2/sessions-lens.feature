@@ -24,7 +24,9 @@
 # Decisions:
 #   - Grouping key stays `gen_ai.conversation.id` (session id == conversation
 #     id for coding agents); the persisted grouping mode key stays
-#     "by-conversation", only user-facing labels say "Sessions".
+#     "by-conversation" and every lens id keeps the name it was stored under,
+#     while the labels a reader sees say "Conversations". "Sessions" names the
+#     coding-agent sessions product, and one word cannot mean both surfaces.
 #   - Rollups aggregate over the latest version of every trace in the time
 #     range (IN-tuple dedup), never over one page.
 #   - Free-text search ALSO matches session transcript content stored in
@@ -208,6 +210,48 @@ Rule: The sessions lens renders true totals
     When the expanded summary renders
     Then it reports how many of the session's traces are listed
     And a session whose turns are all loaded reports the plain total
+
+Rule: A conversation row opens its most recent trace
+
+  # The rollup is a GROUP BY, so the row names no trace on its own. Carrying
+  # the session's newest trace id alongside the totals is what lets a click on
+  # the row land somewhere: the reader's first question about a conversation is
+  # almost always "what just happened in it".
+
+  @integration
+  Scenario: The rollup names each session's most recent trace
+    Given a session whose traces were captured at different times
+    When session groups are queried
+    Then the session row carries the trace id of its latest trace
+
+  @unit
+  Scenario: The session read carries the latest trace id onto the row
+    Given a session group row naming its latest trace
+    When session groups are assembled by the service
+    Then the session carries that trace id
+
+  @integration
+  Scenario: Clicking a conversation opens its latest trace in the drawer
+    Given the conversations lens is showing grouped rows
+    When the reader clicks a conversation row
+    Then the trace drawer opens on the conversation's most recent trace
+    And the row does not expand
+
+  @integration
+  Scenario: The chevron alone expands a conversation inline
+    Given the conversations lens is showing grouped rows
+    When the reader clicks the row's expand chevron
+    Then the conversation expands inline
+    And the trace drawer stays closed
+
+Rule: A conversation row counts only in words
+
+  @integration
+  Scenario: A conversation row carries no bare icon counters
+    Given a conversation row rolling up many spans
+    When the row renders
+    Then no number is shown against an icon with nothing naming it
+    And the expanded summary still says how many spans the conversation holds
 
 Rule: Session spend follows the viewer's cost permission
 

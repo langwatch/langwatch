@@ -6,6 +6,7 @@
 #   platform/app/src/server/app-layer/traces/canonicalisation/extractors/claudeCode.ts                                (title extraction from the response body)
 #   platform/app/src/server/event-sourcing/pipelines/coding-agent-processing/services/coding-agent-session.derivation.ts (fold semantics)
 #   platform/app/src/server/clickhouse/migrations/00075_coding_agent_sessions_git_context.sql                          (session columns)
+#   platform/app/src/server/clickhouse/migrations/00077_coding_agent_sessions_git_branches.sql                         (every branch the session drove)
 #
 # Related specs:
 #   specs/coding-agent/session-aggregate.feature                     , the session fold this enriches
@@ -92,6 +93,34 @@ Rule: Git identity folds with honest semantics
     When the session events fact table is projected
     Then no row is written for the context event
 
+Rule: A session remembers every branch it drove
+
+  # The branch a session ENDS on is the one it is working in, and that is what
+  # `GitBranch` answers. It is not the only branch the session drove: an agent
+  # that lands one change, moves on and opens a second pull request is one
+  # session behind two of them, and remembering only the last branch drops the
+  # first pull request from everything read off the session. The set is the
+  # session's whole history of branches; the scalar stays the present tense.
+
+  @unit
+  Scenario: Every branch a session reports joins its branch set, first seen first
+    Given a session that reports one branch and later another
+    When the session fold runs
+    Then the branch set names both, in the order they were reported
+    And the session's current branch is the later one
+
+  @unit
+  Scenario: A branch reported twice joins the set once
+    Given a session that returns to a branch it already reported
+    When the session fold runs
+    Then the branch set names that branch once
+
+  @unit
+  Scenario: The branch set stops growing at its bound
+    Given a session that reports more branches than the set will hold
+    When the session fold runs
+    Then the set holds the first branches it saw and no more
+
 Rule: The session title lifts from the generated conversation title
 
   @unit
@@ -128,3 +157,15 @@ Rule: The session row stores and reads back the git context
     When the row is read back
     Then the session decodes with no repository, branch, worktree or title
     And the rest of the session is intact
+
+  @integration
+  Scenario: The branch set round-trips through the session row
+    Given a session that drove several branches
+    When the session fold writes and the row is read back
+    Then the row carries every branch it drove, in the order they were reported
+
+  @unit
+  Scenario: A session row from before the branch set column falls back to its one branch
+    Given a session row written before the branch set column existed
+    When a reader asks which branches the session drove
+    Then it answers with the branch the session ended on

@@ -87,6 +87,16 @@ func parse(spec commandSpec, rest []string) (invocation, error) {
 	for i := 0; i < len(rest); i++ {
 		a := rest[i]
 		switch {
+		case a == "--":
+			// The standard end-of-flags separator: everything after it is a
+			// positional verbatim, so a wrapped command's own flags (`haven
+			// slot run -- tsgo --noEmit`) can never be read as haven's.
+			for _, tail := range rest[i+1:] {
+				if err := addPositional(tail); err != nil {
+					return inv, err
+				}
+			}
+			return inv, nil
 		case strings.HasPrefix(a, "--"):
 			name, embedded, hasEmbedded := strings.Cut(a, "=")
 			f := findLong(name)
@@ -412,6 +422,19 @@ var table = []commandSpec{
 		name:    "gate",
 		summary: "answer a Claude Code PreToolUse hook on stdin (install it with `haven setup gate-hook`)",
 		run:     runGate,
+	},
+	{
+		name:    "slot",
+		summary: "run any command under the machine-wide check slot (`slot run -- <cmd>`, `slot explain`)",
+		args:    "run [--label <name>] -- <command> [args…] | explain",
+		maxArgs: -1,
+		// The wrapped command lives after the `--` separator; only --label is
+		// ours, and it arrives before the `--`.
+		minusArgs: true,
+		flags: []flagSpec{
+			{long: "--label", value: "<name>", takesValue: true, summary: "how the run is named while it queues"},
+		},
+		run: runSlot,
 	},
 	{
 		name:    "typecheck",

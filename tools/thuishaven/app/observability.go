@@ -49,6 +49,7 @@ func (o *Orchestrator) linkObservability(ctx context.Context, st *domain.Stack) 
 	}
 	st.ObservabilityOTLPPort = o.obs.Endpoints().OTLPHTTPPort
 	st.ObservabilityGrafanaPort = o.obs.Endpoints().GrafanaPort
+	st.ObservabilityGrafanaURL = o.sharedURL(domain.ObservabilityService)
 	st.ObservabilityConsoleLevel = o.cfg.ObservabilityConsoleLevel
 	o.routeObservability()
 }

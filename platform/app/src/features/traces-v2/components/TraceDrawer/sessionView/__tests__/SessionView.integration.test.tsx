@@ -37,6 +37,7 @@ const REAL_SESSION: CodingAgentSessionRow = {
   repositoryOwner: "acme",
   repositoryName: "widgets",
   gitBranch: "feat/session-git-context",
+  gitBranches: ["feat/session-git-context"],
   gitWorktree: "widgets-feat",
   title: "Add git context to the session row",
   modelCalls: 114,
