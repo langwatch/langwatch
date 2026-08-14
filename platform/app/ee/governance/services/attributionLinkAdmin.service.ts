@@ -177,15 +177,93 @@ export class AttributionLinkAdminService {
   }): Promise<LinkSuggestion[]> {
     if (unattributed.length === 0) return [];
 
-    const sourceIds = [
-      ...new Set(unattributed.map((row) => row.sourceId)),
-    ].filter((id) => id !== "");
-    // One query for the connections, one for the members — the candidate set
-    // is the whole unattributed list, so per-row lookups would scale with the
-    // report rather than with the organization.
+    const { sourceById, byAnchor, byEmail } = await this.candidateIndex({
+      organizationId,
+      sourceIds: [...new Set(unattributed.map((row) => row.sourceId))].filter(
+        (id) => id !== "",
+      ),
+    });
+
+    // Keyed so one login never yields two rows for the same person: an admin
+    // offered the same link twice will eventually confirm it twice.
+    const suggestions = new Map<string, LinkSuggestion>();
+    for (const row of unattributed) {
+      const suggestion = this.suggestionFor({
+        row,
+        sourceById,
+        byAnchor,
+        byEmail,
+      });
+      if (suggestion) suggestions.set(suggestionKey(suggestion), suggestion);
+    }
+    return [...suggestions.values()];
+  }
+
+  /** The one suggestion this ledger row supports, if any. */
+  private suggestionFor({
+    row,
+    sourceById,
+    byAnchor,
+    byEmail,
+  }: {
+    row: { sourceId: string; actorUserId: string; actorEmail: string };
+    sourceById: ReadonlyMap<string, { sourceType: string }>;
+    byAnchor: ReadonlyMap<string, SuggestionMember>;
+    byEmail: ReadonlyMap<string, SuggestionMember>;
+  }): LinkSuggestion | null {
+    const sourceType = sourceById.get(row.sourceId)?.sourceType;
+    const provider = sourceType ? linkProviderForSourceType(sourceType) : null;
+    if (!provider) return null;
+
+    const match = matchFor({ row, byAnchor, byEmail });
+    if (!match) return null;
+
+    const login = this.suggestedLoginRef({
+      provider,
+      row,
+      useAnchor: match.kind === "external_id",
+    });
+    if (!login) return null;
+
+    return {
+      login,
+      userId: match.member.userId,
+      displayName:
+        match.member.user.name ??
+        match.member.user.email ??
+        match.member.userId,
+      source: match.kind,
+      evidence:
+        match.kind === "external_id"
+          ? `Directory id ${row.actorUserId} matches this member's directory record`
+          : `Provider address ${row.actorEmail} matches this member's account address`,
+    };
+  }
+
+  /**
+   * Everything the matcher looks a login up in, indexed once.
+   *
+   * Two queries, never one per row: the candidate set is the whole
+   * unattributed list, so per-row lookups would scale with the size of the
+   * report rather than with the size of the organization.
+   *
+   * Members are indexed by their directory id and by their canonical address —
+   * the two things a provider's ledger row can be recognised by. Disabled
+   * memberships are excluded from SUGGESTIONS (proposing a link to somebody
+   * who has left is noise), which is a different rule from `createLink`'s,
+   * where a disabled member is still a legitimate target because correcting
+   * past attribution is exactly what backdating is for.
+   */
+  private async candidateIndex({
+    organizationId,
+    sourceIds,
+  }: {
+    organizationId: string;
+    sourceIds: readonly string[];
+  }) {
     const [sources, members] = await Promise.all([
       this.prisma.ingestionSource.findMany({
-        where: { id: { in: sourceIds }, organizationId },
+        where: { id: { in: [...sourceIds] }, organizationId },
         select: { id: true, sourceType: true },
       }),
       this.prisma.organizationUser.findMany({
@@ -198,76 +276,21 @@ export class AttributionLinkAdminService {
       }),
     ]);
 
-    const sourceById = new Map(sources.map((source) => [source.id, source]));
-    const byAnchor = new Map(
-      members
-        .filter((member) => member.externalId !== null)
-        .map((member) => [member.externalId!, member]),
-    );
-    const byEmail = new Map(
-      members
-        .filter((member) => member.user.email !== null)
-        .map((member) => [canonicalizeEmailLike(member.user.email!), member]),
-    );
-
-    const suggestions: LinkSuggestion[] = [];
-    const seen = new Set<string>();
-
-    for (const row of unattributed) {
-      const source = sourceById.get(row.sourceId);
-      if (!source) continue;
-      const provider = linkProviderForSourceType(source.sourceType);
-      if (!provider) continue;
-
-      const anchored =
-        row.actorUserId === "" ? undefined : byAnchor.get(row.actorUserId);
-      const byMail =
-        row.actorEmail === ""
-          ? undefined
-          : byEmail.get(canonicalizeEmailLike(row.actorEmail));
-
-      // The anchor wins where both fire: it is the stronger evidence, and
-      // offering an admin two rows for one login invites them to confirm both.
-      const match = anchored
-        ? ({ member: anchored, kind: "external_id" } as const)
-        : byMail
-          ? ({ member: byMail, kind: "email_suggestion_accepted" } as const)
-          : null;
-      if (!match) continue;
-
-      const login = this.suggestedLoginRef({
-        provider,
-        row,
-        useAnchor: match.kind === "external_id",
-      });
-      if (!login) continue;
-
-      const key = [
-        login.providerConnectionId,
-        login.externalKind,
-        login.externalId,
-        match.member.userId,
-      ].join(" ");
-      if (seen.has(key)) continue;
-      seen.add(key);
-
-      const displayName =
-        match.member.user.name ??
-        match.member.user.email ??
-        match.member.userId;
-      suggestions.push({
-        login,
-        userId: match.member.userId,
-        displayName,
-        source: match.kind,
-        evidence:
-          match.kind === "external_id"
-            ? `Directory id ${row.actorUserId} matches this member's directory record`
-            : `Provider address ${row.actorEmail} matches this member's account address`,
-      });
-    }
-
-    return suggestions;
+    return {
+      sourceById: new Map(sources.map((source) => [source.id, source])),
+      byAnchor: new Map(
+        members.flatMap((member) =>
+          member.externalId === null ? [] : [[member.externalId, member]],
+        ),
+      ),
+      byEmail: new Map(
+        members.flatMap((member) =>
+          member.user.email === null
+            ? []
+            : [[canonicalizeEmailLike(member.user.email), member]],
+        ),
+      ),
+    };
   }
 
   /**
@@ -357,3 +380,51 @@ export class AttributionLinkAdminService {
     };
   }
 }
+
+/** One member a ledger login might belong to, plus what makes us think so. */
+type SuggestionMember = {
+  userId: string;
+  user: { name: string | null; email: string | null };
+};
+
+/**
+ * Pick the evidence for one unattributed login.
+ *
+ * The anchor wins wherever both fire. It is the stronger claim — both sides
+ * came from the same identity provider — and offering an admin two rows for
+ * one login only invites them to confirm both.
+ */
+const matchFor = ({
+  row,
+  byAnchor,
+  byEmail,
+}: {
+  row: { actorUserId: string; actorEmail: string };
+  byAnchor: ReadonlyMap<string, SuggestionMember>;
+  byEmail: ReadonlyMap<string, SuggestionMember>;
+}): {
+  member: SuggestionMember;
+  kind: "external_id" | "email_suggestion_accepted";
+} | null => {
+  const anchored =
+    row.actorUserId === "" ? undefined : byAnchor.get(row.actorUserId);
+  if (anchored) return { member: anchored, kind: "external_id" };
+
+  const addressed =
+    row.actorEmail === ""
+      ? undefined
+      : byEmail.get(canonicalizeEmailLike(row.actorEmail));
+  if (addressed) {
+    return { member: addressed, kind: "email_suggestion_accepted" };
+  }
+
+  return null;
+};
+
+const suggestionKey = (suggestion: LinkSuggestion): string =>
+  [
+    suggestion.login.providerConnectionId,
+    suggestion.login.externalKind,
+    suggestion.login.externalId,
+    suggestion.userId,
+  ].join("\u0000");

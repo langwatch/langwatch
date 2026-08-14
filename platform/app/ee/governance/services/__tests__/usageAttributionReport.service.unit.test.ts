@@ -84,17 +84,19 @@ const makeService = (fixture: Partial<Fixture> = {}) => {
     providerIdentityLink: {
       // The storage matches on the full 4-tuple; the stub answers the same
       // way so a ref built with the wrong kind finds nothing here too.
-      findMany: vi.fn().mockImplementation(({ where }: any) =>
-        state.links.filter((row) =>
-          (where.OR as any[]).some(
-            (ref) =>
-              ref.provider === row.provider &&
-              ref.providerConnectionId === row.providerConnectionId &&
-              ref.externalKind === row.externalKind &&
-              ref.externalId === row.externalId,
+      findMany: vi
+        .fn()
+        .mockImplementation(({ where }: any) =>
+          state.links.filter((row) =>
+            (where.OR as any[]).some(
+              (ref) =>
+                ref.provider === row.provider &&
+                ref.providerConnectionId === row.providerConnectionId &&
+                ref.externalKind === row.externalKind &&
+                ref.externalId === row.externalId,
+            ),
           ),
         ),
-      ),
       count: vi.fn().mockImplementation(() => state.backdatedCount),
     },
     user: { findMany: vi.fn().mockImplementation(() => state.users) },
@@ -166,8 +168,9 @@ describe("UsageAttributionReportService", () => {
 
       const { attributed, unattributed, unattributable, ledger } =
         result.totals;
-      expect(attributed.events + unattributed.events + unattributable.events)
-        .toBe(rawEvents);
+      expect(
+        attributed.events + unattributed.events + unattributable.events,
+      ).toBe(rawEvents);
       expect(
         attributed.spendUsd + unattributed.spendUsd + unattributable.spendUsd,
       ).toBeCloseTo(rawSpend, 10);
@@ -561,9 +564,9 @@ describe("UsageAttributionReportService", () => {
     });
 
     it("asks for the link timelines once", () => {
-      expect(fixture.prisma.providerIdentityLink.findMany).toHaveBeenCalledTimes(
-        1,
-      );
+      expect(
+        fixture.prisma.providerIdentityLink.findMany,
+      ).toHaveBeenCalledTimes(1);
     });
 
     it("asks for the display names once", () => {

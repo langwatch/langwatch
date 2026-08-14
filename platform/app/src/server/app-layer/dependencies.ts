@@ -17,6 +17,7 @@ import type { BillableEventsClickHouseRepository } from "../../../ee/billing/ser
 import type { WebhookService } from "../../../ee/billing/services/webhookService";
 import type { GovernanceKpisClickHouseRepository } from "../../../ee/governance/services/governanceKpis.clickhouse.repository";
 import type { GovernanceOcsfEventsClickHouseRepository } from "../../../ee/governance/services/governanceOcsfEvents.clickhouse.repository";
+import type { UsageAttributionLedgerClickHouseRepository } from "../../../ee/governance/services/usageAttributionLedger.clickhouse.repository";
 import type { GovernanceTraceActivityClickHouseRepository } from "../../../ee/governance/services/governanceTraceActivity.clickhouse.repository";
 import type { PersonalUsageClickHouseRepository } from "../../../ee/governance/services/personalUsage.clickhouse.repository";
 import type { ClickHouseClientResolver } from "../clickhouse/clickhouseClient";
@@ -273,6 +274,11 @@ export interface AppDependencies {
     kpis: GovernanceKpisClickHouseRepository | undefined;
     /** The /me dashboard's spend/token/model rollups. */
     personalUsage: PersonalUsageClickHouseRepository | undefined;
+    /** The usage-attribution report's ledger read (ADR-094) — who acted,
+     *  how often and at what cost, across both governance tables. */
+    usageAttributionLedger:
+      | UsageAttributionLedgerClickHouseRepository
+      | undefined;
   };
   /** Billing-month usage rollups (billable_events + trace_summaries) behind
    *  `billableEventsQuery.ts`'s exported query functions. */

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 
 const OCSF_TABLE = "governance_ocsf_events" as const;
 const KPIS_TABLE = "governance_kpis" as const;
@@ -68,7 +68,14 @@ export class EmptyAttributionLedger implements AttributionLedgerReader {
 export class UsageAttributionLedgerClickHouseRepository
   implements AttributionLedgerReader
 {
-  constructor(private readonly client: ClickHouseClient) {}
+  /**
+   * Takes a resolver rather than a client, like every other governance
+   * repository: the client is chosen per tenant so an organization on a
+   * private ClickHouse cluster routes there, and reaching for
+   * `getClickHouseClientForOrganization` from a service would open the third
+   * door the access-boundary test exists to keep shut.
+   */
+  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   /**
    * Ledger rows for one governance tenant over [from, to).
@@ -112,7 +119,8 @@ export class UsageAttributionLedgerClickHouseRepository
     from: Date;
     to: Date;
   }): Promise<AttributionLedgerRow[]> {
-    const result = await this.client.query({
+    const client = await this.resolveClient(input.tenantId);
+    const result = await client.query({
       query: `
         WITH deduped_events AS (
           SELECT

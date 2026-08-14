@@ -44,7 +44,10 @@ describe("eraseSnapshotPersonReferences", () => {
     it("reaches into nested objects and arrays", () => {
       const { snapshot } = eraseSnapshotPersonReferences(
         {
-          owners: [{ email: "alice@example.com" }, { email: "bob@example.com" }],
+          owners: [
+            { email: "alice@example.com" },
+            { email: "bob@example.com" },
+          ],
           audit: { lastEditedBy: { uid: "usr_alice" } },
         },
         alice,

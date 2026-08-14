@@ -18,9 +18,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "~/server/db";
 import { getTestClickHouseClient } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
-
 import { IdentityErasureTokenService } from "~/server/identity-links/erasure-token.service";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 
 import { PROJECT_KIND } from "../governanceProject.service";
 import { UsageAttributionLedgerClickHouseRepository } from "../usageAttributionLedger.clickhouse.repository";
@@ -153,7 +152,7 @@ beforeAll(async () => {
     },
   });
   tenantId = govProject.id;
-  repository = new UsageAttributionLedgerClickHouseRepository(ch);
+  repository = new UsageAttributionLedgerClickHouseRepository(async () => ch);
   service = new UsageAttributionReportService(
     prisma,
     repository,
@@ -342,7 +341,9 @@ describe("UsageAttributionLedgerClickHouseRepository against real ClickHouse", (
 
   it("excludes events outside the window, cost and all", async () => {
     const rows = await findLedger();
-    expect(rows.some((row) => row.traceId === `pull:evt-old-${ns}`)).toBe(false);
+    expect(rows.some((row) => row.traceId === `pull:evt-old-${ns}`)).toBe(
+      false,
+    );
     const total = rows.reduce((sum, row) => sum + row.spendUsd, 0);
     expect(total).toBeCloseTo(20 + 9 + 0 + 1, 6);
   });

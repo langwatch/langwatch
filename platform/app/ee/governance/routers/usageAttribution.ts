@@ -23,8 +23,8 @@
  */
 
 import {
-  emailKindsForProvider,
   EXTERNAL_KINDS_BY_PROVIDER,
+  emailKindsForProvider,
   LINK_ORDERING,
   LINK_SOURCES,
 } from "@langwatch/identity-links";

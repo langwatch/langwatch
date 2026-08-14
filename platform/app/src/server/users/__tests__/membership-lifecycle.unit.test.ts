@@ -313,19 +313,19 @@ describe("MembershipLifecycleService", () => {
       const prisma = seedTwoOrgs();
       const trueFindUnique = prisma.user.findUnique.bind(prisma.user);
       let call = 0;
-      vi.spyOn(prisma.user, "findUnique").mockImplementation(
-        (async (args: Parameters<typeof trueFindUnique>[0]) => {
-          call += 1;
-          if (call === 1) {
-            // The competing transaction has not committed yet.
-            return {
-              id: "alice",
-              orgMemberships: [{ organizationId: "org-b" }],
-            };
-          }
-          return await trueFindUnique(args);
-        }) as typeof trueFindUnique,
-      );
+      vi.spyOn(prisma.user, "findUnique").mockImplementation((async (
+        args: Parameters<typeof trueFindUnique>[0],
+      ) => {
+        call += 1;
+        if (call === 1) {
+          // The competing transaction has not committed yet.
+          return {
+            id: "alice",
+            orgMemberships: [{ organizationId: "org-b" }],
+          };
+        }
+        return await trueFindUnique(args);
+      }) as typeof trueFindUnique);
       // The competing removal, already committed by the time we re-check.
       prisma.organizationUser.rows = [];
 

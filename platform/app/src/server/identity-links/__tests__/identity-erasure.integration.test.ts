@@ -161,7 +161,10 @@ beforeAll(async () => {
         organizationId,
         providerConnectionId: connectionId,
         providerAgentKey: `env-1/bot-other-${ns}`,
-        snapshot: { displayName: "Other Bot", ownerEmail: "nobody@example.com" },
+        snapshot: {
+          displayName: "Other Bot",
+          ownerEmail: "nobody@example.com",
+        },
       },
     }),
   ]);

@@ -254,7 +254,10 @@ secured.access(adminAuth).post("/admin/identity-erasure", async (c) => {
   // Anything that is not literally `true` is a dry run. A truthy-ish value —
   // `"false"`, `1`, `{}` — must not be able to trigger an irreversible write.
   if (body.confirm !== true) {
-    return c.json({ dryRun: true, ...(await service.preview({ organizationId, userId })) });
+    return c.json({
+      dryRun: true,
+      ...(await service.preview({ organizationId, userId })),
+    });
   }
 
   const result = await service.erase({ organizationId, userId, confirm: true });

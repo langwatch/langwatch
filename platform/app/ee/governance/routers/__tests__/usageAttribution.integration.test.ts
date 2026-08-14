@@ -91,7 +91,9 @@ const grant = async ({
     data: { userId, organizationId: orgId, role },
   });
   const teamRole =
-    role === OrganizationUserRole.ADMIN ? TeamUserRole.ADMIN : TeamUserRole.MEMBER;
+    role === OrganizationUserRole.ADMIN
+      ? TeamUserRole.ADMIN
+      : TeamUserRole.MEMBER;
   await prisma.teamUser.create({ data: { userId, teamId, role: teamRole } });
   await prisma.roleBinding.create({
     data: {

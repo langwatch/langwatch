@@ -5,8 +5,8 @@ import {
   actorKindFromOcsf,
   BACKDATED_ATTRIBUTION_NOTICE,
   canonicalizeEmailLike,
-  emailKindsForProvider,
   ERASED_PERSON_DISPLAY_NAME,
+  emailKindsForProvider,
   type IdentityLinkRow,
   isPersonKind,
   type LinkProvider,
@@ -22,7 +22,7 @@ import {
 import { createLogger } from "@langwatch/observability";
 
 import type { PrismaClient } from "~/generated/prisma/client";
-import { getClickHouseClientForOrganization } from "~/server/clickhouse/clickhouseClient";
+import { getApp } from "~/server/app-layer/app";
 import { IdentityErasureTokenService } from "~/server/identity-links/erasure-token.service";
 import { PrismaIdentityLinkStorage } from "~/server/identity-links/prisma-identity-link-storage";
 
@@ -35,7 +35,6 @@ import {
   type AttributionLedgerReader,
   type AttributionLedgerRow,
   EmptyAttributionLedger,
-  UsageAttributionLedgerClickHouseRepository,
 } from "./usageAttributionLedger.clickhouse.repository";
 
 const logger = createLogger("langwatch:governance:usage-attribution-report");
@@ -151,89 +150,19 @@ export class UsageAttributionReportService {
   }): Promise<AttributionReport> {
     const ledgerRows = await this.ledger.findLedger({ tenantId, from, to });
     const sources = await this.loadSources({ organizationId, ledgerRows });
-
-    const rows: AttributionReportRow[] = [];
-    const personRows: Array<{ row: AttributionLedgerRow; login: LedgerLogin }> =
-      [];
-
-    for (const row of ledgerRows) {
-      const source = sources.get(row.sourceId);
-      const provider = source
-        ? linkProviderForSourceType(source.sourceType)
-        : null;
-
-      // The bucket comes from what the adapter declared at ingest, and from
-      // nothing else (Decision 5).
-      const actorKind = actorKindFromOcsf({
-        type: row.actorType,
-        type_id: row.actorTypeId,
-      });
-      if (!isPersonKind(actorKind)) {
-        rows.push(this.toRow(row, provider, "unattributable", null, null));
-        continue;
-      }
-
-      const login: LedgerLogin = {
-        sourceId: row.sourceId,
-        provider,
-        actorUserId: row.actorUserId,
-        actorEmail: row.actorEmail,
-      };
-
-      // A person-kind row carrying no identifier at all cannot be linked and
-      // cannot be a machine either. It stays UNATTRIBUTED — counted, visible,
-      // and honest about the fact that the adapter told us nothing.
-      if (row.actorUserId === "" && row.actorEmail === "") {
-        rows.push(this.toRow(row, provider, "unattributed", null, null));
-        continue;
-      }
-
-      personRows.push({ row, login });
-    }
-
-    const timelines = await this.loadTimelines({
-      organizationId,
-      logins: personRows.map(({ login }) => login),
+    const { settled, personRows } = classifyByActorKind({
+      ledgerRows,
+      sources,
     });
 
-    // Split once per LOGIN, not once per ledger row: the split depends on the
-    // login's timeline and the window, neither of which varies per row.
-    const segmentsByLogin = new Map<string, OwnershipSegment[]>();
-    for (const { login } of personRows) {
-      const key = loginKey(login);
-      if (segmentsByLogin.has(key)) continue;
-      segmentsByLogin.set(
-        key,
-        this.segments({ organizationId, timelines, login, from, to }),
-      );
-    }
-
-    const resolutionFor = (
-      login: LedgerLogin,
-      firstEventMs: number,
-    ): LoginResolution =>
-      resolutionAt(segmentsByLogin.get(loginKey(login)) ?? [], firstEventMs);
-
-    const resolvedUserIds = new Set<string>();
-    for (const { row, login } of personRows) {
-      const resolution = resolutionFor(login, row.firstEventMs);
-      if (resolution.kind === "person") resolvedUserIds.add(resolution.userId);
-    }
-
-    const names = await this.loadDisplayNames(resolvedUserIds);
-
-    for (const { row, login } of personRows) {
-      const resolution = resolutionFor(login, row.firstEventMs);
-      rows.push(
-        this.toRow(
-          row,
-          login.provider,
-          bucketFor(resolution),
-          displayNameFor(resolution, names),
-          resolution.kind === "person" ? resolution.userId : null,
-        ),
-      );
-    }
+    const rows = [...settled];
+    const resolved = await this.resolvePersonRows({
+      organizationId,
+      personRows,
+      from,
+      to,
+    });
+    rows.push(...resolved);
 
     return {
       organizationId,
@@ -320,9 +249,9 @@ export class UsageAttributionReportService {
     organizationId: string;
     ledgerRows: readonly AttributionLedgerRow[];
   }): Promise<Map<string, { id: string; sourceType: string }>> {
-    const sourceIds = [...new Set(ledgerRows.map((row) => row.sourceId))].filter(
-      (id) => id !== "",
-    );
+    const sourceIds = [
+      ...new Set(ledgerRows.map((row) => row.sourceId)),
+    ].filter((id) => id !== "");
     if (sourceIds.length === 0) return new Map();
 
     const sources = await this.prisma.ingestionSource.findMany({
@@ -467,38 +396,11 @@ export class UsageAttributionReportService {
       else email.push(...rows);
     }
 
-    const typedSegments = splitPeriodByOwnership(typed, from, to);
-    if (email.length === 0) return typedSegments;
+    // With no email evidence there is one timeline, so the package's own
+    // splitter is the whole answer.
+    if (email.length === 0) return splitPeriodByOwnership(typed, from, to);
 
-    // Cut at every boundary either timeline introduces, then let precedence
-    // decide each slice — so a typed row appearing mid-window takes over from
-    // the email evidence exactly when it starts, not a segment early or late.
-    const cuts = [
-      ...new Set(
-        [from, ...typed, ...email]
-          .map((entry) =>
-            entry instanceof Date ? entry.getTime() : entry.effectiveFrom.getTime(),
-          )
-          .filter((t) => t >= from.getTime() && t < to.getTime()),
-      ),
-    ].sort((a, b) => a - b);
-
-    const merged: OwnershipSegment[] = [];
-    for (const [index, cut] of cuts.entries()) {
-      const end = index + 1 < cuts.length ? new Date(cuts[index + 1]!) : to;
-      const at = new Date(cut);
-      const typedResolution = resolveOwnerAt(typed, at);
-      const resolution =
-        typedResolution.kind === "none" ? resolveOwnerAt(email, at) : typedResolution;
-
-      const last = merged[merged.length - 1];
-      if (last && sameResolution(last.resolution, resolution)) {
-        last.to = end;
-      } else {
-        merged.push({ from: at, to: end, resolution });
-      }
-    }
-    return merged;
+    return mergeTimelinesByPrecedence({ typed, email, from, to });
   }
 
   /** Display names for the people the window resolved to, in ONE query. */
@@ -521,7 +423,9 @@ export class UsageAttributionReportService {
   ): string | null {
     const present = ledgerRows.some((row) => {
       const sourceType = sources.get(row.sourceId)?.sourceType;
-      return sourceType !== undefined && REVISING_SOURCE_TYPES.includes(sourceType);
+      return (
+        sourceType !== undefined && REVISING_SOURCE_TYPES.includes(sourceType)
+      );
     });
     return present ? REVISING_PROVIDER_FRESHNESS_COPY : null;
   }
@@ -535,7 +439,9 @@ export class UsageAttributionReportService {
    * that was appended BEFORE the export was already in the numbers. Only the
    * overlap rewrites history, and that is the one that has to announce itself.
    */
-  private async changeNoticeFor(organizationId: string): Promise<string | null> {
+  private async changeNoticeFor(
+    organizationId: string,
+  ): Promise<string | null> {
     const lastExport = await this.prisma.attributionReportExport.findFirst({
       where: { organizationId },
       orderBy: { exportedAt: "desc" },
@@ -553,26 +459,211 @@ export class UsageAttributionReportService {
     return backdated > 0 ? BACKDATED_ATTRIBUTION_NOTICE : null;
   }
 
-  private toRow(
-    row: AttributionLedgerRow,
-    provider: LinkProvider | null,
-    bucket: ReportBucket,
-    displayName: string | null,
-    userId: string | null,
-  ): AttributionReportRow {
-    return {
-      bucket,
-      displayName,
-      userId,
-      sourceId: row.sourceId,
-      provider,
-      actorUserId: row.actorUserId,
-      actorEmail: row.actorEmail,
-      events: row.events,
-      spendUsd: row.spendUsd,
-    };
+  /**
+   * Resolve the person-kind rows: split each login's timeline once, place each
+   * row in the segment its usage actually happened in, then attach names.
+   */
+  private async resolvePersonRows({
+    organizationId,
+    personRows,
+    from,
+    to,
+  }: {
+    organizationId: string;
+    personRows: readonly PersonLedgerRow[];
+    from: Date;
+    to: Date;
+  }): Promise<AttributionReportRow[]> {
+    const timelines = await this.loadTimelines({
+      organizationId,
+      logins: personRows.map(({ login }) => login),
+    });
+
+    // Split once per LOGIN, not once per ledger row: the split depends on the
+    // login's timeline and the window, neither of which varies per row.
+    const segmentsByLogin = new Map<string, OwnershipSegment[]>();
+    for (const { login } of personRows) {
+      const key = loginKey(login);
+      if (segmentsByLogin.has(key)) continue;
+      segmentsByLogin.set(
+        key,
+        this.segments({ organizationId, timelines, login, from, to }),
+      );
+    }
+
+    const resolutionFor = ({ row, login }: PersonLedgerRow): LoginResolution =>
+      resolutionAt(
+        segmentsByLogin.get(loginKey(login)) ?? [],
+        row.firstEventMs,
+      );
+
+    const resolvedUserIds = new Set<string>();
+    for (const entry of personRows) {
+      const resolution = resolutionFor(entry);
+      if (resolution.kind === "person") resolvedUserIds.add(resolution.userId);
+    }
+    const names = await this.loadDisplayNames(resolvedUserIds);
+
+    return personRows.map((entry) => {
+      const resolution = resolutionFor(entry);
+      return toReportRow({
+        row: entry.row,
+        provider: entry.login.provider,
+        bucket: bucketFor(resolution),
+        displayName: displayNameFor(resolution, names),
+        userId: resolution.kind === "person" ? resolution.userId : null,
+      });
+    });
   }
 }
+
+/**
+ * Two timelines for one person, resolved into one set of segments.
+ *
+ * Cut at every boundary EITHER timeline introduces, then apply precedence
+ * slice by slice — so a typed row appearing mid-window takes over from the
+ * address evidence exactly when it starts, rather than a segment early or
+ * late. Adjacent slices resolving identically are merged, so a correction that
+ * re-asserts the same owner does not split anything a reader would then have
+ * to explain.
+ */
+const mergeTimelinesByPrecedence = ({
+  typed,
+  email,
+  from,
+  to,
+}: {
+  typed: readonly IdentityLinkRow[];
+  email: readonly IdentityLinkRow[];
+  from: Date;
+  to: Date;
+}): OwnershipSegment[] => {
+  const boundaries = [...typed, ...email]
+    .map((row) => row.effectiveFrom.getTime())
+    .filter((t) => t > from.getTime() && t < to.getTime());
+  const cuts = [...new Set([from.getTime(), ...boundaries])].sort(
+    (a, b) => a - b,
+  );
+
+  const merged: OwnershipSegment[] = [];
+  for (const [index, cut] of cuts.entries()) {
+    const end = index + 1 < cuts.length ? new Date(cuts[index + 1]!) : to;
+    const at = new Date(cut);
+    const resolution = resolveWithPrecedence({ typed, email, at });
+
+    const last = merged[merged.length - 1];
+    if (last && sameResolution(last.resolution, resolution)) {
+      last.to = end;
+    } else {
+      merged.push({ from: at, to: end, resolution });
+    }
+  }
+  return merged;
+};
+
+/** The typed timeline decides wherever it covers the moment at all. */
+const resolveWithPrecedence = ({
+  typed,
+  email,
+  at,
+}: {
+  typed: readonly IdentityLinkRow[];
+  email: readonly IdentityLinkRow[];
+  at: Date;
+}): LoginResolution => {
+  const typedResolution = resolveOwnerAt(typed, at);
+  return typedResolution.kind === "none"
+    ? resolveOwnerAt(email, at)
+    : typedResolution;
+};
+
+/** A ledger row the adapter marked as a person, with its login pulled out. */
+interface PersonLedgerRow {
+  row: AttributionLedgerRow;
+  login: LedgerLogin;
+}
+
+/**
+ * Sort the window's rows into the ones whose bucket is already settled and the
+ * ones that still need the link list.
+ *
+ * The bucket comes from what the adapter declared at INGEST and from nothing
+ * else (Decision 5). A non-person actor is unattributable whether or not a
+ * link happens to exist; a person-kind row carrying no identifier at all is
+ * unattributed — it cannot be linked, but it is not a machine either, so it
+ * stays counted and visible rather than being hidden behind "can never
+ * resolve" or dropped from the totals.
+ */
+const classifyByActorKind = ({
+  ledgerRows,
+  sources,
+}: {
+  ledgerRows: readonly AttributionLedgerRow[];
+  sources: ReadonlyMap<string, { sourceType: string }>;
+}): { settled: AttributionReportRow[]; personRows: PersonLedgerRow[] } => {
+  const settled: AttributionReportRow[] = [];
+  const personRows: PersonLedgerRow[] = [];
+
+  for (const row of ledgerRows) {
+    const sourceType = sources.get(row.sourceId)?.sourceType;
+    const provider = sourceType ? linkProviderForSourceType(sourceType) : null;
+
+    const actorKind = actorKindFromOcsf({
+      type: row.actorType,
+      type_id: row.actorTypeId,
+    });
+    const anonymous = row.actorUserId === "" && row.actorEmail === "";
+
+    if (!isPersonKind(actorKind) || anonymous) {
+      settled.push(
+        toReportRow({
+          row,
+          provider,
+          bucket: isPersonKind(actorKind) ? "unattributed" : "unattributable",
+          displayName: null,
+          userId: null,
+        }),
+      );
+      continue;
+    }
+
+    personRows.push({
+      row,
+      login: {
+        sourceId: row.sourceId,
+        provider,
+        actorUserId: row.actorUserId,
+        actorEmail: row.actorEmail,
+      },
+    });
+  }
+
+  return { settled, personRows };
+};
+
+const toReportRow = ({
+  row,
+  provider,
+  bucket,
+  displayName,
+  userId,
+}: {
+  row: AttributionLedgerRow;
+  provider: LinkProvider | null;
+  bucket: ReportBucket;
+  displayName: string | null;
+  userId: string | null;
+}): AttributionReportRow => ({
+  bucket,
+  displayName,
+  userId,
+  sourceId: row.sourceId,
+  provider,
+  actorUserId: row.actorUserId,
+  actorEmail: row.actorEmail,
+  events: row.events,
+  spendUsd: row.spendUsd,
+});
 
 /**
  * Which ownership segment does this moment fall in?
@@ -591,8 +682,7 @@ const resolutionAt = (
   atMs: number,
 ): LoginResolution =>
   segments.find(
-    (segment) =>
-      segment.from.getTime() <= atMs && atMs < segment.to.getTime(),
+    (segment) => segment.from.getTime() <= atMs && atMs < segment.to.getTime(),
   )?.resolution ?? { kind: "none" };
 
 /**
@@ -623,9 +713,12 @@ export const createUsageAttributionReportService = async ({
     },
     select: { id: true },
   });
-  const client = govProject
-    ? await getClickHouseClientForOrganization(organizationId)
-    : null;
+  // From the App, never by resolving a ClickHouse client here: the access
+  // boundary keeps queries inside repositories the App hands out, and a
+  // service that reached for a client itself would be the third door.
+  const ledger = govProject
+    ? getApp().governance.usageAttributionLedger
+    : undefined;
 
   const tokens = IdentityErasureTokenService.fromEnvOrNull();
   if (!tokens) {
@@ -643,9 +736,7 @@ export const createUsageAttributionReportService = async ({
     tenantId: govProject?.id ?? "",
     service: new UsageAttributionReportService(
       prisma,
-      client
-        ? new UsageAttributionLedgerClickHouseRepository(client)
-        : new EmptyAttributionLedger(),
+      ledger ?? new EmptyAttributionLedger(),
       tokens,
     ),
   };
@@ -682,7 +773,9 @@ const displayNameFor = (
  * Conservation is a property of the sum, so merging happens after every row
  * has been placed and never decides where one goes.
  */
-const mergeRows = (rows: readonly AttributionReportRow[]): AttributionReportRow[] => {
+const mergeRows = (
+  rows: readonly AttributionReportRow[],
+): AttributionReportRow[] => {
   const merged = new Map<string, AttributionReportRow>();
   for (const row of rows) {
     const key = [

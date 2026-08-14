@@ -116,22 +116,19 @@ export const eraseSnapshotPersonReferences = (
   }
 
   let changed = false;
+  const scrub = (value: string): string => {
+    const erased = eraseString(value, compiled);
+    if (erased !== value) changed = true;
+    return erased;
+  };
 
   const walk = (node: unknown): unknown => {
-    if (typeof node === "string") {
-      const erased = eraseString(node, compiled);
-      if (erased !== node) changed = true;
-      return erased;
-    }
+    if (typeof node === "string") return scrub(node);
     if (Array.isArray(node)) return node.map(walk);
     if (node !== null && typeof node === "object") {
-      const out: Record<string, unknown> = {};
-      for (const [key, value] of Object.entries(node)) {
-        const erasedKey = eraseString(key, compiled);
-        if (erasedKey !== key) changed = true;
-        out[erasedKey] = walk(value);
-      }
-      return out;
+      return Object.fromEntries(
+        Object.entries(node).map(([key, value]) => [scrub(key), walk(value)]),
+      );
     }
     return node;
   };

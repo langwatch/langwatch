@@ -1,6 +1,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { BillableEventsClickHouseRepository } from "@ee/billing/services/billableEvents.clickhouse.repository";
 import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
+import { UsageAttributionLedgerClickHouseRepository } from "@ee/governance/services/usageAttributionLedger.clickhouse.repository";
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import { GovernanceTraceActivityClickHouseRepository } from "@ee/governance/services/governanceTraceActivity.clickhouse.repository";
 import { PersonalUsageClickHouseRepository } from "@ee/governance/services/personalUsage.clickhouse.repository";
@@ -101,6 +102,9 @@ export function installClickHouseTestApp({
       traceActivity: new GovernanceTraceActivityClickHouseRepository(required),
       kpis: new GovernanceKpisClickHouseRepository(required),
       personalUsage: new PersonalUsageClickHouseRepository(required),
+      usageAttributionLedger: new UsageAttributionLedgerClickHouseRepository(
+        required,
+      ),
     },
     billableEvents: new BillableEventsClickHouseRepository(
       required,
