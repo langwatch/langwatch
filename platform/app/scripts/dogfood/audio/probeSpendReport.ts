@@ -141,8 +141,10 @@ function checkLedger(debits: LedgerDebit[]): void {
  * the same cost for the same request.
  *
  * The trace id comes off the response, not the spend row: the row's TraceId
- * column is empty on these routes today, so joining through it would silently
- * skip the check.
+ * column is empty on these routes today, so joining through it would skip the
+ * check. A missing join key fails rather than returning quietly, because this
+ * is the probe's headline claim and a silent skip would print "All checks
+ * passed" having proved nothing.
  */
 async function checkTraceCost(
   scope: ProbeScope,
@@ -150,7 +152,16 @@ async function checkTraceCost(
   row: SpendRow | undefined,
   deadlineMs: number,
 ): Promise<void> {
-  if (!speech?.traceId || !row) return;
+  if (!speech?.traceId || !row) {
+    check(
+      "trace cost equals the billed cost",
+      false,
+      speech?.traceId
+        ? "no spend row for the first speech call"
+        : "the response carried no trace id to join on",
+    );
+    return;
+  }
   const traceCost = await until(
     "the trace explorer's cost for the speech call",
     deadlineMs,
