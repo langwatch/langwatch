@@ -80,6 +80,27 @@ function toLeasedMessage(row: ProcessManagerOutbox): LeasedOutboxMessageRecord {
 }
 
 /** Durable Postgres implementation of the process state/inbox/outbox port. */
+/**
+ * Timeouts for the commit transaction.
+ *
+ * Prisma's 5s interactive default measures the whole transaction, and the
+ * first thing this one does is take a BLOCKING advisory lock on the process
+ * reference. So the budget has to cover however long a concurrent commit for
+ * the same process holds that lock, not just this commit's own work — and a
+ * suite finishing several runs at once produces exactly that contention.
+ * Observed in local dev: "timeout was 5000 ms, however 7737 ms passed".
+ *
+ * The work inside is unchanged and still small: a lock, a dedup read, a
+ * compare-and-swap on the instance, and the inbox/outbox inserts. What is
+ * raised is the allowance for waiting, which is why maxWait moves with it —
+ * a commit that cannot even get a connection within maxWait fails before it
+ * has a chance to use its timeout.
+ */
+const COMMIT_TRANSACTION_OPTIONS = {
+  maxWait: 10_000,
+  timeout: 20_000,
+} as const;
+
 export class PrismaProcessStore implements ProcessStore {
   constructor(private readonly prisma: PrismaClient) {}
 
@@ -270,7 +291,7 @@ export class PrismaProcessStore implements ProcessStore {
           insertedMessageKeys,
           duplicateMessageKeys,
         };
-      });
+      }, COMMIT_TRANSACTION_OPTIONS);
     } catch (error) {
       if (error instanceof DuplicateInboxRollback) {
         return { outcome: "duplicateEvent" };
