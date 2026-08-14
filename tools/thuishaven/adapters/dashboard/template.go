@@ -103,10 +103,11 @@ const pageTemplate = `<!doctype html><html lang="en"><head>
   .chip.baseline { color:var(--brand-deep); background:var(--brand-soft); font-weight:600; }
   .dir { color:var(--ink-300); font-size:11px; font-family:ui-monospace,"SF Mono",monospace;
     word-break:break-all; margin:6px 0 10px; }
-  table.svcs { width:100%; border-collapse:collapse; }
-  table.svcs td { padding:5px 0; border-top:1px solid var(--ink-50); }
+  table.svcs { width:100%; border-collapse:collapse; table-layout:fixed; }
+  table.svcs td { padding:6px 0; border-top:1px solid var(--ink-50); vertical-align:middle;
+    overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
   table.svcs tr:first-child td { border-top:0; }
-  .dot-cell { width:16px; }
+  .dot-cell { width:20px; }
   .dot { display:inline-block; width:7px; height:7px; border-radius:50%; position:relative; }
   .dot.up { background:var(--moss); }
   .dot.up::after { content:""; position:absolute; inset:-3px; border-radius:50%;
@@ -114,11 +115,11 @@ const pageTemplate = `<!doctype html><html lang="en"><head>
   @keyframes ping { 0%{ transform:scale(.6); opacity:.5; } 80%,100%{ transform:scale(1.5); opacity:0; } }
   @media (prefers-reduced-motion: reduce){ .dot.up::after { animation:none; } }
   .dot.down { background:var(--rust); opacity:.7; }
-  .svc { width:86px; color:var(--ink-500); font-size:13px; }
-  table.svcs a { color:var(--ink-600); font-size:13px; text-decoration:none;
-    border-bottom:1px solid var(--ink-100); transition:color .3s, border-color .3s; }
-  table.svcs a:hover { color:var(--brand-deep); border-color:var(--brand); }
-  .port { color:var(--ink-300); font-size:12px; font-family:ui-monospace,"SF Mono",monospace; text-align:right; }
+  .svc { width:92px; color:var(--ink-500); font-size:13px; }
+  table.svcs a { color:var(--ink-600); font-size:12.5px; text-decoration:none;
+    font-family:ui-monospace,"SF Mono","JetBrains Mono",monospace; transition:color .3s; }
+  table.svcs a:hover { color:var(--brand-deep); }
+  .port { width:58px; color:var(--ink-300); font-size:12px; font-family:ui-monospace,"SF Mono",monospace; text-align:right; }
 
   .empty { grid-column:1/-1; color:var(--ink-400); padding:40px 0 8px; }
   .empty h2 { margin:0 0 6px; font-family:"Sentient",ui-serif,Georgia,serif; font-weight:400;
@@ -178,8 +179,8 @@ const pageTemplate = `<!doctype html><html lang="en"><head>
     <header><span class="slug">{{.Slug}}</span><span class="spacer"></span>{{if .OpenURL}}<a class="open" href="{{.OpenURL}}">open</a>{{end}}<span class="pill {{.BadgeClass}}">{{.Badge}}</span></header>
     <div class="branch">{{.Branch}}</div>
     <div class="chips">{{range .Chips}}{{if .IsBaseline}}<span class="chip baseline">baseline</span>{{else}}<span class="chip">{{.Label}} <code>{{.Value}}</code></span>{{end}}{{end}}</div>
-    <div class="dir">{{.Dir}}</div>
-    <table class="svcs">{{range .Rows}}<tr><td class="dot-cell">{{if not .IsSub}}<span class="dot {{.DotClass}}"></span>{{end}}</td><td class="svc">{{.Name}}</td><td><a href="{{.URL}}">{{.Host}}</a></td><td class="port">{{.Port}}</td></tr>{{end}}</table>
+    <div class="dir" title="{{.DirFull}}">{{.Dir}}</div>
+    <table class="svcs">{{range .Rows}}<tr><td class="dot-cell">{{if not .IsSub}}<span class="dot {{.DotClass}}"></span>{{end}}</td><td class="svc">{{.Name}}</td><td><a href="{{.URL}}" title="{{.URL}}">{{.Host}}</a></td><td class="port">{{.Port}}</td></tr>{{end}}</table>
   </section>{{end}}</main>
 {{if .SharedNote}}<div class="strip">{{.SharedNote}}</div>{{end}}
 

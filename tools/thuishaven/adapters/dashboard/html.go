@@ -71,7 +71,8 @@ type cardView struct {
 	Badge      string
 	BadgeClass string
 	Branch     string
-	Dir        string
+	Dir        string // shortened for display; DirFull carries the whole path
+	DirFull    string
 	OpenURL    string // the card's primary action; empty hides it
 	Chips      []chipView
 	Rows       []rowView
@@ -139,12 +140,13 @@ var sharedServiceNames = map[string]bool{
 }
 
 // renderCard builds one stack's view data and per-stack aggregates. treeRSS is
-// the stack's whole-tree footprint (0 hides the chip).
-func renderCard(s domain.Stack, probes Probes, treeRSS uint64) stackCard {
+// the stack's whole-tree footprint (0 hides the chip); in supplies the probes
+// and the base domain the hostnames are shortened against.
+func renderCard(s domain.Stack, in renderInputs, treeRSS uint64) stackCard {
 	var c stackCard
 	c.isLive = s.LauncherPID != 0
-	if c.isLive && probes.ProcessAlive != nil {
-		c.isLive = probes.ProcessAlive(s.LauncherPID)
+	if c.isLive && in.probes.ProcessAlive != nil {
+		c.isLive = in.probes.ProcessAlive(s.LauncherPID)
 	}
 	badge := "stale"
 	if c.isLive {
@@ -156,12 +158,23 @@ func renderCard(s domain.Stack, probes Probes, treeRSS uint64) stackCard {
 		Badge:      badge,
 		BadgeClass: badge,
 		Branch:     s.Branch,
-		Dir:        s.WorktreeDir,
+		Dir:        shortDir(s.WorktreeDir),
+		DirFull:    s.WorktreeDir,
 		OpenURL:    appURL(s),
 		Chips:      cardChips(s, c.isLive, treeRSS),
 	}
-	c.view.Rows, c.servicesUp, c.servicesTotal = cardRows(s, probes)
+	c.view.Rows, c.servicesUp, c.servicesTotal = cardRows(s, in)
 	return c
+}
+
+// shortDir keeps a path scannable on a card: the last two segments, the rest
+// elided (the full path stays available on hover).
+func shortDir(dir string) string {
+	parts := strings.Split(strings.TrimRight(dir, "/"), "/")
+	if len(parts) <= 3 {
+		return dir
+	}
+	return "…/" + strings.Join(parts[len(parts)-2:], "/")
 }
 
 func appURL(s domain.Stack) string {
@@ -192,23 +205,26 @@ func cardChips(s domain.Stack, isLive bool, treeRSS uint64) []chipView {
 }
 
 // cardRows lists the stack's OWN services — the shared servers are stated once
-// for the page, not repeated on every card.
-func cardRows(s domain.Stack, probes Probes) (rows []rowView, up, total int) {
+// for the page, not repeated on every card. Hostnames drop the base domain
+// every one of them shares, so a row stays one scannable line; the link and
+// its hover title still carry the full URL.
+func cardRows(s domain.Stack, in renderInputs) (rows []rowView, up, total int) {
+	base := "." + hostFromURL(in.sharedURL("langwatch"))
 	for _, svc := range s.Services {
 		if sharedServiceNames[svc.Name] {
 			continue
 		}
 		total++
 		dotClass := "down"
-		if probes.PortInUse != nil && svc.Port != 0 && probes.PortInUse(svc.Port) {
+		if in.probes.PortInUse != nil && svc.Port != 0 && in.probes.PortInUse(svc.Port) {
 			dotClass = "up"
 			up++
 		}
-		rows = append(rows, rowView{DotClass: dotClass, Name: svc.Name, URL: svc.URL, Host: svc.Hostname, Port: portText(svc.Port)})
+		rows = append(rows, rowView{DotClass: dotClass, Name: svc.Name, URL: svc.URL, Host: strings.TrimSuffix(svc.Hostname, base), Port: portText(svc.Port)})
 		// The API shares app's origin — show it as a sub-row so the single URL
 		// is unmistakable (no separate api.<slug> hostname).
 		if svc.Name == "app" && s.APIPort != 0 {
-			rows = append(rows, rowView{IsSub: true, Name: "└ api", URL: svc.URL + "/api", Host: svc.Hostname + "/api", Port: portText(s.APIPort)})
+			rows = append(rows, rowView{IsSub: true, Name: "└ api", URL: svc.URL + "/api", Host: strings.TrimSuffix(svc.Hostname, base) + "/api", Port: portText(s.APIPort)})
 		}
 	}
 	return rows, up, total
@@ -242,7 +258,7 @@ func renderHTML(stacks []domain.Stack, in renderInputs) string {
 	agg := pageAggregates{total: len(stacks)}
 	var cards []cardView
 	for i := range stacks {
-		c := renderCard(stacks[i], in.probes, in.extras.StackRSS[stacks[i].LauncherPID])
+		c := renderCard(stacks[i], in, in.extras.StackRSS[stacks[i].LauncherPID])
 		cards = append(cards, c.view)
 		if c.isLive {
 			agg.live++
