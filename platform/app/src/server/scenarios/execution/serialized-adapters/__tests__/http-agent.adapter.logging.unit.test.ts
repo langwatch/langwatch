@@ -93,7 +93,9 @@ describe("SerializedHttpAgentAdapter — logging (lw#3593)", () => {
         const adapter = new SerializedHttpAgentAdapter({
           config: defaultConfig,
           logger: logger as unknown as NonNullable<
-            ConstructorParameters<typeof SerializedHttpAgentAdapter>[0]["logger"]
+            ConstructorParameters<
+              typeof SerializedHttpAgentAdapter
+            >[0]["logger"]
           >,
         });
 
@@ -108,6 +110,46 @@ describe("SerializedHttpAgentAdapter — logging (lw#3593)", () => {
           }),
           "http call ok",
         );
+      });
+    });
+  });
+
+  describe("given a secret resolved into a header the name list does not cover", () => {
+    describe("when the adapter logs the request", () => {
+      /** @scenario "A resolved secret value is scrubbed from the request log line" */
+      it("shows the placeholder in that header value", async () => {
+        mockSsrfSafeFetch.mockResolvedValue({
+          ok: true,
+          status: 200,
+          headers: new Headers({ "content-type": "application/json" }),
+          json: vi.fn().mockResolvedValue({ response: "ok" }),
+          text: vi.fn().mockResolvedValue("ok"),
+        } as unknown as Awaited<ReturnType<typeof ssrfSafeFetch>>);
+
+        const adapter = new SerializedHttpAgentAdapter({
+          config: {
+            ...defaultConfig,
+            headers: [
+              { key: "X-Custom-Token", value: "{{ secrets.AGENT_TOKEN }}" },
+            ],
+            secrets: { AGENT_TOKEN: "tok-live-abc123" },
+          },
+          logger: logger as unknown as NonNullable<
+            ConstructorParameters<
+              typeof SerializedHttpAgentAdapter
+            >[0]["logger"]
+          >,
+        });
+
+        await adapter.call(defaultInput);
+
+        // X-Custom-Token is not a name any list can know about. The value
+        // scrub is what keeps the credential out of the log line.
+        const [entry] = logger.info.mock.calls[0] as [
+          { headers: Record<string, string> },
+        ];
+        expect(entry.headers["X-Custom-Token"]).toBe("[redacted]");
+        expect(JSON.stringify(entry)).not.toContain("tok-live-abc123");
       });
     });
   });
@@ -128,7 +170,9 @@ describe("SerializedHttpAgentAdapter — logging (lw#3593)", () => {
         const adapter = new SerializedHttpAgentAdapter({
           config: defaultConfig,
           logger: logger as unknown as NonNullable<
-            ConstructorParameters<typeof SerializedHttpAgentAdapter>[0]["logger"]
+            ConstructorParameters<
+              typeof SerializedHttpAgentAdapter
+            >[0]["logger"]
           >,
         });
 
@@ -157,7 +201,9 @@ describe("SerializedHttpAgentAdapter — logging (lw#3593)", () => {
         const adapter = new SerializedHttpAgentAdapter({
           config: defaultConfig,
           logger: logger as unknown as NonNullable<
-            ConstructorParameters<typeof SerializedHttpAgentAdapter>[0]["logger"]
+            ConstructorParameters<
+              typeof SerializedHttpAgentAdapter
+            >[0]["logger"]
           >,
         });
 

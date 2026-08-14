@@ -87,7 +87,7 @@ vi.mock("~/utils/api", () => ({
         useQuery: () => ({ data: mocks.mockGetByIdData, isLoading: false }),
       },
     },
-    useContext: () => ({
+    useUtils: () => ({
       scenarios: {
         getAll: { invalidate: vi.fn() },
         getById: { invalidate: vi.fn() },

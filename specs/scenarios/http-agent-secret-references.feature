@@ -22,6 +22,18 @@ Feature: HTTP agent requests can reference project secrets
     When the target takes a turn
     Then the request goes to the url with the secret's value in place of the reference
 
+  # The url is a template, and a secret is resolved before the template engine
+  # runs. The resolved value stays out of the engine. If it went through the
+  # engine, a value that holds template syntax would change the text around it,
+  # and the person who writes a secret is not always the person who writes the
+  # scenario.
+  @unit
+  Scenario: A resolved secret value is never read as template source
+    Given a project secret whose value contains template syntax
+    And an http target whose url reads that secret
+    When the target takes a turn
+    Then the url carries the secret's value exactly as it is stored
+
   @unit
   Scenario: Secret references resolve in header values and auth token, value, username, and password
     Given a project secret "AGENT_TOKEN"
@@ -50,6 +62,16 @@ Feature: HTTP agent requests can reference project secrets
     And an http target referencing it that the upstream rejects
     When the run reports the failure
     Then the message names the failure without the secret's value anywhere in it
+
+  # The adapter masks a short list of header names, such as Authorization. A
+  # target can put a reference in any header it likes, so the name list cannot
+  # find every credential. The value scrub covers the rest.
+  @unit
+  Scenario: A resolved secret value is scrubbed from the request log line
+    Given a project secret "AGENT_TOKEN"
+    And an http target that references it from a header name of its own choice
+    When the target takes a turn
+    Then the logged header value shows the placeholder, not the secret's value
 
   @unit
   Scenario: Plaintext auth without secret references behaves unchanged

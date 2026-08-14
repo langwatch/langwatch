@@ -122,14 +122,29 @@ export const scenarioParameterDefinitionsSchema = z
   });
 
 /**
+ * The key schema, which carries the reserved-name check and nothing else.
+ *
+ * It has to run here rather than in the refinement below. Zod drops a
+ * `__proto__` key while it builds the record, so the refinement never sees
+ * one, and the caller got a success for a value the run then ignored. The key
+ * schema runs first, so the name is refused the same way every other bad name
+ * is refused.
+ */
+const runParameterKeySchema = z
+  .string()
+  .refine((name) => !RESERVED_PARAMETER_NAMES.has(name), {
+    message: RESERVED_NAME_MESSAGE,
+  });
+
+/**
  * The values a run supplies, keyed by parameter name.
  *
- * Keys are checked in a refinement rather than by a key schema so a bad name
- * is reported against the key that carries it, and so the size caps can read
- * the record as a whole.
+ * The name grammar is checked in a refinement rather than in the key schema so
+ * a bad name is reported against the key that carries it, and so the size caps
+ * can read the record as a whole.
  */
 export const runParameterValuesSchema = z
-  .record(z.string(), parameterValueSchema)
+  .record(runParameterKeySchema, parameterValueSchema)
   .superRefine((values, ctx) => {
     const names = Object.keys(values);
 
@@ -139,14 +154,6 @@ export const runParameterValuesSchema = z
           code: z.ZodIssueCode.custom,
           path: [name],
           message: PARAMETER_NAME_MESSAGE,
-        });
-        continue;
-      }
-      if (RESERVED_PARAMETER_NAMES.has(name)) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: [name],
-          message: RESERVED_NAME_MESSAGE,
         });
       }
     }

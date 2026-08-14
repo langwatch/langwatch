@@ -159,6 +159,25 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
   }
 
   /**
+   * Header values for a log line: masked by name, then scrubbed by value.
+   *
+   * The name list only covers the headers that carry a credential by
+   * convention. A target may write `{{ secrets.NAME }}` into any header it
+   * likes, so `X-Custom-Token` holds a real credential and no name list can
+   * know that. The value scrub is what covers the rest.
+   */
+  private headersForLogs(
+    headers: Record<string, string>,
+  ): Record<string, string> {
+    return Object.fromEntries(
+      Object.entries(redactHeaders(headers)).map(([key, value]) => [
+        key,
+        this.scrub(value),
+      ]),
+    );
+  }
+
+  /**
    * Scrubs an error and everything it was caused by, in place.
    *
    * The whole chain matters, not just the top: undici reports a transport
@@ -233,7 +252,7 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
     const method = this.config.method.toUpperCase();
     const startedAt = Date.now();
     const loggedUrl = this.scrub(redactUrlForLogs(url));
-    const redactedHeaders = redactHeaders(headers);
+    const redactedHeaders = this.headersForLogs(headers);
     let response: Awaited<ReturnType<typeof ssrfSafeFetch>>;
     try {
       response = await ssrfSafeFetch(url, {

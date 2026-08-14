@@ -26,7 +26,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       scenarios: { getSuiteRunData: { invalidate: vi.fn() } },
     }),
     suites: {
@@ -129,9 +129,9 @@ describe("suite run confirmation parameters", () => {
       });
 
       it("offers one input per declared name, unioned across the scenarios", async () => {
-        // The description matters: it renders a second element for the same
-        // parameter, so the count below only stays honest while the tooltip
-        // sits outside the `suite-run-parameter-` namespace.
+        // The description adds a second element for the same parameter. The
+        // count below is thus only correct while the tooltip test id stays
+        // outside the `suite-run-parameter-` namespace.
         mocks.scenarios = [
           {
             id: "scenario_1",

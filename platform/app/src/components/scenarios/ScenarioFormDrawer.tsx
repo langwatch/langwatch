@@ -323,9 +323,9 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     [project?.id, scenario, updateExisting, createScenario],
   );
   /**
-   * Parameter declarations are edited in their own dialog, so a submit their
-   * validation rejected opens it: the row messages are otherwise behind a
-   * closed surface.
+   * Parameter rows are edited in their own dialog, and the message for a bad
+   * row shows on the row. When parameter validation rejects a submit, open the
+   * dialog again. The reader can then see which row is wrong.
    */
   const openParametersOnInvalid = useCallback(
     (errors: FieldErrors<ScenarioFormData>) => {

@@ -65,7 +65,7 @@ describe("SerializedHttpAgentAdapter", () => {
     expect(adapter.role).toBe(AgentRole.AGENT);
   });
 
-  it("has correct name", () => {
+  it("reports the adapter name", () => {
     const adapter = new SerializedHttpAgentAdapter({ config: defaultConfig });
     expect(adapter.name).toBe("SerializedHttpAgentAdapter");
   });

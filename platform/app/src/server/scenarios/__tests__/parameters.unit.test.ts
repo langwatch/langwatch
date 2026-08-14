@@ -248,23 +248,16 @@ describe("scenario run parameters", () => {
       const fromJson = (name: string) =>
         JSON.parse(`{"${name}": "gold"}`) as Record<string, string>;
 
-      it("refuses constructor and prototype by name", () => {
-        for (const name of ["constructor", "prototype"]) {
+      it("refuses every one of them, so no name is dropped in silence", () => {
+        // __proto__ is the one that needs the key schema. Zod drops that key
+        // while it builds the record, so a refinement over the result would
+        // see an empty record and answer success, and the caller would get a
+        // 2xx for a value the run then ignored.
+        for (const name of ["__proto__", "constructor", "prototype"]) {
           expect(
             runParameterValuesSchema.safeParse(fromJson(name)).success,
           ).toBe(false);
         }
-      });
-
-      it("never lets __proto__ through as a value at all", () => {
-        const parsed = runParameterValuesSchema.safeParse(
-          fromJson("__proto__"),
-        );
-
-        // zod strips this one itself, before any refinement runs, so it cannot
-        // reach the merge whatever the refinement says.
-        expect(parsed.success).toBe(true);
-        expect(Object.keys(parsed.success ? parsed.data : {})).toEqual([]);
       });
     });
 
