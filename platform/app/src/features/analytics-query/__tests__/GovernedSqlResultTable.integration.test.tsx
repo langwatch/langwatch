@@ -249,6 +249,54 @@ describe("the governed SQL result table", () => {
     });
   });
 
+  describe("given a cell whose value contains newlines", () => {
+    const multiline = "line one\nline two\nline three";
+    const withNewlines = () =>
+      governedSqlResult({
+        columns: [{ name: "message", type: "String" }],
+        rows: [{ message: multiline }],
+      });
+
+    describe("when that cell renders in the table", () => {
+      /**
+       * Every row is one `ROW_HEIGHT`, and the virtualizer sizes the scroll
+       * range from that constant rather than from measurement. A preview that
+       * renders its own line breaks makes the row taller than the range it was
+       * counted into, so the padding rows no longer add up and the scrollbar
+       * stops matching the rows under it.
+       */
+      it("previews it on a single line", () => {
+        renderTable(withNewlines());
+
+        const preview = screen
+          .getByTestId("governed-sql-result-row")
+          .querySelector("[data-cell-kind='scalar']");
+
+        expect(preview?.textContent).not.toContain("\n");
+      });
+
+      /**
+       * Collapsing the preview loses the line breaks, so the value has to stay
+       * reachable — otherwise the table would show a version of the value with
+       * no way to get at the real one. Length is not what makes it expandable
+       * here: this value is well under the clip limit.
+       */
+      it("still offers the whole value", async () => {
+        renderTable(withNewlines());
+
+        fireEvent.click(
+          screen.getByRole("button", {
+            name: "Show the full value of message",
+          }),
+        );
+
+        expect(
+          await screen.findByTestId("governed-sql-value-full"),
+        ).toHaveTextContent("line three");
+      });
+    });
+  });
+
   describe("given a result whose columns list the same name twice", () => {
     describe("when the table renders", () => {
       /** @scenario "Duplicate result column names are surfaced, not silently merged" */

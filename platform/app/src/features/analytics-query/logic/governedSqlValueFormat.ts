@@ -184,12 +184,32 @@ function safeJson(value: unknown, space?: number): string {
   }
 }
 
+/**
+ * The preview, and whether it is the whole value.
+ *
+ * Two things can make a preview stand in for the value rather than be it: the
+ * value being longer than the cap, and the value carrying its own line breaks.
+ * Both set `clipped`, which is what puts the expander on the cell — a member
+ * who is not looking at the whole value has to be able to reach it.
+ *
+ * The line breaks go before the cap is applied, so the limit counts what is on
+ * screen. They are collapsed here rather than left to `white-space` because the
+ * table gives every row one fixed height and sizes its scroll range from that
+ * constant rather than from measurement: a cell that renders two lines is
+ * taller than the range it was counted into, and the padding rows stop adding
+ * up. Leaving it to CSS would also keep the breaks in the DOM, where they still
+ * reach anyone copying a selection or listening to a screen reader.
+ */
 function clip(text: string): { display: string; clipped: boolean } {
-  if (text.length <= GOVERNED_SQL_VALUE_PREVIEW_LIMIT) {
-    return { display: text, clipped: false };
+  // \r\n first, so a Windows line ending collapses to one space and not two.
+  const flattened = text.replace(/\r\n|\r|\n/g, " ");
+  const wrapped = flattened !== text;
+
+  if (flattened.length <= GOVERNED_SQL_VALUE_PREVIEW_LIMIT) {
+    return { display: flattened, clipped: wrapped };
   }
   return {
-    display: text.slice(0, GOVERNED_SQL_VALUE_PREVIEW_LIMIT) + ELLIPSIS,
+    display: flattened.slice(0, GOVERNED_SQL_VALUE_PREVIEW_LIMIT) + ELLIPSIS,
     clipped: true,
   };
 }
