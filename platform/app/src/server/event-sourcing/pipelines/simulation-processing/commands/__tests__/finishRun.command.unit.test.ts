@@ -8,13 +8,12 @@ import type { SimulationProcessingEvent } from "../../schemas/events";
 import type { FinishRunDeps } from "../finishRun.command";
 import { FinishRunCommand } from "../finishRun.command";
 
-function makeDeps(
-  overrides: Partial<FinishRunDeps> = {},
-): FinishRunDeps & { loadPriorEvents: ReturnType<typeof vi.fn> } {
+function makeDeps(overrides: Partial<FinishRunDeps> = {}) {
+  const loadPriorEvents = vi.fn().mockResolvedValue([]);
   return {
-    loadPriorEvents: vi.fn().mockResolvedValue([]),
+    loadPriorEvents,
     ...overrides,
-  };
+  } as FinishRunDeps & { loadPriorEvents: typeof loadPriorEvents };
 }
 
 function makeCommand(overrides: Partial<FinishRunCommandData> = {}): {
@@ -88,7 +87,7 @@ describe("FinishRunCommand", () => {
             messages: [],
             traceIds: ["trace-1", "trace-2"],
           },
-        } as SimulationProcessingEvent,
+        } as unknown as SimulationProcessingEvent,
         {
           type: SIMULATION_RUN_EVENT_TYPES.TEXT_MESSAGE_END,
           data: {
@@ -98,7 +97,7 @@ describe("FinishRunCommand", () => {
             content: "hi",
             traceId: "trace-2",
           },
-        } as SimulationProcessingEvent,
+        } as unknown as SimulationProcessingEvent,
         {
           type: SIMULATION_RUN_EVENT_TYPES.TEXT_MESSAGE_END,
           data: {
@@ -108,7 +107,7 @@ describe("FinishRunCommand", () => {
             content: "bye",
             traceId: "trace-3",
           },
-        } as SimulationProcessingEvent,
+        } as unknown as SimulationProcessingEvent,
         {
           type: SIMULATION_RUN_EVENT_TYPES.MESSAGE_SNAPSHOT,
           data: {
@@ -116,7 +115,7 @@ describe("FinishRunCommand", () => {
             messages: [],
             traceIds: ["trace-1"],
           },
-        } as SimulationProcessingEvent,
+        } as unknown as SimulationProcessingEvent,
       ];
       const deps = makeDeps({
         loadPriorEvents: vi.fn().mockResolvedValue(priorEvents),
