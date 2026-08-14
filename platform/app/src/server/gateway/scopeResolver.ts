@@ -37,6 +37,8 @@ import type {
 
 import type { ScopeInput, VirtualKeyWithScopes } from "./virtualKey.repository";
 
+import { modelProviders } from "../modelProviders/registry";
+
 export type EligibleModelProvider = ModelProvider;
 
 export async function eligibleModelProvidersForVk(
@@ -49,13 +51,15 @@ export async function eligibleModelProvidersForVk(
   const scopePredicates = await buildScopePredicates(client, vk);
   if (scopePredicates.length === 0) return [];
 
-  const candidates = await client.modelProvider.findMany({
-    where: {
-      enabled: true,
-      disabledAt: null,
-      scopes: { some: { OR: scopePredicates } },
-    },
-  });
+  const candidates = (
+    await client.modelProvider.findMany({
+      where: {
+        enabled: true,
+        disabledAt: null,
+        scopes: { some: { OR: scopePredicates } },
+      },
+    })
+  ).filter(isDispatchableProvider);
 
   if (vk.routingPolicyId) {
     const policy = await client.routingPolicy.findUnique({
@@ -72,6 +76,18 @@ export async function eligibleModelProvidersForVk(
   }
 
   return candidates.sort(deterministicMpOrder);
+}
+
+// Non-LLM providers (registry type "safety", e.g. azure_safety) hold
+// credentials for evaluators, not chat dispatch. The Go gateway's Bifrost
+// router has no adapter for them, so letting one into the VK chain makes
+// fallback attempts fail with "unsupported provider: azure_safety".
+// Providers absent from the registry pass through: they may be newer than
+// this build's registry snapshot, and the materialiser's default branch
+// still knows how to shape their credentials.
+function isDispatchableProvider(mp: ModelProvider): boolean {
+  const entry = modelProviders[mp.provider as keyof typeof modelProviders];
+  return !entry || entry.type === "llm";
 }
 
 function deterministicMpOrder(a: ModelProvider, b: ModelProvider): number {

@@ -26,10 +26,17 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
-func audioRouter(capture *domain.Request) http.Handler {
+// audioRouter builds an audio-capable router. Extra credentials are
+// appended to the default bundle so a test asking for a non-OpenAI
+// provider prefix has the matching slot bound — without one the
+// dispatcher rejects the request as model_provider_not_bound before
+// the provider is ever reached.
+func audioRouter(capture *domain.Request, extraCreds ...domain.Credential) http.Handler {
 	auth := &mockAuth{
 		resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
-			return testBundle(), nil
+			b := testBundle()
+			b.Credentials = append(b.Credentials, extraCreds...)
+			return b, nil
 		},
 	}
 	provider := &mockProvider{
@@ -107,7 +114,9 @@ func TestAudioSpeech_ReturnsBinaryAudioWithContentType(t *testing.T) {
 
 func TestAudioSpeech_ElevenLabsModelResolvesToElevenLabsProvider(t *testing.T) {
 	var captured domain.Request
-	router := audioRouter(&captured)
+	router := audioRouter(&captured, domain.Credential{
+		ID: "cred-11labs", ProviderID: domain.ProviderElevenLabs, APIKey: "sk-11labs-test",
+	})
 
 	body := `{"model":"elevenlabs/eleven_flash_v2","voice":"cjVigY5qzO86Huf0OWal","input":"Hola."}`
 	req := httptest.NewRequest(http.MethodPost, "/v1/audio/speech", strings.NewReader(body))
@@ -416,7 +425,11 @@ func TestAudioSpeech_UpstreamProviderErrorPassesThrough(t *testing.T) {
 	}
 	auth := &mockAuth{
 		resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
-			return testBundle(), nil
+			b := testBundle()
+			b.Credentials = append(b.Credentials, domain.Credential{
+				ID: "cred-11labs", ProviderID: domain.ProviderElevenLabs, APIKey: "sk-11labs-test",
+			})
+			return b, nil
 		},
 	}
 	router := buildRouter(

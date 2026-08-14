@@ -1,8 +1,10 @@
 package app
 
 import (
+	"context"
 	"testing"
 
+	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -22,6 +24,7 @@ func TestEligibleCredentials(t *testing.T) {
 		name     string
 		resolved *domain.ResolvedModel
 		wantIDs  []string
+		wantErr  herr.Code
 	}{
 		{
 			name:     "explicit anthropic provider keeps both anthropic creds in order",
@@ -69,9 +72,9 @@ func TestEligibleCredentials(t *testing.T) {
 			wantIDs:  []string{"anthropic_1", "openai_1", "gemini_1", "anthropic_2"},
 		},
 		{
-			name:     "no matching provider falls back to original chain (defensive)",
+			name:     "explicit provider with no matching cred hard-fails as not bound",
 			resolved: &domain.ResolvedModel{ProviderID: domain.ProviderBedrock, ModelID: "bedrock-only"},
-			wantIDs:  []string{"anthropic_1", "openai_1", "gemini_1", "anthropic_2"},
+			wantErr:  domain.ErrProviderNotBound,
 		},
 		{
 			name:     "nil resolved leaves chain untouched",
@@ -87,7 +90,16 @@ func TestEligibleCredentials(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := eligibleCredentials(mkCreds(), tc.resolved)
+			got, err := eligibleCredentials(context.Background(), mkCreds(), tc.resolved)
+			if tc.wantErr != "" {
+				if !herr.IsCode(err, tc.wantErr) {
+					t.Fatalf("got err %v, want code %s", err, tc.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
 			gotIDs := make([]string, len(got))
 			for i, c := range got {
 				gotIDs[i] = c.ID
@@ -100,7 +112,10 @@ func TestEligibleCredentials(t *testing.T) {
 }
 
 func TestEligibleCredentialsEmptyChain(t *testing.T) {
-	got := eligibleCredentials(nil, &domain.ResolvedModel{ModelID: "gpt-4o"})
+	got, err := eligibleCredentials(context.Background(), nil, &domain.ResolvedModel{ModelID: "gpt-4o"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if got != nil {
 		t.Errorf("expected nil slice, got %v", got)
 	}
@@ -114,7 +129,10 @@ func TestEligibleCredentialsPreservesPriority(t *testing.T) {
 		{ID: "openai_first", ProviderID: domain.ProviderOpenAI},
 		{ID: "secondary_anthropic", ProviderID: domain.ProviderAnthropic},
 	}
-	got := eligibleCredentials(creds, &domain.ResolvedModel{ProviderID: domain.ProviderAnthropic})
+	got, err := eligibleCredentials(context.Background(), creds, &domain.ResolvedModel{ProviderID: domain.ProviderAnthropic})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if len(got) != 2 {
 		t.Fatalf("got %d creds, want 2", len(got))
 	}
@@ -133,4 +151,21 @@ func equalSlices(a, b []string) bool {
 		}
 	}
 	return true
+}
+
+func TestEligibleCredentialsImplicitNoMatchKeepsSafetyNet(t *testing.T) {
+	// A bare model name (no provider prefix) whose inferred provider has
+	// no credential must NOT hard-fail: without a prefix on the model
+	// string, each attempt dispatches with the credential's own provider
+	// and surfaces that provider's real error.
+	creds := []domain.Credential{
+		{ID: "openai_1", ProviderID: domain.ProviderOpenAI},
+	}
+	got, err := eligibleCredentials(context.Background(), creds, &domain.ResolvedModel{ProviderID: "", ModelID: "gemini-2.5-pro"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(got) != 1 || got[0].ID != "openai_1" {
+		t.Errorf("safety net not applied: got %v", got)
+	}
 }

@@ -58,6 +58,15 @@ Feature: Cross-scope ModelProvider reuse
     Then "OpenAI-enterprise" is included
     And the binding picker labels it as "OpenAI (org: acme)"
 
+  @integration
+  Scenario: Safety-type providers are excluded from gateway dispatch chains
+    Given a ModelProvider "azure_safety" (registry type "safety") enabled at ORGANIZATION scope
+    When the gateway config for any VK in the org is materialised
+    Then "azure_safety" is NOT in the bundle's providers[] or fallback chain
+    # Safety providers hold evaluator credentials; the Go gateway has no
+    # dispatch adapter for them — including one makes fallback attempts
+    # fail with "unsupported provider: azure_safety".
+
   Scenario: Mixed-scope visibility composes
     Given ModelProviders at 3 scopes: ORG "OpenAI-ent", TEAM "OpenAI-plat", PROJECT "OpenAI-prod-only"
     When I call getAllAccessible as alice for projectId="acme-api" (team: acme-platform)

@@ -101,12 +101,17 @@ Feature: AI Gateway — model disambiguation when a VK has multiple providers
     # The provider is clear (openai/), the MODEL is invalid. Ambiguity check
     # passed; upstream error pass-through takes over.
 
-  @integration @v1 @unimplemented
+  @integration @v1
   Scenario: Unknown provider prefix on VK returns 400 with clear envelope
     When I POST with body `{"model": "bedrock/claude-3-haiku", ...}` on "vk_multi" (no bedrock slot)
     Then the response status is 400
     And the response body.type is "model_provider_not_bound"
     And the response body.hint contains "bind a `bedrock` provider slot to this VK, or drop the prefix"
+    # Without this hard-fail the request would dispatch with a mismatched
+    # credential; Bifrost's model-prefix provider override then reads that
+    # credential through the wrong provider's key-config shape, surfacing
+    # opaque errors ("deployments not set", "no keys found that support
+    # model", raw HTML error pages) instead of the real problem.
 
   # ============================================================================
   # Observability — operators should be able to measure ambiguity incidence
