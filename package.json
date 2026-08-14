@@ -38,6 +38,7 @@
     "packages/automations/",
     "packages/clickhouse-client/",
     "packages/handled-error/",
+    "packages/identity-links/",
     "packages/langy/",
     "packages/observability/",
     "packages/react-rum/",
