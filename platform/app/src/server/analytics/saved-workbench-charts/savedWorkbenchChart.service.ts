@@ -41,12 +41,11 @@ import type {
 } from "~/generated/prisma/client";
 
 import type { Protections } from "../../traces/protections";
+import { isUniqueConstraintError } from "../../utils/prismaErrors";
 import {
   type GovernedSqlService,
   getGovernedSqlService,
 } from "../governed-sql/governedSql.service";
-
-import { isUniqueConstraintError } from "../../utils/prismaErrors";
 import {
   SavedWorkbenchChartAlreadyExistsError,
   SavedWorkbenchChartDefinitionInvalidError,
