@@ -34,6 +34,14 @@ vi.mock("~/server/featureFlag", () => ({
   featureFlagService: { isEnabled: mockFeatureFlagIsEnabled },
 }));
 
+// The audit log reaches for the module-level Prisma singleton rather than the
+// client on the context, so injecting a mock client does not cover it. Without
+// this stub the router's audit write hits a real database, which exists in the
+// integration lane but not the unit one.
+vi.mock("@ee/audit-log/auditLog", () => ({
+  auditLog: vi.fn(() => Promise.resolve()),
+}));
+
 vi.mock("~/server/analytics/governed-sql", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("~/server/analytics/governed-sql")>();
