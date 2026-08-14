@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-14
 
-**Status:** Proposed
+**Status:** Accepted (locked 2026-08-14 — captain: Sergio Esteban)
 
 **Relates to:** ADR-088 (pulled usage becomes priced records in the shared usage ledger — this ADR supplies the *person* those records were deferred on, its Decision 4), ADR-092 (the authorization engine — this ADR's data is explicitly outside it), ADR-070 (package layout this ADR's shared piece follows). Prerequisite bugs filed separately: #6972–#6982.
 
@@ -204,6 +204,8 @@ Attributed + unattributed + unattributable always equals the ledger total; nothi
   - **Decision 9:** non-email provider ids re-labeled from "not personal data" (wrong — an object id still resolves to a person) to *pseudonyms whose key we no longer hold* after `userId` and the anchor are gone; "former member (erased)" pinned as display copy inside the **attributed** bucket, conservation equation untouched; `erasedAt` narrowed to link/inventory rows — the mutable anchor gets no marker, and the ADR now says why that is acceptable.
   - **Token contract completed:** canonical input bytes (trimmed, lowercased, UTF-8), one key version per organization, rotation prohibited outright, and a stored-vs-report-derived match test while raw rows are still queryable.
   - **Scope fields declared honestly:** `userId` / `actorUserId` / `providerConnectionId` are plain ids with no database relations; the service validates connection ownership, and a cross-organization rejection test joins the isolation invariant.
+
+- **v6 — 2026-08-14 — LOCKED; captain: Sergio Esteban.** Status flipped Proposed → Accepted. From here, any change to a Decision is a new revision entry with a named captain — quiet edits are a penalty. Release shape decided at lock: **three batches, grouped by release blast radius.** (1) Foundations ride in *this* PR (#6987) beside the ADR — the additive migration and the callerless link package, so the Prisma block and the real schema ship in one diff and cannot drift; zero runtime behavior. (2) Write paths — lifecycle hook + sweep, SCIM anchor, ingest — data flows, nothing reads it yet; carries the #6976 behavior change, so it takes the heaviest review. (3) Read paths — the report and erasure; everything user-visible, gated on data the first two batches produced. Implementation entry point: branch `feat/provider-identity-model`, first migration adds `ProviderIdentityLink` + `DiscoveredAgent` + the two `OrganizationUser` anchor columns, first test is the resolution-determinism invariant (equal `effectiveFrom`, `seq` wins). Standing note for the report batch: erased-email token matching stays in the in-memory name-attach stage, never pushed into ClickHouse (Decision 2).
 
 ## Final ER model
 
