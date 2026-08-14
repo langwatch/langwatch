@@ -257,7 +257,13 @@ export const tracesRouter = createTRPCRouter({
     }),
 
   getFormattedSpansDigest: protectedProcedure
-    .input(z.object({ projectId: z.string(), traceIds: z.array(z.string()) }))
+    .input(
+      z.object({
+        projectId: z.string(),
+        traceIds: z.array(z.string()),
+        withEditOverlay: withEditOverlayInput,
+      }),
+    )
     .use(checkProjectPermission("traces:view"))
     .query(async ({ input, ctx }) => {
       const { projectId, traceIds } = input;
@@ -265,11 +271,21 @@ export const tracesRouter = createTRPCRouter({
         projectId,
       });
 
+      // The digest is one more reading of the same spans the other columns are
+      // mapped from, so the correction is read the same way. Read without it,
+      // the one column that quotes the whole trace would spell out the very
+      // spans the reviewer deleted.
+      //
+      // It stays on previews all the same: this runs over a whole page of
+      // traces at once, and resolving every offloaded value on all of them is
+      // what #4991 kept off the grid. Applying a correction needs none of it.
       const traceService = TraceService.create(ctx.prisma);
       const traces = await traceService.getTracesWithSpans(
         projectId,
         traceIds,
         protections,
+        undefined,
+        { withEditOverlay: input.withEditOverlay },
       );
 
       return Object.fromEntries(
@@ -512,7 +528,6 @@ export const tracesRouter = createTRPCRouter({
 
       try {
         for await (const eventArgs of on(emitter, "trace_updated", {
-          // @ts-expect-error - signal is not typed
           signal: opts.signal,
         })) {
           logger.debug(

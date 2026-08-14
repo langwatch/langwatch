@@ -176,7 +176,7 @@ export function CodexCodingDefaultsDialog({
           <Button
             size="sm"
             colorPalette="orange"
-            loading={apply.isLoading}
+            loading={apply.isPending}
             onClick={() =>
               void acceptCodexCodingDefaults({
                 applyDefaults: apply.mutateAsync,

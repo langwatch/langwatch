@@ -2,7 +2,8 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -11,7 +12,8 @@ datasource db {
   // Further reading:
   // https://next-auth.js.org/adapters/prisma#create-the-prisma-schema
   // https://www.prisma.io/docs/reference/api-reference/prisma-schema-reference#string
-  url          = env("DATABASE_URL")
+  // The connection URL lives in prisma.config.ts (Prisma 7); the runtime
+  // client connects through the pg driver adapter in src/server/db.ts.
   relationMode = "prisma"
 }
 
@@ -1188,8 +1190,12 @@ model ModelDefaultConfig {
 }
 
 // Join table binding a ModelDefaultConfig to a (scopeType, scopeId).
-// One config can have many scope attachments; one scope can have many
-// configs (resolver tiebreaks by createdAt DESC).
+// One config can have many scope attachments, but a scope belongs to at
+// most ONE config: every write path that attaches a scope first detaches
+// it from whichever config held it, under the same per-scope advisory
+// lock, and deletes any config left with zero attachments. The resolver
+// still tiebreaks same-scope configs by createdAt DESC as defense for
+// rows written before that invariant existed.
 model ModelDefaultConfigScope {
   id        String                @id @default(nanoid())
   configId  String
@@ -2080,7 +2086,7 @@ model Agent {
   projectId         String
   project           Project   @relation(fields: [projectId], references: [id])
   name              String
-  type              String // "signature" | "code" | "workflow"
+  type              String // "signature" | "code" | "workflow" | "http"
   config            Json // Node configuration (model, prompt, code, etc.)
   workflowId        String? // For "workflow" type - top level for joins
   workflow          Workflow? @relation(fields: [workflowId], references: [id])
@@ -2129,6 +2135,14 @@ model Scenario {
   situation       String
   criteria        String[]
   labels          String[]
+  // Named parameters the scenario declares, as an array of
+  // { name, description?, defaultValue? }. Values are supplied or overridden
+  // when a run starts, delivered to the target under test, and readable from
+  // the scenario's own situation and criteria as `params.NAME`. Null and an
+  // empty array both mean "this scenario declares none", which is the path
+  // that renders its text untouched. See
+  // specs/scenarios/scenario-run-parameters.feature.
+  parameters      Json?
   // Optional per-scenario model overrides for the run. When null the run
   // resolves the project's scenarios.user_simulator / scenarios.judge
   // DEFAULT-role models. See specs/scenarios/scenario-model-selection.feature.

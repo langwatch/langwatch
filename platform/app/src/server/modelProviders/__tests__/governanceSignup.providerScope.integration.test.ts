@@ -17,13 +17,14 @@
  * hand-building the rows, so the shape under test is the one a signup
  * actually produces.
  */
+
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+} from "~/generated/prisma/client";
 
 import { PersonalWorkspaceService } from "../../../../ee/governance/services/personalWorkspace.service";
 import { selectAmbientTeam } from "../../../hooks/useOrganizationTeamProject";

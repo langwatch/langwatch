@@ -25,7 +25,13 @@ const (
 //  1. SIGTERM/SIGINT, context cancellation, or fatal service error
 //  2. Health registry marked draining (/readyz → 503)
 //  3. Drain delay waits for load balancer to remove the pod
-//  4. Services stopped in reverse registration order
+//  4. The graceful budget starts, and services are stopped in reverse
+//     registration order within it
+//
+// The drain delay sits outside the graceful budget, so total wall time from
+// the signal to the last Stop returning is drainDelay + graceful. That is
+// what makes the graceful budget mean what it says: an in-flight request
+// gets all of it, not what the drain delay left over.
 type Group struct {
 	health     *health.Registry
 	services   []Service
@@ -37,13 +43,17 @@ type Group struct {
 // Option configures a Group.
 type Option func(*Group)
 
-// WithGraceful sets the total shutdown timeout budget.
+// WithGraceful sets how long services get to stop once the drain delay has
+// elapsed. It bounds the stop phase only; the drain delay is charged
+// separately, so the deadline a service's Stop sees is always the full d.
 func WithGraceful(d time.Duration) Option {
 	return func(g *Group) { g.graceful = d }
 }
 
 // WithDrainDelay sets the pause between marking draining and stopping services.
-// This gives the load balancer time to remove the pod from endpoints.
+// This gives the load balancer time to remove the pod from endpoints. It is
+// added to the graceful budget rather than taken out of it, so an operator
+// sizing the pod's termination grace period budgets for the sum of the two.
 func WithDrainDelay(d time.Duration) Option {
 	return func(g *Group) { g.drainDelay = d }
 }
@@ -68,6 +78,18 @@ func New(opts ...Option) *Group {
 // Add registers services. They start in order and stop in reverse.
 func (g *Group) Add(svcs ...Service) {
 	g.services = append(g.services, svcs...)
+}
+
+// ServiceNames returns the registered service names in start order. Stop
+// runs in reverse of this, which is what makes the order worth asserting:
+// which service drains before which is a correctness property, not a
+// detail.
+func (g *Group) ServiceNames() []string {
+	names := make([]string, 0, len(g.services))
+	for _, svc := range g.services {
+		names = append(names, svc.String())
+	}
+	return names
 }
 
 // Run starts all services, blocks until a shutdown trigger fires,
@@ -111,23 +133,24 @@ func (g *Group) Run(ctx context.Context) error {
 	// Cancel the services' context.
 	cancel()
 
-	shutCtx, shutCancel := context.WithTimeout(context.Background(), g.graceful)
-	defer shutCancel()
-
 	// Mark draining so /readyz returns 503.
 	if g.health != nil {
 		g.health.MarkDraining()
 		g.logger.Info("lifecycle_draining")
 	}
 
-	// Pause for LB to remove the pod from endpoints.
+	// Pause for LB to remove the pod from endpoints. This is time spent
+	// making the pod unroutable, not time an in-flight request gets to
+	// finish in, so it is deliberately outside the graceful budget below.
 	if g.drainDelay > 0 {
 		g.logger.Info("lifecycle_drain_delay", zap.Duration("wait", g.drainDelay))
-		select {
-		case <-time.After(g.drainDelay):
-		case <-shutCtx.Done():
-		}
+		time.Sleep(g.drainDelay)
 	}
+
+	// The graceful budget starts here, with the pod already out of
+	// rotation, so a still-running request gets the whole of it.
+	shutCtx, shutCancel := context.WithTimeout(context.Background(), g.graceful)
+	defer shutCancel()
 
 	stopErr := g.stopN(shutCtx, started)
 

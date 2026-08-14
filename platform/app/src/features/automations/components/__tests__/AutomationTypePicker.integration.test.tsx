@@ -10,7 +10,7 @@ import { AutomationTypePicker } from "../AutomationTypePicker";
 
 // Transitive: provider ConfigForms import ~/utils/api at module scope.
 vi.mock("~/utils/api", () => ({
-  api: { useContext: () => ({}) },
+  api: { useUtils: () => ({}) },
 }));
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (

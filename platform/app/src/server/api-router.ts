@@ -67,11 +67,13 @@ import { app as githubApp } from "./routes/github";
 import { app as healthApp } from "./routes/health";
 import { app as healthChecksApp } from "./routes/health-checks";
 import { app as ingestionRoutesApp } from "./routes/ingest/ingestionRoutes";
+import { app as langyApiApp } from "./routes/langy-api";
 import { app as langyInternalApp } from "./routes/langy-internal";
 import { app as langyRelayApp } from "./routes/langy-relay";
 import { app as miscApp } from "./routes/misc";
 import { app as opsApp } from "./routes/ops";
 import { app as otelApp } from "./routes/otel";
+import { app as otelPathAliasApp } from "./routes/otel-path-aliases";
 import { app as playgroundApp } from "./routes/playground";
 import { app as rumApp } from "./routes/rum";
 import { app as scenarioGenerateApp } from "./routes/scenario-generate";
@@ -181,6 +183,7 @@ export function createApiRouter() {
   api.route("/", otelApp);
   api.route("/", rumApp); // /api/rum/v1/traces — browser telemetry proxy
   api.route("/", playgroundApp);
+  api.route("/", langyApiApp); // /api/langy/conversations — key-authed turns
   api.route("/", langyInternalApp);
   api.route("/", langyRelayApp);
   api.route("/", githubApp);
@@ -198,6 +201,10 @@ export function createApiRouter() {
   api.route("/", authCliApp); // /api/auth/cli/* — RFC 8628 device-flow for CLI
   api.route("/", authApp);
   api.route("/", collectorApp);
+  // ORDERING: must come after otelApp and collectorApp, whose namespaces its
+  // aliases overlap — the real routes get their match first. It declines
+  // anything it does not recognise, so apps mounted after it are unaffected.
+  api.route("/", otelPathAliasApp);
   api.route("/", ingestionRoutesApp); // /api/ingest/* — Activity Monitor receivers
   api.route("/", cronApp);
   api.route("/", evaluationsLegacyApp);

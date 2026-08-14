@@ -10,11 +10,11 @@
  */
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import type { SimulationSuite } from "@prisma/client";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import type { FieldMapping } from "~/components/variables/VariableMappingInput";
+import type { SimulationSuite } from "~/generated/prisma/client";
 import { MAX_REPEAT_COUNT } from "~/server/suites/constants";
 import {
   parseSuiteTargets,

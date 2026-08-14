@@ -13,7 +13,7 @@ interface PaginationProps {
   /** Cursor returned by the current batch; null means the end. */
   nextCursor?: PageCursor | null;
   visibleCount?: number;
-  /** What one row is, for the totals copy: "traces" (default) or "sessions". */
+  /** What one row is, for the totals copy: "traces" (default) or "conversations". */
   itemNoun?: string;
   /**
    * Renders a placeholder bar in place of the page description while data is

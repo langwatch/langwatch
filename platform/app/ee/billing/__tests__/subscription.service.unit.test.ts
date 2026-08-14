@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mockSendSlackSubscriptionEvent = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("../../../src/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: () => ({
     notifications: {
       sendSlackSubscriptionEvent: mockSendSlackSubscriptionEvent,
@@ -10,8 +12,8 @@ vi.mock("../../../src/server/app-layer/app", () => ({
   }),
 }));
 
-import type { PrismaClient } from "@prisma/client";
 import Stripe from "stripe";
+import type { PrismaClient } from "~/generated/prisma/client";
 import type { OrganizationRepository } from "../../../src/server/app-layer/organizations/repositories/organization.repository";
 import type { SubscriptionRepository } from "../../../src/server/app-layer/subscription/subscription.repository";
 import type { SubscriptionService } from "../../../src/server/app-layer/subscription/subscription.service";

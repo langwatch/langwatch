@@ -17,6 +17,10 @@
 
 import { createLogger } from "@langwatch/observability";
 import type { ScenarioExecutionPool } from "../../../../scenarios/execution/execution-pool";
+import {
+  type RunParameterValues,
+  runParameterValuesSchema,
+} from "../../../../scenarios/parameters";
 import type {
   ReactorContext,
   ReactorDefinition,
@@ -28,6 +32,23 @@ import { isSimulationRunQueuedEvent } from "../schemas/typeGuards";
 const logger = createLogger(
   "langwatch:simulation-processing:scenario-execution",
 );
+
+/**
+ * The run's resolved parameter values, as recorded on the queued event.
+ *
+ * This is the only place they cross from the event stream into execution: the
+ * pool job is built from fold state, and fold state does not carry them. A
+ * shape this version cannot read is dropped rather than failing the run: the
+ * event was written by whichever build queued it, and a run without parameters
+ * is the behaviour every run had before them.
+ */
+function readRunParameters(
+  metadata: Record<string, unknown> | undefined,
+): RunParameterValues | undefined {
+  const parsed = runParameterValuesSchema.safeParse(metadata?.parameters);
+  if (!parsed.success) return undefined;
+  return Object.keys(parsed.data).length > 0 ? parsed.data : undefined;
+}
 
 export interface ScenarioExecutionReactorHandle {
   reactor: ReactorDefinition<SimulationProcessingEvent, SimulationRunStateData>;
@@ -96,6 +117,7 @@ export function createScenarioExecutionReactor(): ScenarioExecutionReactorHandle
         setId: foldState.ScenarioSetId,
         scenarioName: foldState.Name ?? undefined,
         target,
+        parameters: readRunParameters(event.data.metadata),
       });
 
       logger.debug(

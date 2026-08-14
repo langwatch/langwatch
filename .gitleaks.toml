@@ -118,3 +118,62 @@ paths = [
   '''docs/ai-gateway/cookbooks/metering-and-rebilling\.mdx''',
   '''docs/llms-full\.txt''',
 ]
+
+# `azure-secret-hygiene.unit.test.ts` proves the opposite of a leak: that
+# `redactAuthorizationMaterial` strips bearer tokens out of Azure error text
+# before it reaches a log. To prove that, the fixture has to be shaped exactly
+# like the thing a real leak would be — so gitleaks flags it, correctly, on
+# shape alone.
+#
+# Naming the value, as this file requires. `LEAKED_TOKEN` is three base64
+# segments that decode to:
+#   header    {"alg":"RS256","typ":"JWT"}
+#   payload   {"aud":"https://storage"}
+#   signature the literal ASCII word `signature`
+# No key signed it, it names no tenant, no account and no subject, and it
+# authenticates against nothing. Decode it and there is nothing to revoke.
+#
+# Scoped to this one file and to the two rules its shape trips, so every other
+# rule still applies here: a real Azure account key or SAS token landing in this
+# file is still caught.
+[[allowlists]]
+description = "Synthetic JWT-shaped fixture proving bearer-token redaction; signs nothing, grants nothing"
+targetRules = ["jwt", "generic-api-key"]
+paths = ['''platform/app/src/server/stored-objects/__tests__/azure-secret-hygiene\.unit\.test\.ts''']
+
+# The three synthetic credentials the secret-redaction tests assign to a named
+# key. Same argument as the Azure fixture above: a test that proves a secret is
+# scrubbed has to hand it something shaped like the thing a real leak would be,
+# and gitleaks' `generic-api-key` rule fires on the `TOKEN": "<high-entropy
+# value>"` shape without being able to tell the fixture from what it imitates.
+#
+# Naming the values, as this file requires:
+#   sk-live-abc123    printed by a code node in the nlpgo stdout/stderr
+#                     redaction test. Already the repository's stand-in leak in
+#                     services/langyagent and services/aigateway, where it sits
+#                     in prose rather than an assignment and so goes unflagged.
+#   hunter2-signing   the second secret in that same test, present to prove the
+#                     scrub covers every entry in the map and not just the first.
+#   tok-live-abc123   the `{{ secrets.NAME }}` value in the scenario HTTP target
+#                     test.
+# No provider issued any of them, none has ever authenticated anything, and
+# there is nothing to revoke.
+#
+# Scoped by VALUE rather than by path, which is the stronger of the two: any
+# other high-entropy string in these files is still caught, and the same fixture
+# stays covered wherever else it is used. Scoped to `generic-api-key` on top, so
+# every provider-specific rule still applies to these values too.
+#
+# ANCHORED, because a gitleaks allowlist regex is a substring match against the
+# matched secret. Unanchored, `sk-live-abc123` would also allow a real
+# `sk-live-abc123<rest-of-a-live-key>`, which is the one string an attacker
+# could pick on purpose. `^...$` allows the fixture and nothing that merely
+# starts with it.
+[[allowlists]]
+description = "Synthetic credential fixtures in the secret-redaction tests; issued by nobody, revocable nowhere"
+targetRules = ["generic-api-key"]
+regexes = [
+  '''^sk-live-abc123$''',
+  '''^hunter2-signing$''',
+  '''^tok-live-abc123$''',
+]

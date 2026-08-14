@@ -1,8 +1,9 @@
+import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useIsReadOnlyTrace } from "../context/TraceViewerContext";
 import type { TraceListItem } from "../types/trace";
+import { useDrawerProjectId } from "./useDrawerProjectId";
 import { mergeTraceEvents } from "./useTraceListEvents";
 
 /** Padding on the read window, so an event stamped after its turn's start is still inside it. */
@@ -20,7 +21,7 @@ const WINDOW_PAD_MS = 60 * 60 * 1000;
 export function useConversationTurnEvents(
   turns: TraceListItem[],
 ): TraceListItem[] {
-  const { project } = useOrganizationTeamProject();
+  const projectId = useDrawerProjectId();
   const isReadOnly = useIsReadOnlyTrace();
 
   // Deduplicated and sorted so two renders of the same thread ask for the same
@@ -42,10 +43,10 @@ export function useConversationTurnEvents(
     return { from: from - WINDOW_PAD_MS, to: to + WINDOW_PAD_MS };
   }, [turns]);
 
-  const enabled = !!project?.id && !isReadOnly && traceIds.length > 0;
+  const enabled = !!projectId && !isReadOnly && traceIds.length > 0;
   const query = api.tracesV2.listEvents.useQuery(
     {
-      projectId: project?.id ?? "",
+      projectId,
       traceIds,
       timeRange,
     },
@@ -55,15 +56,15 @@ export function useConversationTurnEvents(
       enabled,
       staleTime: 60_000,
       refetchOnWindowFocus: false,
-      keepPreviousData: true,
+      placeholderData: keepPreviousData,
       trpc: { context: { skipBatch: true } },
     },
   );
 
-  // `keepPreviousData` hands back the previous thread's rollups with
-  // `isLoading` already false, so a turn of the new thread would find no entry
-  // of its own and read as eventless while it is still waiting.
-  const isLoading = enabled && (query.isLoading || query.isPreviousData);
+  // `placeholderData: keepPreviousData` hands back the previous thread's
+  // rollups with `isLoading` already false, so a turn of the new thread would
+  // find no entry of its own and read as eventless while it is still waiting.
+  const isLoading = enabled && (query.isLoading || query.isPlaceholderData);
 
   return useMemo(
     () =>

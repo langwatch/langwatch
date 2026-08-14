@@ -249,8 +249,9 @@ export function DatasetUploadProcessing({
       // normalize runs, so "ready" is only ever reached once normalize has
       // finished; we don't second-guess it (a degenerate columnless dataset is
       // still terminally ready, not an endless spinner).
-      refetchInterval: (data) =>
-        data?.status === "processing" || data?.status === "uploading"
+      refetchInterval: (query) =>
+        query.state.data?.status === "processing" ||
+        query.state.data?.status === "uploading"
           ? 3000
           : false,
     },
@@ -408,7 +409,7 @@ export function UploadCSVForm({
 }) {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id;
-  const trpcUtils = api.useContext();
+  const trpcUtils = api.useUtils();
   const router = useRouter();
 
   // The raw file from the dropzone. The direct-upload path streams this as-is

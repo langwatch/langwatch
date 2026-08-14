@@ -860,7 +860,7 @@ export const AnnotationsTable = ({
           selectedTraceIds={selectedTraceIds}
           selectedQueueItemIds={selectedQueueItemIds}
           pageQueue={pageQueue}
-          isRemoving={deleteQueueItems.isLoading}
+          isRemoving={deleteQueueItems.isPending}
           onClear={() => setRowSelection({})}
           onAddToDataset={addTraceIdsToDataset}
           onRemoveFromQueue={removeFromQueue}

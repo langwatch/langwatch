@@ -66,7 +66,7 @@ export function DeployPromptDialog({
   const assignTag = api.prompts.assignTag.useMutation();
   const createTag = api.promptTags.create.useMutation();
   const deleteTag = api.promptTags.delete.useMutation();
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   const versions = versionsQuery.data ?? [];
 

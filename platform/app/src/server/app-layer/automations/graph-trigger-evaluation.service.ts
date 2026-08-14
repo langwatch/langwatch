@@ -29,8 +29,8 @@ import {
 } from "@langwatch/automations/providers/slack";
 import { buildGraphAlertTemplateContext } from "@langwatch/automations/templating/templateContext";
 import { createLogger } from "@langwatch/observability";
-import type { CustomGraph, Project, Trigger } from "@prisma/client";
 import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
+import type { CustomGraph, Project, Trigger } from "~/generated/prisma/client";
 import type {
   SeriesInputType,
   TimeseriesInputType,

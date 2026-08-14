@@ -413,6 +413,35 @@ export class NotificationService {
   }
 
   /**
+   * Sends a Slack alert when an annual subscription could not be given its
+   * events billing threshold.
+   *
+   * This failure is invisible everywhere else: checkout completion answers
+   * Stripe with a 200 either way (a non-2xx would make Stripe retry the whole
+   * checkout webhook, which must not happen), so Stripe's own redelivery never
+   * fires for it. Without this alert the subscription silently falls back to
+   * one oversized renewal invoice — the exact risk the threshold exists to
+   * remove — and only a log grep would ever reveal it.
+   */
+  async sendSlackBillingThresholdFailureAlert({
+    stripeSubscriptionId,
+    reason,
+  }: {
+    stripeSubscriptionId: string;
+    reason: string;
+  }): Promise<void> {
+    await this.sendSlackMessage({
+      channelUrl: this.config.slackSubscriptionsChannel,
+      body: {
+        text: `Annual events billing threshold NOT set on ${stripeSubscriptionId}: ${reason}. This subscription will bill its event overage as one renewal invoice until the threshold is applied — re-run the backfill or set it manually.`,
+      },
+      missingConfigLog:
+        "SLACK_CHANNEL_SUBSCRIPTIONS is not configured; skipping billing-threshold failure alert",
+      errorLog: "Failed to send Slack billing-threshold failure notification",
+    });
+  }
+
+  /**
    * Sends a Slack notification for subscription events (prospective or confirmed).
    */
   async sendSlackSubscriptionEvent(

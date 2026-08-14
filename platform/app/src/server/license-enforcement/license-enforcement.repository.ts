@@ -4,7 +4,7 @@ import {
   type Prisma,
   type PrismaClient,
   RoleBindingScopeType,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { getCurrentMonthStart } from "../utils/dateUtils";
 import { isFullMember, isLiteMember } from "./member-classification";
 

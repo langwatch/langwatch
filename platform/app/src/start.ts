@@ -82,14 +82,15 @@ import {
   initializeInProcessApp,
   initializeWebApp,
 } from "./server/app-layer/presets";
+import { assertRedisReady } from "./server/app-layer/redis-readiness";
 import { assetBaseOrigin, getAssetBase } from "./server/asset-base";
 import {
   getWorkerMetricsPort,
   isMetricsAuthorized,
   normalizeMetricsPath,
 } from "./server/metrics";
+import { canonicalOtlpPath } from "./server/otel/otlpPathCanonicalisation";
 import { shutdownPostHog } from "./server/posthog";
-import { verifyRedisReady } from "./server/redis";
 import { buildSecurityHeaders } from "./server/securityHeaders";
 import { SHUTDOWN_BUDGET } from "./server/shutdown/budget";
 import { installShutdownHandlers } from "./server/shutdown/runGracefulShutdown";
@@ -108,7 +109,17 @@ export const metricsMiddleware = promBundle({
   customLabels: { project_name: "langwatch" },
   bypass: {
     onRequest: (req) => {
-      if (/^\/(api|assets|auth|settings|share|$)/.test(req.url ?? "")) {
+      // The three root-level OTLP paths a misconfigured exporter posts to are
+      // served by the API (see the handler below), so leaving them out would
+      // hide exactly the traffic worth watching. The OTLP branch is the only
+      // one anchored at the end: the others are deliberately prefixes, while
+      // this one must not let `/v1/traces-anything` in and turn a claim of
+      // three bounded labels into an open set.
+      if (
+        /^\/(?:api|assets|auth|settings|share|v1\/(?:traces|logs|metrics)\/?(?:\?.*)?$|$)/.test(
+          req.url ?? "",
+        )
+      ) {
         return false;
       }
       return true;
@@ -153,7 +164,26 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
   // Fail fast if Redis is unreachable — better-auth uses it as secondary
   // session store, and without it every request ends in a "Redirecting to
   // Sign in…" loop with no actionable error for the developer.
-  await verifyRedisReady();
+  //
+  // Exiting is this caller's decision, not the probe's: the web server owns the
+  // process, and one that cannot reach Redis has nothing to serve. The probe
+  // has already logged what and where (ADR-093).
+  try {
+    await assertRedisReady();
+  } catch (err) {
+    // Synchronous stderr before exiting, for the same reason the server error
+    // handler below does it: the probe logs through pino, whose transports are
+    // async worker threads that never flush past `process.exit(1)`. Without
+    // this, an unreachable Redis is an exit(1) with no output anywhere — the
+    // exact onboarding dead-end this check exists to prevent.
+    writeSync(
+      2,
+      `[langwatch:start] Redis is not reachable, exiting: ${
+        err instanceof Error ? (err.stack ?? err.message) : String(err)
+      }\n`,
+    );
+    process.exit(1);
+  }
 
   // Partial-config assertion on LW_VIRTUAL_KEY_PEPPER /
   // LW_GATEWAY_INTERNAL_SECRET / LW_GATEWAY_JWT_SECRET now lives in
@@ -279,7 +309,15 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
       });
 
       // ---- API Routes (all go through Hono) ----
-      if (pathname.startsWith("/api/")) {
+      // An exporter given the site root as its OTLP endpoint posts to
+      // `/v1/traces`, which the SPA fallback below answers with the HTML shell
+      // and a 200 — the exporter reads that as success and drops the batch.
+      // Those paths belong to the API, which canonicalises them
+      // (src/server/routes/otel-path-aliases.ts).
+      if (
+        pathname.startsWith("/api/") ||
+        canonicalOtlpPath(pathname) !== null
+      ) {
         await apiListener(req, res);
         return;
       }
@@ -410,7 +448,7 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
             server.close(() => resolve()),
           );
           if ("closeIdleConnections" in server) server.closeIdleConnections();
-          mcpHandler.closeAllSessions();
+          await mcpHandler.closeAllSessions();
           try {
             await closed;
           } finally {

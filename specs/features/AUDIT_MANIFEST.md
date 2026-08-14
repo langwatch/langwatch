@@ -697,7 +697,7 @@ See `~/workspace/orchard-codex/plans/unimpl-reduction-2026-04-25.md` for the orc
 | specs/features/suites/suite-runs-time-filter.feature | "Selected date range limits displayed run data" | DUPLICATE | Covered by usePeriodSelector.unit.test.ts |
 | specs/features/suites/suite-runs-time-filter.feature | "Batch runs are included or excluded atomically" | KEEP | run-history-transforms groups runs by batch; behavior implicit |
 | specs/features/suites/suite-runs-time-filter.feature | "Default time range is applied on initial load" | DUPLICATE | usePeriodSelector(30) default covered in usePeriodSelector.unit.test.ts |
-| specs/features/suites/target-selector-select-clear-all.feature | "Target picker displays Select All and Clear buttons" | DUPLICATE | TargetPicker.unit.test.tsx covers footer Select All / Clear (#1970) |
+| specs/features/suites/target-selector-select-clear-all.feature | "Target picker displays Select All and Clear buttons" | DUPLICATE | TargetPicker.integration.test.tsx covers footer Select All / Clear (#1970) |
 | specs/features/suites/target-selector-select-clear-all.feature | "Clicking Select All selects all targets" | DUPLICATE | TargetPicker test calls onSelectAll (line 273) |
 | specs/features/suites/target-selector-select-clear-all.feature | "Clicking Clear deselects all targets" | DUPLICATE | TargetPicker test covers Clear button |
 | specs/features/suites/target-selector-select-clear-all.feature | "Select All adds to partial selection" | KEEP | TargetPicker.onSelectAll selects all; behavior in component |

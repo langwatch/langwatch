@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { nanoid } from "nanoid";
+import { z } from "zod";
 /**
  * AiToolEntryService - owns the AI Tools Portal catalog (Phase 7).
  *
@@ -33,9 +35,7 @@
  *
  * Spec: specs/ai-governance/personal-portal/tool-catalog-*.feature
  */
-import type { Prisma, PrismaClient } from "@prisma/client";
-import { nanoid } from "nanoid";
-import { z } from "zod";
+import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 
 import { modelProviders as supportedModelProviders } from "~/server/modelProviders/registry";
 
@@ -1052,7 +1052,8 @@ export class AiToolEntryService {
         // $executeRaw, not $queryRaw: pg_advisory_xact_lock returns void,
         // which $queryRaw fails to deserialize. The lock releases at
         // commit / rollback.
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`ai-tool-default-catalog:${organizationId}`}, 0))`;
+        await tx.$executeRaw`-- @tenancy: advisory-lock helper, key is organization-bounded
+SELECT pg_advisory_xact_lock(hashtextextended(${`ai-tool-default-catalog:${organizationId}`}, 0))`;
         const countUnderLock = await tx.aiToolEntry.count({
           where: { organizationId },
         });

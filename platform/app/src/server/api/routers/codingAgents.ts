@@ -8,7 +8,14 @@ import {
   resolveCallerProjectScope,
 } from "~/server/organizations/resolveCallerProjectScope";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
+import { canReadCapturedContent } from "~/server/traces/protections";
 import { checkProjectPermission } from "../rbac";
+import { getUserProtectionsForProject } from "../utils";
+import {
+  gatePullRequestSessionTitles,
+  gateSessionListCost,
+  gateSessionListTitles,
+} from "./codingAgents.gates";
 
 /** Default look-back for the personal usage card: the trailing 30 days. */
 const DEFAULT_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
@@ -77,6 +84,36 @@ export const codingAgentsRouter = createTRPCRouter({
     }),
 
   /**
+   * The Sessions screen's list: the project's coding-agent sessions of the
+   * last ninety days, each named by the title its agent generated, priced, and
+   * carrying the pull requests it drove.
+   *
+   * Its own read rather than a shape on `recentSessions`, which answers with
+   * the stored row verbatim for the personal usage card. This one is a display
+   * projection: it drops the columns no column of the table shows, and it
+   * joins the organization's pull-request mapping onto the page.
+   *
+   * The title is the one conversation-derived value on the row, so it follows
+   * the project's content visibility; the cost follows `cost:view`, like every
+   * other spend on the platform.
+   */
+  sessionsList: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkProjectPermission("traces:view"))
+    .query(async ({ ctx, input }) => {
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      });
+      const rows = await getApp().codingAgents.sessionsList.listForProject({
+        projectId: input.projectId,
+      });
+      return gateSessionListCost({
+        rows: gateSessionListTitles({ rows, protections }),
+        protections,
+      });
+    }),
+
+  /**
    * What each of the project's pull requests cost, plus the branches whose
    * pull request has not been opened (or mapped) yet, plus whether GitHub is
    * connected at all, in one query, because the page needs all three to decide
@@ -105,8 +142,14 @@ export const codingAgentsRouter = createTRPCRouter({
 
   /**
    * One pull request in full: its totals, who worked on it, what each model
-   * consumed, and the sessions that ran. Same permission cut as the list, and
-   * the same numbers-only contract: the sessions carry facts, never titles.
+   * consumed, and the sessions that ran. Same permission cut as the list.
+   *
+   * Each session is named by the title its agent generated, and that title is
+   * resolved against the protections of the project the session ran in: the
+   * detail spans an organization, and a reader can be trusted with one
+   * project's conversations and not another's. Only the projects that actually
+   * contributed a session are resolved, so the cost is bounded by what the
+   * detail lists rather than by the size of the organization.
    */
   pullRequestDetail: protectedProcedure
     .input(
@@ -130,15 +173,58 @@ export const codingAgentsRouter = createTRPCRouter({
         userId: ctx.session.user.id,
         organizationId,
       });
-      return getApp().codingAgents.pullRequestUsage.getPullRequestDetail({
-        organizationId,
-        repositoryHost: input.repositoryHost,
-        repositoryFullName: input.repositoryFullName,
-        prNumber: input.prNumber,
-        ...scope,
-      });
+      const detail =
+        await getApp().codingAgents.pullRequestUsage.getPullRequestDetail({
+          organizationId,
+          repositoryHost: input.repositoryHost,
+          repositoryFullName: input.repositoryFullName,
+          prNumber: input.prNumber,
+          ...scope,
+        });
+      return {
+        ...detail,
+        sessions: gatePullRequestSessionTitles({
+          sessions: detail.sessions,
+          contentProjectIds: await contentProjectIdsFor({
+            ctx,
+            projectIds: detail.sessions.map((session) => session.projectId),
+          }),
+        }),
+      };
     }),
 });
+
+/**
+ * Which of these projects the caller may read the captured content of.
+ *
+ * Resolved once per distinct project, because the input is a list of sessions
+ * and several of them routinely ran in the same workspace. A project whose
+ * protections cannot be resolved at all is absent from the set, which hides
+ * its titles: the same fail-closed reading `getUserProtectionsForProject`
+ * applies when a policy lookup fails.
+ */
+async function contentProjectIdsFor({
+  ctx,
+  projectIds,
+}: {
+  ctx: Parameters<typeof getUserProtectionsForProject>[0];
+  projectIds: string[];
+}): Promise<Set<string>> {
+  const distinct = [...new Set(projectIds)];
+  const visible = await Promise.all(
+    distinct.map(async (projectId) => {
+      try {
+        const protections = await getUserProtectionsForProject(ctx, {
+          projectId,
+        });
+        return canReadCapturedContent(protections) ? projectId : null;
+      } catch {
+        return null;
+      }
+    }),
+  );
+  return new Set(visible.filter((projectId) => projectId !== null));
+}
 
 /**
  * The caller's permission cut over the project's organization. An empty cut

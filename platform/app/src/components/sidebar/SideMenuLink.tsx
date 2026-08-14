@@ -1,6 +1,6 @@
 import { Badge, Box, HStack, Text } from "@chakra-ui/react";
-import type { Project } from "@prisma/client";
 import type React from "react";
+import type { Project } from "~/generated/prisma/client";
 import { trackEvent } from "../../utils/tracking";
 import { BetaPill } from "../ui/BetaPill";
 import { LegacyPill } from "../ui/LegacyPill";

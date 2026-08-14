@@ -3,10 +3,19 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProcessStore } from "~/server/event-sourcing/process-manager/stores/processStore.types";
 
 import { ManagerExplorerService } from "../manager-explorer.service";
+import { NullProcessAuditSink } from "../process-audit.repository";
+import { NullProcessOpsRepository } from "../repositories/process-ops.repository";
 
 vi.mock("~/server/event-sourcing/pipelineRegistry", () => ({
   getProcessManagerMetadata: vi.fn(),
 }));
+
+const makeService = (store: ProcessStore) =>
+  new ManagerExplorerService({
+    store,
+    fleet: new NullProcessOpsRepository(),
+    audit: new NullProcessAuditSink(),
+  });
 
 import { getProcessManagerMetadata } from "~/server/event-sourcing/pipelineRegistry";
 
@@ -78,7 +87,7 @@ describe("ManagerExplorerService", () => {
           scheduledSingleton,
           otherAggregate,
         ]);
-        const service = new ManagerExplorerService(fakeStore());
+        const service = makeService(fakeStore());
 
         const result = await service.getForAggregate({
           aggregateType: "trigger",
@@ -96,7 +105,7 @@ describe("ManagerExplorerService", () => {
       it("keys the store by processName + projectId + aggregateId", async () => {
         metadataMock.mockReturnValue([perAggregate]);
         const store = fakeStore();
-        const service = new ManagerExplorerService(store);
+        const service = makeService(store);
 
         await service.getForAggregate({
           aggregateType: "trigger",
@@ -119,7 +128,7 @@ describe("ManagerExplorerService", () => {
     describe("when it is read", () => {
       it("reports a null instance rather than fabricating state", async () => {
         metadataMock.mockReturnValue([perAggregate]);
-        const service = new ManagerExplorerService(
+        const service = makeService(
           fakeStore({ findByRef: vi.fn(async () => null) }),
         );
 
@@ -138,7 +147,7 @@ describe("ManagerExplorerService", () => {
     describe("when it is read", () => {
       it("surfaces the current position and the emitted command", async () => {
         metadataMock.mockReturnValue([perAggregate]);
-        const service = new ManagerExplorerService(
+        const service = makeService(
           fakeStore({
             findByRef: vi.fn(async () => ({
               ref: {
@@ -195,7 +204,7 @@ describe("given dead outbox messages for one endpoint stream", () => {
   describe("when the operator requeues them", () => {
     it("forwards the scope and prefix, stamps now, and returns the count", async () => {
       const store = fakeStore();
-      const service = new ManagerExplorerService(store as never);
+      const service = makeService(store as never);
       const result = await service.requeueDeadMessages({
         processName: "webhookDelivery",
         projectId: "project-1",

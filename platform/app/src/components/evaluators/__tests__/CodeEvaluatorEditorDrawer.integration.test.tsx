@@ -61,7 +61,7 @@ vi.mock("~/components/variables", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       evaluators: {
         getAll: { invalidate: vi.fn() },
         getById: { invalidate: vi.fn() },

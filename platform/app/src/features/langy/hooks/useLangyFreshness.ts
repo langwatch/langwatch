@@ -36,7 +36,7 @@ import { useLangyConversationUpdateListener } from "./useLangyConversationUpdate
  */
 export function useLangyFreshness(activeConversationId: string | null): void {
   const { project } = useOrganizationTeamProject();
-  const trpcUtils = api.useContext();
+  const trpcUtils = api.useUtils();
 
   /**
    * The OPEN conversation's live path (ADR-059): the signal carries the

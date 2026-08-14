@@ -75,7 +75,7 @@ vi.mock("~/components/DashboardLayout", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       secrets: {
         list: {
           invalidate: vi.fn(),

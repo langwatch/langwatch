@@ -3,8 +3,8 @@ import type {
   ModelProvider,
   ModelProviderScope,
   PrismaClient,
-} from "@prisma/client";
-import { Prisma } from "@prisma/client";
+} from "~/generated/prisma/client";
+import { Prisma } from "~/generated/prisma/client";
 import { KSUID_RESOURCES } from "../../utils/constants";
 import { decrypt, encrypt } from "../../utils/encryption";
 import { resolveSingleOrganizationForScopes } from "../scopes/resolveOrganizationForScope";

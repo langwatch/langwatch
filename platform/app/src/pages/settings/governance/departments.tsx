@@ -101,7 +101,7 @@ function DepartmentsPage() {
             <Button
               size="sm"
               colorPalette="orange"
-              loading={createMutation.isLoading}
+              loading={createMutation.isPending}
               disabled={!newName.trim()}
               onClick={() =>
                 createMutation.mutate({
@@ -303,7 +303,7 @@ function DepartmentList({
         message="Spend already attributed to this department rolls up under Unassigned. The department stops appearing in the assignment pickers."
         confirmLabel="Archive"
         tone="warning"
-        loading={archiveMutation.isLoading}
+        loading={archiveMutation.isPending}
         onConfirm={() => {
           if (archiving) {
             archiveMutation.mutate({ organizationId: orgId, id: archiving.id });

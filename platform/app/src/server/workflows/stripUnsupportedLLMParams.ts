@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import type { CustomModelEntry } from "../modelProviders/customModel.schema";
 import { ModelProviderService } from "../modelProviders/modelProvider.service";
 import {

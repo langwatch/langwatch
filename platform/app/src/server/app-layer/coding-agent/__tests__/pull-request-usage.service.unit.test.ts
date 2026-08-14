@@ -62,6 +62,10 @@ function sessionRow(
     models: ["claude-fable-5"],
     userId: "user-abc",
     gitBranch: "feat/linkage",
+    // The dormant shape by default: a row folded before migration 00077 knows
+    // only the branch it ended on, so the fallback is what most cases exercise.
+    gitBranches: [],
+    title: "Fix the flaky fold test",
     ...over,
   };
 }
@@ -81,6 +85,7 @@ function personalSessionRow(
     repositoryOwner: "acme",
     repositoryName: "widgets",
     gitBranch: "feat/linkage",
+    gitBranches: [],
     inputTokens: 100,
     outputTokens: 50,
     cacheReadTokens: 20,
@@ -411,6 +416,30 @@ describe("PullRequestUsageService", () => {
     });
   });
 
+  describe("given a session that drove this branch and then moved to another", () => {
+    /** @scenario "A session that moved to another branch counts toward the pull request it drove first" */
+    it("counts its tokens and cost toward the pull request it drove", async () => {
+      const { service } = serviceWith({
+        pullRequests: [pullRequestRow()],
+        sessions: [
+          sessionRow({
+            sessionId: "moved-on",
+            // The branch read matched on the set, so the row arrives naming a
+            // branch this pull request never had.
+            gitBranch: "feat/next",
+            gitBranches: ["feat/linkage", "feat/next"],
+          }),
+        ],
+      });
+
+      const usage = await service.getPullRequestUsage(QUERY);
+
+      expect(usage.totals.sessionsCount).toBe(1);
+      expect(usage.totals.totalTokens).toBe(180);
+      expect(usage.totals.costUsd).toBe(1.5);
+    });
+  });
+
   describe("given a caller who may view no project at all", () => {
     it("reads no sessions and answers with empty totals", async () => {
       const { service, listByRepositoryBranch } = serviceWith({
@@ -670,6 +699,40 @@ describe("PullRequestUsageService", () => {
     });
   });
 
+  describe("given a personal session that drove two branches", () => {
+    /** @scenario "The personal page discovers pull requests from every branch a session drove" */
+    it("looks up the pull requests of both, not only the one it ended on", async () => {
+      const { service, findAllByBranches } = personalServiceWith({
+        pullRequests: [pullRequestRow()],
+        personalSessions: [
+          personalSessionRow({
+            sessionId: "mine",
+            gitBranch: "feat/next",
+            gitBranches: ["feat/linkage", "feat/next"],
+          }),
+        ],
+        organizationSessions: [
+          sessionRow({
+            sessionId: "mine",
+            gitBranch: "feat/next",
+            gitBranches: ["feat/linkage", "feat/next"],
+          }),
+        ],
+      });
+
+      const usage = await service.getForPersonalProject(PERSONAL_QUERY);
+
+      expect(findAllByBranches).toHaveBeenCalledWith(
+        expect.objectContaining({
+          headBranches: ["feat/linkage", "feat/next"],
+        }),
+      );
+      // Discovered through the branch it left, and priced there too.
+      expect(usage.rows[0]?.prNumber).toBe(7);
+      expect(usage.rows[0]?.sessionsCount).toBe(1);
+    });
+  });
+
   describe("given a pull request whose sessions ran in two projects", () => {
     /** @scenario "A listed pull request counts every project the viewer may read" */
     it("counts every project the viewer may read on the personal row", async () => {
@@ -718,7 +781,7 @@ describe("PullRequestUsageService", () => {
       expect(usage.rows[0]?.costUsd).toBeCloseTo(1.5);
     });
 
-    /** @scenario "A row names who worked on the pull request" */
+    /** @scenario "The drawer names who worked on the pull request" */
     it("names each contributor once and how many sessions they ran", async () => {
       const { service } = personalServiceWith({
         pullRequests: [pullRequestRow()],
@@ -1073,17 +1136,32 @@ describe("PullRequestUsageService", () => {
       ]);
     });
 
-    /** @scenario "The sessions list never carries a session title" */
-    it("carries facts about each session and nothing else", async () => {
+    /** @scenario "The sessions list names each session by its generated title" */
+    it("names each session by its title, alongside its facts", async () => {
       const { service } = serviceWith({
         pullRequests: [pullRequestRow()],
-        sessions: [sessionRow()],
+        sessions: [
+          sessionRow(),
+          sessionRow({ sessionId: "session-b", title: "" }),
+        ],
       });
 
       const detail = await service.getPullRequestDetail(QUERY);
 
-      // The session row's own key set, pinned. A title added here would be a
-      // disclosure nobody decided on.
+      // Both fixtures started at the same moment, so sort order says nothing
+      // about which is which. Each is found by its sessionId instead.
+      const titled = detail.sessions.find((s) => s.sessionId === "session-a");
+      const untitled = detail.sessions.find((s) => s.sessionId === "session-b");
+
+      expect(titled?.title).toBe("Fix the flaky fold test");
+      // A session that never generated one says so with null rather than an
+      // empty string, so a reader renders absence instead of a blank cell.
+      expect(untitled?.title).toBeNull();
+
+      // The session row's own key set, pinned. Anything else added here would
+      // be a disclosure nobody decided on; the title is the one piece of
+      // conversation-derived content on the payload, and the read boundary
+      // decides whether this reader gets it.
       expect(Object.keys(detail.sessions[0]!).sort()).toEqual([
         "agent",
         "contributorIsProject",
@@ -1093,6 +1171,7 @@ describe("PullRequestUsageService", () => {
         "projectSlug",
         "sessionId",
         "startedAtMs",
+        "title",
         "totalTokens",
       ]);
     });

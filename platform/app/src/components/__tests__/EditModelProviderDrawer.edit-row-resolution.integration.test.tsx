@@ -74,7 +74,7 @@ vi.mock("../../utils/api", () => ({
         useQuery: () => ({ data: { managed: false } }),
       },
     },
-    useContext: () => ({
+    useUtils: () => ({
       organization: {
         getAll: { invalidate: vi.fn() },
       },

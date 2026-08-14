@@ -55,6 +55,11 @@ func (o *Orchestrator) RunDaemon(ctx context.Context, dash Dashboard) error {
 		fmt.Println("haven daemon already running")
 		return nil
 	}
+	if o.procTel != nil {
+		// The final process-watch sample is flushed on the way out; without
+		// this the periodic reader's last 30-second window dies with us.
+		defer o.procTel.Close()
+	}
 	ports, err := o.sys.FreePorts(1)
 	if err != nil {
 		return err
@@ -124,8 +129,10 @@ func (o *Orchestrator) monitorLoop(ctx context.Context) {
 			}
 			// Every ~10 min, refresh the idle clock of every registered stack's
 			// databases, and prune databases whose worktree has not been up in
-			// DBIdleTTL — the unattended counterpart of `haven down --drop-db`.
+			// DBIdleTTL — the unattended counterpart of the interactive reclaim in
+			// `haven clean` (`down` itself never discards data).
 			if cycles%60 == 1 {
+				o.reapTestContainers(ctx)
 				// Fail closed: this clock guards destructive pruning, so if any
 				// refresh cannot be persisted, skip pruning this cycle rather
 				// than risk dropping a recently used database off a stale clock.
@@ -155,12 +162,185 @@ func (o *Orchestrator) monitorLoop(ctx context.Context) {
 					o.proxy.Remove(svc.Name, s.Slug)
 				}
 				o.store.RemoveStack(s.Slug)
+				reason := "launcher died"
+				if stale && !dead {
+					reason = "heartbeat stale past the idle TTL"
+				}
+				o.recordReap("stack", s.Slug, reason)
 				o.log.Info("reaped stack", zap.String("slug", s.Slug), zap.Bool("dead", dead), zap.Bool("stale", stale))
 			}
+			o.governPressure()
+			o.governProcesses()
 			o.refreshObservability(ctx)
 			o.reapClickHouse()
 		}
 	}
+}
+
+// vitestWorkerMarker is what an orphaned test worker's command line contains.
+// Narrow on purpose: the sweep below reclaims a process only when it matches
+// this AND is owned by PID 1, which together mean an interrupted run left it
+// behind and nobody is coming back for it.
+const vitestWorkerMarker = "vitest/dist/workers"
+
+// governPressure is the daemon's whole response to a loaded machine (ADR-090).
+//
+// It samples, publishes, and then slows things down — it never kills. macOS can
+// bound a process's memory (`taskpolicy -m` sets a jetsam limit at spawn), but
+// jetsam kills what breaches it, which turns a slow machine into lost work.
+// Demotion is reversible and costs nothing but time.
+//
+// The publish comes first and the work after it runs in the background, because
+// everything after the sample shells out: a sweep, a process list, a taskpolicy
+// call per stack, and two more probes per stack at red. Each is deadline-bound
+// on its own, but on a degraded machine with several stacks running they add up
+// on one tick — and a tick that outlasts domain.PressureStaleAfter makes every
+// reader on the machine fall back to green, switching governance off exactly
+// when the machine is at its worst. Publishing on a bounded path keeps the
+// record fresh however long the slow half takes.
+func (o *Orchestrator) governPressure() {
+	level := domain.ClassifyPressure(o.sys.MemStat())
+	o.publishPressure(level)
+
+	if o.isGoverning.Swap(true) {
+		// The previous tick's work is still going. Skipping is right rather than
+		// sad: what it would do is decided from a reading now two ticks old, and
+		// the run in flight is already doing it.
+		return
+	}
+	o.governance.Add(1)
+	go func() {
+		defer o.governance.Done()
+		defer o.isGoverning.Store(false)
+		o.applyGovernance(level)
+	}()
+}
+
+// awaitGovernance blocks until the slow half of the current tick has finished.
+// For tests, which assert on what it did.
+func (o *Orchestrator) awaitGovernance() { o.governance.Wait() }
+
+// applyGovernance is the slow half: everything that shells out.
+func (o *Orchestrator) applyGovernance(level domain.Pressure) {
+	o.sweepOrphanedWorkers()
+
+	stacks := o.store.Stacks()
+	if len(stacks) == 0 {
+		return
+	}
+	if level == domain.Green {
+		o.restoreDemoted(stacks)
+		return
+	}
+	o.demoteUnfocused(stacks)
+	if level == domain.Red {
+		o.warnCritical()
+	}
+}
+
+// publishPressure runs before any demotion, so readers see the current level
+// even if the demotion does nothing. A failure to publish is not worth a tick:
+// readers treat a missing record as green, which disables narrowing and refusal
+// and leaves slot counting exactly as it was.
+func (o *Orchestrator) publishPressure(level domain.Pressure) {
+	if err := o.store.WritePressure(domain.PressureRecord{
+		Version:   domain.PressureRecordVersion,
+		Level:     level.String(),
+		WrittenAt: o.sys.Now(),
+	}); err != nil {
+		o.log.Warn("could not publish memory pressure", zap.Error(err))
+	}
+}
+
+// governable reports whether a stack's launcher is a pid worth signaling.
+//
+// The zero check is not defensive tidiness: a registered stack can carry
+// LauncherPID == 0 (the reaper above guards it for the same reason), and pid 0
+// in kill(2) addresses the caller's OWN process group. Demoting it would demote
+// the daemon, and every group operation here would then be aimed at haven
+// itself.
+func (o *Orchestrator) governable(s domain.Stack) bool {
+	return s.LauncherPID != 0 && o.sys.ProcessAlive(s.LauncherPID)
+}
+
+func (o *Orchestrator) restoreDemoted(stacks []domain.Stack) {
+	for _, s := range stacks {
+		if o.governable(s) {
+			o.sys.RestoreGroup(s.LauncherPID)
+		}
+	}
+}
+
+// demoteUnfocused slows every live stack except the head of Stacks(), which is
+// ordered most-recently-updated first — the head is the worktree being worked
+// in, and demoting that one would slow down exactly the thing the developer is
+// watching.
+func (o *Orchestrator) demoteUnfocused(stacks []domain.Stack) {
+	focused := stacks[0].Slug
+	for _, s := range stacks {
+		if s.Slug == focused || !o.governable(s) {
+			continue
+		}
+		o.sys.DemoteGroup(s.LauncherPID)
+	}
+}
+
+// warnCritical names the largest stack, and does no more than name it. The
+// daemon did not start this work and has no standing to end it; the operator
+// decides.
+func (o *Orchestrator) warnCritical() {
+	slug, rss := o.fattestStack()
+	if slug == "" {
+		return
+	}
+	o.log.Warn("memory pressure critical",
+		zap.String("largest_stack", slug),
+		zap.String("rss", domain.HumanBytes(int64(rss))),
+		zap.String("hint", "haven down "+slug))
+}
+
+// sweepOrphanedWorkers reclaims test workers an interrupted run left parented to
+// PID 1. haven already does this for dev-runtime processes at every `up`
+// (procsupervisor.reapOrphans); this is the same rule on the tick, widened to
+// the workers CLAUDE.md currently asks people to pkill by hand.
+func (o *Orchestrator) sweepOrphanedWorkers() {
+	orphans := o.sys.OrphanedWorkers(vitestWorkerMarker)
+	for _, pid := range orphans {
+		if pid <= 0 {
+			continue // pid 0 kills the daemon's own process group
+		}
+		o.sys.KillGroup(pid)
+	}
+	if len(orphans) > 0 {
+		o.recordReap("orphans", fmt.Sprintf("%d test worker(s)", len(orphans)), "parented to PID 1 by an interrupted run")
+		o.log.Info("reclaimed orphaned test workers", zap.Int("count", len(orphans)))
+	}
+}
+
+// recordReap appends one reclamation to the store's bounded record — the hub's
+// "what has the reaper been doing" feed. Losing an event never stops a reap.
+func (o *Orchestrator) recordReap(kind, target, reason string) {
+	ev := domain.ReapEvent{At: o.sys.Now(), Kind: kind, Target: target, Reason: reason}
+	if err := o.store.AppendReapEvent(ev); err != nil {
+		o.log.Warn("could not record reap event", zap.String("kind", kind), zap.Error(err))
+	}
+}
+
+// fattestStack names the live stack with the largest whole-tree footprint.
+// Approximate by construction — summed RSS double-counts shared pages — which
+// is fine for "which one should I look at first" and is why it is never a
+// control input.
+func (o *Orchestrator) fattestStack() (slug string, rss uint64) {
+	stackRSS := o.StackRSSByLauncher()
+	for _, s := range o.store.Stacks() {
+		if !o.sys.ProcessAlive(s.LauncherPID) {
+			continue
+		}
+		if got := stackRSS[s.LauncherPID]; got > rss {
+			slug, rss = s.Slug, got
+		}
+	}
+	return slug, rss
 }
 
 // pruneIdleDatabases drops per-slug ClickHouse + Postgres databases whose
@@ -223,8 +403,38 @@ func (o *Orchestrator) pruneIdleDatabases(ctx context.Context) {
 		}
 		o.store.RemoveDBActivity(slug)
 		if existsSomewhere {
+			o.recordReap("database", db, "worktree idle past the database TTL")
 			o.log.Info("pruned idle databases", zap.String("slug", slug), zap.String("db", db), zap.Duration("idle", now.Sub(lastSeen)))
 		}
+	}
+}
+
+// reapTestContainers removes containers a testcontainers run left behind —
+// the library's own reaper (Ryuk) dies with the run that started it, so an
+// interrupted integration test leaves its ClickHouse/Redis running in the
+// shared VM until something else sweeps them. Stopped containers get the short
+// TTL; running ones a much longer one, because a running container may still
+// be serving a live run whatever its birthday says (withReuse keeps the
+// original CreatedAt across runs). The running TTL never undercuts the stopped
+// one, so a single misconfigured knob cannot make live containers the more
+// eagerly reaped kind.
+func (o *Orchestrator) reapTestContainers(ctx context.Context) {
+	ttl := o.cfg.TestContainerTTL
+	if o.janitor == nil || ttl <= 0 {
+		return
+	}
+	runningTTL := max(o.cfg.RunningTestContainerTTL, ttl)
+	now := o.sys.Now()
+	names, err := o.janitor.ReapTestContainers(ctx, now.Add(-ttl), now.Add(-runningTTL))
+	if err != nil {
+		o.log.Warn("test-container sweep failed", zap.Error(err))
+		return
+	}
+	if len(names) > 0 {
+		for _, name := range names {
+			o.recordReap("testcontainer", name, "left behind by an interrupted test run")
+		}
+		o.log.Info("reaped leaked test containers", zap.Strings("containers", names))
 	}
 }
 
@@ -237,6 +447,7 @@ func (o *Orchestrator) reapClickHouse() {
 	}
 	if len(o.store.Stacks()) == 0 && o.ch.Running() {
 		o.ch.Stop()
+		o.recordReap("clickhouse", "clickhouse-server", "no stacks running")
 		o.log.Info("stopped idle managed clickhouse-server (no stacks running)")
 	}
 }

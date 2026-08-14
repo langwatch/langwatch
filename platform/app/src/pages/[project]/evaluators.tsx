@@ -34,7 +34,7 @@ import { api } from "~/utils/api";
 function Page() {
   const { project } = useOrganizationTeamProject();
   const { openDrawer, closeDrawer } = useDrawer();
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   // State for tracking which evaluator is being deleted
   const [evaluatorToDelete, setEvaluatorToDelete] = useState<{

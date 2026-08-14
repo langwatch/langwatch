@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockSendSlackSubscriptionEvent = vi.fn().mockResolvedValue(undefined);
+const mockSendSlackBillingThresholdFailureAlert = vi
+  .fn()
+  .mockResolvedValue(undefined);
 const mockSetForScope = vi.fn().mockResolvedValue(undefined);
 const mockRemoveForScope = vi.fn().mockResolvedValue(undefined);
 // Seat provisioning is create-if-absent: it reads the org's current rules and
@@ -9,9 +12,13 @@ const mockRemoveForScope = vi.fn().mockResolvedValue(undefined);
 const mockListOrganizationRules = vi.fn().mockResolvedValue([]);
 
 vi.mock("../../../src/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: () => ({
     notifications: {
       sendSlackSubscriptionEvent: mockSendSlackSubscriptionEvent,
+      sendSlackBillingThresholdFailureAlert:
+        mockSendSlackBillingThresholdFailureAlert,
     },
     dataRetention: {
       policy: {
@@ -35,6 +42,8 @@ import {
 } from "../../../src/server/data-retention/retentionPolicy.schema";
 import { SubscriptionStatus } from "../planTypes";
 import { EEWebhookService } from "../services/webhookService";
+import { ANNUAL_EVENTS_BILLING_THRESHOLD } from "../stripe/annualEventsBillingThreshold";
+import { prices } from "../stripe/stripePriceCatalog";
 
 const createMockSubscriptionRepository = () => ({
   findLastNonCancelled: vi.fn(),
@@ -131,9 +140,13 @@ const makeSubscriptionWithOrg = (
 
 const createMockStripe = (overrides: Record<string, unknown> = {}) => ({
   subscriptions: {
-    retrieve: vi
-      .fn()
-      .mockResolvedValue({ id: "sub_stripe_1", status: "active" }),
+    retrieve: vi.fn().mockResolvedValue({
+      id: "sub_stripe_1",
+      status: "active",
+      billing_thresholds: null,
+      items: { data: [] },
+    }),
+    update: vi.fn().mockResolvedValue({}),
     cancel: vi.fn().mockResolvedValue({}),
   },
   ...overrides,
@@ -380,6 +393,183 @@ describe("webhookService", () => {
 
         // No invite approver configured — should not throw
         expect(subRepo.activate).toHaveBeenCalled();
+      });
+    });
+
+    describe("when the new subscription bills events annually", () => {
+      const setupLinkedCheckout = () => {
+        subRepo.linkStripeId.mockResolvedValue({ count: 1 });
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.PENDING }),
+        );
+        subRepo.activate.mockResolvedValue(
+          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+        );
+      };
+
+      const annualStripeSubscription = {
+        id: "sub_stripe_1",
+        status: "active",
+        billing_thresholds: null,
+        items: {
+          data: [
+            { price: { id: prices.GROWTH_SEAT_USD_ANNUAL } },
+            { price: { id: prices.GROWTH_EVENTS_USD_ANNUAL } },
+          ],
+        },
+      };
+
+      /** @scenario An annual subscription gets a billing threshold after checkout completes */
+      it("sets the billing threshold on the Stripe subscription", async () => {
+        setupLinkedCheckout();
+        mockStripeInstance.subscriptions.retrieve.mockResolvedValue(
+          annualStripeSubscription,
+        );
+
+        const promise = service.handleCheckoutCompleted({
+          subscriptionId: "sub_stripe_1",
+          clientReferenceId: "subscription_setup_sub_db_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(mockStripeInstance.subscriptions.update).toHaveBeenCalledWith(
+          "sub_stripe_1",
+          {
+            billing_thresholds: {
+              amount_gte: ANNUAL_EVENTS_BILLING_THRESHOLD,
+              reset_billing_cycle_anchor: false,
+            },
+          },
+        );
+      });
+
+      /** @scenario A failure setting the threshold never fails the checkout */
+      it("still links and activates when the threshold update fails", async () => {
+        setupLinkedCheckout();
+        mockStripeInstance.subscriptions.retrieve.mockResolvedValue(
+          annualStripeSubscription,
+        );
+        mockStripeInstance.subscriptions.update.mockRejectedValue(
+          new Error("stripe down"),
+        );
+
+        const promise = service.handleCheckoutCompleted({
+          subscriptionId: "sub_stripe_1",
+          clientReferenceId: "subscription_setup_sub_db_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        const result = await promise;
+
+        expect(result.earlyReturn).toBe(false);
+        expect(subRepo.activate).toHaveBeenCalled();
+        expect(subRepo.cancelTrialSubscriptions).toHaveBeenCalledWith(
+          "org_123",
+        );
+      });
+
+      /** @scenario A threshold failure raises an alert for manual follow-up */
+      it("alerts on Slack when the threshold update fails", async () => {
+        setupLinkedCheckout();
+        mockStripeInstance.subscriptions.retrieve.mockResolvedValue(
+          annualStripeSubscription,
+        );
+        mockStripeInstance.subscriptions.update.mockRejectedValue(
+          new Error("stripe down"),
+        );
+
+        const promise = service.handleCheckoutCompleted({
+          subscriptionId: "sub_stripe_1",
+          clientReferenceId: "subscription_setup_sub_db_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(mockSendSlackBillingThresholdFailureAlert).toHaveBeenCalledWith({
+          stripeSubscriptionId: "sub_stripe_1",
+          reason: "stripe down",
+        });
+      });
+
+      /** @scenario An annual subscription gets a billing threshold after checkout completes */
+      it("does not alert when the threshold is applied successfully", async () => {
+        setupLinkedCheckout();
+        mockStripeInstance.subscriptions.retrieve.mockResolvedValue(
+          annualStripeSubscription,
+        );
+
+        const promise = service.handleCheckoutCompleted({
+          subscriptionId: "sub_stripe_1",
+          clientReferenceId: "subscription_setup_sub_db_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(
+          mockSendSlackBillingThresholdFailureAlert,
+        ).not.toHaveBeenCalled();
+      });
+
+      /** @scenario A threshold failure raises an alert for manual follow-up */
+      it("still completes checkout when the alert itself fails", async () => {
+        setupLinkedCheckout();
+        mockStripeInstance.subscriptions.retrieve.mockResolvedValue(
+          annualStripeSubscription,
+        );
+        mockStripeInstance.subscriptions.update.mockRejectedValue(
+          new Error("stripe down"),
+        );
+        mockSendSlackBillingThresholdFailureAlert.mockRejectedValueOnce(
+          new Error("slack down"),
+        );
+
+        const promise = service.handleCheckoutCompleted({
+          subscriptionId: "sub_stripe_1",
+          clientReferenceId: "subscription_setup_sub_db_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+
+        await expect(promise).resolves.toEqual({ earlyReturn: false });
+        expect(subRepo.activate).toHaveBeenCalled();
+      });
+    });
+
+    describe("when the new subscription bills events monthly", () => {
+      /** @scenario A monthly subscription is left without a billing threshold */
+      it("does not set a billing threshold", async () => {
+        subRepo.linkStripeId.mockResolvedValue({ count: 1 });
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.PENDING }),
+        );
+        subRepo.activate.mockResolvedValue(
+          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+        );
+        mockStripeInstance.subscriptions.retrieve.mockResolvedValue({
+          id: "sub_stripe_1",
+          status: "active",
+          billing_thresholds: null,
+          items: {
+            data: [
+              { price: { id: prices.GROWTH_SEAT_USD_MONTHLY } },
+              { price: { id: prices.GROWTH_EVENTS_USD_MONTHLY } },
+            ],
+          },
+        });
+
+        const promise = service.handleCheckoutCompleted({
+          subscriptionId: "sub_stripe_1",
+          clientReferenceId: "subscription_setup_sub_db_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(mockStripeInstance.subscriptions.update).not.toHaveBeenCalled();
       });
     });
   });
@@ -1331,6 +1521,61 @@ describe("webhookService", () => {
 
         expect(subRepo.cancel).toHaveBeenCalledWith({ id: "sub_db_1" });
         expect(mockRemoveForScope).not.toHaveBeenCalled();
+      });
+    });
+  });
+  // #5591: Stripe retries any webhook answered with a 5xx, so a notification
+  // that throws does not merely lose a message, it replays a handler that has
+  // already written. The rule was previously kept per call site and was kept in
+  // one place out of four. These pin it at the boundary that matters: the
+  // handler's own promise.
+  describe("given a notification that throws", () => {
+    const notificationFailure = new Error("slack is down");
+
+    describe("when a subscription is deleted", () => {
+      it("still cancels the subscription and resolves", async () => {
+        mockSendSlackSubscriptionEvent.mockRejectedValueOnce(
+          notificationFailure,
+        );
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.ACTIVE }),
+        );
+        subRepo.findLastNonCancelled.mockResolvedValue(null);
+
+        const promise = service.handleSubscriptionDeleted({
+          stripeSubscriptionId: "sub_stripe_1",
+        });
+        await vi.advanceTimersByTimeAsync(2000);
+
+        await expect(promise).resolves.not.toThrow();
+        expect(subRepo.cancel).toHaveBeenCalledWith({ id: "sub_db_1" });
+        expect(mockSendSlackSubscriptionEvent).toHaveBeenCalled();
+      });
+    });
+
+    describe("when an invoice payment succeeds", () => {
+      it("still activates the subscription and resolves", async () => {
+        mockSendSlackSubscriptionEvent.mockRejectedValueOnce(
+          notificationFailure,
+        );
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.PENDING }),
+        );
+        subRepo.activate.mockResolvedValue(
+          makeSubscriptionWithOrg({
+            status: SubscriptionStatus.ACTIVE,
+            organization: { name: "Acme", license: null },
+          }),
+        );
+
+        const promise = service.handleInvoicePaymentSucceeded({
+          subscriptionId: "sub_stripe_1",
+        });
+        await vi.advanceTimersByTimeAsync(2000);
+
+        await expect(promise).resolves.not.toThrow();
+        expect(subRepo.activate).toHaveBeenCalled();
+        expect(mockSendSlackSubscriptionEvent).toHaveBeenCalled();
       });
     });
   });

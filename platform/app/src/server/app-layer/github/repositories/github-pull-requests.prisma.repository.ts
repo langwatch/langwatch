@@ -1,5 +1,5 @@
-import { Prisma, type PrismaClient } from "@prisma/client";
 import { nanoid } from "nanoid";
+import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import { toPgTimestampUtc } from "~/server/utils/pgTimestamp";
 
 import type {

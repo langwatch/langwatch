@@ -99,8 +99,15 @@ async function readJobDataFromStdin(): Promise<ChildProcessJobData> {
 }
 
 async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
-  const { context, scenario, adapterData, modelParams, nlpServiceUrl, target } =
-    jobData;
+  const {
+    context,
+    scenario,
+    parameters,
+    adapterData,
+    modelParams,
+    nlpServiceUrl,
+    target,
+  } = jobData;
 
   // These are injected as env vars by the parent process (scenario.processor.ts
   // buildChildProcessEnv). They originate from prefetchScenarioData telemetry.
@@ -122,6 +129,7 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
     modelParams,
     nlpServiceUrl,
     projectApiKey: langwatchApiKey,
+    parameters,
   });
   // The user-simulator and judge resolve their own models (run-plan /
   // scenario override or the DEFAULT-role scenarios.* defaults). A job queued
@@ -186,6 +194,7 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
           targetReferenceId: target.referenceId,
           targetType: target.type,
         },
+        ...(Object.keys(parameters).length > 0 ? { parameters } : {}),
       },
     },
     {

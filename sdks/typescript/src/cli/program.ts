@@ -33,6 +33,28 @@ import {
 
 declare const __CLI_VERSION__: string;
 
+/**
+ * Help for the repeatable `--param key=value` flag the run commands share.
+ * Written here rather than imported so the command tree keeps its own boot
+ * cost; the reading it describes lives in `cli/utils/keyValueFlags.ts`.
+ */
+const PARAM_FLAG_HELP =
+  "Value for one parameter the run supplies, written key=value. Repeat the flag for more than one. A value is read as text, unless it is exactly true or false, which is read as a boolean, or a plain number, which is read as a number.";
+
+const WORKFLOW_PARAM_FLAG_HELP = `${PARAM_FLAG_HELP} The workflow receives it as an entry input, and a pair given here wins over the same key in --input.`;
+
+/**
+ * Collect a repeated `--param` into the list the run commands read.
+ *
+ * One value per occurrence rather than a variadic `<pair...>`: a variadic
+ * option keeps eating argv until the next flag, so `--param env=prod my-suite`
+ * would swallow the id the command is about to run.
+ */
+const collectParam = (pair: string, previous: string[] = []): string[] => [
+  ...previous,
+  pair,
+];
+
 // Import commands with proper async handling
 const addCommand = async (name: string, options: { version?: string; localFile?: string }): Promise<void> => {
   const { addCommand: addCommandImpl } = await import("./commands/add.js");
@@ -155,7 +177,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     )
     .option(
       "--project [slug]",
-      "Project login: mint a project SDK key via the browser and write it to .env (for the SDK, `langwatch eval`, prompts). Prefer this one if user is working on an agent project rather than trying to instrument their coding assistant.",
+      "Project login: write a project's SDK key to .env (for the SDK, `langwatch eval`, prompts). With a slug it uses your existing device login, no browser and no prompts; without one you pick the project in the browser, which needs an interactive terminal and exits 1 in a non-TTY. Prefer this one if user is working on an agent project rather than trying to instrument their coding assistant.",
     )
     .option(
       "--token <token>",
@@ -438,8 +460,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         "Send an issue report to the LangWatch team: what you were doing, what " +
           "went wrong, optionally the whole session transcript. Works with no " +
           "login and no API key. Ask the user for permission first, then pass " +
-          "--user-approved. Secrets and personal data are redacted locally " +
-          "before anything is sent.",
+          "--user-approved. The title, summary and transcript are scrubbed " +
+          "locally by pattern before anything is sent; whatever no pattern " +
+          "matches is sent as written. Use --dry-run to print the payload.",
       )
       .option("--user-approved", "confirm the user approved sending this report")
       .option(
@@ -480,8 +503,11 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
           "  had to figure out by trial and error.",
           "",
           "Privacy, so you can send the whole session with confidence:",
-          "  Everything is redacted locally, before upload:",
+          "  The title, summary and transcript are redacted locally by pattern,",
+          "  before upload. What the patterns catch:",
           ...SESSION_REDACTION_SUMMARY.map((line) => `    - ${line}`),
+          "  Anything no pattern matches is sent as written, including a contact",
+          "  address passed with --email.",
           "  Audit the exact rules (short, readable regexes):",
           `    ${REDACTION_AUDIT_URL}`,
           "  Preview precisely what would be sent with --dry-run: it sends nothing,",
@@ -1391,8 +1417,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .command("run <slug>")
       .description("Start an experiment run by slug")
       .option("--wait", "Wait for the experiment to complete before returning")
+      .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (slug: string, options: { wait?: boolean }) => {
+    async (slug: string, options: { wait?: boolean; param?: string[] }) => {
       const { runExperimentCommand: impl } = await import("./commands/experiment/run.js");
       return impl(slug, options);
     },
@@ -1499,10 +1526,11 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .command("run <id>")
       .description("Execute a workflow with JSON input")
       .option("--input <json>", "Input data as JSON string")
+      .option("--param <pair>", WORKFLOW_PARAM_FLAG_HELP, collectParam)
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string, options: { input?: string }) => {
+    async (id: string, options: { input?: string; param?: string[] }) => {
       const { runWorkflowCommand: impl } = await import("./commands/workflows/run.js");
-      return impl(id, options);
+      return impl({ id, options });
     },
   );
 
@@ -2521,8 +2549,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .description("Run a scenario against a target (agent or prompt)")
     .requiredOption("--target <target>", "Target to run against, as <type>:<referenceId> (e.g., http:agent_abc123)")
     .option("--wait", "Wait for the scenario run to complete")
+    .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
     .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (id: string, options: { target: string; wait?: boolean; format?: string }) => {
+    .action(async (id: string, options: { target: string; wait?: boolean; format?: string; param?: string[] }) => {
       const { runScenarioCommand: impl } = await import("./commands/scenarios/run.js");
       await impl(id, options);
     });
@@ -2613,10 +2642,11 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .command("run <id>")
     .description("Execute a suite run — schedules all scenario × target × repeat jobs")
     .option("--wait", "Wait for the suite run to complete before returning")
+    .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
     .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (id: string, options: { wait?: boolean; format?: string }) => {
+    .action(async (id: string, options: { wait?: boolean; format?: string; param?: string[] }) => {
       const { runSuiteCommand: impl } = await import("./commands/suites/run.js");
-      await impl(id, options);
+      await impl({ id, options });
     });
 
   emitsResult(

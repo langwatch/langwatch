@@ -27,7 +27,7 @@ const {
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({ invalidate: invalidateMock }),
+    useUtils: () => ({ invalidate: invalidateMock }),
     license: {
       upload: {
         useMutation: (options: Record<string, any>) => {

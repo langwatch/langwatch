@@ -60,6 +60,36 @@ const str = (
   return typeof value === "string" && value.length > 0 ? value : fallback;
 };
 
+/**
+ * Reads a list of short identifiers out of `meta` without trusting it.
+ *
+ * Bounded on both axes because the sentence these end up in is read by a
+ * person: a long list stops being copy and becomes a dump, and a single
+ * oversized entry would push the rest off the screen.
+ */
+const strList = (error: HandledErrorShape, key: string): string[] => {
+  const value = error.meta[key];
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((entry): entry is string => typeof entry === "string")
+    .filter((entry) => entry.length > 0 && entry.length <= 64)
+    .slice(0, 10);
+};
+
+/**
+ * Names the piece of a scenario a parameter failure came from, so the copy can
+ * point at it instead of asking the reader to search their own text.
+ * `meta.field` is written by the renderer as `situation` or `criteria[N]`,
+ * zero-based; criteria are numbered from one for the reader.
+ */
+const scenarioFieldLabel = (error: HandledErrorShape): string => {
+  const field = str(error, "field", "");
+  if (field === "situation") return "The situation";
+  const criterion = /^criteria\[(\d+)\]$/.exec(field);
+  if (criterion) return `Criterion ${Number(criterion[1]) + 1}`;
+  return "The scenario's text";
+};
+
 type MissingModelRequestType =
   | "chat"
   | "messages"
@@ -525,6 +555,13 @@ const presentations = {
     describe: () =>
       "Pick a different default model in your project's model settings, then try again.",
   },
+  model_default_scope_forbidden: {
+    // Same refusal shape as `model_provider_scope_forbidden`, aimed at the
+    // Default Models policies instead of the provider credentials.
+    title: "You can't change default models here",
+    describe: () =>
+      "They're managed above where you can act. Ask an admin on your team to change them.",
+  },
   model_not_configured: {
     // Distinct from `no_provider_configured` (nothing connected at all) and
     // from `llm_model_not_set` (a workflow node with an empty field): here a
@@ -914,6 +951,36 @@ const presentations = {
     title: "They're already in this group",
     describe: () => "Nothing to do: the group already grants them its access.",
   },
+  schedule_not_found: {
+    title: "That schedule no longer exists",
+    describe: () =>
+      "It was removed while this page was open. Reload to see what is scheduled now.",
+  },
+  schedule_inactive: {
+    title: "That schedule is paused",
+    describe: () =>
+      "Resume it before running it. Running a paused schedule would fire work you have switched off.",
+  },
+  schedule_already_in_flight: {
+    // The conditional update found a different fencing value, which means the
+    // loop moved the row between the operator reading it and acting on it.
+    title: "The scheduler got there first",
+    describe: () =>
+      "This slot was claimed while you were looking at it, so nothing was changed. Reload to see its current state.",
+  },
+  schedule_run_in_progress: {
+    // Distinct from `schedule_already_in_flight`: nothing raced the operator,
+    // the schedule is simply mid-run. Re-arming it would hand the same slot to
+    // a second worker and deliver the target twice.
+    title: "That schedule is already running",
+    describe: () =>
+      "Wait for the current run to finish before starting another. Running it now would deliver the same work twice.",
+  },
+  schedule_slot_not_stale: {
+    title: "That run is still current",
+    describe: () =>
+      "Clearing is only for a slot whose worker has stopped responding. Give this one time to finish, or wait until it goes stale.",
+  },
   scim_managed_group: {
     // The group, its name and its membership come from the directory on every
     // sync, so a change made here is not merely refused, it would be undone.
@@ -1086,6 +1153,44 @@ const presentations = {
         : "Send the credential class this endpoint accepts. Organization API keys are created in Settings > API Keys.";
     },
   },
+  // ---- scenario run parameters ----
+  scenario_parameter_unknown: {
+    // Both lists are our own names, not free text: the run dialog needs to
+    // show the rejected one so the typo is visible, and the declared ones so
+    // the customer can see what they meant to write.
+    title: "No scenario in this run has a parameter by that name",
+    describe: (error) => {
+      const unknown = strList(error, "unknownKeys");
+      const declared = strList(error, "declaredNames");
+      const rejected =
+        unknown.length > 0
+          ? `${listLabels(unknown)} ${unknown.length === 1 ? "isn't" : "aren't"} declared by any scenario in this run.`
+          : "One of the values supplied isn't declared by any scenario in this run.";
+      return declared.length > 0
+        ? `${rejected} You can set ${listLabels(declared)}.`
+        : `${rejected} None of its scenarios declare parameters.`;
+    },
+  },
+  scenario_parameter_missing: {
+    title: "This run is missing a parameter value",
+    describe: (error) => {
+      const missing = strList(error, "names");
+      const plural = missing.length > 1;
+      const subject =
+        missing.length > 0
+          ? `${listLabels(missing)} ${plural ? "have no values" : "has no value"}.`
+          : "A parameter the scenario reads has no value.";
+      const remedy = plural
+        ? "Set values for this run, or give each parameter a default on the scenario."
+        : "Set a value for this run, or give the parameter a default on the scenario.";
+      return `${subject} ${scenarioFieldLabel(error)} reads ${plural ? "them" : "it"}. ${remedy}`;
+    },
+  },
+  scenario_parameter_template_invalid: {
+    title: "This scenario's text couldn't be filled in",
+    describe: (error) =>
+      `${scenarioFieldLabel(error)} references a parameter in a way we can't read. Check it is written as params.name, then try again.`,
+  },
   scenario_run_export_unauthenticated: {
     title: "Log in to export simulation runs",
     describe: () =>
@@ -1129,11 +1234,37 @@ const presentations = {
     title: "Billing is busy right now",
     describe: () => "Nothing was charged. Try again in a moment.",
   },
+  billing_quote_expired: {
+    // fault: customer. Nothing broke — the dialog sat open long enough that
+    // the amount we quoted is no longer the amount that would be charged, so
+    // we refuse rather than charge a different number than the one on screen.
+    // The action is to reopen, which is a real action the customer can take.
+    title: "This quote is out of date",
+    describe: () =>
+      "Nothing was charged. Close this and open it again to see the current amount.",
+  },
   seat_billing_unavailable: {
     // fault: provider. The payment provider didn't answer. Nothing was
     // charged, and saying so is the first thing anyone wants to know.
     title: "Seat billing is unavailable right now",
     describe: () => "Nothing was charged. Try again in a moment.",
+  },
+  subscription_ambiguous: {
+    // fault: platform. Two live plans on one account, which only an operator
+    // can have created and only an operator can resolve. Nothing was charged,
+    // and that is the first thing the customer wants to know on a money path.
+    title: "Seat changes need a hand from us",
+    describe: () =>
+      "This account has more than one active plan, so we didn't change anything or charge you. Contact support and we'll sort it out.",
+  },
+  subscription_not_linked: {
+    // fault: platform. The plan is active but our record of it was never
+    // connected to the billing provider's, so seat changes can't be made from
+    // the app. Waiting doesn't fix it — reconnecting is an operator action —
+    // so the copy must not suggest retrying.
+    title: "Seat changes need a hand from us",
+    describe: () =>
+      "Your plan is active, but seat updates aren't available from here yet. Contact support and we'll finish the setup.",
   },
   subscription_sync_failed: {
     // fault: platform. Our copy of the plan is behind the payment provider's;
@@ -1421,6 +1552,39 @@ const presentations = {
     title: "Langy is unavailable",
     describe: () =>
       "Langy can't be reached right now. Your message is safe, so send it again in a moment.",
+  },
+  // The `/api/langy` key-authed surface. These reach an API caller reading a
+  // JSON envelope, not a person reading a toast, so the copy names the
+  // credential and the fix rather than reassuring anyone about their message.
+  langy_api_credential_missing: {
+    title: "No auth token",
+    describe: () =>
+      "This request carried no project API key. Send one as X-Auth-Token or an Authorization header.",
+  },
+  langy_api_credential_invalid: {
+    title: "Auth token not accepted",
+    describe: () =>
+      "The token did not resolve to a project. Check it was copied whole and has not been revoked.",
+  },
+  langy_api_key_unowned: {
+    title: "Key has no owner",
+    describe: () =>
+      "A Langy turn acts as a user, and this key has no owning user to act as. Use a personal API key instead.",
+  },
+  langy_api_key_no_langy_access: {
+    title: "No Langy access",
+    describe: () =>
+      "The user who owns this key cannot use Langy in this project. A workspace admin can grant that access.",
+  },
+  langy_api_actor_missing: {
+    title: "Key owner is gone",
+    describe: () =>
+      "The user who owns this key no longer exists, so the turn has no one to act as. Mint a new key under a current user.",
+  },
+  langy_api_request_invalid: {
+    title: "Invalid request body",
+    describe: () =>
+      "Some fields in this request were not valid. The error details list each one that was rejected — correct those and send it again.",
   },
   langy_agent_errored: {
     title: "Langy's reply failed",

@@ -9,6 +9,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
+import { isAllowedRedirectScheme } from "~/mcp/redirectSchemes";
 import { useSession } from "~/utils/auth-client";
 import { useRouter } from "~/utils/compat/next-router";
 import {
@@ -83,16 +84,31 @@ export default function McpAuthorize() {
 
       const data = await response.json();
 
-      if (!response.ok) {
-        showError(data.error ?? "Unknown error");
+      // A failure the server could attribute to this client comes back with a
+      // redirect that carries the OAuth error, so the waiting application is
+      // told what went wrong instead of hanging on a popup. Failures it could
+      // not attribute have no safe destination and are shown here.
+      if (data.redirect) {
+        // The server verified this against the client registry before sending
+        // it, so this is the second lock: a regression there becomes a broken
+        // redirect rather than script running on our origin.
+        if (!isAllowedRedirectScheme(data.redirect)) {
+          showError("The application asked to return to an unusable address");
+          return;
+        }
+        window.location.href = data.redirect;
         return;
       }
 
-      if (data.redirect) {
-        window.location.href = data.redirect;
-      } else {
-        showError("No redirect URL received from server");
+      if (!response.ok) {
+        // RFC 6749 §4.1.2.1 wire fields from our own authorize endpoint, not a
+        // mutation error: the copy is written for the customer at the point it
+        // is produced, so there is no error code to look up here.
+        showError(data.error_description ?? data.error ?? "Unknown error");
+        return;
       }
+
+      showError("No redirect URL received from server");
     } catch (err) {
       showError(err instanceof Error ? err.message : "Network error");
     }
@@ -100,16 +116,11 @@ export default function McpAuthorize() {
 
   const handleDeny = () => {
     if (oauthParams.redirect_uri) {
-      const url = new URL(oauthParams.redirect_uri);
-      // Prevent XSS via executable schemes
-      if (
-        url.protocol === "javascript:" ||
-        url.protocol === "data:" ||
-        url.protocol === "vbscript:"
-      ) {
+      if (!isAllowedRedirectScheme(oauthParams.redirect_uri)) {
         void router.push("/");
         return;
       }
+      const url = new URL(oauthParams.redirect_uri);
       url.searchParams.set("error", "access_denied");
       if (oauthParams.state) {
         url.searchParams.set("state", oauthParams.state);

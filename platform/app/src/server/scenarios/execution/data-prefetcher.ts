@@ -20,6 +20,12 @@ import { getInputsOutputs } from "../../../optimization_studio/utils/nodeUtils";
 import { resolveModelForFeature } from "../../modelProviders/resolveModelForFeature";
 import { extractSuiteId } from "../../suites/suite-set-id";
 import { parseSuiteTargets } from "../../suites/types";
+import {
+  mergeRunParameters,
+  parseScenarioParameterDefinitions,
+  type RunParameterValues,
+} from "../parameters";
+import { renderScenarioContent } from "./scenario-content-template";
 import { validateWorkflowAgentMappings } from "./validate-workflow-mappings";
 
 const logger = createLogger("langwatch:scenarios:data-prefetcher");
@@ -71,6 +77,8 @@ export interface ScenarioFetcher {
     simulatorModel?: string | null;
     /** Per-scenario judge model override (null = use default). */
     judgeModel?: string | null;
+    /** The parameters the scenario declares, as stored on its JSON column. */
+    parameters?: unknown;
   } | null>;
 }
 
@@ -209,14 +217,34 @@ export type PrefetchResult =
 // ============================================================================
 
 /**
+ * What a prefetch is asked to prepare: the run's execution context, plus the
+ * parameter values it resolved.
+ *
+ * The values travel with the context rather than beside it because they are
+ * part of what identifies this run: the same scenario, the same target and the
+ * same set can be run again with different ones and be a different run.
+ */
+export type PrefetchContext = ExecutionContext & {
+  /**
+   * The values the run resolved for this scenario, as recorded on the queued
+   * event. Merged again over the scenario's declared defaults here, which
+   * makes the merge idempotent: a job queued by a build that did not resolve
+   * them still gets the defaults, and one queued by a build that did gets the
+   * same answer twice.
+   */
+  parameters?: RunParameterValues;
+};
+
+/**
  * Pre-fetch all data needed for scenario execution.
  *
- * @param context - Execution context with project/scenario IDs
+ * @param context - Execution context with project/scenario IDs and the run's
+ *   resolved parameter values
  * @param target - Target configuration (prompt or http)
  * @param deps - Injected dependencies for data fetching
  */
 export async function prefetchScenarioData(
-  context: ExecutionContext,
+  context: PrefetchContext,
   target: TargetConfig,
   deps: DataPrefetcherDependencies,
 ): Promise<PrefetchResult> {
@@ -230,11 +258,12 @@ export async function prefetchScenarioData(
     "Prefetching scenario data",
   );
 
-  const scenarioResult = await fetchScenario(
-    context.projectId,
-    context.scenarioId,
-    deps.scenarioFetcher,
-  );
+  const scenarioResult = await fetchScenario({
+    projectId: context.projectId,
+    scenarioId: context.scenarioId,
+    fetcher: deps.scenarioFetcher,
+    suppliedParameters: context.parameters,
+  });
   if (!scenarioResult) {
     logger.warn(
       { projectId: context.projectId, scenarioId: context.scenarioId },
@@ -445,6 +474,7 @@ export async function prefetchScenarioData(
     data: {
       context,
       scenario,
+      parameters: scenarioResult.parameters,
       adapterData,
       modelParams,
       simulatorModelParams: simulatorParamsResult.params,
@@ -463,25 +493,56 @@ export async function prefetchScenarioData(
 // Internal Fetch Functions
 // ============================================================================
 
-async function fetchScenario(
-  projectId: string,
-  scenarioId: string,
-  fetcher: ScenarioFetcher,
-): Promise<{
+async function fetchScenario({
+  projectId,
+  scenarioId,
+  fetcher,
+  suppliedParameters,
+}: {
+  projectId: string;
+  scenarioId: string;
+  fetcher: ScenarioFetcher;
+  suppliedParameters?: RunParameterValues;
+}): Promise<{
   config: ScenarioConfig;
+  parameters: RunParameterValues;
   simulatorModel: string | null;
   judgeModel: string | null;
 } | null> {
   const scenario = await fetcher.getById({ projectId, id: scenarioId });
   if (!scenario) return null;
+
+  const definitions = parseScenarioParameterDefinitions(scenario.parameters);
+  const parameters = mergeRunParameters({
+    definitions,
+    values: suppliedParameters,
+  });
+
+  const rendered = await renderScenarioContent({
+    situation: scenario.situation,
+    criteria: scenario.criteria,
+    parameters,
+    declaredNames: definitions.map((definition) => definition.name),
+  });
+  if (!rendered.ok) {
+    // The request that started this run rendered the same text against the
+    // same values and accepted it, so reaching here means the scenario or its
+    // parameters changed underneath a queued run. There is nothing the run can
+    // do with that, and nothing the customer chose that explains it.
+    throw new Error(
+      `Scenario ${scenarioId} ${rendered.field} could not be rendered against the run's parameters (${rendered.reason})`,
+    );
+  }
+
   return {
     config: {
       id: scenario.id,
       name: scenario.name,
-      situation: scenario.situation,
-      criteria: scenario.criteria,
+      situation: rendered.situation,
+      criteria: rendered.criteria,
       labels: scenario.labels,
     },
+    parameters,
     simulatorModel: scenario.simulatorModel ?? null,
     judgeModel: scenario.judgeModel ?? null,
   };
@@ -542,7 +603,12 @@ async function fetchAgentData(
       projectSecretsFetcher: deps.projectSecretsFetcher,
     });
   }
-  return fetchHttpAgentData(projectId, target.referenceId, deps.agentFetcher);
+  return fetchHttpAgentData({
+    projectId,
+    agentId: target.referenceId,
+    fetcher: deps.agentFetcher,
+    projectSecretsFetcher: deps.projectSecretsFetcher,
+  });
 }
 
 async function fetchPromptConfigData(
@@ -588,11 +654,17 @@ const HttpAgentConfigSchema = z.object({
   scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
 });
 
-async function fetchHttpAgentData(
-  projectId: string,
-  agentId: string,
-  fetcher: AgentFetcher,
-): Promise<HttpAgentData | null> {
+async function fetchHttpAgentData({
+  projectId,
+  agentId,
+  fetcher,
+  projectSecretsFetcher,
+}: {
+  projectId: string;
+  agentId: string;
+  fetcher: AgentFetcher;
+  projectSecretsFetcher: ProjectSecretsFetcher;
+}): Promise<HttpAgentData | null> {
   const agent = await fetcher.findById({ projectId, id: agentId });
   if (agent?.type !== "http") return null;
 
@@ -601,6 +673,11 @@ async function fetchHttpAgentData(
     return null;
   }
   const config = parseResult.data;
+
+  // Loaded once for the whole run, the same way the code and workflow paths
+  // load them: the child process has no database access, so a secret the url,
+  // a header or an auth field references has to travel with the job.
+  const secrets = await projectSecretsFetcher.getSecrets(projectId);
 
   return {
     type: "http",
@@ -612,6 +689,7 @@ async function fetchHttpAgentData(
     bodyTemplate: config.bodyTemplate,
     outputPath: config.outputPath,
     scenarioMappings: config.scenarioMappings,
+    secrets,
   };
 }
 

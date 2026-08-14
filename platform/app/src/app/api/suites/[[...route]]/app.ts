@@ -1,14 +1,15 @@
 import { createLogger } from "@langwatch/observability";
-import type { SimulationSuite } from "@prisma/client";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
+import type { SimulationSuite } from "~/generated/prisma/client";
 import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { ProjectRepository } from "~/server/projects/project.repository";
+import { runParameterValuesSchema } from "~/server/scenarios/parameters";
 import { SuiteDomainError } from "~/server/suites/errors";
 import { SuiteService } from "~/server/suites/suite.service";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
@@ -61,6 +62,11 @@ const updateSuiteInputSchema = z.object({
 
 const runSuiteInputSchema = z.object({
   idempotencyKey: z.string().optional(),
+  parameters: runParameterValuesSchema
+    .optional()
+    .describe(
+      "Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name.",
+    ),
 });
 
 const suiteRunResultSchema = z.object({
@@ -416,6 +422,7 @@ secured.access(requires("scenarios:create")).post(
         projectId: project.id,
         organizationId,
         idempotencyKey,
+        parameters: body.parameters,
       });
 
       return c.json({

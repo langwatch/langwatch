@@ -50,10 +50,16 @@ See the parent [`event-sourcing/README.md`](../../README.md) for the full builde
 You only instantiate `GroupQueueProcessor` when building a new queue surface outside the event-sourcing framework — rare. The shape:
 
 ```typescript
+import { getApp } from "~/server/app-layer/app";
+import { roleRunsWorkers } from "~/server/app-layer/config";
 import { GroupQueueProcessor } from "~/server/event-sourcing/queues/groupQueue/groupQueue";
-import { connection } from "~/server/redis";
 import { createStorageRegistry } from "~/server/stored-objects/stored-objects-factory";
 import { resolveProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
+
+// The App owns the process's connection (ADR-093). It is null when no Redis is
+// configured, and this processor requires one — so narrow before constructing.
+const redis = getApp().redis;
+if (!redis) throw new Error("this queue needs Redis");
 
 const queue = new GroupQueueProcessor<MyPayload>(
   {
@@ -62,9 +68,9 @@ const queue = new GroupQueueProcessor<MyPayload>(
     process: async (payload) => { /* handle one job */ },
     options: { globalConcurrency: 50 },
   },
-  connection,
+  redis,
   {
-    consumerEnabled: processRole === "worker",
+    consumerEnabled: roleRunsWorkers(processRole),
     objectStoreFor: (projectId) => createStorageRegistry({ projectId }),
     resolveStorageDestination: resolveProjectStorageDestination,
   },
