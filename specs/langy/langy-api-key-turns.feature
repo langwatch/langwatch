@@ -91,6 +91,40 @@ Feature: Starting Langy conversations with a project API key
     When the caller starts a turn and reads the event stream
     Then at least two distinct events arrive before the turn completes
 
+  # Synchronous delivery (RFC 7240 `Prefer: wait=<seconds>`). A plain HTTP
+  # client — a script, CI, or a scenario HTTP agent — has no way to consume the
+  # 202-then-stream contract, so the turn route itself can hold the connection
+  # until the turn settles on the durable fold and answer with the assistant's
+  # output in the body.
+
+  @unit
+  Scenario: A caller preferring to wait receives the assistant's output synchronously
+    Given an accepted turn started with a project API key
+    And the request carries a wait preference
+    When the turn settles with an assistant response
+    Then the response is synchronous and carries the assistant's output for that turn
+    And the response declares which preference was applied
+
+  @unit
+  Scenario: A wait is satisfied only by the turn this request started
+    Given a request waiting on its own accepted turn
+    When a different turn on the same conversation settles first
+    Then the wait continues until this request's own turn settles
+
+  @unit
+  Scenario: A failed turn settles the wait as a domain outcome, not a transport refusal
+    Given a request waiting on its own accepted turn
+    When the turn fails
+    Then the response is successful at the transport level
+    And it carries the turn's failed status and error with no assistant reply
+
+  @unit
+  Scenario: An expired wait degrades to the asynchronous acceptance
+    Given a request waiting on its own accepted turn
+    When the wait window expires before the turn settles
+    Then the response is the same asynchronous acceptance an unadorned request receives
+    And no applied preference is declared
+
   # ---------------------------------------------------------------------------
   # Failure modes
   # ---------------------------------------------------------------------------
@@ -186,6 +220,12 @@ Feature: Starting Langy conversations with a project API key
 #          -> Scenario: A key with langy:create starts a conversation without a browser session
 # AC 2:  "same caller continues the conversation, receives assistant output"
 #          -> Scenario: The same key continues an existing conversation
+#          (supporting, unit level: A caller preferring to wait receives the
+#           assistant's output synchronously / A wait is satisfied only by the
+#           turn this request started / A failed turn settles the wait as a
+#           domain outcome, not a transport refusal / An expired wait degrades
+#           to the asynchronous acceptance — the `Prefer: wait` delivery path
+#           for that output)
 # AC 3:  "incremental turn events before the turn completes, at least two"
 #          -> Scenario: The caller observes incremental events before the turn completes
 # AC 4:  "langy:view but not langy:create refused 403, no worker provisioned"

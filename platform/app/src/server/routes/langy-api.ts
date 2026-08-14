@@ -15,7 +15,9 @@
  *   3. `langy:create` ceiling         → else 403
  *   4. key owns an actor + has Langy  → else 403
  *   5. actor row still exists         → else 403
- *   6. shared `startConversationTurn` → 202
+ *   6. shared `startConversationTurn` → 202 — or, with `Prefer: wait=<seconds>`
+ *      (RFC 7240), a 200 carrying the assistant's reply once the turn settles
+ *      on the durable fold, degrading to the same 202 when the wait expires.
  *
  * The flag is checked AFTER authentication as a deliberate choice, NOT because
  * it is impossible to check earlier. Rollback is staged per project, so the
@@ -79,6 +81,10 @@
  * HandledError that is re-thrown untouched.
  */
 
+import {
+  LANGY_CONVERSATION_EVENT_TYPES,
+  type LangyEventCursor,
+} from "@langwatch/langy";
 import type { Context } from "hono";
 import { z } from "zod";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
@@ -93,7 +99,9 @@ import {
   LangyApiCredentialMissingError,
   LangyApiIdentityDeniedError,
   LangyApiRequestInvalidError,
+  LangyConversationNotFoundError,
 } from "~/server/app-layer/langy/errors";
+import { extractTextFromParts } from "~/server/app-layer/langy/langy-message.service";
 import type { LangyChatMessageInput } from "~/server/app-layer/langy/langy-turn.service";
 import { resolveLangyActorSession } from "~/server/app-layer/langy/langyApiKeyActorSession";
 import { resolveLangyKeyIdentity } from "~/server/app-layer/langy/langyApiKeyIdentity";
@@ -225,6 +233,119 @@ async function authorizeTurn(c: Context) {
 }
 
 /**
+ * `Prefer: wait=<seconds>` (RFC 7240) opts a caller into synchronous delivery:
+ * the request is held until the turn settles and the assistant's reply comes
+ * back in the body. The ceiling exists because this connection crosses an
+ * ingress with its own idle timeout; a caller asking for more simply gets the
+ * ceiling (RFC 7240 §3: a preference is not a contract), and on expiry the
+ * response degrades to the exact 202 the async path returns.
+ */
+const MAX_WAIT_SECONDS = 120;
+const WAIT_POLL_INTERVAL_MS = 750;
+
+function requestedWaitSeconds(c: Context): number | null {
+  const prefer = c.req.header("prefer");
+  if (!prefer) return null;
+  const match = /(?:^|[,;\s])wait=(\d{1,4})/i.exec(prefer);
+  if (!match?.[1]) return null;
+  return Math.min(Number(match[1]), MAX_WAIT_SECONDS);
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Watch the conversation's durable TURN events until THIS turn settles.
+ *
+ * The durable fold, not the Redis token buffer, is the source of truth here:
+ * `AGENT_RESPONDED` / `AGENT_RESPONSE_FAILED` both carry the `turnId`, so the
+ * wait can key on exactly the turn this request started — a concurrent or
+ * replayed turn on the same conversation cannot satisfy it. The buffer is
+ * best-effort live delivery and may be absent entirely (no Redis); the fold is
+ * what `finalizeTurn` calls "the real backend confirmation".
+ *
+ * `LangyConversationNotFoundError` inside the loop is projection lag — the
+ * accepted turn's row has not landed yet — so it means "keep waiting", not
+ * "gone". Every other error propagates.
+ */
+type TurnSettlement = {
+  outcome: string;
+  error: string | null;
+  text: string;
+};
+
+type ConversationTurnEvents = Awaited<
+  ReturnType<
+    ReturnType<typeof getApp>["langy"]["conversations"]["getEventsAfter"]
+  >
+>;
+
+function settlementFromEvents(
+  events: ConversationTurnEvents["events"],
+  turnId: string,
+): TurnSettlement | null {
+  for (const event of events) {
+    if (
+      event.type === LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED &&
+      event.data.turnId === turnId
+    ) {
+      return {
+        outcome: event.data.outcome,
+        error: event.data.error ?? null,
+        text: extractTextFromParts(event.data.parts),
+      };
+    }
+    if (
+      event.type === LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONSE_FAILED &&
+      event.data.turnId === turnId
+    ) {
+      return { outcome: "failed", error: event.data.error, text: "" };
+    }
+  }
+  return null;
+}
+
+async function waitForTurnSettlement({
+  projectId,
+  conversationId,
+  turnId,
+  userId,
+  deadlineMs,
+}: {
+  projectId: string;
+  conversationId: string;
+  turnId: string;
+  userId: string;
+  deadlineMs: number;
+}): Promise<TurnSettlement | null> {
+  let cursor: LangyEventCursor = { acceptedAt: 0, eventId: "" };
+  while (Date.now() < deadlineMs) {
+    const events = await getApp()
+      .langy.conversations.getEventsAfter({
+        projectId,
+        conversationId,
+        userId,
+        after: cursor,
+      })
+      .catch((error: unknown) => {
+        if (error instanceof LangyConversationNotFoundError) return null;
+        throw error;
+      });
+    if (!events) {
+      await sleep(WAIT_POLL_INTERVAL_MS);
+      continue;
+    }
+
+    const settlement = settlementFromEvents(events.events, turnId);
+    if (settlement) return settlement;
+
+    cursor = events.cursor;
+    if (events.truncated) continue;
+    await sleep(WAIT_POLL_INTERVAL_MS);
+  }
+  return null;
+}
+
+/**
  * Start or continue a turn.
  *
  * Nothing is caught. A domain `HandledError` already carries the status, code
@@ -260,6 +381,42 @@ async function startTurn({
     turnContext: {},
   });
   auth.markUsed();
+
+  // `Prefer: wait=<seconds>` holds the connection until the turn settles and
+  // returns the assistant's reply in the body — the synchronous mode a plain
+  // HTTP client (or a scenario HTTP agent) needs, since this surface has no
+  // public poll or stream endpoint yet. On timeout the response degrades to
+  // the 202 below, indistinguishable from never having asked.
+  const waitSeconds = requestedWaitSeconds(c);
+  if (waitSeconds && waitSeconds > 0) {
+    const settlement = await waitForTurnSettlement({
+      projectId: auth.projectId,
+      conversationId: result.conversationId,
+      turnId: result.turnId,
+      userId: auth.session.user.id,
+      deadlineMs: Date.now() + waitSeconds * 1000,
+    });
+    if (settlement) {
+      c.header("Preference-Applied", "wait");
+      // 200 even when the turn itself failed: the REQUEST succeeded — it was
+      // authorized, accepted and settled — and `status`/`error` carry the
+      // turn's own outcome. Failure here is a domain result, not a transport
+      // refusal.
+      return c.json(
+        {
+          ...result,
+          status: settlement.outcome,
+          error: settlement.error,
+          reply:
+            settlement.outcome === "failed"
+              ? null
+              : { role: "assistant" as const, text: settlement.text },
+        },
+        200,
+      );
+    }
+  }
+
   // 202, not 200: the turn is accepted and dispatched, and the assistant's
   // answer does not exist yet. The caller polls or streams for it.
   return c.json(result, 202);
