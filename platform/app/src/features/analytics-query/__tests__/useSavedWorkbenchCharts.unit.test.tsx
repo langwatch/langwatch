@@ -173,6 +173,48 @@ describe("saving a workbench chart", () => {
     });
   });
 
+  describe("given the member clicks Save twice before the first write lands", () => {
+    describe("when no chart is open yet", () => {
+      // `isSaving` cannot cover this: it is React state, so the second click
+      // reads its pre-render value and would create a second chart.
+      it("creates one chart rather than two", async () => {
+        // Every call gets its resolver collected, not just the last: if the
+        // guard ever regresses, the second write must still settle so the test
+        // fails on the call count rather than hanging for the timeout and
+        // taking the rest of the file down with it.
+        const pending: ((created: { id: string; name: string }) => void)[] = [];
+        mocks.create.mutateAsync.mockImplementation(
+          () =>
+            new Promise<{ id: string; name: string }>((resolve) => {
+              pending.push(resolve);
+            }),
+        );
+        const release = (created: { id: string; name: string }) => {
+          for (const resolve of pending.splice(0)) resolve(created);
+        };
+
+        const { result, onError } = mountHook();
+
+        await act(async () => {
+          const first = result.current.save({
+            draft: DRAFT,
+            name: "Traces per day",
+          });
+          const second = result.current.save({
+            draft: DRAFT,
+            name: "Traces per day",
+          });
+          release({ id: "chart-1", name: "Traces per day" });
+          await Promise.all([first, second]);
+        });
+
+        expect(mocks.create.mutateAsync).toHaveBeenCalledTimes(1);
+        expect(onError).not.toHaveBeenCalled();
+        expect(result.current.openedChartId).toBe("chart-1");
+      });
+    });
+  });
+
   describe("given the write succeeds but refreshing the list then fails", () => {
     describe("when the member saves", () => {
       /**

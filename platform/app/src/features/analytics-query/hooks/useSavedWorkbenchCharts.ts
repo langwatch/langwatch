@@ -16,6 +16,7 @@ import {
   type Dispatch,
   type SetStateAction,
   useCallback,
+  useRef,
   useState,
 } from "react";
 
@@ -202,42 +203,60 @@ function useSaveChart({
   createChart: CreateChartMutation;
   updateChart: UpdateChartMutation;
 }) {
+  // Set synchronously at entry, which `isSaving` cannot be: that flag is React
+  // state off `isPending`, so two Saves in one tick both read its pre-render
+  // value, both see no chart open, and both create — the duplicate this module
+  // exists to prevent. Disabling the button is still worth doing; it just
+  // cannot serialise the calls, so the refusal has to live here.
+  const inFlight = useRef(false);
+
   return useCallback(
     async ({ draft, name }: { draft: WorkbenchChartDraft; name?: string }) => {
-      const definition = definitionOf(draft);
+      // Dropped rather than queued: a second Save on an unchanged draft is a
+      // double-click, and running it again would write the same bytes twice.
+      if (inFlight.current) return;
+      inFlight.current = true;
       try {
-        if (opened) {
-          await writeBackToOpened({
-            projectId,
-            opened,
-            name,
-            definition,
-            updateChart,
-            setOpened,
-          });
-        } else {
-          await createNewChart({
-            projectId,
-            name,
-            definition,
-            createChart,
-            setOpened,
-          });
+        const definition = definitionOf(draft);
+        try {
+          if (opened) {
+            await writeBackToOpened({
+              projectId,
+              opened,
+              name,
+              definition,
+              updateChart,
+              setOpened,
+            });
+          } else {
+            await createNewChart({
+              projectId,
+              name,
+              definition,
+              createChart,
+              setOpened,
+            });
+          }
+        } catch (error) {
+          // Rethrowing would leave the workbench with an unhandled rejection
+          // and nothing on screen; the caller turns this into registry copy.
+          onError(error, "Couldn't save the chart");
+          return;
         }
-      } catch (error) {
-        // Rethrowing would leave the workbench with an unhandled rejection and
-        // nothing on screen; the caller turns this into registry copy.
-        onError(error, "Couldn't save the chart");
-        return;
-      }
 
-      // Outside the write's catch on purpose: the chart is already saved by
-      // this point, and reporting a failed refresh as a failed save sends the
-      // member back to press Save again, creating a duplicate.
-      try {
-        await refreshList();
-      } catch (error) {
-        onError(error, "Saved, but the chart list didn't refresh");
+        // Outside the write's catch on purpose: the chart is already saved by
+        // this point, and reporting a failed refresh as a failed save sends the
+        // member back to press Save again, creating a duplicate.
+        try {
+          await refreshList();
+        } catch (error) {
+          onError(error, "Saved, but the chart list didn't refresh");
+        }
+      } finally {
+        // Held across the refresh too, not just the write: `setOpened` is state
+        // as well, so releasing at write-end would let a Save arriving before
+        // the re-render still read `opened` as null and create a second chart.
+        inFlight.current = false;
       }
     },
     [
