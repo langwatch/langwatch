@@ -8,22 +8,16 @@
 
 import { z } from "zod";
 import type { Span } from "../../tracer/types";
+import { FieldMappingSchema } from "../field-mapping";
 
 // ============================================================================
 // Field Mapping Types
 // (defined first so adapter schemas can reference them)
 // ============================================================================
 
-/** Field mapping for agent inputs — maps to a scenario source or a static value */
-export const FieldMappingSchema = z.discriminatedUnion("type", [
-  z.object({
-    type: z.literal("source"),
-    sourceId: z.string(),
-    path: z.array(z.string()),
-  }),
-  z.object({ type: z.literal("value"), value: z.string() }),
-]);
-export type FieldMapping = z.infer<typeof FieldMappingSchema>;
+// FieldMappingSchema lives in ../field-mapping: it is the one thing here that
+// the suite schema and the studio DSL also need, and keeping it out means this
+// module has no importers outside the child's own code.
 
 // ============================================================================
 // Adapter Data Types (Zod schemas for data contracts)

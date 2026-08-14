@@ -17,12 +17,12 @@
  */
 
 import type { AgentInput } from "@langwatch/scenario";
+import type { FieldMapping } from "../field-mapping";
 import {
   computeBestMatchMappings,
   resolveFieldMappings,
   sourceFieldOf,
 } from "./resolve-field-mappings";
-import type { FieldMapping } from "./types";
 
 /** An input variable declared on the prompt. */
 export interface PromptInputDeclaration {
