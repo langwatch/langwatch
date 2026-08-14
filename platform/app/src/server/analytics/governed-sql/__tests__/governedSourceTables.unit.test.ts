@@ -37,14 +37,14 @@ const SOURCE_DATABASE = "app_unit";
 function view(
   name: string,
   sourceTable: string,
-  { postgresResident = false }: { postgresResident?: boolean } = {},
+  { isPostgresResident = false }: { isPostgresResident?: boolean } = {},
 ): GovernedViewDefinition {
   return {
     name,
     sourceTable,
     // Presence of `postgres` is what `isPostgresResident` keys on, and that in
     // turn decides which database the source resolves to.
-    ...(postgresResident ? { postgres: {} } : {}),
+    ...(isPostgresResident ? { postgres: {} } : {}),
   } as unknown as GovernedViewDefinition;
 }
 
@@ -77,7 +77,7 @@ describe("given the governed source tables", () => {
           view("events_fact", "events"),
           // ...and an unrelated PostgreSQL-engine table of the same name,
           // which resolves to the governed database instead.
-          view("events_pg", "events", { postgresResident: true }),
+          view("events_pg", "events", { isPostgresResident: true }),
         ],
       });
 
