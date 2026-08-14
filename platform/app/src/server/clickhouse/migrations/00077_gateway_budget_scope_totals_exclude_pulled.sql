@@ -27,24 +27,31 @@
 -- the aggregate never contains a pulled figure at all, so such a read finds
 -- nothing to leak.
 --
--- Why this is a plain view swap and not 00069's rebuild-and-swap: that
--- migration had to repair aggregates that were already wrong. This one has
--- nothing to repair. `Scope = 'pulled'` is introduced by the same change set
--- that adds this filter, so at the instant this runs no pulled row exists in
--- the ledger and no pulled figure exists in the rollup. There is no backfill
--- because there is no history. A rebuild would re-derive the identical table
--- at the cost of a full re-read of the ledger.
+-- Why this is not 00069's rebuild-and-swap: that migration had to repair
+-- aggregates that were already wrong. This one has nothing to repair.
+-- `Scope = 'pulled'` is introduced by the same change set that adds this
+-- filter, so at the instant this runs no pulled row exists in the ledger and
+-- no pulled figure exists in the rollup. There is no backfill because there is
+-- no history. A rebuild would re-derive the identical table at the cost of a
+-- full re-read of the ledger.
 --
--- The gap between DROP and CREATE is the one real cost, and it is bounded and
--- recoverable: debits inserted in that window land in the ledger (which is the
--- source of truth and is never wrong) but are not folded into the rollup, so
--- they under-report until re-derived. Run this the way 00064 and 00069 were
--- run — during a maintenance window — and if a debit is known to have landed
--- inside the gap, re-derive with 00069's reconciliation block, which computes
--- a per-key delta and clamps at zero.
+-- Why this is `MODIFY QUERY` and not the `DROP` + `CREATE` the other view
+-- migrations use: a materialised view is an insert trigger, so between a DROP
+-- and the following CREATE there is no trigger at all. ClickHouse does not
+-- replay the inserts made in that window, and this migration has no delta
+-- replay, so every successful non-pulled debit landing in the gap would be
+-- absent from the rollup permanently. The ledger would still hold it — that is
+-- the source of truth and is never wrong — but `getSpendForBudgets*` sums the
+-- rollup, so the gap under-reports spend, and under-reported spend is a budget
+-- that authorises a request it should have refused. A maintenance-window
+-- convention does not make that safe; it only makes it unlikely. `MODIFY
+-- QUERY` swaps the SELECT atomically, with the trigger never absent, so there
+-- is no window to reconcile and no procedure to remember.
 --
--- Re-running the whole file converges: the view is dropped if present and
--- recreated with the same definition.
+-- Re-running the whole file converges: setting the same query twice is a no-op.
+-- It does require the view to already exist, which ordered migrations
+-- guarantee — 00070 creates it, and on a missing view this fails loudly with
+-- UNKNOWN_TABLE rather than silently doing nothing.
 --
 -- The view body below is 00070's CURRENT definition with exactly one line
 -- added (`AND Scope != 'pulled'`). Copy the latest migration that touched this
@@ -55,13 +62,8 @@
 -- ============================================================================
 
 -- +goose StatementBegin
-DROP VIEW IF EXISTS ${CLICKHOUSE_DATABASE}.gateway_budget_scope_totals_mv;
--- +goose StatementEnd
-
--- +goose StatementBegin
-CREATE MATERIALIZED VIEW IF NOT EXISTS ${CLICKHOUSE_DATABASE}.gateway_budget_scope_totals_mv
-TO ${CLICKHOUSE_DATABASE}.gateway_budget_scope_totals
-AS
+ALTER TABLE ${CLICKHOUSE_DATABASE}.gateway_budget_scope_totals_mv
+MODIFY QUERY
 SELECT
     TenantId,
     Scope,
@@ -116,9 +118,13 @@ GROUP BY TenantId, Scope, ScopeId, Window, PeriodStart, BudgetId;
 -- would let pulled provider cost fold into budget totals, and a budget would
 -- then enforce against money spent outside the gateway. Rollback statements
 -- stay commented out and must be applied deliberately, by hand.
+--
+-- The inverse is 00070's query, not a DROP. Dropping the view would remove the
+-- trigger outright and stop folding every scope, which is a larger outage than
+-- the one being rolled back; re-run 00070 to restore its SELECT atomically.
 
 -- +goose StatementBegin
--- DROP VIEW IF EXISTS ${CLICKHOUSE_DATABASE}.gateway_budget_scope_totals_mv;
+-- Re-run 00070 to restore its view definition.
 -- +goose StatementEnd
 
 -- +goose ENVSUB OFF
