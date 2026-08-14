@@ -119,10 +119,10 @@ We will not build the media relay until all four hold.
 
 ## References
 
-- Related Nexus pages (internal wiki, no repo link): `gateway-spend-command-pipeline-adr`, `skai-gateway-replacement-adr`, `bench-gateway-kong`, `feature-ai-gateway`, `feature-gateway-virtual-keys`, `feature-voice-agent-testing`, `pain-voice-agent-testing-cost`
-- Repo ADRs: `053-tenant-aware-egress-and-workload-isolation.md` (Proposed), `017-gateway-trace-payload-capture.md` (Accepted, and not the regime running in code), `016-scoped-model-providers.md`, `021-multi-scope-targeting-and-tenancy.md`, `018-governance-unified-observability-substrate.md`
-- Scenario ADRs, in the `langwatch/scenario` repository: `docs/adr/002-voice-provider-state.md` (Proposed), `docs/adr/003-voice-internal-design.md` (Accepted)
-- Shipped audio support: `langwatch/langwatch#6168`, `specs/ai-gateway/audio-endpoints.feature`, `docs/ai-gateway/api/audio.mdx`
+- Related Nexus pages (internal wiki): `gateway-spend-command-pipeline-adr`, `skai-gateway-replacement-adr`, `bench-gateway-kong`, `feature-ai-gateway`, `feature-gateway-virtual-keys`, `feature-voice-agent-testing`, `pain-voice-agent-testing-cost`
+- Repo ADRs: [053-tenant-aware-egress-and-workload-isolation.md](./053-tenant-aware-egress-and-workload-isolation.md) (Proposed), [017-gateway-trace-payload-capture.md](./017-gateway-trace-payload-capture.md) (Accepted, and not the regime running in code), [016-scoped-model-providers.md](./016-scoped-model-providers.md), [021-multi-scope-targeting-and-tenancy.md](./021-multi-scope-targeting-and-tenancy.md), [018-governance-unified-observability-substrate.md](./018-governance-unified-observability-substrate.md)
+- Scenario ADRs, in the `langwatch/scenario` repository: [docs/adr/002-voice-provider-state.md](https://github.com/langwatch/scenario/blob/main/docs/adr/002-voice-provider-state.md) (Proposed), [docs/adr/003-voice-internal-design.md](https://github.com/langwatch/scenario/blob/main/docs/adr/003-voice-internal-design.md) (Accepted)
+- Shipped audio support: `langwatch/langwatch#6168`, [specs/ai-gateway/audio-endpoints.feature](../../../specs/ai-gateway/audio-endpoints.feature), [docs/ai-gateway/api/audio.mdx](../../../docs/ai-gateway/api/audio.mdx)
 - Vendor documentation: OpenAI Realtime websocket and costs guides, ElevenLabs Conversational AI websocket and authentication references, Google Gemini Live API and session management, Deepgram Voice Agent reference, Azure Voice Live how-to
 - Competitor realtime support: Cloudflare AI Gateway realtime websockets, LiteLLM `/v1/realtime`, Portkey realtime API, Helicone realtime integration, Kong voice AI observability cookbook
 
