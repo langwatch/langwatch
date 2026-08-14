@@ -17,6 +17,7 @@ import type { SimulationRunExecutionProcessState } from "../simulationRunExecuti
 import {
   CANCEL_GRACE_MS,
   SIMULATION_RUN_EXECUTION_PROCESS_NAME,
+  simulationRunProcessEventViewSchema,
 } from "../simulationRunExecutionProcess.types";
 
 const PROJECT_ID = "project-1";
@@ -215,6 +216,15 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
       // Scheduling from business time would write a wake already behind the
       // present, declaring the run stalled the moment the wake worker saw it.
       expect(evolution.nextWakeAt).toBe(now + STALL_THRESHOLD_MS);
+
+      // The stored stamp has to move with it. The wake measures
+      // `now - lastActivityAtMs`, so leaving business time here would let the
+      // first wake find an hour of "inactivity" on a run that just started —
+      // the same bug, one field over.
+      expect(evolution.state.lastActivityAtMs).toBe(now);
+      // queuedAtMs stays business time: it records when the run was queued,
+      // it is not a deadline.
+      expect(evolution.state.queuedAtMs).toBe(occurredAt);
     });
 
     it("finishes the run unexecutable when the queued event carries no target or identity", () => {
@@ -665,6 +675,44 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
       expect(evolution.state).toEqual(state);
       expect(evolution.intents).toEqual([]);
       expect(evolution.nextWakeAt).toBeNull();
+    });
+  });
+
+  describe("when a queued event carries a malformed target", () => {
+    it("normalises it to null rather than letting it reach the schema", () => {
+      // The view is persisted and parsed back on the way in, so an object that
+      // merely looks like a target would throw there — and a throwing handler
+      // redelivers forever. Null is the shape handleRunQueued already answers,
+      // by finishing the run as unexecutable.
+      const view = buildSimulationRunEventView({
+        type: SIMULATION_RUN_EVENT_TYPES.QUEUED,
+        occurredAt: 1_000,
+        data: {
+          scenarioRunId: "run-1",
+          scenarioId: "scen-1",
+          batchRunId: "batch-1",
+          scenarioSetId: "set-1",
+          target: { type: "not-a-real-type", referenceId: 42 },
+        },
+      } as unknown as Parameters<typeof buildSimulationRunEventView>[0]);
+
+      expect(view.target).toBeNull();
+      expect(() =>
+        simulationRunProcessEventViewSchema.parse(view),
+      ).not.toThrow();
+    });
+
+    it("keeps a well-formed target", () => {
+      const view = buildSimulationRunEventView({
+        type: SIMULATION_RUN_EVENT_TYPES.QUEUED,
+        occurredAt: 1_000,
+        data: {
+          scenarioRunId: "run-1",
+          target: { type: "prompt", referenceId: "prompt-1" },
+        },
+      } as unknown as Parameters<typeof buildSimulationRunEventView>[0]);
+
+      expect(view.target).toEqual({ type: "prompt", referenceId: "prompt-1" });
     });
   });
 

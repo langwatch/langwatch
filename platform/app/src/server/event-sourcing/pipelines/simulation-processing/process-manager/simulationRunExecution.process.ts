@@ -58,10 +58,14 @@ export function buildSimulationRunEventView(
   const data = event.data as Record<string, unknown>;
   const str = (value: unknown): string | null =>
     typeof value === "string" ? value : null;
-  const target =
-    typeof data.target === "object" && data.target !== null
-      ? (data.target as SimulationRunProcessEventView["target"])
-      : null;
+  // Validated rather than cast. A cast lets any non-null object through as a
+  // target, and the schema parse on the way back in then THROWS on it — so a
+  // malformed target becomes a redelivering handler instead of a run that
+  // fails once, clearly. Normalising to null instead hands handleRunQueued the
+  // case it already has an answer for: finish the run as unexecutable.
+  const parsedTarget =
+    simulationRunProcessEventViewSchema.shape.target.safeParse(data.target);
+  const target = parsedTarget.success ? parsedTarget.data : null;
   return {
     eventType: event.type,
     occurredAt: event.occurredAt,
