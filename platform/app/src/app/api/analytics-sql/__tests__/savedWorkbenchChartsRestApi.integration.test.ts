@@ -51,6 +51,7 @@ import {
   type Team,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { WORKBENCH_SQL_CHART_KIND } from "~/server/analytics/chartKinds";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
@@ -750,7 +751,7 @@ describe("given the saved workbench chart REST endpoints", () => {
           // Structurally a chart, but not this build's chart: no version, and
           // the fields under a name the parser does not know.
           graph: { spec: { mark: "bar" }, query: "SELECT 1" },
-          kind: "workbench_sql",
+          kind: WORKBENCH_SQL_CHART_KIND,
         },
       });
 

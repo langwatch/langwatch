@@ -86,6 +86,25 @@ const vega = vi.hoisted(() => {
 
 vi.mock("vega-embed", () => ({ default: vega.embed }));
 
+/** Set to make the next spec build throw, before `embed` is ever reached. */
+const build = vi.hoisted(() => ({ throwWith: null as unknown }));
+
+vi.mock("../visualization/buildGovernedVegaSpec", async (importOriginal) => {
+  const original =
+    await importOriginal<
+      typeof import("../visualization/buildGovernedVegaSpec")
+    >();
+  return {
+    ...original,
+    buildGovernedVegaSpec: (
+      ...args: Parameters<typeof original.buildGovernedVegaSpec>
+    ) => {
+      if (build.throwWith !== null) throw build.throwWith;
+      return original.buildGovernedVegaSpec(...args);
+    },
+  };
+});
+
 const colorModeHarness = vi.hoisted(() => ({
   mode: "light" as "light" | "dark",
 }));
@@ -150,6 +169,7 @@ beforeEach(() => {
   vega.state.resizes = 0;
   vega.state.finalized = 0;
   vega.state.failWith = null;
+  build.throwWith = null;
   colorModeHarness.mode = "light";
 });
 
@@ -437,6 +457,24 @@ describe("the governed Vega-Lite chart", () => {
       expect(
         screen.getByTestId("governed-chart-failure").textContent,
       ).toContain("Unrecognized signal name");
+    });
+
+    /** @scenario "Chart failures are distinct intentional states, never a blank chart" */
+    it("names a failure raised while the specification is being built", async () => {
+      // A build throw is synchronous, so it lands before `embed` has a
+      // rejection handler. Unguarded it escapes the effect and the panel sits
+      // on "embedding" forever — a blank chart, which is the one outcome this
+      // module promises never to produce.
+      build.throwWith = new Error("Spec build gave out");
+      withChakra(chart());
+
+      await screen.findByTestId("governed-chart-failure");
+      expect(failureCode()).toBe("render-failure");
+      expect(
+        screen.getByTestId("governed-chart-failure").textContent,
+      ).toContain("Spec build gave out");
+      // The failure has to come instead of the embed, not alongside it.
+      expect(vega.state.calls).toHaveLength(0);
     });
 
     /** @scenario "Chart failures are distinct intentional states, never a blank chart" */

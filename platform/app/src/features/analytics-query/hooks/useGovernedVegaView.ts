@@ -217,11 +217,25 @@ function embedGovernedVegaView({
   let abandoned = false;
   setState(EMBEDDING);
 
-  const build = buildGovernedVegaSpec({
-    spec,
-    datasets: datasetsRef.current,
-    pinnedConfig,
-  });
+  // Guarded for the same reason `pushDatasetsIntoView` guards its own build: a
+  // throw here is synchronous, so it escapes before `embed`'s rejection
+  // handler exists and leaves the view stuck in `EMBEDDING` — a blank chart
+  // with no failure on screen, which is exactly the state this module says it
+  // never produces. The spec is caller-authored, so the input is not ours to
+  // trust even though no current path throws.
+  let build: GovernedVegaSpecBuild;
+  try {
+    build = buildGovernedVegaSpec({
+      spec,
+      datasets: datasetsRef.current,
+      pinnedConfig,
+    });
+  } catch (error) {
+    setState({ status: "failed", failure: governedRenderFailure(error) });
+    return () => {
+      abandoned = true;
+    };
+  }
   buildRef.current = build;
   const embedded = datasetsRef.current;
 
