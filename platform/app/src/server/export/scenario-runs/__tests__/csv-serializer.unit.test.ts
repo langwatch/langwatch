@@ -360,6 +360,44 @@ describe("scenario run CSV serializers", () => {
 
       expect(parse(csv)[0]!.run_target_type).toBe("");
     });
+
+    it("carries the parameter values the run resolved as one JSON object", () => {
+      const csv = serializeRunsToFullCsv({
+        runs: [
+          buildRun({
+            metadata: {
+              parameters: {
+                account_tier: "platinum",
+                seats: 12,
+                trial: false,
+              },
+            },
+          }),
+        ],
+        includeHeader: true,
+      });
+
+      expect(JSON.parse(parse(csv)[0]!.run_parameters!)).toEqual({
+        account_tier: "platinum",
+        seats: 12,
+        trial: false,
+      });
+    });
+
+    it("leaves the parameters column empty for a run that resolved none", () => {
+      for (const metadata of [
+        null,
+        { langwatch: { targetType: "http" } },
+        { parameters: {} },
+      ]) {
+        const csv = serializeRunsToFullCsv({
+          runs: [buildRun({ metadata } as Partial<ExportableRun>)],
+          includeHeader: true,
+        });
+
+        expect(parse(csv)[0]!.run_parameters).toBe("");
+      }
+    });
   });
 
   describe("when a cell begins with a spreadsheet formula character", () => {

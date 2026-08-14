@@ -58,6 +58,21 @@ const TIE_WINNER = "tie";
 const UNRESOLVED_WINNER = "unresolved";
 
 /**
+ * Written when a comparison produced no winner: the two judge passes named
+ * different winners, the judge answered without naming one, or the row had too
+ * few candidate outputs to compare at all.
+ *
+ * One token for all of them because the stored row cannot tell them apart: the
+ * SDKs report `inconclusive` and `skipped` as distinct verdicts but record both
+ * under the same batch status, so naming either one here would be a guess. The
+ * reasoning cell beside it says which happened, in the judge's own words.
+ *
+ * These used to export as three empty cells, which read exactly like a row with
+ * no comparison result at all, and dropped the explanation with them.
+ */
+const NO_VERDICT_WINNER = "no_verdict";
+
+/**
  * Name of one comparison candidate, resolved the way the results page resolves
  * it: the variant's display name, falling back to the raw identifier for a
  * candidate the run has dropped since it was judged.
@@ -77,6 +92,7 @@ const formatComparisonWinner = (
   verdict: BatchComparisonVerdict,
 ): string => {
   if (verdict.winnerId === null) {
+    if (verdict.isUnsettled) return NO_VERDICT_WINNER;
     return verdict.isUnresolved ? UNRESOLVED_WINNER : TIE_WINNER;
   }
   return comparisonVariantName(column, verdict.winnerId);
@@ -289,9 +305,10 @@ const buildCsvRow = (
   for (const comparison of data.comparisonColumns ?? []) {
     const verdict = comparison.verdictsByRow[row.index];
 
-    // No verdict at all: the judge either never ran on this row or declined to
-    // call it. Leaving the block empty says that, where any winner value would
-    // claim a comparison happened.
+    // The judge never ran on this row. Leaving the block empty says that,
+    // where any winner value would claim a comparison happened. A row it DID
+    // run and could not settle is a different thing and exports as
+    // `no_verdict`, carrying the judge's account of it.
     if (!verdict) {
       values.push("", "", "");
       continue;

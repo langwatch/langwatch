@@ -20427,6 +20427,11 @@ export interface operations {
                         situation: string;
                         criteria: string[];
                         labels: string[];
+                        parameters: {
+                            name: string;
+                            description?: string;
+                            defaultValue?: string | number | boolean;
+                        }[];
                         /** Format: uri */
                         platformUrl: string;
                     }[];
@@ -20498,6 +20503,12 @@ export interface operations {
                     criteria?: string[];
                     /** @default [] */
                     labels?: string[];
+                    /** @description The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME. */
+                    parameters?: {
+                        name: string;
+                        description?: string;
+                        defaultValue?: string | number | boolean;
+                    }[];
                 };
             };
         };
@@ -20514,6 +20525,11 @@ export interface operations {
                         situation: string;
                         criteria: string[];
                         labels: string[];
+                        parameters: {
+                            name: string;
+                            description?: string;
+                            defaultValue?: string | number | boolean;
+                        }[];
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -20592,6 +20608,11 @@ export interface operations {
                         situation: string;
                         criteria: string[];
                         labels: string[];
+                        parameters: {
+                            name: string;
+                            description?: string;
+                            defaultValue?: string | number | boolean;
+                        }[];
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -20675,6 +20696,12 @@ export interface operations {
                     situation?: string;
                     criteria?: string[];
                     labels?: string[];
+                    /** @description The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME. */
+                    parameters?: {
+                        name: string;
+                        description?: string;
+                        defaultValue?: string | number | boolean;
+                    }[];
                 };
             };
         };
@@ -20691,6 +20718,11 @@ export interface operations {
                         situation: string;
                         criteria: string[];
                         labels: string[];
+                        parameters: {
+                            name: string;
+                            description?: string;
+                            defaultValue?: string | number | boolean;
+                        }[];
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -22524,6 +22556,10 @@ export interface operations {
             content: {
                 "application/json": {
                     idempotencyKey?: string;
+                    /** @description Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name. */
+                    parameters?: {
+                        [key: string]: string | number | boolean;
+                    };
                 };
             };
         };

@@ -2097,7 +2097,7 @@ model Agent {
   projectId         String
   project           Project   @relation(fields: [projectId], references: [id])
   name              String
-  type              String // "signature" | "code" | "workflow"
+  type              String // "signature" | "code" | "workflow" | "http"
   config            Json // Node configuration (model, prompt, code, etc.)
   workflowId        String? // For "workflow" type - top level for joins
   workflow          Workflow? @relation(fields: [workflowId], references: [id])
@@ -2146,6 +2146,14 @@ model Scenario {
   situation       String
   criteria        String[]
   labels          String[]
+  // Named parameters the scenario declares, as an array of
+  // { name, description?, defaultValue? }. Values are supplied or overridden
+  // when a run starts, delivered to the target under test, and readable from
+  // the scenario's own situation and criteria as `params.NAME`. Null and an
+  // empty array both mean "this scenario declares none", which is the path
+  // that renders its text untouched. See
+  // specs/scenarios/scenario-run-parameters.feature.
+  parameters      Json?
   // Optional per-scenario model overrides for the run. When null the run
   // resolves the project's scenarios.user_simulator / scenarios.judge
   // DEFAULT-role models. See specs/scenarios/scenario-model-selection.feature.
