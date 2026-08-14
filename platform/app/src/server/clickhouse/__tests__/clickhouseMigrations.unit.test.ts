@@ -51,7 +51,11 @@ describe("ClickHouse migrations", () => {
 
     expect(executed).toContain("MODIFY QUERY");
     expect(executed).not.toMatch(
-      /DROP\s+VIEW[\s\S]*gateway_budget_scope_totals_mv/i,
+      // DROP TABLE drops a materialised view too and leaves the same gap;
+      // matching only DROP VIEW waved a reopened hole through (verified: the
+      // VIEW-only pattern passed a file carrying a stray DROP TABLE of this mv).
+      // Scoped to one statement so an unrelated later DROP cannot trip it.
+      /DROP\s+(?:VIEW|TABLE)[^;]*gateway_budget_scope_totals_mv/i,
     );
     // The filter this migration exists to add must survive the rewrite.
     expect(executed).toContain("Scope != 'pulled'");
