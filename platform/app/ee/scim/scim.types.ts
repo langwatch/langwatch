@@ -4,6 +4,12 @@ import { z } from "zod";
 export interface ScimUser {
   schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"];
   id: string;
+  /**
+   * The directory's own id for this person, echoed back so the IdP can
+   * confirm the anchor it believes it wrote. Absent for members no directory
+   * manages. ADR-094 Decision 7.
+   */
+  externalId?: string;
   userName: string;
   name: {
     givenName: string;
@@ -84,6 +90,13 @@ const scimEnterpriseUserSchema = z
 export const scimCreateUserRequestSchema = z
   .object({
     schemas: z.array(z.string()),
+    /**
+     * Declared rather than left to `.passthrough()`, because the value is the
+     * directory anchor now (ADR-094 Decision 7) and Entra matches users on it
+     * — a dropped externalId makes a retrieve return nothing, and Entra's next
+     * move on an empty result is to provision a duplicate person.
+     */
+    externalId: z.string().optional(),
     userName: z.string().email(),
     name: z
       .object({
@@ -131,6 +144,13 @@ export const scimGroupMemberSchema = z.object({
 
 export const scimCreateGroupRequestSchema = z.object({
   schemas: z.array(z.string()),
+  /**
+   * Declared for the same reason the user schema declares it. This object is
+   * NOT `.passthrough()`, so the group service's cast was reading a field zod
+   * had already stripped — every SCIM group has been created with a null
+   * anchor.
+   */
+  externalId: z.string().optional(),
   displayName: z.string(),
   members: z.array(scimGroupMemberSchema).optional(),
 });

@@ -160,7 +160,7 @@ export class ScimGroupService {
         name: request.displayName,
         slug,
         scimSource: "scim",
-        externalId: (request as { externalId?: string }).externalId ?? null,
+        externalId: request.externalId ?? null,
       },
     });
 
