@@ -38,11 +38,27 @@ const CELL_MAX_HEIGHT = 140;
 
 type WinnerVisual = {
   label: string;
-  /** Green for any winner: a win is a win, and the name says which. */
-  colorPalette: "green" | "gray";
+  /**
+   * One colour per outcome, because these are exactly the states a reader
+   * scanning the column has to tell apart at a glance:
+   *
+   * - `green`  a winner. A win is a win, and the name says which.
+   * - `gray`   a tie. Settled, and neutral by definition.
+   * - `orange` no verdict. Not settled at all, so it cannot share the tie's
+   *   colour. These two already share a null winner id, and painting them
+   *   alike puts the distinction back out of reach of anyone reading the
+   *   page rather than querying it. Orange and not red: the row is
+   *   unresolved, not broken.
+   */
+  colorPalette: "green" | "gray" | "orange";
 };
 
-const resolveWinner = (
+/**
+ * Exported for its own test: Chakra compiles `colorPalette` into an emotion
+ * class with no attribute to read back, so the colour a verdict resolves to is
+ * only assertable here, before it reaches the Badge.
+ */
+export const resolveWinner = (
   column: BatchComparisonColumn,
   verdict: BatchComparisonVerdict,
 ): WinnerVisual => {
@@ -50,7 +66,7 @@ const resolveWinner = (
   // calling it a tie would report a result the judge explicitly refused to
   // reach.
   if (verdict.isUnsettled) {
-    return { label: "No verdict", colorPalette: "gray" };
+    return { label: "No verdict", colorPalette: "orange" };
   }
   if (verdict.winnerId === null) {
     return { label: "Tie", colorPalette: "gray" };

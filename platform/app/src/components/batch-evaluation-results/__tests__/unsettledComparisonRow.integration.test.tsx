@@ -24,7 +24,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ExperimentRunWithItems } from "~/server/experiments-v3/services/types";
 
 import { buildPairwiseComparisons } from "../buildPairwiseComparisons";
-import { ComparisonWinnerCell } from "../ComparisonWinnerCell";
+import { ComparisonWinnerCell, resolveWinner } from "../ComparisonWinnerCell";
 import { buildCsvData, buildCsvHeaders } from "../csvExport";
 import type { BatchComparisonColumn, BatchEvaluationData } from "../types";
 import { transformBatchEvaluationData } from "../types";
@@ -199,6 +199,29 @@ describe("given a comparison row the judge ran and could not settle", () => {
       expect(
         screen.getByTestId("comparison-winner-badge-no-verdict"),
       ).toBeDefined();
+    });
+
+    /** @scenario "A row the judge could not settle says so, and why" */
+    it("does not wear the tie's colour either", () => {
+      const unsettled = resolveWinner(column, unsettledVerdict);
+      const tie = resolveWinner(column, {
+        ...unsettledVerdict,
+        isUnsettled: undefined,
+      });
+      const decided = resolveWinner(column, {
+        ...unsettledVerdict,
+        isUnsettled: undefined,
+        winnerId: "target-a",
+      });
+
+      // Telling the two apart in the data model is only half the job.
+      // Dogfooding this change showed both rendering the same near-white gray,
+      // which puts the reader back where they started: one of the two states
+      // this PR exists to separate, separated everywhere except on the page.
+      expect(unsettled.colorPalette).toBe("orange");
+      expect(tie.colorPalette).toBe("gray");
+      expect(decided.colorPalette).toBe("green");
+      expect(unsettled.colorPalette).not.toBe(tie.colorPalette);
     });
 
     /** @scenario "A row the judge could not settle says so, and why" */
