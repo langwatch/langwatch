@@ -25,24 +25,24 @@ Feature: Continuous profiling — where the CPU actually went
 
     @unit
     Scenario: A process with no profiling endpoint does not profile
-      Given a process started with no profiling server address
+      Given a deployment that has not been told where to send profiles
       When the process boots
-      Then no profiler is started
-      And the profiler's dependencies are never loaded
+      Then it gathers no profiles and sends nothing
+      And it pays no startup or memory cost for the profiler
 
     @unit
     Scenario: A process with a profiling endpoint profiles itself
-      Given a process started with a profiling server address
-      When the process boots
-      Then it samples its own CPU and heap on a timer
-      And it pushes those samples to that address
+      Given a deployment that has been told where to send profiles
+      When the process has been running for a while
+      Then profiles of its own CPU and memory arrive at that destination
+      And they keep arriving for as long as it runs
 
     @unit
     Scenario: A profiler that cannot start does not stop the process
-      Given a process started with a profiling server address
-      When the profiler fails to initialise
-      Then the failure is logged as a warning
-      And the process continues to serve traffic
+      Given a deployment that has been told where to send profiles
+      When profiling cannot start on this machine
+      Then the process keeps serving traffic without profiles
+      And an operator can tell from the logs why they are missing
 
   Rule: A profile is findable by the same identity as a trace
 

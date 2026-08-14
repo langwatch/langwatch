@@ -1,4 +1,10 @@
-// Continuous CPU and heap profiling for the Node process, pushed to Pyroscope.
+// Continuous profiling for the Node process, pushed to Pyroscope.
+//
+// Two profilers run, both started by Pyroscope.start(): the wall-time profiler
+// (carrying CPU time too — see the init call below) and the heap profiler. Heap
+// samples flush on a slower cadence than wall ones, so a short-lived process may
+// push wall profiles and never get as far as a heap one; that is the SDK's
+// cadence, not a missing configuration.
 //
 // Dependency-free at module scope by design — this is imported from
 // instrumentation.node.ts, which runs before the app graph exists. The profiler
@@ -45,11 +51,30 @@ export const tagsFromResourceAttributes = (
   return tags;
 };
 
+// Type-only, so it is erased at compile time and the module never reaches the
+// boot graph — which is the whole point of the lazy require below. Top-level
+// rather than an inline `typeof import(...)` per the repo's ban on inline
+// import() (CLAUDE.md).
+import type * as PyroscopeNodejs from "@pyroscope/nodejs";
+
+type PyroscopeModule = typeof PyroscopeNodejs;
+
 export interface ProfilingOptions {
   serverAddress: string | undefined;
   appName: string;
   environment: string | undefined;
   resourceAttributes: string | undefined;
+  /**
+   * How the profiler module is loaded. Injected only by tests.
+   *
+   * The failure path below — "the native binding is unavailable on this
+   * platform" — is the one branch that cannot be reached by passing different
+   * options, and mocking a module that a *already-imported* module `require`s
+   * depends on the test runner's interception timing. A test that quietly stops
+   * exercising the branch it names still passes, which is the worst kind of
+   * green. A seam makes it deterministic.
+   */
+  loadProfiler?: () => PyroscopeModule;
 }
 
 export interface StartedProfiler {
@@ -68,6 +93,11 @@ export const startProfiling = ({
   appName,
   environment,
   resourceAttributes,
+  // Loaded via require rather than a static import for the same reason as the
+  // OTel SDK in instrumentation.node.ts: this compiles to CJS, and the point of
+  // the gate is that @pyroscope/nodejs and its native @datadog/pprof binding
+  // never enter the boot graph of a process that is not profiling.
+  loadProfiler = () => require("@pyroscope/nodejs") as PyroscopeModule,
 }: ProfilingOptions): StartedProfiler | undefined => {
   const address = serverAddress?.trim();
   if (!address) return undefined;
@@ -76,12 +106,7 @@ export const startProfiling = ({
   if (environment) tags.environment = environment;
 
   try {
-    // Loaded via require rather than a static import for the same reason as the
-    // OTel SDK above it: this compiles to CJS, and the point of the gate is that
-    // @pyroscope/nodejs and its native @datadog/pprof binding never enter the
-    // boot graph of a process that is not profiling.
-    const Pyroscope =
-      require("@pyroscope/nodejs") as typeof import("@pyroscope/nodejs");
+    const Pyroscope = loadProfiler();
 
     Pyroscope.init({
       serverAddress: address,

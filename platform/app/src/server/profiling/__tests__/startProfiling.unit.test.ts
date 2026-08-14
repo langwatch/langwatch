@@ -44,25 +44,34 @@ describe("given a process deciding whether to profile itself", () => {
     // A process that cannot profile itself has one fewer debugging signal. A
     // process that refuses to boot because it could not profile itself is an
     // outage, so the failure is a warning and the server serves traffic.
+    // The load is injected rather than module-mocked. Mocking a module that an
+    // already-imported module `require`s depends on the runner's interception
+    // timing, and if it ever stopped intercepting, the real profiler would load,
+    // start cleanly, and this test would go green while exercising nothing.
     // @scenario "A profiler that cannot start does not stop the process"
     it("warns and returns without throwing", () => {
       const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-      vi.doMock("@pyroscope/nodejs", () => {
+      const loadProfiler = vi.fn(() => {
         throw new Error("native binding unavailable for this platform");
       });
 
-      expect(() =>
-        startProfiling({
-          // A port nothing listens on is still a valid address: the failure
-          // being simulated is the module load, not the upload.
-          serverAddress: "http://127.0.0.1:1",
+      let profiler: ReturnType<typeof startProfiling>;
+      expect(() => {
+        profiler = startProfiling({
+          serverAddress: "http://127.0.0.1:4040",
           appName: "langwatch-app",
           environment: "development",
           resourceAttributes: undefined,
-        }),
-      ).not.toThrow();
+          loadProfiler,
+        });
+      }).not.toThrow();
 
+      // The branch was actually taken, rather than the address gate short-
+      // circuiting before the load was ever attempted.
+      expect(loadProfiler).toHaveBeenCalled();
       expect(warn).toHaveBeenCalled();
+      // Nothing to stop, and the caller must not be handed a broken handle.
+      expect(profiler!).toBeUndefined();
     });
   });
 });
