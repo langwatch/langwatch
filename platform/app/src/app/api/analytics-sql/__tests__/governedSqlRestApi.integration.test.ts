@@ -839,7 +839,7 @@ describe("given the governed analytics SQL REST endpoints", () => {
       const body = (await response.json()) as Record<string, any>;
 
       expect(response.status).toBe(400);
-      expect(body.error).toBe("governed_sql_reserved_parameter_supplied");
+      expect(body.error.code).toBe("governed_sql_reserved_parameter_supplied");
     });
 
     /** @scenario "A statement with no period parameters runs, and says so" */
