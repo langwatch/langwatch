@@ -259,20 +259,28 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 		return
 	}
 
+	// The span's token counts are the provider's own totals, audio included.
+	// domain.Usage carries audio tokens out of the prompt and completion
+	// totals so the billing wire can price them at their own rate; the span
+	// has no audio-token attribute to price them from, so folding them back
+	// in keeps a trace costing what it always did.
+	promptTokens := params.Usage.PromptTokens + params.Usage.InputAudioTokens
+	completionTokens := params.Usage.CompletionTokens + params.Usage.OutputAudioTokens
+
 	// PromptTokens includes any cached tokens; the span reports the fresh,
 	// non-cached input separately from the cache-read/cache-write counts so the
 	// cost calc prices each bucket once. Fall back to the full prompt if a
 	// provider ever reports cache counts that aren't folded into PromptTokens.
-	freshInput := params.Usage.PromptTokens - params.Usage.CacheReadTokens - params.Usage.CacheCreationTokens
+	freshInput := promptTokens - params.Usage.CacheReadTokens - params.Usage.CacheCreationTokens
 	if freshInput < 0 {
-		freshInput = params.Usage.PromptTokens
+		freshInput = promptTokens
 	}
 
 	attrs := []attribute.KeyValue{
 		semconv.GenAIProviderNameKey.String(string(params.ProviderID)),
 		semconv.GenAIRequestModelKey.String(canonicalModelID(params.ProviderID, params.Model)),
 		semconv.GenAIUsageInputTokensKey.Int(freshInput),
-		semconv.GenAIUsageOutputTokensKey.Int(params.Usage.CompletionTokens),
+		semconv.GenAIUsageOutputTokensKey.Int(completionTokens),
 		attrTotalUsage.Int(params.Usage.TotalTokens),
 		attrCost.Int64(params.Usage.CostMicroUSD),
 	}

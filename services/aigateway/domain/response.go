@@ -48,6 +48,67 @@ type Usage struct {
 	// not applicable.
 	InputChars   int     // TTS: characters synthesized
 	AudioSeconds float64 // STT: seconds of audio transcribed
+
+	// Audio token counts, for the realtime and audio-native models that
+	// bill audio far above text: OpenAI charges $32 per million audio input
+	// tokens against $4 for text input on gpt-realtime, so a flat prompt
+	// total prices an audio turn at an eighth of what it costs. Both counts
+	// are DISJOINT from PromptTokens and CompletionTokens, which
+	// SplitAudioTokens is what keeps true, so every consumer prices each
+	// bucket exactly once.
+	InputAudioTokens  int
+	OutputAudioTokens int
+
+	// ReasoningTokens is the portion of CompletionTokens the model spent
+	// thinking. The provider already bills those tokens inside the
+	// completion total, so this count is reported and never priced.
+	ReasoningTokens int
+}
+
+// AudioTokenSplit is one provider's audio/text token breakdown, as reported
+// on the response. Text counts are zero when the provider states only the
+// audio side.
+type AudioTokenSplit struct {
+	InputAudio  int
+	InputText   int
+	OutputAudio int
+	OutputText  int
+}
+
+// SplitAudioTokens records the audio token counts and takes them out of the
+// prompt and completion totals.
+//
+// Providers report audio tokens INSIDE those totals. Pricing the totals at
+// the text rate and the audio counts at the audio rate on top charges the
+// audio portion twice, at rates that differ by 8x, so the counts have to be
+// made disjoint before anything prices them. The provider's own text count
+// wins when it reports one; otherwise the audio count comes off the total.
+//
+// A pair that does not add up leaves the totals alone. A negative remainder
+// means the provider's own numbers disagree, and an unsplit total charges
+// the audio at the text rate, which is the behaviour every caller had
+// before this split existed.
+func (u Usage) SplitAudioTokens(split AudioTokenSplit) Usage {
+	u.InputAudioTokens, u.PromptTokens = resolveAudioSplit(
+		split.InputAudio, split.InputText, u.PromptTokens)
+	u.OutputAudioTokens, u.CompletionTokens = resolveAudioSplit(
+		split.OutputAudio, split.OutputText, u.CompletionTokens)
+	return u
+}
+
+// resolveAudioSplit answers one side of the split: the audio count to keep
+// and the text total that is left once the audio is out of it.
+func resolveAudioSplit(audio, text, total int) (int, int) {
+	if audio <= 0 {
+		return 0, total
+	}
+	if text > 0 {
+		return audio, text
+	}
+	if remainder := total - audio; remainder >= 0 {
+		return audio, remainder
+	}
+	return 0, total
 }
 
 // ReconcileCacheWrites raises CacheCreationTokens to at least

@@ -189,12 +189,18 @@ func extractSpeechUsage(resp *bfschemas.BifrostSpeechResponse) domain.Usage {
 	if resp == nil || resp.Usage == nil {
 		return domain.Usage{}
 	}
-	return domain.Usage{
+	u := domain.Usage{
 		PromptTokens:     resp.Usage.InputTokens,
 		CompletionTokens: resp.Usage.OutputTokens,
 		TotalTokens:      resp.Usage.TotalTokens,
 		InputChars:       resp.Usage.InputChars,
 	}
+	var split domain.AudioTokenSplit
+	if d := resp.Usage.InputTokenDetails; d != nil {
+		split.InputAudio = d.AudioTokens
+		split.InputText = d.TextTokens
+	}
+	return u.SplitAudioTokens(split)
 }
 
 // extractTranscriptionUsage maps Bifrost transcription usage onto the domain

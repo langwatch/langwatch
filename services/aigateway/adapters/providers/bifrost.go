@@ -1655,11 +1655,19 @@ func extractUsage(resp *bfschemas.BifrostChatResponse) domain.Usage {
 		CompletionTokens: resp.Usage.CompletionTokens,
 		TotalTokens:      resp.Usage.TotalTokens,
 	}
+	var split domain.AudioTokenSplit
 	if d := resp.Usage.PromptTokensDetails; d != nil {
 		u.CacheReadTokens = d.CachedReadTokens
 		u.CacheCreationTokens = d.CachedWriteTokens
+		split.InputAudio = d.AudioTokens
+		split.InputText = d.TextTokens
 	}
-	return u
+	if d := resp.Usage.CompletionTokensDetails; d != nil {
+		u.ReasoningTokens = d.ReasoningTokens
+		split.OutputAudio = d.AudioTokens
+		split.OutputText = d.TextTokens
+	}
+	return u.SplitAudioTokens(split)
 }
 
 // extractResponsesUsage maps the Responses-API usage block onto the
@@ -1675,11 +1683,19 @@ func extractResponsesUsage(resp *bfschemas.BifrostResponsesResponse) domain.Usag
 		CompletionTokens: resp.Usage.OutputTokens,
 		TotalTokens:      resp.Usage.TotalTokens,
 	}
+	var split domain.AudioTokenSplit
 	if d := resp.Usage.InputTokensDetails; d != nil {
 		u.CacheReadTokens = d.CachedReadTokens
 		u.CacheCreationTokens = d.CachedWriteTokens
+		split.InputAudio = d.AudioTokens
+		split.InputText = d.TextTokens
 	}
-	return u
+	if d := resp.Usage.OutputTokensDetails; d != nil {
+		u.ReasoningTokens = d.ReasoningTokens
+		split.OutputAudio = d.AudioTokens
+		split.OutputText = d.TextTokens
+	}
+	return u.SplitAudioTokens(split)
 }
 
 // extractEmbeddingUsage maps Bifrost's embedding usage block. Embedding
@@ -1811,6 +1827,19 @@ func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
 				}
 				if u.CacheCreation1hTokens > 0 {
 					it.usage.CacheCreation1hTokens = u.CacheCreation1hTokens
+				}
+				// Audio tokens merge on the same rule. A chunk that
+				// reports none must not clear a count an earlier chunk
+				// already carried, or a streamed audio turn prices at the
+				// text rate.
+				if u.InputAudioTokens > 0 {
+					it.usage.InputAudioTokens = u.InputAudioTokens
+				}
+				if u.OutputAudioTokens > 0 {
+					it.usage.OutputAudioTokens = u.OutputAudioTokens
+				}
+				if u.ReasoningTokens > 0 {
+					it.usage.ReasoningTokens = u.ReasoningTokens
 				}
 				// Prefer the parser's reported total when non-zero —
 				// Gemini's `totalTokenCount` can exceed prompt+completion
