@@ -364,7 +364,12 @@ export class GatewaySpendEventsRepository {
       TokensOutput: state.usage?.output_tokens ?? 0,
       TokensCacheRead: state.usage?.cache_read_input_tokens ?? 0,
       TokensCacheWrite: state.usage?.cache_creation_input_tokens ?? 0,
+      TokensCacheWrite1h: state.usage?.cache_creation_1h_tokens ?? 0,
       TokensReasoning: state.usage?.reasoning_tokens ?? 0,
+      TokensInputAudio: state.usage?.input_audio_tokens ?? 0,
+      TokensOutputAudio: state.usage?.output_audio_tokens ?? 0,
+      CharsInput: state.usage?.input_chars ?? 0,
+      AudioMS: state.usage?.audio_ms ?? 0,
       CostNanoUSD: state.costNanoUsd,
       RateVersion: state.rateVersion,
       Labels: state.labels,
@@ -409,9 +414,17 @@ export class GatewaySpendEventsRepository {
     gatewayRequestId: string;
   }): Promise<GatewaySpendState | null> {
     const client = await this.resolveClient(tenantId);
+    // The quantity columns beyond the five token classes are read HERE and
+    // not through SPEND_ROW_COLUMNS: the shared list shapes the REST and UI
+    // surfaces, and widening it would change those response bodies. The fold
+    // needs them because a late admission folding over a confirmed request
+    // rewrites the row from this state, so a quantity that does not decode
+    // is a quantity zeroed on the next write.
     const result = await client.query({
       query: `
         SELECT ${SPEND_ROW_COLUMNS}, SettleReason, PodId, PodSeq,
+               TokensCacheWrite1h, TokensInputAudio, TokensOutputAudio,
+               CharsInput, AudioMS,
                Version, CreatedAt, LastEventOccurredAt, EventTimestamp
         FROM ${TABLE} FINAL
         WHERE TenantId = {tenantId:String}
@@ -428,11 +441,20 @@ export class GatewaySpendEventsRepository {
       return null;
     }
     const row = mapSpendEventRow(r);
+    const quantity = (column: string): number => Number(r[column] ?? 0);
+    // Any measured quantity means the row carries usage, not only the token
+    // classes: a character-priced call has zero tokens and 4000 characters,
+    // and reading it back as "no usage" would drop them on the next fold.
     const hasUsage =
       row.status === "confirmed" ||
       row.status === "failed" ||
       row.tokensInput > 0 ||
-      row.tokensOutput > 0;
+      row.tokensOutput > 0 ||
+      quantity("CharsInput") > 0 ||
+      quantity("AudioMS") > 0 ||
+      quantity("TokensInputAudio") > 0 ||
+      quantity("TokensOutputAudio") > 0 ||
+      quantity("TokensCacheWrite1h") > 0;
     return {
       status: row.status,
       organizationId: row.organizationId,
@@ -453,7 +475,12 @@ export class GatewaySpendEventsRepository {
             output_tokens: row.tokensOutput,
             cache_read_input_tokens: row.tokensCacheRead,
             cache_creation_input_tokens: row.tokensCacheWrite,
+            cache_creation_1h_tokens: quantity("TokensCacheWrite1h"),
             reasoning_tokens: row.tokensReasoning,
+            input_audio_tokens: quantity("TokensInputAudio"),
+            output_audio_tokens: quantity("TokensOutputAudio"),
+            input_chars: quantity("CharsInput"),
+            audio_ms: quantity("AudioMS"),
           }
         : null,
       rateVersion: row.rateVersion,

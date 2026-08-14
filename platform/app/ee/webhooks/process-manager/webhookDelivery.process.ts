@@ -11,8 +11,8 @@ import type {
   ConfirmSpendCommandData,
   FailSpendCommandData,
   SettleSpendCommandData,
-  SpendUsage,
 } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/commands";
+import { EMPTY_SPEND_USAGE } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/commands";
 import {
   GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
@@ -157,12 +157,21 @@ export function isEndpointStreamKey(processKey: string): boolean {
   return processKey.startsWith("endpoint:");
 }
 
+/** Every quantity added after the first deploy carries a default: this rides
+ *  a durable outbox row, so a payload the previous build wrote is read back
+ *  by this one, and a field without a default turns that row into a
+ *  permanent parse failure instead of a delivery. */
 const spendUsagePayloadSchema = z.object({
   input_tokens: z.number().int().min(0),
   output_tokens: z.number().int().min(0),
   cache_read_input_tokens: z.number().int().min(0),
   cache_creation_input_tokens: z.number().int().min(0),
+  cache_creation_1h_tokens: z.number().int().min(0).default(0),
   reasoning_tokens: z.number().int().min(0),
+  input_audio_tokens: z.number().int().min(0).default(0),
+  output_audio_tokens: z.number().int().min(0).default(0),
+  input_chars: z.number().int().min(0).default(0),
+  audio_ms: z.number().int().min(0).default(0),
 });
 
 /** Everything the deliver executor needs to rate, build the envelope, and
@@ -240,14 +249,6 @@ export interface WebhookDeliveryProcessDeps {
   now?: () => number;
 }
 
-const EMPTY_USAGE: SpendUsage = {
-  input_tokens: 0,
-  output_tokens: 0,
-  cache_read_input_tokens: 0,
-  cache_creation_input_tokens: 0,
-  reasoning_tokens: 0,
-};
-
 /** The columns admission's attribution owns. A row whose process instance
  *  never saw an `admitted` event still needs every one of them, so each
  *  falls back to the empty value the spend log stores. */
@@ -288,7 +289,7 @@ function resolvedModel(payload: DeliverPayload, fallback: string): string {
  *  event carried, never a fresh rating and never a read of the fold's
  *  table: the log's consumers stay independent AND state the same cost. */
 export function deliverPayloadToRow(payload: DeliverPayload): SpendEventRow {
-  const usage = payload.usage ?? EMPTY_USAGE;
+  const usage = payload.usage ?? EMPTY_SPEND_USAGE;
   return {
     ...attributedColumns(payload.attribution),
     tenantId: payload.project_id,
