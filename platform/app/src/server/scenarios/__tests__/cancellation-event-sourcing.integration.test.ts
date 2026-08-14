@@ -176,10 +176,14 @@ describe("Event-sourcing cancellation (real Redis)", () => {
         },
         // Mirrors the registry wiring: the PM publishes through the shared
         // Redis connection.
+        // Exactly the two fields the real handler passes. batchRunId is
+        // optional and the cancel intent does not carry it, so sending it
+        // here — as null, a value the type does not even allow — would make
+        // this mock prove something production never does.
         publishCancellation: async ({ projectId, scenarioRunId }) => {
           await publishCancellation({
             publisher: redis,
-            message: { projectId, scenarioRunId, batchRunId: null },
+            message: { projectId, scenarioRunId },
           });
         },
       });
