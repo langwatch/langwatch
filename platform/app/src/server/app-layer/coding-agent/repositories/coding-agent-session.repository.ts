@@ -31,6 +31,12 @@ export interface CodingAgentBranchSessionRow {
   /** The AGENT's reported identity, not the LangWatch account. */
   userId: string;
   gitBranch: string;
+  /**
+   * Every branch the session drove, first seen first. Empty for a row folded
+   * before the column existed, where `gitBranch` is the whole of what is known;
+   * read both through `branchesOf` rather than either one alone.
+   */
+  gitBranches: string[];
   /** The generated conversation title, empty when the agent never made one. */
   title: string;
 }

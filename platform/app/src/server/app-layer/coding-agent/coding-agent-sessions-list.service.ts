@@ -5,7 +5,10 @@ import type {
   GithubPullRequestLookup,
   PullRequestBranchKey,
 } from "../traces/session-groups.pull-request-link";
-import { assignSessionsToPullRequests } from "./pull-request-assignment";
+import {
+  assignSessionsToPullRequests,
+  branchesOf,
+} from "./pull-request-assignment";
 
 /**
  * The Sessions screen's read: one row per coding-agent session, named by the
@@ -203,11 +206,6 @@ interface BranchDrive {
 /**
  * The branches each session drove, as join keys.
  *
- * `gitBranches` (migration 00077) is the whole history. A row folded before
- * that column existed carries only `gitBranch`, so it falls back to that one:
- * the session did drive it, and answering nothing would silently unlink every
- * session in the dormant population.
- *
  * Host and repository are case-folded here, the way the mapping stores them
  * and the way the sessions lens folds its own join key: a session records
  * whatever casing its git remote carries, hosts are case insensitive, and
@@ -233,14 +231,6 @@ function branchDrivesOf(rows: CodingAgentSessionRow[]): BranchDrive[] {
     }
   }
   return drives;
-}
-
-/** Every branch a session drove, oldest first, with the fallback applied. */
-export function branchesOf(
-  row: Pick<CodingAgentSessionRow, "gitBranch" | "gitBranches">,
-): string[] {
-  if (row.gitBranches.length > 0) return row.gitBranches;
-  return row.gitBranch ? [row.gitBranch] : [];
 }
 
 /** The distinct (host, repository, branch) keys the page's sessions ran on. */

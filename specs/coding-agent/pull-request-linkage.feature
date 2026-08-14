@@ -171,10 +171,35 @@ Rule: The Pull Requests page prices each pull request's lifetime
   # and leaves the earlier ones looking free.
 
   @integration
-  Scenario: A session that moved to another branch still counts toward the pull requests it drove
+  Scenario: A session that moved to another branch is still read for the branch it left
     Given a session that worked on one branch and then moved to another
     When the sessions of the first branch are read
     Then that session is among them
+
+  @unit
+  Scenario: A session that moved to another branch counts toward the pull request it drove first
+    Given a session that drove a pull request's branch and then moved to another
+    When that pull request's usage is read
+    Then the session's tokens and cost are counted toward it
+
+  @unit
+  Scenario: The personal page discovers pull requests from every branch a session drove
+    Given a session that drove two branches
+    When the personal pull requests are read
+    Then the pull requests of both branches are looked up
+
+  # A session records one set of token and cost totals for its whole life and
+  # the per-call facts carry no branch, so there is nothing to divide between
+  # two pull requests. Counting the whole session toward each one would make a
+  # repository's pull requests sum to more than was ever spent. The sessions
+  # screen is where all of a session's pull requests are shown.
+
+  @unit
+  Scenario: A session that drove two pull requests counts toward only one of them
+    Given a session that drove two branches, each with a live pull request
+    When the tenure rule is asked
+    Then the session counts toward the pull request it opened first
+    And it counts toward the other one not at all
 
   @unit
   Scenario: A viewer without a GitHub connection sees the connect invitation

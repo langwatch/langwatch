@@ -61,6 +61,9 @@ function sessionRow(
     models: ["claude-fable-5"],
     userId: "user-abc",
     gitBranch: "feat/linkage",
+    // The dormant shape by default: a row folded before migration 00077 knows
+    // only the branch it ended on, so the fallback is what most cases exercise.
+    gitBranches: [],
     title: "Fix the flaky fold test",
     ...over,
   };
@@ -81,6 +84,7 @@ function personalSessionRow(
     repositoryOwner: "acme",
     repositoryName: "widgets",
     gitBranch: "feat/linkage",
+    gitBranches: [],
     inputTokens: 100,
     outputTokens: 50,
     cacheReadTokens: 20,
@@ -411,6 +415,30 @@ describe("PullRequestUsageService", () => {
     });
   });
 
+  describe("given a session that drove this branch and then moved to another", () => {
+    /** @scenario "A session that moved to another branch counts toward the pull request it drove first" */
+    it("counts its tokens and cost toward the pull request it drove", async () => {
+      const { service } = serviceWith({
+        pullRequests: [pullRequestRow()],
+        sessions: [
+          sessionRow({
+            sessionId: "moved-on",
+            // The branch read matched on the set, so the row arrives naming a
+            // branch this pull request never had.
+            gitBranch: "feat/next",
+            gitBranches: ["feat/linkage", "feat/next"],
+          }),
+        ],
+      });
+
+      const usage = await service.getPullRequestUsage(QUERY);
+
+      expect(usage.totals.sessionsCount).toBe(1);
+      expect(usage.totals.totalTokens).toBe(180);
+      expect(usage.totals.costUsd).toBe(1.5);
+    });
+  });
+
   describe("given a caller who may view no project at all", () => {
     it("reads no sessions and answers with empty totals", async () => {
       const { service, listByRepositoryBranch } = serviceWith({
@@ -667,6 +695,40 @@ describe("PullRequestUsageService", () => {
       const usage = await service.getForPersonalProject(PERSONAL_QUERY);
 
       expect(usage.unlinked[0]?.modelBreakdown).toEqual([]);
+    });
+  });
+
+  describe("given a personal session that drove two branches", () => {
+    /** @scenario "The personal page discovers pull requests from every branch a session drove" */
+    it("looks up the pull requests of both, not only the one it ended on", async () => {
+      const { service, findAllByBranches } = personalServiceWith({
+        pullRequests: [pullRequestRow()],
+        personalSessions: [
+          personalSessionRow({
+            sessionId: "mine",
+            gitBranch: "feat/next",
+            gitBranches: ["feat/linkage", "feat/next"],
+          }),
+        ],
+        organizationSessions: [
+          sessionRow({
+            sessionId: "mine",
+            gitBranch: "feat/next",
+            gitBranches: ["feat/linkage", "feat/next"],
+          }),
+        ],
+      });
+
+      const usage = await service.getForPersonalProject(PERSONAL_QUERY);
+
+      expect(findAllByBranches).toHaveBeenCalledWith(
+        expect.objectContaining({
+          headBranches: ["feat/linkage", "feat/next"],
+        }),
+      );
+      // Discovered through the branch it left, and priced there too.
+      expect(usage.rows[0]?.prNumber).toBe(7);
+      expect(usage.rows[0]?.sessionsCount).toBe(1);
     });
   });
 

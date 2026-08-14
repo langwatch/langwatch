@@ -13,7 +13,6 @@ import type { CodingAgentSessionRow } from "~/server/event-sourcing/pipelines/co
 import { codingAgentSessionRow } from "../../github/__tests__/codingAgentSessionRowFixture";
 import type { GithubPullRequestLookup } from "../../traces/session-groups.pull-request-link";
 import {
-  branchesOf,
   CodingAgentSessionsListService,
   SESSIONS_LIST_LIMIT,
   SESSIONS_LIST_WINDOW_MS,
@@ -336,17 +335,6 @@ describe("CodingAgentSessionsListService", () => {
 
       expect(rows[0]?.pullRequests).toEqual([]);
       expect(findForBranches).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("given a session row written before the branch set column existed", () => {
-    /** @scenario "A session row from before the branch set column falls back to its one branch" */
-    it("answers with the branch the session ended on", () => {
-      expect(branchesOf({ gitBranch: "feat/one", gitBranches: [] })).toEqual([
-        "feat/one",
-      ]);
-      // A row that names no branch at all drove none, and says so.
-      expect(branchesOf({ gitBranch: "", gitBranches: [] })).toEqual([]);
     });
   });
 });

@@ -547,7 +547,7 @@ describe("coding_agent_sessions by repository branch", () => {
     );
   });
 
-  /** @scenario A session that moved to another branch still counts toward the pull requests it drove */
+  /** @scenario A session that moved to another branch is still read for the branch it left */
   it("lists a session under every branch it drove, not only its last", async () => {
     const listed = await sessions.listByRepositoryBranch({
       tenantIds: [tenantId],
@@ -566,6 +566,10 @@ describe("coding_agent_sessions by repository branch", () => {
     // the detail names it by.
     expect(found!.gitBranch).toBe("feat/second");
     expect(found!.title).toBe("Ship both branches");
+    // The whole set comes back too, which is what attribution runs the tenure
+    // rule over: matched on a branch it left, the row would otherwise reach the
+    // rollup knowing only a branch that pull request never had.
+    expect(found!.gitBranches).toEqual(["feat/first", "feat/second"]);
   });
 
   it("still matches the branch the session ended on", async () => {

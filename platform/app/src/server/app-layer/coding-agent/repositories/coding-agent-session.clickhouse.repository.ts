@@ -188,6 +188,7 @@ function toBranchSessionRow(
     models: asStringArray(record.Models),
     userId: String(record.UserId ?? ""),
     gitBranch: String(record.GitBranch ?? ""),
+    gitBranches: asStringArray(record.GitBranches),
     title: String(record.Title ?? ""),
   };
 }
@@ -712,7 +713,10 @@ export class CodingAgentSessionClickHouseRepository
    * A session matches on the branch it ENDED on or on any branch it drove
    * (`GitBranches`, migration 00077). Matching the scalar alone would charge a
    * session that landed one change and moved on entirely to its last pull
-   * request, leaving the one it opened first reading as free.
+   * request, leaving the one it opened first reading as free. The set is
+   * selected as well as matched on, because attribution runs the tenure rule
+   * over it again on the way out: a row fetched on a branch it no longer sits
+   * on is only useful if the caller can still see which branch that was.
    *
    * Only the columns the rollup adds up are selected, plus the session's title
    * and the scalar keys the shared tie-break ranks on. The two array-length
@@ -799,6 +803,7 @@ export class CodingAgentSessionClickHouseRepository
           Models,
           UserId,
           GitBranch,
+          GitBranches,
           Title,
           LastEventOccurredAt,
           ModelCalls,

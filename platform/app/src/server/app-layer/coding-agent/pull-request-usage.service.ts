@@ -43,7 +43,10 @@ import type {
   GithubPullRequestsRepository,
 } from "../github/repositories/github-pull-requests.repository";
 import { ingestSourceTypeOfAgent } from "./coding-agent-source-type";
-import { assignSessionsToPullRequests } from "./pull-request-assignment";
+import {
+  assignDrivingSessionsToPullRequests,
+  branchesOf,
+} from "./pull-request-assignment";
 import type {
   CodingAgentBranchSessionRow,
   CodingAgentSessionRepository,
@@ -321,6 +324,8 @@ export interface PersonalSessionLookup {
       repositoryOwner: string;
       repositoryName: string;
       gitBranch: string;
+      /** Every branch the session drove; empty for a row folded before it. */
+      gitBranches: string[];
       inputTokens: number;
       outputTokens: number;
       cacheReadTokens: number;
@@ -481,9 +486,11 @@ export class PullRequestUsageService {
         organizationId,
         repositoryHost: group.repositoryHost,
         repositoryFullName: group.repositoryFullName,
-        headBranches: [...new Set(group.sessions.map((s) => s.headBranch))],
+        headBranches: [
+          ...new Set(group.sessions.flatMap((s) => s.headBranches)),
+        ],
       });
-      const assignments = assignSessionsToPullRequests({
+      const assignments = assignDrivingSessionsToPullRequests({
         sessions: group.sessions,
         pullRequests: toAssignable(pullRequests),
       });
@@ -571,11 +578,11 @@ export class PullRequestUsageService {
       branches: [...new Set(discovered.map((row) => row.headBranch))],
       startedAtFromMs: toMs - USAGE_SESSION_WINDOW_MS,
     });
-    const assignments = assignSessionsToPullRequests({
+    const assignments = assignDrivingSessionsToPullRequests({
       sessions: sessions.map((session) => ({
         sessionId: session.sessionId,
         startedAtMs: session.startedAtMs,
-        headBranch: session.gitBranch,
+        headBranches: branchesOf(session),
       })),
       pullRequests: toAssignable(pullRequests),
     });
@@ -753,11 +760,11 @@ function attachedToPullRequest({
   pullRequests: GithubPullRequestRow[];
   prNumber: number;
 }): CodingAgentBranchSessionRow[] {
-  const assignments = assignSessionsToPullRequests({
+  const assignments = assignDrivingSessionsToPullRequests({
     sessions: sessions.map((session) => ({
       sessionId: session.sessionId,
       startedAtMs: session.startedAtMs,
-      headBranch: session.gitBranch,
+      headBranches: branchesOf(session),
     })),
     pullRequests: toAssignable(pullRequests),
   });
@@ -1099,7 +1106,14 @@ interface PersonalRepositoryGroup {
     startedAtMs: number;
     lastEventOccurredAtMs: number;
     agent: string;
+    /**
+     * The branch the session sits on now. The unlinked rollups group on it, so
+     * a session whose work maps to no pull request is reported once, where the
+     * work currently is, rather than once per branch it ever touched.
+     */
     headBranch: string;
+    /** Every branch it drove, which is what discovery and attribution read. */
+    headBranches: string[];
     inputTokens: number;
     outputTokens: number;
     cacheReadTokens: number;
@@ -1144,6 +1158,7 @@ function groupSessionsByRepository(
       lastEventOccurredAtMs: session.lastEventOccurredAt,
       agent: session.agent,
       headBranch: session.gitBranch,
+      headBranches: branchesOf(session),
       inputTokens: session.inputTokens,
       outputTokens: session.outputTokens,
       cacheReadTokens: session.cacheReadTokens,
