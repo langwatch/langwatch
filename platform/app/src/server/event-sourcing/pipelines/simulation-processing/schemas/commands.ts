@@ -50,6 +50,14 @@ export const finishRunCommandDataSchema = z.object({
   tenantId: z.string(),
   scenarioRunId: z.string(),
   results: simulationResultsSchema.optional(),
+  /**
+   * Failure reason from infrastructure callers (the stall watchdog and
+   * cancel-grace intents) that have no judge verdict to report. When
+   * `results` is absent, FinishRunCommand synthesizes the failure-results
+   * envelope from this so the reason is recorded on the event instead of
+   * being dropped at the schema boundary. Ignored when `results` is given.
+   */
+  error: z.string().optional(),
   durationMs: z.number().optional(),
   status: z.string().optional(),
   /**

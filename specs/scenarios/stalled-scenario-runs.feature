@@ -33,6 +33,16 @@ Feature: Detect and display stalled scenario runs
     When the stall watchdog wake fires
     Then the run finishes with status ERROR and reason "stalled"
 
+  # The watchdog only puts the reason on its finish command; the command is
+  # what must carry it onto the recorded event, or the run shows an error
+  # with no explanation.
+  @unit
+  Scenario: The stall reason is recorded on the terminal event
+    Given the stall watchdog finishes a run with a bare error reason
+    And no judge results accompany the finish command
+    When the finish command emits the terminal event
+    Then the event carries failure results encoding that reason
+
   # ============================================================================
   # End-to-End - User Workflow
   # ============================================================================

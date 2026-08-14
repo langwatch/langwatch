@@ -1,10 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
+import {
+  decodeScenarioError,
+  ScenarioInfraErrorCode,
+} from "~/server/scenarios/scenario-infra-error";
 import type { FinishRunCommandData } from "../../schemas/commands";
 import {
   SIMULATION_EVENT_VERSIONS,
   SIMULATION_RUN_EVENT_TYPES,
 } from "../../schemas/constants";
 import type { SimulationProcessingEvent } from "../../schemas/events";
+import type { SimulationResults } from "../../schemas/shared";
 import type { FinishRunDeps } from "../finishRun.command";
 import { FinishRunCommand } from "../finishRun.command";
 
@@ -180,6 +185,62 @@ describe("FinishRunCommand", () => {
 
       expect(events).toHaveLength(1);
       expect(events[0]!.data).toEqual({ scenarioRunId: "run-1" });
+    });
+  });
+
+  describe("when an infrastructure caller supplies a bare error", () => {
+    /** @scenario "The stall reason is recorded on the terminal event" */
+    it("synthesizes failure results so the reason lands on the event", async () => {
+      const handler = new FinishRunCommand(makeDeps());
+
+      const events = await handler.handle(
+        makeCommand({ status: "ERROR", error: "stalled" }) as any,
+      );
+
+      const results = (events[0]!.data as { results?: SimulationResults })
+        .results;
+      expect(results).toBeDefined();
+      expect(results!.verdict).toBe("failure");
+      expect(decodeScenarioError(results!.error)?.code).toBe(
+        ScenarioInfraErrorCode.Infra,
+      );
+    });
+
+    it("keeps the cancelled shape for a CANCELLED status", async () => {
+      const handler = new FinishRunCommand(makeDeps());
+
+      const events = await handler.handle(
+        makeCommand({ status: "CANCELLED", error: "Cancelled by user" }) as any,
+      );
+
+      const results = (events[0]!.data as { results?: SimulationResults })
+        .results;
+      expect(results).toBeDefined();
+      expect(results!.verdict).toBe("inconclusive");
+      expect(results!.error).toBe("Cancelled by user");
+    });
+
+    it("prefers caller-supplied results over the bare error", async () => {
+      const handler = new FinishRunCommand(makeDeps());
+      const supplied = {
+        verdict: "failure" as const,
+        reasoning: "judge said no",
+        metCriteria: [],
+        unmetCriteria: [],
+        error: "judge failure",
+      };
+
+      const events = await handler.handle(
+        makeCommand({
+          status: "ERROR",
+          error: "stalled",
+          results: supplied,
+        }) as any,
+      );
+
+      expect(
+        (events[0]!.data as { results?: SimulationResults }).results,
+      ).toEqual(supplied);
     });
   });
 

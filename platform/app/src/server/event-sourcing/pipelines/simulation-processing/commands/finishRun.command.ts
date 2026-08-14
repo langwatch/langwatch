@@ -1,4 +1,6 @@
 import { createLogger } from "@langwatch/observability";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import { buildFailureResults } from "~/server/scenarios/scenario-failure-results";
 import type { Command, CommandHandler } from "../../../";
 import { createTenantId, defineCommandSchema, EventUtils } from "../../../";
 import type { FinishRunCommandData } from "../schemas/commands";
@@ -99,9 +101,22 @@ export class FinishRunCommand
 
     const ecst = await this.backfillEcstFields(tenantIdStr, data);
 
+    // Infrastructure callers (stall watchdog, cancel-grace) supply a bare
+    // `error` and no verdict; synthesize the same failure-results envelope
+    // the in-process failure path writes, so the reason is recorded on the
+    // event rather than lost. A caller-supplied `results` always wins.
+    const results =
+      data.results ??
+      (data.error !== undefined
+        ? buildFailureResults({
+            cancelled: data.status === ScenarioRunStatus.CANCELLED,
+            error: data.error,
+          })
+        : undefined);
+
     const eventData: SimulationRunFinishedEventData = {
       scenarioRunId,
-      ...(data.results !== undefined && { results: data.results }),
+      ...(results !== undefined && { results }),
       ...(data.durationMs !== undefined && { durationMs: data.durationMs }),
       ...(data.status !== undefined && { status: data.status }),
       ...(ecst.scenarioId !== undefined && { scenarioId: ecst.scenarioId }),
