@@ -105,62 +105,68 @@ describe("Feature: The prompt list reports live copy counts", () => {
   }
 
   describe("given a prompt with a copy in each of two other projects", () => {
-    /** @scenario "A prompt with copies reports their number" */
-    it("reports two copies when the prompts are listed", async () => {
-      const source = await createSourcePrompt("copied-twice");
-      await service.copyPrompt({
-        idOrHandle: source.id,
-        sourceProjectId: sourceProject.id,
-        targetProjectId: copyProjectA.id,
-      });
-      await service.copyPrompt({
-        idOrHandle: source.id,
-        sourceProjectId: sourceProject.id,
-        targetProjectId: copyProjectB.id,
-      });
+    describe("when the prompts are listed", () => {
+      /** @scenario "A prompt with copies reports their number" */
+      it("reports two copies", async () => {
+        const source = await createSourcePrompt("copied-twice");
+        await service.copyPrompt({
+          idOrHandle: source.id,
+          sourceProjectId: sourceProject.id,
+          targetProjectId: copyProjectA.id,
+        });
+        await service.copyPrompt({
+          idOrHandle: source.id,
+          sourceProjectId: sourceProject.id,
+          targetProjectId: copyProjectB.id,
+        });
 
-      const listed = await listSourceProjectPrompts();
+        const listed = await listSourceProjectPrompts();
 
-      const prompt = listed.find((p) => p.id === source.id);
-      expect(prompt?._count?.copiedPrompts).toBe(2);
+        const prompt = listed.find((p) => p.id === source.id);
+        expect(prompt?._count?.copiedPrompts).toBe(2);
+      });
     });
   });
 
   describe("given a prompt with two copies and one of them deleted", () => {
-    /** @scenario "A deleted copy is not counted" */
-    it("reports one copy when the prompts are listed", async () => {
-      const source = await createSourcePrompt("copied-then-deleted");
-      const copyA = await service.copyPrompt({
-        idOrHandle: source.id,
-        sourceProjectId: sourceProject.id,
-        targetProjectId: copyProjectA.id,
-      });
-      await service.copyPrompt({
-        idOrHandle: source.id,
-        sourceProjectId: sourceProject.id,
-        targetProjectId: copyProjectB.id,
-      });
-      await service.deletePrompt({
-        idOrHandle: copyA.id,
-        projectId: copyProjectA.id,
-      });
+    describe("when the prompts are listed", () => {
+      /** @scenario "A deleted copy is not counted" */
+      it("reports one copy", async () => {
+        const source = await createSourcePrompt("copied-then-deleted");
+        const copyA = await service.copyPrompt({
+          idOrHandle: source.id,
+          sourceProjectId: sourceProject.id,
+          targetProjectId: copyProjectA.id,
+        });
+        await service.copyPrompt({
+          idOrHandle: source.id,
+          sourceProjectId: sourceProject.id,
+          targetProjectId: copyProjectB.id,
+        });
+        await service.deletePrompt({
+          idOrHandle: copyA.id,
+          projectId: copyProjectA.id,
+        });
 
-      const listed = await listSourceProjectPrompts();
+        const listed = await listSourceProjectPrompts();
 
-      const prompt = listed.find((p) => p.id === source.id);
-      expect(prompt?._count?.copiedPrompts).toBe(1);
+        const prompt = listed.find((p) => p.id === source.id);
+        expect(prompt?._count?.copiedPrompts).toBe(1);
+      });
     });
   });
 
   describe("given a prompt that was never copied", () => {
-    /** @scenario "A prompt without copies reports zero" */
-    it("reports zero copies when the prompts are listed", async () => {
-      const source = await createSourcePrompt("never-copied");
+    describe("when the prompts are listed", () => {
+      /** @scenario "A prompt without copies reports zero" */
+      it("reports zero copies", async () => {
+        const source = await createSourcePrompt("never-copied");
 
-      const listed = await listSourceProjectPrompts();
+        const listed = await listSourceProjectPrompts();
 
-      const prompt = listed.find((p) => p.id === source.id);
-      expect(prompt?._count?.copiedPrompts).toBe(0);
+        const prompt = listed.find((p) => p.id === source.id);
+        expect(prompt?._count?.copiedPrompts).toBe(0);
+      });
     });
   });
 });
