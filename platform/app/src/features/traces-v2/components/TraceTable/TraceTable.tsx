@@ -51,7 +51,7 @@ const sessionsShell = (sessions: SessionGroupsResult): TableShell => ({
   isTransitioning: sessions.isPlaceholderData,
   isError: sessions.isError,
   error: sessions.error,
-  itemNoun: "sessions",
+  itemNoun: "conversations",
   maxPageSize: SESSIONS_MAX_PAGE_SIZE,
 });
 

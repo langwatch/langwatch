@@ -292,6 +292,10 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/me/configure")),
       },
       {
+        // The devices inventory moved into a tab of /me/configure, and this
+        // path keeps resolving so old links do not dead-end. A page that
+        // renders <Navigate>, not a `loader` redirect: loaders do not run on a
+        // cold load of the SPA, which is exactly how a stale link arrives.
         path: "/me/devices",
         ...page(() => import("./pages/me/devices")),
       },
@@ -300,10 +304,6 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/me/pull-requests")),
       },
       {
-        // Pre-rename path for the devices inventory, kept resolving so old
-        // links do not dead-end. A page that renders <Navigate>, not a
-        // `loader` redirect: loaders do not run on a cold load of the SPA,
-        // which is exactly how a stale link arrives.
         path: "/me/sessions",
         ...page(() => import("./pages/me/sessions")),
       },

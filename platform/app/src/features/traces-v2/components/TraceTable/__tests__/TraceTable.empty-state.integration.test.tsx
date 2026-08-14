@@ -310,7 +310,7 @@ describe("<TraceTable /> failed-read gating", () => {
           screen.queryByTestId("empty-filter-state"),
         ).not.toBeInTheDocument();
         expect(
-          screen.getByText(/could not load your sessions/i),
+          screen.getByText(/could not load your conversations/i),
         ).toBeInTheDocument();
       });
 
