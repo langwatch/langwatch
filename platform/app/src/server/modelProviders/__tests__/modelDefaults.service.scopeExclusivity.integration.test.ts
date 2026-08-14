@@ -92,9 +92,12 @@ describe("given default-model configs with scope attachments (real DB)", () => {
   // above another would break it.
   //
   // Through cleanupTestRows, not a raw deleteMany: `organizationId` is
-  // assigned in beforeAll, so it is undefined exactly when setup failed,
-  // and Prisma drops an undefined filter rather than matching nothing
-  // (#6219). The scope rows cascade on the config foreign key.
+  // assigned in beforeAll, so it is still undefined if setup threw before
+  // that assignment. A raw deleteMany would then sweep the table, because
+  // Prisma drops an undefined filter rather than matching nothing (#6219).
+  // cleanupTestRows refuses an entry that identifies nothing, so the rows
+  // are left untouched and the teardown throws instead. The scope rows
+  // cascade on the config foreign key.
   afterEach(() =>
     cleanupTestRows(prisma, [["modelDefaultConfig", { organizationId }]]),
   );
