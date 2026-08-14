@@ -79,7 +79,10 @@ const extractTextsFromParts = (parts: unknown[]): string[] => {
         texts.push(part.text);
       } else if (typeof part.content === "string") {
         texts.push(part.content);
-      } else if (part.type === "thinking" && typeof part.thinking === "string") {
+      } else if (
+        part.type === "thinking" &&
+        typeof part.thinking === "string"
+      ) {
         texts.push(part.thinking);
       } else if (part.type === "tool_use" && part.input != null) {
         const s = safeStringify(part.input);
@@ -100,7 +103,7 @@ const extractTextsFromParts = (parts: unknown[]): string[] => {
         // order survives.
         const inner: string[] = [];
         for (const block of part.toolResult.content) {
-          if (isRecord(block) && block.json != null) {
+          if (isRecord(block) && "json" in block) {
             const s = safeStringify(block.json);
             if (s !== null) inner.push(s);
           } else {

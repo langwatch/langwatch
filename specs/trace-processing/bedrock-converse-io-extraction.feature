@@ -44,6 +44,12 @@ Feature: Bedrock Converse span I/O extraction
     Then the input text is the JSON of the tool result's structured content
 
   @unit @canonicalisation
+  Scenario: Converse toolResult json:null block is preserved, not dropped
+    Given a gen_ai.prompt message whose content is [{toolResult: {content: [{json: null}]}}]
+    When trace I/O is extracted
+    Then the input text is the literal string "null"
+
+  @unit @canonicalisation
   Scenario: Converse toolResult block with empty content contributes nothing
     Given a gen_ai.prompt message whose content is [{toolResult: {content: []}}]
     When trace I/O is extracted
