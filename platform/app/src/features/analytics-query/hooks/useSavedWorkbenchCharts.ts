@@ -303,9 +303,17 @@ function useRenameChart({
         setOpened((current) =>
           current && current.id === id ? { id, name } : current,
         );
-        await refreshList();
       } catch (error) {
         onError(error, "Couldn't rename the chart");
+        return;
+      }
+
+      // The rename landed; only the list is behind. Same reason as the save
+      // path: a stale list must not read as work that did not happen.
+      try {
+        await refreshList();
+      } catch (error) {
+        onError(error, "Renamed, but the chart list didn't refresh");
       }
     },
     [projectId, updateChart, setOpened, refreshList, onError],
@@ -328,9 +336,17 @@ function useRemoveChart({
       try {
         await deleteChart.mutateAsync({ projectId, id: chartId });
         setOpened((current) => (current?.id === chartId ? null : current));
-        await refreshList();
       } catch (error) {
         onError(error, "Couldn't delete the chart");
+        return;
+      }
+
+      // Deleted on the server. Reporting a refresh failure as a failed delete
+      // invites a second attempt at a chart that is already gone.
+      try {
+        await refreshList();
+      } catch (error) {
+        onError(error, "Deleted, but the chart list didn't refresh");
       }
     },
     [projectId, deleteChart, setOpened, refreshList, onError],

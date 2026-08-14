@@ -198,7 +198,46 @@ describe("saving a workbench chart", () => {
 
         // Reported, but as a stale list — never as a lost save.
         expect(onError).toHaveBeenCalledTimes(1);
-        expect(onError.mock.calls[0]?.[1]).not.toBe("Couldn't save the chart");
+        expect(onError.mock.calls[0]?.[1]).toBe(
+          "Saved, but the chart list didn't refresh",
+        );
+      });
+    });
+
+    describe("when the member renames or deletes", () => {
+      /**
+       * The same shape as the save path, and the same lie: the write is on the
+       * server before the refresh is attempted, so a rejected refresh must not
+       * be reported as a rename or delete that did not happen.
+       */
+      it.each([
+        [
+          "rename",
+          "Renamed, but the chart list didn't refresh",
+          async (r: ReturnType<typeof mountHook>["result"]) => {
+            await r.current.rename({ id: "chart-1", name: "Renamed" });
+          },
+        ],
+        [
+          "delete",
+          "Deleted, but the chart list didn't refresh",
+          async (r: ReturnType<typeof mountHook>["result"]) => {
+            await r.current.remove("chart-1");
+          },
+        ],
+      ])("does not report the %s as failed", async (_case, reported, act_) => {
+        mocks.remove.mutateAsync.mockResolvedValue({ id: "chart-1" });
+        const { result, onError } = mountHook();
+        mocks.utils.analytics.savedWorkbenchCharts.getAll.invalidate.mockRejectedValue(
+          new Error("network"),
+        );
+
+        await act(async () => {
+          await act_(result);
+        });
+
+        expect(onError).toHaveBeenCalledTimes(1);
+        expect(onError.mock.calls[0]?.[1]).toBe(reported);
       });
     });
   });
