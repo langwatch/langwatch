@@ -4,12 +4,13 @@ description: An admin decides once which providers and models a key can reach. V
 sidebarTitle: Routing policies
 ---
 
-A routing policy answers one question. When someone calls a model
-through your organization, which providers serve it, in what order,
-and which models can they ask for?
+A routing policy is one decision, written down. It says which
+providers serve a request, and in which order. It says which model
+names a client can send.
 
-An admin writes the policy once. Each virtual key points at it. To
-change how many keys route, you edit the policy, not the keys.
+An admin writes the policy one time. Each virtual key points to the
+policy. To change the routing of many keys, change the policy. Do
+not change each key.
 
 ## Shape
 
@@ -20,21 +21,21 @@ RoutingPolicy {
   name:             string
   description?:     string
 
-  // The providers this policy routes through. The gateway tries the
-  // first one. It moves to the next one when a request fails in a way
-  // another provider can answer.
+  // The providers this policy routes through, in order. The gateway
+  // tries the first provider. If the request fails in a way that a
+  // different provider can answer, the gateway tries the next one.
   modelProviderIds: string[]
 
-  // Model name mapping. The key is the name a client sends. The value
-  // is the model to use instead. The three reserved tier names live
-  // here with every other mapping.
+  // Model name mapping. The key is the name the client sends. The
+  // value is the model that serves the request. The three tier names
+  // are entries in this map.
   modelAliases:     Record<string, string>
 
-  // The model a tier uses when this policy names no model for it.
-  // Applies to the tier names only.
+  // The model that serves a tier when the map has no entry for it.
+  // Applies only to the three tier names.
   defaultModel?:    string
 
-  // What a request may reach. Four groups: tools, mcp, urls, models.
+  // What a request can reach. Four groups: tools, mcp, urls, models.
   // Each group has a deny list and an allow list.
   policyRules:      { tools: {...}, mcp: {...}, urls: {...}, models: {...} }
 
@@ -43,24 +44,24 @@ RoutingPolicy {
 }
 ```
 
-A policy can apply at more than one place. Each entry in `scopes`
-adds one organization, team, or project it applies to.
+A policy can apply in more than one place. Each entry in `scopes`
+adds one organization, one team, or one project.
 
 ## Model tiers
 
-A client can send a tier name in place of a model name. The policy
-decides which model the tier means. The client does not change when
-you move to a newer model.
+A client can send a tier name in the `model` field. The policy maps
+the tier name to a model. When you move to a newer model, you change
+the policy. The client code does not change.
 
-Three names are reserved:
+The gateway knows three tier names:
 
-| Tier | What it means |
+| Tier | Use |
 | --- | --- |
-| `complex` | The strongest model you have. Use it when quality matters more than cost. |
-| `reasoning` | A model that works through a problem before it answers. Use it for planning, analysis, and hard debugging. |
-| `fast` | A small model for high volume work. Use it for classification, extraction, routing, and short replies. |
+| `complex` | The strongest model you have. Use it when quality is more important than cost. |
+| `reasoning` | A model that thinks before it answers. Use it for plans, analysis, and difficult debugging. |
+| `fast` | A small model for high volumes. Use it for classification, extraction, routing, and short replies. |
 
-The client sends the tier name in the `model` field:
+The client sends the tier name where a model name goes:
 
 ```json
 {
@@ -68,29 +69,29 @@ The client sends the tier name in the `model` field:
 }
 ```
 
-Set a model for each tier in the policy. A tier you leave empty uses
-`defaultModel`. A tier with no model and no `defaultModel` is not a
-known name, so a request that sends it gets an error.
+Set a model for each tier in the policy. A tier without a model uses
+`defaultModel`. A tier without a model and without `defaultModel` is
+not a known name. The gateway refuses a request that sends it.
 
-`defaultModel` applies to the three tier names only. A model name
-that a client gets wrong still gets an error. The gateway does not
-send the default model in its place.
+`defaultModel` applies only to the three tier names. A model name
+with a typo in it still gets a refusal. The gateway does not put the
+default model in its place.
 
-Store a real model id, such as `openai/gpt-5-mini`. Do not store a
-name that moves, such as `openai/latest`. The gateway reads the name
-exactly as you wrote it. It would try to call a model named
-`latest`. The product refuses to save a name that moves.
+Write a full model id, for example `openai/gpt-5-mini`. Do not write
+a name that changes over time, for example `openai/latest`. The
+gateway reads the value as one literal model name, so it would call
+a model named `latest`. The app refuses to save such a name.
 
-`GET /v1/models` lists a tier that has a model, so it shows in a
-model picker with every other name. Set `defaultModel` and all three
-tiers are listed. A tier with no model and no `defaultModel` is not
-listed, because a request that sends it gets an error.
+`GET /v1/models` lists each tier that has a model. The tier shows in
+a model picker with the other names. If you set `defaultModel`, the
+list has all three tiers. A tier without a model and without
+`defaultModel` is not in the list, because the gateway refuses it.
 
 ## Model name mapping
 
-`modelAliases` also maps ordinary names. Use it to send an old name
-to its replacement, or to give a model the name your teams already
-use.
+`modelAliases` also maps usual model names. Use it to point an old
+name to its replacement. Use it to give a model the name your teams
+already use.
 
 ```json
 {
@@ -99,57 +100,60 @@ use.
 }
 ```
 
-A mapping cannot reach a model the key is not allowed to use. The
-gateway checks the model the mapping points at, not the name the
-client sent.
+A mapping cannot reach a model that the key is not permitted to use.
+The gateway examines the model that the mapping points to, not the
+name that the client sent.
 
 ## Restrictions
 
-`policyRules` holds four groups of patterns. Each group has a deny
+`policyRules` has four groups of patterns. Each group has a deny
 list and an allow list.
 
-- `tools`: the name of each tool a request offers the model.
-- `mcp`: the name and address of each MCP server a request names.
-- `urls`: every address in the request, including messages, system
-  prompts, and tool arguments.
-- `models`: the model the request resolves to.
+- `tools`: the name of each tool in the request.
+- `mcp`: the name and the address of each MCP server in the request.
+- `urls`: each address in the request. This includes messages,
+  system prompts, and tool arguments.
+- `models`: the model that the request resolves to.
 
-A request that matches a deny pattern is refused before it costs
-anything. When a group has any allow pattern, a request must match
-one of them. Deny wins over allow.
+The gateway refuses a request that matches a deny pattern. The
+refusal comes before the request costs money. If a group has one or
+more allow patterns, a request must match one of them. Deny wins
+over allow.
 
-The `models` group is checked after the name mapping runs. A mapping
-cannot route around it.
+The gateway applies the `models` group after the name mapping. A
+mapping cannot go around it.
 
 ## Provider order
 
 `modelProviderIds` is an ordered list. The gateway tries the first
-provider. It moves to the next one when a request fails in a way
-another provider can answer.
+provider. If the request fails in a way that a different provider
+can answer, the gateway tries the next one.
 
-The gateway skips a provider that cannot serve the model. It does
-not call it. So a chain across two vendors only fails over for
-models both of them serve. To give a model failover, map its name to
-each vendor's own model, or point a tier at each one.
+The gateway does not call a provider that cannot serve the model. A
+chain across two vendors only moves over for models that the two
+vendors serve. To give one model a backup, map its name to a model
+from each vendor, or point a tier to a model from each vendor.
 
-The gateway also drops a provider the key can no longer reach, for
-example when an admin removes it from the key's scope.
+The gateway also removes a provider that the key cannot reach. This
+occurs, for example, when an admin removes the provider from the
+key's scope.
 
-A model name that gives a provider, such as `openai/gpt-5-mini`, only
-runs on that provider. When the key cannot reach it, the request gets
-an error. The gateway does not send it to another vendor. A tier or a
-mapping that points at a provider you removed behaves the same way,
-and `GET /v1/models` stops listing it.
+A model name that contains a provider, for example
+`openai/gpt-5-mini`, runs only on that provider. If the key cannot
+reach the provider, the gateway refuses the request. It does not
+send the request to a different vendor. A tier or a mapping that
+points to a removed provider gets the same refusal, and
+`GET /v1/models` stops listing it.
 
 ## Defaults
 
-One policy for each scope can be the default. Marking a policy
-default clears the flag on any other policy that shares a scope with
-it. The change happens in one step, so two policies are never both
-default for the same scope.
+One policy in each scope can be the default. When you make a policy
+the default, the app clears the flag on the other policies in the
+same scope. This occurs in one step. Two policies are never both the
+default for one scope.
 
-A key routes through the policy it names. The default is the policy
-the product offers first when someone makes a key for that scope.
+A key routes through the policy that it names. The default policy is
+the one the app offers first when someone makes a key in that scope.
 
 ## Manage in the app
 
@@ -159,14 +163,15 @@ on a policy and select **Edit**.
 
 In the editor you can:
 
-- Name the policy and say what it is for.
-- Choose where it applies.
-- Choose the providers and put them in order.
-- Choose a model for each tier, and a default model.
+- Give the policy a name and a description.
+- Select where it applies.
+- Select the providers and put them in order.
+- Select a model for each tier, and a default model.
 - Map other model names.
 - Add restrictions.
 
-The editor has its own address. A link to a policy opens that policy.
+The editor has its own address. A link to a policy opens that
+policy.
 
 ## Manage with tRPC
 
@@ -203,14 +208,16 @@ trpc.routingPolicy.delete.useMutation();
 ## Keys that name no policy
 
 A key that names no policy uses its own routing mode. `NONE` sends
-the request to one provider and returns the error. `FALLBACK_ALL`
-tries the providers the key can reach, in a fixed order.
+the request to one provider and returns that provider's answer.
+`FALLBACK_ALL` tries the providers that the key can reach, in a set
+order.
 
 To move a key to a policy:
 
-1. Make a policy with the providers the key uses.
-2. Set the key's routing policy to it.
-3. Send a request and check that it reaches the provider you expect.
+1. Make a policy with the providers that the key uses.
+2. Set the key's routing policy.
+3. Send a request. Make sure that it reaches the provider you
+   expect.
 
-Point new keys at a policy. It keeps the routing decision in one
+Point new keys to a policy. Then the routing decision stays in one
 place.

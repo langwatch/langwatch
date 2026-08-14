@@ -55,7 +55,7 @@ Every client using `model: "claude"` now hits Bedrock. Switch back in one edit. 
 Given a request with `model: "<name>"`:
 
 1. If `<name>` has a `/` in it (explicit `provider/model` form), **aliases are bypassed** and the gateway routes directly to that provider, subject to `models_allowed` and the VK's `providers[]` list.
-2. Otherwise, `<name>` is looked up in `model_aliases`. If found, the mapped `provider/model` is checked against `models_allowed` and, when it passes, dispatched.
+2. Otherwise the gateway looks up `<name>` in `model_aliases`. If there is an entry, the gateway checks the mapped `provider/model` against `models_allowed`. If the check passes, the gateway dispatches it.
 3. If not found in aliases, the gateway checks `models_allowed`. If the model is allowed, it's dispatched to the VK's primary provider.
 4. If none of the above, returns `403 model_not_allowed`.
 
@@ -67,13 +67,13 @@ This lets you have an `openai/` namespace that addresses OpenAI directly for tes
 
 ## Enforcement
 
-Aliases do not bypass `models_allowed`. The allowlist judges the model the alias resolves to, never the name the caller typed, and it accepts either spelling of that model: an allowlist entry of `gpt-5-mini` and one of `openai/gpt-5-mini` both match the same resolved model, so you write whichever form your team reads more naturally.
+Aliases do not go around `models_allowed`. The allowlist judges the model that the alias resolves to, never the name that the caller typed. It accepts the two spellings of that model: an entry of `gpt-5-mini` and an entry of `openai/gpt-5-mini` match the same resolved model. Write the form that your team reads.
 
-If `models_allowed: ["gpt-5-mini", "claude-haiku-4-5-20251001"]` and an alias maps to `openai/o3`, a request using the alias is refused with `model_not_allowed`. The rejection names `o3`, the model the alias resolved to, alongside the alias the key gave it, so the operator can see which side to fix.
+If `models_allowed: ["gpt-5-mini", "claude-haiku-4-5-20251001"]` and an alias maps to `openai/o3`, the gateway refuses a request that uses the alias with `model_not_allowed`. The refusal names `o3`, the resolved model, and it names the alias. The operator can see which side to correct.
 
-This matters for security: don't grant a model via aliases that you wouldn't grant explicitly.
+This matters for security: do not grant a model through an alias that you would not grant directly.
 
-[Policy rules](/ai-gateway/policy-rules) judge the resolved model the same way, so an alias pointing at a denied model is blocked.
+[Policy rules](/ai-gateway/policy-rules) judge the resolved model in the same way. An alias that points to a denied model is blocked.
 
 ## Discovery via `/v1/models`
 

@@ -54,4 +54,4 @@ Reasoning models return a `reasoning_tokens` count in `usage.completion_tokens_d
 
 - **Responses API vs Chat Completions API**: the two have slightly different payload shapes. The gateway proxies whichever endpoint the client hits; it does not translate between them. Codex users should see [Codex CLI](/ai-gateway/cli/codex) for guidance on `wire_api` config.
 - **Organization header on egress**: if the VK doesn't set a custom Organization, the upstream OpenAI request uses the ModelProvider's default.
-- **Rate-limit responses (429)**: a 429 always walks the VK's [fallback chain](/ai-gateway/providers/fallback-chains) to the next credential. When the chain is exhausted or the VK has none, OpenAI's `Retry-After` header is surfaced to the client verbatim.
+- **Rate-limit responses (429)**: a 429 moves to the next credential in the VK's [fallback chain](/ai-gateway/providers/fallback-chains). When the chain is used up, or the VK has no chain, the gateway sends OpenAI's `Retry-After` header to the client as is.

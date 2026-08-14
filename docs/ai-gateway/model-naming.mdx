@@ -120,7 +120,7 @@ The error surfaces the accepted names so an integrator can fix the request witho
     Use an alias. Edit the VK once, zero caller changes. See [Model Aliases](/ai-gateway/model-aliases).
   </Step>
   <Step title="Cross-provider fallback (primary dies, secondary takes over)">
-    Name a model the fallback providers also serve, for example an Anthropic model with both an Anthropic and a Bedrock credential on the VK. One request resolves to one model, and the gateway carries that same model name to the next credential in the chain. See [Fallback Chains](/ai-gateway/providers/fallback-chains).
+    Name a model that the fallback providers also serve, for example an Anthropic model with an Anthropic credential and a Bedrock credential on the VK. One request resolves to one model. The gateway carries that same model name to the next credential in the chain. See [Fallback Chains](/ai-gateway/providers/fallback-chains).
   </Step>
 </Steps>
 

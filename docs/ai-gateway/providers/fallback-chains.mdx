@@ -13,7 +13,7 @@ On the VK edit screen:
 1. Select a **primary** provider credential.
 2. Add one or more **fallback** credentials in the order they should be tried.
 
-The VK's resolved configuration carries the chain and the bound on the walk:
+The VK's resolved configuration carries the chain and the attempt limit:
 
 ```json
 {
@@ -24,11 +24,11 @@ The VK's resolved configuration carries the chain and the bound on the walk:
 }
 ```
 
-`chain` is the ordered credential list and `max_attempts` (default `3`) is how many of them one request may be tried against. A key configured for no fallback gets exactly one attempt.
+`chain` is the ordered credential list. `max_attempts` (default `3`) sets how many of them the gateway tries for one request. A key with no fallback gets exactly one attempt.
 
 ## When fallback triggers
 
-Which failures are worth another provider is decided by the gateway from the real upstream outcome, in one place, and is the same for every virtual key. There is no per-key trigger list: a narrowed one could only ever turn a failure the gateway would have recovered from into one your callers see.
+The gateway decides which failures move to the next provider. It reads the real upstream result, and the rule is the same for every virtual key. There is no per-key trigger list. A narrowed list could only turn a failure the gateway can recover from into one that your callers see.
 
 | Condition | Fires? | Why |
 |---|---|---|
@@ -36,23 +36,23 @@ Which failures are worth another provider is decided by the gateway from the rea
 | `timeout` | ✅ | Provider degraded. |
 | `429 rate_limit_exceeded` | ✅ | Primary is throttled; secondary may have headroom. |
 | `network_error` (DNS/TCP/TLS) | ✅ | Connectivity issue to primary. |
-| Upstream `404 Not Found` | ✅ | In a multi-provider chain this usually means this provider doesn't serve that model, and the next one may. Common with self-hosted and OpenAI-compatible providers. |
+| Upstream `404 Not Found` | ✅ | In a chain with more than one provider, this usually means that this provider does not serve that model. The next one can. Common with self-hosted and OpenAI-compatible providers. |
 | `circuit_breaker` open | ✅ | Preemptive, gateway knows primary has been failing recently. |
 | Upstream `400 Bad Request` | ❌ | Client-fault. Surfacing the error is correct. |
 | Upstream `401 Unauthorized` | ❌ | Provider credential bad. Needs human fix, not masking. |
 | Upstream `403 Forbidden` | ❌ | Authorization issue. Silent switch would hide a real problem. |
-| Client disconnect or an expired request deadline | ❌ | The caller walked away. It says nothing about the provider's health. |
+| Client disconnect or an expired request deadline | ❌ | The caller went away. This tells nothing about the provider's health. |
 | LangWatch-internal `invalid_api_key` etc | ❌ | Never reaches the fallback layer. |
 
 ## Crossing providers mid-chain
 
 A single VK may have mixed providers (OpenAI + Anthropic + Bedrock). The gateway uses [Bifrost's provider-dispatch library](https://github.com/maximhq/bifrost) to translate payloads: same `messages` schema, different wire formats.
 
-The model itself does not change across the chain. One request resolves to one model, and the gateway sends that same model name to the next credential, expecting the provider to serve it. So a chain earns its keep when its entries overlap on the models you actually call: an Anthropic credential paired with a Bedrock one serving Anthropic models, or two OpenAI accounts in different regions.
+The model does not change across the chain. One request resolves to one model. The gateway sends that same model name to the next credential and expects the provider to serve it. So a chain helps when its entries overlap on the models you call: an Anthropic credential with a Bedrock credential that serves Anthropic models, or two OpenAI accounts in different regions.
 
-Credentials that cannot serve the resolved model are skipped rather than dialed. When a request names a model the gateway can attribute to a provider, through an alias, the `provider/model` form, or a recognizable bare name, the walk visits only that provider's credentials on the VK. If the VK holds none for that provider, the gateway walks the chain as configured rather than refusing up front, and the providers' own answers decide the outcome.
+The gateway skips a credential that cannot serve the resolved model. It does not call it. When the model name tells the gateway which provider owns it, through an alias, the `provider/model` form, or a known bare name, the chain visits only that provider's credentials on the VK. If the name tells the gateway nothing, the gateway walks the chain as configured, and the providers' own answers decide the outcome.
 
-A VK narrowed to specific providers is enforced here too: if the model resolves to a provider the key may not use, the request comes back as `model_not_allowed` naming the model and asking the key's owner to widen its provider access.
+A VK narrowed to specific providers is enforced here too. If the model resolves to a provider that the key cannot use, the gateway refuses with `model_not_allowed`. The refusal names the model and tells the key's owner to widen the key's provider access.
 
 ## Streaming
 
@@ -104,4 +104,4 @@ When a request hits a circuit that's currently `open`, the gateway skips to the 
 
 ## Sizing the chain
 
-Diminishing returns after 3 entries. Every extra attempt spends another provider round-trip in series, so with the default `max_attempts=3` the worst case is three upstream calls back to back; the latency budget of the original call is gone well before the last one answers and the client has probably given up. Use chains of 2 to 3 entries for latency-sensitive traffic, lower `max_attempts` if you need a tighter total budget, and save longer chains for batch and offline work where wall-clock is cheap.
+Returns decrease after 3 entries. Each extra attempt spends one more provider round-trip, one after the other. With the default `max_attempts=3`, the worst case is three upstream calls in a row. The client has usually stopped waiting before the last one answers. Use chains of 2 to 3 entries for latency-sensitive traffic. Lower `max_attempts` if you need a tighter total budget. Keep longer chains for batch and offline work, where wall-clock time is cheap.

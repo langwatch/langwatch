@@ -4109,13 +4109,13 @@ The combination that's been most-tested with Codex on v1:
 - VK fallback chain: `openai-primary → anthropic-fallback`.
 - VK `models_allowed: ["gpt-5-mini", "gpt-5", "gpt-4o", "claude-haiku-4-5-20251001"]`.
 
-  A chain that spans two providers only fails over for models both of them
-  serve. The gateway skips a credential that cannot serve the resolved model
-  rather than dialing it, so a request for `gpt-5-mini` never reaches the
-  Anthropic slot: that model has one attempt, and an OpenAI outage surfaces to
-  Codex. Give a model failover by mapping its name on the routing policy, or by
-  pointing a [model tier](/ai-gateway/model-aliases) at each provider's own
-  equivalent and having Codex ask for the tier.
+  A chain across two providers only moves over for models that the two
+  providers serve. The gateway does not call a credential that cannot serve
+  the resolved model. So a request for `gpt-5-mini` never reaches the
+  Anthropic slot: that model gets one attempt, and an OpenAI outage shows in
+  Codex. To give a model a backup, map its name on the routing policy, or
+  point a [model tier](/ai-gateway/model-aliases) to a model from each
+  provider and let Codex ask for the tier.
 - Personal-access VK bound to the engineer.
 - Monthly `principal` budget with `warn` at 80%, `block` at 100%.
 
@@ -4734,19 +4734,19 @@ Aliases always win over explicit `provider/model` form if both are defined for t
 
 ## Fallback chain
 
-Ordered list of **ModelProvider** ids (not models) the VK may dispatch through. Carried on the routing policy bound to the VK (or, when the VK pins no policy, on the org's default policy). Which failures walk the chain is decided by the gateway from the real upstream outcome, the same way for every key. Triggered by:
+Ordered list of **ModelProvider** ids (not models) the VK can dispatch through. Carried on the routing policy bound to the VK (or, when the VK pins no policy, on the org's default policy). The gateway decides which failures move to the next provider. It reads the real upstream result, and the rule is the same for every key. Triggered by:
 
 - `5xx` from upstream.
 - `timeout` from upstream.
 - `429 rate_limit_exceeded` from upstream.
 - `network_error` (connection reset, DNS, TLS).
-- Upstream `404`, which in a multi-provider chain usually means this provider does not serve that model.
+- Upstream `404`. In a chain with more than one provider, this usually means that this provider does not serve that model.
 - `circuit_breaker`, gateway-internal tripped after N consecutive failures.
 
 **Does not** trigger fallback:
 
-- Upstream `400 / 401 / 403`. These are terminal: a `400` is the request, and a `401` or `403` is usually the provider credential. Switching credentials would hide the thing that has to be fixed.
-- A caller that disconnected or ran out its own deadline, which says nothing about the provider.
+- Upstream `400 / 401 / 403`. These stop the request. A `400` points to the request itself. A `401` or `403` usually points to the provider credential. A different provider would hide the fault that you must repair.
+- A caller that disconnected, or a caller deadline that ended. This tells nothing about the provider.
 - Any LangWatch-internal error (`invalid_api_key`, `permission_denied`, etc).
 
 For streaming: if the primary fails **before the first chunk**, fallback is transparent. Once chunks have started flowing, the stream stays on the original provider, otherwise the client would see a Frankenstein stream.
@@ -8298,12 +8298,13 @@ description: An admin decides once which providers and models a key can reach. V
 sidebarTitle: Routing policies
 ---
 
-A routing policy answers one question. When someone calls a model
-through your organization, which providers serve it, in what order,
-and which models can they ask for?
+A routing policy is one decision, written down. It says which
+providers serve a request, and in which order. It says which model
+names a client can send.
 
-An admin writes the policy once. Each virtual key points at it. To
-change how many keys route, you edit the policy, not the keys.
+An admin writes the policy one time. Each virtual key points to the
+policy. To change the routing of many keys, change the policy. Do
+not change each key.
 
 ## Shape
 
@@ -8314,21 +8315,21 @@ RoutingPolicy {
   name:             string
   description?:     string
 
-  // The providers this policy routes through. The gateway tries the
-  // first one. It moves to the next one when a request fails in a way
-  // another provider can answer.
+  // The providers this policy routes through, in order. The gateway
+  // tries the first provider. If the request fails in a way that a
+  // different provider can answer, the gateway tries the next one.
   modelProviderIds: string[]
 
-  // Model name mapping. The key is the name a client sends. The value
-  // is the model to use instead. The three reserved tier names live
-  // here with every other mapping.
+  // Model name mapping. The key is the name the client sends. The
+  // value is the model that serves the request. The three tier names
+  // are entries in this map.
   modelAliases:     Record<string, string>
 
-  // The model a tier uses when this policy names no model for it.
-  // Applies to the tier names only.
+  // The model that serves a tier when the map has no entry for it.
+  // Applies only to the three tier names.
   defaultModel?:    string
 
-  // What a request may reach. Four groups: tools, mcp, urls, models.
+  // What a request can reach. Four groups: tools, mcp, urls, models.
   // Each group has a deny list and an allow list.
   policyRules:      { tools: {...}, mcp: {...}, urls: {...}, models: {...} }
 
@@ -8337,24 +8338,24 @@ RoutingPolicy {
 }
 ```
 
-A policy can apply at more than one place. Each entry in `scopes`
-adds one organization, team, or project it applies to.
+A policy can apply in more than one place. Each entry in `scopes`
+adds one organization, one team, or one project.
 
 ## Model tiers
 
-A client can send a tier name in place of a model name. The policy
-decides which model the tier means. The client does not change when
-you move to a newer model.
+A client can send a tier name in the `model` field. The policy maps
+the tier name to a model. When you move to a newer model, you change
+the policy. The client code does not change.
 
-Three names are reserved:
+The gateway knows three tier names:
 
-| Tier | What it means |
+| Tier | Use |
 | --- | --- |
-| `complex` | The strongest model you have. Use it when quality matters more than cost. |
-| `reasoning` | A model that works through a problem before it answers. Use it for planning, analysis, and hard debugging. |
-| `fast` | A small model for high volume work. Use it for classification, extraction, routing, and short replies. |
+| `complex` | The strongest model you have. Use it when quality is more important than cost. |
+| `reasoning` | A model that thinks before it answers. Use it for plans, analysis, and difficult debugging. |
+| `fast` | A small model for high volumes. Use it for classification, extraction, routing, and short replies. |
 
-The client sends the tier name in the `model` field:
+The client sends the tier name where a model name goes:
 
 ```json
 {
@@ -8362,29 +8363,29 @@ The client sends the tier name in the `model` field:
 }
 ```
 
-Set a model for each tier in the policy. A tier you leave empty uses
-`defaultModel`. A tier with no model and no `defaultModel` is not a
-known name, so a request that sends it gets an error.
+Set a model for each tier in the policy. A tier without a model uses
+`defaultModel`. A tier without a model and without `defaultModel` is
+not a known name. The gateway refuses a request that sends it.
 
-`defaultModel` applies to the three tier names only. A model name
-that a client gets wrong still gets an error. The gateway does not
-send the default model in its place.
+`defaultModel` applies only to the three tier names. A model name
+with a typo in it still gets a refusal. The gateway does not put the
+default model in its place.
 
-Store a real model id, such as `openai/gpt-5-mini`. Do not store a
-name that moves, such as `openai/latest`. The gateway reads the name
-exactly as you wrote it. It would try to call a model named
-`latest`. The product refuses to save a name that moves.
+Write a full model id, for example `openai/gpt-5-mini`. Do not write
+a name that changes over time, for example `openai/latest`. The
+gateway reads the value as one literal model name, so it would call
+a model named `latest`. The app refuses to save such a name.
 
-`GET /v1/models` lists a tier that has a model, so it shows in a
-model picker with every other name. Set `defaultModel` and all three
-tiers are listed. A tier with no model and no `defaultModel` is not
-listed, because a request that sends it gets an error.
+`GET /v1/models` lists each tier that has a model. The tier shows in
+a model picker with the other names. If you set `defaultModel`, the
+list has all three tiers. A tier without a model and without
+`defaultModel` is not in the list, because the gateway refuses it.
 
 ## Model name mapping
 
-`modelAliases` also maps ordinary names. Use it to send an old name
-to its replacement, or to give a model the name your teams already
-use.
+`modelAliases` also maps usual model names. Use it to point an old
+name to its replacement. Use it to give a model the name your teams
+already use.
 
 ```json
 {
@@ -8393,57 +8394,60 @@ use.
 }
 ```
 
-A mapping cannot reach a model the key is not allowed to use. The
-gateway checks the model the mapping points at, not the name the
-client sent.
+A mapping cannot reach a model that the key is not permitted to use.
+The gateway examines the model that the mapping points to, not the
+name that the client sent.
 
 ## Restrictions
 
-`policyRules` holds four groups of patterns. Each group has a deny
+`policyRules` has four groups of patterns. Each group has a deny
 list and an allow list.
 
-- `tools`: the name of each tool a request offers the model.
-- `mcp`: the name and address of each MCP server a request names.
-- `urls`: every address in the request, including messages, system
-  prompts, and tool arguments.
-- `models`: the model the request resolves to.
+- `tools`: the name of each tool in the request.
+- `mcp`: the name and the address of each MCP server in the request.
+- `urls`: each address in the request. This includes messages,
+  system prompts, and tool arguments.
+- `models`: the model that the request resolves to.
 
-A request that matches a deny pattern is refused before it costs
-anything. When a group has any allow pattern, a request must match
-one of them. Deny wins over allow.
+The gateway refuses a request that matches a deny pattern. The
+refusal comes before the request costs money. If a group has one or
+more allow patterns, a request must match one of them. Deny wins
+over allow.
 
-The `models` group is checked after the name mapping runs. A mapping
-cannot route around it.
+The gateway applies the `models` group after the name mapping. A
+mapping cannot go around it.
 
 ## Provider order
 
 `modelProviderIds` is an ordered list. The gateway tries the first
-provider. It moves to the next one when a request fails in a way
-another provider can answer.
+provider. If the request fails in a way that a different provider
+can answer, the gateway tries the next one.
 
-The gateway skips a provider that cannot serve the model. It does
-not call it. So a chain across two vendors only fails over for
-models both of them serve. To give a model failover, map its name to
-each vendor's own model, or point a tier at each one.
+The gateway does not call a provider that cannot serve the model. A
+chain across two vendors only moves over for models that the two
+vendors serve. To give one model a backup, map its name to a model
+from each vendor, or point a tier to a model from each vendor.
 
-The gateway also drops a provider the key can no longer reach, for
-example when an admin removes it from the key's scope.
+The gateway also removes a provider that the key cannot reach. This
+occurs, for example, when an admin removes the provider from the
+key's scope.
 
-A model name that gives a provider, such as `openai/gpt-5-mini`, only
-runs on that provider. When the key cannot reach it, the request gets
-an error. The gateway does not send it to another vendor. A tier or a
-mapping that points at a provider you removed behaves the same way,
-and `GET /v1/models` stops listing it.
+A model name that contains a provider, for example
+`openai/gpt-5-mini`, runs only on that provider. If the key cannot
+reach the provider, the gateway refuses the request. It does not
+send the request to a different vendor. A tier or a mapping that
+points to a removed provider gets the same refusal, and
+`GET /v1/models` stops listing it.
 
 ## Defaults
 
-One policy for each scope can be the default. Marking a policy
-default clears the flag on any other policy that shares a scope with
-it. The change happens in one step, so two policies are never both
-default for the same scope.
+One policy in each scope can be the default. When you make a policy
+the default, the app clears the flag on the other policies in the
+same scope. This occurs in one step. Two policies are never both the
+default for one scope.
 
-A key routes through the policy it names. The default is the policy
-the product offers first when someone makes a key for that scope.
+A key routes through the policy that it names. The default policy is
+the one the app offers first when someone makes a key in that scope.
 
 ## Manage in the app
 
@@ -8453,14 +8457,15 @@ on a policy and select **Edit**.
 
 In the editor you can:
 
-- Name the policy and say what it is for.
-- Choose where it applies.
-- Choose the providers and put them in order.
-- Choose a model for each tier, and a default model.
+- Give the policy a name and a description.
+- Select where it applies.
+- Select the providers and put them in order.
+- Select a model for each tier, and a default model.
 - Map other model names.
 - Add restrictions.
 
-The editor has its own address. A link to a policy opens that policy.
+The editor has its own address. A link to a policy opens that
+policy.
 
 ## Manage with tRPC
 
@@ -8497,16 +8502,18 @@ trpc.routingPolicy.delete.useMutation();
 ## Keys that name no policy
 
 A key that names no policy uses its own routing mode. `NONE` sends
-the request to one provider and returns the error. `FALLBACK_ALL`
-tries the providers the key can reach, in a fixed order.
+the request to one provider and returns that provider's answer.
+`FALLBACK_ALL` tries the providers that the key can reach, in a set
+order.
 
 To move a key to a policy:
 
-1. Make a policy with the providers the key uses.
-2. Set the key's routing policy to it.
-3. Send a request and check that it reaches the provider you expect.
+1. Make a policy with the providers that the key uses.
+2. Set the key's routing policy.
+3. Send a request. Make sure that it reaches the provider you
+   expect.
 
-Point new keys at a policy. It keeps the routing decision in one
+Point new keys to a policy. Then the routing decision stays in one
 place.
 
 ---
@@ -8713,7 +8720,7 @@ Every client using `model: "claude"` now hits Bedrock. Switch back in one edit. 
 Given a request with `model: "<name>"`:
 
 1. If `<name>` has a `/` in it (explicit `provider/model` form), **aliases are bypassed** and the gateway routes directly to that provider, subject to `models_allowed` and the VK's `providers[]` list.
-2. Otherwise, `<name>` is looked up in `model_aliases`. If found, the mapped `provider/model` is checked against `models_allowed` and, when it passes, dispatched.
+2. Otherwise the gateway looks up `<name>` in `model_aliases`. If there is an entry, the gateway checks the mapped `provider/model` against `models_allowed`. If the check passes, the gateway dispatches it.
 3. If not found in aliases, the gateway checks `models_allowed`. If the model is allowed, it's dispatched to the VK's primary provider.
 4. If none of the above, returns `403 model_not_allowed`.
 
@@ -8725,13 +8732,13 @@ This lets you have an `openai/` namespace that addresses OpenAI directly for tes
 
 ## Enforcement
 
-Aliases do not bypass `models_allowed`. The allowlist judges the model the alias resolves to, never the name the caller typed, and it accepts either spelling of that model: an allowlist entry of `gpt-5-mini` and one of `openai/gpt-5-mini` both match the same resolved model, so you write whichever form your team reads more naturally.
+Aliases do not go around `models_allowed`. The allowlist judges the model that the alias resolves to, never the name that the caller typed. It accepts the two spellings of that model: an entry of `gpt-5-mini` and an entry of `openai/gpt-5-mini` match the same resolved model. Write the form that your team reads.
 
-If `models_allowed: ["gpt-5-mini", "claude-haiku-4-5-20251001"]` and an alias maps to `openai/o3`, a request using the alias is refused with `model_not_allowed`. The rejection names `o3`, the model the alias resolved to, alongside the alias the key gave it, so the operator can see which side to fix.
+If `models_allowed: ["gpt-5-mini", "claude-haiku-4-5-20251001"]` and an alias maps to `openai/o3`, the gateway refuses a request that uses the alias with `model_not_allowed`. The refusal names `o3`, the resolved model, and it names the alias. The operator can see which side to correct.
 
-This matters for security: don't grant a model via aliases that you wouldn't grant explicitly.
+This matters for security: do not grant a model through an alias that you would not grant directly.
 
-[Policy rules](/ai-gateway/policy-rules) judge the resolved model the same way, so an alias pointing at a denied model is blocked.
+[Policy rules](/ai-gateway/policy-rules) judge the resolved model in the same way. An alias that points to a denied model is blocked.
 
 ## Discovery via `/v1/models`
 
@@ -8881,7 +8888,7 @@ The error surfaces the accepted names so an integrator can fix the request witho
     Use an alias. Edit the VK once, zero caller changes. See [Model Aliases](/ai-gateway/model-aliases).
   </Step>
   <Step title="Cross-provider fallback (primary dies, secondary takes over)">
-    Name a model the fallback providers also serve, for example an Anthropic model with both an Anthropic and a Bedrock credential on the VK. One request resolves to one model, and the gateway carries that same model name to the next credential in the chain. See [Fallback Chains](/ai-gateway/providers/fallback-chains).
+    Name a model that the fallback providers also serve, for example an Anthropic model with an Anthropic credential and a Bedrock credential on the VK. One request resolves to one model. The gateway carries that same model name to the next credential in the chain. See [Fallback Chains](/ai-gateway/providers/fallback-chains).
   </Step>
 </Steps>
 
@@ -9380,7 +9387,7 @@ Four kinds of patterns:
 
 Each has a `deny` list and an optional `allow` list.
 
-<Note>**Enforcement point:** policy-rule checks run immediately after authentication and rate limiting, **before** guardrails, budget reconciliation, or the upstream provider. The tools, MCP, and URL dimensions judge the request body as sent; the models dimension runs a step later, at model resolution, so it can judge the model the request actually resolves to. A blocked request never incurs a provider token cost, a guardrail evaluator run, or a budget debit. This is the cheapest possible reject path in the dispatcher.</Note>
+<Note>**Enforcement point:** policy-rule checks run immediately after authentication and rate limiting, **before** guardrails, budget reconciliation, or the upstream provider. The tools, MCP, and URL dimensions judge the request body as sent. The models dimension runs one step later, at model resolution, and judges the resolved model. A blocked request never incurs a provider token cost, a guardrail evaluator run, or a budget debit. This is the cheapest possible reject path in the dispatcher.</Note>
 
 ## How it works
 
@@ -9438,16 +9445,16 @@ First URL that hits a deny rule (or falls outside a non-null `allow` list) → `
 
 ### Models
 
-The `models` dimension is RE2-matched against the **resolved** model id, the one the request will actually be billed and served under, not the string the caller typed. Alias resolution runs first, then the rules judge its result. This is policy-by-regex (e.g. "block anything matching `^gpt-4(-turbo)?$`"), distinct from the static `models_allowed` glob allowlist on the VK.
+The `models` dimension is RE2-matched against the **resolved** model id, the model that serves the request and gets billed, not the string that the caller typed. Alias resolution runs first. Then the rules judge its result. This is policy-by-regex (e.g. "block anything matching `^gpt-4(-turbo)?$`"), distinct from the static `models_allowed` glob allowlist on the VK.
 
-Two consequences follow directly, and both are the point of judging the resolved id:
+Judging the resolved id has two effects:
 
-- An alias pointing at a denied model **is** blocked. Naming `gpt-4` in an alias is not a way around a rule that denies `^gpt-4(-turbo)?$`.
-- A rule denying a name that resolves elsewhere does **not** block. If `gpt-4` is an alias for `azure/my-eastus-deployment`, a deny on `^gpt-4$` never fires, because nothing denied ever runs.
+- An alias that points to a denied model **is** blocked. An alias named `gpt-4` does not go around a rule that denies `^gpt-4(-turbo)?$`.
+- A rule that denies a name that resolves to a different model does **not** block. If `gpt-4` is an alias for `azure/my-eastus-deployment`, a deny on `^gpt-4$` never fires. The denied name never runs.
 
-Rules match either spelling of the resolved model, the bare id and the provider-qualified one, so `^gpt-4.*` and `^openai/gpt-4.*` both reach `openai/gpt-4o`. Write whichever your team reads more naturally instead of maintaining both.
+Rules match the two spellings of the resolved model, the bare id and the provider-qualified id. `^gpt-4.*` and `^openai/gpt-4.*` both reach `openai/gpt-4o`. Write one form. You do not need both.
 
-The other three dimensions are properties of the request body as sent, so tools, MCP servers, and URLs are judged exactly as the client wrote them.
+The other three dimensions read the request body as sent. The gateway judges tools, MCP servers, and URLs as the client wrote them.
 
 Blocked → `403 model_not_allowed`. Attribution via request-id correlation (see [§Tools](#tools) above).
 
@@ -9460,7 +9467,7 @@ Both gate which models a VK can call, but they solve different problems:
 | `models_allowed` | `["claude-haiku-*", "gpt-5-mini"]` (glob allowlist) | Static, human-readable "these models and no others." Simplest case. |
 | `policy_rules.models` | `{deny: [...], allow: [...]}` (RE2 regex) | Policy that needs regex power, "deny any `gpt-4*` except `gpt-4o-mini`," "deny anything not from a provider prefix." |
 
-They compose: a request passes only if both checks allow it. `models_allowed` is applied first, during model resolution, and the regex rules judge what resolution settled on. Both read the resolved model in either spelling, so neither can be routed around with an alias. Use `models_allowed` for 90% of cases and reach for `policy_rules.models` when regex semantics are actually needed.
+They compose: a request passes only if both checks allow it. The gateway applies `models_allowed` first, at model resolution. The regex rules then judge the resolved model. The two checks read the resolved model in the two spellings, so an alias cannot go around them. Use `models_allowed` for 90% of cases and reach for `policy_rules.models` when you need regex semantics.
 
 ## Common policies
 
@@ -9956,7 +9963,7 @@ On the VK edit screen:
 1. Select a **primary** provider credential.
 2. Add one or more **fallback** credentials in the order they should be tried.
 
-The VK's resolved configuration carries the chain and the bound on the walk:
+The VK's resolved configuration carries the chain and the attempt limit:
 
 ```json
 {
@@ -9967,11 +9974,11 @@ The VK's resolved configuration carries the chain and the bound on the walk:
 }
 ```
 
-`chain` is the ordered credential list and `max_attempts` (default `3`) is how many of them one request may be tried against. A key configured for no fallback gets exactly one attempt.
+`chain` is the ordered credential list. `max_attempts` (default `3`) sets how many of them the gateway tries for one request. A key with no fallback gets exactly one attempt.
 
 ## When fallback triggers
 
-Which failures are worth another provider is decided by the gateway from the real upstream outcome, in one place, and is the same for every virtual key. There is no per-key trigger list: a narrowed one could only ever turn a failure the gateway would have recovered from into one your callers see.
+The gateway decides which failures move to the next provider. It reads the real upstream result, and the rule is the same for every virtual key. There is no per-key trigger list. A narrowed list could only turn a failure the gateway can recover from into one that your callers see.
 
 | Condition | Fires? | Why |
 |---|---|---|
@@ -9979,23 +9986,23 @@ Which failures are worth another provider is decided by the gateway from the rea
 | `timeout` | ✅ | Provider degraded. |
 | `429 rate_limit_exceeded` | ✅ | Primary is throttled; secondary may have headroom. |
 | `network_error` (DNS/TCP/TLS) | ✅ | Connectivity issue to primary. |
-| Upstream `404 Not Found` | ✅ | In a multi-provider chain this usually means this provider doesn't serve that model, and the next one may. Common with self-hosted and OpenAI-compatible providers. |
+| Upstream `404 Not Found` | ✅ | In a chain with more than one provider, this usually means that this provider does not serve that model. The next one can. Common with self-hosted and OpenAI-compatible providers. |
 | `circuit_breaker` open | ✅ | Preemptive, gateway knows primary has been failing recently. |
 | Upstream `400 Bad Request` | ❌ | Client-fault. Surfacing the error is correct. |
 | Upstream `401 Unauthorized` | ❌ | Provider credential bad. Needs human fix, not masking. |
 | Upstream `403 Forbidden` | ❌ | Authorization issue. Silent switch would hide a real problem. |
-| Client disconnect or an expired request deadline | ❌ | The caller walked away. It says nothing about the provider's health. |
+| Client disconnect or an expired request deadline | ❌ | The caller went away. This tells nothing about the provider's health. |
 | LangWatch-internal `invalid_api_key` etc | ❌ | Never reaches the fallback layer. |
 
 ## Crossing providers mid-chain
 
 A single VK may have mixed providers (OpenAI + Anthropic + Bedrock). The gateway uses [Bifrost's provider-dispatch library](https://github.com/maximhq/bifrost) to translate payloads: same `messages` schema, different wire formats.
 
-The model itself does not change across the chain. One request resolves to one model, and the gateway sends that same model name to the next credential, expecting the provider to serve it. So a chain earns its keep when its entries overlap on the models you actually call: an Anthropic credential paired with a Bedrock one serving Anthropic models, or two OpenAI accounts in different regions.
+The model does not change across the chain. One request resolves to one model. The gateway sends that same model name to the next credential and expects the provider to serve it. So a chain helps when its entries overlap on the models you call: an Anthropic credential with a Bedrock credential that serves Anthropic models, or two OpenAI accounts in different regions.
 
-Credentials that cannot serve the resolved model are skipped rather than dialed. When a request names a model the gateway can attribute to a provider, through an alias, the `provider/model` form, or a recognizable bare name, the walk visits only that provider's credentials on the VK. If the VK holds none for that provider, the gateway walks the chain as configured rather than refusing up front, and the providers' own answers decide the outcome.
+The gateway skips a credential that cannot serve the resolved model. It does not call it. When the model name tells the gateway which provider owns it, through an alias, the `provider/model` form, or a known bare name, the chain visits only that provider's credentials on the VK. If the name tells the gateway nothing, the gateway walks the chain as configured, and the providers' own answers decide the outcome.
 
-A VK narrowed to specific providers is enforced here too: if the model resolves to a provider the key may not use, the request comes back as `model_not_allowed` naming the model and asking the key's owner to widen its provider access.
+A VK narrowed to specific providers is enforced here too. If the model resolves to a provider that the key cannot use, the gateway refuses with `model_not_allowed`. The refusal names the model and tells the key's owner to widen the key's provider access.
 
 ## Streaming
 
@@ -10047,7 +10054,7 @@ When a request hits a circuit that's currently `open`, the gateway skips to the 
 
 ## Sizing the chain
 
-Diminishing returns after 3 entries. Every extra attempt spends another provider round-trip in series, so with the default `max_attempts=3` the worst case is three upstream calls back to back; the latency budget of the original call is gone well before the last one answers and the client has probably given up. Use chains of 2 to 3 entries for latency-sensitive traffic, lower `max_attempts` if you need a tighter total budget, and save longer chains for batch and offline work where wall-clock is cheap.
+Returns decrease after 3 entries. Each extra attempt spends one more provider round-trip, one after the other. With the default `max_attempts=3`, the worst case is three upstream calls in a row. The client has usually stopped waiting before the last one answers. Use chains of 2 to 3 entries for latency-sensitive traffic. Lower `max_attempts` if you need a tighter total budget. Keep longer chains for batch and offline work, where wall-clock time is cheap.
 
 ---
 
@@ -10178,7 +10185,7 @@ Reasoning models return a `reasoning_tokens` count in `usage.completion_tokens_d
 
 - **Responses API vs Chat Completions API**: the two have slightly different payload shapes. The gateway proxies whichever endpoint the client hits; it does not translate between them. Codex users should see [Codex CLI](/ai-gateway/cli/codex) for guidance on `wire_api` config.
 - **Organization header on egress**: if the VK doesn't set a custom Organization, the upstream OpenAI request uses the ModelProvider's default.
-- **Rate-limit responses (429)**: a 429 always walks the VK's [fallback chain](/ai-gateway/providers/fallback-chains) to the next credential. When the chain is exhausted or the VK has none, OpenAI's `Retry-After` header is surfaced to the client verbatim.
+- **Rate-limit responses (429)**: a 429 moves to the next credential in the VK's [fallback chain](/ai-gateway/providers/fallback-chains). When the chain is used up, or the VK has no chain, the gateway sends OpenAI's `Retry-After` header to the client as is.
 
 ---
 
