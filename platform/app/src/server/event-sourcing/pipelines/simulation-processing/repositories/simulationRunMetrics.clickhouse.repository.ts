@@ -54,7 +54,8 @@ export class SimulationRunMetricsRepositoryClickHouse
   async insertRows(
     rows: SimulationRunMetricsProjectionRecord[],
   ): Promise<void> {
-    if (rows.length === 0) return;
+    const [firstRow] = rows;
+    if (!firstRow) return;
 
     // Map-projection batches are tenant-scoped, so every row in one call
     // carries the same TenantId (stamped on the record itself, per the
@@ -65,7 +66,7 @@ export class SimulationRunMetricsRepositoryClickHouse
     // another tenant's database. Cheap to check, and the only alternative is
     // trusting a comment. A plain Error on purpose: it is a broken internal
     // invariant, not something a caller can act on.
-    const tenantId = rows[0]!.TenantId;
+    const tenantId = firstRow.TenantId;
     const foreign = rows.find((row) => row.TenantId !== tenantId);
     if (foreign) {
       throw new Error(
