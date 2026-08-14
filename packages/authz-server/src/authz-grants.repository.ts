@@ -12,11 +12,14 @@ import type {
 } from "./authz-read.repository";
 
 /** Which principal a binding row points at. Exactly one, by construction -
- *  the union is what makes "two principals on one row" unrepresentable. */
+ *  the `?: never` exclusions are what make "two principals on one row"
+ *  unrepresentable. A bare union would not: excess-property checks skip
+ *  variables, so `{ userId, groupId }` passed by reference would type-check
+ *  and the adapter would write both columns. */
 export type BindingPrincipalWhere =
-  | { userId: string }
-  | { groupId: string }
-  | { apiKeyId: string };
+  | { userId: string; groupId?: never; apiKeyId?: never }
+  | { userId?: never; groupId: string; apiKeyId?: never }
+  | { userId?: never; groupId?: never; apiKeyId: string };
 
 /** The row shape for a binding INSERT. The adapter spreads `principal` onto
  *  its three nullable columns; the union is the only place that mapping is

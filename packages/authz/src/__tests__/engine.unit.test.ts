@@ -553,6 +553,40 @@ describe("authz engine decide()", () => {
       expect(decision.denialReason).toBe("no-membership");
     });
 
+    it("denies at resource scope despite a leftover binding on the resource's lineage", () => {
+      // The membership gate defers on resource scopes so share links stay
+      // reachable — but membership-before-bindings must still hold, or a
+      // removed member's leftover PROJECT binding reads every trace under it.
+      const decision = engine.decide({
+        grants: nonMember({
+          bindings: [
+            binding({ role: "ADMIN", scopeType: "PROJECT", scopeId: PROJECT }),
+          ],
+        }),
+        permission: "traces:view",
+        scope: traceScope,
+      });
+      expect(decision.allowed).toBe(false);
+    });
+
+    it("denies at resource scope despite a leftover legacy TeamUser row", () => {
+      const decision = engine.decide({
+        grants: nonMember({
+          legacyTeamMemberships: [
+            {
+              teamId: TEAM,
+              role: "ADMIN",
+              customRoleId: null,
+              isPersonal: false,
+            },
+          ],
+        }),
+        permission: "traces:view",
+        scope: traceScope,
+      });
+      expect(decision.allowed).toBe(false);
+    });
+
     it("still resolves a presented share link through the resource tier", () => {
       const decision = engine.decide({
         grants: nonMember(),

@@ -1875,31 +1875,29 @@ export async function batchScopePermissions(
   }
 
   // ADR-092 stage A4: every verdict this batch produced is a real
-  // authorization answer, so each one is compared. The volume is bounded by
-  // the shadow's own per-call sampling — at the rates this ships at, a page
-  // enumerating a hundred scopes compares a handful of them, and the batched
-  // legacy answer above still costs its four queries flat.
+  // authorization answer, so each one is compared — through the batch entry
+  // point, which draws the sample once and collects grants once for the
+  // whole batch. Per-scope userPermissionCheck calls here would fan legacy's
+  // four flat queries into a detached collect per scope (the pool-starving
+  // fan-out api-key.service.ts documents), with the whole batch as the
+  // worst case at sample rate 1.
   const userId = ctx.session?.user?.id;
   if (userId) {
-    const shadow = authzShadowFor(ctx.prisma);
-    for (const [teamId, permitted] of teamsMap) {
-      shadow.userPermissionCheck({
-        userId,
-        permission: args.permission,
-        legacyAllowed: permitted,
+    authzShadowFor(ctx.prisma).userBatchPermissionCheck({
+      userId,
+      permission: args.permission,
+      organizationId: args.organizationId,
+      teams: [...teamsMap].map(([teamId, legacyAllowed]) => ({
         teamId,
-        caller: "trpc.batch",
-      });
-    }
-    for (const [projectId, permitted] of projectsMap) {
-      shadow.userPermissionCheck({
-        userId,
-        permission: args.permission,
-        legacyAllowed: permitted,
+        legacyAllowed,
+      })),
+      projects: [...projectsMap].map(([projectId, legacyAllowed]) => ({
         projectId,
-        caller: "trpc.batch",
-      });
-    }
+        teamId: args.projectTeamId[projectId],
+        legacyAllowed,
+      })),
+      caller: "trpc.batch",
+    });
   }
 
   return { teams: teamsMap, projects: projectsMap };

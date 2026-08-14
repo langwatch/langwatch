@@ -77,16 +77,16 @@ waits on nothing.
 
 ```
  A1  registry           A2  built-in roles      A3  engine            A4  shadow mode
- server/authz/          server/authz/roles.ts   server/authz/         wrap the 6 legacy
- registry.ts            viewer/member/admin/    engine.ts + explain   resolvers, compare,
- + matrix codegen       lite-member/demo/ops    + principals + scopes log mismatches
+ packages/authz/src/    packages/authz/src/     packages/authz/src/   wrap the 6 legacy
+ registry.ts            roles.ts (viewer/       engine.ts + explain   resolvers, compare,
+ + matrix codegen       member/admin/demo…)     + principals + scopes log mismatches
 
  A5  resource tier
  resource scopes + child closure + audiences + anonymous principal,
  collected from ADR-057's ShareLink rows (no schema change until C5)
 ```
 
-- **A1 `server/authz/registry.ts`.** All ~32 resources, per-resource actions,
+- **A1 `packages/authz/src/registry.ts`.** All ~32 resources, per-resource actions,
   grantable scopes (absorbs `ORG_EXCLUSIVE_RESOURCES` + a new `platform`
   scope for `ops:*`), manage-implications, UI labels/descriptions/order,
   API-key category mapping, and a **stable bitset index per permission**
@@ -100,12 +100,12 @@ waits on nothing.
   `DEMO_VIEW_PERMISSIONS`, `PERMISSION_CATEGORIES`, and
   `permissionsConfig.ts` exists in the registry (the reverse - registry
   entries with no legacy source - is a documented allowlist).
-- **A2 `server/authz/roles.ts`.** Built-ins declared as diffs (member =
+- **A2 `packages/authz/src/roles.ts`.** Built-ins declared as diffs (member =
   viewer + additions, admin = member + additions). *The load-bearing test:*
   generated exhaustive equality against today's bags in `rbac.ts` - every
   (role × permission) cell must match, hierarchy rules included. This is the
   characterisation suite the whole migration leans on.
-- **A3 `server/authz/engine.ts`.** `Principal` (`{actor, subject}` pair),
+- **A3 `packages/authz/src/engine.ts`.** Shipped as the pure `@langwatch/authz` package; `platform/app/src/server/authz/` keeps only the app adapters and Prisma composition. `Principal` (`{actor, subject}` pair),
   `ScopeRef`, COLLECT/FILTER/EXPAND/UNION/DECIDE/RECORD, `AuthzDecision`
   with `denialReason` + `audience`, `explain()`, ceiling algebra (`∩`) for
   API keys. Pure core over a collected-bindings input; one Prisma-backed

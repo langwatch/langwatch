@@ -198,10 +198,7 @@ export class AuthzCollectorService {
     return rows
       .filter((row) => isLiveShareLink(row, now))
       .map((row) => ({
-        kind:
-          row.resourceType === "TRACE"
-            ? ("trace" as const)
-            : ("thread" as const),
+        kind: kindForResourceType(row.resourceType),
         id: row.resourceId,
         projectId: row.projectId,
         permission: "traces:view",
@@ -339,6 +336,26 @@ function isLiveShareLink(row: ShareLinkRow, now: Date): boolean {
   if (row.expiresAt != null && row.expiresAt <= now) return false;
   if (row.maxViews != null && row.viewCount >= row.maxViews) return false;
   return true;
+}
+
+function kindForResourceType(
+  resourceType: ShareLinkRow["resourceType"],
+): ShareableResourceKind {
+  switch (resourceType) {
+    case "TRACE":
+      return "trace";
+    case "THREAD":
+      return "thread";
+    default: {
+      // A resource type added to the stored enum without a kind here would
+      // otherwise need a fallback, and any fallback is a grant matched at a
+      // node the resource does not sit at.
+      const unreachable: never = resourceType;
+      throw new Error(
+        `unhandled share link resource type: ${String(unreachable)}`,
+      );
+    }
+  }
 }
 
 /**

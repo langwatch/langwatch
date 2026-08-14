@@ -195,6 +195,105 @@ export class AuthzShadowService {
     })();
   }
 
+  /**
+   * The batched resolver's comparison: one sampling draw, one grant
+   * collection, N decisions against that snapshot. The per-scope loop the
+   * batch caller would otherwise write costs a resolveScopeRef plus a
+   * collectGrants PER SCOPE — a page enumerating a hundred scopes turning
+   * legacy's four flat queries into hundreds of detached ones (the same
+   * fan-out api-key.service.ts:736 documents starving the pool).
+   *
+   * Scope refs are built from the lineage the caller already resolved —
+   * these ids come out of legacy's own org-scoped batch resolution, not the
+   * request — with resolveScopeRef as the fallback for a project whose team
+   * the caller does not know.
+   */
+  userBatchPermissionCheck({
+    userId,
+    permission,
+    organizationId,
+    teams,
+    projects,
+    caller,
+  }: {
+    userId: string;
+    permission: string;
+    organizationId: string;
+    teams: ReadonlyArray<{ teamId: string; legacyAllowed: boolean }>;
+    projects: ReadonlyArray<{
+      projectId: string;
+      teamId?: string | undefined;
+      legacyAllowed: boolean;
+    }>;
+    caller: string;
+  }): void {
+    if (!this.sampled()) return;
+    void (async () => {
+      try {
+        const principal: AuthzPrincipalRef = { type: "user", id: userId };
+        const grants = await this.collector.collectGrants({
+          principal,
+          organizationId,
+        });
+        const demoProjectId = this.options.demoProjectId();
+        const scoped: Array<{ scope: AuthzScopeRef | null; legacyAllowed: boolean }> =
+          [
+            ...teams.map(({ teamId, legacyAllowed }) => ({
+              scope: {
+                type: "team" as const,
+                id: teamId,
+                organizationId,
+              },
+              legacyAllowed,
+            })),
+            ...(await Promise.all(
+              projects.map(async ({ projectId, teamId, legacyAllowed }) => ({
+                scope: teamId
+                  ? {
+                      type: "project" as const,
+                      id: projectId,
+                      teamId,
+                      organizationId,
+                    }
+                  : await this.collector.resolveScopeRef({ projectId }),
+                legacyAllowed,
+              })),
+            )),
+          ];
+        for (const { scope, legacyAllowed } of scoped) {
+          if (!scope) {
+            logOutcome({
+              caller,
+              legacyAllowed,
+              engineAllowed: false,
+              permission,
+              scope: null,
+              principal,
+            });
+            continue;
+          }
+          const decision = this.engine.decide({
+            grants,
+            permission,
+            scope,
+            demoProjectId,
+          });
+          logOutcome({
+            caller,
+            legacyAllowed,
+            engineAllowed: decision.allowed,
+            permission,
+            scope,
+            principal,
+            denialReason: decision.denialReason,
+          });
+        }
+      } catch (error) {
+        logger.debug({ error, caller }, "authz shadow comparison failed");
+      }
+    })();
+  }
+
   apiKeyPermissionCheck({
     apiKeyId,
     ownerUserId,

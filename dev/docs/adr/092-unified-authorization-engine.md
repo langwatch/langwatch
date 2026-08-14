@@ -337,7 +337,7 @@ A single `as const` registry declares every resource, the actions it supports, t
 it, and its presentation metadata. Everything else is **derived** from it:
 
 ```
- server/authz/registry.ts
+ packages/authz/src/registry.ts
  ┌─────────────────────────────────────────────────────────────────┐
  │ traces:       actions: view · share · create · update           │
  │               scopes:  project · team · org                     │
@@ -381,7 +381,7 @@ and hoping.
 ### 2. One resolver, one decision shape
 
 The six-step walk pictured above is implemented **once**, in
-`server/authz/engine.ts`, and every caller uses it:
+`packages/authz/src/engine.ts`, and every caller uses it:
 
 - The batch case (`batchScopePermissions`, the model-defaults page) is the
   same function taking N scopes. Collect once, decide N times in memory.
@@ -890,7 +890,7 @@ re-collect is the same 1-2 queries the engine already does.
 ### 13. Migration: six shippable stages
 
 ```
- A  EXTRACT   server/authz/ registry + engine + AuthzDecision.
+ A  EXTRACT   packages/authz/ registry + engine + AuthzDecision.
               Characterization tests generated from the registry
               (role × permission × scope matrix vs today's answers).
               A5 adds the RESOURCE TIER (§8), collected from ADR-057's

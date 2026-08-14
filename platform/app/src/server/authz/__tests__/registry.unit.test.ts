@@ -59,10 +59,7 @@ describe("authz registry", () => {
           (action) => `${resource}:${action}`,
         ),
       );
-      const missing = uiStrings.filter(
-        (permission) => !isRegistryPermission(permission),
-      );
-      expect(missing).toEqual([
+      const KNOWN_DRIFT = [
         "team:create",
         "team:update",
         "team:delete",
@@ -72,7 +69,15 @@ describe("authz registry", () => {
         "aiTools:create",
         "aiTools:update",
         "aiTools:delete",
-      ]);
+      ];
+      const missing = uiStrings.filter(
+        (permission) => !isRegistryPermission(permission),
+      );
+      // Only NEW drift fails: retiring a pair from the UI catalogue is the
+      // progress the comment above promises, so a shrunk list passes.
+      expect(
+        missing.filter((permission) => !KNOWN_DRIFT.includes(permission)),
+      ).toEqual([]);
     });
   });
 

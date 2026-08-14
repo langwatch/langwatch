@@ -144,6 +144,45 @@ describe("authz shadow mode", () => {
     });
   });
 
+  describe("given a batched comparison", () => {
+    it("collects grants once and compares every scope against that snapshot", async () => {
+      const reader = makeShadowReader({
+        findOrganizationRole: vi.fn().mockResolvedValue("MEMBER"),
+        findUserBindings: vi.fn().mockResolvedValue(projectBinding("ADMIN")),
+      });
+      const shadow = makeShadow(reader);
+
+      shadow.userBatchPermissionCheck({
+        userId: "alice",
+        permission: "traces:view",
+        organizationId: ORG,
+        // The team verdict diverges (legacy yes, project-scoped binding no);
+        // both project verdicts agree.
+        teams: [{ teamId: TEAM, legacyAllowed: true }],
+        projects: [
+          { projectId: PROJECT, teamId: TEAM, legacyAllowed: true },
+          { projectId: "proj-2", teamId: TEAM, legacyAllowed: false },
+        ],
+        caller: "trpc.batch",
+      });
+
+      await vi.waitFor(() => expect(warn).toHaveBeenCalledTimes(1));
+      expect(warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          caller: "trpc.batch",
+          scopeType: "team",
+          legacyAllowed: true,
+          engineAllowed: false,
+        }),
+        "authz shadow mismatch",
+      );
+      // One grant collection covered all three scopes, and the supplied
+      // lineage meant no per-scope resolution queries at all.
+      expect(reader.findOrganizationRole).toHaveBeenCalledTimes(1);
+      expect(reader.findProjectLineage).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when the comparison itself fails", () => {
     it("logs debug and swallows — never affects the response", async () => {
       const shadow = makeShadow(

@@ -6,8 +6,10 @@
  * targets) and the naming of the two knowable storage failures all live
  * here.
  *
- * These are module functions over the repository, not methods: they hold no
- * state and every one of them is a pure question asked of storage.
+ * These are module functions, not methods: they hold no state. The tenancy
+ * and existence checks are questions asked of storage; the rest
+ * (unknownPermissions, principalWhere, rethrowKnownWriteFailure) are pure
+ * translations that never touch it.
  */
 import { type AuthzScopeRef, isRegistryPermission } from "@langwatch/authz";
 import { HandledError } from "@langwatch/handled-error";

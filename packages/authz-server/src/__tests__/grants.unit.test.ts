@@ -3,6 +3,7 @@ import { AuthzCollectorService } from "../authz-collector.service";
 import {
   type AuthzGrantsRepository,
   BindingMissingError,
+  type BindingPrincipalWhere,
   DuplicateBindingError,
 } from "../authz-grants.repository";
 import type { AuthzReadRepository } from "../authz-read.repository";
@@ -518,5 +519,22 @@ describe("GrantsService.offboard", () => {
       expect(decision.allowed).toBe(false);
       expect(decision.denialReason).toBe("owner-ceiling");
     });
+  });
+});
+
+describe("BindingPrincipalWhere", () => {
+  it("rejects a value carrying two principals, even passed by reference", () => {
+    // Excess-property checks skip variables, so without the `?: never`
+    // exclusions this assignment would type-check and the adapter would
+    // write two principal columns onto one row.
+    const twoPrincipals = { userId: "user-1", groupId: "group-1" };
+    // @ts-expect-error exactly one principal per binding row
+    const rejected: BindingPrincipalWhere = twoPrincipals;
+    void rejected;
+
+    const user: BindingPrincipalWhere = { userId: "user-1" };
+    const group: BindingPrincipalWhere = { groupId: "group-1" };
+    const apiKey: BindingPrincipalWhere = { apiKeyId: "key-1" };
+    expect([user, group, apiKey]).toHaveLength(3);
   });
 });

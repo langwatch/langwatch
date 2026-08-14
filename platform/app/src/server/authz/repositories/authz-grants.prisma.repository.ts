@@ -199,50 +199,56 @@ export class PrismaAuthzGrantsRepository implements AuthzGrantsRepository {
     organizationId: string;
     prove: (txReader: AuthzReadRepository) => Promise<void>;
   }): Promise<OffboardCounts> {
-    return this.prisma.$transaction(async (tx) => {
-      const bindings = await tx.roleBinding.deleteMany({
-        where: { organizationId, userId },
-      });
-      const groupMemberships = await tx.groupMembership.deleteMany({
-        where: { userId, group: { organizationId } },
-      });
-      const legacyTeamMemberships = await tx.teamUser.deleteMany({
-        where: { userId, team: { organizationId } },
-      });
-      const organizationMembership = await tx.organizationUser.deleteMany({
-        where: { userId, organizationId },
-      });
-      // Pending invites are keyed by email, not by user id, so the address
-      // has to be read to match them. It is read HERE so the lookup and the
-      // delete commit or roll back together with the other offboarding
-      // writes; reading it before the transaction widened the window in
-      // which an address change strands a live invite the returned counts
-      // claim was removed. (The transaction does not serialize against a
-      // concurrent email update itself — that residual race is the email
-      // writer's, not this read's.)
-      const user = await tx.user.findUnique({
-        where: { id: userId },
-        select: { email: true },
-      });
-      const email = user?.email ?? null;
-      const pendingInvites = email
-        ? await tx.organizationInvite.deleteMany({
-            where: { organizationId, email, status: "PENDING" },
-          })
-        : { count: 0 };
+    return this.prisma.$transaction(
+      async (tx) => {
+        const bindings = await tx.roleBinding.deleteMany({
+          where: { organizationId, userId },
+        });
+        const groupMemberships = await tx.groupMembership.deleteMany({
+          where: { userId, group: { organizationId } },
+        });
+        const legacyTeamMemberships = await tx.teamUser.deleteMany({
+          where: { userId, team: { organizationId } },
+        });
+        const organizationMembership = await tx.organizationUser.deleteMany({
+          where: { userId, organizationId },
+        });
+        // Pending invites are keyed by email, not by user id, so the address
+        // has to be read to match them. It is read HERE so the lookup and the
+        // delete commit or roll back together with the other offboarding
+        // writes; reading it before the transaction widened the window in
+        // which an address change strands a live invite the returned counts
+        // claim was removed. (The transaction does not serialize against a
+        // concurrent email update itself — that residual race is the email
+        // writer's, not this read's.)
+        const user = await tx.user.findUnique({
+          where: { id: userId },
+          select: { email: true },
+        });
+        const email = user?.email ?? null;
+        const pendingInvites = email
+          ? await tx.organizationInvite.deleteMany({
+              where: { organizationId, email, status: "PENDING" },
+            })
+          : { count: 0 };
 
-      // The proof runs against THIS transaction, so the deletes above are
-      // visible to it; a throw rolls the whole offboarding back.
-      await prove(new PrismaAuthzReadRepository(tx));
+        // The proof runs against THIS transaction, so the deletes above are
+        // visible to it; a throw rolls the whole offboarding back.
+        await prove(new PrismaAuthzReadRepository(tx));
 
-      return {
-        bindings: bindings.count,
-        groupMemberships: groupMemberships.count,
-        legacyTeamMemberships: legacyTeamMemberships.count,
-        pendingInvites: pendingInvites.count,
-        organizationMembership: organizationMembership.count > 0,
-      };
-    });
+        return {
+          bindings: bindings.count,
+          groupMemberships: groupMemberships.count,
+          legacyTeamMemberships: legacyTeamMemberships.count,
+          pendingInvites: pendingInvites.count,
+          organizationMembership: organizationMembership.count > 0,
+        };
+      },
+      // Seven sequential statements plus the re-collecting proof share this
+      // transaction; Prisma's default 5s timeout would roll the whole
+      // offboarding back on a slow pool, so give it explicit room.
+      { timeout: 15_000 },
+    );
   }
 
   async findOwnedApiKeys({

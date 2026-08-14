@@ -183,8 +183,10 @@ export class AuthzService {
   }
 
   /**
-   * ADR-092 §6 — render the walk for a decision, recollecting the snapshot
-   * the decision was made against.
+   * ADR-092 §6 — render the walk for a decision against the CURRENT grant
+   * snapshot, not the one the decision was made against: a grant write
+   * between the decision and this call changes the rendered walk. Carrying
+   * the decision's own snapshot lands with the stage E explain surface.
    */
   async explainDecision({
     decision,

@@ -289,7 +289,14 @@ describe("PrismaAuthzReadRepository", () => {
           // clause is the half that requires the role to have been minted
           // for this key; without it the guard admits the orphan.
           const branch = findMany.mock.calls[0]?.[0]?.where?.OR?.[1];
-          expect(branch.roleBindings.some).toEqual({ apiKeyId: "key-1" });
+          // The whole branch, not a dereferenced path: shape drift should
+          // fail this assertion, not throw a TypeError on the way to it.
+          expect(branch).toMatchObject({
+            roleBindings: {
+              some: { apiKeyId: "key-1" },
+              every: { apiKeyId: "key-1" },
+            },
+          });
         });
       });
     });

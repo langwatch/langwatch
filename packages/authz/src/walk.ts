@@ -75,8 +75,11 @@ export function demoProjectStep({
  * path never authorizes. Api-key principals hold no org membership and pass
  * this gate untouched — past it they may still resolve through bindings or
  * an api-key-audience resource grant. The resource tier is deliberately
- * outside the gate: share links are how a non-member or an anonymous caller
- * sees anything at all.
+ * outside this OUTRIGHT denial: share links are how a non-member or an
+ * anonymous caller sees anything at all. Membership-before-bindings still
+ * holds there — bindingsStep and legacyTeamFallbackStep carry their own
+ * non-member guard, so on a resource scope a non-member's only path is the
+ * resource tier, never a leftover binding on the resource's lineage.
  */
 export function organizationMembershipGateStep({
   grants,
@@ -105,6 +108,19 @@ export function organizationRoleFloorStep({
   return { ...base, allowed: true, via: "org-role-floor" };
 }
 
+/**
+ * A user with no OrganizationUser row never resolves through bindings or the
+ * legacy team fallback, at ANY tier. Non-resource scopes already denied at
+ * the membership gate; this closes the resource tier, where the gate defers
+ * so share links stay reachable — without it, a since-removed member's
+ * leftover binding on the resource's project/team/org lineage would still
+ * authorize a resource read. Api-key principals hold no membership by design
+ * and pass.
+ */
+function principalLacksMembership(grants: CollectedGrants): boolean {
+  return grants.principal.type === "user" && !grants.isOrgMember;
+}
+
 /** Bindings walk: union across every binding on the scope chain. */
 export function bindingsStep({
   grants,
@@ -112,6 +128,7 @@ export function bindingsStep({
   chainBindings,
   base,
 }: DecideContext): AuthzDecision | undefined {
+  if (principalLacksMembership(grants)) return;
   for (const binding of chainBindings) {
     if (bindingGrants({ binding, grants, permission })) {
       return {
@@ -134,6 +151,7 @@ export function legacyTeamFallbackStep({
   chainBindings,
   base,
 }: DecideContext): AuthzDecision | undefined {
+  if (principalLacksMembership(grants)) return;
   const granted = legacyTeamFallbackGrants({
     grants,
     scope,

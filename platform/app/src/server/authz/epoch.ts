@@ -39,8 +39,13 @@ export async function getAuthzEpoch({
   try {
     const raw = await connection.get(`${EPOCH_KEY_PREFIX}${organizationId}`);
     if (raw == null) return null;
-    const parsed = Number.parseInt(raw, 10);
-    return Number.isNaN(parsed) ? null : parsed;
+    // Full-string match, not parseInt(): parseInt("12abc") is 12, and
+    // Number("") is 0 — either would read a foreign value as a usable
+    // epoch. INCR only ever writes integers, so anything else here means
+    // the key was written by something else: exactly the case null is for.
+    if (!/^-?\d+$/.test(raw)) return null;
+    const parsed = Number(raw);
+    return Number.isSafeInteger(parsed) ? parsed : null;
   } catch (error) {
     logger.warn({ error, organizationId }, "authz epoch read failed");
     return null;
