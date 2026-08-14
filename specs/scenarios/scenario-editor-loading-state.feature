@@ -46,6 +46,17 @@ Feature: The scenario editor says when it is still reading
     And the fields hold the scenario's values
     And the save actions are available
 
+  # The prompt catalog loads on the same screen, but it says nothing about the
+  # scenario being edited. The form waits for its own read and nothing else.
+  # This is what the customer actually hit: the catalog was slow and the
+  # editor sat blank behind it.
+  @integration
+  Scenario: The editor does not wait for the prompt catalog
+    Given the editor is opened on an existing scenario
+    When the scenario has been read
+    And the prompt catalog has not answered yet
+    Then the fields hold the scenario's values
+
   # Creating a scenario reads nothing, so the editor must never wait. The read
   # is disabled in that case and reports itself as not loading, but the editor
   # gates on there being a scenario to read at all rather than trusting that.

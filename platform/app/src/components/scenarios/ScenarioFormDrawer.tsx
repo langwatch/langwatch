@@ -179,7 +179,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   // Editing an existing scenario means the fields are empty until the query
   // answers. Without this the drawer renders a complete, blank form, which
   // reads as "the scenario has no name and no criteria" rather than "not
-  // loaded yet" — and the person who just asked an agent to write it cannot
+  // loaded yet", and the person who just asked an agent to write it cannot
   // tell the difference.
   const isHydrating = !!scenarioId && isScenarioLoading;
   // A read that fails ends the wait without producing a record, so the form
@@ -325,7 +325,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
 
       // Branching on the loaded record alone made "we have not read it yet"
       // and "there is nothing to read" the same condition, so a save during
-      // the read — or after one that failed — created a second scenario
+      // the read, or after one that failed, created a second scenario
       // instead of updating the one being edited. Being pointed at a scenario
       // is what decides this; the record only decides whether we can act yet.
       if (scenarioId) {
@@ -628,7 +628,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
  * Stands in for the form when the scenario could not be read.
  *
  * The alternative is the form at its defaults, which invites the person to
- * retype a scenario that already exists — and the save would have created a
+ * retype a scenario that already exists, and the save would have created a
  * second copy of it. Copy comes from the code-keyed registry like every other
  * error surface; the way forward is to read it again.
  */

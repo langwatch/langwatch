@@ -932,12 +932,13 @@ const handledErrorMiddleware = t.middleware(async ({ next }) => {
  * unnoticed: every procedure on the path reported success, and the duration
  * was already on the record but never changed the level.
  *
- * Deliberately generous. Some procedures are legitimately long (a model
- * generating a draft, an export), and the warning for those is still true:
- * it states what the call cost, which is worth knowing even when expected.
- * The throttle is what keeps that honest rather than noisy.
+ * One second, because that regression ran at 1.5 to 2.3 seconds per call
+ * and a higher budget would have kept it invisible. Procedures that are
+ * legitimately long (a model generating a draft, an export) still warn,
+ * and the warning for those is still true: it states what the call cost.
+ * The per-path throttle is what keeps the volume down.
  */
-const DEFAULT_SLOW_CALL_MS = 3000;
+const DEFAULT_SLOW_CALL_MS = 1000;
 
 const SLOW_CALL_THROTTLE_MS = 60_000;
 
@@ -1096,7 +1097,7 @@ function isSilencedCall({
  *
  * The two halves belong together. Silencing runs first and drops the record
  * entirely, so "a slow presence heartbeat raises nothing" is a property of the
- * pair and of neither alone — asserting it against the classifier proves only
+ * pair and of neither alone. Asserting it against the classifier proves only
  * that a boolean is what it is, and asserting it against the logger tests a
  * call the middleware never makes. This is the seam that can be asked the real
  * question.

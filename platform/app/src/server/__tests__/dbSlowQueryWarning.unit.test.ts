@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  *
- * specs/observability/slow-work-warnings.feature — the Postgres half.
+ * specs/observability/slow-work-warnings.feature, the Postgres half.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -104,7 +104,7 @@ describe("the Postgres slow-query warning", () => {
         // One reading, not two: the rejection propagates out of the await, so
         // the finish reading is never taken and nothing is reported. Counting
         // the readings is what proves that, rather than inferring it from the
-        // absence of a warning — which a fast call would produce too.
+        // absence of a warning, which a fast call would produce too.
         const clock = vi.spyOn(performance, "now").mockReturnValue(0);
         const boom = new Error("connection reset");
 

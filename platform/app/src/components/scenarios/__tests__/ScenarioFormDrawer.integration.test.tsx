@@ -113,9 +113,10 @@ const mocks = vi.hoisted(() => ({
     criteria: string[];
     labels: string[];
   } | null,
-  mockGetByIdLoading: false,
-  mockGetByIdError: false,
+  mockGetByIdIsLoading: false,
+  mockGetByIdHasError: false,
   mockGetByIdRefetch: vi.fn(),
+  mockPromptsCatalogIsLoading: false,
 }));
 
 vi.mock("~/utils/api", () => ({
@@ -166,9 +167,9 @@ vi.mock("~/utils/api", () => ({
       getById: {
         useQuery: () => ({
           data: mocks.mockGetByIdData,
-          isLoading: mocks.mockGetByIdLoading,
-          isError: mocks.mockGetByIdError,
-          error: mocks.mockGetByIdError
+          isLoading: mocks.mockGetByIdIsLoading,
+          isError: mocks.mockGetByIdHasError,
+          error: mocks.mockGetByIdHasError
             ? new Error("scenario read failed")
             : null,
           refetch: mocks.mockGetByIdRefetch,
@@ -182,7 +183,10 @@ vi.mock("~/utils/api", () => ({
     },
     prompts: {
       getAllPromptsForProject: {
-        useQuery: () => ({ data: [] }),
+        useQuery: () =>
+          mocks.mockPromptsCatalogIsLoading
+            ? { data: undefined, isLoading: true }
+            : { data: [], isLoading: false },
       },
     },
     licenseEnforcement: {
@@ -282,8 +286,9 @@ describe("<ScenarioFormDrawer/>", () => {
     mocks.mockDrawerParams = {};
     mocks.mockComplexProps = {};
     mocks.mockGetByIdData = null;
-    mocks.mockGetByIdLoading = false;
-    mocks.mockGetByIdError = false;
+    mocks.mockGetByIdIsLoading = false;
+    mocks.mockGetByIdHasError = false;
+    mocks.mockPromptsCatalogIsLoading = false;
     mocks.mockCreateMutateAsync.mockResolvedValue({
       id: "new-scenario-id",
       name: "Refund Request Test",
@@ -784,7 +789,7 @@ describe("<ScenarioFormDrawer/>", () => {
     beforeEach(() => {
       mocks.mockDrawerParams = { scenarioId: "scenario-123" };
       mocks.mockGetByIdData = null;
-      mocks.mockGetByIdLoading = true;
+      mocks.mockGetByIdIsLoading = true;
     });
 
     /** @scenario "An unloaded scenario shows that it is loading" */
@@ -832,7 +837,7 @@ describe("<ScenarioFormDrawer/>", () => {
         criteria: ["Agent acknowledges the issue"],
         labels: [],
       };
-      mocks.mockGetByIdLoading = false;
+      mocks.mockGetByIdIsLoading = false;
     });
 
     /** @scenario "A loaded scenario shows its fields" */
@@ -854,6 +859,35 @@ describe("<ScenarioFormDrawer/>", () => {
     });
   });
 
+  describe("when the prompt catalog has not answered yet", () => {
+    beforeEach(() => {
+      mocks.mockDrawerParams = { scenarioId: "scenario-123" };
+      mocks.mockGetByIdData = {
+        id: "scenario-123",
+        name: "Refund Request Test",
+        situation: "User requests a refund",
+        criteria: ["Agent acknowledges the issue"],
+        labels: [],
+      };
+      mocks.mockGetByIdIsLoading = false;
+      mocks.mockPromptsCatalogIsLoading = true;
+    });
+
+    /** @scenario "The editor does not wait for the prompt catalog" */
+    it("shows the scenario fields without waiting for it", async () => {
+      render(<ScenarioFormDrawer open={true} scenarioId="scenario-123" />, {
+        wrapper: Wrapper,
+      });
+
+      expect(screen.queryByTestId("scenario-form-skeleton")).toBe(null);
+      await waitFor(() => {
+        expect(
+          screen.getByDisplayValue("Refund Request Test"),
+        ).toBeInTheDocument();
+      });
+    });
+  });
+
   /**
    * specs/scenarios/scenario-editor-loading-state.feature
    *
@@ -865,8 +899,8 @@ describe("<ScenarioFormDrawer/>", () => {
     beforeEach(() => {
       mocks.mockDrawerParams = { scenarioId: "scenario-123" };
       mocks.mockGetByIdData = null;
-      mocks.mockGetByIdLoading = false;
-      mocks.mockGetByIdError = true;
+      mocks.mockGetByIdIsLoading = false;
+      mocks.mockGetByIdHasError = true;
     });
 
     /** @scenario "A failed read says so instead of showing empty fields" */
@@ -915,7 +949,7 @@ describe("<ScenarioFormDrawer/>", () => {
       const user = userEvent.setup();
       mocks.mockDrawerParams = { scenarioId: "scenario-123" };
       mocks.mockGetByIdData = null;
-      mocks.mockGetByIdLoading = false;
+      mocks.mockGetByIdIsLoading = false;
 
       render(<ScenarioFormDrawer open={true} scenarioId="scenario-123" />, {
         wrapper: Wrapper,
@@ -934,8 +968,8 @@ describe("<ScenarioFormDrawer/>", () => {
     /** @scenario "A new scenario never waits on a read" */
     it("never shows the placeholder, because there is nothing to read", () => {
       // A disabled query reports isLoading false, but the drawer gates on the
-      // scenarioId too — so a stale true here must still not blank the form.
-      mocks.mockGetByIdLoading = true;
+      // scenarioId too, so a stale true here must still not blank the form.
+      mocks.mockGetByIdIsLoading = true;
 
       render(<ScenarioFormDrawer open={true} />, { wrapper: Wrapper });
 

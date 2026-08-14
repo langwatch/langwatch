@@ -3,8 +3,8 @@ Feature: A slow database query or a slow API call names itself in the log
   Work that succeeds slowly is the hardest kind to find. A failure leaves an
   error record with a stack. A query that takes four seconds and then returns
   the right answer leaves the same info line as one that took three
-  milliseconds, so nobody sees it until a customer reports that a screen feels
-  broken.
+  milliseconds, so it goes unseen until a customer reports that a screen
+  feels broken.
 
   That is what happened to the scenario editor. Every record on the path was
   healthy, every log line said the call succeeded, and the only signal was a
@@ -30,22 +30,19 @@ Feature: A slow database query or a slow API call names itself in the log
 
     @unit
     Scenario: A query inside the budget is not warned about
-      Given the slow query budget is 500 milliseconds
-      When a query takes 20 milliseconds
+      When a query finishes inside its budget
       Then no warning is logged
 
     @unit
     Scenario: A query over the budget is warned about
-      Given the slow query budget is 500 milliseconds
-      When a query takes 900 milliseconds
+      When a query takes longer than its budget
       Then a warning is logged
       And the warning names the model and the operation
       And the warning states the duration and the budget
 
     @unit
     Scenario: A failing query is left to the caller to report
-      Given the slow query budget is 500 milliseconds
-      When a query takes 900 milliseconds and then throws
+      When a query runs over its budget and then throws
       Then no warning is logged
       And the error reaches the caller unchanged
 
@@ -58,14 +55,12 @@ Feature: A slow database query or a slow API call names itself in the log
 
     @unit
     Scenario: Argument values are not logged
-      Given the slow query budget is 500 milliseconds
       When a slow query filters on a customer email address
       Then the warning does not contain the email address
       And the warning lists the argument keys
 
     @unit
     Scenario: A raw query does not log its SQL
-      Given the slow query budget is 500 milliseconds
       When a slow raw query runs
       Then the warning names the operation as raw
       And the warning does not contain the SQL text
@@ -78,72 +73,62 @@ Feature: A slow database query or a slow API call names itself in the log
 
     @unit
     Scenario: The same slow query warns once per interval
-      Given the slow query budget is 500 milliseconds
-      And the throttle interval is 60 seconds
-      When the same model and operation runs slowly 50 times inside the interval
+      When the same model and operation runs slowly many times inside one interval
       Then one warning is logged
 
     @unit
     Scenario: A throttled warning states how many calls it stands for
-      Given the slow query budget is 500 milliseconds
-      And the throttle interval is 60 seconds
-      When the same model and operation runs slowly 50 times inside the interval
+      When the same model and operation runs slowly many times inside one interval
       And the interval elapses
       And it runs slowly once more
       Then the next warning states the number of calls it suppressed
 
     @unit
     Scenario: A different query is not throttled by its neighbour
-      Given the slow query budget is 500 milliseconds
-      And the throttle interval is 60 seconds
-      When two different models each run slowly once inside the interval
+      When two different models each run slowly once inside one interval
       Then two warnings are logged
 
   # ---------------------------------------------------------------------------
   # API calls
   #
-  # The Postgres warning above would not have found the scenario editor
-  # regression: every Postgres query on that path was fast. The call that was
-  # slow was an API procedure whose own work was in ClickHouse, and the record
-  # for it already carried the duration and still logged at info.
+  # The scenario editor regression turned out to be a Postgres query (the
+  # prompt list aggregated a whole table per call), which the warning above
+  # names directly. This half covers the calls whose slow work is somewhere
+  # else: a ClickHouse read, a provider call, serialization. The procedure
+  # record is also the only one that carries the full duration of the call.
   # ---------------------------------------------------------------------------
 
   Rule: An API call slower than its budget leaves a warning
 
     @unit
     Scenario: A call inside the budget stays at info
-      Given the slow call budget is 3000 milliseconds
-      When a call succeeds in 42 milliseconds
+      When a call succeeds inside its budget
       Then the record is logged at info level
 
     @unit
     Scenario: A call over the budget is raised to warning
-      Given the slow call budget is 3000 milliseconds
-      When a call succeeds in 9000 milliseconds
+      When a call succeeds over its budget
       Then the record is logged at warning level
       And the record names the procedure path
       And the record states the duration and the budget
 
     @unit
     Scenario: A failed slow call keeps the level its failure earned
-      Given the slow call budget is 3000 milliseconds
-      When a call fails in 9000 milliseconds with a platform fault
+      When a call fails over its budget with a platform fault
       Then the record is logged at error level
 
     # Presence heartbeats say nothing on the happy path however long they take.
     # That is deliberate: they fire every few seconds per open tab, so a
     # degraded server would turn this warning into the flood it exists to
-    # avoid. A heartbeat that fails is still reported — the volume that earns
-    # the silence is happy-path volume.
+    # avoid. A heartbeat that fails is still reported, because the volume that
+    # earns the silence is happy-path volume.
     @unit
     Scenario: A silenced path stays silent even when slow
-      Given the slow call budget is 3000 milliseconds
-      When a presence heartbeat succeeds in 9000 milliseconds
+      When a presence heartbeat succeeds over its budget
       Then nothing is logged for it
       But an ordinary call of the same duration is warned about
 
     @unit
     Scenario: A silenced path still reports its failures
-      Given the slow call budget is 3000 milliseconds
       When a presence heartbeat fails
       Then the failure is logged
