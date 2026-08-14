@@ -32,7 +32,9 @@ import {
   REVISING_SOURCE_TYPES,
 } from "./usageAttribution.constants";
 import {
+  type AttributionLedgerReader,
   type AttributionLedgerRow,
+  EmptyAttributionLedger,
   UsageAttributionLedgerClickHouseRepository,
 } from "./usageAttributionLedger.clickhouse.repository";
 
@@ -125,7 +127,7 @@ const emptyTotals = (): AttributionTotals => ({ events: 0, spendUsd: 0 });
 export class UsageAttributionReportService {
   constructor(
     private readonly prisma: PrismaClient,
-    private readonly ledger: UsageAttributionLedgerClickHouseRepository,
+    private readonly ledger: AttributionLedgerReader,
     /**
      * Null when the instance has no erasure secret configured. The report
      * still runs; it simply builds no erased-token refs, because there is no
@@ -612,7 +614,7 @@ export const createUsageAttributionReportService = async ({
 }): Promise<{
   service: UsageAttributionReportService;
   tenantId: string;
-} | null> => {
+}> => {
   const govProject = await prisma.project.findFirst({
     where: {
       kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
@@ -621,10 +623,9 @@ export const createUsageAttributionReportService = async ({
     },
     select: { id: true },
   });
-  if (!govProject) return null;
-
-  const client = await getClickHouseClientForOrganization(organizationId);
-  if (!client) return null;
+  const client = govProject
+    ? await getClickHouseClientForOrganization(organizationId)
+    : null;
 
   const tokens = IdentityErasureTokenService.fromEnvOrNull();
   if (!tokens) {
@@ -635,10 +636,16 @@ export const createUsageAttributionReportService = async ({
   }
 
   return {
-    tenantId: govProject.id,
+    // Empty rather than absent when there is nothing to read. The report is
+    // ALWAYS constructible, so no caller has to grow a second code path for
+    // the empty case — and an export over an empty window still records that
+    // the period was reported, which is the whole reason the record exists.
+    tenantId: govProject?.id ?? "",
     service: new UsageAttributionReportService(
       prisma,
-      new UsageAttributionLedgerClickHouseRepository(client),
+      client
+        ? new UsageAttributionLedgerClickHouseRepository(client)
+        : new EmptyAttributionLedger(),
       tokens,
     ),
   };

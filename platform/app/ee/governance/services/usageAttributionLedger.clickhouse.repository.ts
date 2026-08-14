@@ -31,6 +31,31 @@ export interface AttributionLedgerRow {
   firstEventMs: number;
 }
 
+/** What the report reads its money from. */
+export interface AttributionLedgerReader {
+  findLedger(input: {
+    tenantId: string;
+    from: Date;
+    to: Date;
+  }): Promise<AttributionLedgerRow[]>;
+}
+
+/**
+ * The reader for an organization with nothing to read: no hidden governance
+ * project, or an instance with no ClickHouse at all.
+ *
+ * An empty ledger rather than a null service, so the report is ALWAYS
+ * constructible. Otherwise every caller carries a second code path for the
+ * empty case — and the export procedure quietly grew one that produced zeros
+ * without recording that a period had been reported, which is the one thing an
+ * export exists to do.
+ */
+export class EmptyAttributionLedger implements AttributionLedgerReader {
+  async findLedger(): Promise<AttributionLedgerRow[]> {
+    return [];
+  }
+}
+
 /**
  * The money side of the usage-attribution report (ADR-094 Decision 2).
  *
@@ -40,7 +65,9 @@ export interface AttributionLedgerRow {
  * ClickHouse change and the write-path batch spent it on the `ActorUserId`
  * index. Everything else is `JSONExtract` over the payload we already store.
  */
-export class UsageAttributionLedgerClickHouseRepository {
+export class UsageAttributionLedgerClickHouseRepository
+  implements AttributionLedgerReader
+{
   constructor(private readonly client: ClickHouseClient) {}
 
   /**
