@@ -22,6 +22,7 @@
  * Spec: specs/ai-governance/puller-framework/puller-adapter-contract.feature
  */
 import type { PulledUsageObservedEventData } from "@ee/event-sourcing/pipelines/pulled-usage-processing/schemas/events";
+import { ocsfActorType } from "@langwatch/identity-links";
 import { createLogger } from "@langwatch/observability";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import { getApp } from "~/server/app-layer/app";
@@ -766,7 +767,7 @@ async function recordPulledUsageFor({
  * org — same key the trace-fold subscriber and OCSF export service use.
  * Resolved by the worker before this is called.
  */
-function mapToOcsfRow({
+export function mapToOcsfRow({
   event,
   tenantId,
   ingestionSourceId,
@@ -791,7 +792,16 @@ function mapToOcsfRow({
     severity_id: OCSF_SEVERITY.INFO,
     time: occurredAtMs,
     actor: {
-      user: { uid: "", email_addr: event.actor },
+      user: {
+        uid: event.actor_id,
+        email_addr: event.actor,
+        // Which report bucket this row can belong to, declared by the adapter
+        // at ingest (ADR-094 Decision 5). It rides OCSF's own user-type
+        // fields rather than a new column: the ADR caps this batch at exactly
+        // one ClickHouse change, and that budget is spent on the ActorUserId
+        // index the report groups by.
+        ...ocsfActorType(event.actor_kind),
+      },
       enduser: { uid: "" },
     },
     api: { operation: event.action },
@@ -822,7 +832,11 @@ function mapToOcsfRow({
     activityId: OCSF_ACTIVITY.INVOKE,
     severityId: OCSF_SEVERITY.INFO,
     eventTime: safeEventTime,
-    actorUserId: "",
+    // The provider's own id for the actor — the column a cost report groups
+    // by and joins the link list on (ADR-094). Deterministic in the pulled
+    // event, so a re-pull of the same source event overwrites the row with an
+    // identical one (ADR-088 restatement).
+    actorUserId: event.actor_id,
     actorEmail: event.actor,
     actorEnduserId: "",
     actionName: event.action,
