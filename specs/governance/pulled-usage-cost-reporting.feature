@@ -23,6 +23,14 @@ Feature: Pulled provider usage becomes visible, attributed cost
     And the team's spending limit is not tripped by the pulled cost
     And gateway requests for that team are still allowed
 
+  @unit
+  Scenario: Gateway spend is not lost while the pulled-cost filter is deployed
+    Given a team whose gateway requests count towards a spending limit
+    When the change that excludes pulled cost from those totals is rolled out
+    And the team keeps making gateway requests throughout the rollout
+    Then every one of those requests still counts towards the team's limit
+    And the team's limit is not left with spend it should have refused
+
   @integration
   Scenario: Pulled cost is attributed to the source's team
     Given the source belongs to a team

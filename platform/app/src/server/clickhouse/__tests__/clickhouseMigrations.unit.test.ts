@@ -20,7 +20,7 @@ describe("ClickHouse migrations", () => {
     expect(duplicates).toEqual([]);
   });
 
-  /** @scenario The budget spend rollup keeps folding while its filter changes */
+  /** @scenario Gateway spend is not lost while the pulled-cost filter is deployed */
   it("changes the budget rollup view without dropping its trigger", () => {
     // A materialised view is an insert trigger. Between a DROP and the
     // following CREATE there is no trigger, ClickHouse does not replay the
