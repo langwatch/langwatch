@@ -462,7 +462,7 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
     Then no PostgreSQL credential is revealed
 
   # ---------------------------------------------------------------------------
-  # Public API (later PR of this issue — #6480)
+  # Public API (bound in this PR — the shipped REST endpoint)
   # ---------------------------------------------------------------------------
 
   @integration
@@ -599,7 +599,8 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
     Then the response carries a POSSIBLE_FANOUT diagnostic naming the affected columns with evidence
 
   # ---------------------------------------------------------------------------
-  # Tenant isolation and authorization at the gateway (later PR of this issue — #6480)
+  # Tenant isolation and authorization at the gateway (bound in this PR — the
+  # shipped REST endpoint)
   # ---------------------------------------------------------------------------
 
   @integration
@@ -626,7 +627,8 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
 
   # ---------------------------------------------------------------------------
   # Read-only, exfiltration, and fail-closed behavior at the gateway
-  # (later PR of this issue — #6480; the database-identity half is bound above)
+  # (bound in this PR except the @unimplemented fail-closed wiring; the
+  # database-identity half is bound above)
   # ---------------------------------------------------------------------------
 
   @integration
@@ -749,7 +751,7 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
     And the partial AnnotationIds projection is either removed or widened, not left half-done
 
   # ---------------------------------------------------------------------------
-  # Non-goals held as scope guards (later PR of this issue — #6480)
+  # Non-goals held as scope guards (bound in this PR)
   # ---------------------------------------------------------------------------
 
   @integration

@@ -1051,7 +1051,16 @@ describe("given the governed views provisioned over the shipped fact tables", ()
     it("prunes partitions, and each dedup strategy's cost is recorded", async () => {
       const view = GOVERNED_VIEW_CATALOG.find(
         (entry) => entry.name === "traces",
-      )!;
+      );
+      // Before the try, because the `finally` below re-applies the shipped view
+      // using this same entry: a catalog rename would otherwise throw inside
+      // the try and then throw again while restoring, masking the first
+      // failure and leaving the view mis-shaped for every case after this one.
+      if (!view) {
+        throw new Error(
+          `governed-sql views suite: "traces" is not in the shipped catalog, so there is no view to measure dedup strategies on`,
+        );
+      }
       const unfiltered = `SELECT count() AS value FROM ${database}.traces`;
       const filtered =
         `SELECT count() AS value FROM ${database}.traces ` +

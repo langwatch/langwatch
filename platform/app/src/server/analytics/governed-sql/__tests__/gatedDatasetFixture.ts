@@ -43,6 +43,16 @@ export const GATED_DATASET: GovernedViewDefinition = {
     versionColumn: "UpdatedAt",
   },
   columns: [
+    // Exposed because the entry advertises it as the join key and half the
+    // grain — the shape the catalog invariants demand of every real entry, and
+    // therefore the shape this fixture must teach.
+    {
+      name: "TenantId",
+      type: "String",
+      description: "Tenant the transcript belongs to.",
+      gates: [],
+      sourceColumns: ["TenantId"],
+    },
     {
       name: "TranscriptId",
       type: "String",

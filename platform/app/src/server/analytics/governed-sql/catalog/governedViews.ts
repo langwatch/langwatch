@@ -590,7 +590,11 @@ const EVALUATIONS: GovernedViewDefinition = {
       name: "Details",
       type: "Nullable(String)",
       description: "The evaluator's explanation of its result.",
-      gates: [],
+      // Free text produced while processing the captured input and output —
+      // an LLM judge's explanation routinely quotes the conversation it
+      // scored — so it carries both content gates rather than shipping the
+      // one ungated free-text carrier in the catalog.
+      gates: ["input", "output"],
       sourceColumns: ["Details"],
     },
     {

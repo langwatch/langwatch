@@ -477,7 +477,6 @@ describe("given the governed analytics SQL REST endpoints", () => {
     );
   };
 
-  /** Administrator-side row count per tenant: the control behind every zero-rows claim. */
   /** Rows one tenant holds in a named fact table, read as the administrator. */
   const adminRowCount = async (table: string, tenantId: string) => {
     const [row] = await selectRows<{ value: string }>(
@@ -820,10 +819,10 @@ describe("given the governed analytics SQL REST endpoints", () => {
         `SELECT count() FROM ${database}.traces ` +
           `SETTINGS ${harness.names.tenantSetting} = 'anything'`,
       );
-      expect(body.error).toBe("governed_sql_not_permitted");
-      expect(body.violations.map((violation: any) => violation.code)).toContain(
-        "SETTINGS_CLAUSE",
-      );
+      expect(body.error.code).toBe("governed_sql_not_permitted");
+      expect(
+        body.error.meta.violations.map((violation: any) => violation.code),
+      ).toContain("SETTINGS_CLAUSE");
     });
 
     /** @scenario "Tenant scope derives exclusively from authenticated server context" */
@@ -834,7 +833,9 @@ describe("given the governed analytics SQL REST endpoints", () => {
         { path: queryPath(gatedProject), token: openProject.apiKey },
       );
       expect(response.status).toBe(404);
-      expect(((await response.json()) as any).error).toBe("project_not_found");
+      expect(((await response.json()) as any).error.code).toBe(
+        "project_not_found",
+      );
     });
 
     /** @scenario "Tenant scope derives exclusively from authenticated server context" */
@@ -857,10 +858,10 @@ describe("given the governed analytics SQL REST endpoints", () => {
         openProject,
         `SELECT count() FROM ${facts}.trace_summaries`,
       );
-      expect(body.error).toBe("governed_sql_not_permitted");
-      expect(body.violations.map((violation: any) => violation.code)).toContain(
-        "TABLE_NOT_ALLOWED",
-      );
+      expect(body.error.code).toBe("governed_sql_not_permitted");
+      expect(
+        body.error.meta.violations.map((violation: any) => violation.code),
+      ).toContain("TABLE_NOT_ALLOWED");
     });
   });
 
@@ -878,9 +879,9 @@ describe("given the governed analytics SQL REST endpoints", () => {
         const body = await refuse(openProject, sql);
         // The coded refusal is itself the evidence: a rejection by the database
         // arrives as a translated or unknown failure, never as this code.
-        expect(body.error, sql).toBe("governed_sql_not_permitted");
+        expect(body.error.code, sql).toBe("governed_sql_not_permitted");
         expect(
-          body.violations.map((violation: any) => violation.code),
+          body.error.meta.violations.map((violation: any) => violation.code),
           sql,
         ).toContain("TABLE_FUNCTION");
       }
@@ -894,9 +895,9 @@ describe("given the governed analytics SQL REST endpoints", () => {
         "SELECT * FROM information_schema.tables",
       ]) {
         const body = await refuse(openProject, sql);
-        expect(body.error, sql).toBe("governed_sql_not_permitted");
+        expect(body.error.code, sql).toBe("governed_sql_not_permitted");
         expect(
-          body.violations.map((violation: any) => violation.code),
+          body.error.meta.violations.map((violation: any) => violation.code),
           sql,
         ).toContain("SCHEMA_NOT_ALLOWED");
       }
@@ -910,9 +911,9 @@ describe("given the governed analytics SQL REST endpoints", () => {
         [`SELECT 1; SELECT 2`, "MULTIPLE_STATEMENTS"],
       ] as const) {
         const body = await refuse(openProject, sql);
-        expect(body.error, sql).toBe("governed_sql_not_permitted");
+        expect(body.error.code, sql).toBe("governed_sql_not_permitted");
         expect(
-          body.violations.map((violation: any) => violation.code),
+          body.error.meta.violations.map((violation: any) => violation.code),
           sql,
         ).toContain(expected);
       }
@@ -920,8 +921,8 @@ describe("given the governed analytics SQL REST endpoints", () => {
 
     it("reports unparseable text as its own failure, not as a policy refusal", async () => {
       const body = await refuse(openProject, "SELECT FROM WHERE )(");
-      expect(body.error).toBe("governed_sql_unparseable");
-      expect(body.violations[0].code).toBe("PARSE_FAILED");
+      expect(body.error.code).toBe("governed_sql_unparseable");
+      expect(body.error.meta.violations[0].code).toBe("PARSE_FAILED");
     });
   });
 
@@ -941,9 +942,9 @@ describe("given the governed analytics SQL REST endpoints", () => {
 
       for (const sql of positions(database)) {
         const body = await refuse(gatedProject, sql);
-        expect(body.error, sql).toBe("governed_sql_not_permitted");
+        expect(body.error.code, sql).toBe("governed_sql_not_permitted");
         expect(
-          body.violations.map((violation: any) => violation.code),
+          body.error.meta.violations.map((violation: any) => violation.code),
           sql,
         ).toContain("GATED_COLUMN");
       }
@@ -960,7 +961,7 @@ describe("given the governed analytics SQL REST endpoints", () => {
       const sql = `SELECT * FROM ${database}.traces LIMIT 1`;
       const refused = await refuse(gatedProject, sql);
       expect(
-        refused.violations.map((violation: any) => violation.code),
+        refused.error.meta.violations.map((violation: any) => violation.code),
       ).toContain("WILDCARD_NOT_ALLOWED");
 
       expect((await post(openProject, { sql })).status).toBe(200);
@@ -1202,9 +1203,9 @@ describe("given the governed analytics SQL REST endpoints", () => {
         const sql = `SELECT count() AS value FROM ${database}.transcripts`;
 
         const refused = await refuse(gatedProject, sql);
-        expect(refused.error).toBe("governed_sql_not_permitted");
+        expect(refused.error.code).toBe("governed_sql_not_permitted");
         expect(
-          refused.violations.map((violation: any) => violation.code),
+          refused.error.meta.violations.map((violation: any) => violation.code),
         ).toContain("TABLE_NOT_ALLOWED");
 
         // The permitted caller reads it, which is what proves the refusal was
@@ -1285,7 +1286,7 @@ describe("given the governed analytics SQL REST endpoints", () => {
           `SELECT CapturedInput FROM ${database}.traces`,
         );
         expect(
-          refused.violations.map((violation: any) => violation.code),
+          refused.error.meta.violations.map((violation: any) => violation.code),
         ).toContain("GATED_COLUMN");
       } finally {
         outage.mockRestore();
@@ -1333,8 +1334,8 @@ describe("given the governed analytics SQL REST endpoints", () => {
       });
       const body = (await response.json()) as any;
       expect(response.status).toBe(400);
-      expect(body.error).toBe("governed_sql_parameter_missing");
-      expect(body.parameters).toEqual(["floor"]);
+      expect(body.error.code).toBe("governed_sql_parameter_missing");
+      expect(body.error.meta.parameters).toEqual(["floor"]);
     });
   });
 
@@ -1419,10 +1420,10 @@ describe("given the governed analytics SQL REST endpoints", () => {
         `SELECT ${call(harness.names.tenantSetting)} AS value FROM ${database}.traces`,
       );
 
-      expect(body.error).toBe("governed_sql_not_permitted");
-      expect(body.violations.map((violation: any) => violation.code)).toEqual([
-        "FUNCTION_NOT_ALLOWED",
-      ]);
+      expect(body.error.code).toBe("governed_sql_not_permitted");
+      expect(
+        body.error.meta.violations.map((violation: any) => violation.code),
+      ).toEqual(["FUNCTION_NOT_ALLOWED"]);
     });
 
     it("still answers the same query shape with a function it does support", async () => {
