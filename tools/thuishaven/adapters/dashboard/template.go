@@ -79,7 +79,7 @@ const pageTemplate = `<!doctype html><html lang="en"><head>
     text-transform:uppercase; color:var(--ink-400); }
   .kicker .count { color:var(--ink-300); font-weight:500; letter-spacing:.06em; margin-left:8px; }
 
-  main.cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:18px; }
+  main.cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(310px,1fr)); gap:18px; }
   .card { background:var(--paper); border:1px solid var(--ink-100); border-radius:14px;
     padding:18px 20px 14px; box-shadow:var(--shadow); }
   @media (prefers-color-scheme: dark){ .card { background:var(--paper-soft); } }
@@ -115,7 +115,7 @@ const pageTemplate = `<!doctype html><html lang="en"><head>
   @keyframes ping { 0%{ transform:scale(.6); opacity:.5; } 80%,100%{ transform:scale(1.5); opacity:0; } }
   @media (prefers-reduced-motion: reduce){ .dot.up::after { animation:none; } }
   .dot.down { background:var(--rust); opacity:.7; }
-  .svc { width:92px; color:var(--ink-500); font-size:13px; }
+  .subglyph { color:var(--ink-300); font-family:ui-monospace,"SF Mono",monospace; font-size:12px; }
   table.svcs a { color:var(--ink-600); font-size:12.5px; text-decoration:none;
     font-family:ui-monospace,"SF Mono","JetBrains Mono",monospace; transition:color .3s; }
   table.svcs a:hover { color:var(--brand-deep); }
@@ -180,7 +180,7 @@ const pageTemplate = `<!doctype html><html lang="en"><head>
     <div class="branch">{{.Branch}}</div>
     <div class="chips">{{range .Chips}}{{if .IsBaseline}}<span class="chip baseline">baseline</span>{{else}}<span class="chip">{{.Label}} <code>{{.Value}}</code></span>{{end}}{{end}}</div>
     <div class="dir" title="{{.DirFull}}">{{.Dir}}</div>
-    <table class="svcs">{{range .Rows}}<tr><td class="dot-cell">{{if not .IsSub}}<span class="dot {{.DotClass}}"></span>{{end}}</td><td class="svc">{{.Name}}</td><td><a href="{{.URL}}" title="{{.URL}}">{{.Host}}</a></td><td class="port">{{.Port}}</td></tr>{{end}}</table>
+    <table class="svcs">{{range .Rows}}<tr><td class="dot-cell">{{if not .IsSub}}<span class="dot {{.DotClass}}"></span>{{end}}</td><td class="host">{{if .IsSub}}<span class="subglyph">└</span> {{end}}<a href="{{.URL}}" title="{{.URL}}">{{.Host}}</a></td><td class="port">{{.Port}}</td></tr>{{end}}</table>
   </section>{{end}}</main>
 {{if .SharedNote}}<div class="strip">{{.SharedNote}}</div>{{end}}
 
