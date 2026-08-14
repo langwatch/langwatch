@@ -78,6 +78,9 @@ func NormalizeProviderID(raw string) ProviderID {
 		return ProviderAnthropic
 	case "openai":
 		return ProviderOpenAI
+	// Listed for completeness only: the spelling already equals the
+	// constant, so the default branch returns the same value and no test
+	// can distinguish this case being present from it being absent.
 	case "openai_codex":
 		return ProviderOpenAICodex
 	default:
