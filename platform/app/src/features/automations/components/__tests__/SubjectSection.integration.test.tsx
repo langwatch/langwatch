@@ -229,6 +229,19 @@ describe("SubjectSection", () => {
       });
     });
 
+    describe("when an existing alert's graph is gone from the project", () => {
+      it("keeps the picker with the selection, not the empty state", () => {
+        server.graphs = [];
+        seedGraphDraft();
+        render(<SubjectSection />, { wrapper: Wrapper });
+
+        expect(selectContainingOption(/select a graph/i)).toBeInTheDocument();
+        expect(
+          screen.queryByText(/doesn.t have a custom graph yet/i),
+        ).not.toBeInTheDocument();
+      });
+    });
+
     describe("when opened prefilled even though the project has no other graphs", () => {
       it("still shows the locked graph picker, not the empty state", () => {
         server.graphs = [];
@@ -313,7 +326,7 @@ describe("SubjectSection", () => {
       });
     });
 
-    describe("while the graph list is still loading", () => {
+    describe("given the graph list is still loading", () => {
       it("shows neither the empty state nor the picker's missing-graph error", () => {
         server.graphsLoading = true;
         seedFreshAlertDraft();

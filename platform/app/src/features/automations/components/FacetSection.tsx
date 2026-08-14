@@ -92,7 +92,13 @@ export function FacetSection({
   const { open, onToggle } = accordion;
 
   return (
-    <Box borderRadius="md" border="1px solid" borderColor="border" bg="bg">
+    <Box
+      borderRadius="md"
+      border="1px solid"
+      borderColor="border"
+      bg="bg"
+      _hover={{ borderColor: "border.emphasized" }}
+    >
       <Box
         role="button"
         tabIndex={0}
@@ -109,7 +115,6 @@ export function FacetSection({
             onToggle();
           }
         }}
-        _hover={{ borderColor: "border.emphasized" }}
       >
         <HStack gap={2} align="center">
           <VStack align="start" gap={0} flex="1" minWidth="0">
