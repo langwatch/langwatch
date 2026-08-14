@@ -38,14 +38,13 @@ import {
   PromptService,
   type VersionedPrompt,
 } from "../../prompt-config/prompt.service";
+import { type FieldMapping, FieldMappingSchema } from "../field-mapping";
 import { ScenarioService } from "../scenario.service";
 import {
   AuthConfigSchema,
   type ChildProcessJobData,
   type CodeAgentData,
   type ExecutionContext,
-  type FieldMapping,
-  FieldMappingSchema,
   type HttpAgentData,
   type LiteLLMParams,
   type PromptConfigData,

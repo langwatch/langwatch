@@ -6,7 +6,7 @@
  */
 
 import type { AgentInput } from "@langwatch/scenario";
-import type { FieldMapping } from "./types";
+import type { FieldMapping } from "../field-mapping";
 
 /** Maps pre-rename field names to current names for backwards compatibility. */
 const LEGACY_FIELD_NAMES: Record<string, string> = {
