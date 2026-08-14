@@ -71,10 +71,12 @@ function rankByMatch<T extends { keys: string[] }>(
  * this only changes what the autocomplete surfaces. Typing "estimated" now
  * finds `tokens` instead of a second field.
  */
-const FOLDED_QUALIFIER_FIELDS = new Set(["tokensEstimated"]);
-const QUALIFIER_SYNONYMS: Record<string, string[]> = {
+const FOLDED_QUALIFIER_FIELDS: ReadonlySet<string> = new Set([
+  "tokensEstimated",
+]);
+const QUALIFIER_SYNONYMS: Readonly<Record<string, readonly string[]>> = {
   tokens: ["estimated"],
-};
+} as const;
 
 export function getFieldSuggestions(query: string): SuggestionItem[] {
   const fieldItems = FIELD_NAMES.filter(

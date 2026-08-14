@@ -1,3 +1,4 @@
+import type { SlackDeliveryMethod } from "@langwatch/automations/providers/slack";
 import type { TriggerActionParams } from "./triggerActionParams";
 
 /**
@@ -44,13 +45,19 @@ export function slackDestinationPresentation(
   >,
 ): SlackDestinationPresentation {
   // Absent `slackDelivery` means a legacy row saved before bot delivery
-  // existed — back-compat default to webhook.
-  if ((actionParams.slackDelivery ?? "webhook") === "bot") {
-    return { kind: "bot", channelId: actionParams.slackChannelId ?? null };
+  // existed — back-compat default to webhook. The switch is exhaustive over
+  // `SlackDeliveryMethod`, so a new delivery method fails typecheck here
+  // instead of silently presenting as a webhook.
+  const delivery: SlackDeliveryMethod = actionParams.slackDelivery ?? "webhook";
+  switch (delivery) {
+    case "bot":
+      return { kind: "bot", channelId: actionParams.slackChannelId ?? null };
+    case "webhook": {
+      const webhook = actionParams.slackWebhook;
+      return {
+        kind: "webhook",
+        tooltipUrl: webhook?.startsWith("https://") ? webhook : null,
+      };
+    }
   }
-  const webhook = actionParams.slackWebhook;
-  return {
-    kind: "webhook",
-    tooltipUrl: webhook?.startsWith("https://") ? webhook : null,
-  };
 }

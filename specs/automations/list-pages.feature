@@ -26,7 +26,7 @@ Feature: Automations list pages, providers, and shared copy
       When the user confirms the deletion
       Then the alert is removed from the list
       And the toast reads "Alert deleted"
-      And a stale copy of the row can no longer be read from the drawer cache
+      And reopening the drawer can no longer show the deleted alert
 
     @integration
     Scenario: Deleting a schedule names it as a schedule, not an automation
@@ -67,7 +67,7 @@ Feature: Automations list pages, providers, and shared copy
       When the user selects "+ Create New" in the dataset picker
       Then a create-dataset drawer opens
       And saving it selects the newly created dataset in the picker
-      Without requiring any dataset to have existed beforehand
+      And no dataset had to exist beforehand
 
   Rule: The annotation-queue "Send to" selection is clickable everywhere it renders
 

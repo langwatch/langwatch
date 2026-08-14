@@ -1,3 +1,4 @@
+import type { SlackDeliveryMethod } from "@langwatch/automations/providers/slack";
 import type {
   GraphAlertOperator,
   GraphAlertTimePeriod,
@@ -16,9 +17,8 @@ export interface TriggerActionParams {
   slackWebhook?: string;
   /** How a Slack automation reaches Slack — a legacy incoming webhook, or a
    *  Slack app bot token posting via the Web API. Absent means `"webhook"`
-   *  (back-compat for rows saved before this existed). Mirrors
-   *  `SlackDeliveryMethod` in `@langwatch/automations/providers/slack`. */
-  slackDelivery?: "webhook" | "bot";
+   *  (back-compat for rows saved before this existed). */
+  slackDelivery?: SlackDeliveryMethod;
   /** The bot-delivery destination channel's raw Slack id (e.g. `C0123456`).
    *  Only the id is ever persisted — the channel NAME shown while authoring
    *  comes from a live, bot-token-authenticated Slack API call the display

@@ -156,11 +156,24 @@ function DatasetConfigForm({
 
   // #6716: "+ Create New" was a no-op (`onCreateNew={() => {}}`) — a project
   // with zero datasets had no way to get one from inside this panel. Reuses
-  // the same create-dataset drawer `AddDatasetRecordDrawer` opens for the
-  // same affordance, then selects the newly created dataset the moment it
-  // lands, exactly as picking an existing one would.
-  const onDatasetCreated = ({ datasetId }: { datasetId: string }) => {
-    void datasets.refetch().then(() => selectDataset(datasetId));
+  // `AddOrEditDatasetDrawer`, the same create-dataset drawer the datasets
+  // page opens, and selects the newly created dataset straight from the
+  // drawer's own payload: the columns are already in hand, so the selection
+  // and its derived mapping can't be lost to a failed or stale list refetch.
+  // The refetch only refreshes the picker's names.
+  const onDatasetCreated = ({
+    datasetId,
+    columnTypes,
+  }: {
+    datasetId: string;
+    columnTypes: DatasetColumns;
+  }) => {
+    onChange({
+      ...slice,
+      datasetId,
+      mapping: deriveMappingFromColumns(columnTypes),
+    });
+    void datasets.refetch();
   };
 
   // Backfill a default mapping for a row that already has a dataset but no

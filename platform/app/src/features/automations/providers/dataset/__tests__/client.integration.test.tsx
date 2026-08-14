@@ -44,13 +44,26 @@ vi.mock("~/components/AddOrEditDatasetDrawer", () => ({
     onSuccess,
   }: {
     open: boolean;
-    onSuccess: (dataset: { datasetId: string }) => void;
+    onSuccess: (dataset: {
+      datasetId: string;
+      name: string;
+      columnTypes: Array<{ name: string; type: string }>;
+    }) => void;
   }) =>
     open ? (
       <div data-testid="create-dataset-drawer">
         <button
           type="button"
-          onClick={() => onSuccess({ datasetId: "new-dataset-1" })}
+          onClick={() =>
+            onSuccess({
+              datasetId: "new-dataset-1",
+              name: "New dataset",
+              columnTypes: [
+                { name: "input", type: "string" },
+                { name: "expected_output", type: "string" },
+              ],
+            })
+          }
         >
           Save new dataset
         </button>
@@ -126,22 +139,29 @@ describe("given a project with no datasets yet", () => {
   });
 
   describe("when saving the newly created dataset", () => {
-    it("selects it in the picker without the author retyping anything", async () => {
+    it("selects it with a mapping derived from the drawer's own columns, before any refetch answers", () => {
       mockDatasetsData.current = [];
+      // The refetch never resolving (or failing) must not matter: the
+      // selection comes from the drawer's payload, not the list.
+      mockDatasetsRefetch.mockReturnValueOnce(new Promise(() => undefined));
       const onChangeSpy = vi.fn();
       renderForm(onChangeSpy);
 
       fireEvent.click(screen.getByText("+ Create New"));
       fireEvent.click(screen.getByText("Save new dataset"));
 
-      await vi.waitFor(() => {
-        expect(mockDatasetsRefetch).toHaveBeenCalled();
-      });
-      await vi.waitFor(() => {
-        expect(onChangeSpy).toHaveBeenCalledWith(
-          expect.objectContaining({ datasetId: "new-dataset-1" }),
-        );
-      });
+      expect(onChangeSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          datasetId: "new-dataset-1",
+          mapping: expect.objectContaining({
+            mapping: expect.objectContaining({
+              input: expect.anything(),
+              expected_output: expect.anything(),
+            }),
+          }),
+        }),
+      );
+      expect(mockDatasetsRefetch).toHaveBeenCalled();
     });
   });
 });
