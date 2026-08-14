@@ -944,6 +944,36 @@ const presentations = {
     title: "They're already in this group",
     describe: () => "Nothing to do: the group already grants them its access.",
   },
+  schedule_not_found: {
+    title: "That schedule no longer exists",
+    describe: () =>
+      "It was removed while this page was open. Reload to see what is scheduled now.",
+  },
+  schedule_inactive: {
+    title: "That schedule is paused",
+    describe: () =>
+      "Resume it before running it. Running a paused schedule would fire work you have switched off.",
+  },
+  schedule_already_in_flight: {
+    // The conditional update found a different fencing value, which means the
+    // loop moved the row between the operator reading it and acting on it.
+    title: "The scheduler got there first",
+    describe: () =>
+      "This slot was claimed while you were looking at it, so nothing was changed. Reload to see its current state.",
+  },
+  schedule_run_in_progress: {
+    // Distinct from `schedule_already_in_flight`: nothing raced the operator,
+    // the schedule is simply mid-run. Re-arming it would hand the same slot to
+    // a second worker and deliver the target twice.
+    title: "That schedule is already running",
+    describe: () =>
+      "Wait for the current run to finish before starting another. Running it now would deliver the same work twice.",
+  },
+  schedule_slot_not_stale: {
+    title: "That run is still current",
+    describe: () =>
+      "Clearing is only for a slot whose worker has stopped responding. Give this one time to finish, or wait until it goes stale.",
+  },
   scim_managed_group: {
     // The group, its name and its membership come from the directory on every
     // sync, so a change made here is not merely refused, it would be undone.
@@ -1197,11 +1227,37 @@ const presentations = {
     title: "Billing is busy right now",
     describe: () => "Nothing was charged. Try again in a moment.",
   },
+  billing_quote_expired: {
+    // fault: customer. Nothing broke — the dialog sat open long enough that
+    // the amount we quoted is no longer the amount that would be charged, so
+    // we refuse rather than charge a different number than the one on screen.
+    // The action is to reopen, which is a real action the customer can take.
+    title: "This quote is out of date",
+    describe: () =>
+      "Nothing was charged. Close this and open it again to see the current amount.",
+  },
   seat_billing_unavailable: {
     // fault: provider. The payment provider didn't answer. Nothing was
     // charged, and saying so is the first thing anyone wants to know.
     title: "Seat billing is unavailable right now",
     describe: () => "Nothing was charged. Try again in a moment.",
+  },
+  subscription_ambiguous: {
+    // fault: platform. Two live plans on one account, which only an operator
+    // can have created and only an operator can resolve. Nothing was charged,
+    // and that is the first thing the customer wants to know on a money path.
+    title: "Seat changes need a hand from us",
+    describe: () =>
+      "This account has more than one active plan, so we didn't change anything or charge you. Contact support and we'll sort it out.",
+  },
+  subscription_not_linked: {
+    // fault: platform. The plan is active but our record of it was never
+    // connected to the billing provider's, so seat changes can't be made from
+    // the app. Waiting doesn't fix it — reconnecting is an operator action —
+    // so the copy must not suggest retrying.
+    title: "Seat changes need a hand from us",
+    describe: () =>
+      "Your plan is active, but seat updates aren't available from here yet. Contact support and we'll finish the setup.",
   },
   subscription_sync_failed: {
     // fault: platform. Our copy of the plan is behind the payment provider's;

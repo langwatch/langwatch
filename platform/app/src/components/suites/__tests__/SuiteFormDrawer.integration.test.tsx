@@ -13,10 +13,10 @@
  * @see specs/suites/suite-workflow.feature - "Create / Edit Run Plan"
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { SimulationSuite } from "@prisma/client";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { SimulationSuite } from "~/generated/prisma/client";
 import { SuiteFormDrawer } from "../SuiteFormDrawer";
 
 // -- Mock data --
@@ -131,7 +131,7 @@ vi.mock("~/utils/api", () => ({
         useQuery: vi.fn(() => ({ data: { model: "openai/gpt-5-mini" } })),
       },
     },
-    useContext: vi.fn(() => ({
+    useUtils: vi.fn(() => ({
       suites: {
         getAll: { invalidate: vi.fn() },
         getById: { invalidate: vi.fn() },

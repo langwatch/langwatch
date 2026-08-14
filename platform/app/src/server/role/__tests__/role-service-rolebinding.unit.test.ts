@@ -1,5 +1,5 @@
-import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import { UserNotTeamMemberError } from "../errors";
 import { RoleService } from "../role.service";
 
@@ -28,6 +28,9 @@ const mockPrisma = {
     delete: vi.fn(),
   },
   $transaction: vi.fn((cb: (tx: any) => Promise<any>) => cb(mockTx)),
+  // `isRootPrismaClient` discriminates on `$connect` (Prisma 7 transaction
+  // clients carry `$transaction` too), so a root-client stand-in must have it.
+  $connect: vi.fn(),
 } as any;
 
 describe("RoleService.assignRoleToUser", () => {

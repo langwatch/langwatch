@@ -45,7 +45,7 @@ vi.mock("../../../utils/api", () => ({
       },
       isManagedProvider: { useQuery: () => ({ data: { managed: false } }) },
     },
-    useContext: () => ({
+    useUtils: () => ({
       organization: { getAll: { invalidate: vi.fn() } },
       modelProvider: {
         getAllForProject: { invalidate: vi.fn() },

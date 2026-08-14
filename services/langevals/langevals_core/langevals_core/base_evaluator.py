@@ -152,10 +152,16 @@ class EvaluationResult(BaseModel):
 class EvaluationResultSkipped(BaseModel):
     """
     Evaluation result marking an entry that was skipped with an optional details explanation.
+
+    An entry can be skipped after the evaluator has already paid for model
+    calls: an evaluator that cross-checks its own answer and finds the two
+    disagree has no result to report, but the calls were still billed. `cost`
+    carries that spend so it is accounted for rather than lost.
     """
 
     status: Literal["skipped"] = "skipped"
     details: Optional[str] = None
+    cost: Optional[Money] = None
 
 
 class EvaluationResultError(BaseModel):

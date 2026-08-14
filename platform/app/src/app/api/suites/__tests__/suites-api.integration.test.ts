@@ -1,3 +1,7 @@
+import { nanoid } from "nanoid";
+import type { Mock } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { projectFactory } from "~/factories/project.factory";
 import type {
   Agent,
   Organization,
@@ -6,11 +10,7 @@ import type {
   Scenario,
   SimulationSuite,
   Team,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import type { Mock } from "vitest";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { projectFactory } from "~/factories/project.factory";
+} from "~/generated/prisma/client";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import {

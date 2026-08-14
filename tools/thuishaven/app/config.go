@@ -16,7 +16,20 @@ type Config struct {
 	// daemon prunes them in the background (0 disables pruning). Only databases
 	// haven itself tracked (via the activity clock) are ever touched, and the
 	// protected main database is always kept.
-	DBIdleTTL                time.Duration
+	DBIdleTTL time.Duration
+	// TestContainerTTL is how old a stopped testcontainers-labeled container
+	// must be before the daemon reaps it as leaked (0 disables the sweep
+	// entirely). Fresh ones are left alone — a live test run may still be
+	// using them.
+	TestContainerTTL time.Duration
+	// RunningTestContainerTTL is the same rule for containers still running,
+	// whose age says nothing about current use (reused containers keep their
+	// original creation time across runs). Clamped to at least TestContainerTTL.
+	RunningTestContainerTTL time.Duration
+	// Tsgo bounds what tsgo may take from the machine (ADR-095); the daemon's
+	// tick enforces it over every live tsgo process regardless of who spawned
+	// it. Tsgo.RunMaxRSS == 0 disables the governor.
+	Tsgo                     domain.TsgoLimits
 	HeartbeatEvery           time.Duration // launcher heartbeat cadence
 	DaemonArgv               []string      // how to (re)launch `haven daemon`
 	IsAgent                  bool          // token-free plain output for AI drivers (no color/TUI)

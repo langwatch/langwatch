@@ -7,8 +7,8 @@
 
 import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
-import type { PrismaClient, SimulationSuite } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
+import type { PrismaClient, SimulationSuite } from "~/generated/prisma/client";
 import type {
   SuiteRunResult,
   SuiteRunService,

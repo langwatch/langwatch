@@ -1,11 +1,11 @@
 import { createLogger } from "@langwatch/observability";
+import type { z } from "zod";
 import type {
   LlmPromptConfigVersion,
   Prisma,
   PrismaClient,
   PromptScope,
-} from "@prisma/client";
-import type { z } from "zod";
+} from "~/generated/prisma/client";
 import {
   deriveResponseFormatFromOutputs,
   handleSchema,

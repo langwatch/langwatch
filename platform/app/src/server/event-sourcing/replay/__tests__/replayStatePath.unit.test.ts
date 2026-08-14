@@ -6,8 +6,8 @@ import type {
   StateProjectionStore,
   StoredProjection,
 } from "../../projections/stateProjection.types";
+import { runFoldMapReplay } from "../replayEngine";
 import { nullLog } from "../replayLog";
-import { replayOptimized } from "../replayOptimizedPath";
 import { replayStateProjection } from "../replayStatePath";
 import type { RegisteredStateProjection, ReplayContext } from "../types";
 
@@ -483,7 +483,7 @@ describe("replayStateProjection", () => {
   });
 });
 
-describe("replayOptimized with state projections", () => {
+describe("the fold/map engine with state projections", () => {
   it("rejects a config carrying state projections rather than silently skipping them", async () => {
     const { store } = spyStore();
     const ctx = {
@@ -495,7 +495,7 @@ describe("replayOptimized with state projections", () => {
     } as unknown as ReplayContext;
 
     await expect(
-      replayOptimized({
+      runFoldMapReplay({
         ctx,
         config: {
           projections: [],

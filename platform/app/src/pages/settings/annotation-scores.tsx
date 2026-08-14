@@ -10,11 +10,11 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { AnnotationScoreDataType } from "@prisma/client";
 import { useEffect, useState } from "react";
 import { Edit, MoreVertical, Plus, ThumbsUp, Trash } from "react-feather";
 import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { AnnotationScoreDataType } from "~/generated/prisma/client";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useLiteMemberGuard } from "~/hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";

@@ -8,6 +8,8 @@ const mockReportEvaluation = vi.fn();
 const mockCheckLimit = vi.fn();
 
 vi.mock("~/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: vi.fn(() => ({
     usage: { checkLimit: mockCheckLimit },
     traces: { collection: { ingestNormalizedSpan: mockIngestNormalizedSpan } },
@@ -328,6 +330,34 @@ describe("POST /api/collector", () => {
 
         expect(res.status).toBe(400);
         expect(mockIngestNormalizedSpan).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given an evaluation reporting an error alongside a verdict", () => {
+    describe("when it is dispatched to the evaluations pipeline", () => {
+      it("dispatches with status error and no verdict (passed/score/label null)", async () => {
+        const res = await postCollector({
+          trace_id: "trace-1",
+          spans: [makeSpan(1)],
+          evaluations: [
+            {
+              name: "eval-a",
+              score: 0.1,
+              passed: false,
+              label: "bad",
+              error: { message: "provider timeout", stacktrace: [] },
+            },
+          ],
+        });
+
+        expect(res.status).toBe(200);
+        const call = mockReportEvaluation.mock.calls[0]![0];
+        expect(call.status).toBe("error");
+        expect(call.passed).toBeNull();
+        expect(call.score).toBeNull();
+        expect(call.label).toBeNull();
+        expect(call.error).toBe("provider timeout");
       });
     });
   });

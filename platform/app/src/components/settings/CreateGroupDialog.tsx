@@ -33,7 +33,7 @@ export function CreateGroupDialog({
   open: boolean;
   onClose: () => void;
 }) {
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
   const [name, setName] = useState("");
   const [pendingBindings, setPendingBindings] = useState<PendingBinding[]>([]);
   const [pendingMemberIds, setPendingMemberIds] = useState<string[]>([]);

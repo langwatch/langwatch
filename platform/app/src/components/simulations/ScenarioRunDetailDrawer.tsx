@@ -96,8 +96,11 @@ export function ScenarioRunDetailDrawer({
         enabled: !!project?.id && !!scenarioRunId && !!open,
         // Finished runs never change — stop polling entirely. Live runs poll
         // fast only while the event stream is down.
-        refetchInterval: (data) =>
-          getRunStatePollInterval({ status: data?.status, sseConnected }),
+        refetchInterval: (query) =>
+          getRunStatePollInterval({
+            status: query.state.data?.status,
+            sseConnected,
+          }),
       },
     );
 

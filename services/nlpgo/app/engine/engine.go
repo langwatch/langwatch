@@ -167,8 +167,26 @@ type NodeState struct {
 	Stderr     string         `json:"stderr,omitempty"`
 	Cost       float64        `json:"cost,omitempty"`
 	Metrics    *NodeMetrics   `json:"metrics,omitempty"`
+	HTTP       *NodeHTTP      `json:"http,omitempty"`
 	DurationMS int64          `json:"duration_ms,omitempty"`
 	Error      *NodeError     `json:"error,omitempty"`
+}
+
+// NodeHTTP is what an HTTP node saw on the wire, surfaced so whoever is
+// configuring the endpoint can read its actual answer instead of guessing from
+// a status code. Diagnostics only: no downstream node binds to any of it, the
+// same way NodeMetrics carries an LLM node's counts without being workflow
+// data.
+//
+// RenderedBody is the request body the engine sent after templating. It is
+// safe to surface because the body template is deliberately the one field
+// secrets are NOT resolved into (see runHTTP), precisely so it can be shown.
+type NodeHTTP struct {
+	StatusCode      int               `json:"status_code,omitempty"`
+	StatusText      string            `json:"status_text,omitempty"`
+	ResponseHeaders map[string]string `json:"response_headers,omitempty"`
+	RenderedBody    string            `json:"rendered_body,omitempty"`
+	Warnings        []string          `json:"warnings,omitempty"`
 }
 
 // NodeMetrics carries an LLM node's token usage + resolved model so the
@@ -568,6 +586,17 @@ func (e *Engine) runHTTP(ctx context.Context, node *dsl.Node, inputs map[string]
 		Inputs:       inputs,
 	}
 	res, err := e.http.Execute(ctx, req)
+	// Recorded before the error check: a non-2xx still carries the status and
+	// headers, and that failing case is the one the author most needs to read.
+	if res != nil {
+		ns.HTTP = &NodeHTTP{
+			StatusCode:      res.StatusCode,
+			StatusText:      res.StatusText,
+			ResponseHeaders: res.ResponseHeaders,
+			RenderedBody:    res.RenderedBody,
+			Warnings:        res.Warnings,
+		}
+	}
 	if err != nil {
 		// Redact resolved secret values from the error message: Go HTTP
 		// errors embed the request URL, so a `{{ secrets.X }}` in the
@@ -576,6 +605,15 @@ func (e *Engine) runHTTP(ctx context.Context, node *dsl.Node, inputs map[string]
 		var ue *httpblock.UpstreamError
 		if errors.As(err, &ue) {
 			return nil, &NodeError{Type: "upstream_http_error", Message: msg, Status: ue.Status}
+		}
+		// A refused destination is its own failure, not a failure to reach one.
+		// Reported as http_error it presented as "couldn't reach the agent,
+		// check the URL and that the service is running" — advice that sends
+		// the author to debug an endpoint which is running and was never
+		// dialed. The code has copy of its own saying the address is not
+		// permitted.
+		if errors.Is(err, httpblock.ErrSSRFBlocked) {
+			return nil, &NodeError{Type: "ssrf_blocked", Message: msg}
 		}
 		return nil, &NodeError{Type: "http_error", Message: msg}
 	}
@@ -587,7 +625,6 @@ func (e *Engine) runHTTP(ctx context.Context, node *dsl.Node, inputs map[string]
 		// Workflow-author chose a single output name — bind there.
 		out = map[string]any{outs[0]: res.Output}
 	}
-	_ = ns
 	return out, nil
 }
 

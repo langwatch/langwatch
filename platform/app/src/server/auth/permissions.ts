@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import type { Permission } from "~/server/api/rbac";
 import { PermissionsService } from "~/server/app-layer/permissions/permissions.service";
 

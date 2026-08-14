@@ -47,6 +47,8 @@ vi.mock("~/server/scenarios/scenario.service", () => ({
 
 const mockQueueRun = vi.fn().mockResolvedValue(undefined);
 vi.mock("~/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: vi.fn().mockReturnValue({
     simulations: {
       queueRun: (...args: unknown[]) => mockQueueRun(...args),

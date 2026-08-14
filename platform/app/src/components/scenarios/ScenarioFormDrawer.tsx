@@ -8,7 +8,6 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { generate } from "@langwatch/ksuid";
-import type { Scenario } from "@prisma/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   type FieldErrors,
@@ -21,6 +20,7 @@ import {
   FormServerError,
   showErrorToast,
 } from "~/features/errors";
+import type { Scenario } from "~/generated/prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
 import {
   clearFlowCallbacks,
@@ -108,7 +108,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     rawComplexProps && "initialFormData" in rawComplexProps
       ? (rawComplexProps as Partial<ScenarioInitialData>)
       : {};
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const [formInstance, setFormInstance] =
     useState<UseFormReturn<ScenarioFormData> | null>(null);
   const { runScenario, isRunning } = useRunScenario({

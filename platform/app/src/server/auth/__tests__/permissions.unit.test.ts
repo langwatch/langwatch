@@ -1,5 +1,5 @@
-import { OrganizationUserRole } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { OrganizationUserRole } from "~/generated/prisma/client";
 
 const resolveProjectPermissionMock = vi.fn();
 

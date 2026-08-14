@@ -143,21 +143,21 @@ images:
   ## @param images.app.pullPolicy [string] App image pull policy.
   app:
     repository: langwatch/langwatch
-    tag: 3.12.0 # x-release-please-version
+    tag: 3.13.0 # x-release-please-version
     pullPolicy: IfNotPresent
   ## @param images.langwatch_nlp.repository [string] NLP image repository (Go nlpgo binary, published as langwatch_nlp).
   ## @param images.langwatch_nlp.tag [string] NLP image tag.
   ## @param images.langwatch_nlp.pullPolicy [string] NLP image pull policy.
   langwatch_nlp:
     repository: langwatch/langwatch_nlp
-    tag: 3.12.0 # x-release-please-version
+    tag: 3.13.0 # x-release-please-version
     pullPolicy: IfNotPresent
   ## @param images.langevals.repository [string] Langevals image repository.
   ## @param images.langevals.tag [string] Langevals image tag.
   ## @param images.langevals.pullPolicy [string] Langevals image pull policy.
   langevals:
     repository: langwatch/langevals
-    tag: 3.12.0 # x-release-please-version
+    tag: 3.13.0 # x-release-please-version
     pullPolicy: IfNotPresent
 
 # =============================================================================
@@ -401,6 +401,8 @@ app:
           value: ""
           ## @param app.dataplane.providers.azureBlob.container.secretKeyRef [object] Secret ref for the Azure Blob container name.
           secretKeyRef: { name: "", key: "" }
+        ## @param app.dataplane.providers.azureBlob.spoolRetentionConfirmed [boolean] Confirms the container has a lifecycle rule deleting `trace-blobs/spool/` blobs after 3 days. The ADR-022 trace spool refuses to write to Azure until this is true, because a crash between the spool write and its delete is bounded only by that rule and the app cannot verify a management-plane policy with a data-plane key. Leave false unless you have created the policy.
+        spoolRetentionConfirmed: false
         # Optional. Override the blob endpoint for sovereign clouds
         # (*.usgovcloudapi.net, *.chinacloudapi.cn), private endpoints, or an
         # emulator. Defaults to https://{accountName}.blob.core.windows.net.
@@ -1055,6 +1057,24 @@ langwatch_nlp:
   ## @param langwatch_nlp.service.type [string, default: ClusterIP] Service type.
   ## @param langwatch_nlp.service.port [default: 5561] Service port.
   service: { type: ClusterIP, port: 5561 }
+
+  # Where workflows are allowed to send HTTP requests. This is the service that
+  # runs HTTP agents and workflow HTTP nodes, so this is the setting that
+  # decides whether an agent can reach a service on your own network.
+  #
+  # Keep blockLocalHTTPCalls false for a self-hosted install whose agents are
+  # internal — the common case, and the default. Set it true for a
+  # multi-tenant deployment, where a workflow author is not necessarily
+  # someone you want reaching into the cluster, and list the internal hosts
+  # you do intend to reach in allowedProxyHosts.
+  #
+  # Cloud metadata endpoints are refused either way and cannot be allow-listed.
+  ## @extra langwatch_nlp.security Outbound request policy for workflow HTTP nodes.
+  ## @param langwatch_nlp.security.blockLocalHTTPCalls [default: false] Refuse workflow HTTP requests to private, loopback and link-local addresses. Keep false for self-hosted installs that call internal services; set true for multi-tenant deployments.
+  ## @param langwatch_nlp.security.allowedProxyHosts [array, default: []] Hostnames reachable even when blockLocalHTTPCalls is on. Matched literally, case-insensitive, port ignored. Cloud metadata is never allow-listed.
+  security:
+    blockLocalHTTPCalls: false
+    allowedProxyHosts: []
 
   # Resource requirements for the NLP service. The service is a lean static Go
   # binary (nlpgo) that only spawns a transient Python interpreter to sandbox

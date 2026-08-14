@@ -61,11 +61,12 @@ vi.mock("~/utils/api", () => ({
     // The hook passes this procedure object to (the mocked)
     // useSSESubscription — it only needs to exist, not function.
     tracesV2: { onDiscoverUpdate: {} },
-    useContext: () => ({
+    useUtils: () => ({
       tracesV2: {
         list: {
           cancel: mockListCancel,
           invalidate: mockListInvalidate,
+          getData: vi.fn().mockReturnValue(null),
         },
         newCount: {
           cancel: mockNewCountCancel,
@@ -84,11 +85,6 @@ vi.mock("~/utils/api", () => ({
         },
         traceEvents: { invalidate: vi.fn().mockResolvedValue(undefined) },
         resourceInfo: { invalidate: vi.fn().mockResolvedValue(undefined) },
-      },
-    }),
-    useUtils: () => ({
-      tracesV2: {
-        list: { getData: vi.fn().mockReturnValue(null) },
       },
     }),
   },

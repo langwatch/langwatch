@@ -9,7 +9,10 @@ import {
 } from "~/server/event-sourcing/queues/groupQueue/cachedLuaScript";
 import {
   decodeJobEnvelope,
+  isEnvelope,
+  readEnvelopeDescriptor,
   readJobRoutingMeta,
+  splitEnvelope,
 } from "~/server/event-sourcing/queues/groupQueue/jobEnvelope";
 import { legacyStagedJobAttempt } from "~/server/event-sourcing/queues/groupQueue/legacyStagedJobAttempt";
 import { RedisJobBlobStore } from "~/server/event-sourcing/queues/groupQueue/redisJobBlobStore";
@@ -25,12 +28,19 @@ import { TieredBlobStore } from "~/server/event-sourcing/queues/groupQueue/tiere
 import { resolveProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
 import { createStorageRegistry } from "~/server/stored-objects/stored-objects-factory";
 import { normalizeErrorMessage } from "../normalize-error-message";
-import type { ErrorCluster, GroupInfo, QueueInfo } from "../types";
+import type { ParkedTenant } from "../snapshot/snapshot.types";
+import type {
+  ErrorCluster,
+  GroupInfo,
+  ParkedGroupInfo,
+  QueueInfo,
+} from "../types";
 import type {
   BlockedSummary,
   DlqGroupInfo,
   DrainPreview,
   JobEntry,
+  ParkedTenantsPage,
   QueueRepository,
   ReconcileResult,
 } from "./queue.repository";
@@ -68,6 +78,11 @@ if wasBlocked > 0 then
   -- it did depended on how long the operator took to press the button (the
   -- chain expires on its own after GROUP_ATTEMPT_TTL_SECONDS).
   redis.call("DEL", strikesKey)
+-- The poison guard's per-group state is the claim marker; the legacy strikes
+-- counter above is cleared alongside it so a group blocked by the old guard
+-- still unblocks cleanly while both are in the fleet. Derived from strikesKey
+-- (":strikes" is 8 chars) so the key arity stays fixed.
+redis.call("DEL", string.sub(strikesKey, 1, #strikesKey - 8) .. ":claim")
   -- specs/event-sourcing/poison-group-park-guard.feature
   redis.call("DEL", attemptKey)
   redis.call("DEL", failStreakKey)
@@ -130,6 +145,11 @@ redis.call("DEL", errorKey)
 -- carried failure streak re-quarantines it (ADR-080,
 -- specs/event-sourcing/poison-group-park-guard.feature).
 redis.call("DEL", strikesKey)
+-- The poison guard's per-group state is the claim marker; the legacy strikes
+-- counter above is cleared alongside it so a group blocked by the old guard
+-- still unblocks cleanly while both are in the fleet. Derived from strikesKey
+-- (":strikes" is 8 chars) so the key arity stays fixed.
+redis.call("DEL", string.sub(strikesKey, 1, #strikesKey - 8) .. ":claim")
 redis.call("DEL", attemptKey)
 redis.call("DEL", failStreakKey)
 redis.call("ZREM", readyKey, groupId)
@@ -197,6 +217,11 @@ redis.call("DEL", srcErrorKey)
 -- get a fresh run, not inherit strikes, a spent retry chain, or a failure
 -- streak from the jobs that were carried off (ADR-080).
 redis.call("DEL", strikesKey)
+-- The poison guard's per-group state is the claim marker; the legacy strikes
+-- counter above is cleared alongside it so a group blocked by the old guard
+-- still unblocks cleanly while both are in the fleet. Derived from strikesKey
+-- (":strikes" is 8 chars) so the key arity stays fixed.
+redis.call("DEL", string.sub(strikesKey, 1, #strikesKey - 8) .. ":claim")
 redis.call("DEL", attemptKey)
 redis.call("DEL", failStreakKey)
 redis.call("ZREM", readyKey, groupId)
@@ -752,6 +777,25 @@ export class QueueRedisRepository implements QueueRepository {
 
   // ── Job Browsing ────────────────────────────────────────────────
 
+  /**
+   * The payload size to DISPLAY for a staged value: the encoder-recorded
+   * `header.s` when present, the stored length for bare JSON, and null when
+   * the value cannot say. Deliberately not `readJobPayloadBytes`, whose
+   * "unknown is worth the cap" sentinel is a batch-budget rule — rendered on
+   * a job card it would read as a 50 MB payload that isn't one.
+   */
+  private readDisplayPayloadBytes(raw: string): number | null {
+    try {
+      if (!isEnvelope(raw)) return Buffer.byteLength(raw, "utf8");
+      const { header } = splitEnvelope(raw);
+      return Number.isSafeInteger(header.s) && (header.s as number) >= 0
+        ? (header.s as number)
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
   async getGroupJobs(params: {
     queueName: string;
     groupId: string;
@@ -778,7 +822,13 @@ export class QueueRedisRepository implements QueueRepository {
       const jobId = jobEntries[i]!;
       const score = parseFloat(jobEntries[i + 1]!);
       jobIds.push(jobId);
-      jobs.push({ jobId, score, data: null });
+      jobs.push({
+        jobId,
+        score,
+        data: null,
+        payloadBytes: null,
+        envelope: null,
+      });
     }
 
     if (jobIds.length > 0) {
@@ -807,28 +857,52 @@ export class QueueRedisRepository implements QueueRepository {
       await Promise.all(
         jobIds.map(async (_, i) => {
           const raw = dataResults?.[i]?.[1] as string | null;
-          if (raw) {
-            try {
-              // Ops-dashboard inspection: DO NOT refresh the blob TTL on read
-              // (2026-06-24 review). A repeatedly-viewed blocked group would
-              // otherwise keep its orphan blobs alive indefinitely. readMode
-              // "peek" routes BOTH the GQ1 blobs.get AND the tieredBlobs.get
-              // to their peek variants.
-              jobs[i]!.data = await decodeJobEnvelope({
-                value: raw,
-                blobs,
-                tieredBlobs,
-                readMode: "peek",
-              });
-            } catch {
-              // ignore undecodable values
-            }
-          }
+          if (!raw) return;
+          await this.decorateJobFromRaw({
+            job: jobs[i]!,
+            raw,
+            blobs,
+            tieredBlobs,
+          });
         }),
       );
     }
 
     return { jobs, total };
+  }
+
+  /** Fill one job's envelope descriptor, payload size, and decoded body. */
+  private async decorateJobFromRaw({
+    job,
+    raw,
+    blobs,
+    tieredBlobs,
+  }: {
+    job: JobEntry;
+    raw: string;
+    blobs: RedisJobBlobStore;
+    tieredBlobs: TieredBlobStore;
+  }): Promise<void> {
+    // Storage shape from the header alone — survives a body the decode below
+    // cannot read, which is exactly when an operator most wants to know where
+    // the body was supposed to be.
+    job.envelope = isEnvelope(raw) ? readEnvelopeDescriptor(raw) : null;
+    job.payloadBytes = this.readDisplayPayloadBytes(raw);
+    try {
+      // Ops-dashboard inspection: DO NOT refresh the blob TTL on read
+      // (2026-06-24 review). A repeatedly-viewed blocked group would
+      // otherwise keep its orphan blobs alive indefinitely. readMode
+      // "peek" routes BOTH the GQ1 blobs.get AND the tieredBlobs.get
+      // to their peek variants.
+      job.data = await decodeJobEnvelope({
+        value: raw,
+        blobs,
+        tieredBlobs,
+        readMode: "peek",
+      });
+    } catch {
+      // ignore undecodable values
+    }
   }
 
   // ── Blocked Group Analysis ─────────────────────────────────────
@@ -928,6 +1002,179 @@ export class QueueRedisRepository implements QueueRepository {
     );
 
     return { totalBlocked, clusters };
+  }
+
+  // ── Parked (tenant soft cap) ────────────────────────────────────
+
+  async enumerateParkedTenants(params: {
+    queueNames: string[];
+    maxTenants: number;
+  }): Promise<ParkedTenantsPage> {
+    const rows: ParkedTenant[] = [];
+    for (const queueName of params.queueNames) {
+      rows.push(...(await this.parkedTenantsForQueue(queueName)));
+    }
+
+    rows.sort((a, b) => b.groupCount - a.groupCount);
+    return {
+      tenants: rows.slice(0, Math.max(0, params.maxTenants)),
+      total: rows.length,
+    };
+  }
+
+  /**
+   * One queue's over-cap tenants.
+   *
+   * The registry holds one entry per OVER-CAP TENANT, not per parked group, so
+   * this stays cheap even when parked DEPTH is in the hundreds of thousands —
+   * which is exactly the case the dashboard has to explain.
+   */
+  private async parkedTenantsForQueue(
+    queueName: string,
+  ): Promise<ParkedTenant[]> {
+    const prefix = `${queueName}:gq:`;
+    const tenantIds = await this.redis.smembers(`${prefix}parked-tenants`);
+    if (tenantIds.length === 0) return [];
+
+    const pipeline = this.redis.pipeline();
+    for (const tenantId of tenantIds) {
+      pipeline.zcard(`${prefix}parked:${tenantId}`);
+      pipeline.zrange(`${prefix}parked:${tenantId}`, 0, 0);
+    }
+    const results = await pipeline.exec();
+
+    const depths = new Map<string, number>();
+    const headGroups: Array<{ tenantId: string; groupId: string }> = [];
+    for (let i = 0; i < tenantIds.length; i++) {
+      const tenantId = tenantIds[i]!;
+      const depth = Number(results?.[i * 2]?.[1] ?? 0) || 0;
+      if (depth === 0) continue;
+      depths.set(tenantId, depth);
+      const head = (results?.[i * 2 + 1]?.[1] as string[]) ?? [];
+      if (head[0]) headGroups.push({ tenantId, groupId: head[0] });
+    }
+
+    const ageMs = await this.oldestJobPerTenant({ prefix, headGroups });
+
+    return Array.from(depths, ([tenantId, groupCount]) => ({
+      tenantId,
+      queueName,
+      groupCount,
+      oldestParkedMs: ageMs.get(tenantId) ?? null,
+    }));
+  }
+
+  /**
+   * Age comes from each tenant's head parked group's oldest job. The head is
+   * the tenant's most dispatch-eligible parked group, and parking preserves the
+   * score it held in ready, so this is the closest available answer to "how
+   * long has this tenant been waiting" without walking every parked group.
+   */
+  private async oldestJobPerTenant({
+    prefix,
+    headGroups,
+  }: {
+    prefix: string;
+    headGroups: Array<{ tenantId: string; groupId: string }>;
+  }): Promise<Map<string, number>> {
+    const ageMs = new Map<string, number>();
+    if (headGroups.length === 0) return ageMs;
+
+    const pipeline = this.redis.pipeline();
+    for (const { groupId } of headGroups) {
+      pipeline.zrange(`${prefix}group:${groupId}:jobs`, 0, 0, "WITHSCORES");
+    }
+    const results = await pipeline.exec();
+
+    for (let i = 0; i < headGroups.length; i++) {
+      const arr = (results?.[i]?.[1] as string[]) ?? [];
+      if (arr.length < 2) continue;
+      const ts = parseFloat(arr[1]!);
+      if (Number.isFinite(ts)) ageMs.set(headGroups[i]!.tenantId, ts);
+    }
+    return ageMs;
+  }
+
+  async listParkedGroups(params: {
+    queueName: string;
+    tenantId: string;
+    page: number;
+    pageSize: number;
+  }): Promise<{ groups: ParkedGroupInfo[]; total: number }> {
+    const prefix = `${params.queueName}:gq:`;
+    const parkedKey = `${prefix}parked:${params.tenantId}`;
+
+    const total = await this.redis.zcard(parkedKey);
+    if (total === 0) return { groups: [], total: 0 };
+
+    const start = (params.page - 1) * params.pageSize;
+    const members = await this.redis.zrange(
+      parkedKey,
+      start,
+      start + params.pageSize - 1,
+      "WITHSCORES",
+    );
+
+    const scores = new Map<string, number>();
+    for (let i = 0; i < members.length; i += 2) {
+      scores.set(members[i]!, parseFloat(members[i + 1]!));
+    }
+    if (scores.size === 0) return { groups: [], total };
+
+    return {
+      groups: await this.hydrateParkedGroups({ prefix, scores }),
+      total,
+    };
+  }
+
+  /** Fill in job counts, oldest wait and pipeline name for one page of groups. */
+  private async hydrateParkedGroups({
+    prefix,
+    scores,
+  }: {
+    prefix: string;
+    scores: Map<string, number>;
+  }): Promise<ParkedGroupInfo[]> {
+    const groupIds = Array.from(scores.keys());
+
+    const pipeline = this.redis.pipeline();
+    for (const groupId of groupIds) {
+      pipeline.zcard(`${prefix}group:${groupId}:jobs`);
+      pipeline.zrange(`${prefix}group:${groupId}:jobs`, 0, 0, "WITHSCORES");
+    }
+    const results = await pipeline.exec();
+
+    const oldestJobIds = groupIds.map((groupId, i) => ({
+      groupId,
+      jobId: ((results?.[i * 2 + 1]?.[1] as string[]) ?? [])[0] ?? null,
+    }));
+
+    const dataPipeline = this.redis.pipeline();
+    for (const { groupId, jobId } of oldestJobIds) {
+      if (jobId) dataPipeline.hget(`${prefix}group:${groupId}:data`, jobId);
+    }
+    const withJob = oldestJobIds.filter((entry) => entry.jobId !== null);
+    const dataResults = withJob.length > 0 ? await dataPipeline.exec() : [];
+
+    const pipelineNames = new Map<string, string | null>();
+    for (let i = 0; i < withJob.length; i++) {
+      const raw = (dataResults?.[i]?.[1] as string) ?? null;
+      pipelineNames.set(
+        withJob[i]!.groupId,
+        raw ? readJobRoutingMeta(raw).pipelineName : null,
+      );
+    }
+
+    return groupIds.map((groupId, i) => {
+      const oldestArr = (results?.[i * 2 + 1]?.[1] as string[]) ?? [];
+      return {
+        groupId,
+        pendingJobs: Number(results?.[i * 2]?.[1] ?? 0) || 0,
+        oldestJobMs: oldestArr.length >= 2 ? parseFloat(oldestArr[1]!) : null,
+        score: scores.get(groupId) ?? 0,
+        pipelineName: pipelineNames.get(groupId) ?? null,
+      };
+    });
   }
 
   // ── Actions ─────────────────────────────────────────────────────

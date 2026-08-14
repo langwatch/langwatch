@@ -7,8 +7,8 @@
  */
 
 import { generate } from "@langwatch/ksuid";
-import type { SimulationSuite } from "@prisma/client";
 import { useCallback, useMemo, useRef, useState } from "react";
+import type { SimulationSuite } from "~/generated/prisma/client";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
@@ -97,7 +97,7 @@ function toRunParameters({
 export function useRunSuite(options: UseRunSuiteOptions = {}) {
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const optionsRef = useRef(options);
   optionsRef.current = options;
 

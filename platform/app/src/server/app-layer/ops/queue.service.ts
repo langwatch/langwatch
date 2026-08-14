@@ -5,7 +5,7 @@ import type {
   JobEntry,
   QueueRepository,
 } from "./repositories/queue.repository";
-import type { GroupInfo, QueueSummaryInfo } from "./types";
+import type { GroupInfo, ParkedGroupInfo, QueueSummaryInfo } from "./types";
 
 export class QueueService {
   constructor(readonly repo: QueueRepository) {}
@@ -88,6 +88,25 @@ export class QueueService {
   async getBlockedSummary(): Promise<BlockedSummary> {
     const queueNames = await this.repo.discoverQueueNames();
     return this.repo.getBlockedSummary({ queueNames });
+  }
+
+  /**
+   * One parked tenant's groups. Read at request time so an operator acting on
+   * a row is acting on current state, not on a snapshot cycle's worth of past.
+   */
+  async getParkedGroups(params: {
+    queueName: string;
+    tenantId: string;
+    page: number;
+    pageSize: number;
+  }): Promise<{
+    groups: ParkedGroupInfo[];
+    total: number;
+    page: number;
+    pageSize: number;
+  }> {
+    const result = await this.repo.listParkedGroups(params);
+    return { ...result, page: params.page, pageSize: params.pageSize };
   }
 
   async getAllDlqGroups(): Promise<

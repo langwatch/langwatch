@@ -1,5 +1,6 @@
 import os
 from tempfile import mkdtemp
+from typing import Optional
 import warnings
 import litellm
 import litellm.cost_calculator
@@ -13,6 +14,101 @@ os.environ["DSPY_CACHEDIR"] = mkdtemp()
 # Parameters that need type conversion from string env vars
 INT_PARAMS = {"max_tokens", "seed", "n", "top_logprobs", "max_completion_tokens"}
 FLOAT_PARAMS = {"temperature", "top_p", "frequency_penalty", "presence_penalty"}
+
+# The parameter a provider names when the reasoning setting is what it refused.
+REASONING_EFFORT_PARAM = "reasoning_effort"
+
+# The value that switches reasoning off.
+REASONING_OFF = "none"
+
+# `/v1/chat/completions` refuses a request carrying function tools on these
+# models unless reasoning is switched off explicitly: "Function tools with
+# reasoning_effort are not supported for <model> in /v1/chat/completions. To use
+# function tools, use /v1/responses or set reasoning_effort to 'none'." Nearly
+# every LLM-as-judge evaluator here asks for its verdict through a function
+# tool, so on such a model no evaluation reaches a verdict at all.
+#
+# An exact allowlist rather than a pattern, because the family boundary is not
+# where the behavior changes: openai/gpt-5.6-sol-pro, azure/gpt-5.6-sol and
+# openai/gpt-5.5-sol all accept the combination, and some reasoning models
+# refuse to run with their reasoning off at all. A model joins this set once it
+# has actually been observed to need it.
+TOOL_REASONING_INCOMPATIBLE_MODELS = frozenset(
+    {
+        "openai/gpt-5.6-luna",
+        "openai/gpt-5.6-sol",
+        "openai/gpt-5.6-terra",
+    }
+)
+
+
+class ToolReasoningConflictError(Exception):
+    """
+    A model refused a request carrying function tools because of its reasoning
+    setting.
+
+    The message is written for the person configuring the evaluator: it names
+    their own model and the setting to change, and leaves the provider's own
+    wording out, which talks about endpoints they do not choose.
+    """
+
+    def __init__(self, model: Optional[str] = None):
+        subject = f"The evaluator model {model}" if model else "The evaluator model"
+        super().__init__(
+            f"{subject} does not accept function tools while its reasoning is "
+            f"on, and this evaluator asks for its verdict through a function "
+            f"call. Choose a different evaluator model, or set its reasoning "
+            f"effort to '{REASONING_OFF}'."
+        )
+        self.model = model
+
+
+def tool_reasoning_conflict(
+    kwargs: dict, exception: BaseException
+) -> Optional[ToolReasoningConflictError]:
+    """
+    The error to report in place of a provider rejection that is the
+    tools-versus-reasoning conflict, or None when the rejection is something
+    else and belongs to the caller untouched.
+
+    Three signals, and all are required: the request carried tools, the
+    rejection names the reasoning parameter, and the rejection is about tools.
+    Any of them alone also describes ordinary rejections that have nothing to
+    do with this, such as an unsupported reasoning value on a request that
+    asked for no tools at all.
+    """
+    if not kwargs.get("tools"):
+        return None
+
+    message = str(exception).lower()
+    if REASONING_EFFORT_PARAM not in message or "tool" not in message:
+        return None
+
+    return ToolReasoningConflictError(kwargs.get("model"))
+
+
+def apply_tool_reasoning_compatibility(kwargs: dict) -> dict:
+    """
+    Switch reasoning off for the models that reject function tools while it is
+    on, so a judge call reaches a verdict instead of a 400.
+
+    A default and never an override, on three counts. A caller that asked for a
+    specific reasoning effort keeps it and gets the provider's own answer
+    rather than having its intent silently rewritten. A request carrying no
+    tools is left alone, since the incompatibility is only about tools and
+    reasoning is worth having on the calls that can use it. And a model outside
+    the allowlist is left alone, since disabling reasoning is itself rejected by
+    models that only work with it on.
+    """
+    if kwargs.get(REASONING_EFFORT_PARAM) is not None:
+        return kwargs
+    if not kwargs.get("tools"):
+        return kwargs
+    if kwargs.get("model") not in TOOL_REASONING_INCOMPATIBLE_MODELS:
+        return kwargs
+
+    kwargs[REASONING_EFFORT_PARAM] = REASONING_OFF
+    return kwargs
 
 
 def convert_param_type(key: str, value: str):
@@ -83,21 +179,38 @@ def patch_litellm():
             del kwargs["api_base"]
             del kwargs["use_azure_gateway"]
 
+        # Last, so that an operator's X_LITELLM_reasoning_effort counts as an
+        # explicit choice and the azure rewrites above have already settled
+        # which model the request actually names.
+        kwargs = apply_tool_reasoning_compatibility(kwargs)
+
         return kwargs
 
     def patched_completion(*args, **kwargs):
         kwargs = patch_litellm_params(kwargs)
 
-        return _original_completion(*args, **kwargs)
+        try:
+            return _original_completion(*args, **kwargs)
+        except Exception as exception:
+            conflict = tool_reasoning_conflict(kwargs, exception)
+            if conflict is not None:
+                raise conflict from exception
+            raise
 
     litellm.completion = patched_completion
 
     _original_acompletion = litellm.acompletion
 
-    def patched_acompletion(*args, **kwargs):
+    async def patched_acompletion(*args, **kwargs):
         kwargs = patch_litellm_params(kwargs)
 
-        return _original_acompletion(*args, **kwargs)
+        try:
+            return await _original_acompletion(*args, **kwargs)
+        except Exception as exception:
+            conflict = tool_reasoning_conflict(kwargs, exception)
+            if conflict is not None:
+                raise conflict from exception
+            raise
 
     litellm.acompletion = patched_acompletion
 

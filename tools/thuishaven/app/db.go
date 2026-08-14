@@ -73,6 +73,15 @@ func SeedPresetNames() []string {
 	return names
 }
 
+// ValidateSeedPreset reports whether a preset name is one this registry knows
+// ("" is the plain identity seed). It exists for the surfaces that must reject
+// a bad preset before they start doing expensive or destructive work — `haven
+// play --seed` checks it before it resolves the PR, so a typo costs nothing.
+func ValidateSeedPreset(name string) error {
+	_, err := resolveSeedPreset(name)
+	return err
+}
+
 // resolveSeedPreset validates a preset name ("" is the plain identity seed).
 func resolveSeedPreset(name string) (seedPreset, error) {
 	if name == "" {

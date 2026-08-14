@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
-import { connection } from "~/server/redis";
+import type { RedisConnection } from "@langwatch/redis-client";
+import { resolveRedis } from "./resolveRedis";
 
 const logger = createLogger("langwatch:outbox:emailHourlyCap");
 
@@ -100,7 +101,7 @@ end
 `;
 
 async function expireIfUnset(
-  redis: NonNullable<typeof connection>,
+  redis: RedisConnection,
   key: string,
   seconds: number,
 ): Promise<void> {
@@ -137,6 +138,7 @@ export async function consumeEmailCapSlot({
   now,
   cap,
   dedupKey,
+  redis,
 }: {
   projectId: string;
   triggerId: string;
@@ -149,10 +151,13 @@ export async function consumeEmailCapSlot({
    * caller already has this — see the dispatcher's `auditDedupKey`.
    */
   dedupKey: string;
+  /** Omit for the App's connection; pass `null` to force the in-memory path. */
+  redis?: RedisConnection | null;
 }): Promise<{ allowed: boolean; count: number }> {
   const hourBucket = Math.floor(now.getTime() / HOUR_MS);
   const key = `trigger-email-cap:${projectId}:${triggerId}:${hourBucket}`;
   const claimKey = `cap-claimed:${dedupKey}`;
+  const connection = resolveRedis(redis);
 
   if (connection) {
     try {
@@ -254,6 +259,7 @@ export async function consumeTenantEmailCapSlot({
   cap,
   recipientCount,
   dedupKey,
+  redis,
 }: {
   projectId: string;
   now: Date;
@@ -270,10 +276,13 @@ export async function consumeTenantEmailCapSlot({
    * recipients. Distinct from the hourly cap's claim key (different prefix).
    */
   dedupKey: string;
+  /** Omit for the App's connection; pass `null` to force the in-memory path. */
+  redis?: RedisConnection | null;
 }): Promise<{ allowed: boolean; count: number }> {
   const dayBucket = Math.floor(now.getTime() / DAY_MS);
   const key = `trigger-email-tenant-cap:${projectId}:${dayBucket}`;
   const claimKey = `tenant-cap-claimed:${dedupKey}`;
+  const connection = resolveRedis(redis);
 
   if (connection) {
     try {
