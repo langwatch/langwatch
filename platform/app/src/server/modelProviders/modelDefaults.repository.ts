@@ -230,9 +230,13 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`mdc:${scopeType}:${scopeId}`}, 
     });
   }
 
-  /** Delete the given scope-attachment rows. Ids are sorted so two
-   * writes over overlapping sets take their row locks in the same
-   * order. */
+  /** Delete the given scope-attachment rows.
+   *
+   * What keeps two writes over overlapping sets apart is
+   * `lockOrganization`, which every write path takes first. The id sort
+   * is not part of that: one `deleteMany` locks rows in whatever scan
+   * order the planner picks, and an `IN` list is not an ordering
+   * directive. It is here so the statement is reproducible. */
   async deleteAttachments(attachmentIds: string[]): Promise<void> {
     if (attachmentIds.length === 0) return;
     await this.prisma.modelDefaultConfigScope.deleteMany({
@@ -242,8 +246,8 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`mdc:${scopeType}:${scopeId}`}, 
 
   /** Delete any of the given configs that no longer have a single scope
    * attachment: an unattached config can never be hit by the resolver,
-   * it just haunts the settings table. Ids are sorted for the same
-   * reason as `deleteAttachments`. */
+   * it just haunts the settings table. Serialised by
+   * `lockOrganization`, same as `deleteAttachments`. */
   async deleteConfigsWithoutScopes(configIds: string[]): Promise<void> {
     if (configIds.length === 0) return;
     await this.prisma.modelDefaultConfig.deleteMany({

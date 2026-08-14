@@ -33,6 +33,11 @@ const MIGRATION_FILE = join(
   "prisma/migrations/20260814120000_collapse_duplicate_model_default_scopes/migration.sql",
 );
 
+/** The replay seeds, collapses and asserts inside one transaction,
+ *  which is more than Prisma's 5 second default is worth betting a
+ *  loaded CI shard on. */
+const TX_BUDGET = { timeout: 20_000, maxWait: 10_000 } as const;
+
 /**
  * The two collapse statements exactly as shipped, read from the
  * migration file so this test fails if the rule is ever edited out from
@@ -219,7 +224,7 @@ describe("given configs written before the one-config-per-scope rule (real DB)",
           ).toBeNull();
 
           throw rollback;
-        }),
+        }, TX_BUDGET),
       ).rejects.toThrow("rollback");
 
       // The rollback held: none of the synthetic rows survived.
