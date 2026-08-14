@@ -28,8 +28,8 @@ import {
   getGovernedSqlService,
   MAX_GOVERNED_SQL_LENGTH,
 } from "~/server/analytics/governed-sql";
+import { governedSqlEnabled } from "~/server/analytics/governed-sql/access";
 import { GovernedSqlNotEnabledError } from "~/server/analytics/governed-sql/errors";
-import { featureFlagService } from "~/server/featureFlag";
 
 import { checkProjectPermission } from "../../rbac";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
@@ -43,30 +43,13 @@ import { getUserProtectionsForProject } from "../../utils";
  * the page — and `schema`/`query` refuse outright, so a caller who skips the
  * availability question gets the same answer.
  */
-const GOVERNED_SQL_FLAG = "release_governed_sql_workbench";
-
 const workbenchEnabled = async ({
   prisma,
-  userId,
   projectId,
 }: {
   prisma: PrismaClient;
-  userId: string;
   projectId: string;
-}): Promise<boolean> => {
-  // The flag store's organization-scoped rules fail closed when the calling
-  // context has no organization, so the gate resolves it — without this, a
-  // rule enabling the workbench for an organization could never match.
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: { team: { select: { organizationId: true } } },
-  });
-  return featureFlagService.isEnabled(GOVERNED_SQL_FLAG, {
-    distinctId: userId,
-    projectId,
-    organizationId: project?.team.organizationId,
-  });
-};
+}): Promise<boolean> => governedSqlEnabled({ prisma, projectId });
 
 /**
  * A bound parameter's value. Scalars only — a parameter is a *value*, and
@@ -116,7 +99,6 @@ const availability = protectedProcedure
   .query(async ({ ctx, input }): Promise<GovernedSqlAvailability> => {
     const enabled = await workbenchEnabled({
       prisma: ctx.prisma,
-      userId: ctx.session.user.id,
       projectId: input.projectId,
     });
     if (!enabled) return { available: false, reason: "disabled" };
@@ -135,7 +117,6 @@ const schema = protectedProcedure
     if (
       !(await workbenchEnabled({
         prisma: ctx.prisma,
-        userId: ctx.session.user.id,
         projectId: input.projectId,
       }))
     ) {
@@ -171,7 +152,6 @@ const query = protectedProcedure
     if (
       !(await workbenchEnabled({
         prisma: ctx.prisma,
-        userId: ctx.session.user.id,
         projectId: input.projectId,
       }))
     ) {

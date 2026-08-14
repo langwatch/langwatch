@@ -242,6 +242,10 @@ describe("field reference validation", () => {
           }),
         );
         expect(tooEarly.ok).toBe(false);
+        if (!tooEarly.ok) {
+          expect(tooEarly.errors[0]?.rule).toBe("field.unknown");
+          expect(tooEarly.errors[0]?.message).toContain("tripled");
+        }
 
         const inOrder = validate(
           bar({

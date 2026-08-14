@@ -143,10 +143,8 @@ function statisticPairs(): (string | null)[][] {
  * Polls a DOM condition without `expect`, so nothing in the assertion library
  * runs inside a wait that is measuring the browser's own scheduling.
  */
-async function poll(
-  check: () => boolean,
-  timeoutMs = 10_000,
-): Promise<boolean> {
+async function poll(check: () => boolean): Promise<boolean> {
+  const timeoutMs = 10_000;
   const started = Date.now();
   while (Date.now() - started < timeoutMs) {
     if (check()) return true;

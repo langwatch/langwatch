@@ -104,6 +104,11 @@ describe("governed rule coverage", () => {
             fixture.attacks,
           );
         }
+        for (const fixture of INVALID_VEGA_FIXTURES) {
+          expect(GOVERNED_VEGA_RULE_IDS as readonly string[]).toContain(
+            fixture.refusedBy,
+          );
+        }
       });
     });
   });

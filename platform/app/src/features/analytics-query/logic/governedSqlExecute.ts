@@ -55,6 +55,9 @@ export function createGovernedSqlExecute({
     options?: { signal?: AbortSignal },
   ) => Promise<GovernedSqlQueryResult>;
 
+  // `projectId` goes last so the bound project wins: spreading it first let any
+  // `projectId` carried on the request override the project this executor is
+  // bound to, which is the one thing the binding exists to prevent.
   return (request, { signal }) =>
-    mutate(GOVERNED_SQL_QUERY_PATH, { projectId, ...request }, { signal });
+    mutate(GOVERNED_SQL_QUERY_PATH, { ...request, projectId }, { signal });
 }
