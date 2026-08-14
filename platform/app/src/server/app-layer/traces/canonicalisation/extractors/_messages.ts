@@ -30,7 +30,7 @@ export const extractMessageContentText = (message: unknown): string | null => {
   if (typeof msg.content === "string") return msg.content;
 
   // Content array (OpenAI multimodal / Strands / Anthropic)
-  if (Array.isArray(msg.content)) {
+  if (isUnknownArray(msg.content)) {
     const texts = extractTextsFromParts(msg.content);
     if (texts.length > 0) return texts.join("\n");
   }
@@ -43,7 +43,7 @@ export const extractMessageContentText = (message: unknown): string | null => {
   }
 
   // Parts array (Mastra / Vercel AI SDK)
-  if (Array.isArray(msg.parts)) {
+  if (isUnknownArray(msg.parts)) {
     const texts = extractTextsFromParts(msg.parts);
     if (texts.length > 0) return texts.join("\n");
   }
@@ -73,35 +73,34 @@ const extractTextsFromParts = (parts: unknown[]): string[] => {
       texts.push(part);
       continue;
     }
-    if (part && typeof part === "object") {
-      const p = part as Record<string, unknown>;
-      if (typeof p.text === "string") {
-        if (!isReplyTextPart(p)) continue;
-        texts.push(p.text);
-      } else if (typeof p.content === "string") {
-        texts.push(p.content);
-      } else if (p.type === "thinking" && typeof p.thinking === "string") {
-        texts.push(p.thinking);
-      } else if (p.type === "tool_use" && p.input != null) {
-        const s = safeStringify(p.input);
+    if (isRecord(part)) {
+      if (typeof part.text === "string") {
+        if (!isReplyTextPart(part)) continue;
+        texts.push(part.text);
+      } else if (typeof part.content === "string") {
+        texts.push(part.content);
+      } else if (part.type === "thinking" && typeof part.thinking === "string") {
+        texts.push(part.thinking);
+      } else if (part.type === "tool_use" && part.input != null) {
+        const s = safeStringify(part.input);
         if (s !== null) texts.push(s);
-      } else if (p.type === "tool_result" && isUnknownArray(p.content)) {
-        const inner = extractTextsFromParts(p.content);
+      } else if (part.type === "tool_result" && isUnknownArray(part.content)) {
+        const inner = extractTextsFromParts(part.content);
         if (inner.length > 0) texts.push(inner.join("\n"));
-      } else if (isRecord(p.toolUse) && p.toolUse.input != null) {
-        const s = safeStringify(p.toolUse.input);
+      } else if (isRecord(part.toolUse) && part.toolUse.input != null) {
+        const s = safeStringify(part.toolUse.input);
         if (s !== null) texts.push(s);
       } else if (
-        isRecord(p.toolResult) &&
-        isUnknownArray(p.toolResult.content)
+        isRecord(part.toolResult) &&
+        isUnknownArray(part.toolResult.content)
       ) {
         // Converse tool-result content is a union; we handle the {text} and
         // {json} variants and ignore the rest (document, image, video,
         // searchResult). The json variant is stringified in place so block
         // order survives.
         const inner: string[] = [];
-        for (const block of p.toolResult.content) {
-          if (isRecord(block) && "json" in block) {
+        for (const block of part.toolResult.content) {
+          if (isRecord(block) && block.json != null) {
             const s = safeStringify(block.json);
             if (s !== null) inner.push(s);
           } else {
@@ -141,9 +140,8 @@ export const extractLastUserMessageText = (
  */
 const textFromBlock = (p: unknown): string | null => {
   if (!isRecord(p)) return null;
-  const rec = p as Record<string, unknown>;
-  if (typeof rec.text === "string") return rec.text;
-  if (typeof rec.content === "string") return rec.content;
+  if (typeof p.text === "string") return p.text;
+  if (typeof p.content === "string") return p.content;
   return null;
 };
 
@@ -152,7 +150,7 @@ const textFromBlock = (p: unknown): string | null => {
  * (Vercel AI SDK / pi-ai use `parts` instead of `content`).
  */
 const getMessageContentOrParts = (msg: MessageLike): unknown =>
-  msg.content ?? (msg as Record<string, unknown>).parts;
+  msg.content ?? msg.parts;
 
 export const extractSystemInstructionFromMessages = (
   messages: unknown,
@@ -175,7 +173,7 @@ export const extractSystemInstructionFromMessages = (
     return content;
   }
 
-  if (Array.isArray(content)) {
+  if (isUnknownArray(content)) {
     const texts = content
       .map(textFromBlock)
       .filter((p): p is string => p !== null);
@@ -217,12 +215,9 @@ export const stripSystemMessages = (messages: unknown[]): unknown[] =>
  * - string => raw prompt/completion
  */
 export const decodeMessagesPayload = (payload: unknown): unknown => {
-  if (Array.isArray(payload)) return payload;
-  if (
-    isRecord(payload) &&
-    Array.isArray((payload as Record<string, unknown>).messages)
-  ) {
-    return (payload as Record<string, unknown>).messages;
+  if (isUnknownArray(payload)) return payload;
+  if (isRecord(payload) && isUnknownArray(payload.messages)) {
+    return payload.messages;
   }
   return payload;
 };
@@ -235,10 +230,10 @@ export const unwrapWrappedMessages = (messages: unknown[]): unknown[] => {
   return messages.map((msg) => {
     if (
       isRecord(msg) &&
-      isRecord((msg as Record<string, unknown>).message) &&
+      isRecord(msg.message) &&
       Object.keys(msg).length === 1
     ) {
-      return (msg as Record<string, unknown>).message;
+      return msg.message;
     }
     return msg;
   });
@@ -254,16 +249,11 @@ export const normalizeToMessages = (
   if (typeof raw === "string") {
     return [{ role: defaultRole, content: raw }];
   }
-  if (Array.isArray(raw)) {
+  if (isUnknownArray(raw)) {
     return unwrapWrappedMessages(raw);
   }
-  if (
-    isRecord(raw) &&
-    Array.isArray((raw as Record<string, unknown>).messages)
-  ) {
-    return unwrapWrappedMessages(
-      (raw as Record<string, unknown>).messages as unknown[],
-    );
+  if (isRecord(raw) && isUnknownArray(raw.messages)) {
+    return unwrapWrappedMessages(raw.messages);
   }
   return [{ role: defaultRole, content: raw }];
 };
