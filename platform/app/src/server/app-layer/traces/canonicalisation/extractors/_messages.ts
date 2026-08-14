@@ -99,8 +99,10 @@ const extractTextsFromParts = (parts: unknown[]): string[] => {
         isRecord(p.toolResult) &&
         Array.isArray((p.toolResult as Record<string, unknown>).content)
       ) {
-        // Converse tool-result content is a union of {text} and {json} blocks;
-        // stringify the structured variant in place so block order survives.
+        // Converse tool-result content is a union; we handle the {text} and
+        // {json} variants and ignore the rest (document, image, video,
+        // searchResult). The json variant is stringified in place so block
+        // order survives.
         const inner: string[] = [];
         for (const block of (p.toolResult as Record<string, unknown>)
           .content as unknown[]) {
