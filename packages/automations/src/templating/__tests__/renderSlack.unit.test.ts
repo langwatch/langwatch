@@ -24,6 +24,7 @@ describe("renderTriggerSlack", () => {
     // not just its identifier — an author previewing this (or a teammate
     // reading the delivered Slack message) needs the input and output, not a
     // trace ID they'd still have to open LangWatch to make sense of.
+    /** @scenario "Default Slack message is rendered when no Slack template is set" */
     it("renders the default message as text with the matched trace's input and output", async () => {
       const slack = await renderTriggerSlack({
         templateType: null,
@@ -34,6 +35,7 @@ describe("renderTriggerSlack", () => {
       expect(text).toContain("High latency");
       expect(text).toContain("what is the weather");
       expect(text).toContain("it is sunny");
+      expect(text).toContain("https://app.langwatch.ai/acme/traces/trace_1");
       expect(slack.usedDefault).toBe(true);
     });
   });

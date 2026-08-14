@@ -1,5 +1,6 @@
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import { buildAuthHeaders } from "@/internal/api/auth";
+import { TRIGGER_REQUEST_TIMEOUT_MS } from "./requestTimeout";
 import { scopedApiKey } from "@/internal/credentialContext";
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
@@ -29,6 +30,7 @@ export const setTriggerActiveCommand = async (
     const response = await fetch(
       `${endpoint}/api/triggers/${encodeURIComponent(id)}/${verb}`,
       {
+        signal: AbortSignal.timeout(TRIGGER_REQUEST_TIMEOUT_MS),
         method: "POST",
         headers: {
           "Content-Type": "application/json",

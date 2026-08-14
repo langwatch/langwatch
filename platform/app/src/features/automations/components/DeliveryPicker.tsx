@@ -37,13 +37,13 @@ export function DeliveryPicker({
   const setSection = useAutomationStore((s) => s.setSection);
   const configComplete = useConfigComplete();
   const configSummary = useConfigurationSummary();
-  // The webhook card is never offered for reports — the scheduled-report
-  // dispatch is email/Slack only.
   const isAlertKind = source === "customGraph";
   const notifyOnly = isAlertKind || source === "report";
+  // The webhook card is never offered for reports — the scheduled-report
+  // dispatch is email/Slack only.
+  const offersEndpoint = source !== "report";
   const entries = Object.values(CLIENT_PROVIDERS).filter(
-    (e) =>
-      e.shared.action !== TriggerAction.SEND_WEBHOOK || source !== "report",
+    (e) => e.shared.action !== TriggerAction.SEND_WEBHOOK || offersEndpoint,
   );
   const notify = entries.filter((e) => e.shared.category === "notify");
   const action = entries.filter((e) => e.shared.category === "action");
@@ -59,7 +59,11 @@ export function DeliveryPicker({
   return (
     <FacetSection
       title="Delivery"
-      help="Where the notification goes and what it sends. Notify channels post to Slack, send email, or call an endpoint. Actions add matching traces to a dataset or annotation queue."
+      help={
+        offersEndpoint
+          ? "Where the notification goes and what it sends. Notify channels post to Slack, send email, or call an endpoint. Actions add matching traces to a dataset or annotation queue."
+          : "Where the notification goes and what it sends. Notify channels post to Slack or send email."
+      }
       accordion={accordion}
       complete={configComplete}
       summary={value ? configSummary : "Choose where it goes"}
@@ -68,7 +72,11 @@ export function DeliveryPicker({
         {notify.length > 0 ? (
           <DeliveryGroup
             label="Notify"
-            description="Tell someone through Slack, email, or an endpoint."
+            description={
+              offersEndpoint
+                ? "Tell someone through Slack, email, or an endpoint."
+                : "Tell someone through Slack or email."
+            }
             entries={notify}
             value={value}
             onChange={pick}

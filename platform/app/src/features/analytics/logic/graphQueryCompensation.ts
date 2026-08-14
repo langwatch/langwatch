@@ -3,6 +3,17 @@ import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
 /** Minutes per bucket at or above which a bucket is a whole day. */
 const DAY_SCALE_MINUTES = 1440;
 
+/** The hourly default a graph falls back to when its stored `timeScale` is
+ *  missing or mangled — stored JSON reaches here cast, not parsed, so a bad
+ *  value must degrade to a sane bucket rather than throw or query with NaN. */
+const FALLBACK_SCALE_MINUTES = 60;
+
+function normalizeNumericTimeScale(value: unknown): number {
+  const parsed =
+    typeof value === "number" ? value : parseInt(String(value ?? ""), 10);
+  return Number.isFinite(parsed) ? parsed : FALLBACK_SCALE_MINUTES;
+}
+
 /**
  * Two compensations the analytics UI applies before querying a graph's
  * stored `CustomGraphInput`, which the raw stored JSON does not carry on its
@@ -46,7 +57,7 @@ export function resolveGraphTimeScale({
     ? "full"
     : timeScale === "full"
       ? timeScale
-      : parseInt(timeScale.toString(), 10);
+      : normalizeNumericTimeScale(timeScale);
 
   if (
     typeof resolved === "number" &&

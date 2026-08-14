@@ -133,6 +133,47 @@ export const actionParamsSchema = z.union([
   annotationQueueActionParamsSchema,
 ]);
 
+const ACTION_PARAMS_SCHEMA_BY_ACTION: Partial<
+  Record<string, z.ZodTypeAny>
+> = {
+  SEND_EMAIL: emailActionParamsSchema,
+  SEND_SLACK_MESSAGE: slackActionParamsSchema,
+  SEND_WEBHOOK: webhookActionParamsSchema,
+  ADD_TO_DATASET: datasetActionParamsSchema,
+  ADD_TO_ANNOTATION_QUEUE: annotationQueueActionParamsSchema,
+};
+
+/**
+ * The write-side contract the tool description states: `actionParams` is the
+ * configuration for the channel named in `action`. The union above stays for
+ * tolerant reads, but a WRITE is bound to its channel here — otherwise a
+ * `SEND_WEBHOOK` with `{}` (or with email fields) slips through the
+ * all-optional Slack shape and is refused server-side with worse words. An
+ * action this build does not know validates against the loose union, the
+ * same deployment tolerance reads keep.
+ */
+export function validateActionParamsForAction({
+  action,
+  actionParams,
+}: {
+  action: string;
+  actionParams: unknown;
+}): { ok: true } | { ok: false; message: string } {
+  const schema = ACTION_PARAMS_SCHEMA_BY_ACTION[action] ?? actionParamsSchema;
+  const parsed = schema.safeParse(actionParams);
+  if (parsed.success) return { ok: true };
+  const issues = parsed.error.issues
+    .map(
+      (issue) =>
+        `${issue.path.join(".") || "(actionParams)"}: ${issue.message}`,
+    )
+    .join("; ");
+  return {
+    ok: false,
+    message: `actionParams does not fit ${action} — ${issues}`,
+  };
+}
+
 export const graphAlertSchema = z
   .object({
     seriesName: z.string().describe("The series on the graph to watch."),

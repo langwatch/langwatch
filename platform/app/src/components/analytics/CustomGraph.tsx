@@ -1355,21 +1355,21 @@ const shapeDataForSummary = (
       // Sum all values across all time periods for summary charts
       const totalValue = values.reduce((sum, value) => sum + (value ?? 0), 0);
 
-      // Count aggregations use integer format, percentage series use "0%",
-      // both regardless of the metric's own default.
-      const isCardinalitySeries = series?.aggregation === "cardinality";
-      const formatOverride =
-        metric && (isCardinalitySeries || series?.asPercent)
-          ? {
-              ...metric,
-              format:
-                resolveSeriesValueFormat({
-                  isPercent: series?.asPercent,
-                  aggregation: series?.aggregation,
-                  metricFormat: metric.format,
-                }) ?? metric.format,
-            }
-          : metric;
+      // The resolver owns the precedence rules (percentage over cardinality
+      // over the metric's own format) — consulted unconditionally so summary
+      // totals can never disagree with the axis and tooltip paths, which call
+      // it the same way. Only the `metric` presence check stays here.
+      const formatOverride = metric
+        ? {
+            ...metric,
+            format:
+              resolveSeriesValueFormat({
+                isPercent: series?.asPercent,
+                aggregation: series?.aggregation,
+                metricFormat: metric.format,
+              }) ?? metric.format,
+          }
+        : metric;
 
       return {
         key: aggKey,

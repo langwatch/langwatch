@@ -31,6 +31,8 @@ export const useFurthestWizardStep = () =>
 
 export const useConditionsSet = () =>
   useAutomationStore((s) => conditionsAreSet(s.draft));
+export const useConditionRowsInvalid = () =>
+  useAutomationStore((s) => s.conditionRowsInvalid);
 export const useSubjectSet = () =>
   useAutomationStore((s) => subjectIsSet(s.draft));
 export const useCadenceSet = () =>

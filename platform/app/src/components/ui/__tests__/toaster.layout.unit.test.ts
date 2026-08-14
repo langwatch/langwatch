@@ -61,9 +61,11 @@ describe("given the toast card's material", () => {
       const [overrideBlur, overrideRing] = alphasOf(LIGHT_MODE_ELEVATION);
 
       expect(recipeBlur).toBeDefined();
-      expect(overrideBlur).toBeGreaterThan(recipeBlur!);
+      expect(overrideBlur).toBeDefined();
+      expect(overrideBlur!).toBeGreaterThan(recipeBlur!);
       expect(recipeRing).toBeDefined();
-      expect(overrideRing).toBeGreaterThan(recipeRing!);
+      expect(overrideRing).toBeDefined();
+      expect(overrideRing!).toBeGreaterThan(recipeRing!);
     });
   });
 });

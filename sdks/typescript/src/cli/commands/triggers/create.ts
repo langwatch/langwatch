@@ -6,6 +6,7 @@ import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
 import { buildAuthHeaders } from "@/internal/api/auth";
+import { TRIGGER_REQUEST_TIMEOUT_MS } from "./requestTimeout";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
@@ -58,6 +59,7 @@ export const createTriggerCommand = async (
     if (options.slackWebhook) actionParams.slackWebhook = options.slackWebhook;
 
     const response = await fetch(`${endpoint}/api/triggers`, {
+      signal: AbortSignal.timeout(TRIGGER_REQUEST_TIMEOUT_MS),
       method: "POST",
       headers: {
         "Content-Type": "application/json",

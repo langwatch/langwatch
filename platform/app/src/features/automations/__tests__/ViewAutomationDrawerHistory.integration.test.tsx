@@ -1,15 +1,20 @@
 /**
  * @vitest-environment jsdom
  *
- * The in-depth view: what the automation has done (its firing history and the
- * last check of an alert) and what it will do next. Binds
- * specs/automations/evaluation-visibility.feature.
+ * The in-depth view's history: what an alert's last check concluded, and how
+ * repeated fires read. Binds specs/automations/evaluation-visibility.feature.
+ * Sibling suites: ViewAutomationDrawerNextFiring (what happens next) and
+ * ViewAutomationDrawerRunNow (running the conditions against live traces).
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ViewAutomationDrawer } from "../ViewAutomationDrawer";
+import {
+  fakeQuery,
+  GRAPH_ALERT_ROW,
+  TRACE_AUTOMATION_ROW,
+} from "./viewDrawerTestKit";
 
 const MINUTE_MS = 60 * 1000;
 
@@ -17,11 +22,6 @@ let mockTriggerRow: Record<string, unknown> | null = null;
 let mockFires: Array<Record<string, unknown>> = [];
 let mockLatestEvaluation: Record<string, unknown> | null = null;
 let mockNextFiring: Record<string, unknown> | null = null;
-let mockMatchingTraces: Record<string, unknown> | undefined;
-
-const { mockTracesRefetch } = vi.hoisted(() => ({
-  mockTracesRefetch: vi.fn(),
-}));
 
 vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({
@@ -48,32 +48,7 @@ vi.mock("~/components/automations/FilterDisplay", () => ({
   ),
 }));
 
-/**
- * A faithful-enough stand-in for one react-query v4 hook result.
- *
- * `enabled: false` is the case that matters: such a query never resolves, so
- * it reports `isLoading` FOREVER. A mock that hard-codes `isLoading: false`
- * makes that state unrepresentable — which is how a permanent skeleton over
- * every non-alert automation's history shipped once already.
- *
- * `undefined` means "has not resolved"; `null` means "resolved, and the
- * answer is nothing" (an automation that was never evaluated), which is a
- * settled query with `data === null`.
- */
-const { fakeQuery } = vi.hoisted(() => ({
-  fakeQuery: (data: unknown, options?: { enabled?: boolean }) => {
-    const enabled = options?.enabled ?? true;
-    const settled = enabled && data !== undefined;
-    return {
-      data,
-      isLoading: !settled,
-      isFetching: enabled && !settled,
-      error: null,
-      refetch: vi.fn(),
-    };
-  },
-}));
-
+// Wiring only — the query semantics live in the kit's `fakeQuery`.
 vi.mock("~/utils/api", () => ({
   api: {
     automation: {
@@ -122,10 +97,8 @@ vi.mock("~/utils/api", () => ({
     },
     tracesV2: {
       list: {
-        useQuery: (_input: unknown, options?: { enabled?: boolean }) => ({
-          ...fakeQuery(mockMatchingTraces, options),
-          refetch: mockTracesRefetch,
-        }),
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery(undefined, options),
       },
     },
   },
@@ -139,41 +112,13 @@ function renderDrawer() {
   );
 }
 
-const graphAlert = {
-  id: "trigger_1",
-  name: "p95 latency alert",
-  action: "SEND_SLACK_MESSAGE",
-  customGraphId: "graph_1",
-  filters: "{}",
-  triggerKind: "ALERT",
-  actionParams: {
-    slackWebhook: "https://hooks.slack.com/services/abc",
-    seriesName: "0/latency/p95",
-    operator: "gt",
-    threshold: 100,
-    timePeriod: 60,
-  },
-};
-
-const traceAutomation = {
-  id: "trigger_1",
-  name: "Errors to Slack",
-  action: "SEND_SLACK_MESSAGE",
-  customGraphId: null,
-  filters: "{}",
-  filterQuery: "status:error",
-  triggerKind: "AUTOMATION",
-  actionParams: { slackWebhook: "https://hooks.slack.com/services/abc" },
-};
-
-describe("ViewAutomationDrawer in-depth view", () => {
+describe("ViewAutomationDrawer history", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockTriggerRow = null;
     mockFires = [];
     mockLatestEvaluation = null;
     mockNextFiring = { kind: "alert", sweepIntervalMs: 30_000 };
-    mockMatchingTraces = undefined;
   });
 
   afterEach(() => {
@@ -182,7 +127,7 @@ describe("ViewAutomationDrawer in-depth view", () => {
 
   describe("given an alert whose last check did not cross its threshold", () => {
     beforeEach(() => {
-      mockTriggerRow = graphAlert;
+      mockTriggerRow = GRAPH_ALERT_ROW;
       mockLatestEvaluation = {
         evaluatedAt: new Date(Date.now() - 5 * MINUTE_MS),
         verdict: "not_breached",
@@ -214,7 +159,7 @@ describe("ViewAutomationDrawer in-depth view", () => {
     describe("when the drawer renders", () => {
       /** @scenario An automation that crossed its threshold reads as fired */
       it("says the automation fired on that check", () => {
-        mockTriggerRow = graphAlert;
+        mockTriggerRow = GRAPH_ALERT_ROW;
         mockLatestEvaluation = {
           evaluatedAt: new Date(Date.now() - MINUTE_MS),
           verdict: "fired",
@@ -237,7 +182,7 @@ describe("ViewAutomationDrawer in-depth view", () => {
     describe("when the graph groups by too many values", () => {
       /** @scenario A skipped evaluation names its reason */
       it("says the check was skipped and names what to change", () => {
-        mockTriggerRow = graphAlert;
+        mockTriggerRow = GRAPH_ALERT_ROW;
         mockLatestEvaluation = {
           evaluatedAt: new Date(Date.now() - 2 * MINUTE_MS),
           verdict: "skipped",
@@ -262,7 +207,7 @@ describe("ViewAutomationDrawer in-depth view", () => {
     describe("when the drawer renders", () => {
       /** @scenario An automation that has never been evaluated says so */
       it("says it has not been checked yet", () => {
-        mockTriggerRow = graphAlert;
+        mockTriggerRow = GRAPH_ALERT_ROW;
         mockLatestEvaluation = null;
         mockFires = [];
 
@@ -275,105 +220,10 @@ describe("ViewAutomationDrawer in-depth view", () => {
     });
   });
 
-  describe("given a schedule with an active calendar entry", () => {
-    describe("when the drawer renders", () => {
-      /** @scenario The view shows the next scheduled firing */
-      it("shows the next time it sends", () => {
-        mockTriggerRow = {
-          ...traceAutomation,
-          triggerKind: "REPORT",
-          filterQuery: null,
-        };
-        const nextRunAt = new Date(Date.now() + 90 * MINUTE_MS);
-        mockNextFiring = {
-          kind: "schedule",
-          nextRunAt,
-          paused: false,
-        };
-
-        renderDrawer();
-
-        expect(screen.getByText("Sends next on")).toBeDefined();
-        expect(screen.getByText(/^in about/)).toBeDefined();
-      });
-    });
-  });
-
-  describe("given a paused report", () => {
-    describe("when the drawer renders", () => {
-      /** @scenario A paused report does not claim a next firing */
-      it("says it sends nothing while it is paused, and marks it paused", () => {
-        mockTriggerRow = {
-          ...traceAutomation,
-          triggerKind: "REPORT",
-          filterQuery: null,
-          active: false,
-        };
-        mockNextFiring = {
-          kind: "paused",
-          subject: "schedule",
-          pausedReason: null,
-        };
-
-        renderDrawer();
-
-        expect(
-          screen.getByText("Nothing, while this report is paused"),
-        ).toBeDefined();
-        expect(screen.getByText(/Resume it/)).toBeDefined();
-        // The state that explains the silence belongs with the identity too,
-        // not only in the answer further down the drawer.
-        expect(screen.getByText("Paused")).toBeDefined();
-      });
-    });
-  });
-
-  describe("given a paused graph-watching automation", () => {
-    describe("when the drawer renders", () => {
-      it("does not claim it is still being checked", () => {
-        mockTriggerRow = { ...graphAlert, active: false };
-        mockNextFiring = {
-          kind: "paused",
-          subject: "alert",
-          pausedReason: null,
-        };
-
-        renderDrawer();
-
-        expect(
-          screen.getByText("Nothing, while this automation is paused"),
-        ).toBeDefined();
-        expect(screen.queryByText("Checked as data arrives")).toBeNull();
-      });
-    });
-  });
-
-  describe("given an automation the platform paused for runaway volume", () => {
-    describe("when the drawer renders", () => {
-      it("explains what it did and what to change", () => {
-        mockTriggerRow = { ...traceAutomation, active: false };
-        mockNextFiring = {
-          kind: "paused",
-          subject: "automation",
-          pausedReason: "runaway_volume",
-        };
-
-        renderDrawer();
-
-        expect(
-          screen.getByText("Nothing, while this automation is paused"),
-        ).toBeDefined();
-        expect(
-          screen.getByText(/matched almost every trace in the project/),
-        ).toBeDefined();
-      });
-    });
-  });
-
   describe("given a trace automation that has fired repeatedly", () => {
     describe("when the drawer renders", () => {
       it("collapses a run of same-minute fires into one counted row", () => {
-        mockTriggerRow = traceAutomation;
+        mockTriggerRow = TRACE_AUTOMATION_ROW;
         const firedAt = Date.now() - 6 * MINUTE_MS;
         mockFires = Array.from({ length: 3 }, (_, index) => ({
           id: `sent_${index}`,
@@ -390,111 +240,6 @@ describe("ViewAutomationDrawer in-depth view", () => {
         // The whole history must render for a non-alert automation: it asks
         // for no evaluation, and a disabled query reports `isLoading` forever.
         expect(screen.queryByText(/has not fired yet/)).toBeNull();
-      });
-    });
-  });
-
-  describe("given an automation that batches its notifications", () => {
-    describe("when the drawer renders", () => {
-      /** @scenario A digest automation shows when its next window closes */
-      it("says when the next batch is sent", () => {
-        mockTriggerRow = traceAutomation;
-        mockNextFiring = {
-          kind: "digest",
-          cadence: "5min_digest",
-          windowClosesAt: new Date(Date.now() + 3 * MINUTE_MS),
-        };
-
-        renderDrawer();
-
-        expect(screen.getByText("Sends the next batch at")).toBeDefined();
-        expect(screen.getByText(/Every 5 minutes/)).toBeDefined();
-      });
-    });
-  });
-
-  describe("given an alert with no calendar entry of its own", () => {
-    describe("when the drawer renders", () => {
-      /** @scenario A graph-watching automation says how often it is checked */
-      it("says the alert is checked as data arrives", () => {
-        mockTriggerRow = graphAlert;
-        mockNextFiring = { kind: "alert", sweepIntervalMs: 30_000 };
-
-        renderDrawer();
-
-        expect(screen.getByText("Checked as data arrives")).toBeDefined();
-        expect(screen.getByText(/every 30 seconds/)).toBeDefined();
-      });
-    });
-  });
-
-  describe("given a trace automation with a search query", () => {
-    describe("when the user runs the conditions against recent traces", () => {
-      /** @scenario Run now lists currently matching traces */
-      it("lists the matching traces with their input and output", async () => {
-        mockTriggerRow = traceAutomation;
-        mockMatchingTraces = {
-          totalHits: 3,
-          items: [
-            {
-              traceId: "trace_1",
-              name: "checkout agent",
-              timestamp: Date.now() - MINUTE_MS,
-              durationMs: 1234,
-              status: "error",
-              input: "book me a flight",
-              output: "upstream timed out",
-            },
-          ],
-        };
-
-        renderDrawer();
-        await userEvent.click(
-          screen.getByRole("button", { name: "Run the conditions now" }),
-        );
-
-        expect(
-          screen.getByText("3 traces matched in the last 7 days"),
-        ).toBeDefined();
-        expect(screen.getByText("checkout agent")).toBeDefined();
-        // Enough identity to find the trace again: its id and duration.
-        expect(screen.getByText("trace_1")).toBeDefined();
-        expect(screen.getByText(/1\.2s/)).toBeDefined();
-        expect(screen.getByText(/book me a flight/)).toBeDefined();
-        expect(screen.getByText(/upstream timed out/)).toBeDefined();
-      });
-
-      /** @scenario A never-matched automation explains itself */
-      it("explains that nothing matched and why it stays quiet", async () => {
-        mockTriggerRow = traceAutomation;
-        mockMatchingTraces = { totalHits: 0, items: [] };
-
-        renderDrawer();
-        await userEvent.click(
-          screen.getByRole("button", { name: "Run the conditions now" }),
-        );
-
-        expect(
-          screen.getByText(/Nothing matched in the last 7 days/),
-        ).toBeDefined();
-        expect(
-          screen.getByText(/so it stays quiet until one does/),
-        ).toBeDefined();
-      });
-    });
-  });
-
-  describe("given an alert that watches a graph metric", () => {
-    describe("when the drawer renders", () => {
-      /** @scenario A graph-watching automation offers no trace run */
-      it("offers no run-against-traces control", () => {
-        mockTriggerRow = graphAlert;
-
-        renderDrawer();
-
-        expect(
-          screen.queryByRole("button", { name: "Run the conditions now" }),
-        ).toBeNull();
       });
     });
   });

@@ -25,6 +25,7 @@ import {
   serializeConditions,
   valueTypeOfField,
 } from "../logic/conditionQuery";
+import { useAutomationStore } from "../state/automationStore";
 
 const OPERATOR_LABEL: Record<ConditionOperator, string> = {
   is: "is",
@@ -170,6 +171,22 @@ export function ConditionBuilder({
     if (parsed) setConditions(withMinimumRow(parsed));
   }, [query]);
 
+  // A completed row whose key can't round-trip is excluded from the emitted
+  // query (below), so on its own it would silently save a WIDER automation
+  // than the one on screen. Reporting it to the store lets the drawer's save
+  // gate hold Save until the row is fixed or removed; cleared on unmount so
+  // switching to Code mode (which owns raw text) never leaves Save stuck.
+  const setConditionRowsInvalid = useAutomationStore(
+    (s) => s.setConditionRowsInvalid,
+  );
+  const hasInvalidRow = conditions.some(
+    (condition) => !attributeFieldRoundTrips(condition),
+  );
+  useEffect(() => {
+    setConditionRowsInvalid(hasInvalidRow);
+    return () => setConditionRowsInvalid(false);
+  }, [hasInvalidRow, setConditionRowsInvalid]);
+
   const commit = (next: Condition[]) => {
     setConditions(next);
     // A prefix the author picked but hasn't typed a key into yet has nothing
@@ -299,7 +316,8 @@ function ConditionRow({
     : "";
   // Only meaningful once the row is otherwise complete — a key the author
   // hasn't finished typing yet isn't wrong, just unfinished.
-  const attributeKeyInvalid = !attributeFieldRoundTrips(condition);
+  const isAttributeKeyInvalid = !attributeFieldRoundTrips(condition);
+  const attributeKeyErrorId = `condition-${condition.id}-key-error`;
 
   return (
     <VStack align="stretch" gap={1}>
@@ -316,8 +334,11 @@ function ConditionRow({
               placeholder="attribute key"
               aria-label={`${attributePrefix.label} key`}
               value={attributeKey}
-              aria-invalid={attributeKeyInvalid}
-              borderColor={attributeKeyInvalid ? "border.error" : undefined}
+              aria-invalid={isAttributeKeyInvalid}
+              aria-describedby={
+                isAttributeKeyInvalid ? attributeKeyErrorId : undefined
+              }
+              borderColor={isAttributeKeyInvalid ? "border.error" : undefined}
               onChange={(e) =>
                 onFieldKey(attributePrefix.value + e.target.value)
               }
@@ -370,8 +391,8 @@ function ConditionRow({
           <X size={15} />
         </IconButton>
       </HStack>
-      {attributeKeyInvalid ? (
-        <Text textStyle="2xs" color="fg.error">
+      {isAttributeKeyInvalid ? (
+        <Text id={attributeKeyErrorId} textStyle="2xs" color="fg.error">
           {ATTRIBUTE_KEY_ERROR}
         </Text>
       ) : null}

@@ -95,7 +95,8 @@ describe("a builder condition on a custom attribute", () => {
  * `field` is the one place the query string is built from raw user
  * keystrokes rather than a fixed dropdown token — `serializeCondition`
  * (conditionQuery.ts) only escapes the VALUE, never the field. A key
- * containing whitespace or liqe syntax can silently retarget what the
+ * containing whitespace or Liqe query syntax (liqe is the parser behind
+ * the filter language) can silently retarget what the
  * clause matches instead of failing loudly (a space splits it into two
  * unrelated clauses; a lone space fails to parse at all). These pin that
  * every such key is rejected, never silently saved.

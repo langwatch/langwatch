@@ -11,6 +11,7 @@ import {
   reportSchema,
   templatesSchema,
   triggerActionSchema,
+  validateActionParamsForAction,
 } from "./schemas/triggers.js";
 import { fetchDocumentation } from "./documentation-fetch.js";
 import {
@@ -1326,6 +1327,13 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     withToolLogging("platform_create_trigger", async (params) => {
       requireApiKey();
       const { createTrigger } = await import("./langwatch-api-triggers.js");
+      const boundParams = validateActionParamsForAction({
+        action: params.action,
+        actionParams: params.actionParams,
+      });
+      if (!boundParams.ok) {
+        return { content: [{ type: "text", text: `Error: ${boundParams.message}` }] };
+      }
       let filters: Record<string, unknown> | undefined;
       if (params.filters) {
         try { filters = JSON.parse(params.filters) as Record<string, unknown>; }
@@ -1373,7 +1381,19 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     },
     withToolLogging("platform_update_trigger", async (params) => {
       requireApiKey();
-      const { updateTrigger } = await import("./langwatch-api-triggers.js");
+      const { getTrigger, updateTrigger } = await import("./langwatch-api-triggers.js");
+      if (params.actionParams !== undefined) {
+        // The channel cannot change on update, so the SAVED action decides
+        // which shape the replacement configuration must fit.
+        const saved = await getTrigger(params.id);
+        const boundParams = validateActionParamsForAction({
+          action: saved.action,
+          actionParams: params.actionParams,
+        });
+        if (!boundParams.ok) {
+          return { content: [{ type: "text", text: `Error: ${boundParams.message}` }] };
+        }
+      }
       let filters: Record<string, unknown> | undefined;
       if (params.filters) {
         try { filters = JSON.parse(params.filters) as Record<string, unknown>; }

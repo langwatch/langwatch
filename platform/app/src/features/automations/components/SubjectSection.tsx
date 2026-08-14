@@ -21,6 +21,7 @@ import { FieldsFilters } from "~/components/filters/FieldsFilters";
 import { Link } from "~/components/ui/link";
 import { Tooltip } from "~/components/ui/tooltip";
 import { describeError } from "~/features/errors";
+import { explainAnyError } from "~/features/errors/logic/presentation";
 import type { FilterParam } from "~/hooks/useFilterParams";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
@@ -366,7 +367,18 @@ function NoGraphsYet({ projectSlug }: { projectSlug?: string }) {
  * detail in the copy (customer-safe per error-handling.md); retry just
  * re-runs the same query.
  */
-function GraphsLoadFailed({ onRetry }: { onRetry: () => void }) {
+function GraphsLoadFailed({
+  error,
+  onRetry,
+}: {
+  error: unknown;
+  onRetry: () => void;
+}) {
+  // A handled failure carries registry copy keyed by its code — show that,
+  // so a nameable cause (say, a permission gate) explains itself. Anything
+  // unregistered keeps the generic line: still customer-safe, never raw
+  // error detail.
+  const explanation = explainAnyError(error);
   return (
     <VStack
       align="start"
@@ -378,7 +390,9 @@ function GraphsLoadFailed({ onRetry }: { onRetry: () => void }) {
       bg="bg.subtle"
     >
       <Text textStyle="sm">
-        Your custom graphs couldn{"'"}t be loaded right now.
+        {explanation.isRegistered
+          ? explanation.description
+          : `Your custom graphs couldn't be loaded right now.`}
       </Text>
       <Button size="xs" variant="outline" onClick={onRetry}>
         Try again
@@ -933,7 +947,7 @@ function TracePreview({
  * to recognise a trace and to find it again in the traces view.
  */
 function PreviewTraceRow({ trace }: { trace: PreviewTrace }) {
-  const named = trace.name.length > 0;
+  const hasName = trace.name.length > 0;
   return (
     <HStack
       gap={2.5}
@@ -952,11 +966,11 @@ function PreviewTraceRow({ trace }: { trace: PreviewTrace }) {
       <VStack align="start" gap={0} flex={1} minWidth={0}>
         <Text
           textStyle="xs"
-          color={named ? "fg" : "fg.muted"}
+          color={hasName ? "fg" : "fg.muted"}
           truncate
           maxWidth="full"
         >
-          {named ? trace.name : "Unnamed trace"}
+          {hasName ? trace.name : "Unnamed trace"}
         </Text>
         <Text
           textStyle="2xs"

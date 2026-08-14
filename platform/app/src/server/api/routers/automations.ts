@@ -62,7 +62,7 @@ import {
   slackProjectTokenReader,
 } from "~/server/app-layer/automations/slack-integration/slack-token-resolver";
 import { TriggerFireHistoryService } from "~/server/app-layer/automations/trigger-fire-history.service";
-import { TriggerLatestEvaluationService } from "~/server/app-layer/automations/trigger-latest-evaluation.service";
+import { createTriggerLatestEvaluationService } from "~/server/app-layer/automations/trigger-latest-evaluation.wiring";
 import { redactTriggerForRead } from "~/server/app-layer/automations/trigger-redaction";
 import {
   type DraftProject,
@@ -579,7 +579,7 @@ export const automationRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string(), triggerId: z.string() }))
     .use(checkProjectPermission("triggers:view"))
     .query(async ({ ctx, input }) => {
-      const evaluations = TriggerLatestEvaluationService.create(ctx.prisma);
+      const evaluations = createTriggerLatestEvaluationService(ctx.prisma);
       return evaluations.getByTriggerId({
         projectId: input.projectId,
         triggerId: input.triggerId,

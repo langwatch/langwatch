@@ -33,6 +33,7 @@ Feature: Liquid templates for trigger notifications
       Then the body shows each matched trace's input and output, not only its
         identifier and a link
 
+    @unit
     Scenario: Default Slack message is rendered when no Slack template is set
       Given the trigger has no custom Slack template
       When the Slack notification is rendered

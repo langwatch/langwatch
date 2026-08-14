@@ -12,6 +12,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { useAutomationStore } from "../../state/automationStore";
 import { ConditionBuilder } from "../ConditionBuilder";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -128,6 +129,28 @@ describe("ConditionBuilder", () => {
       expect(onChangeSpy).toHaveBeenLastCalledWith(
         "trace.attribute.plan:premium",
       );
+    });
+  });
+
+  describe("when a completed attribute key cannot round-trip", () => {
+    it("holds the drawer's save gate until the key is fixed", () => {
+      render(<Harness initial="trace.attribute.user_id:premium" />, {
+        wrapper: Wrapper,
+      });
+      expect(useAutomationStore.getState().conditionRowsInvalid).toBe(false);
+
+      // The row stays complete (value untouched) while its key turns into
+      // something the query language would re-parse as two clauses — the
+      // exact case that would otherwise silently save a wider automation.
+      fireEvent.change(screen.getByDisplayValue("user_id"), {
+        target: { value: "user id" },
+      });
+      expect(useAutomationStore.getState().conditionRowsInvalid).toBe(true);
+
+      fireEvent.change(screen.getByDisplayValue("user id"), {
+        target: { value: "user_id" },
+      });
+      expect(useAutomationStore.getState().conditionRowsInvalid).toBe(false);
     });
   });
 });

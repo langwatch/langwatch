@@ -89,6 +89,7 @@ import { useGraphAlertLabels } from "./logic/useGraphAlertLabels";
 import { nextStep, previousStep } from "./logic/wizardSteps";
 import { useAutomationStore } from "./state/automationStore";
 import {
+  useConditionRowsInvalid,
   useConditionsSet,
   useConfigComplete,
   useDraft,
@@ -138,8 +139,9 @@ function templateValidationTitle(error: unknown): string | undefined {
 }
 
 /** Facet-ordered "why can't I save yet" copy: Name → Subject → Cadence →
- *  Severity → Delivery. What it watches is always answered — the draft opens
- *  on a trace filter — so it never contributes a message. */
+ *  Severity → Delivery. Each unanswered facet contributes its own todo,
+ *  subject and cadence mutually exclusively — an unset subject makes any
+ *  cadence advice premature. */
 function saveDisabledReason({
   draft,
   nameSet,
@@ -244,6 +246,7 @@ export function AutomationDrawer({
   const section = useSection();
   const step = useWizardStep();
   const conditionsSet = useConditionsSet();
+  const conditionRowsInvalid = useConditionRowsInvalid();
   const configComplete = useConfigComplete();
   const isGraphAlert = draft.source === "customGraph";
   // A schedule keeps the single-pane composer — the wizard authors the two
@@ -291,8 +294,84 @@ export function AutomationDrawer({
   const baselineRef = useRef<string | null>(null);
   const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
 
-  // Pre-fill conditions from the traces view on a fresh create.
+  // Gate hydration to the FIRST successful read per automationId. tRPC's
+  // background refetch (window-focus, query invalidation) would otherwise
+  // re-fire this effect mid-session and overwrite unsaved edits with the
+  // last-saved row.
+  const hydratedFromServerFor = useRef<string | null>(null);
+  /** Latched once the name has been seeded from the watched graph's own name;
+   *  declared here so the identity-reset effect below can unlatch it. */
+  const seededNameFromGraph = useRef(false);
+  // Latches for the one-shot prefill effects below. The identity-reset
+  // effect re-arms them, and runs FIRST (declaration order), so a new drawer
+  // opening prefills again instead of skipping on a stale latch.
   const prefilledFromTraces = useRef(false);
+  const prefilledFromGraph = useRef(false);
+  const prefilledFromParams = useRef(false);
+
+  /**
+   * Reopening this drawer for a DIFFERENT automation — or a different create
+   * prefill — does not remount it.
+   *
+   * `openDrawer` replaces the URL params in place when the drawer type is
+   * already open (`useDrawer`), and the drawer host renders the component
+   * without a key — so the instance, the singleton store, and every latch in
+   * this file survive the transition. The unmount `reset()` and the mount-time
+   * "editing opens on Review" effect are both dead in that path.
+   *
+   * Left alone, "New automation" from a saved automation's locked Watch step
+   * carried the whole edited draft into the create: the heading flipped, the
+   * store still held the saved name, query and action, and Save wrote a second
+   * row from it (or hit the one-automation-per-graph constraint, wearing an
+   * error that named nothing the author had done). The close-guard was equally
+   * blind, diffing against the previous automation's baseline. And a create
+   * opened with different prefill parameters (a new `prefilledGraphId`, a
+   * different use-case card) silently kept the previous prefill, because the
+   * one-shot effects had already latched.
+   *
+   * So the identity change does by hand exactly what unmounting would have
+   * done. The identity is the automation id on edit, and the full prefill
+   * parameter set on create — edit-A → edit-B, edit → create, and create-A →
+   * create-B are all the same transition with the same consequence.
+   *
+   * It is declared ABOVE the prefill and hydration effects on purpose:
+   * effects run in declaration order, so those effects (re-keyed on the same
+   * identity) find their latches re-armed and the draft blanked when they
+   * run for the new identity.
+   *
+   * The baseline is re-armed rather than cleared, because the effect that
+   * captures a create's baseline runs on mount only. Left null, `isDirty`
+   * would be false forever and closing a fully configured new automation would
+   * discard it without a word.
+   */
+  const drawerIdentity = automationId
+    ? `edit:${automationId}`
+    : `create:${[
+        prefilledGraphId,
+        prefilledSeriesName,
+        initialSource,
+        initialName,
+        initialAction,
+        initialFilters,
+        initialFilterQuery,
+      ]
+        .map((value) => value ?? "")
+        .join("|")}`;
+  const openedForRef = useRef<string>(drawerIdentity);
+  useEffect(() => {
+    if (openedForRef.current === drawerIdentity) return;
+    openedForRef.current = drawerIdentity;
+    reset();
+    hydratedFromServerFor.current = null;
+    baselineRef.current = JSON.stringify(useAutomationStore.getState().draft);
+    prefilledFromTraces.current = false;
+    prefilledFromGraph.current = false;
+    prefilledFromParams.current = false;
+    seededNameFromGraph.current = false;
+    setStep(automationId ? "review" : "watch");
+  }, [drawerIdentity, automationId, reset, setStep]);
+
+  // Pre-fill conditions from the traces view on a fresh create.
   useEffect(() => {
     if (automationId) return;
     if (prefilledFromTraces.current) return;
@@ -300,14 +379,15 @@ export function AutomationDrawer({
       dispatch({ type: "SET_FILTERS", value: filterParams.filters });
       prefilledFromTraces.current = true;
     }
+    // Latch + identity: everything else read here is intentionally frozen
+    // per drawer opening.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [drawerIdentity]);
 
   // Pre-fill graph-alert mode from drawer params on a fresh create. Used
   // by the dashboard "Add automation" entry (Phase 5.2). When set, the drawer
   // opens with source = customGraph and the graph / series already
   // selected and locked, so the author lands on the threshold rule.
-  const prefilledFromGraph = useRef(false);
   useEffect(() => {
     if (automationId) return;
     if (prefilledFromGraph.current) return;
@@ -325,15 +405,16 @@ export function AutomationDrawer({
     // through the When secondary — the author can still change it there.
     dispatch({ type: "SET_ALERT_TYPE", value: AlertType.WARNING });
     prefilledFromGraph.current = true;
+    // Latch + identity: everything else read here is intentionally frozen
+    // per drawer opening.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [drawerIdentity]);
 
   // Pre-fill identity + kind from drawer params on a fresh create. Set by
   // the automations page (a graph-watching use-case card opens straight into
   // graph mode, seeding a name and action too). Ordering matters:
   // SET_SOURCE runs first because switching to customGraph resets any
   // action that alerts don't support.
-  const prefilledFromParams = useRef(false);
   useEffect(() => {
     if (automationId) return;
     if (prefilledFromParams.current) return;
@@ -391,66 +472,16 @@ export function AutomationDrawer({
       dispatch({ type: "SET_FILTER_QUERY", value: initialFilterQuery });
     }
     prefilledFromParams.current = true;
+    // Latch + identity: everything else read here is intentionally frozen
+    // per drawer opening.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [drawerIdentity]);
 
   // Edit prefill from the saved trigger.
   const triggerQuery = api.automation.getTriggerById.useQuery(
     { triggerId: automationId ?? "", projectId },
     { enabled: !!automationId && !!projectId },
   );
-  // Gate hydration to the FIRST successful read per automationId. tRPC's
-  // background refetch (window-focus, query invalidation) would otherwise
-  // re-fire this effect mid-session and overwrite unsaved edits with the
-  // last-saved row.
-  const hydratedFromServerFor = useRef<string | null>(null);
-  /** Latched once the name has been seeded from the watched graph's own name;
-   *  declared here so the identity-reset effect below can unlatch it. */
-  const seededNameFromGraph = useRef(false);
-
-  /**
-   * Reopening this drawer for a DIFFERENT automation does not remount it.
-   *
-   * `openDrawer` replaces the URL params in place when the drawer type is
-   * already open (`useDrawer`), and the drawer host renders the component
-   * without a key — so the instance, the singleton store, and every latch in
-   * this file survive the transition. The unmount `reset()` and the mount-time
-   * "editing opens on Review" effect are both dead in that path.
-   *
-   * Left alone, "New automation" from a saved automation's locked Watch step
-   * carried the whole edited draft into the create: the heading flipped, the
-   * store still held the saved name, query and action, and Save wrote a second
-   * row from it (or hit the one-automation-per-graph constraint, wearing an
-   * error that named nothing the author had done). The close-guard was equally
-   * blind, diffing against the previous automation's baseline.
-   *
-   * So the identity change does by hand exactly what unmounting would have
-   * done. Keyed on the id rather than only on set→absent, because edit-A →
-   * edit-B is the same transition with the same consequence.
-   *
-   * It is declared ABOVE the hydration effect on purpose: effects run in
-   * declaration order, and hydration reading a draft this one has not blanked
-   * yet takes its "the author already started editing" branch, latches, and
-   * never runs again — which would open the next automation on an empty Review.
-   *
-   * The baseline is re-armed rather than cleared, because the effect that
-   * captures a create's baseline runs on mount only. Left null, `isDirty`
-   * would be false forever and closing a fully configured new automation would
-   * discard it without a word.
-   */
-  const openedForRef = useRef<string | undefined>(automationId);
-  useEffect(() => {
-    if (openedForRef.current === automationId) return;
-    openedForRef.current = automationId;
-    reset();
-    hydratedFromServerFor.current = null;
-    baselineRef.current = JSON.stringify(useAutomationStore.getState().draft);
-    prefilledFromTraces.current = false;
-    prefilledFromGraph.current = false;
-    prefilledFromParams.current = false;
-    seededNameFromGraph.current = false;
-    setStep(automationId ? "review" : "watch");
-  }, [automationId, reset, setStep]);
 
   useEffect(() => {
     if (!automationId) return;
@@ -819,9 +850,16 @@ export function AutomationDrawer({
   const nameSet = draft.name.trim().length > 0;
   // Cadence is an always-visible inline facet now (ADR-043), so there is no
   // "confirm the cadence" detour to gate on — subject + cadence validity is
-  // folded into conditionsSet.
+  // folded into conditionsSet. An invalid condition row additionally holds
+  // Save: the row is excluded from the emitted query, so saving past it
+  // would persist a wider automation than the one on screen.
   const canSave =
-    nameSet && conditionsSet && configComplete && !editLoading && !editError;
+    nameSet &&
+    conditionsSet &&
+    !conditionRowsInvalid &&
+    configComplete &&
+    !editLoading &&
+    !editError;
 
   const onTestFire = useCallback(() => {
     if (!channel || !projectId || !draft.action) return;

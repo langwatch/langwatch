@@ -553,12 +553,15 @@ async function dispatchNotifyDigest({
         // integration serves the rest. The two failures are told apart on
         // purpose — a missing channel is this automation's configuration, a
         // missing token anywhere is the project's.
-        const ownToken = decryptSlackBotToken(params);
+        // The wired resolver owns the whole decision, so the row's own token
+        // is only decrypted on the fallback path that actually reads it.
+        const ownTokenFallback = (): ResolvedSlackToken | null => {
+          const ownToken = decryptSlackBotToken(params);
+          return ownToken ? { token: ownToken, source: "automation" } : null;
+        };
         const resolved: ResolvedSlackToken | null = deps.resolveSlackToken
           ? await deps.resolveSlackToken({ projectId, actionParams: params })
-          : ownToken
-            ? { token: ownToken, source: "automation" }
-            : null;
+          : ownTokenFallback();
         if (!resolved) {
           throw slackTokenMissingDispatchError({ triggerName: trigger.name });
         }

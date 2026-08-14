@@ -161,13 +161,13 @@ describe("Feature: the API saves what the dashboard would accept", () => {
     /** @scenario "The listing includes paused automations" */
     it("keeps it in the listing", async () => {
       const name = `Paused ${ns}`;
-      const created = (await (
-        await createTrigger({
-          name,
-          action: TriggerAction.SEND_EMAIL,
-          actionParams: { members: ["someone@example.com"] },
-        })
-      ).json()) as { id: string };
+      const createResponse = await createTrigger({
+        name,
+        action: TriggerAction.SEND_EMAIL,
+        actionParams: { members: ["someone@example.com"] },
+      });
+      expect(createResponse.status).toBe(201);
+      const created = (await createResponse.json()) as { id: string };
 
       const paused = await app.request(`/api/triggers/${created.id}`, {
         method: "PATCH",
@@ -198,27 +198,31 @@ describe("Feature: the API saves what the dashboard would accept", () => {
           apiKey: `test-other-api-key-${ns}`,
         },
       });
-      const theirs = await prisma.trigger.create({
-        data: {
-          id: nanoid(),
-          projectId: elsewhere.id,
-          name: `Theirs ${ns}`,
-          action: TriggerAction.SEND_EMAIL,
-          actionParams: { members: ["them@example.com"] },
-          filters: JSON.stringify(CONDITION),
-          lastRunAt: new Date().getTime(),
-        },
-      });
+      // Cleaned in `finally` so a failing assertion can't leak the foreign
+      // project into later runs.
+      try {
+        const theirs = await prisma.trigger.create({
+          data: {
+            id: nanoid(),
+            projectId: elsewhere.id,
+            name: `Theirs ${ns}`,
+            action: TriggerAction.SEND_EMAIL,
+            actionParams: { members: ["them@example.com"] },
+            filters: JSON.stringify(CONDITION),
+            lastRunAt: new Date().getTime(),
+          },
+        });
 
-      const response = await app.request(`/api/triggers/${theirs.id}`, {
-        headers: headers(),
-      });
+        const response = await app.request(`/api/triggers/${theirs.id}`, {
+          headers: headers(),
+        });
 
-      expect(response.status).toBe(404);
-      expect((await response.json()).error).toBe("trigger_not_found");
-
-      await prisma.trigger.deleteMany({ where: { projectId: elsewhere.id } });
-      await prisma.project.delete({ where: { id: elsewhere.id } });
+        expect(response.status).toBe(404);
+        expect((await response.json()).error).toBe("trigger_not_found");
+      } finally {
+        await prisma.trigger.deleteMany({ where: { projectId: elsewhere.id } });
+        await prisma.project.delete({ where: { id: elsewhere.id } });
+      }
     });
   });
 });

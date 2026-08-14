@@ -13,7 +13,6 @@ import {
   CADENCE_WINDOW_MS,
   type NotificationCadence,
 } from "@langwatch/automations/cadences";
-import { useState } from "react";
 import { HelpCircle, Plus } from "react-feather";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -22,10 +21,10 @@ import {
   TIME_PERIOD_LABELS,
 } from "~/features/automations/logic/draftReducer";
 import { resolveSeriesLabel } from "~/features/automations/logic/seriesOptions";
-import { confirmSwitchToProjectIntegration } from "~/features/automations/logic/slackLegacyTokenCopy";
 import type { TriggerActionParams } from "~/features/automations/logic/triggerActionParams";
+import { useSwitchToProjectIntegration } from "~/features/automations/logic/useSwitchToProjectIntegration";
 import { describeError } from "~/features/errors";
-import { api, type RouterOutputs } from "~/utils/api";
+import type { RouterOutputs } from "~/utils/api";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 
 type EnhancedTrigger = RouterOutputs["automation"]["getTriggers"][number];
@@ -62,18 +61,9 @@ export function OwnSlackTokenNudge({
   workspaceName: string | null;
   canSwitch: boolean;
 }) {
-  const [confirming, setConfirming] = useState(false);
-  const utils = api.useContext();
-  const switchOver = api.slackIntegration.switchToIntegration.useMutation({
-    onSuccess: () => {
-      setConfirming(false);
-      void utils.automation.getTriggers.invalidate({ projectId });
-      void utils.slackIntegration.getLegacyTokenCensus.invalidate({
-        projectId,
-      });
-    },
-  });
-  const confirmation = confirmSwitchToProjectIntegration({
+  const switchOver = useSwitchToProjectIntegration({
+    projectId,
+    automationId,
     automationName,
     workspaceName,
   });
@@ -95,7 +85,7 @@ export function OwnSlackTokenNudge({
           onClick={(event) => {
             // The whole row opens the automation; this action is its own.
             event.stopPropagation();
-            setConfirming(true);
+            switchOver.setIsConfirming(true);
           }}
         >
           Use the project integration
@@ -110,16 +100,14 @@ export function OwnSlackTokenNudge({
         </Text>
       ) : null}
       <ConfirmDialog
-        open={confirming}
-        onOpenChange={setConfirming}
-        title={confirmation.title}
-        message={confirmation.message}
-        confirmLabel={confirmation.confirmLabel}
+        open={switchOver.isConfirming}
+        onOpenChange={switchOver.setIsConfirming}
+        title={switchOver.confirmation.title}
+        message={switchOver.confirmation.message}
+        confirmLabel={switchOver.confirmation.confirmLabel}
         tone="danger"
         loading={switchOver.isPending}
-        onConfirm={() =>
-          switchOver.mutate({ projectId, automationIds: [automationId] })
-        }
+        onConfirm={switchOver.confirmSwitch}
       />
     </VStack>
   );

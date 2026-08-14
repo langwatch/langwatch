@@ -6,6 +6,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ViewAutomationDrawer } from "../ViewAutomationDrawer";
+import { fakeQuery } from "./viewDrawerTestKit";
 
 const HOUR_MS = 60 * 60 * 1000;
 const MINUTE_MS = 60 * 1000;
@@ -51,32 +52,8 @@ vi.mock("~/components/automations/FilterDisplay", () => ({
   ),
 }));
 
-/**
- * A faithful-enough stand-in for one react-query v4 hook result.
- *
- * `enabled: false` is the case that matters: such a query never resolves, so
- * it reports `isLoading` FOREVER. A mock that hard-codes `isLoading: false`
- * makes that state unrepresentable — which is how a permanent skeleton over
- * every non-alert automation's history shipped once already.
- *
- * `undefined` means "has not resolved"; `null` means "resolved, and the
- * answer is nothing" (an automation that was never evaluated), which is a
- * settled query with `data === null`.
- */
-const { fakeQuery } = vi.hoisted(() => ({
-  fakeQuery: (data: unknown, options?: { enabled?: boolean }) => {
-    const enabled = options?.enabled ?? true;
-    const settled = enabled && data !== undefined;
-    return {
-      data,
-      isLoading: !settled,
-      isFetching: enabled && !settled,
-      error: null,
-      refetch: vi.fn(),
-    };
-  },
-}));
-
+// The react-query stand-in contract lives once in the kit; the closures
+// below read it at render time, after every import has initialized.
 vi.mock("~/utils/api", () => ({
   api: {
     automation: {
@@ -412,7 +389,7 @@ describe("ViewAutomationDrawer", () => {
   });
 
   describe("given a legacy Slack row saved before delivery method existed", () => {
-    it("falls back to webhook delivery and shows the masked URL on hover", () => {
+    it("falls back to webhook delivery and shows the masked URL on hover", async () => {
       mockTriggerRow = {
         id: "trigger_1",
         name: "Old-style Slack automation",
@@ -431,15 +408,21 @@ describe("ViewAutomationDrawer", () => {
 
       expect(screen.getByText("Slack webhook")).toBeDefined();
       expect(screen.queryByText("Slack app")).toBeNull();
-      // The masked label is a real tooltip trigger (the full URL shows on
-      // hover) — a distinct code path from the redacted case below, which
-      // renders no tooltip at all.
-      expect(document.querySelector('[data-scope="tooltip"]')).not.toBeNull();
+      // The full URL genuinely shows on hover — asserted by hovering and
+      // reading the URL text, not by the shape of tooltip markup.
+      await userEvent.hover(screen.getByText("Slack webhook"));
+      expect(
+        await screen.findByText(
+          "https://hooks.slack.com/services/legacy",
+          undefined,
+          { timeout: 3000 },
+        ),
+      ).toBeDefined();
     });
   });
 
   describe("given a Slack webhook row read through a redacting boundary", () => {
-    it("shows the masked label without rendering the placeholder as a URL", () => {
+    it("shows the masked label without rendering the placeholder as a URL", async () => {
       mockTriggerRow = {
         id: "trigger_1",
         name: "Redacted webhook automation",
@@ -458,9 +441,11 @@ describe("ViewAutomationDrawer", () => {
       renderDrawer();
 
       expect(screen.getByText("Slack webhook")).toBeDefined();
-      // Never rendered as though `[redacted]` were a real, hoverable URL.
+      // Never rendered as though `[redacted]` were a real, hoverable URL —
+      // hovering shows nothing, asserted on the text itself.
+      await userEvent.hover(screen.getByText("Slack webhook"));
+      await new Promise((resolve) => setTimeout(resolve, 600));
       expect(screen.queryByText("[redacted]")).toBeNull();
-      expect(document.querySelector('[data-scope="tooltip"]')).toBeNull();
     });
   });
 

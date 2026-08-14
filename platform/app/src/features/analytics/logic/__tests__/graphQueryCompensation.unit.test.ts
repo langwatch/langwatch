@@ -85,6 +85,29 @@ describe("resolveGraphTimeScale", () => {
       ).toBe(1440);
     });
   });
+
+  describe("given stored JSON whose timeScale is missing or mangled", () => {
+    // Stored graph JSON is cast, not parsed — these arrive at runtime even
+    // though the type says they can't.
+    const badScale = (value: unknown) =>
+      resolveGraphTimeScale({
+        graphType: "line",
+        timeScale: value as CustomGraphInput["timeScale"],
+      });
+
+    it("falls back to hourly rather than throwing on null or undefined", () => {
+      expect(badScale(null)).toBe(60);
+      expect(badScale(undefined)).toBe(60);
+    });
+
+    it("falls back to hourly rather than querying with NaN", () => {
+      expect(badScale("not-a-number")).toBe(60);
+    });
+
+    it("still reads a numeric string the way the UI stores one", () => {
+      expect(badScale("1440")).toBe(1440);
+    });
+  });
 });
 
 describe("withGroupedPipeline", () => {

@@ -1,4 +1,5 @@
 import { Alert, Box, Button } from "@chakra-ui/react";
+import { Link } from "~/components/ui/link";
 import type { DailyCapAdvice } from "../logic/dailyCapAdvice";
 
 /**
@@ -53,7 +54,7 @@ export function DailyCapAdviceAlert({
           alignSelf="center"
           data-testid="daily-cap-advice-upgrade"
         >
-          <a href="/settings/plans">Upgrade Plan</a>
+          <Link href="/settings/plans">Upgrade Plan</Link>
         </Button>
       </Alert.Root>
     </Box>

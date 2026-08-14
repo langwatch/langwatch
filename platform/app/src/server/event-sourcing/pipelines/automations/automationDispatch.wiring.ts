@@ -38,7 +38,7 @@ import {
   slackProjectTokenReader,
 } from "~/server/app-layer/automations/slack-integration/slack-token-resolver";
 import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
-import { TriggerLatestEvaluationService } from "~/server/app-layer/automations/trigger-latest-evaluation.service";
+import { createTriggerLatestEvaluationService } from "~/server/app-layer/automations/trigger-latest-evaluation.wiring";
 import { WebhookDeliveryService } from "~/server/app-layer/automations/webhook-delivery.service";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
@@ -170,7 +170,7 @@ export function buildAutomationDispatchPorts({
   // What each check observed, so the automation's view can explain a quiet
   // alert. The service swallows its own write failures — an alert must never
   // go unsent because its observation could not be recorded.
-  const latestEvaluations = TriggerLatestEvaluationService.create(prisma);
+  const latestEvaluations = createTriggerLatestEvaluationService(prisma);
   const graphTriggerEvalDeps: GraphTriggerEvaluationDeps = {
     loadTrigger: async ({ triggerId, projectId }) =>
       triggers.getById({ triggerId, projectId }),

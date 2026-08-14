@@ -514,6 +514,27 @@ describe("AutomationDrawer", () => {
       });
     });
 
+    describe("when the drawer is reopened with a different create prefill", () => {
+      it("applies the new prefill instead of skipping on the previous opening's latch", async () => {
+        const opened = renderDrawer({ prefilledGraphId: "graph-1" });
+        await waitFor(() => {
+          expect(useAutomationStore.getState().draft.customGraphId).toBe(
+            "graph-1",
+          );
+        });
+
+        // Same drawer type reopened with new params: no remount, so only the
+        // identity change can re-arm the prefill effects.
+        opened.rerender(<AutomationDrawer prefilledGraphId="graph-2" />);
+
+        await waitFor(() => {
+          expect(useAutomationStore.getState().draft.customGraphId).toBe(
+            "graph-2",
+          );
+        });
+      });
+    });
+
     describe("when the author starts a new automation from the locked watch step", () => {
       it("opens a pristine create instead of carrying the edited draft into it", async () => {
         mockTriggerRow = savedRow({

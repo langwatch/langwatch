@@ -22,7 +22,8 @@ const { mockGraphsRefetch } = vi.hoisted(() => ({
   mockGraphsRefetch: vi.fn(),
 }));
 
-/** What the two trace-preview queries return for the test at hand.
+/** What the subject's mocked queries — the trace preview, the plan-cap
+ *  status, and the graph list — return for the test at hand.
  *  `graphs` and `graphsError` are independent — react-query's `isError`
  *  does NOT imply `data` is empty: a background refetch failure leaves the
  *  last good `data` in place, and a test needs to represent that state

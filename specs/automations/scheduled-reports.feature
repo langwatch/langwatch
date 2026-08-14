@@ -70,7 +70,7 @@ Feature: Scheduled report content and links
 
     @unit
     Scenario: A panel whose configuration cannot be evaluated is left out; the report still delivers
-      Given a dashboard with a healthy panel and a panel with unusable stored configuration
+      Given a dashboard with a healthy panel and a panel set up in a way that can never render
       When the report renders its charts
       Then the unusable panel is left out of the report entirely
       And the healthy panel still carries its data
@@ -78,7 +78,7 @@ Feature: Scheduled report content and links
 
     @unit
     Scenario: All panels failing retries rather than delivering a false empty report
-      Given a dashboard whose every panel has unusable stored configuration
+      Given a dashboard whose every panel is set up in a way that can never render
       When the report renders its charts
       Then the report is not delivered
       And no false "Nothing to show for this period" is ever sent

@@ -6,6 +6,7 @@ import { formatFetchError } from "../../utils/formatFetchError";
 import { formatTable } from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";
 import { buildAuthHeaders } from "@/internal/api/auth";
+import { TRIGGER_REQUEST_TIMEOUT_MS } from "./requestTimeout";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
@@ -24,6 +25,7 @@ export const listTriggersCommand = async (): Promise<CommandResult | void> => {
 
   try {
     const response = await fetch(`${endpoint}/api/triggers`, {
+      signal: AbortSignal.timeout(TRIGGER_REQUEST_TIMEOUT_MS),
       headers: buildAuthHeaders({ apiKey }),
     });
 

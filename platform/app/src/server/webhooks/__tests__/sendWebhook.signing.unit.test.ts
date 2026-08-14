@@ -135,6 +135,19 @@ describe("webhook content type", () => {
     });
   });
 
+  describe("when a customer header tries to claim content-type", () => {
+    it("strips it, so the header always describes the body actually sent", async () => {
+      await sendWebhook({
+        ...base,
+        headers: { "content-type": "application/xml" },
+      });
+
+      const sent = sentHeaders();
+      expect(sent["Content-Type"]).toBe("application/json");
+      expect(sent["content-type"]).toBeUndefined();
+    });
+  });
+
   describe("when the caller states a plain-text body", () => {
     it("announces it as text, so the receiver does not try to parse JSON", async () => {
       await sendWebhook({

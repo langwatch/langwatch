@@ -11,7 +11,11 @@ import {
   testFireTrigger,
   updateTrigger,
 } from "../langwatch-api-triggers.js";
-import { actionParamsSchema, reportSchema } from "../schemas/triggers.js";
+import {
+  actionParamsSchema,
+  reportSchema,
+  validateActionParamsForAction,
+} from "../schemas/triggers.js";
 
 const request = vi.mocked(makeRequest);
 
@@ -141,6 +145,51 @@ describe("Feature: an agent configures an automation over MCP", () => {
       };
 
       expect(actionParamsSchema.parse(destination)).toEqual(destination);
+    });
+  });
+
+  describe("when actionParams is bound to the channel named in action", () => {
+    it("refuses a webhook with no url, instead of letting the Slack shape absorb it", () => {
+      const verdict = validateActionParamsForAction({
+        action: "SEND_WEBHOOK",
+        actionParams: {},
+      });
+
+      expect(verdict.ok).toBe(false);
+      if (!verdict.ok) expect(verdict.message).toContain("SEND_WEBHOOK");
+    });
+
+    it("refuses email fields sent for a webhook channel", () => {
+      expect(
+        validateActionParamsForAction({
+          action: "SEND_WEBHOOK",
+          actionParams: { members: ["someone@example.com"] },
+        }).ok,
+      ).toBe(false);
+    });
+
+    it("accepts each channel's own configuration", () => {
+      expect(
+        validateActionParamsForAction({
+          action: "SEND_EMAIL",
+          actionParams: { members: ["someone@example.com"] },
+        }).ok,
+      ).toBe(true);
+      expect(
+        validateActionParamsForAction({
+          action: "SEND_WEBHOOK",
+          actionParams: { url: "https://example.com/hooks/langwatch" },
+        }).ok,
+      ).toBe(true);
+    });
+
+    it("stays tolerant of an action this build does not know", () => {
+      expect(
+        validateActionParamsForAction({
+          action: "SEND_CARRIER_PIGEON",
+          actionParams: { members: ["someone@example.com"] },
+        }).ok,
+      ).toBe(true);
     });
   });
 

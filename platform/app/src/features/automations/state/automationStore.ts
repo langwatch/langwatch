@@ -40,9 +40,16 @@ export interface AutomationStore {
    *  earlier steps stay one click away. */
   furthestStep: WizardStep;
   testHistory: TestFireAttempt[];
+  /** True while the condition builder shows a completed row whose attribute
+   *  key can't round-trip through the query language. The row is excluded
+   *  from the emitted query, so without this flag Save would silently
+   *  persist a wider automation than the one on screen. */
+  conditionRowsInvalid: boolean;
 
   /** Drives the pure reducer. */
   dispatch: (action: DraftAction) => void;
+  /** Reported by the condition builder as its rows change. */
+  setConditionRowsInvalid: (invalid: boolean) => void;
   /** Open or close a secondary drawer. */
   setSection: (section: Section) => void;
   /** Show a wizard step. Reaching a later step never un-reaches an earlier
@@ -70,9 +77,11 @@ export const useAutomationStore = create<AutomationStore>((set) => ({
   step: "watch",
   furthestStep: "watch",
   testHistory: [],
+  conditionRowsInvalid: false,
 
   dispatch: (action) =>
     set((state) => ({ draft: reducer(state.draft, action) })),
+  setConditionRowsInvalid: (invalid) => set({ conditionRowsInvalid: invalid }),
   setSection: (section) => set({ section }),
   setStep: (step) =>
     set((state) => ({
@@ -94,5 +103,6 @@ export const useAutomationStore = create<AutomationStore>((set) => ({
       step: "watch",
       furthestStep: "watch",
       testHistory: [],
+      conditionRowsInvalid: false,
     }),
 }));

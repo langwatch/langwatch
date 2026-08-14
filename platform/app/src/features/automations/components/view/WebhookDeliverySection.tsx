@@ -52,8 +52,11 @@ export function WebhookDeliverySection({
 /**
  * The webhook delivery log (ADR-040 §6): attempts grouped by the fire that
  * produced them (`dispatchId`), newest fire first. A failed attempt expands
- * to its error and a plain-language explanation of what went wrong — the log
- * stores outcome facts only, never request or response content.
+ * to its error, the truncated response the receiver sent back (body and
+ * headers — debugging context the server stores capped), and a
+ * plain-language explanation of what went wrong. What is never stored or
+ * shown is OUR request content: the rendered body and its headers can carry
+ * credentials.
  */
 function WebhookDeliveriesList({
   deliveries,
