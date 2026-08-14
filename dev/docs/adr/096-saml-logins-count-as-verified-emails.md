@@ -69,13 +69,13 @@ Forces and constraints (locked 2026-08-14):
 
 | Name | Value | Purpose |
 |---|---|---|
-| SAML sub prefix | `"samlp|"` (7 chars, trailing pipe included) | The only strategy prefix granted the override; trailing pipe prevents matching a hypothetical `samlpx` strategy |
+| SAML sub prefix | `"samlp\|"` (7 chars, trailing pipe included) | The only strategy prefix granted the override; trailing pipe prevents matching a hypothetical `samlpx` strategy |
 
 ## Invariants
 
 | Invariant | Meaning | Satisfied by / test anchor |
 |---|---|---|
-| Only `samlp|` subs are upgraded | `auth0\|…`, `google-oauth2\|…`, `waad\|…`, absent/non-string subs never gain `emailVerified: true` | `isSamlSub` unit cases + mapped-profile assertion in `ee/sso/__tests__` |
+| Only `samlp\|` subs are upgraded | `auth0\|…`, `google-oauth2\|…`, `waad\|…`, absent/non-string subs never gain `emailVerified: true` | `isSamlSub` unit cases + mapped-profile assertion in `ee/sso/__tests__` |
 | Non-SAML profiles are untouched | The mapped object contains no `emailVerified` key for non-SAML subs (claim value flows through) | assertion `"emailVerified" not in mapped` |
 | SAML profiles map to `emailVerified: true` | Linking gate passes for SAML sign-ins | assertion on mapped object |
 | Rest of the mapping unchanged | name/email/image behavior identical to before | existing `fallbackName` tests keep passing |
@@ -84,9 +84,9 @@ Forces and constraints (locked 2026-08-14):
 
 | Assumption | What breaks if false |
 |---|---|
-| Auth0 SAML subs always start `samlp|` | Fix silently doesn't fire; user stays locked out — incomplete, not wrong. Verified against Auth0 docs; first real sign-in (debug logs are on) confirms on our tenant |
-| No self-signup path yields a `samlp|` sub | Account takeover via linking. Holds by construction: SAML connections are operator-created in Auth0 |
-| Every SAML connection in the tenant maps `email` from an IdP-controlled attribute | **This is the load-bearing assumption (red-team, v2).** `samlp|` proves *authenticated via SAML*, not *owns this email*. If any SAML connection in the configured Auth0 tenant sources email from a user-editable attribute or an open-registration IdP, an attacker can assert a victim's email and link into their existing account — the exact link today's code refuses. The domain guard does not stop it: existing users are soft-flagged, only first-time signups hard-block (`hooks.ts`). Holds when the operator creates connections deliberately against trusted corporate IdPs — the same trust class as the tenant's client secret |
+| Auth0 SAML subs always start `samlp\|` | Fix silently doesn't fire; user stays locked out — incomplete, not wrong. Verified against Auth0 docs; first real sign-in (debug logs are on) confirms on our tenant |
+| No self-signup path yields a `samlp\|` sub | Account takeover via linking. Holds by construction: SAML connections are operator-created in Auth0 |
+| Every SAML connection in the tenant maps `email` from an IdP-controlled attribute | **This is the load-bearing assumption (red-team, v2).** `samlp\|` proves *authenticated via SAML*, not *owns this email*. If any SAML connection in the configured Auth0 tenant sources email from a user-editable attribute or an open-registration IdP, an attacker can assert a victim's email and link into their existing account — the exact link today's code refuses. The domain guard does not stop it: existing users are soft-flagged, only first-time signups hard-block (`hooks.ts`). Holds when the operator creates connections deliberately against trusted corporate IdPs — the same trust class as the tenant's client secret |
 | `mapProfileToUser` return overrides the claim | Fix is a no-op. Verified by reading BetterAuth 1.6.23 source (`routes.mjs:~209`) — pinned-version fact, re-check on BetterAuth upgrades |
 
 ## Gates
@@ -163,26 +163,20 @@ None. No migrations, no env vars, no config keys.
   trust, high blast radius, samlp-prefix + no-schema + one-PR constraints);
   forks locked: exported named helper over inline one-liner, one-off over
   shared capability.
-- **v2 (2026-08-14, red-team, 4-lens panel):** the mechanism and premise
-  **held** — `samlp|` cannot be forged from non-SAML connections (a
-  database user id of `samlp|x` yields sub `auth0|samlp|x`), the
-  `typeof`+prefix check has no type or unicode holes, and no better
-  mechanism exists in BetterAuth 1.6.23 (`trustedProviders` is
-  provider-wide and matched pre-token-exchange; per-config trust flags
-  exist in `handleOAuthUserInfo` but are never passed by any route; hooks
-  fire after the link gate and can only block, never permit). The
-  **universal** safety claim was refuted: SAML authentication proves
-  identity at the IdP, not ownership of the asserted email — the residual
-  risk is captured in the load-bearing assumption above and is the same
-  class the tenant's OIDC enterprise connections (`waad|`, `okta|`)
-  already carry, as their linked account pairs in production show.
-  Connection-bound hardening deferred (see Open questions); scope
-  unchanged from v1.
-- **v2 (2026-08-14, red-team, 4 lenses):** claim survives narrowed. Held:
-  `samlp|` cannot be forged from non-SAML connections (a database user_id
-  of `samlp|x` yields sub `auth0|samlp|x`); no safer BetterAuth mechanism
-  exists in 1.6.23. Narrowed: safety is conditional on every SAML
-  connection in the tenant mapping email from an IdP-controlled attribute
-  — promoted to the load-bearing assumption above. Allowlist alternative
-  re-asked and rejected (see Rejected alternatives). Boundary decision:
-  document + code-comment, keep prefix-only.
+- **v2 (2026-08-14, red-team, 4-lens panel):** claim survives narrowed.
+  Held: `samlp|` cannot be forged from non-SAML connections (a database
+  user id of `samlp|x` yields sub `auth0|samlp|x`), the `typeof`+prefix
+  check has no type or unicode holes, and no better mechanism exists in
+  BetterAuth 1.6.23 (`trustedProviders` is provider-wide and matched
+  pre-token-exchange; per-config trust flags exist in
+  `handleOAuthUserInfo` but are never passed by any route; hooks fire
+  after the link gate and can only block, never permit). Narrowed: the
+  **universal** safety claim was refuted — SAML authentication proves
+  identity at the IdP, not ownership of the asserted email. Safety is
+  conditional on every SAML connection in the tenant mapping email from
+  an IdP-controlled attribute, promoted to the load-bearing assumption
+  above; same risk class as the tenant's OIDC enterprise connections
+  (`waad|`, `okta|`), as their linked account pairs in production show.
+  Per-connection allowlist re-asked and rejected (see Rejected
+  alternatives). Boundary decision: document + code-comment, keep
+  prefix-only. Scope unchanged from v1.
