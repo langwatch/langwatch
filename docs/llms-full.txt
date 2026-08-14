@@ -8375,8 +8375,10 @@ name that moves, such as `openai/latest`. The gateway reads the name
 exactly as you wrote it. It would try to call a model named
 `latest`. The product refuses to save a name that moves.
 
-`GET /v1/models` lists the tier names, so they show in a model
-picker with every other name.
+`GET /v1/models` lists a tier that has a model, so it shows in a
+model picker with every other name. Set `defaultModel` and all three
+tiers are listed. A tier with no model and no `defaultModel` is not
+listed, because a request that sends it gets an error.
 
 ## Model name mapping
 
