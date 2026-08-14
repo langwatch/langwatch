@@ -247,7 +247,61 @@ Feature: Machine-wide slots for whole-repo checks
     When the postinstall step runs
     Then it changes nothing
 
-  # --- Interaction with haven ---
+  # --- The queue lives inside haven ---
+
+  # The queue's decisions are Go code in haven: `haven slot run -- <cmd>`
+  # takes a slot from the same flock semaphore `haven typecheck` holds — one
+  # counter for everything that saturates the cores — then runs the command
+  # with the gate off and the Go memory cap set, exactly as the JS wrapper
+  # would. check-queue.mjs delegates to it whenever the haven binary is
+  # installed (HAVEN_BIN overrides where to look), and keeps its JavaScript
+  # queue only as the fallback for machines without haven. Flock slots die
+  # with their holder, so a killed run frees its slot with no bookkeeping.
+
+  @unit
+  Scenario: With haven installed the queue runs inside haven
+    Given the haven binary is installed
+    When a whole-repo check runs through the queue
+    Then the run is handed to haven's slot command
+    And the command's exit code reaches the caller unchanged
+
+  @unit
+  Scenario: Without haven the JavaScript queue still gates
+    Given no haven binary is installed
+    When a whole-repo check runs through the queue
+    Then the JavaScript queue takes the slot and runs the command
+
+  @unit
+  Scenario: The operator can force the JavaScript queue
+    Given CHECK_QUEUE_IMPL is js
+    When a whole-repo check runs through the queue
+    Then haven is never consulted
+
+  @unit
+  Scenario: haven derives the same limit the JavaScript queue would
+    Given CHECK_SLOTS is unset on a developer machine
+    When haven resolves the slot limit
+    Then it is one slot per 6 GiB of RAM, capped at one per 4 CPUs, and never below 1
+    And an explicit CHECK_SLOTS, a disabling value, and CI resolve exactly as the JavaScript queue resolves them
+
+  @unit
+  Scenario: haven's slot run is transparent to the command
+    Given a command that fails
+    When it runs under haven's slot command with a free slot
+    Then its exit code reaches the caller unchanged and nothing extra is printed
+    And the child runs with the gate off and the Go memory cap set, so it cannot queue behind itself
+
+  @unit
+  Scenario: A run queued inside haven says so
+    Given every check slot is held
+    When a run starts under haven's slot command
+    Then it reports it is queued and names the knob that changes the limit
+    And once a slot frees it reports how long it queued
+
+  @unit
+  Scenario: haven typecheck and delegated checks share one counter
+    Given "haven typecheck" holds a check slot
+    Then a delegated check counts against the same semaphore, not a second ledger
 
   @unit
   Scenario: haven typecheck is not gated twice

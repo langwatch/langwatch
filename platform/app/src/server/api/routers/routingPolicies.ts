@@ -15,9 +15,9 @@ import {
   RoutingPolicyMustHaveScopeError,
   RoutingPolicyService,
 } from "@ee/governance/services/routingPolicy.service";
-import { RoutingPolicyScopeType } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { RoutingPolicyScopeType } from "~/generated/prisma/client";
 
 import { checkOrganizationPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";

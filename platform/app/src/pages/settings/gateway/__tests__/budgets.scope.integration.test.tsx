@@ -138,7 +138,7 @@ const BUDGETS = [
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       gatewayBudgets: { list: { invalidate: vi.fn() } },
     }),
     gatewayBudgets: {

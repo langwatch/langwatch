@@ -325,6 +325,39 @@ const registry = {
       "Install the LangWatch GitHub App (Settings → Integrations) to let the agent open pull requests",
     ],
   },
+  langy_api_credential_missing: {
+    tips: [
+      "Send the project API key as X-Auth-Token, Authorization: Bearer <token>, or Authorization: Basic base64(projectId:token)",
+    ],
+    docsPath: "/api-reference/api-keys/overview",
+  },
+  langy_api_credential_invalid: {
+    tips: [
+      "The token did not resolve to a project — check it was copied whole and has not been revoked",
+    ],
+    docsPath: "/api-reference/api-keys/overview",
+  },
+  langy_api_key_unowned: {
+    tips: [
+      "This key has no owning user, so there is no one for the turn to act as — mint a personal API key and use that instead",
+    ],
+    docsPath: "/api-reference/api-keys/create-api-key",
+  },
+  langy_api_key_no_langy_access: {
+    tips: [
+      "The user who owns this key cannot use Langy in this project — ask a workspace admin to grant Langy access, then retry",
+    ],
+  },
+  langy_api_actor_missing: {
+    tips: [
+      "The user who owns this key no longer exists — mint a new key under a current user",
+    ],
+  },
+  langy_api_request_invalid: {
+    tips: [
+      "Read the `issues` array in `meta` — it names the field that failed and why",
+    ],
+  },
   langy_github_repo_not_accessible: {
     tips: [
       "Grant the LangWatch GitHub App access to that repository (Settings → Integrations → Configure), then retry",

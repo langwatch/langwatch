@@ -32,6 +32,8 @@ import {
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 
 vi.mock("~/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: () => ({
     gateway: {
       budgets: new GatewayBudgetClickHouseRepository(async (projectId) => {

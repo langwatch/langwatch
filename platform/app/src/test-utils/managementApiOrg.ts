@@ -14,14 +14,14 @@
 import { FREE_PLAN } from "@ee/licensing/constants";
 import type { PlanInfo } from "@ee/licensing/planInfo";
 import { generate } from "@langwatch/ksuid";
+import { nanoid } from "nanoid";
 import {
   type Organization,
   OrganizationUserRole,
   type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
+} from "~/generated/prisma/client";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { KSUID_RESOURCES } from "~/utils/constants";
 

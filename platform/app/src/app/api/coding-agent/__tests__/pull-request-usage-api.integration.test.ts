@@ -15,18 +15,19 @@
  * @see specs/coding-agent/pull-request-linkage.feature
  */
 import { generate } from "@langwatch/ksuid";
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   type Organization,
   OrganizationUserRole,
   RoleBindingScopeType,
   type Team,
   TeamUserRole,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+} from "~/generated/prisma/client";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { CodingAgentSessionService } from "~/server/app-layer/coding-agent/coding-agent-session.service";
+import { CodingAgentSessionsListService } from "~/server/app-layer/coding-agent/coding-agent-sessions-list.service";
 import { PullRequestUsageService } from "~/server/app-layer/coding-agent/pull-request-usage.service";
 import { NullCodingAgentSessionRepository } from "~/server/app-layer/coding-agent/repositories/coding-agent-session.repository";
 import { NullCodingAgentSessionEventsRepository } from "~/server/app-layer/coding-agent/repositories/coding-agent-session-events.repository";
@@ -37,6 +38,7 @@ import { GithubAppTokenService } from "~/server/app-layer/github/githubAppToken"
 import { NullGithubInstallationsRepository } from "~/server/app-layer/github/repositories/github-installations.repository";
 import { PrismaGithubPullRequestsRepository } from "~/server/app-layer/github/repositories/github-pull-requests.prisma.repository";
 import { createTestApp } from "~/server/app-layer/presets";
+import { NullGithubPullRequestLookup } from "~/server/app-layer/traces/session-groups.pull-request-link";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -195,6 +197,12 @@ beforeAll(async () => {
   globalForApp.__langwatch_app = createTestApp({
     codingAgents: {
       sessions,
+      // The REST surface under test never reads it; the App's shape does.
+      sessionsList: new CodingAgentSessionsListService({
+        sessions,
+        pullRequests: new NullGithubPullRequestLookup(),
+        resolveOrganizationId: async () => organization.id,
+      }),
       pullRequestUsage: new PullRequestUsageService({
         pullRequests: new PrismaGithubPullRequestsRepository(prisma),
         sessions: nullSessions,

@@ -1,3 +1,17 @@
+import type { LatencyWindows } from "~/shared/ops/latency";
+import type { BoundedSection, ParkedTenant } from "./snapshot/snapshot.types";
+
+/** One tenant's parked group, as the drill-down lists it. */
+export interface ParkedGroupInfo {
+  groupId: string;
+  pendingJobs: number;
+  /** Timestamp of the group's oldest waiting job, in ms; null when empty. */
+  oldestJobMs: number | null;
+  /** Dispatch-eligibility score, preserved across parking. */
+  score: number;
+  pipelineName: string | null;
+}
+
 export interface GroupInfo {
   groupId: string;
   pendingJobs: number;
@@ -149,6 +163,12 @@ export interface DashboardData {
   latencyP99Ms: number;
   peakLatencyP50Ms: number;
   peakLatencyP99Ms: number;
+  /**
+   * Bucketed percentiles per time window (hour/day/week/all time), computed
+   * by the writer's detail cycle from the completion histograms. Null until
+   * the first detail cycle lands.
+   */
+  latencyWindows: LatencyWindows | null;
   phases: {
     commands: PhaseMetrics;
     projections: PhaseMetrics;
@@ -157,6 +177,39 @@ export interface DashboardData {
   jobNameMetrics: JobNameMetrics[];
   pausedKeys: string[];
   topErrors: ErrorCluster[];
+  /**
+   * Tenants sitting at their in-flight cap, deepest first (ADR-090).
+   *
+   * Always tenant soft-cap parking — the poison-group guard's unrelated "park"
+   * puts a crash-looping group in the BLOCKED set and never appears here.
+   */
+  parkedTenants: ParkedTenant[];
+  parkedTenantsBound: BoundedSection;
+  /** How much of the blocked set the error clusters actually cover. */
+  errorClustersBound: BoundedSection;
+  /** Provenance of the served snapshot, so the page can report its own age. */
+  snapshot: SnapshotProvenance;
+}
+
+/**
+ * Where the served data came from and how old it is.
+ *
+ * Nulls mean "no snapshot of that kind has been read yet", which the dashboard
+ * renders as its loading state rather than as zeroes.
+ */
+export interface SnapshotProvenance {
+  /** When the live artifact was computed, in ms; null when none has been read. */
+  computedAt: number | null;
+  /** When the exhaustive detail artifact was computed, in ms. */
+  detailComputedAt: number | null;
+  /** Which writer produced it — the pod to look at when something is stuck. */
+  writerId: string | null;
+  /**
+   * Increments on every lease acquisition, including a re-acquisition by the
+   * pod that just lost it. It separates a stuck writer from a churning one; it
+   * is not a fleet-wide ordering of writers.
+   */
+  leaseEpoch: number | null;
 }
 
 export type SSEEvent =

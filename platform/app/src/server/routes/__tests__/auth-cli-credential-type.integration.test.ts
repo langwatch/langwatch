@@ -17,8 +17,11 @@
  *
  * Spec: specs/ai-governance/cli-onboarding/login-unified.feature
  */
+import type { Redis } from "ioredis";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { createTestApp } from "~/server/app-layer/presets";
 
 import { prisma } from "~/server/db";
 import {
@@ -52,8 +55,13 @@ async function callExchange(deviceCode: string) {
 }
 
 describe("CLI credential_type discriminator — no-paste convergence", () => {
+  /** The container's connection; /api/auth/cli/* requires one on the App. */
+  let redisConnection: Redis | null = null;
+
   beforeAll(async () => {
-    await startTestContainers();
+    ({ redisConnection } = await startTestContainers());
+    await resetApp();
+    globalForApp.__langwatch_app = createTestApp({ redis: redisConnection });
 
     await prisma.organization.create({
       data: {
@@ -97,6 +105,7 @@ describe("CLI credential_type discriminator — no-paste convergence", () => {
   });
 
   afterAll(async () => {
+    await resetApp();
     await prisma.project
       .deleteMany({ where: { id: PROJECT_ID } })
       .catch(() => {});

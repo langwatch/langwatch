@@ -132,7 +132,7 @@ vi.mock("~/components/suites/ScenarioInputMappingSection", () => ({
 //   api.agents.getById.useQuery   — load agent (with workflowId + config)
 //   api.workflow.getById.useQuery — load workflow (with currentVersion.dsl)
 //   api.agents.update.useMutation — save (not exercised here)
-//   api.useContext()              — for cache invalidation after save
+//   api.useUtils()              — for cache invalidation after save
 // ---------------------------------------------------------------------------
 
 /** A minimal workflow DSL that has an entry node with one declared output
@@ -229,7 +229,7 @@ vi.mock("~/utils/api", () => ({
         },
       },
     },
-    useContext: () => ({
+    useUtils: () => ({
       agents: {
         getAll: { invalidate: vi.fn() },
         getById: { invalidate: vi.fn() },

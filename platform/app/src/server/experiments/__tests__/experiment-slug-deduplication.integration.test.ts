@@ -3,9 +3,9 @@
  * @see specs/evaluations-v3/experiment-slug-deduplication.feature
  */
 
-import type { Project } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import type { Project } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 import { getTestProject } from "~/utils/testUtils";
 import { ExperimentService } from "../experiment.service";

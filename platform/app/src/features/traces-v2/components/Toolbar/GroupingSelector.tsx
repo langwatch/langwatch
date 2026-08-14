@@ -15,8 +15,7 @@ import { useViewStore } from "../../stores/viewStore";
 
 const GROUPING_OPTIONS: Record<GroupingMode, string> = {
   flat: "Flat",
-  // Persisted mode key stays "by-conversation"; only the label says Session.
-  "by-conversation": "By Session",
+  "by-conversation": "By Conversation",
   "by-service": "By Service",
   "by-user": "By User",
   "by-model": "By Model",

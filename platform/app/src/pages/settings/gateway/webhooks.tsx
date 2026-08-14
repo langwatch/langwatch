@@ -108,7 +108,7 @@ function useWebhookEndpointMutations(handlers: {
   onSecretRolled: (secret: string) => void;
   onArchived: () => void;
 }) {
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const refresh = () => void utils.webhookEndpoints.list.invalidate();
   const onError = (error: unknown) =>
     showErrorToast({ error, fallbackTitle: "That webhook change failed" });

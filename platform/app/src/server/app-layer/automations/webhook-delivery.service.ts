@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { PrismaWebhookDeliveryRepository } from "./repositories/webhook-delivery.prisma.repository";
 import type {
   WebhookDeliveryInput,

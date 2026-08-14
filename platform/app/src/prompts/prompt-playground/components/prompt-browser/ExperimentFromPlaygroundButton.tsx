@@ -195,7 +195,7 @@ export function ExperimentFromPlaygroundButton({
   const router = useRouter();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   // Get all tabs from all windows
   const { isComparing, allTabs, activeTab } = useDraggableTabsBrowserStore(

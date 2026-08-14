@@ -43,7 +43,7 @@ export const CopyEvaluatorDialog = ({
           sourceProjectId,
         });
       }}
-      isLoading={copyEvaluator.isLoading}
+      isLoading={copyEvaluator.isPending}
       logError={logger.error.bind(logger)}
     />
   );

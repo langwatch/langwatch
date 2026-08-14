@@ -1,5 +1,5 @@
-import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import {
   type Audience,
   type Disposition,
@@ -25,6 +25,8 @@ const mockOrgService = {
 
 vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({ organizations: mockOrgService }),
+  // Reached through the TtlCache these paths read; null keeps it in-memory.
+  tryGetApp: () => null,
 }));
 
 const mockPrisma = {

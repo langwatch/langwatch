@@ -16,6 +16,8 @@ const appMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("~/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: () => ({
     dataRetention: {
       policy: {

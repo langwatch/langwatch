@@ -22,6 +22,8 @@ vi.mock("../../../src/server/mailer/licenseEmail", () => ({
 const mockSendSlackLicensePurchase = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("../../../src/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: () => ({
     notifications: {
       sendSlackLicensePurchase: mockSendSlackLicensePurchase,

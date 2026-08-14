@@ -37,7 +37,11 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import { type Dataset, Prisma, type PrismaClient } from "@prisma/client";
+import {
+  type Dataset,
+  Prisma,
+  type PrismaClient,
+} from "~/generated/prisma/client";
 import { StreamingChunkWriter } from "../server/datasets/dataset-chunk-writer";
 import { withDatasetLock } from "../server/datasets/dataset-lock";
 import { DatasetRecordRepository } from "../server/datasets/dataset-record.repository";

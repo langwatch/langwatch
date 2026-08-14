@@ -12,8 +12,7 @@
  * list and the Budgets page use, with bucket-exact targets, so a limit
  * and its "spent so far" agree wherever they are shown.
  */
-import type { GatewayBudget, PrismaClient } from "@prisma/client";
-
+import type { GatewayBudget, PrismaClient } from "~/generated/prisma/client";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import {
   type GatewayBudgetClickHouseRepository,

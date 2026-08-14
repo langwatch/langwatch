@@ -79,3 +79,82 @@ Feature: Coding agent terminal view
     Given a session long enough to scroll
     When the reader scrolls through the transcript
     Then the bottom bar stays fixed and keeps showing the session name and running stats
+
+  # A coding-agent session is many traces: one per turn. The Terminal tab opens
+  # on ONE of them, so the session's earlier turns are simply not on screen, and
+  # a reader who scrolls up hits the top of a turn rather than the top of the
+  # session. The turns of the session are already ordered by
+  # `tracesV2.conversationContext`, so the view walks backwards through them and
+  # prepends each earlier turn above the one already loaded.
+  #
+  # Loading is driven by the reader's gesture, not by a sentinel's position: the
+  # tab opens at the top of its own turn, so anything position-triggered would
+  # walk the whole session back to turn one before the reader had read a line.
+
+Rule: The terminal reads back the whole session
+
+  @integration
+  Scenario: Scrolling up past the top loads the previous turn
+    Given the terminal opened on a later turn of a session
+    When the reader scrolls upward into the top of the transcript
+    Then the previous turn's entries appear above a turn divider
+    And the row the reader was looking at stays where it was
+
+  @integration
+  Scenario: A prepend never yanks the reader to the bottom
+    Given a turn short enough that the reader is at the bottom of it
+    When an earlier turn is prepended above it
+    Then the screen stays where the reader left it instead of following the tail
+
+  @integration
+  Scenario: Reaching the first turn shows the session start
+    Given the terminal has walked back to the session's first turn
+    When the reader reaches the top of the transcript
+    Then the session start is marked and no further turns are offered
+
+  @integration
+  Scenario: A trace outside any conversation shows no scrollback
+    Given a trace that belongs to no coding agent session
+    When the Terminal tab renders it
+    Then the session banner is at the top and no earlier turns are offered
+
+  @integration
+  Scenario: A failed earlier-turn load offers a retry
+    Given the previous turn's transcript could not be read
+    When the reader reaches the top of the transcript
+    Then the failure is stated on one line and clicking it tries again
+
+  @integration
+  Scenario: The cumulative footer counts every loaded turn
+    Given an earlier turn was loaded above the opened turn
+    When the reader reads the bottom bar
+    Then the step count covers the earlier turn's beats as well
+
+  # Agents inject blocks into the user's message that the human never typed: a
+  # monitor firing, a hook's system reminder, a queued task notification. Printed
+  # verbatim behind the prompt caret they read as the reader's own words, which
+  # is both wrong and unreadable. They are notes about the session, so they are
+  # drawn like the session's other notes, collapsed to one line.
+
+Rule: An injected notification reads as a note, not as the user's words
+
+  @integration
+  Scenario: A task notification collapses to one gray line naming its summary
+    Given a user message that is a task notification block with a summary
+    When the Terminal tab renders that message
+    Then the notification is one collapsed note naming its summary
+    And no prompt caret claims it as something the user typed
+    And expanding the note shows the block as it arrived
+
+  @integration
+  Scenario: A mixed message keeps the human words as the prompt
+    Given a user message with an injected block above the words the human typed
+    When the Terminal tab renders that message
+    Then the injected block is a collapsed note
+    And the human words are shown as the prompt
+
+  @unit
+  Scenario: A plain system notification marker is drawn back too
+    Given a user message that opens with the system notification marker
+    When the message is classified
+    Then the whole message is one notice and nothing is left as the prompt

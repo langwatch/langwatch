@@ -9,6 +9,8 @@ const mockGetActivePlan = vi.fn();
 const mockNotifyPlanLimitReached = vi.fn();
 
 vi.mock("~/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: vi.fn(() => ({
     usage: { checkLimit: mockCheckLimit },
     planProvider: { getActivePlan: mockGetActivePlan },

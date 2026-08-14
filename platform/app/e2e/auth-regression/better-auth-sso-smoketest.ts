@@ -21,7 +21,8 @@
  *     npx tsx scripts/better-auth-sso-smoketest.ts
  */
 
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "../../src/generated/prisma/client";
+import { createPrismaPgAdapter } from "../../src/server/prismaPgAdapter";
 import { assertLocalhostDatabaseUrl } from "./_smoketest-guard";
 
 let exitCode = 0;
@@ -38,7 +39,9 @@ const check = (label: string, condition: boolean, detail?: string): void => {
 async function main() {
   assertLocalhostDatabaseUrl();
 
-  const prisma = new PrismaClient();
+  const prisma = new PrismaClient({
+    adapter: createPrismaPgAdapter(process.env.DATABASE_URL ?? ""),
+  });
 
   // ADR-027: the ssoDomain auto-join rides the platform SSO gate, which
   // requires a genuine (signature-valid) license. Mint one with a throwaway

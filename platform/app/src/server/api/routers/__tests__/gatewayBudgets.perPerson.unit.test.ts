@@ -7,9 +7,10 @@
  * about is dropped in silence and the column just goes blank; that is how
  * ATTRIBUTED_USER rows shipped nameless.
  */
-import type { PrismaClient } from "@prisma/client";
-import { Prisma } from "@prisma/client";
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
+import { Prisma } from "~/generated/prisma/client";
 import {
   nanoUsdToDecimalString,
   usdToNanoUsd,
@@ -39,6 +40,8 @@ const breakdown = vi.hoisted(() => vi.fn());
 // The router takes the budget ledger from the App, so standing in for the
 // store means standing in for `getApp()`.
 vi.mock("~/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: () => ({
     gateway: {
       budgets: {

@@ -16,13 +16,13 @@
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { HandledError } from "@langwatch/handled-error";
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+} from "~/generated/prisma/client";
 import type { Permission } from "~/server/api/rbac";
 import { prisma } from "~/server/db";
 import type { CodingAgentSessionEventRecord } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSessionEvents.mapProjection";
@@ -407,7 +407,7 @@ const query = () => ({
 
 describe("pull request usage", () => {
   describe("given mapped pull requests with sessions attached across their lifetimes", () => {
-    /** @scenario "The page rolls up sessions, tokens and cost per pull request" */
+    /** @scenario "The page rolls up tokens and cost per pull request" */
     it("reports the sessions count, tokens and assistant cost over the whole lifetime", async () => {
       const usage = await service.getPullRequestUsage({
         ...query(),
@@ -512,7 +512,7 @@ describe("pull request usage", () => {
   });
 
   describe("given a session whose remote was reported with the host's own casing", () => {
-    /** @scenario "The page rolls up sessions, tokens and cost per pull request" */
+    /** @scenario "The page rolls up tokens and cost per pull request" */
     it("rolls it up all the same", async () => {
       const usage = await service.getPullRequestUsage({
         ...query(),
