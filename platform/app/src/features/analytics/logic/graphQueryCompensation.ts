@@ -75,7 +75,8 @@ export function resolveGraphTimeScale({
  * Pie and donut charts grouped by a field need a pipeline to populate
  * grouped buckets at all — a numeric `timeScale` with `groupBy` and no
  * pipeline comes back empty. Adds the same default pipeline (`sum` over
- * `trace_id`) the UI injects to each series that does not already define
+ * `trace_id`) that both callers — the dashboard UI and the scheduled-report
+ * renderer — inject to each series that does not already define
  * one of its own; an author's explicit pipeline is never overwritten.
  */
 export function withGroupedPipeline(input: CustomGraphInput): CustomGraphInput {

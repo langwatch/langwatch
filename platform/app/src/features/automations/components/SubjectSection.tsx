@@ -390,6 +390,9 @@ function GraphsLoadFailed({
   const explanation = explainAnyError(error);
   return (
     <VStack
+      // The failure can replace the picker mid-session on a refetch, so
+      // announce the swap to assistive technology.
+      role="alert"
       align="start"
       gap={2}
       padding={3}

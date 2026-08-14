@@ -116,6 +116,14 @@ export function attributeFieldRoundTrips(condition: Condition): boolean {
   );
 }
 
+/** True when the row may enter the emitted query: not a bare prefix pick,
+ *  and its key round-trips through the query language. The ONE owner of the
+ *  gate — `commit` filters by it and the tests import it, so a change here
+ *  can't drift past either. */
+export function isUsableCondition(condition: Condition): boolean {
+  return !isPrefixOnly(condition.field) && attributeFieldRoundTrips(condition);
+}
+
 let blankRowCounter = 0;
 function blankCondition(): Condition {
   return {
@@ -200,9 +208,7 @@ export function ConditionBuilder({
     // (whitespace, `:`, a quote) must never reach the saved query — both are
     // excluded the same way any other half-filled row is, with the reason
     // shown inline on the row (see `attributeFieldRoundTrips`).
-    const usable = next.filter(
-      (c) => !isPrefixOnly(c.field) && attributeFieldRoundTrips(c),
-    );
+    const usable = next.filter(isUsableCondition);
     const q = serializeConditions(usable);
     lastEmitted.current = q;
     onChange(q);

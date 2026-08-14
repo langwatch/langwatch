@@ -65,7 +65,7 @@ describe("NameField", () => {
     it("marks the name field invalid", () => {
       render(<NameField isEdit={false} />, { wrapper: Wrapper });
 
-      const input = screen.getByDisplayValue("");
+      const input = screen.getByLabelText("Name");
       expect(input.getAttribute("aria-invalid")).toBe("true");
     });
   });
