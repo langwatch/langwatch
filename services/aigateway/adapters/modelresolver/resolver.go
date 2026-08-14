@@ -134,22 +134,7 @@ func (r *Resolver) Resolve(ctx context.Context, req *domain.Request, config doma
 }
 
 func normalizeProvider(raw string) domain.ProviderID {
-	switch raw {
-	case "azure_openai", "azure":
-		return domain.ProviderAzure
-	case "google_vertex", "vertex":
-		return domain.ProviderVertex
-	case "aws_bedrock", "bedrock":
-		return domain.ProviderBedrock
-	case "google_gemini", "gemini":
-		return domain.ProviderGemini
-	case "anthropic":
-		return domain.ProviderAnthropic
-	case "openai":
-		return domain.ProviderOpenAI
-	default:
-		return domain.ProviderID(raw)
-	}
+	return domain.NormalizeProviderID(raw)
 }
 
 func modelAllowed(config domain.BundleConfig, model string) bool {

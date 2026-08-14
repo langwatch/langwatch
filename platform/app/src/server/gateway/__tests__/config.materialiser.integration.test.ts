@@ -630,6 +630,7 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
   });
 
   describe("when materialising a VK with no linked RoutingPolicy", () => {
+    /** @scenario Safety-type providers are excluded from gateway dispatch chains */
     it("excludes safety-type providers (azure_safety) from the dispatch chain", async () => {
       const repo = new VirtualKeyRepository(prisma);
       const vk = await repo.findById(VK_NO_RP_ID, ORG_ID);

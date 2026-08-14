@@ -49,6 +49,42 @@ const (
 	ProviderOpenAICodex ProviderID = "openai_codex"
 )
 
+// NormalizeProviderID maps the provider spellings that reach the gateway
+// onto the canonical ProviderID constants above.
+//
+// Two vocabularies feed in and they must agree. Requests carry the prefix
+// the caller typed ("vertex_ai/gemini-2.5-flash" — LiteLLM's spelling, the
+// one most SDKs emit); credentials carry the provider type the control
+// plane stored ("google_vertex"). Both sides used to keep their own switch,
+// and the tables had drifted: the credential side accepted "vertex_ai" and
+// the request side did not. A caller with a working Vertex credential then
+// resolved to provider "vertex_ai", matched no credential named "vertex",
+// and their traffic died against whichever credential the chain reached
+// first. Normalizing through one table is what keeps that from recurring.
+//
+// Unknown values pass through verbatim, so a provider added to the control
+// plane before this build knows its name still routes on its own ID.
+func NormalizeProviderID(raw string) ProviderID {
+	switch raw {
+	case "azure", "azure_openai":
+		return ProviderAzure
+	case "bedrock", "aws_bedrock":
+		return ProviderBedrock
+	case "vertex", "vertex_ai", "google_vertex":
+		return ProviderVertex
+	case "gemini", "google_gemini":
+		return ProviderGemini
+	case "anthropic":
+		return ProviderAnthropic
+	case "openai":
+		return ProviderOpenAI
+	case "openai_codex":
+		return ProviderOpenAICodex
+	default:
+		return ProviderID(raw)
+	}
+}
+
 // CodexTokenRefresher exchanges a codex provider row's stored refresh token
 // for a fresh access token via the control plane (which owns storage and
 // rotation). A dead session (refresh rejected — the user must sign in again)
