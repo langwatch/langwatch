@@ -34,10 +34,8 @@ import type {
   Prisma,
   PrismaClient,
 } from "~/generated/prisma/client";
-
-import type { ScopeInput, VirtualKeyWithScopes } from "./virtualKey.repository";
-
 import { modelProviders } from "../modelProviders/registry";
+import type { ScopeInput, VirtualKeyWithScopes } from "./virtualKey.repository";
 
 export type EligibleModelProvider = ModelProvider;
 

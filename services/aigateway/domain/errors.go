@@ -63,7 +63,7 @@ const (
 	ErrGuardrailUpstreamUnavailable = herr.Code("guardrail_upstream_unavailable")
 	ErrPolicyViolation              = herr.Code("policy_violation")
 	ErrModelNotAllowed              = herr.Code("model_not_allowed")
-	// ErrProviderNotBound: the request names a provider (explicit
+	// ErrProviderNotBound means the request names a provider (explicit
 	// "provider/model" prefix or alias) that has no credential slot on
 	// this VK. Dispatching anyway would hand a mismatched credential to
 	// the provider selected by the model prefix, which surfaces as opaque

@@ -1711,6 +1711,11 @@ const presentations = {
     title: "No model provider configured",
     describe: () => "Add a provider in settings to continue.",
   },
+  model_provider_not_bound: {
+    title: "That provider isn't bound to this key",
+    describe: () =>
+      "The model name asks for a provider this virtual key has no slot for. Bind that provider to the key, or drop the prefix from the model name.",
+  },
   guardrail_blocked: {
     title: "Blocked by a guardrail",
     describe: () => "This request didn't pass one of your configured policies.",
