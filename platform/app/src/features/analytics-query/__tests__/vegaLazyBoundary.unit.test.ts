@@ -22,6 +22,9 @@ import { describe, expect, it } from "vitest";
 /** `…/analytics-query/__tests__` → `…/analytics-query` */
 const FEATURE_DIR = fileURLToPath(new URL("../", import.meta.url));
 
+/** `…/analytics-query` → `…/src`, which the `~/` alias resolves from. */
+const SRC_DIR = resolve(FEATURE_DIR, "../..");
+
 const LAZY_BOUNDARY = join(
   FEATURE_DIR,
   "components/LazyGovernedSqlChartMode.tsx",
@@ -54,9 +57,20 @@ function specifiersOf(source: string): string[] {
   return found;
 }
 
-function resolveLocal(specifier: string, fromFile: string): string | null {
-  if (!specifier.startsWith(".")) return null;
-  const base = resolve(dirname(fromFile), specifier);
+function resolveLocal({
+  specifier,
+  fromFile,
+}: {
+  specifier: string;
+  fromFile: string;
+}): string | null {
+  const base = specifier.startsWith("~/")
+    ? join(SRC_DIR, specifier.slice(2))
+    : specifier.startsWith(".")
+      ? resolve(dirname(fromFile), specifier)
+      : null;
+  if (base === null) return null;
+
   const candidates = [
     base,
     ...EXTENSIONS.map((extension) => `${base}${extension}`),
@@ -88,7 +102,7 @@ function walkStaticGraph(root: string): GraphWalk {
     files.add(file);
 
     for (const specifier of specifiersOf(readFileSync(file, "utf8"))) {
-      const local = resolveLocal(specifier, file);
+      const local = resolveLocal({ specifier, fromFile: file });
       if (local === null) {
         packages.add(specifier);
         continue;

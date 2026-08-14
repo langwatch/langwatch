@@ -8,6 +8,8 @@
  * touches the policy, which is the opposite of what this file is for.
  */
 
+import type { Loader } from "vega";
+
 import { governedVegaError } from "./vegaLitePolicy";
 import { JSON_POINTER_ROOT } from "./vegaLiteStructure";
 import type { VegaValidationError } from "./visualization.types";
@@ -22,6 +24,23 @@ export interface GovernedVegaLoader {
   http(uri: string, options?: unknown): Promise<string>;
   file(filename: string): Promise<string>;
 }
+
+/**
+ * Ties the hand-written shape above to vega's own contract at compile time.
+ *
+ * Without it, a future change to vega's `Loader` would leave this interface
+ * quietly non-conforming, and vega-embed — which reads a non-`Loader` object as
+ * `LoaderOptions` — would build a real, network-capable loader in its place.
+ * The guarantee this file exists to give would be gone, and nothing would fail.
+ *
+ * Type-only, so no vega module is evaluated; see the file header.
+ */
+type AssertGovernedLoaderMatchesVega =
+  GovernedVegaLoader extends Pick<Loader, keyof GovernedVegaLoader>
+    ? true
+    : never;
+const _governedLoaderMatchesVega: AssertGovernedLoaderMatchesVega = true;
+void _governedLoaderMatchesVega;
 
 /** The rejection every loader method produces, carrying its structured refusal. */
 export class GovernedVegaLoadBlockedError extends Error {

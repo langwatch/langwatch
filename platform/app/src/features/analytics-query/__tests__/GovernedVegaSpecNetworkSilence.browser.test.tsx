@@ -12,8 +12,8 @@
  * source, a stylesheet, a font).
  *
  * The recorders are proven to work at the end of the test rather than assumed:
- * one deliberate same-origin request has to show up in all of them, because an
- * absence assertion that cannot fail is worth nothing.
+ * one deliberate same-origin call through each channel has to show up in its
+ * recorder, because an absence assertion that cannot fail is worth nothing.
  *
  * Spec: specs/analytics/governed-sql-workbench.feature
  */
@@ -278,10 +278,17 @@ describe("the governed chart surface with the browser's network recorded", () =>
           expect(network.requests).toEqual([]);
           expect(network.resourceUrls()).toEqual([]);
 
-          // The recorders are not vacuous — one deliberate request has to
-          // register in both channels.
+          // The recorders are not vacuous — a deliberate call through each
+          // channel has to register: fetch and Resource Timing share one
+          // call, XHR and beacon each get their own.
           await fetch(globalThis.location.href);
-          expect(network.requests).toHaveLength(1);
+          new XMLHttpRequest().open("GET", globalThis.location.href);
+          navigator.sendBeacon(globalThis.location.href);
+          expect(network.requests).toEqual([
+            `fetch ${globalThis.location.href}`,
+            `xhr GET ${globalThis.location.href}`,
+            `beacon ${globalThis.location.href}`,
+          ]);
           await poll(() => network.resourceUrls().length > 0);
           expect(network.resourceUrls()).toContain(globalThis.location.href);
         } finally {

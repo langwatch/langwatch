@@ -98,13 +98,25 @@ function valueTyped(row: ParameterRow): boolean {
  * What stops a row being sent, or `undefined` when it can be — including a row
  * still empty, which is not a parameter yet rather than a broken one.
  *
- * These are exactly the rows {@link recordOf} drops. Saying so on the row and
- * holding Run back is what keeps a dropped row from becoming a round-trip that
- * comes back naming a parameter the member can see they filled in.
+ * These are exactly the rows {@link recordOf} drops or collapses. Saying so on
+ * the row and holding Run back is what keeps a dropped row from becoming a
+ * round-trip that comes back naming a parameter the member can see they filled
+ * in.
+ *
+ * A repeated name needs the whole set to see: {@link recordOf} keys by name, so
+ * two rows called `limit` leave one entry and the later row silently wins. Read
+ * one row at a time that is invisible — both rows look complete.
  */
-function rowProblem(row: ParameterRow): string | undefined {
-  if (row.name.trim().length === 0) {
+function rowProblem(
+  row: ParameterRow,
+  rows: readonly ParameterRow[],
+): string | undefined {
+  const name = row.name.trim();
+  if (name.length === 0) {
     return valueTyped(row) ? "Name this parameter." : undefined;
+  }
+  if (rows.filter((other) => other.name.trim() === name).length > 1) {
+    return "Use this name once.";
   }
   return valueOf(row) === undefined ? "Enter a number." : undefined;
 }
@@ -176,14 +188,17 @@ function ParameterValueField({
 
 function ParameterRowFields({
   row,
+  rows,
   onPatch,
   onRemove,
 }: {
   row: ParameterRow;
+  /** Every row, so a name repeated across rows can be reported on both. */
+  rows: readonly ParameterRow[];
   onPatch: (changes: Partial<Omit<ParameterRow, "id">>) => void;
   onRemove: () => void;
 }) {
-  const problem = rowProblem(row);
+  const problem = rowProblem(row, rows);
 
   return (
     <Stack gap={1}>
@@ -257,7 +272,7 @@ export function GovernedSqlParametersEditor({
       setRows(next);
       onChange({
         parameters: recordOf(next),
-        sendable: next.every((row) => rowProblem(row) === undefined),
+        sendable: next.every((row) => rowProblem(row, next) === undefined),
       });
     },
     [onChange],
@@ -308,6 +323,7 @@ export function GovernedSqlParametersEditor({
             <ParameterRowFields
               key={row.id}
               row={row}
+              rows={rows}
               onPatch={(changes) => patch(row.id, changes)}
               onRemove={() =>
                 update(rows.filter((other) => other.id !== row.id))

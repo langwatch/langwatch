@@ -9,7 +9,7 @@
  *
  * Spec: specs/analytics/governed-sql-workbench.feature
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   mockFeatureFlagIsEnabled,
@@ -116,10 +116,6 @@ describe("the governed SQL router's feature switch", () => {
       team: { organizationId: "org_test_123" },
     });
     caller = createTestCaller();
-  });
-
-  afterEach(() => {
-    mockFeatureFlagIsEnabled.mockResolvedValue(true);
   });
 
   describe("given the switch is on for the project", () => {

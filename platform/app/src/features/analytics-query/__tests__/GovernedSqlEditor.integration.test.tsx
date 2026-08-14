@@ -1,8 +1,9 @@
 /**
  * @vitest-environment jsdom
  *
- * The editor's assistance is the schema response and nothing else, and the
- * positions a refusal named are marked where the member is looking.
+ * The editor's assistance is the schema response and nothing else: this test
+ * passes refusal markers in and verifies they map to the Monaco markers the
+ * editor registers.
  *
  * Monaco is replaced by a stub at the module boundary: the assertions are about
  * what the workbench registers and hands to it, which is ours, not about what
