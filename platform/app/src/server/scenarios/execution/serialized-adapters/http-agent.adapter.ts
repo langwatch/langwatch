@@ -20,10 +20,10 @@ import {
   renderUrlTemplate,
 } from "../http-template-engine";
 import {
+  fenceSecretRefs,
   preserveSecretRefs,
   redactSecrets,
   resolveAuthSecrets,
-  fenceSecretRefs,
   resolveSecretsInMap,
 } from "../secret-references";
 import type { HttpAgentData } from "../types";
