@@ -71,9 +71,13 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
   size?: "sm" | "md" | "full";
   disabled?: boolean;
   inheritOption?: {
-    /** Model identifier the cascade would resolve to. Rendered with the provider icon. */
-    model: string;
-    /** Short label shown above the model, e.g. "Inherit (from organization)" or "Suggested from openai". */
+    /** Model identifier the cascade would resolve to, rendered with the
+     *  provider icon. Absent when nothing wider carries a value (or the
+     *  widest scope is being edited): the entry then reads as its label
+     *  alone, still selectable so a pinned key can be cleared back to
+     *  inherit. */
+    model?: string;
+    /** Short label shown above the model, e.g. "Inherit (from organization)" or "Not configured". */
     label: string;
   };
   /** Configured custom-model display names, keyed by `<provider>/<modelId>`.
@@ -158,7 +162,7 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
   // picked anything. Uses the inherited model's icon + family at 0.55
   // opacity so it reads as "this is what you'd get if you don't
   // override" instead of an empty / broken selector.
-  const inheritIcon = inheritOption
+  const inheritIcon = inheritOption?.model
     ? modelProviderIcons[
         inheritOption.model.split("/")[0] as keyof typeof modelProviderIcons
       ]
@@ -202,14 +206,16 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
         )}
         <Box
           fontSize={size === "sm" ? 12 : 14}
-          fontFamily="mono"
+          fontFamily={inheritOption.model ? "mono" : undefined}
           lineClamp={1}
           wordBreak="break-all"
         >
-          {modelDisplayLabel({
-            fullModelId: inheritOption.model,
-            displayNames,
-          })}
+          {inheritOption.model
+            ? modelDisplayLabel({
+                fullModelId: inheritOption.model,
+                displayNames,
+              })
+            : inheritOption.label}
         </Box>
       </HStack>
     ) : (
@@ -337,17 +343,19 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
                 <Text fontSize="sm" fontWeight="medium">
                   {inheritOption.label}
                 </Text>
-                <Text
-                  fontSize="xs"
-                  color="fg.muted"
-                  fontFamily="mono"
-                  lineClamp={1}
-                >
-                  {modelDisplayLabel({
-                    fullModelId: inheritOption.model,
-                    displayNames,
-                  })}
-                </Text>
+                {inheritOption.model && (
+                  <Text
+                    fontSize="xs"
+                    color="fg.muted"
+                    fontFamily="mono"
+                    lineClamp={1}
+                  >
+                    {modelDisplayLabel({
+                      fullModelId: inheritOption.model,
+                      displayNames,
+                    })}
+                  </Text>
+                )}
               </Box>
             </HStack>
           </Select.Item>

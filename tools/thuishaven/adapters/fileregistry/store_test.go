@@ -196,3 +196,29 @@ func TestObserveDurationKeepsEveryKeyWhenRunsFinishTogether(t *testing.T) {
 		})
 	})
 }
+
+// @scenario "Reaping is recorded as it happens"
+func TestReapEventsPersistBoundedNewestLast(t *testing.T) {
+	s := New(t.TempDir())
+
+	if got := s.ReapEvents(); len(got) != 0 {
+		t.Fatalf("an absent record must read empty, got %d events", len(got))
+	}
+	for i := range domain.ReapEventCap + 5 {
+		ev := domain.ReapEvent{At: time.Unix(int64(i), 0), Kind: "testcontainer", Target: "tc-ryuk", Reason: "leaked"}
+		if err := s.AppendReapEvent(ev); err != nil {
+			t.Fatalf("append: %v", err)
+		}
+	}
+
+	events := s.ReapEvents()
+	if len(events) != domain.ReapEventCap {
+		t.Fatalf("record must cap at %d, got %d", domain.ReapEventCap, len(events))
+	}
+	if !events[len(events)-1].At.Equal(time.Unix(int64(domain.ReapEventCap+4), 0)) {
+		t.Fatal("the newest event must survive the cap, oldest dropped")
+	}
+	if events[0].At.Equal(time.Unix(0, 0)) {
+		t.Fatal("the oldest event past the cap must be dropped")
+	}
+}

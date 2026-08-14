@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -96,12 +97,20 @@ type Auth struct {
 }
 
 // Result is the executor's output.
+//
+// StatusText and ResponseHeaders are diagnostics rather than workflow data:
+// nothing downstream binds to them, and they exist so the person configuring
+// an agent can see what the endpoint actually answered. They are populated on
+// success and on a non-2xx alike, since the failing case is the one worth
+// looking at.
 type Result struct {
-	Output       any
-	StatusCode   int
-	UpstreamBody []byte
-	RenderedBody string
-	Warnings     []string
+	Output          any
+	StatusCode      int
+	StatusText      string
+	ResponseHeaders map[string]string
+	UpstreamBody    []byte
+	RenderedBody    string
+	Warnings        []string
 }
 
 // Execute runs the request, performs SSRF check, sends, and extracts.
@@ -163,13 +172,18 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	if readErr != nil && resp.StatusCode/100 == 2 {
 		return nil, fmt.Errorf("httpblock: read response body: %w", readErr)
 	}
+
+	result := &Result{
+		StatusCode:      resp.StatusCode,
+		StatusText:      statusText(resp),
+		ResponseHeaders: flattenHeaders(resp.Header),
+		UpstreamBody:    bodyBytes,
+		RenderedBody:    rendered,
+		Warnings:        warnings,
+	}
+
 	if resp.StatusCode/100 != 2 {
-		return &Result{
-			StatusCode:   resp.StatusCode,
-			UpstreamBody: bodyBytes,
-			RenderedBody: rendered,
-			Warnings:     warnings,
-		}, &UpstreamError{Status: resp.StatusCode, Body: bodyBytes}
+		return result, &UpstreamError{Status: resp.StatusCode, Body: bodyBytes}
 	}
 
 	var data any
@@ -181,30 +195,64 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	}
 
 	if req.OutputPath == "" {
-		return &Result{
-			Output:       data,
-			StatusCode:   resp.StatusCode,
-			UpstreamBody: bodyBytes,
-			RenderedBody: rendered,
-			Warnings:     warnings,
-		}, nil
+		result.Output = data
+		return result, nil
 	}
 	out, err := ExtractJSONPath(data, req.OutputPath)
 	if err != nil {
-		return &Result{
-			StatusCode:   resp.StatusCode,
-			UpstreamBody: bodyBytes,
-			RenderedBody: rendered,
-			Warnings:     warnings,
-		}, err
+		return result, err
 	}
-	return &Result{
-		Output:       out,
-		StatusCode:   resp.StatusCode,
-		UpstreamBody: bodyBytes,
-		RenderedBody: rendered,
-		Warnings:     warnings,
-	}, nil
+	result.Output = out
+	return result, nil
+}
+
+// statusText prefers the upstream's own reason phrase over the canonical text
+// for the code, because a service that answers "403 Quota Exceeded" has told
+// the author more than "Forbidden" will.
+func statusText(resp *http.Response) string {
+	if _, phrase, ok := strings.Cut(resp.Status, " "); ok && phrase != "" {
+		return phrase
+	}
+	return http.StatusText(resp.StatusCode)
+}
+
+const redactedHeaderValue = "[REDACTED]"
+
+// credentialHeaderWord matches names built around a credential. Whole words, so
+// X-Amz-Security-Token and X-Api-Key lose their values while X-Api-Version,
+// X-Idempotency-Key and WWW-Authenticate keep theirs: half the value of
+// reporting headers at all is the ones an author came to read.
+//
+// Applied to responses as well as requests. Set-Cookie and Authorization hand
+// out access rather than describe it whichever direction they travel in, and a
+// response carries whatever the upstream chose to send.
+//
+// This is the rule sanitizeHeadersForTrace applies on the app side; the two
+// should stay in step, since they redact the same request for the same reader.
+var credentialHeaderWord = regexp.MustCompile(
+	`(?i)(^|[-_])(authorization|auth|cookie2?|api[-_]?key|token|secret|password|credential)s?([-_]|$)`,
+)
+
+// flattenHeaders joins repeated headers the way they appeared on the wire, so
+// two Vary lines read as two rather than silently becoming one.
+//
+// A credential keeps its name and loses its value: the author still sees that
+// their endpoint set a cookie, which is usually the thing they are checking,
+// while the value stays out of a workflow's execution state and off the screen
+// of whoever opens it next.
+func flattenHeaders(h http.Header) map[string]string {
+	if len(h) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(h))
+	for name, values := range h {
+		if credentialHeaderWord.MatchString(name) {
+			out[name] = redactedHeaderValue
+			continue
+		}
+		out[name] = strings.Join(values, ", ")
+	}
+	return out
 }
 
 // applyAuth attaches credentials to the request based on the Auth.Type.

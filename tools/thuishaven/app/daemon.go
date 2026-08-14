@@ -55,6 +55,11 @@ func (o *Orchestrator) RunDaemon(ctx context.Context, dash Dashboard) error {
 		fmt.Println("haven daemon already running")
 		return nil
 	}
+	if o.procTel != nil {
+		// The final process-watch sample is flushed on the way out; without
+		// this the periodic reader's last 30-second window dies with us.
+		defer o.procTel.Close()
+	}
 	ports, err := o.sys.FreePorts(1)
 	if err != nil {
 		return err
@@ -124,8 +129,10 @@ func (o *Orchestrator) monitorLoop(ctx context.Context) {
 			}
 			// Every ~10 min, refresh the idle clock of every registered stack's
 			// databases, and prune databases whose worktree has not been up in
-			// DBIdleTTL — the unattended counterpart of `haven down --drop-db`.
+			// DBIdleTTL — the unattended counterpart of the interactive reclaim in
+			// `haven clean` (`down` itself never discards data).
 			if cycles%60 == 1 {
+				o.reapTestContainers(ctx)
 				// Fail closed: this clock guards destructive pruning, so if any
 				// refresh cannot be persisted, skip pruning this cycle rather
 				// than risk dropping a recently used database off a stale clock.
@@ -155,9 +162,15 @@ func (o *Orchestrator) monitorLoop(ctx context.Context) {
 					o.proxy.Remove(svc.Name, s.Slug)
 				}
 				o.store.RemoveStack(s.Slug)
+				reason := "launcher died"
+				if stale && !dead {
+					reason = "heartbeat stale past the idle TTL"
+				}
+				o.recordReap("stack", s.Slug, reason)
 				o.log.Info("reaped stack", zap.String("slug", s.Slug), zap.Bool("dead", dead), zap.Bool("stale", stale))
 			}
 			o.governPressure()
+			o.governProcesses()
 			o.refreshObservability(ctx)
 			o.reapClickHouse()
 		}
@@ -299,20 +312,31 @@ func (o *Orchestrator) sweepOrphanedWorkers() {
 		o.sys.KillGroup(pid)
 	}
 	if len(orphans) > 0 {
+		o.recordReap("orphans", fmt.Sprintf("%d test worker(s)", len(orphans)), "parented to PID 1 by an interrupted run")
 		o.log.Info("reclaimed orphaned test workers", zap.Int("count", len(orphans)))
 	}
 }
 
-// fattestStack names the live stack with the largest process-group footprint.
-// Approximate by construction — GroupRSS double-counts shared pages — which is
-// fine for "which one should I look at first" and is why it is never a control
-// input.
+// recordReap appends one reclamation to the store's bounded record — the hub's
+// "what has the reaper been doing" feed. Losing an event never stops a reap.
+func (o *Orchestrator) recordReap(kind, target, reason string) {
+	ev := domain.ReapEvent{At: o.sys.Now(), Kind: kind, Target: target, Reason: reason}
+	if err := o.store.AppendReapEvent(ev); err != nil {
+		o.log.Warn("could not record reap event", zap.String("kind", kind), zap.Error(err))
+	}
+}
+
+// fattestStack names the live stack with the largest whole-tree footprint.
+// Approximate by construction — summed RSS double-counts shared pages — which
+// is fine for "which one should I look at first" and is why it is never a
+// control input.
 func (o *Orchestrator) fattestStack() (slug string, rss uint64) {
+	stackRSS := o.StackRSSByLauncher()
 	for _, s := range o.store.Stacks() {
 		if !o.sys.ProcessAlive(s.LauncherPID) {
 			continue
 		}
-		if got := o.sys.GroupRSS(s.LauncherPID); got > rss {
+		if got := stackRSS[s.LauncherPID]; got > rss {
 			slug, rss = s.Slug, got
 		}
 	}
@@ -379,8 +403,38 @@ func (o *Orchestrator) pruneIdleDatabases(ctx context.Context) {
 		}
 		o.store.RemoveDBActivity(slug)
 		if existsSomewhere {
+			o.recordReap("database", db, "worktree idle past the database TTL")
 			o.log.Info("pruned idle databases", zap.String("slug", slug), zap.String("db", db), zap.Duration("idle", now.Sub(lastSeen)))
 		}
+	}
+}
+
+// reapTestContainers removes containers a testcontainers run left behind —
+// the library's own reaper (Ryuk) dies with the run that started it, so an
+// interrupted integration test leaves its ClickHouse/Redis running in the
+// shared VM until something else sweeps them. Stopped containers get the short
+// TTL; running ones a much longer one, because a running container may still
+// be serving a live run whatever its birthday says (withReuse keeps the
+// original CreatedAt across runs). The running TTL never undercuts the stopped
+// one, so a single misconfigured knob cannot make live containers the more
+// eagerly reaped kind.
+func (o *Orchestrator) reapTestContainers(ctx context.Context) {
+	ttl := o.cfg.TestContainerTTL
+	if o.janitor == nil || ttl <= 0 {
+		return
+	}
+	runningTTL := max(o.cfg.RunningTestContainerTTL, ttl)
+	now := o.sys.Now()
+	names, err := o.janitor.ReapTestContainers(ctx, now.Add(-ttl), now.Add(-runningTTL))
+	if err != nil {
+		o.log.Warn("test-container sweep failed", zap.Error(err))
+		return
+	}
+	if len(names) > 0 {
+		for _, name := range names {
+			o.recordReap("testcontainer", name, "left behind by an interrupted test run")
+		}
+		o.log.Info("reaped leaked test containers", zap.Strings("containers", names))
 	}
 }
 
@@ -393,6 +447,7 @@ func (o *Orchestrator) reapClickHouse() {
 	}
 	if len(o.store.Stacks()) == 0 && o.ch.Running() {
 		o.ch.Stop()
+		o.recordReap("clickhouse", "clickhouse-server", "no stacks running")
 		o.log.Info("stopped idle managed clickhouse-server (no stacks running)")
 	}
 }

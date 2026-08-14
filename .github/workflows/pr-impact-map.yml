@@ -71,7 +71,7 @@ jobs:
               ["SDKs",           p => /^(sdks\/python|sdks\/typescript|sdks\/go|mcp\/typescript|packages)\//.test(p)],
               // Python must precede "Go services": services/langevals starts with
               // `services/`, which the Go-services regex would otherwise claim first.
-              ["Python",         p => /^(langwatch_nlp|services\/langevals|langwatch_server)\//.test(p)],
+              ["Python",         p => /^services\/langevals\//.test(p)],
               ["Go services",    p => /^(services|pkg|cmd)\//.test(p) || p === "go.mod"],
               ["App · Server",   p => p.startsWith("platform/app/src/server/")
                                    || p.endsWith("schema.prisma")

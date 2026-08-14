@@ -28,7 +28,10 @@
 # survives branch recycling and sessions that ran before the PR was opened.
 # PR STATUS is always fetched live by the reader, never maintained by the queue;
 # the stored state is only a fallback label. The usage rollup is organization
-# first and RBAC-scoped: numbers only, never content. Work is attributed to a
+# first and RBAC-scoped, and carries numbers only. The DETAIL read adds the
+# one-line title a session generated for itself, which travels under the content
+# visibility of the project that session ran in and is the only content on that
+# surface. Work is attributed to a
 # PROJECT, named by the person who owns it when the project is one person's
 # workspace; the id an agent reports about its own user names nobody and is
 # never shown.
@@ -156,11 +159,47 @@ Rule: Pull request status is read live, never maintained by the queue
 Rule: The Pull Requests page prices each pull request's lifetime
 
   @integration
-  Scenario: The page rolls up sessions, tokens and cost per pull request
+  Scenario: The page rolls up tokens and cost per pull request
     Given mapped pull requests with sessions attached across their lifetimes
     When the pull request usage is read for the caller's project
-    Then each pull request reports its sessions count, tokens and assistant cost
+    Then each pull request reports its tokens and assistant cost
     And the figures cover the pull request's lifetime, not a time picker window
+
+  # One session often drives several pull requests: it lands a change, moves to
+  # the next branch and opens another. Reading a pull request's price off the
+  # branch a session ENDED on charges the whole session to its last pull request
+  # and leaves the earlier ones looking free.
+
+  @integration
+  Scenario: A session that moved to another branch is still read for the branch it left
+    Given a session that worked on one branch and then moved to another
+    When the sessions of the first branch are read
+    Then that session is among them
+
+  @unit
+  Scenario: A session that moved to another branch counts toward the pull request it drove first
+    Given a session that drove a pull request's branch and then moved to another
+    When that pull request's usage is read
+    Then the session's tokens and cost are counted toward it
+
+  @unit
+  Scenario: The personal page discovers pull requests from every branch a session drove
+    Given a session that drove two branches
+    When the personal pull requests are read
+    Then the pull requests of both branches are looked up
+
+  # A session records one set of token and cost totals for its whole life and
+  # the per-call facts carry no branch, so there is nothing to divide between
+  # two pull requests. Counting the whole session toward each one would make a
+  # repository's pull requests sum to more than was ever spent. The sessions
+  # screen is where all of a session's pull requests are shown.
+
+  @unit
+  Scenario: A session that drove two pull requests counts toward only one of them
+    Given a session that drove two branches, each with a live pull request
+    When the tenure rule is asked
+    Then the session counts toward the pull request it opened first
+    And it counts toward the other one not at all
 
   @unit
   Scenario: A viewer without a GitHub connection sees the connect invitation
@@ -226,10 +265,10 @@ Rule: A personal row asks a personal question and answers with the organization'
     Then the branch reports only the viewer's own sessions
 
   @unit @integration
-  Scenario: A row names who worked on the pull request
+  Scenario: The drawer names who worked on the pull request
     Given a pull request worked on by two contributors
-    When the Pull Requests page lists it
-    Then the row names each contributor once and how many sessions they ran
+    When the reader opens its detail
+    Then the detail names each contributor once and how many sessions they ran
 
 Rule: A contributor is a person or a project, never an agent-reported id
 
@@ -397,7 +436,7 @@ Rule: Each pull request reports what every model consumed
     When the table is sorted by model
     Then both kinds of row take their place by the model they name
 
-Rule: The pull request detail answers with facts and never with content
+Rule: The pull request detail answers with facts, and names its sessions
 
   @unit
   Scenario: The detail carries its contributors, models and sessions
@@ -406,11 +445,32 @@ Rule: The pull request detail answers with facts and never with content
     Then it carries the totals, one row per contributor, the per-model totals and the sessions
     And the sessions are the most recent first
 
+  # A session's title is the one thing that tells two of a person's sessions
+  # apart, and a detail that lists three anonymous rows makes the reader open
+  # each one to find out which is which. It is conversation-derived content, so
+  # it travels under the same content visibility every other session surface
+  # applies, resolved per contributing project: a reader may be trusted with
+  # one project's conversations and not another's, and the detail spans both.
+
   @unit
-  Scenario: The sessions list never carries a session title
-    Given sessions with titles and transcripts
+  Scenario: The sessions list names each session by its generated title
+    Given a pull request whose sessions generated titles
     When the pull request detail is read
-    Then each session carries its start time, contributor, agent, tokens and cost only
+    Then each session carries its title alongside its start time, contributor, agent, tokens and cost
+
+  @unit
+  Scenario: A session whose project hides captured content is listed without its title
+    Given a pull request with sessions from a project whose captured content this reader may not see
+    When the pull request detail is read
+    Then that project's sessions carry no title
+    And the sessions of a project the reader may read keep theirs
+
+  @integration
+  Scenario: The drawer names each session by its title, or says it has none
+    Given a pull request whose sessions include one with a title and one without
+    When the detail is read
+    Then the titled session is named by its title
+    And the untitled one is named as an untitled session
 
   # A reader knows their assistants by the names their makers gave them, not by
   # the spelling that happened to arrive on the wire.

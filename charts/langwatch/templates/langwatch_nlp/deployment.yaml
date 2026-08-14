@@ -108,6 +108,17 @@ spec:
             - name: LANGWATCH_ENDPOINT
               value: {{ .Values.langwatch_nlp.upstreams.langwatch.scheme | default "http" }}://{{ .Values.langwatch_nlp.upstreams.langwatch.name | default (printf "%s-app" .Release.Name) }}:{{ .Values.langwatch_nlp.upstreams.langwatch.port | default 5560 }}
 
+            # Outbound request policy for workflow HTTP nodes, which is what an
+            # HTTP agent runs as. Passed explicitly rather than left to the
+            # binary's default so the rendered Deployment states the policy an
+            # operator can read, and so the allow-list is reachable at all.
+            - name: BLOCK_LOCAL_HTTP_CALLS
+              value: {{ .Values.langwatch_nlp.security.blockLocalHTTPCalls | default false | quote }}
+            {{- with .Values.langwatch_nlp.security.allowedProxyHosts }}
+            - name: ALLOWED_PROXY_HOSTS
+              value: {{ join "," . | quote }}
+            {{- end }}
+
             {{- with .Values.langwatch_nlp.extraEnvs}}
             {{- toYaml . | nindent 12 }}
             {{- end }}

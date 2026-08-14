@@ -61,9 +61,7 @@ function createFakeRepo() {
 
 type StubbedRuntime = ReturnType<typeof createReplayRuntime>;
 
-function stubRuntime(
-  replayOptimized: StubbedRuntime["service"]["replayOptimized"],
-) {
+function stubRuntime(replay: StubbedRuntime["service"]["replay"]) {
   const cleanup = vi.fn(async () => undefined);
   const checkPreviousRun = vi.fn(async () => ({
     completedCount: 7,
@@ -84,7 +82,7 @@ function stubRuntime(
     mapProjections: [],
     stateProjections: [],
     service: {
-      replayOptimized,
+      replay,
       cleanup,
       checkPreviousRun,
     } as unknown as StubbedRuntime["service"],
@@ -94,7 +92,6 @@ function stubRuntime(
 }
 
 function stubStateRuntime(replay: StubbedRuntime["service"]["replay"]) {
-  const replayOptimized = vi.fn();
   mockedCreateReplayRuntime.mockReturnValue({
     projections: [],
     mapProjections: [],
@@ -112,11 +109,10 @@ function stubStateRuntime(replay: StubbedRuntime["service"]["replay"]) {
     ],
     service: {
       replay,
-      replayOptimized,
     } as unknown as StubbedRuntime["service"],
     close: vi.fn(async () => undefined),
   } satisfies StubbedRuntime);
-  return { replayOptimized };
+  return {};
 }
 
 function buildProgress(
@@ -186,12 +182,12 @@ describe("ops ReplayService", () => {
       it("fails the run instead of replaying against them", async () => {
         const repo = createFakeRepo();
         const service = new ReplayService(repo);
-        const replayOptimized = vi.fn(async () => ({
+        const replay = vi.fn(async () => ({
           aggregatesReplayed: 1,
           totalEvents: 3,
           batchErrors: 0,
         }));
-        const { cleanup } = stubRuntime(replayOptimized);
+        const { cleanup } = stubRuntime(replay);
         cleanup.mockRejectedValue(new Error("redis unavailable"));
 
         await service.startReplay({
@@ -207,7 +203,7 @@ describe("ops ReplayService", () => {
           expect((await service.getStatus()).state).toBe("failed");
         });
         expect((await service.getStatus()).error).toBe("redis unavailable");
-        expect(replayOptimized).not.toHaveBeenCalled();
+        expect(replay).not.toHaveBeenCalled();
       });
     });
 
@@ -239,7 +235,7 @@ describe("ops ReplayService", () => {
     });
   });
 
-  it("routes operational state projections through the safe normal replay path", async () => {
+  it("routes operational state projections through the unified replay entry point", async () => {
     const repo = createFakeRepo();
     const service = new ReplayService(repo);
     const replay = vi.fn(async () => ({
@@ -247,7 +243,7 @@ describe("ops ReplayService", () => {
       totalEvents: 3,
       batchErrors: 0,
     }));
-    const { replayOptimized } = stubStateRuntime(replay);
+    stubStateRuntime(replay);
 
     await service.startReplay({
       projectionNames: ["langyConversationState"],
@@ -272,7 +268,6 @@ describe("ops ReplayService", () => {
       }),
       expect.objectContaining({ onProgress: expect.any(Function) }),
     );
-    expect(replayOptimized).not.toHaveBeenCalled();
   });
 
   describe("given a single batch phase emitting no callbacks for longer than the lock refresh interval", () => {

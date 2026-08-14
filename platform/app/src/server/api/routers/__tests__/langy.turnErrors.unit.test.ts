@@ -30,6 +30,8 @@ vi.mock("~/server/middleware/rate-limit-langy", () => ({
 }));
 
 vi.mock("~/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: () => ({ langy: { turns: { startConversationTurn } } }),
 }));
 

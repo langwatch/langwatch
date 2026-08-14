@@ -2,10 +2,17 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { TranscriptEntry } from "~/server/app-layer/traces/coding-agent-transcript.derivation";
+import type { TurnDivider } from "../sessionScrollback";
 import { TerminalView } from "../TerminalView";
 
 afterEach(cleanup);
@@ -367,4 +374,448 @@ describe("TerminalView", () => {
       });
     });
   });
+
+  describe("given a session whose earlier turns are still out there", () => {
+    describe("when an earlier turn is prepended above the reader", () => {
+      /** @scenario "Scrolling up past the top loads the previous turn" */
+      it("moves the screen by exactly what arrived, so the row stays under their eyes", () => {
+        const view = renderScrollback();
+        fakeBox(view.screenEl, { scrollHeight: 1000 });
+        scrollTo(view.screenEl, 0);
+
+        prependEarlierTurn(view, { scrollHeight: 1800 });
+
+        expect(view.screenEl.scrollTop).toBe(800);
+      });
+
+      it("shows the previous turn's entries above a divider naming the turn", () => {
+        const view = renderScrollback();
+        fakeBox(view.screenEl, { scrollHeight: 1000 });
+        scrollTo(view.screenEl, 0);
+
+        prependEarlierTurn(view, { scrollHeight: 1800 });
+
+        expect(screen.getByText("check git status")).toBeInTheDocument();
+        expect(screen.getByText(/turn 5\/12 · /)).toBeInTheDocument();
+      });
+
+      /** @scenario "A prepend never yanks the reader to the bottom" */
+      it("leaves a turn too short to overflow where it was instead of following the tail", () => {
+        const view = renderScrollback();
+        // Content shorter than the viewport: the reader is at the bottom of
+        // this turn simply by being on it.
+        fakeBox(view.screenEl, { scrollHeight: 100 });
+        scrollTo(view.screenEl, 0);
+
+        prependEarlierTurn(view, { scrollHeight: 500 });
+
+        expect(view.screenEl.scrollTop).toBe(400);
+      });
+
+      it("keeps a row's expanded state with the row it belongs to", async () => {
+        const user = userEvent.setup();
+        const view = renderScrollback();
+        await user.click(
+          screen.getByRole("button", { name: /session context/ }),
+        );
+        expect(screen.getByText(/always use pnpm/)).toBeInTheDocument();
+
+        prependEarlierTurn(view, { scrollHeight: 500 });
+
+        expect(screen.getByText(/always use pnpm/)).toBeInTheDocument();
+        expect(screen.queryByText(/always use npm/)).not.toBeInTheDocument();
+      });
+
+      /** @scenario "The cumulative footer counts every loaded turn" */
+      it("counts the earlier turn's beats in the step count", () => {
+        const view = renderScrollback();
+        expect(screen.getByText("step 3/3")).toBeInTheDocument();
+
+        prependEarlierTurn(view, { scrollHeight: 500 });
+
+        expect(screen.getByText("step 5/5")).toBeInTheDocument();
+      });
+    });
+
+    describe("when new output is appended at the bottom", () => {
+      it("still follows the tail while the reader is caught up", () => {
+        const view = renderScrollback();
+        fakeBox(view.screenEl, { scrollHeight: 1000 });
+        scrollTo(view.screenEl, 800);
+
+        act(() => {
+          fakeBox(view.screenEl, { scrollHeight: 1400 });
+          view.rerender({ entries: [...OPENED_TURN, APPENDED_REPLY] });
+        });
+
+        expect(view.screenEl.scrollTop).toBe(1400);
+      });
+    });
+  });
+
+  describe("given earlier turns are one gesture away", () => {
+    describe("when the reader scrolls upward into the top", () => {
+      it("asks for the earlier turn once", () => {
+        const onLoadEarlier = vi.fn();
+        const view = renderScrollback({
+          scrollback: { status: "available", earlierCount: 3, onLoadEarlier },
+        });
+        fakeBox(view.screenEl, { scrollHeight: 1000 });
+
+        scrollTo(view.screenEl, 300);
+        scrollTo(view.screenEl, 50);
+
+        expect(onLoadEarlier).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when the reader scrolls upward but stays far from the top", () => {
+      it("asks for nothing, because they are still reading this turn", () => {
+        const onLoadEarlier = vi.fn();
+        const view = renderScrollback({
+          scrollback: { status: "available", earlierCount: 3, onLoadEarlier },
+        });
+        fakeBox(view.screenEl, { scrollHeight: 1000 });
+
+        scrollTo(view.screenEl, 800);
+        scrollTo(view.screenEl, 600);
+
+        expect(onLoadEarlier).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the reader moves downward at the same position", () => {
+      it("asks for nothing, because reading on is not reading back", () => {
+        const onLoadEarlier = vi.fn();
+        const view = renderScrollback({
+          scrollback: { status: "available", earlierCount: 3, onLoadEarlier },
+        });
+        fakeBox(view.screenEl, { scrollHeight: 1000 });
+
+        scrollTo(view.screenEl, 0);
+        scrollTo(view.screenEl, 120);
+
+        expect(onLoadEarlier).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the turn is too short to scroll at all", () => {
+      it("reads the wheel instead, which is the only gesture left", () => {
+        const onLoadEarlier = vi.fn();
+        const view = renderScrollback({
+          scrollback: { status: "available", earlierCount: 3, onLoadEarlier },
+        });
+        fakeBox(view.screenEl, { scrollHeight: 100 });
+
+        fireEvent.wheel(view.screenEl, { deltaY: -80 });
+
+        expect(onLoadEarlier).toHaveBeenCalledTimes(1);
+      });
+
+      it("ignores a wheel pointed the other way", () => {
+        const onLoadEarlier = vi.fn();
+        const view = renderScrollback({
+          scrollback: { status: "available", earlierCount: 3, onLoadEarlier },
+        });
+        fakeBox(view.screenEl, { scrollHeight: 100 });
+
+        fireEvent.wheel(view.screenEl, { deltaY: 80 });
+
+        expect(onLoadEarlier).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when a turn is already being read", () => {
+      it("asks for nothing more until it lands", () => {
+        const onLoadEarlier = vi.fn();
+        const view = renderScrollback({
+          scrollback: { status: "loading", earlierCount: 3, onLoadEarlier },
+        });
+        fakeBox(view.screenEl, { scrollHeight: 1000 });
+
+        scrollTo(view.screenEl, 300);
+        scrollTo(view.screenEl, 50);
+        fireEvent.wheel(view.screenEl, { deltaY: -80 });
+
+        expect(onLoadEarlier).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given the top of the screen", () => {
+    it("offers the earlier turns with how many are left", () => {
+      renderScrollback({
+        scrollback: {
+          status: "available",
+          earlierCount: 3,
+          onLoadEarlier: vi.fn(),
+        },
+      });
+
+      expect(
+        screen.getByRole("button", { name: /3 earlier turns, scroll to load/ }),
+      ).toBeInTheDocument();
+    });
+
+    it("counts a single turn as one turn", () => {
+      renderScrollback({
+        scrollback: {
+          status: "available",
+          earlierCount: 1,
+          onLoadEarlier: vi.fn(),
+        },
+      });
+
+      expect(
+        screen.getByRole("button", { name: /1 earlier turn, scroll to load/ }),
+      ).toBeInTheDocument();
+    });
+
+    it("says a turn is being read while it is in flight", () => {
+      renderScrollback({
+        scrollback: {
+          status: "loading",
+          earlierCount: 3,
+          onLoadEarlier: vi.fn(),
+        },
+      });
+
+      expect(screen.getByText(/loading earlier turn/)).toBeInTheDocument();
+    });
+
+    /** @scenario "A failed earlier-turn load offers a retry" */
+    it("states a failed read on one line and tries again when it is clicked", async () => {
+      const user = userEvent.setup();
+      const onLoadEarlier = vi.fn();
+      renderScrollback({
+        scrollback: { status: "error", earlierCount: 3, onLoadEarlier },
+      });
+
+      const retry = screen.getByRole("button", {
+        name: /couldn't load the earlier turn, click to retry/,
+      });
+      await user.click(retry);
+
+      expect(onLoadEarlier).toHaveBeenCalledTimes(1);
+    });
+
+    it("says so when the session runs past what the view can walk", () => {
+      renderScrollback({
+        scrollback: {
+          status: "unavailable",
+          earlierCount: 0,
+          onLoadEarlier: vi.fn(),
+        },
+      });
+
+      expect(
+        screen.getByText(/longer than the 200 turns the view can walk/),
+      ).toBeInTheDocument();
+    });
+
+    /** @scenario "Reaching the first turn shows the session start" */
+    it("marks the session start once the first turn is on screen", () => {
+      renderScrollback({
+        entries: [...EARLIER_TURN, ...OPENED_TURN],
+        rowKeys: [...EARLIER_KEYS, ...OPENED_KEYS],
+        turnDividers: TURN_DIVIDERS,
+        banner: {
+          agent: "claude_code",
+          version: "2.1.207",
+          model: "claude-opus-4-8",
+          repo: "langwatch/langwatch",
+        },
+        scrollback: {
+          status: "start",
+          earlierCount: 0,
+          onLoadEarlier: vi.fn(),
+        },
+      });
+
+      expect(screen.getByText("Claude Code v2.1.207")).toBeInTheDocument();
+      expect(screen.getByText("session start")).toBeInTheDocument();
+      expect(screen.queryByText(/scroll to load/)).not.toBeInTheDocument();
+    });
+
+    /** @scenario "A trace outside any conversation shows no scrollback" */
+    it("shows the banner and nothing else for a trace with no session", () => {
+      renderScrollback({
+        banner: {
+          agent: "claude_code",
+          version: "2.1.207",
+          model: "claude-opus-4-8",
+          repo: "langwatch/langwatch",
+        },
+      });
+
+      expect(screen.getByText("Claude Code v2.1.207")).toBeInTheDocument();
+      expect(screen.queryByText(/earlier turn/)).not.toBeInTheDocument();
+      expect(screen.queryByText("session start")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given a user message an agent injected a block into", () => {
+    const taskNotification = [
+      "<task-notification>",
+      "  <summary>Monitor event: PR watch: CI + comments</summary>",
+      "  <detail>2 new comments on langwatch#4711</detail>",
+      "</task-notification>",
+    ].join("\n");
+
+    function messageEntries(text: string): TranscriptEntry[] {
+      return [{ kind: "user_prompt", atMs: 1000, text, chars: text.length }];
+    }
+
+    /** @scenario "A task notification collapses to one gray line naming its summary" */
+    it("collapses it to one note naming its summary, with no prompt caret", () => {
+      const { container } = renderView({
+        entries: messageEntries(taskNotification),
+      });
+
+      expect(
+        screen.getByRole("button", {
+          name: /task notification: Monitor event: PR watch: CI \+ comments/,
+        }),
+      ).toBeInTheDocument();
+      expect(container.textContent).not.toContain("<task-notification>");
+      // The only caret left is the bottom bar's own input line.
+      expect(container.textContent?.match(/❯/g)).toHaveLength(1);
+    });
+
+    it("shows the block as it arrived once the note is opened", async () => {
+      const user = userEvent.setup();
+      renderView({ entries: messageEntries(taskNotification) });
+
+      const note = screen.getByRole("button", { name: /task notification/ });
+      await user.click(note);
+
+      expect(note).toHaveAttribute("aria-expanded", "true");
+      expect(
+        screen.getByText(/2 new comments on langwatch#4711/),
+      ).toBeInTheDocument();
+    });
+
+    /** @scenario "A mixed message keeps the human words as the prompt" */
+    it("keeps the words the human typed as the prompt under the note", () => {
+      renderView({
+        entries: messageEntries(
+          "<system-reminder>Background task finished.</system-reminder>\n\nnow ship it",
+        ),
+      });
+
+      expect(
+        screen.getByRole("button", { name: /system reminder/ }),
+      ).toBeInTheDocument();
+      expect(screen.getByText("now ship it")).toBeInTheDocument();
+    });
+  });
 });
+
+/** A viewport tall enough that "at the bottom" means something. */
+const VIEWPORT_HEIGHT = 200;
+
+const OPENED_TURN: TranscriptEntry[] = [
+  {
+    kind: "system_prompt",
+    atMs: 5000,
+    text: "You are Claude Code. CLAUDE.md says always use pnpm.",
+    chars: 52,
+  },
+  { kind: "user_prompt", atMs: 5100, text: "bump the version", chars: 16 },
+  {
+    kind: "assistant_message",
+    atMs: 5200,
+    text: "Bumped to 2.",
+    model: "claude-opus-4",
+  },
+];
+const OPENED_KEYS = ["turn-5#0", "turn-5#1", "turn-5#2"];
+
+const EARLIER_TURN: TranscriptEntry[] = [
+  {
+    kind: "system_prompt",
+    atMs: 1000,
+    text: "You are Claude Code. CLAUDE.md says always use npm.",
+    chars: 52,
+  },
+  { kind: "user_prompt", atMs: 1100, text: "check git status", chars: 16 },
+];
+const EARLIER_KEYS = ["turn-4#0", "turn-4#1"];
+
+/** The boundary the merge puts at the opened turn's first entry. */
+const TURN_DIVIDERS: ReadonlyMap<number, TurnDivider> = new Map([
+  [EARLIER_TURN.length, { turnNumber: 5, turnCount: 12, atMs: 5000 }],
+]);
+
+const APPENDED_REPLY: TranscriptEntry = {
+  kind: "assistant_message",
+  atMs: 5300,
+  text: "Pushed.",
+  model: "claude-opus-4",
+};
+
+/**
+ * jsdom has no layout engine, so `scrollHeight` and `clientHeight` are a hard
+ * zero and the anchoring maths has nothing to work with. Drive the geometry by
+ * hand and let the view do exactly what it does in a browser: read the numbers,
+ * work out what moved, and set `scrollTop`.
+ */
+function fakeBox(
+  el: HTMLElement,
+  {
+    scrollHeight,
+    clientHeight = VIEWPORT_HEIGHT,
+  }: { scrollHeight: number; clientHeight?: number },
+) {
+  Object.defineProperty(el, "clientHeight", {
+    configurable: true,
+    value: clientHeight,
+  });
+  Object.defineProperty(el, "scrollHeight", {
+    configurable: true,
+    value: scrollHeight,
+  });
+}
+
+/** Move the screen the way a wheel or a trackpad would. */
+function scrollTo(el: HTMLElement, top: number) {
+  act(() => {
+    el.scrollTop = top;
+    fireEvent.scroll(el);
+  });
+}
+
+type ViewProps = Partial<React.ComponentProps<typeof TerminalView>>;
+
+function renderScrollback(props: ViewProps = {}) {
+  const tree = (extra: ViewProps) => (
+    <ChakraProvider value={defaultSystem}>
+      <TerminalView
+        entries={OPENED_TURN}
+        rowKeys={OPENED_KEYS}
+        {...props}
+        {...extra}
+      />
+    </ChakraProvider>
+  );
+  const view = render(tree({}));
+  return {
+    screenEl: screen.getByTestId("terminal-screen"),
+    rerender: (extra: ViewProps) => view.rerender(tree(extra)),
+  };
+}
+
+/** The earlier turn landing above the reader, height and all, in one commit. */
+function prependEarlierTurn(
+  view: ReturnType<typeof renderScrollback>,
+  { scrollHeight }: { scrollHeight: number },
+) {
+  act(() => {
+    fakeBox(view.screenEl, { scrollHeight });
+    view.rerender({
+      entries: [...EARLIER_TURN, ...OPENED_TURN],
+      rowKeys: [...EARLIER_KEYS, ...OPENED_KEYS],
+      turnDividers: TURN_DIVIDERS,
+    });
+  });
+}

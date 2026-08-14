@@ -117,6 +117,17 @@ interface DrawerState extends DrawerUrlState {
   pinned: boolean;
   traceId: string | null;
   /**
+   * The project the open trace belongs to, when it is not the project the app
+   * chrome is currently sitting in. The personal pages (`/me/…`) are the case
+   * that needs it: they read the caller's own workspace while the ambient
+   * project stays whatever was last visited, so a trace opened from there and
+   * queried against the ambient project reads as "Trace not found".
+   *
+   * `null` means "the ambient project", which is right everywhere the drawer
+   * opens over a project's own pages.
+   */
+  projectId: string | null;
+  /**
    * Trace's approximate occurredAt (ms epoch). Threaded into per-trace
    * queries as a partition-pruning hint on `stored_spans`.
    */
@@ -141,7 +152,7 @@ interface DrawerState extends DrawerUrlState {
   openTrace: (
     traceId: string,
     occurredAtMs?: number | null,
-    expectedSpanCount?: number | null,
+    options?: OpenTraceOptions,
   ) => void;
   /**
    * Fill in the partition-pruning hint after the fact, from a resolved
@@ -220,8 +231,23 @@ interface DrawerState extends DrawerUrlState {
   hydrateUrlState: (next: Partial<DrawerUrlState>) => void;
 }
 
+/** What an opener knows about the trace beyond its id and when it happened. */
+export interface OpenTraceOptions {
+  /**
+   * Span count carried over from the row that opened the drawer, so the
+   * skeleton can hold the right height while the real tree loads.
+   */
+  expectedSpanCount?: number | null;
+  /**
+   * The trace's own project, for openers whose page is not inside it. See
+   * `DrawerState.projectId`.
+   */
+  projectId?: string | null;
+}
+
 interface InitialFromURL extends DrawerUrlState {
   traceId: string | null;
+  projectId: string | null;
   occurredAtMs: number | null;
   isOpen: boolean;
 }
@@ -314,6 +340,7 @@ function persistLastVizTab(tab: VizTab): void {
 function readInitialFromURL(): InitialFromURL {
   const fallback: InitialFromURL = {
     traceId: null,
+    projectId: null,
     occurredAtMs: null,
     selectedSpanId: null,
     // Summary is the friendlier landing tab for users who haven't
@@ -332,6 +359,7 @@ function readInitialFromURL(): InitialFromURL {
     const params = new URLSearchParams(window.location.search);
     const isOpen = params.get("drawer.open") === "traceV2Details";
     const traceId = params.get("drawer.traceId");
+    const projectId = params.get("drawer.projectId");
     const tRaw = params.get("drawer.t");
     const t = tRaw ? Number(tRaw) : NaN;
     const occurredAtMs = Number.isFinite(t) && t > 0 ? t : null;
@@ -358,6 +386,7 @@ function readInitialFromURL(): InitialFromURL {
 
     return {
       traceId,
+      projectId,
       occurredAtMs,
       selectedSpanId,
       viewMode: viewModeForEditState({ viewMode, isEditing }),
@@ -580,6 +609,7 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
   preMaximizeWidthPx: null,
   paneState: readPaneStateFromStorage(),
   traceId: initial.traceId,
+  projectId: initial.projectId,
   occurredAtMs: initial.occurredAtMs,
   expectedSpanCount: null,
   selectedSpanId: initial.selectedSpanId,
@@ -593,7 +623,7 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
 
   traceBackStack: [],
 
-  openTrace: (traceId, occurredAtMs, expectedSpanCount) => {
+  openTrace: (traceId, occurredAtMs, options) => {
     // Reading the captured trace is a decision about the trace in front of the
     // reader, not a preference: the next one opens corrected, the way every
     // trace does until they ask otherwise.
@@ -606,8 +636,16 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
     set({
       isOpen: true,
       traceId,
+      // An opener that names no project keeps the one already open rather than
+      // falling back to the ambient project. Every in-drawer move stays inside
+      // the trace's own project: stepping through the back stack, walking to a
+      // sibling trace, re-opening the same trace to leave edit mode. Resetting
+      // here would send the second trace of a session to whichever project the
+      // chrome happens to sit in, which is the same "Trace not found" one click
+      // deeper. A fresh open always starts clean because `closeTrace` clears it.
+      projectId: options?.projectId ?? get().projectId,
       occurredAtMs: occurredAtMs ?? null,
-      expectedSpanCount: expectedSpanCount ?? null,
+      expectedSpanCount: options?.expectedSpanCount ?? null,
       selectedSpanId: null,
       pinnedSpanIds: [],
       // Edit mode belongs to the trace it was started on. Moving to another
@@ -630,6 +668,7 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
       isMaximized: false,
       shortcutsOpen: false,
       traceId: null,
+      projectId: null,
       occurredAtMs: null,
       expectedSpanCount: null,
       selectedSpanId: null,

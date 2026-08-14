@@ -24,7 +24,17 @@ import { getLangWatchTracer } from "langwatch";
 import type { SemConvAttributes } from "langwatch/observability";
 import { isDispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import { SHUTDOWN_BUDGET } from "~/server/shutdown/budget";
+import {
+  LATENCY_HOUR_BUCKET_TTL_SECONDS,
+  LATENCY_MINUTE_BUCKET_TTL_SECONDS,
+  LATENCY_SAMPLE_SIZE,
+  latencyAllTimeKey,
+  latencyBucketField,
+  latencyHourBucketKey,
+  latencyMinuteBucketKey,
+} from "~/shared/ops/latency";
 import { KSUID_RESOURCES } from "~/utils/constants";
+import { tryGetApp } from "../../../app-layer/app";
 import {
   createContextFromJobData,
   getJobContextMetadata,
@@ -36,7 +46,6 @@ import {
   TenantRateTracker,
   tenantIdFromGroupId,
 } from "../../../observability/tenantRateTracker";
-import { connection } from "../../../redis";
 import {
   type ProjectStorageDestination,
   redactStorageUrisInText,
@@ -412,7 +421,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       auditAdapter,
     } = definition;
 
-    const effectiveConnection = redisConnection ?? connection;
+    // `tryGetApp`, not `getApp`: this is a constructor, and EventSourcing
+    // builds queues while the composition root is still assembling — so an App
+    // may legitimately not exist yet. The caller that matters always passes a
+    // connection; falling through to the ConfigurationError below states the
+    // real problem, where `getApp()` would raise a boot-order error instead.
+    const effectiveConnection = redisConnection ?? tryGetApp()?.redis ?? null;
     if (!effectiveConnection) {
       throw new ConfigurationError(
         "GroupQueueProcessor",
@@ -1715,16 +1729,33 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       this.activeJobCount--;
       const jobDurationMs = performance.now() - jobStartTime;
       gqJobDurationMilliseconds.observe(routingLabels, jobDurationMs);
-      // Feed the ops dashboard P50/P99 tiles. Capped circular buffer; the
-      // collector LRANGE's it every 2s. Fire-and-forget so an instrumentation
-      // hiccup never bubbles into the worker pipeline.
+      // Feed the ops dashboard latency figures. Two shapes, one write: the
+      // capped circular buffer behind the live P50/P99 tiles (LRANGE'd every
+      // 2s, sized by the same shared constant the tiles quote), and the
+      // time-bucketed histograms behind the hour/day/week/all-time windows
+      // (merged by the elected snapshot writer on its detail cycle).
+      // Fire-and-forget so an instrumentation hiccup never bubbles into the
+      // worker pipeline.
+      const completedAtMs = Date.now();
+      const bucketField = latencyBucketField(jobDurationMs);
+      const minuteKey = latencyMinuteBucketKey(this.queueName, completedAtMs);
+      const hourKey = latencyHourBucketKey(this.queueName, completedAtMs);
       this.redisConnection
         .multi()
         .lpush(
           `${this.queueName}:gq:stats:latencies-ms`,
           String(Math.round(jobDurationMs)),
         )
-        .ltrim(`${this.queueName}:gq:stats:latencies-ms`, 0, 199)
+        .ltrim(
+          `${this.queueName}:gq:stats:latencies-ms`,
+          0,
+          LATENCY_SAMPLE_SIZE - 1,
+        )
+        .hincrby(minuteKey, bucketField, 1)
+        .expire(minuteKey, LATENCY_MINUTE_BUCKET_TTL_SECONDS)
+        .hincrby(hourKey, bucketField, 1)
+        .expire(hourKey, LATENCY_HOUR_BUCKET_TTL_SECONDS)
+        .hincrby(latencyAllTimeKey(this.queueName), bucketField, 1)
         .exec()
         .catch(() => {
           // best-effort stats write; failures are non-fatal

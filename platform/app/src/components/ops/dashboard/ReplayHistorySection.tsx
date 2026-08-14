@@ -2,10 +2,12 @@ import { Badge, Box, Card, HStack, Text } from "@chakra-ui/react";
 import { ArrowUpRight } from "lucide-react";
 import { formatDuration } from "~/components/ops/shared/formatters";
 import { replayStateColor } from "~/components/ops/shared/ReplayStateBadge";
+import { useDrawer } from "~/hooks/useDrawer";
 import { api } from "~/utils/api";
 import NextLink from "~/utils/compat/next-link";
 
 export function ReplayHistorySection() {
+  const { openDrawer } = useDrawer();
   const historyQuery = api.ops.getReplayHistory.useQuery(undefined, {
     refetchInterval: 10000,
   });
@@ -14,21 +16,20 @@ export function ReplayHistorySection() {
 
   return (
     <Card.Root overflow="hidden">
-      <NextLink href="/ops/projections" style={{ textDecoration: "none" }}>
-        <HStack
-          paddingX={4}
-          paddingTop={3}
-          paddingBottom={2}
-          cursor="pointer"
-          _hover={{ color: "orange.500" }}
-          transition="color 0.1s"
-        >
-          <Text textStyle="xs" fontWeight="medium" color="fg.muted">
-            Latest Replay
-          </Text>
-          <ArrowUpRight size={10} />
-        </HStack>
-      </NextLink>
+      <HStack
+        paddingX={4}
+        paddingTop={3}
+        paddingBottom={2}
+        cursor="pointer"
+        _hover={{ color: "orange.500" }}
+        transition="color 0.1s"
+        onClick={() => openDrawer("opsReplay", {})}
+      >
+        <Text textStyle="xs" fontWeight="medium" color="fg.muted">
+          Latest Replay
+        </Text>
+        <ArrowUpRight size={10} />
+      </HStack>
       <Box paddingX={4} paddingBottom={4}>
         {latestEntry ? (
           <NextLink

@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 
 import { getLangyRateLimitCounter } from "~/server/metrics";
-import { connection } from "../redis";
+import { tryGetApp } from "../app-layer/app";
 
 const logger = createLogger("langwatch:langy:rate-limit");
 
@@ -26,6 +26,7 @@ export async function checkLangyMessageRateLimit({
   projectId: string;
   limit?: number;
 }): Promise<RateLimitResult> {
+  const connection = tryGetApp()?.redis ?? null;
   if (!connection) {
     return { allowed: true, remaining: limit };
   }

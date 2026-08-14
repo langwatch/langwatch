@@ -3,8 +3,8 @@ import { createLogger } from "@langwatch/observability";
 import type { IncomingMessage, RequestListener, ServerResponse } from "http";
 import http from "http";
 import { register } from "prom-client";
+import { assertRedisReady } from "~/server/app-layer/redis-readiness";
 import { getWorkerMetricsPort, isMetricsAuthorized } from "~/server/metrics";
-import { assertRedisReady } from "~/server/redis";
 
 const logger = createLogger("langwatch:workers");
 
@@ -82,7 +82,9 @@ async function bootScenarioProcessor(
     concurrency: SCENARIO_WORKER.CONCURRENCY,
   });
   getScenarioExecutionHandle()?.setPool(scenarioPool);
-  const scenarioProcessor = await startScenarioProcessor(scenarioPool);
+  const scenarioProcessor = await startScenarioProcessor({
+    pool: scenarioPool,
+  });
   if (scenarioProcessor) {
     shutdownHandles.push(() => scenarioProcessor.close());
   }

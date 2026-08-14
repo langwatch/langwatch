@@ -68,6 +68,16 @@ export type PersonalContext = {
   /** Personal project the /me recent-activity table reads from + deep-links into. */
   personalProjectId: string | null;
   personalProjectSlug: string | null;
+  /**
+   * Whether the read behind `personalProjectId` has answered.
+   *
+   * `ready` is about the session and the organization, and the personal
+   * context is only asked for once those land, so there is a window where
+   * `ready` is true and the project is still unknown. A surface that says
+   * something about the workspace when there is no project has to tell that
+   * window apart from a genuine absence, or it states a fact it does not have.
+   */
+  isPersonalProjectResolved: boolean;
   apiKeys: PersonalApiKeyRow[];
 };
 
@@ -204,6 +214,7 @@ export function usePersonalContext(): PersonalContext {
         usd: row.spentUsd,
         billedUsd: row.billedUsd,
       })) ?? [],
+    isPersonalProjectResolved: personalContextQuery.isSuccess,
     personalProjectId: personalContextQuery.data?.workspace.project.id ?? null,
     personalProjectSlug:
       personalContextQuery.data?.workspace.project.slug ?? null,
