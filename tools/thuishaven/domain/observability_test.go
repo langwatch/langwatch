@@ -98,10 +98,11 @@ func TestObservabilityEnvPublishesTheGrafanaLink(t *testing.T) {
 func TestDefaultObservabilityLimitsStayWithinTheirBounds(t *testing.T) {
 	gib := uint64(1) << 30
 
-	// A small machine still gets enough to start the six-process bundle at all.
+	// A small machine still gets enough to start the six-process bundle at all
+	// — the floor covers the ~1.5 GiB idle plus profile ingest headroom.
 	small := DefaultObservabilityLimits(4*gib, 2)
-	if small.MemoryMB != 1536 {
-		t.Errorf("4 GiB machine: MemoryMB = %d, want the 1536 floor", small.MemoryMB)
+	if small.MemoryMB != 2048 {
+		t.Errorf("4 GiB machine: MemoryMB = %d, want the 2048 floor", small.MemoryMB)
 	}
 	if small.CPUs != 1 {
 		t.Errorf("2-core machine: CPUs = %v, want the floor of 1", small.CPUs)
@@ -109,21 +110,21 @@ func TestDefaultObservabilityLimitsStayWithinTheirBounds(t *testing.T) {
 
 	// A big one does not get to hand the stack an unbounded slice of it.
 	big := DefaultObservabilityLimits(128*gib, 32)
-	if big.MemoryMB != 3072 {
-		t.Errorf("128 GiB machine: MemoryMB = %d, want the 3072 ceiling", big.MemoryMB)
+	if big.MemoryMB != 4096 {
+		t.Errorf("128 GiB machine: MemoryMB = %d, want the 4096 ceiling", big.MemoryMB)
 	}
-	if big.CPUs != 2.5 {
-		t.Errorf("32-core machine: CPUs = %v, want the ceiling of 2.5", big.CPUs)
+	if big.CPUs != 3 {
+		t.Errorf("32-core machine: CPUs = %v, want the ceiling of 3", big.CPUs)
 	}
 
-	// A seventh of the machine in between, with the CPU divisor between its
+	// A sixth of the machine in between, with the CPU divisor between its
 	// floor and ceiling.
 	mid := DefaultObservabilityLimits(16*gib, 8)
-	if want := 16 * 1024 / 7; mid.MemoryMB != want {
-		t.Errorf("16 GiB machine: MemoryMB = %d, want %d (a seventh)", mid.MemoryMB, want)
+	if want := 16 * 1024 / 6; mid.MemoryMB != want {
+		t.Errorf("16 GiB machine: MemoryMB = %d, want %d (a sixth)", mid.MemoryMB, want)
 	}
-	if mid.CPUs != 2 {
-		t.Errorf("8-core machine: CPUs = %v, want 2 (a quarter)", mid.CPUs)
+	if want := float64(8) / 3; mid.CPUs != want {
+		t.Errorf("8-core machine: CPUs = %v, want %v (a third)", mid.CPUs, want)
 	}
 }
 
