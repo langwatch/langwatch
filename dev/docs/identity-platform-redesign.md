@@ -15,7 +15,8 @@ This program makes identity first-class and self-service:
 
 - An **identifiers** model: one user, many attach/detach-able verified identifiers (email, password, OAuth, OIDC/SAML, passkey), tombstoned forever. Storage = the **existing `Account` table adapted in place** (column-ownership split, see D01).
 - A first-class, event-sourced **SsoConnection** per organization with a guarded lifecycle, domain verification, and org-admin self-service onboarding. Self-hosted priority: single-SSO deployments auto-redirect straight to the IdP.
-- **Domain join-requests** (Anthropic-Teams-style) and **resilient invitations** (identifier-aware acceptance, inviter one-click resend) — the two fixes for the invitation dead-end support load.
+- **Domain join-requests** (ask-to-join with org-admin approval, or domain auto-join where the org opts in) and **resilient invitations** (identifier-aware acceptance, inviter one-click resend) — the fixes for the invitation dead-end support load and for the orphaned organizations sign-up keeps minting.
+- A **first-party sign-in & sign-up UI** (D13): Auth0 owned the front-door screens; every unauthenticated screen is rebuilt in-product, and sign-up offers join-your-team **before** create-a-workspace.
 - **MFA (TOTP + backup codes, never SMS)** and **passkeys**, using better-auth plugins for protocol while our domain model remains the record.
 - SCIM scoped per connection, producing commands/events, writing membership exclusively through `grants.*`.
 - **Two separate identity surfaces**: a platform-ops identity lookup (cross-org support tooling) and an org-admin surface inside org settings.
@@ -35,16 +36,18 @@ Requirements are stated here at domain level; the normative, implementable versi
 - Multiple verified email identifiers per user (aliases). Login works with any active credential; **login is never gated on email verification** — verification gates routing, linking, and join-matching. Notifications always to PRIMARY; `User.email` polyfilled from PRIMARY.
 - Attach requires ceremony evidence, never bare input. Detach is guarded (≥1 remaining verified identifier + ≥1 recovery path). Tombstones forever.
 
-## Domain: Sign-in routing → D03
+## Domain: Sign-in routing & screens → D03, D13
 
 - Identifier-first sign-in: email → route by verified ACTIVE connection domain → IdP redirect; otherwise a uniform method picker (no account-existence oracle).
 - Self-hosted priority: exactly one ACTIVE connection ⇒ auto-redirect to the IdP; break-glass local login at `/auth/signin?local=1`.
 - Cloud: multiple methods simultaneously (ends the `NEXTAUTH_PROVIDER` one-method invariant). Amends ADR-027's mechanism (hook → router policy); license-gate semantics preserved.
+- The complete unauthenticated screen set is first-party (D13): sign-in, sign-up, method picker, password reset, email verification, deny/guidance states. D03 owns the routing contract; D13 renders it; both flip on one flag. Sign-up is verification-first and offers join-your-team before workspace creation.
 
 ## Domain: Join requests & invitations → D11, D12
 
 - Resilient invitations (D11, needs only identifiers — pulled ahead of the router): identifier-aware acceptance (any verified method), inviter one-click resend, 14-day expiry, explicit states PENDING → ACCEPTED | EXPIRED | REVOKED.
-- Join requests (D12, needs the router + org-admin surface): verified email → see colleagues' org → request → org-admin approval (default role, no picker). Default on for cloud self-serve orgs; off for SSO-connected orgs and self-hosted.
+- Join requests (D12, needs the router, the D13 interstitial hook + org-admin surface): verified email → see colleagues' org → request → org-admin approval (default role, no picker) — or immediate auto-join where the org sets `domainJoin = auto`. Modes `off | request | auto`; default `request` for cloud self-serve orgs; forced `off` for SSO-connected orgs and self-hosted; public email domains never match in any mode.
+- Orphaned-organization prevention (D12 + D13): the join decision comes **before** workspace creation; an org is only created on explicit choice or no-match. Metric: orphaned-org creation rate.
 
 ## Domain: Resilience (Redis loss) → D02
 
@@ -137,7 +140,7 @@ Decisions settled in design discussion:
 | R2 | Redis resilience | Circuit breaker scoped to the auth path; amends ADR-007 process roles for this pipeline (ADR ships with D02) |
 | R3 | Multi-method sign-in | Cloud priority; self-hosted = single SSO + auto-redirect + break-glass local path |
 | R4 | Rate limiting | Nothing beyond better-auth's existing limiter |
-| R5 | Join requests & invites | Default on for cloud self-serve, off for SSO orgs/self-hosted; fixed default role; identifier-aware invites + one-click resend + 14-day expiry |
+| R5 | Join requests & invites | `domainJoin` modes `off \| request \| auto` (default `request` for cloud self-serve; forced `off` for SSO orgs/self-hosted; public domains never match); fixed default role; identifier-aware invites + one-click resend + 14-day expiry |
 | R6 | RBAC relationship | **Hard precondition.** The unified authz engine is landed before this program starts; no seam, no parallel track. Registry entries and `grants.*` from day one |
 | R7 | Identity surfaces | Two separate UIs; shared command handlers; separate pages/routes/queries |
 | R8 | Aliases & verification | Multiple verified emails; login never gated on verification; ceremony = verification for OAuth/SSO; notifications to PRIMARY; `User.email` polyfilled |
@@ -194,7 +197,9 @@ The deployment env (`NEXTAUTH_PROVIDER`) is the hidden eighth table: it selects 
 | `Session.impersonating` JSON | authz `Principal {actor, subject}`; session + `identifierId`, `amr`, `mfaVerifiedAt` | D06 |
 | `ScimToken` per-org, direct writes | Per-connection tokens; SCIM = command producer; `grants.*` only writer | D08 |
 | Invites: 2-day, method-sensitive, ops-only resend | Identifier-aware, 14-day, one-click resend, explicit states | D11 |
-| (no join path without invite) | Domain join-requests with org-admin approval | D12 |
+| (no join path without invite) | Domain join-requests: admin approval or opt-in auto-join | D12 |
+| Auth0-hosted front-door screens | Complete first-party sign-in/sign-up/reset/verification UI | D13 |
+| Sign-up always mints a fresh org (orphans) | Join-before-create interstitial; org creation is an explicit choice | D12, D13 |
 | (no support visibility) | Platform-ops lookup + org-admin surface | D05 |
 | Redis hard dependency on auth | Circuit breaker: inline commands + PG-only sessions | D02 |
 | super-admin hand-sets `ssoDomain` | Org-admin self-service + ops approval; `sso:manage`/`scim:manage` in registry | D05 |
@@ -261,7 +266,7 @@ flowchart TD
     H -->|no| K
     I --> K["Session {identifierId, amr, mfaVerifiedAt}<br/>Principal {actor, subject} via authz edge middleware"]
     K --> JR{"new verified email +<br/>colleagues' org exists<br/>on this domain?"}
-    JR -->|yes| JRO["post-login: 'Acme Corp — 12 colleagues here.<br/>Request to join' / or create own workspace"]
+    JR -->|yes| JRO["'Acme Corp — 12 colleagues here.'<br/>join (auto if org allows) / request to join<br/>/ create own workspace (explicit choice)"]
     JR -->|no| DONE[workspace home]
     JRO --> DONE
 ```
@@ -270,7 +275,7 @@ Aggregate lifecycles (SsoConnection, identifier, MFA enrollment, SCIM sync, join
 
 # Technical Plan
 
-Twelve deliverables, each independently shippable and flag-gated. Normative detail per deliverable; sequencing in the delivery plan.
+Thirteen deliverables, each independently shippable and flag-gated. Normative detail per deliverable; sequencing in the delivery plan.
 
 | # | Deliverable spec | One-liner |
 |---|---|---|
@@ -285,7 +290,8 @@ Twelve deliverables, each independently shippable and flag-gated. Normative deta
 | D09 | `identity-platform/D09-auth0-customer-migrations.md` | Per-customer playbook with grace |
 | D10 | `identity-platform/D10-auth0-deletion.md` | Code, config, infra, and QA-login deletion |
 | D11 | `identity-platform/D11-resilient-invitations.md` | Identifier-aware acceptance, one-click resend, 14-day expiry |
-| D12 | `identity-platform/D12-join-requests.md` | Domain join-requests with org-admin approval |
+| D12 | `identity-platform/D12-join-requests.md` | Domain join-requests: admin approval or opt-in auto-join; orphan-org prevention |
+| D13 | `identity-platform/D13-signin-signup-screens.md` | The first-party sign-in & sign-up screens (flips with D03) |
 
 Cross-deliverable conventions:
 
@@ -300,7 +306,8 @@ See `identity-platform/delivery-plan.md` — dependency graph, flags, exit gates
 # Security Concerns
 
 - **Identifier-first enumeration**: uniform page/timing; domain-level SSO routing discoverable by design, user-level existence never.
-- **Join-request privacy**: org existence/name revealed only after email verification, only on domain match, never for personal orgs; coarse member counts; admin gates every join.
+- **Join-request privacy**: org existence/name revealed only after email verification, only on domain match, never for personal orgs; coarse member counts; admin gates every join — except deliberate org opt-in to `domainJoin = auto`, which still requires a verified non-public domain and notifies admins on every join.
+- **Domain auto-join abuse**: public email domains structurally excluded from all domain features; auto mode is admin-set opt-in; every auto-join is an audited event.
 - **Surface separation (R7)**: org-admin queries org-scoped at the data layer; ops lookup platform-ops-gated; no shared pages/routes.
 - **Attach-without-proof**: every identifier attach requires ceremony evidence.
 - **Wrong-human linking**: auto-link only when unambiguous; org-admin confirmation otherwise; before/after audit events on every link.
@@ -329,6 +336,7 @@ See `identity-platform/delivery-plan.md` — dependency graph, flags, exit gates
 11. **License-gate timing**: `specs/licensing/sso-license-gating.feature:16-17` asserts startup-decided gating ("never mid-flight"). Per-method router policy naturally evaluates per-request. Keep restart semantics for self-hosted license changes, or accept mid-flight evaluation? (Lean: keep startup semantics for the license gate specifically.)
 12. **Sign-up enumeration tension**: `signup-does-not-strand-an-account.feature:58-61` returns `email_already_registered`, in tension with the no-oracle stance on sign-up. Deliberate decision needed (sign-up enumeration is conventionally accepted; the no-oracle invariant is scoped to sign-in).
 13. **Member-initiated invites (`WAITING_APPROVAL`)**: today a MEMBER can request an invite that an ADMIN approves before it goes out (`specs/members/update-pending-invitation.feature:94-99`). D11's state model (PENDING → ACCEPTED | EXPIRED | REVOKED) doesn't carry it. Keep as a fifth state, or retire it since D12's join requests serve the same motivation from the joiner's side? Decide before D11's spec amendment.
+14. **Existing orphaned organizations**: D12/D13 stop new ones being minted, but production already carries a long tail of abandoned single-user orgs. Sweep them (delete empty orgs whose owner is active elsewhere on the same domain), build a merge tool, or leave them? Needs a product decision and a data pass to size the pool.
 
 # Still left to think about
 

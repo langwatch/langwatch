@@ -1,6 +1,6 @@
 # Identity Platform — Delivery Plan
 
-The final spec: how the twelve deliverables (`D01`–`D12`, see `../identity-platform-redesign.md` for the epic) sequence, gate, and roll back. Each deliverable is a sealed goal: independently shippable, flag-gated, measurable exit, stated rollback.
+The final spec: how the thirteen deliverables (`D01`–`D13`, see `../identity-platform-redesign.md` for the epic) sequence, gate, and roll back. Each deliverable is a sealed goal: independently shippable, flag-gated, measurable exit, stated rollback.
 
 # Precondition — authz program landed
 
@@ -13,42 +13,89 @@ This program starts only when the unified authz engine is on `main`. Ready-to-st
 - [ ] `CustomRole` supports org-scope permission keys (for the IT-admin role).
 - [ ] `rbac.ts` monolith and `TeamUser` deleted or behind an enforcing flag with a dated deletion — identity code must never call them.
 
-If the authz program slips, D01–D04 and D11 can start (they need nothing from authz); D05 and D08 hard-block on the checklist.
+If the authz program slips, D01–D04, D11 and D13 can start (they need nothing from authz); D05 and D08 hard-block on the checklist.
 
 # Sequencing
 
+Critical path: **D01 → D02 → D03+D13 → D04 → D05 → D08 → D09 → D10**. D11 forks off after D01; D06/D07/D12 fork off after D03/D05; Wave 4 has no dates by design.
+
+The chart shows the wave structure; the exact per-deliverable dependencies live in the **Needs** column of the tables below (drawing every edge made the graph unreadable).
+
 ```mermaid
-flowchart LR
-    subgraph Wave1["Wave 1 — foundation (no product behavior change)"]
-        D01 --> D02
+flowchart TB
+    subgraph W1["Wave 1 — foundations (nothing a user can see)"]
+        direction LR
+        D01["D01<br/>identifiers"] --> D02["D02<br/>auth-path breaker"]
     end
-    subgraph Wave2["Wave 2 — the front door + invite fixes"]
-        D02 --> D03 --> D04
-        D01 --> D11
+    subgraph W2["Wave 2 — the new front door + the invite fix"]
+        direction LR
+        D03["D03<br/>identifier-first router"] -. one flag .- D13["D13<br/>sign-in & sign-up screens"]
+        D03 --> D04["D04<br/>SsoConnection aggregate"]
+        D11["D11<br/>resilient invitations"]
     end
-    subgraph Wave3["Wave 3 — self-service + factors"]
-        D04 --> D05
-        D03 --> D06
-        D03 --> D07
-        D05 --> D08
-        D03 --> D12
-        D05 --> D12
+    subgraph W3["Wave 3 — self-service + factors (parallel tracks)"]
+        direction LR
+        D05["D05<br/>self-serve SSO + identity surfaces"] --> D08["D08<br/>SCIM per connection"]
+        D06["D06<br/>MFA"]
+        D07["D07<br/>passkeys"]
+        D12["D12<br/>join requests + domain auto-join"]
     end
-    subgraph Wave4["Wave 4 — Auth0 dies (customer-paced)"]
-        D05 --> D09
-        D08 --> D09
-        D09 --> D10
+    subgraph W4["Wave 4 — Auth0 dies (customer-paced)"]
+        direction LR
+        D09["D09<br/>per-customer migration"] --> D10["D10<br/>delete Auth0"]
     end
-    AUTHZ["authz precondition checklist"] ==>|hard| D05
-    AUTHZ ==>|hard| D08
+    W1 --> W2 --> W3 --> W4
+    AUTHZ["authz precondition checklist"] ==>|hard| W3
 ```
 
-Rationale:
+# What each wave actually delivers
 
-- **D02 before D03** (decision: pulled ahead) — the cutover milestone should not also be the milestone that discovers Redis-loss takes down sign-in. Cost is touching dispatch before real load exists; acceptable.
+## Wave 1 — foundations
+
+Nothing a customer can see. Both deliverables exist to make Wave 2 safe.
+
+| # | Needs | What ships | Impact when it lands |
+|---|---|---|---|
+| D01 | — | The identifier model: one user, many verified sign-in methods, event-sourced lifecycle columns on the existing `Account` table, full backfill | No product change yet — but identity state becomes *visible data* for the first time, and every other deliverable builds on it |
+| D02 | D01 | A circuit breaker scoped to the auth path: Redis down ⇒ sessions go PG-only, identity commands run inline | A Redis outage stops locking every customer out of sign-in; de-risks the D03 cutover before it exists |
+
+## Wave 2 — the new front door + the invite fix
+
+The customer-visible core: a completely new unauthenticated experience, and the end of the invitation dead ends.
+
+| # | Needs | What ships | Impact when it lands |
+|---|---|---|---|
+| D03 | D01, D02 | The identifier-first routing engine: email → route to the right IdP or method set, auto-link rules, shadow-compared cutover | One front door for every method at once — ends the one-method-per-deployment limit; account-linking dead ends stop being support tickets |
+| D13 | D01; flips with D03 | The complete first-party sign-in & sign-up screens (Auth0 owned these visuals until now): sign-in, sign-up, method picker, password reset, email verification, every deny/guidance state | The first thing every user ever sees is ours; sign-up gains the join-your-team step **before** workspace creation, which is where orphaned organizations stop being minted |
+| D04 | D03 | `SsoConnection` as a real aggregate with a guarded lifecycle; existing `ssoDomain` strings grandfathered in silently | Enterprise SSO becomes data with history instead of two hand-set strings; no customer notices, which is the point |
+| D11 | D01 only | Resilient invitations: accept via any verified method, one-click resend, 14-day expiry, visible states | The loudest support pain (invited with email, has a Google account, can't get in) is fixed — before the router cutover makes noise |
+
+## Wave 3 — self-service + factors
+
+Parallel tracks; staff in any order capacity allows.
+
+| # | Needs | What ships | Impact when it lands |
+|---|---|---|---|
+| D05 | D04 + authz checklist (hard) | Self-serve SSO onboarding (register → verify domain → activate) plus both identity surfaces: platform-ops lookup and the org-admin panel | Enterprise onboarding drops to one LangWatch action (an approval click); DB surgery as a support tool ends |
+| D06 | D03 | TOTP MFA + backup codes, org-level `mfaRequired`, sessions that carry `amr` (one forced re-login) | Orgs can finally require MFA; impersonation and step-up become provable |
+| D07 | D03 | Passkeys via WebAuthn, including no-email discoverable sign-in | The fastest sign-in method, and the phishing-resistant one |
+| D08 | D05 + authz checklist (hard) | SCIM tokens scoped per connection; SCIM writes membership only through `grants.*` | Cross-org SCIM writes become impossible; deprovisioning gets a provable postcondition |
+| D12 | D03 + D05 | Join requests + domain auto-join: sign up with a work email → see your company's org → request (admin approves) or walk straight in where the org allows it | "I signed up and my company was invisible" is over; the join-before-create flow is what starves orphaned organizations |
+
+## Wave 4 — Auth0 dies
+
+| # | Needs | What ships | Impact when it lands |
+|---|---|---|---|
+| D09 | D05, D08 | The per-customer migration wizard with both-connections grace and the legacy callback shim (R9) | Each enterprise moves at its own pace with rollback built in; nobody reconfigures their IdP under pressure |
+| D10 | D09 program exit: zero ACTIVE legacy connections | Deletion: provider config, password service, webhook, shim, secrets, QA login | Auth0 spend and code hit zero. This is the program's DONE signal — customer-paced, not a scheduled milestone |
+
+# Sequencing rationale
+
+- **D02 before D03** — the cutover milestone should not also be the milestone that discovers Redis-loss takes down sign-in. Cost is touching dispatch before real load exists; acceptable.
+- **D03 and D13 flip together** — one flag (`IDENTITY_ROUTER_V2`): the router is the logic, the screens are the experience, and shipping either alone would mean building throwaway UI or an invisible engine. Shadow mode exercises the router only; the screens appear at the enforce flip.
 - **D03 is the highest-risk deliverable** — every human's front door. It lands only after D01's replay parity and D02's Redis-kill test are green.
-- **D11 (resilient invitations) was pulled out of the old combined deliverable and moved to Wave 2**: identifier-aware acceptance and one-click resend need only D01's identifiers — they fix the loudest support pain and shouldn't wait for the router. Resend UI lands in the existing members/invitations area; the org-admin surface absorbs it at D05.
-- **D06/D07/D08/D12 are mutually independent** after D03/D05; staff in whatever order capacity allows. Suggested: D06 → D07 → D08; D12 (join requests) needs D03's interstitial hook and D05's org-admin surface.
+- **D11 was pulled out of the old combined deliverable into Wave 2**: identifier-aware acceptance and one-click resend need only D01's identifiers — they fix the loudest support pain and shouldn't wait for the router. Resend UI lands in the existing members/invitations area; the org-admin surface absorbs it at D05.
+- **D06/D07/D08/D12 are mutually independent** after D03/D05. Suggested order: D06 → D07 → D08; D12 needs D03's interstitial hook and D05's org-admin surface.
 - **D09 is customer-paced, per tenant, slow by design** — no fleet deadline. **D10 is a program exit criterion, not a schedulable milestone**: it starts when the last legacy connection tears down; Auth0 spend and the agents-box login survive until then, and that's fine.
 
 # Deliverable gates
@@ -66,7 +113,8 @@ Rationale:
 | D09 | per-customer | Per customer: all active users linked, quiet grace, shim hits at zero, teardown event. Program: zero ACTIVE legacy connections | Both-connections-active grace IS the rollback | Customer-facing |
 | D10 (program exit criterion — customer-paced) | — | `grep -ri auth0 platform/app` → changelog only; deploy pipeline green | None needed (nothing left to break) | Low |
 | D11 | invite changes additive | Round-trips: invite → wrong-method → accepted; expiry → resend → accepted; Slack invite cases replay green | Additive; old flow flag-restorable during bake | Low |
-| D12 | `JOIN_REQUESTS` | request → approve → member round-trip; reminder/expiry wakes verified; matching/privacy specs green | `JOIN_REQUESTS` off | Low |
+| D12 | `JOIN_REQUESTS` | request → approve → member round-trip; domain auto-join round-trip (org opt-in, never public email domains); reminder/expiry wakes verified; matching/privacy specs green; orphaned-org creation rate visibly down | `JOIN_REQUESTS` off | Low |
+| D13 | `IDENTITY_ROUTER_V2` (with D03) | Every unauthenticated journey round-trips in the new UI: sign-in per method, sign-up per method, reset, verification, deny/guidance states; zero Auth0-hosted pages or assets; sign-up completion ≥ baseline | Flag off — legacy screens intact until bake end | Medium (rides the D03 flip) |
 
 # ADRs to write (before or with the gated deliverable)
 
@@ -74,10 +122,10 @@ Plain design docs, written before the code they cover:
 
 1. **Identity platform + identifiers** (D01) — the column-ownership rule; **explicitly amends ADR-022/015** (replay excludes protocol columns; replay tooling gains per-pipeline column scoping). Carries the pseudonymization rule (generalizes ADR-052's content boundary).
 2. **Auth-path resilience** (D02) — the circuit breaker; **explicitly amends ADR-007's process-role rule** for the identity pipeline only, with the failure-semantics analysis.
-3. **Sign-in router + SSO self-service** (D03–D05) — identifier-first routing, auto-link rules; **explicitly amends ADR-027** (hook → per-method router policy; carries over the constants table and the route-table canary; answers the license-timing question, Open Q11).
+3. **Sign-in router, screens + SSO self-service** (D03/D13–D05) — identifier-first routing, auto-link rules, the first-party screen set; **explicitly amends ADR-027** (hook → per-method router policy; carries over the constants table and the route-table canary; answers the license-timing question, Open Q11).
 4. **MFA + session shape** (D06) — `amr` semantics incl. the passkey/`phw` decision (Open Q4); the forced re-login.
 
-Gherkin specs to write fresh (no existing coverage): join-request lifecycle (D12), org-admin surface panels (D05), ops lookup actions (D05), MFA enrollment/step-up (D06), connection self-service lifecycle (D05). Use `/write-spec` per deliverable.
+Gherkin specs to write fresh (no existing coverage): join-request lifecycle including domain auto-join and the join-before-create sign-up path (D12/D13), the full sign-in & sign-up screen set with its deny/guidance states (D13), org-admin surface panels (D05), ops lookup actions (D05), MFA enrollment/step-up (D06), connection self-service lifecycle (D05). Use `/write-spec` per deliverable.
 
 # Spec-amendment table (existing corpus)
 
@@ -85,7 +133,7 @@ Gherkin specs to write fresh (no existing coverage): join-request lifecycle (D12
 |---|---|---|
 | `specs/auth/phase-1-better-auth-config.feature` | Retire `NEXTAUTH_PROVIDER` matrix (:19-45), `ssoProvider` matching (:51-73), `pendingSsoSetup` (:112-117); keep better-auth/bcrypt anchors | D03 |
 | 〃 `:119-137` (legacy `Session.impersonating`) | Retire; replace with `{actor, subject}` scenarios | D06 |
-| `specs/auth/auth-signin-flows.feature` | Port credentials/Google flows to router; Auth0 flow retired at D10 (legacy callback kept working by the shim, R9, until then) | D03, D09/D10 |
+| `specs/auth/auth-signin-flows.feature` | Port credentials/Google flows to the router + the new screens; Auth0 flow retired at D10 (legacy callback kept working by the shim, R9, until then) | D03/D13, D09/D10 |
 | `specs/auth/password-reset.feature` | Flip cloud/SSO-mode rejection per Open Q9; keep no-oracle + revoke-all anchors | D03 |
 | `specs/auth/sso-wrong-provider-recovery.feature` | Port from `ssoDomain` strings to `SsoConnection`; most scenarios survive | D04 |
 | `specs/auth/sso-orphan-user-linking.feature` | Generalize into the auto-link/admin-confirm rule; reconcile "unverified orphan" with R8 | D03 |
@@ -104,15 +152,17 @@ Gherkin specs to write fresh (no existing coverage): join-request lifecycle (D12
 
 # Flag inventory
 
-`AUTH_REDIS_BREAKER` (D02) · `IDENTITY_ROUTER_V2` (D03) · `SSOCONN_ROUTING` (D04) · `SELF_SERVE_SSO` per-org (D05) · `MFA_ENROLLMENT_OPEN` (D06) · `PASSKEYS_ENABLED` (D07) · `SCIM_V2_GRANTS` (D08) · invite changes additive (D11) · `JOIN_REQUESTS` (D12) · deploy-time session revoke (D06, one-way).
+`AUTH_REDIS_BREAKER` (D02) · `IDENTITY_ROUTER_V2` (D03 + D13 — router and screens flip together) · `SSOCONN_ROUTING` (D04) · `SELF_SERVE_SSO` per-org (D05) · `MFA_ENROLLMENT_OPEN` (D06) · `PASSKEYS_ENABLED` (D07) · `SCIM_V2_GRANTS` (D08) · invite changes additive (D11) · `JOIN_REQUESTS` (D12) · deploy-time session revoke (D06, one-way).
 
-House discipline: dashboards before flags flip. Metrics pack per deliverable: routing decisions by outcome, link proposals auto vs confirmed, ceremony success rates, SCIM dead-letters, breaker state transitions, join-request funnel, invite resend/expiry rates, per-customer migration progress + shim hits, sign-in success vs baseline.
+House discipline: dashboards before flags flip. Metrics pack per deliverable: routing decisions by outcome, link proposals auto vs confirmed, ceremony success rates, SCIM dead-letters, breaker state transitions, join-request funnel (incl. auto-joins), invite resend/expiry rates, sign-up funnel + orphaned-organization creation rate, per-customer migration progress + shim hits, sign-in success vs baseline.
 
 # Risk register
 
 | Risk | Where | Mitigation |
 |---|---|---|
 | Cutover breaks sign-in fleet-wide | D03 | Shadow bake with zero-mismatch gate; flag off = instant revert; D02 already landed |
+| New front door tanks sign-up conversion | D13 | Sign-up funnel dashboard live before the flip; completion ≥ baseline in the exit gate; flag off restores legacy screens |
+| Domain auto-join admits the wrong person | D12 | Org opt-in only; verified email required; public email domains excluded outright; every auto-join is an audited event admins are notified of |
 | Replay clobbers protocol columns | D01 | ADR-1 amends replay contract; replay-parity test in exit gate; lint rule on lifecycle-column writes |
 | Inline processing overloads web role during Redis outage | D02 | Identity volume is hundreds/day; breaker metrics; half-open probes; ADR-2 records the analysis |
 | Session revoke-all strands users mid-work | D06 | Comms + precedent (better-auth cutover); schedule low-traffic window |
@@ -124,6 +174,7 @@ House discipline: dashboards before flags flip. Metrics pack per deliverable: ro
 # Staffing notes
 
 - D01–D03 are strictly sequential, same owner ideally (they share the pipeline + dispatch path).
+- D13 pairs with D03: one engineer on the router, one on the screens, one flag between them.
 - D06/D07 pair naturally (both touch session shape + better-auth plugins).
 - D09 is engineering + CS per customer; the wizard and playbook are engineering's deliverable, execution is shared and deliberately slow.
 - D02 and D11 (invitations) are the best parallelization candidates for a second engineer; D11 needs only D01 and can start immediately after it.

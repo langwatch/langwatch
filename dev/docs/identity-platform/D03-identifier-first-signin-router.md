@@ -10,7 +10,7 @@ Replace the `NEXTAUTH_PROVIDER` one-method front door with identifier-first rout
 
 - Router reads `Account` lifecycle columns + domain routing tables (strings until D04; `SSOCONN_ROUTING` takes over after). PG reads only on the hot path.
 - Normalization identical to D01 attach-time: lowercase, plus-strip, fold.
-- Uniform method picker (passkey placeholder until D07 | password | social): same page, same timing, whether or not the account exists — no user-level existence oracle. Domain-level SSO routing is discoverable by design and accepted.
+- Uniform method picker (passkey placeholder until D07 | password | social): same page, same timing, whether or not the account exists — no user-level existence oracle. Domain-level SSO routing is discoverable by design and accepted. D03 owns this contract and the decision engine; the screens that render it are D13, on the same flag.
 - Self-hosted: exactly one ACTIVE connection ⇒ auto-redirect straight to the IdP; deliberate escape hatch `/auth/signin?local=1` (the break-glass binding made real). Env becomes the default method set, not a global gate.
 - Cloud: multiple methods simultaneously — ends the `NEXTAUTH_PROVIDER` one-method invariant there.
 - SSO callback linking:
@@ -24,7 +24,7 @@ Replace the `NEXTAUTH_PROVIDER` one-method front door with identifier-first rout
 
 # Out of Scope
 
-- Connection management UI (D05), MFA step-up UI (D06 — the router leaves the hook point), passkeys as a picker method (D07), join-request interstitial (D12 — hook point left).
+- The screen set itself (D13 — sign-in, sign-up, reset, verification, deny/guidance states; flips with this deliverable on the same flag). Connection management UI (D05), MFA step-up UI (D06 — the router leaves the hook point), passkeys as a picker method (D07), join-request interstitial (D12 — hook point left).
 
 # Research
 
@@ -34,7 +34,7 @@ Replace the `NEXTAUTH_PROVIDER` one-method front door with identifier-first rout
 # Technical Plan
 
 1. Router module: email → routing decision (pure function over PG reads; unit-testable; decision logged with reason codes for the ops surface).
-2. Uniform picker UI with timing normalization.
+2. Routing-decision contract consumed by D13's screens (decision + reason codes); timing-normalization requirements pinned by contract tests.
 3. Auto-link / LinkProposed commands (identity pipeline); audit events with before/after.
 4. Break-glass local path bound to break-glass bindings (bindings land fully in D05; interim: platform-ops-granted).
 5. `pendingSsoSetup` reconciliation job + column drop.
