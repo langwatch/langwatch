@@ -48,17 +48,35 @@ import {
 const MODULE_DIR = fileURLToPath(new URL("../", import.meta.url));
 
 /**
- * Imports that would drag a browser runtime into the policy. `vega-lite` is
+ * A type-only `import`/`export` statement, however it wraps across lines.
+ *
+ * The lazy body stops at that statement's own `from "…"`, so a value import on
+ * a following line is left alone rather than shielded by the type import above
+ * it. This is a statement-level strip rather than a lookbehind on the module
+ * pattern: a lookbehind cannot span a multiline `import type { … }` without
+ * also reaching back across statement boundaries.
+ */
+const TYPE_ONLY_STATEMENT =
+  /(?:^|\n)\s*(?:import|export)\s+type\b[\s\S]*?from\s+["'][^"']+["']/g;
+
+/**
+ * Modules that would drag a browser runtime into the policy. `vega-lite` is
  * absent from this list on purpose: the schema module imports its bundled JSON
  * schema, which is data and evaluates nothing.
- *
- * The lookahead excludes `import type` / `export type`: a type-only import is
- * erased before anything evaluates it, so it drags in no runtime. That is what
- * lets `noNetworkVegaLoader.ts` check its shape against vega's own `Loader`
- * without importing vega.
  */
-const BROWSER_RUNTIME_IMPORT =
-  /(?<!\b(?:import|export)\s+type\b[^\n]*)from\s+["'](react|react-dom|react-vega|vega|vega-embed|vega-view|@chakra-ui\/[^"']+)["']/;
+const BROWSER_RUNTIME_MODULE =
+  /from\s+["'](react|react-dom|react-vega|vega|vega-embed|vega-view|@chakra-ui\/[^"']+)["']/;
+
+/**
+ * Whether a module *evaluates* a browser runtime.
+ *
+ * Type-only imports are stripped first because they are erased before anything
+ * runs — which is what lets `noNetworkVegaLoader.ts` check its shape against
+ * vega's own `Loader` at compile time without importing vega.
+ */
+function importsBrowserRuntime(source: string): boolean {
+  return BROWSER_RUNTIME_MODULE.test(source.replace(TYPE_ONLY_STATEMENT, ""));
+}
 
 const sourceFiles = () =>
   readdirSync(MODULE_DIR, { recursive: true, withFileTypes: true })
@@ -89,7 +107,7 @@ describe("the Vega-Lite validator and policy modules", () => {
         expect(files.length).toBeGreaterThan(5);
         for (const { name, source } of files) {
           expect(
-            BROWSER_RUNTIME_IMPORT.test(source),
+            importsBrowserRuntime(source),
             `${name} imports a browser runtime`,
           ).toBe(false);
           expect(source.includes("import("), `${name} uses a lazy import`).toBe(
@@ -162,6 +180,51 @@ describe("the Vega-Lite validator and policy modules", () => {
           "maxUnitViews",
         ]);
         expect(ALLOWED_VEGA_LITE_TRANSFORMS).toContain("filter");
+      });
+    });
+  });
+  describe("given the guard's own pattern", () => {
+    describe("when it is shown each import form", () => {
+      /** @scenario "Policy modules stay pure and server-import-safe" */
+      it("catches every value import and admits every type-only one", () => {
+        // The guard exists to keep a browser runtime out of the policy, and a
+        // type-only import brings none — it is erased before anything runs.
+        // That distinction is a lookbehind, which is easy to get subtly wrong,
+        // so both halves are pinned here rather than trusted: a pattern that
+        // stopped catching value imports would disarm the guard without
+        // failing anything, and one that rejected type-only imports would
+        // force `noNetworkVegaLoader.ts` to drop its `Loader` conformance
+        // check — the compile-time link that keeps the deny-everything loader
+        // honest.
+        const caught = [
+          'import { View } from "vega";',
+          'import vegaEmbed from "vega-embed";',
+          'import { useState } from "react";',
+          'import { Box } from "@chakra-ui/react";',
+          // A type-only import earlier in the file must not shield a value
+          // import later in it.
+          'import type { Loader } from "vega";\nimport { View } from "vega";',
+        ];
+        const admitted = [
+          'import type { Loader } from "vega";',
+          'export type { Loader } from "vega";',
+          'import type { Loader as VegaLoader } from "vega";',
+          'import type {\n  Loader,\n} from "vega";',
+          'import type { EmbedOptions } from "vega-embed";',
+        ];
+
+        for (const source of caught) {
+          expect(
+            importsBrowserRuntime(source),
+            `should catch: ${source}`,
+          ).toBe(true);
+        }
+        for (const source of admitted) {
+          expect(
+            importsBrowserRuntime(source),
+            `should admit: ${source}`,
+          ).toBe(false);
+        }
       });
     });
   });
