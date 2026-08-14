@@ -24,12 +24,12 @@ Feature: Pulled provider usage becomes visible, attributed cost
     And gateway requests for that team are still allowed
 
   @unit
-  Scenario: Gateway spend is not lost while the pulled-cost filter is deployed
-    Given a team whose gateway requests count towards a spending limit
-    When the change that excludes pulled cost from those totals is rolled out
-    And the team keeps making gateway requests throughout the rollout
-    Then every one of those requests still counts towards the team's limit
-    And the team's limit is not left with spend it should have refused
+  Scenario: The pulled-cost exclusion changes the budget rollup in place
+    Given the migration that excludes pulled cost from budget totals
+    Then it changes the rollup view's query in place, rather than dropping and
+      recreating the view
+    And it keeps the filter that excludes pulled scope
+    And it keeps the spend column that budget enforcement reads
 
   @integration
   Scenario: Pulled cost is attributed to the source's team

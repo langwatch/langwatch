@@ -20,7 +20,7 @@ describe("ClickHouse migrations", () => {
     expect(duplicates).toEqual([]);
   });
 
-  /** @scenario Gateway spend is not lost while the pulled-cost filter is deployed */
+  /** @scenario The pulled-cost exclusion changes the budget rollup in place */
   it("changes the budget rollup view without dropping its trigger", () => {
     // A materialised view is an insert trigger. Between a DROP and the
     // following CREATE there is no trigger, ClickHouse does not replay the
@@ -30,6 +30,12 @@ describe("ClickHouse migrations", () => {
     // (getSpendForBudgets* reads sumMerge(SpendNanoUSD)), so the missing money
     // reads as headroom and a budget authorises a request it should refuse.
     // MODIFY QUERY swaps the SELECT with the trigger never absent.
+    //
+    // This is a static read of the migration text and nothing more: it does not
+    // run the migration, write a debit, or consult an enforcement decision. It
+    // pins the mechanism the reasoning above depends on. Proving that a debit
+    // written mid-rollout still reaches a budget needs a live ClickHouse, next
+    // to "Pulled cost never blocks spending" in pulledUsageLedger.integration.
     const sql = readFileSync(
       resolve(
         process.cwd(),
