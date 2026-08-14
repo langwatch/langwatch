@@ -154,6 +154,19 @@ function dedupeScopes(scopes: ScopeAttachment[]): ScopeAttachment[] {
 }
 
 /**
+ * Transaction budget for every default-models write.
+ *
+ * These writes queue on an advisory lock, and the wait counts against
+ * the interactive-transaction timeout. Prisma's default is 5 seconds,
+ * which a write queued behind another one in the same organization can
+ * exceed, and it would then fail with P2028: an unknown error on a save
+ * that only needed to wait its turn. `timeout` therefore has to cover
+ * the lock queue, not just the statements. `maxWait` is the separate
+ * budget for getting a connection out of the pool.
+ */
+const WRITE_TX_BUDGET = { timeout: 20_000, maxWait: 10_000 } as const;
+
+/**
  * Run `fn` inside a transaction when handed the root PrismaClient, or
  * directly when the caller already opened one (e.g. `upsertKeyAtScope`
  * calls back into `createConfig` from inside its own `$transaction`).
@@ -163,7 +176,7 @@ async function withScopeTransaction<T>(
   fn: (tx: ModelDefaultsPrisma) => Promise<T>,
 ): Promise<T> {
   if (isRootPrismaClient(prisma)) {
-    return prisma.$transaction(fn);
+    return prisma.$transaction(fn, WRITE_TX_BUDGET);
   }
   return fn(prisma);
 }
@@ -549,5 +562,5 @@ async function upsertKeyAtScope(
         authorId: params.authorId ?? null,
       },
     );
-  });
+  }, WRITE_TX_BUDGET);
 }

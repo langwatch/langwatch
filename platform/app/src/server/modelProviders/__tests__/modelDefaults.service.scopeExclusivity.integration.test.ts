@@ -23,6 +23,7 @@ import {
   createConfig,
   updateConfig,
 } from "../modelDefaults.service";
+import { resolveModelForFeature } from "../resolveModelForFeature";
 
 describe("given default-model configs with scope attachments (real DB)", () => {
   const ns = `mdcfg-excl-${nanoid(8)}`;
@@ -125,6 +126,15 @@ describe("given default-model configs with scope attachments (real DB)", () => {
         where: { id: old.id },
       });
       expect(oldRow).toBeNull();
+
+      // The part a customer actually sees. Asserting only the rows would
+      // stay green if the claim detached the attachment but the resolver
+      // still read the config that lost it.
+      const resolved = await resolveModelForFeature("prompt.create_default", {
+        prisma,
+        projectId: webProjectId,
+      });
+      expect(resolved.model).toBe("gemini/gemini-2.5-pro");
     });
   });
 
