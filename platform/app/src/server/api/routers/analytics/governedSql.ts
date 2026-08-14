@@ -27,6 +27,7 @@ import {
   getGovernedSqlService,
   MAX_GOVERNED_SQL_LENGTH,
 } from "~/server/analytics/governed-sql";
+import { governedSqlTimeWindowSchema } from "~/server/analytics/governed-sql/timeWindowSchema";
 import { workbenchEnabled } from "~/server/analytics/workbenchFeatureGate";
 
 import { checkProjectPermission } from "../../rbac";
@@ -48,21 +49,6 @@ const parameterValueSchema = z.union([
 ]);
 
 const projectScopeSchema = z.object({ projectId: z.string() });
-
-/**
- * The period the page is showing.
- *
- * Coerced rather than typed as a `Date`, so the same shape is accepted whether
- * the client sent epoch milliseconds, an ISO string, or a real `Date` through
- * superjson. Which of the reserved parameters this fills, and whether it fills
- * any at all, is decided by the service from the statement itself.
- *
- * @see ~/server/analytics/governed-sql/timeWindow
- */
-const timeWindowSchema = z.object({
-  start: z.coerce.date(),
-  end: z.coerce.date(),
-});
 
 /**
  * Which gate closed, when one did.
@@ -143,7 +129,7 @@ const query = protectedProcedure
       // one that was submitted.
       sql: z.string().min(1).max(MAX_GOVERNED_SQL_LENGTH),
       parameters: z.record(z.string(), parameterValueSchema).optional(),
-      timeWindow: timeWindowSchema.optional(),
+      timeWindow: governedSqlTimeWindowSchema.optional(),
     }),
   )
   .use(checkProjectPermission("analytics:view"))

@@ -43,6 +43,18 @@ const harness = vi.hoisted(() => ({
   mutation: vi.fn(),
   /** Stands for whatever the member wrote in the specification editor. */
   editedSpec: '{"mark":"point"}',
+  /** What the saved-chart list answers; empty unless a case says otherwise. */
+  charts: [] as { id: string; name: string }[],
+  /** What opening a saved chart fetches. */
+  openableChart: null as null | {
+    id: string;
+    name: string;
+    definition: {
+      sql: string;
+      parameters: Record<string, string>;
+      vegaLiteSpec?: Record<string, unknown>;
+    };
+  },
 }));
 
 vi.mock("@trpc/client", async (importOriginal) => {
@@ -57,7 +69,20 @@ vi.mock("@trpc/client", async (importOriginal) => {
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useUtils: () => ({ client: {} }),
+    useUtils: () => ({
+      client: {},
+      analytics: {
+        savedWorkbenchCharts: {
+          getById: {
+            fetch: async () => {
+              if (!harness.openableChart) throw new Error("no chart to open");
+              return harness.openableChart;
+            },
+          },
+          getAll: { invalidate: async () => undefined },
+        },
+      },
+    }),
     analytics: {
       governedSql: {
         schema: {
@@ -70,7 +95,11 @@ vi.mock("~/utils/api", () => ({
       },
       savedWorkbenchCharts: {
         getAll: {
-          useQuery: () => ({ data: [], isLoading: false, error: null }),
+          useQuery: () => ({
+            data: harness.charts,
+            isLoading: false,
+            error: null,
+          }),
         },
         create: {
           useMutation: () => ({
@@ -212,6 +241,8 @@ function addParameter({ name, value }: { name: string; value: string }) {
 beforeEach(() => {
   harness.mutation.mockReset();
   harness.mutation.mockResolvedValue(governedSqlResult());
+  harness.charts = [];
+  harness.openableChart = null;
 });
 
 describe("the governed SQL workbench", () => {
@@ -511,6 +542,58 @@ describe("the governed SQL workbench", () => {
         );
         fireEvent.click(screen.getByRole("button", { name: "Run query" }));
 
+        await waitFor(() => expect(harness.mutation).toHaveBeenCalledTimes(1));
+        expect(harness.mutation.mock.calls[0]![1].timeWindow).toEqual(
+          PAGE_WINDOW,
+        );
+      });
+
+      // The gap this closes: the fields keep showing what was typed while it
+      // is invalid, so without the gate Run would execute the last committed
+      // window — one the member is no longer looking at.
+      it("holds Run while the visible text does not name a runnable window", async () => {
+        const editor = await renderWorkbench();
+        typeSql(editor, SQL);
+
+        fireEvent.change(screen.getByLabelText("period_start"), {
+          target: { value: "2026-02-30 12:00:00" },
+        });
+        expect(
+          screen.getByRole("button", { name: "Run query" }),
+        ).toBeDisabled();
+
+        fireEvent.change(screen.getByLabelText("period_start"), {
+          target: { value: "2026-02-24 09:00:00" },
+        });
+        expect(screen.getByRole("button", { name: "Run query" })).toBeEnabled();
+      });
+    });
+
+    describe("when a saved chart is opened while a window override is held", () => {
+      it("drops the override, so the opened chart follows the page's period", async () => {
+        harness.charts = [{ id: "chart-1", name: "Traces per day" }];
+        harness.openableChart = {
+          id: "chart-1",
+          name: "Traces per day",
+          definition: { sql: "SELECT 1", parameters: {} },
+        };
+
+        const editor = await renderWorkbench();
+        typeSql(editor, SQL);
+        fireEvent.change(screen.getByLabelText("period_start"), {
+          target: { value: "2026-02-24 09:00:00" },
+        });
+        expect(screen.getByText("Set for this query")).toBeInTheDocument();
+
+        await userEvent.click(screen.getByTestId("open-saved-chart"));
+        await userEvent.click(await screen.findByText("Traces per day"));
+
+        await waitFor(() =>
+          expect(
+            screen.getByText("From the period on this page"),
+          ).toBeInTheDocument(),
+        );
+        fireEvent.click(screen.getByRole("button", { name: "Run query" }));
         await waitFor(() => expect(harness.mutation).toHaveBeenCalledTimes(1));
         expect(harness.mutation.mock.calls[0]![1].timeWindow).toEqual(
           PAGE_WINDOW,

@@ -187,6 +187,50 @@ describe("the saved workbench chart definition", () => {
       });
     });
 
+    describe("when one parameter's name is longer than the ceiling", () => {
+      /** @scenario "A definition larger than the stored ceilings is refused" */
+      it("refuses the name as too big and names which parameter it was", () => {
+        const longName = "p".repeat(257);
+        const overLongName = workbenchChartDefinitionSchema.safeParse({
+          version: WORKBENCH_CHART_DEFINITION_VERSION,
+          sql: SQL,
+          parameters: { [longName]: "ok" },
+        });
+
+        expect(overLongName.success).toBe(false);
+        expect(overLongName.error?.issues).toContainEqual(
+          expect.objectContaining({
+            code: "too_big",
+            maximum: 256,
+            path: ["parameters", longName],
+          }),
+        );
+
+        // A name exactly at the ceiling is admitted.
+        expect(
+          workbenchChartDefinitionSchema.safeParse({
+            version: WORKBENCH_CHART_DEFINITION_VERSION,
+            sql: SQL,
+            parameters: { ["p".repeat(256)]: "ok" },
+          }).success,
+        ).toBe(true);
+      });
+    });
+
+    describe("when a parameter's numeric value is not a finite number", () => {
+      it("refuses NaN and infinities, which JSON cannot store as numbers", () => {
+        for (const value of [Number.NaN, Infinity, -Infinity]) {
+          expect(
+            workbenchChartDefinitionSchema.safeParse({
+              version: WORKBENCH_CHART_DEFINITION_VERSION,
+              sql: SQL,
+              parameters: { since: value },
+            }).success,
+          ).toBe(false);
+        }
+      });
+    });
+
     describe("when one parameter's value is longer than the ceiling", () => {
       /** @scenario "A definition larger than the stored ceilings is refused" */
       it("refuses the value as too big and names which parameter it was", () => {

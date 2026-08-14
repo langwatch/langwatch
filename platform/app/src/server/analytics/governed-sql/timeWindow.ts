@@ -70,8 +70,15 @@ export function isGovernedSqlTimeWindowParameter(
  * the injected value carries a time, so binding it to a day-resolution type
  * would truncate the window without saying so, and a window that may be null is
  * not a window.
+ *
+ * A zone argument other than `'UTC'` is refused too. The injected value is a
+ * UTC wall clock with no zone designator, and ClickHouse reads it in the
+ * declared zone — `DateTime('Asia/Tokyo')` would shift the whole window by
+ * nine hours without a word. The bare spellings stay allowed: with no zone
+ * argument the server's own zone applies, which the platform runs as UTC.
  */
-const GOVERNED_DATE_TIME_TYPE = /^DateTime(?:64)?(?:\s*\([^)]*\))?$/;
+const GOVERNED_DATE_TIME_TYPE =
+  /^(?:DateTime(?:\(\s*'UTC'\s*\))?|DateTime64(?:\(\s*\d+\s*(?:,\s*'UTC'\s*)?\))?)$/;
 
 /** Whether a declared ClickHouse type can carry an instant. */
 export function isGovernedSqlDateTimeParameterType(type: string): boolean {

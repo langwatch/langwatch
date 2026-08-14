@@ -44,7 +44,7 @@ function mount(
       openedChartId={null}
       openedChartName={null}
       isSaving={false}
-      savable={true}
+      canSave={true}
       {...handlers}
       {...overrides}
     />,
@@ -77,7 +77,7 @@ describe("the saved chart toolbar", () => {
 
     describe("when the member has written nothing to save", () => {
       it("offers no save at all", () => {
-        mount({ savable: false });
+        mount({ canSave: false });
         expect(screen.getByTestId("save-chart")).toBeDisabled();
       });
     });
@@ -114,7 +114,10 @@ describe("the saved chart toolbar", () => {
           openedChartName: "Traces per day",
         });
 
-        expect(screen.getByTestId("save-chart")).toHaveTextContent("Save");
+        // Anchored: `toHaveTextContent("Save")` matches "Save chart" too, and
+        // the label IS the claim — with a chart open the button must not read
+        // as "create another".
+        expect(screen.getByTestId("save-chart")).toHaveTextContent(/^Save$/);
         await user.click(screen.getByTestId("save-chart"));
 
         // No dialog, and no name — which is what makes this an update of the

@@ -31,6 +31,7 @@ const WINDOW = {
  */
 function renderEditor() {
   const onOverride = vi.fn();
+  const onSendableChange = vi.fn();
   render(
     <ChakraProvider value={defaultSystem}>
       <GovernedSqlTimeWindowEditor
@@ -38,10 +39,15 @@ function renderEditor() {
         overridden={false}
         onOverride={onOverride}
         onFollowPage={vi.fn()}
+        onSendableChange={onSendableChange}
       />
     </ChakraProvider>,
   );
-  return { onOverride, start: screen.getByLabelText("period_start") };
+  return {
+    onOverride,
+    onSendableChange,
+    start: screen.getByLabelText("period_start"),
+  };
 }
 
 /** What the member typing into a field looks like to the component. */
@@ -148,6 +154,35 @@ describe("given the fields that carry the window a query reports over", () => {
         start: Date.UTC(2026, 1, 24, 0, 0, 0),
         end: WINDOW.end,
       });
+    });
+  });
+
+  // The half of the contract that keeps a refused edit from executing: while
+  // the visible text does not name a runnable window, the last committed one is
+  // stale against what is on screen, and the caller is told to hold Run rather
+  // than run a window the member is no longer looking at.
+  describe("when the visible text does not name a runnable window", () => {
+    it("reports unsendable while a field is invalid, and sendable once it parses again", () => {
+      const { onSendableChange, start } = renderEditor();
+
+      type(start, "2026-02-30 12:00:00");
+      expect(onSendableChange).toHaveBeenLastCalledWith(false);
+
+      type(start, "2026-02-24 12:00:00");
+      expect(onSendableChange).toHaveBeenLastCalledWith(true);
+    });
+
+    it("refuses an inverted window, saying which way round it has to be", () => {
+      const { onOverride, onSendableChange, start } = renderEditor();
+
+      // After WINDOW.end, so both fields parse and only the order is wrong.
+      type(start, "2026-03-01 00:00:00");
+
+      expect(onOverride).not.toHaveBeenCalled();
+      expect(onSendableChange).toHaveBeenLastCalledWith(false);
+      expect(
+        screen.getByText("The start must be before the end."),
+      ).toBeInTheDocument();
     });
   });
 });

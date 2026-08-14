@@ -18,7 +18,7 @@
  */
 
 import { Box, Button, HStack, Input, Stack, Text } from "@chakra-ui/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 // The leaf module, never the barrel: `timeWindow.ts` is import-free precisely
 // so the browser can read the same names and format the database is bound with,
@@ -106,6 +106,13 @@ export interface GovernedSqlTimeWindowEditorProps {
    * knows, and the browser deliberately does not parse SQL to guess.
    */
   followsTimeWindow?: boolean | undefined;
+  /**
+   * Told whether the visible text names a sendable window — both fields parse
+   * and the start precedes the end. While it is `false` the last committed
+   * window no longer matches what is on screen, and the caller must hold Run
+   * rather than execute a window the member is no longer looking at.
+   */
+  onSendableChange: (sendable: boolean) => void;
 }
 
 function InstantField({
@@ -161,6 +168,7 @@ export function GovernedSqlTimeWindowEditor({
   onOverride,
   onFollowPage,
   followsTimeWindow,
+  onSendableChange,
 }: GovernedSqlTimeWindowEditorProps) {
   const displayed = textOf(value);
   const [text, setText] = useState<WindowText>(displayed);
@@ -169,17 +177,35 @@ export function GovernedSqlTimeWindowEditor({
   // The window moved underneath the member — the page's period changed, or they
   // dropped their override — so what the fields show has to move with it.
   // Derived during render rather than in an effect, so the fields never paint
-  // one window while the request would carry another.
+  // one window while the request would carry another. The one divergence left
+  // is the member's own typing, and `onSendableChange` below is what keeps it
+  // from executing.
   if (shown.start !== displayed.start || shown.end !== displayed.end) {
     setShown(displayed);
     setText(displayed);
   }
 
+  const startInstant = parseGovernedSqlTimeWindowText(text.start);
+  const endInstant = parseGovernedSqlTimeWindowText(text.end);
+  // Its own answer rather than folded into per-field validity, because it
+  // needs its own words: both fields are fine on their own.
+  const inverted =
+    startInstant !== undefined &&
+    endInstant !== undefined &&
+    startInstant >= endInstant;
+  const sendable =
+    startInstant !== undefined && endInstant !== undefined && !inverted;
+
+  useEffect(() => {
+    onSendableChange(sendable);
+  }, [onSendableChange, sendable]);
+
   const change = (next: WindowText) => {
     setText(next);
     const start = parseGovernedSqlTimeWindowText(next.start);
     const end = parseGovernedSqlTimeWindowText(next.end);
-    if (start !== undefined && end !== undefined) onOverride({ start, end });
+    if (start !== undefined && end !== undefined && start < end)
+      onOverride({ start, end });
   };
 
   return (
@@ -211,6 +237,12 @@ export function GovernedSqlTimeWindowEditor({
           onText={(end) => change({ ...text, end })}
         />
       </HStack>
+
+      {inverted && (
+        <Text fontSize="12px" color="red.fg" data-testid="inverted-time-window">
+          The start must be before the end.
+        </Text>
+      )}
 
       <Text fontSize="12px" color="fg.muted">
         Values are UTC, and the period is half-open — write{" "}

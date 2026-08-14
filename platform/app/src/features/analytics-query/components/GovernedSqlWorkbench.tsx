@@ -134,16 +134,27 @@ function followsTimeWindowOf(
  * The page's period is the default rather than a starting value that then drifts
  * — an unoverridden workbench follows the period selector for as long as it is
  * open, which is what makes authoring behave the way the dashboard will.
+ *
+ * The override is scoped to the opened chart's revision the same way the
+ * specification draft is: a window held while chart A was open must not become
+ * the window chart B runs with the moment it is opened.
  */
 function useWorkbenchTimeWindow({
   query,
+  openedRevision,
 }: {
   query: ReturnType<typeof useGovernedSqlQuery>;
+  /** Bumped whenever a saved chart is opened. */
+  openedRevision: number;
 }) {
   const { period } = usePeriodSelector();
-  const [override, setOverride] = useState<GovernedSqlTimeWindowValues | null>(
-    null,
-  );
+  const [override, setOverride] = useState<{
+    revision: number;
+    window: GovernedSqlTimeWindowValues;
+  } | null>(null);
+  // Whether the editor's visible text names a window that can run. Held here
+  // so the Run gate and the editor read one answer.
+  const [sendable, setSendable] = useState(true);
 
   const pagePeriod = useMemo(
     () => ({
@@ -152,7 +163,11 @@ function useWorkbenchTimeWindow({
     }),
     [period.startDate, period.endDate],
   );
-  const value = override ?? pagePeriod;
+  const held =
+    override !== null && override.revision === openedRevision
+      ? override.window
+      : null;
+  const value = held ?? pagePeriod;
 
   const { setTimeWindow } = query;
   useEffect(() => {
@@ -161,8 +176,14 @@ function useWorkbenchTimeWindow({
 
   return {
     value,
-    overridden: override !== null,
-    onOverride: setOverride,
+    overridden: held !== null,
+    sendable,
+    onSendableChange: setSendable,
+    onOverride: useCallback(
+      (window: GovernedSqlTimeWindowValues) =>
+        setOverride({ revision: openedRevision, window }),
+      [openedRevision],
+    ),
     onFollowPage: useCallback(() => setOverride(null), []),
   };
 }
@@ -310,21 +331,29 @@ function useDraftInsert({
  * chart's specification, not an edit made against the previous one.
  */
 function useSpecDraft(wiring: ReturnType<typeof useSavedChartWiring>) {
+  // `text` is three-way: `undefined` means the member has not touched the
+  // specification, `null` means they asked for the starter back, and a string
+  // is their edit. Collapsing the first two made Reset a no-op while a saved
+  // chart was open — `null` fell through to the chart's stored specification,
+  // and the member had no way back to the starter.
   const [specDraft, setSpecDraft] = useState<{
     revision: number;
-    text: string | null;
-  }>({ revision: wiring.openedRevision, text: null });
+    text: string | null | undefined;
+  }>({ revision: wiring.openedRevision, text: undefined });
   const editedSpecText =
-    specDraft.revision === wiring.openedRevision ? specDraft.text : null;
+    specDraft.revision === wiring.openedRevision ? specDraft.text : undefined;
   const openedRevision = wiring.openedRevision;
   const setEditedSpecText = useCallback(
     (text: string | null) => setSpecDraft({ revision: openedRevision, text }),
     [openedRevision],
   );
-  // What the chart is handed: the member's edit, else the opened chart's
-  // saved specification, else `null` — which chart mode reads as "follow the
-  // starter for the result on screen".
-  const shownSpecText = editedSpecText ?? wiring.openedSpecText ?? null;
+  // What the chart is handed: the member's edit (a reset counts as one), else
+  // the opened chart's saved specification, else `null` — which chart mode
+  // reads as "follow the starter for the result on screen".
+  const shownSpecText =
+    editedSpecText === undefined
+      ? (wiring.openedSpecText ?? null)
+      : editedSpecText;
   return { shownSpecText, setEditedSpecText };
 }
 
@@ -376,14 +405,20 @@ export function GovernedSqlWorkbench({ projectId }: GovernedSqlWorkbenchProps) {
   const query = useGovernedSqlQuery({ projectId });
 
   const [schemaVisible, setSchemaVisible] = useState(true);
-  const { parameters, parametersSendable } = useParameterState(query);
+  const wiring = useSavedChartWiring({ projectId, query });
+  const { parameters, parametersSendable } = useParameterState(
+    query,
+    wiring.openedRevision,
+  );
   const { registerInsert, handleInsert, insertExample } = useDraftInsert({
     query,
     exampleSql: schema.model.datasets[0]?.exampleSql,
   });
   const failure = useMemo(() => failureView(query.state), [query.state]);
-  const wiring = useSavedChartWiring({ projectId, query });
-  const timeWindow = useWorkbenchTimeWindow({ query });
+  const timeWindow = useWorkbenchTimeWindow({
+    query,
+    openedRevision: wiring.openedRevision,
+  });
   const { shownSpecText, setEditedSpecText } = useSpecDraft(wiring);
 
   return (
@@ -470,9 +505,20 @@ function SchemaSidebar({
  * answer, Run stays lit and the round-trip comes back naming a parameter the
  * member is looking at, filled in.
  */
-function useParameterState(query: ReturnType<typeof useGovernedSqlQuery>) {
+function useParameterState(
+  query: ReturnType<typeof useGovernedSqlQuery>,
+  openedRevision: number,
+) {
   const [parametersSendable, setParametersSendable] = useState(true);
   const { setParameters } = query;
+
+  // Opening a saved chart remounts the parameters form with the chart's own
+  // values, and the remount announces nothing — a `false` left behind by a
+  // form that no longer exists would keep Run disabled with every visible row
+  // valid, and nothing on screen would say why.
+  useEffect(() => {
+    setParametersSendable(true);
+  }, [openedRevision]);
 
   const parameters = useCallback(
     ({ parameters: values, sendable }: GovernedSqlParametersChange) => {
@@ -527,6 +573,7 @@ function QueryCard({
         runnable={
           draft.sql.trim().length > 0 &&
           parametersSendable &&
+          timeWindow.sendable &&
           !query.state.inFlight
         }
         inFlight={query.state.inFlight}
@@ -540,7 +587,7 @@ function QueryCard({
         savedCharts={
           <BoundSavedCharts
             wiring={wiring}
-            savable={draft.sql.trim().length > 0}
+            canSave={draft.sql.trim().length > 0}
           />
         }
       />
@@ -570,6 +617,7 @@ function QueryCard({
           onOverride={timeWindow.onOverride}
           onFollowPage={timeWindow.onFollowPage}
           followsTimeWindow={followsTimeWindowOf(query.state)}
+          onSendableChange={timeWindow.onSendableChange}
         />
 
         <GovernedSqlParametersEditor
@@ -589,10 +637,10 @@ function QueryCard({
 /** The Save and Open toolbar, bound to the workbench's saved-chart wiring. */
 function BoundSavedCharts({
   wiring,
-  savable,
+  canSave,
 }: {
   wiring: ReturnType<typeof useSavedChartWiring>;
-  savable: boolean;
+  canSave: boolean;
 }) {
   const { saved, currentDraft } = wiring;
   return (
@@ -601,7 +649,7 @@ function BoundSavedCharts({
       openedChartId={saved.openedChartId}
       openedChartName={saved.openedChartName}
       isSaving={saved.isSaving}
-      savable={savable}
+      canSave={canSave}
       onSave={({ name }) =>
         void saved.save({
           draft: currentDraft(),

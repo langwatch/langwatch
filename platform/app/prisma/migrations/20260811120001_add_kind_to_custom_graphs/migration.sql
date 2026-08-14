@@ -16,3 +16,9 @@ ALTER TABLE "CustomGraph"
 -- clients issue, so neither pays for a full project scan followed by an
 -- in-memory filter as the other kind's row count grows.
 CREATE INDEX "CustomGraph_projectId_kind_idx" ON "CustomGraph"("projectId", "kind");
+
+-- Down (manual rollback only; Prisma does not execute this block):
+-- DROP INDEX "CustomGraph_projectId_kind_idx";
+-- ALTER TABLE "CustomGraph" DROP COLUMN "kind";
+-- WARNING: dropping "kind" removes the builder/workbench discriminator, so any
+-- saved workbench chart rows would become indistinguishable from builder rows.
