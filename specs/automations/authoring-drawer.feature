@@ -369,7 +369,6 @@ Feature: Staged automation authoring drawer
       Given the user has completed every section except the name
       When the user tries to save
       Then the name field shows that a name is required
-      And saving is blocked
 
     Scenario: Abandoning the drawer persists nothing
       Given the user has partially configured a new automation

@@ -18,6 +18,7 @@ import {
 import {
   attributeFieldRoundTrips,
   isPrefixOnly,
+  isUsableCondition,
   matchAttributePrefix,
 } from "../ConditionBuilder";
 
@@ -204,9 +205,7 @@ describe("attributeFieldRoundTrips", () => {
         operator: "is" as const,
         value: "error",
       };
-      const usable = [bad, good].filter(
-        (c) => !isPrefixOnly(c.field) && attributeFieldRoundTrips(c),
-      );
+      const usable = [bad, good].filter(isUsableCondition);
 
       expect(serializeConditions(usable)).toBe("status:error");
     });

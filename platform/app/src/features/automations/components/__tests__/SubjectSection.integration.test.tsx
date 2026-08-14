@@ -39,6 +39,8 @@ const server = vi.hoisted(() => ({
     | undefined,
   graphsLoading: false,
   graphsError: false,
+  /** What react-query would carry in `error` when `graphsError` is set. */
+  graphsErrorValue: null as unknown,
 }));
 
 vi.mock("~/utils/api", () => ({
@@ -49,6 +51,7 @@ vi.mock("~/utils/api", () => ({
           data: server.graphs,
           isLoading: server.graphsLoading,
           isError: server.graphsError,
+          error: server.graphsErrorValue,
           refetch: mockGraphsRefetch,
         }),
       },
@@ -150,6 +153,7 @@ describe("SubjectSection", () => {
     server.graphs = [{ id: "graph-1", name: "Latency", trigger: null }];
     server.graphsLoading = false;
     server.graphsError = false;
+    server.graphsErrorValue = null;
     mockGraphsRefetch.mockClear();
   });
   afterEach(() => {
@@ -273,10 +277,16 @@ describe("SubjectSection", () => {
       it("does not name the underlying error", () => {
         server.graphsError = true;
         server.graphs = undefined;
+        // A recognizable message the failure state must never leak — without
+        // one in the mocked query, this assertion could never fail.
+        server.graphsErrorValue = new Error(
+          "upstream exploded: connect ECONNREFUSED 10.0.0.7:8123",
+        );
         seedFreshAlertDraft();
         render(<SubjectSection />, { wrapper: Wrapper });
 
-        expect(screen.queryByText(/upstream|fetch|network/i)).toBeNull();
+        expect(screen.queryByText(/upstream exploded/i)).toBeNull();
+        expect(screen.queryByText(/ECONNREFUSED/i)).toBeNull();
       });
 
       it("does not offer to create a graph the project may already have", () => {
