@@ -15,9 +15,6 @@
 
 import { createLogger } from "@langwatch/observability";
 import { type ChildProcess, spawn } from "child_process";
-import os from "os";
-import path from "path";
-import { env } from "~/env.mjs";
 import { tryGetApp } from "../app-layer/app";
 import { resolveAppPackageRoot } from "../appPackageRoot";
 import {
@@ -34,12 +31,8 @@ import {
   type CancellationMessage,
   subscribeToCancellations,
 } from "./cancellation-channel";
-import {
-  encodeScenarioLogContext,
-  SCENARIO_LOG_CONTEXT_ENV,
-} from "./execution/child-logger";
+import { buildChildEnvironment } from "./execution/child-environment";
 import { resolveChildProcessSpawn } from "./execution/child-process-spawn";
-import { resolveChildTlsEnv } from "./execution/child-tls-env";
 import {
   createDataPrefetcherDependencies,
   prefetchScenarioData,
@@ -228,66 +221,6 @@ function createScenarioLogger(jobData: ExecutionJobData) {
   });
 }
 
-/**
- * Build OTEL resource attributes string for scenario labels and platform source.
- * @internal Exported for testing
- */
-export function buildOtelResourceAttributes(labels: string[]): string {
-  const parts = ["langwatch.origin.source=platform"];
-  if (labels.length) {
-    const escapedLabels = labels.map((l) =>
-      l.replace(/\\/g, "\\\\").replace(/[,=]/g, "\\$&"),
-    );
-    parts.push(`scenario.labels=${escapedLabels.join(",")}`);
-  }
-  return parts.join(",");
-}
-
-/**
- * Build minimal env for child process - whitelist only what's needed.
- * @internal Exported for testing
- */
-/**
- * Where the scenario child keeps its V8 compile cache. Under the OS temp dir
- * because that is writable in every deployment shape we ship, including a
- * read-only application root.
- */
-const SCENARIO_CHILD_COMPILE_CACHE_DIR = path.join(
-  os.tmpdir(),
-  "langwatch-scenario-compile-cache",
-);
-
-export function buildChildProcessEnv(
-  scenarioVars: Record<string, string | undefined>,
-): NodeJS.ProcessEnv {
-  const vars: Record<string, string | undefined> = {
-    PATH: process.env.PATH,
-    HOME: process.env.HOME,
-    USER: process.env.USER,
-    SHELL: process.env.SHELL,
-    LANG: process.env.LANG,
-    LC_ALL: process.env.LC_ALL,
-    TERM: process.env.TERM,
-    NODE_ENV: process.env.NODE_ENV,
-    NODE_OPTIONS: process.env.NODE_OPTIONS,
-    SKIP_ENV_VALIDATION: "1",
-    // The child is a fresh process per run, so without this it re-compiles the
-    // same bundle every time. Node keys each entry by a hash of the source, so
-    // a rebuilt bundle can never be served a stale compilation — the entries
-    // for the old one are simply never read again. An unwritable directory
-    // degrades to no caching rather than failing the spawn.
-    NODE_COMPILE_CACHE:
-      process.env.NODE_COMPILE_CACHE ?? SCENARIO_CHILD_COMPILE_CACHE_DIR,
-    COREPACK_ENABLE_DOWNLOAD_PROMPT:
-      process.env.COREPACK_ENABLE_DOWNLOAD_PROMPT,
-    ...scenarioVars,
-  };
-
-  return Object.fromEntries(
-    Object.entries(vars).filter(([, v]) => v !== undefined),
-  ) as NodeJS.ProcessEnv;
-}
-
 /** The runner's structured stdout result line. */
 export interface ChildProcessResult {
   success: boolean;
@@ -469,32 +402,10 @@ async function spawnScenarioChildProcess(
       childLogger[level](extra ?? {}, message);
     };
 
-    const otelResourceAttrs = buildOtelResourceAttributes(
-      childProcessData.scenario.labels,
-    );
-    const logContext = encodeScenarioLogContext({
-      scenarioRunId: jobData.scenarioRunId,
-      batchRunId,
-      projectId,
-      scenarioId,
-      setId,
-    });
-    // TLS for the runner's own fetch stack (EventReporter → platform, and the
-    // model API call). Forwards haven's trusted local CA when present; only in
-    // local non-SaaS dev does it fall back to relaxing TLS. Never in SaaS/prod.
-    // See resolveChildTlsEnv for the gating.
-    const tlsEnv = resolveChildTlsEnv({
-      isSaaS: !!env.IS_SAAS,
-      nodeEnv: process.env.NODE_ENV,
-      nodeExtraCaCerts: process.env.NODE_EXTRA_CA_CERTS,
-    });
-    const childEnv = buildChildProcessEnv({
-      LANGWATCH_API_KEY: telemetry.apiKey,
-      LANGWATCH_ENDPOINT: telemetry.endpoint,
-      SCENARIO_HEADLESS: "true",
-      OTEL_RESOURCE_ATTRIBUTES: otelResourceAttrs,
-      [SCENARIO_LOG_CONTEXT_ENV]: logContext,
-      ...tlsEnv,
+    const childEnv = buildChildEnvironment({
+      jobData,
+      labels: childProcessData.scenario.labels,
+      telemetry,
     });
 
     const packageRoot = resolveAppPackageRoot();

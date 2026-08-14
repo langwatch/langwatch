@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { buildChildProcessEnv } from "../scenario.processor";
+import { buildChildProcessEnv } from "../execution/child-environment";
 
 describe("buildChildProcessEnv", () => {
   describe("given the scenario processor builds the child environment", () => {
