@@ -1,13 +1,21 @@
 export {
   EMAIL_EXTERNAL_KINDS,
   EXTERNAL_KINDS_BY_PROVIDER,
+  type ExternalKind,
+  isEmailKind,
   LINK_ORDERING,
   LINK_SOURCES,
-  isEmailKind,
-  type ExternalKind,
   type LinkProvider,
   type LinkSource,
 } from "./constants";
+export {
+  type LinkTimelineRow,
+  type LoginResolution,
+  type OwnershipSegment,
+  resolveOwnerAt,
+  splitPeriodByOwnership,
+} from "./resolution";
+export type { IdentityLinkStorage } from "./storage";
 export type {
   AppendLinkInput,
   EraseIdentifiersInput,
@@ -15,11 +23,3 @@ export type {
   IdentityLinkRow,
   LoginRef,
 } from "./types";
-export type { IdentityLinkStorage } from "./storage";
-export {
-  resolveOwnerAt,
-  splitPeriodByOwnership,
-  type LinkTimelineRow,
-  type LoginResolution,
-  type OwnershipSegment,
-} from "./resolution";
