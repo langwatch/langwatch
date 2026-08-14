@@ -152,13 +152,14 @@ function viewUrl(source: ReportSource, baseHost: string, slug: string): string {
     case "traceQuery":
       return `${base}/traces`;
     case "customGraph":
-      return `${base}/analytics/custom/${source.customGraphId}`;
+      return `${base}/analytics/custom/${encodeURIComponent(source.customGraphId)}`;
     case "dashboard":
       // Matches the deep link the dashboard page itself pushes to after
       // creating a graph on it (`analytics/custom/index.tsx`) — dropping
       // `dashboardId` here previously sent every dashboard report to the
-      // generic, dashboard-less `/analytics` route (#6716).
-      return `${base}/analytics/reports?dashboard=${source.dashboardId}`;
+      // generic, dashboard-less `/analytics` route (#6716). Encoded, so an
+      // id carrying reserved URL characters survives as one query value.
+      return `${base}/analytics/reports?dashboard=${encodeURIComponent(source.dashboardId)}`;
   }
 }
 
