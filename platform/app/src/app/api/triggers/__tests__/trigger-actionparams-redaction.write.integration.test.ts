@@ -73,7 +73,9 @@ describe("Feature: delivery credentials survive the REST write paths redacted", 
       });
     });
 
-    it("declines to store the placeholder as a destination", async () => {
+    // A listing copied into a create call names no destination — the
+    // placeholder stands for a credential this new automation has never had.
+    it("declines a listing copied into a create call", async () => {
       const response = await app.request("/api/triggers", {
         method: "POST",
         headers: headers(),
@@ -88,12 +90,16 @@ describe("Feature: delivery credentials survive the REST write paths redacted", 
         }),
       });
 
-      expect(response.status).toBe(201);
-      const created = (await response.json()) as { id: string };
-      const stored = await prisma.trigger.findUniqueOrThrow({
-        where: { id: created.id, projectId: projectId() },
-      });
-      expect(stored.actionParams).toEqual({ slackDelivery: "webhook" });
+      expect(response.status).toBe(422);
+      expect((await response.json()).error).toBe("invalid_action_params");
+      expect(
+        await prisma.trigger.count({
+          where: {
+            projectId: projectId(),
+            name: `Created from a listing ${ns}`,
+          },
+        }),
+      ).toBe(0);
     });
   });
 
