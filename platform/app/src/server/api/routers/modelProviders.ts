@@ -648,6 +648,12 @@ export const modelProviderRouter = createTRPCRouter({
    * - `id` omitted → create a new config.
    * - `id` provided → update that config's JSON + scope attachments.
    *
+   * Either way the attached scopes are claimed exclusively: a scope
+   * belongs to at most one config, so whichever config held one of
+   * them before loses that attachment (and is deleted once nothing
+   * keeps it alive). See the one-config-per-scope invariant in
+   * specs/model-providers/model-default-config-cascade.feature.
+   *
    * Scope-aware authz: the caller must hold the matching manage
    * permission on every scope they are attaching to OR removing from,
    * so a project admin can't silently push a default up to org level.

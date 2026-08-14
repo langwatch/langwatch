@@ -21,9 +21,16 @@ Feature: Model default config cascade
   #
   # ModelDefaultConfigScope:
   #   Join row binding a config to a (scopeType, scopeId). The same
-  #   (configId, scopeType, scopeId) cannot appear twice. The same
-  #   (scopeType, scopeId) CAN appear under multiple configs — that's how
-  #   "two configs on the same project" happens. Last-created wins.
+  #   (configId, scopeType, scopeId) cannot appear twice, and a
+  #   (scopeType, scopeId) belongs to at most ONE config: every write
+  #   path that attaches a scope first detaches it from whichever config
+  #   held it before (deleting configs left with zero scopes), under the
+  #   same per-scope advisory lock the role/feature setters use. Two
+  #   rows for the same scope in the settings table was never readable:
+  #   the newer config shadowed the older one key-by-key while both
+  #   rows rendered the shadowed result. The resolver still tiebreaks
+  #   same-scope configs by createdAt DESC as defense for data written
+  #   before this invariant existed.
   #
   # config JSON shape:
   #   {
@@ -110,14 +117,17 @@ Feature: Model default config cascade
     # The project config carries no FAST key; cascade walks up to org.
 
   @integration
-  Scenario: Two configs attached to the same project resolve by created-at DESC
-    Given a project has two configs both attached at PROJECT scope:
+  Scenario: Legacy duplicate configs at the same scope resolve by created-at DESC
+    Given a project has two configs both attached at PROJECT scope (written before the one-config-per-scope invariant):
       | created     | config                                |
       | 2026-05-01  | { "DEFAULT": "openai/gpt-5.4-mini" }  |
       | 2026-05-15  | { "DEFAULT": "openai/gpt-5.5" }       |
     When I resolve "prompt.create_default" for that project
     Then the resolver returns "openai/gpt-5.5"
-    # Newer config wins on tie at the same scope tier.
+    # Newer config wins on tie at the same scope tier. Write paths no
+    # longer produce this state; the resolver keeps the tiebreak so
+    # pre-invariant rows keep resolving deterministically until the
+    # cleanup migration collapses them.
 
   @integration
   Scenario: A config can attach to many scopes at once
@@ -239,6 +249,68 @@ Feature: Model default config cascade
     And one ModelDefaultConfigScope row exists pointing (ORGANIZATION, org-acme) at it
     # Write-side; needs real DB.
 
+  # ────────────────────────────────────────────────────────────────────────────
+  # One config per scope (customer report, 2026-08-13)
+  # ────────────────────────────────────────────────────────────────────────────
+  #
+  # A customer set org-wide gpt defaults, then used "+ Add config" to
+  # switch the org to gemini, and got a second org row instead of a
+  # replacement. Both rows rendered the newer values (the resolver's
+  # newest-wins tiebreak), so the older config became invisible and
+  # uneditable-in-effect. Creating a config now CLAIMS its scopes:
+  # whichever config previously held one of them loses that attachment.
+
+  @integration
+  Scenario: Creating a config at a scope that already has one replaces that scope's config
+    Given an organization-scoped config { "DEFAULT": "openai/gpt-5.5" }
+    When I save a new config { "DEFAULT": "gemini/gemini-2.5-pro" } attached to that organization
+    Then only the new config remains attached at ORGANIZATION scope
+    And the old config is deleted because it has no scopes left
+    And resolving DEFAULT for a project in that organization returns "gemini/gemini-2.5-pro"
+
+  @integration
+  Scenario: Claiming a scope held by a multi-scope config detaches only that scope
+    Given a config { "DEFAULT": "openai/gpt-5.5" } attached to projects "web-app" and "api"
+    When I save a new config { "DEFAULT": "gemini/gemini-2.5-pro" } attached to project "web-app"
+    Then the old config keeps its "api" attachment and its JSON
+    And project "web-app" is attached only to the new config
+
+  @integration
+  Scenario: Adding a scope to an existing config claims it from its previous config
+    Given an organization-scoped config { "DEFAULT": "openai/gpt-5.5" }
+    And a project-scoped config { "DEFAULT": "openai/gpt-5.4-mini" } attached to project "web-app"
+    When I update the org config's scope attachments to include project "web-app"
+    Then the project config is deleted because it has no scopes left
+    And project "web-app" is attached only to the org config
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Write-side error paths (part of the same customer report: saving an
+  # all-inherit new config surfaced as a raw "unknown error" 500)
+  # ────────────────────────────────────────────────────────────────────────────
+
+  @integration
+  Scenario: Saving a brand-new config with every key on Inherit is refused with a handled error
+    When I save a new config with an empty JSON payload attached to an organization
+    Then the save fails with a handled "validation_error" and not an unknown 500
+    And no ModelDefaultConfig row is created
+
+  @integration
+  Scenario: Saving into a scope the caller cannot manage is refused with a handled error
+    Given a caller without "organization:manage" on the organization
+    When they save a config attached to ORGANIZATION scope
+    Then the save fails with a handled "model_default_scope_forbidden" error carrying a 403
+    And no ModelDefaultConfig row is created
+
+  @integration @unimplemented
+  Scenario: Migration collapses pre-invariant duplicate configs per scope
+    Given two configs attached to the same (ORGANIZATION, org-acme) scope
+    When migration 20260814120000_collapse_duplicate_model_default_scopes runs
+    Then only the newest config keeps the org-acme attachment
+    And the older config is deleted when it has no other attachment
+    # Bound to the migration toolchain like the flat-rows migration
+    # above; the keep-newest rule matches the resolver tiebreak so
+    # resolution results do not change.
+
   @integration @unimplemented
   Scenario: Saving a config attached to many scopes creates one config + N scope rows
     When I save a new config { "DEFAULT": "openai/gpt-5.5" } attached to:
@@ -283,6 +355,17 @@ Feature: Model default config cascade
     # Absence = inherit; lean storage; merge logic stays trivial.
     # The drawer-to-server round-trip + JSON storage shape — bind via
     # the drawer integration test once the inherit-dropdown lands.
+
+  @integration
+  Scenario: Editing an existing config to all-Inherit deletes it
+    Given a project-scoped config { "DEFAULT": "openai/gpt-5.5" }
+    When the user sets every key to Inherit and saves
+    Then the config row is deleted
+    And its scope attachments are gone
+    # An attached-but-empty config has no effect on resolution but still
+    # occupies the same-scope slot, so the write path treats it as a
+    # delete. The drawer's toast says the config was removed, not
+    # "updated"; see role-based-default-models.feature.
 
   @integration
   Scenario: Inherit row is a real, selectable option in the model picker

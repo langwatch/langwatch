@@ -7,7 +7,6 @@ import type {
   PrismaClient,
 } from "~/generated/prisma/client";
 import { KSUID_RESOURCES } from "../../utils/constants";
-import { isRootPrismaClient } from "../db";
 import { resolveSingleOrganizationForScopes } from "../scopes/resolveOrganizationForScope";
 
 export type ModelDefaultsPrisma = PrismaClient | Prisma.TransactionClient;
@@ -129,10 +128,11 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`mdc:${scopeType}:${scopeId}`}, 
     });
   }
 
-  /** Add/remove scope attachments for an existing config, atomically
-   * with an optional config-payload bump. Requires a root PrismaClient
-   * (transaction clients lack `$transaction`). The service-layer guard
-   * enforces that contract. */
+  /** Add/remove scope attachments for an existing config, with an
+   * optional config-payload bump. The statements run sequentially on
+   * this repository's client, so callers must hold a transaction (the
+   * service's `withScopeTransaction` wrapper) for the write to stay
+   * atomic. */
   async updateConfigScopes(params: {
     id: string;
     configPayload?: {
@@ -142,23 +142,17 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`mdc:${scopeType}:${scopeId}`}, 
     toAdd: ScopeAttachment[];
     toRemoveIds: string[];
   }): Promise<void> {
-    if (!isRootPrismaClient(this.prisma)) {
-      throw new Error(
-        "ModelDefaultsRepository.updateConfigScopes requires a root PrismaClient, not a transaction client.",
-      );
-    }
-    const prisma: PrismaClient = this.prisma;
     // Single-organization invariant (ADR-021): newly attached scopes must
     // resolve to the same org the config is already anchored to. Otherwise this
     // path could attach cross-org or orphaned scopes while organizationId stays
     // pinned to the old tenant — the inconsistency create() now prevents.
     if (params.toAdd.length > 0) {
       const organizationId = await resolveSingleOrganizationForScopes(
-        prisma,
+        this.prisma,
         params.toAdd,
         "model default config",
       );
-      const existing = await prisma.modelDefaultConfig.findUnique({
+      const existing = await this.prisma.modelDefaultConfig.findUnique({
         where: { id: params.id },
         select: { organizationId: true },
       });
@@ -168,31 +162,64 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`mdc:${scopeType}:${scopeId}`}, 
         );
       }
     }
-    await prisma.$transaction([
-      prisma.modelDefaultConfig.update({
-        where: { id: params.id },
-        data: params.configPayload ?? {},
-      }),
-      ...(params.toAdd.length > 0
-        ? [
-            prisma.modelDefaultConfigScope.createMany({
-              data: params.toAdd.map((s) => ({
-                id: this.newScopeId(),
-                configId: params.id,
-                scopeType: s.scopeType,
-                scopeId: s.scopeId,
-              })),
-            }),
-          ]
-        : []),
-      ...(params.toRemoveIds.length > 0
-        ? [
-            prisma.modelDefaultConfigScope.deleteMany({
-              where: { id: { in: params.toRemoveIds } },
-            }),
-          ]
-        : []),
-    ]);
+    await this.prisma.modelDefaultConfig.update({
+      where: { id: params.id },
+      data: params.configPayload ?? {},
+    });
+    if (params.toAdd.length > 0) {
+      await this.prisma.modelDefaultConfigScope.createMany({
+        data: params.toAdd.map((s) => ({
+          id: this.newScopeId(),
+          configId: params.id,
+          scopeType: s.scopeType,
+          scopeId: s.scopeId,
+        })),
+      });
+    }
+    if (params.toRemoveIds.length > 0) {
+      await this.prisma.modelDefaultConfigScope.deleteMany({
+        where: { id: { in: params.toRemoveIds } },
+      });
+    }
+  }
+
+  /** Every scope attachment on OTHER configs for the given scopes:
+   * the rows a claiming write detaches. */
+  async findAttachmentsForScopes(
+    scopes: ScopeAttachment[],
+    opts: { exceptConfigId?: string } = {},
+  ): Promise<Array<{ id: string; configId: string }>> {
+    if (scopes.length === 0) return [];
+    return this.prisma.modelDefaultConfigScope.findMany({
+      where: {
+        OR: scopes.map((s) => ({
+          scopeType: s.scopeType,
+          scopeId: s.scopeId,
+        })),
+        ...(opts.exceptConfigId
+          ? { configId: { not: opts.exceptConfigId } }
+          : {}),
+      },
+      select: { id: true, configId: true },
+    });
+  }
+
+  /** Delete the given scope-attachment rows. */
+  async deleteAttachments(attachmentIds: string[]): Promise<void> {
+    if (attachmentIds.length === 0) return;
+    await this.prisma.modelDefaultConfigScope.deleteMany({
+      where: { id: { in: attachmentIds } },
+    });
+  }
+
+  /** Delete any of the given configs that no longer have a single scope
+   * attachment: an unattached config can never be hit by the resolver,
+   * it just haunts the settings table. */
+  async deleteConfigsWithoutScopes(configIds: string[]): Promise<void> {
+    if (configIds.length === 0) return;
+    await this.prisma.modelDefaultConfig.deleteMany({
+      where: { id: { in: configIds }, scopes: { none: {} } },
+    });
   }
 
   /** Delete a config row. ModelDefaultConfigScope rows cascade via the

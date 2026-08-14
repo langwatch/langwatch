@@ -1,3 +1,4 @@
+import { ValidationError } from "@langwatch/handled-error";
 import type {
   ModelDefaultScopeType,
   PrismaClient,
@@ -9,11 +10,13 @@ import {
   hasProjectPermission,
   hasTeamPermission,
 } from "../api/rbac";
+import { isRootPrismaClient } from "../db";
 import { CODING_ASSISTANT_SURFACES_ONLY_NEEDLE } from "./codexRefusalMessage";
 import {
   isModelAllowedAsRoleDefault,
   isModelAllowedForFeature,
 } from "./codexRestrictions";
+import { ModelDefaultScopeForbiddenError } from "./errors";
 import {
   allFeatures,
   featureByKey,
@@ -64,18 +67,27 @@ export async function assertCanWriteScope(
         "organization:manage",
       ))
     ) {
-      throw new Error("Missing organization:manage permission");
+      throw new ModelDefaultScopeForbiddenError({
+        scopeType,
+        requiredPermission: "organization:manage",
+      });
     }
     return;
   }
   if (scopeType === "TEAM") {
     if (!(await hasTeamPermission(ctx, scopeId, "team:manage"))) {
-      throw new Error("Missing team:manage permission");
+      throw new ModelDefaultScopeForbiddenError({
+        scopeType,
+        requiredPermission: "team:manage",
+      });
     }
     return;
   }
   if (!(await hasProjectPermission(ctx, scopeId, "project:update"))) {
-    throw new Error("Missing project:update permission");
+    throw new ModelDefaultScopeForbiddenError({
+      scopeType,
+      requiredPermission: "project:update",
+    });
   }
 }
 
@@ -124,7 +136,7 @@ function sanitizeConfig(raw: Record<string, unknown>): Record<string, string> {
       ? isModelAllowedAsRoleDefault(value, key as ModelRole)
       : isModelAllowedForFeature({ modelId: value, featureKey: key });
     if (!allowed) {
-      throw new Error(
+      throw new ValidationError(
         `"${value}" ${CODING_ASSISTANT_SURFACES_ONLY_NEEDLE} and cannot be set for "${key}".`,
       );
     }
@@ -146,9 +158,57 @@ function dedupeScopes(scopes: ScopeAttachment[]): ScopeAttachment[] {
 }
 
 /**
+ * Run `fn` inside a transaction when handed the root PrismaClient, or
+ * directly when the caller already opened one (e.g. `upsertKeyAtScope`
+ * calls back into `createConfig` from inside its own `$transaction`).
+ */
+async function withScopeTransaction<T>(
+  prisma: ModelDefaultsPrisma,
+  fn: (tx: ModelDefaultsPrisma) => Promise<T>,
+): Promise<T> {
+  if (isRootPrismaClient(prisma)) {
+    return prisma.$transaction(fn);
+  }
+  return fn(prisma);
+}
+
+/** Deterministic lock order so two concurrent multi-scope writes can
+ * never deadlock on each other's scope locks. */
+function sortForLocking(scopes: ScopeAttachment[]): ScopeAttachment[] {
+  return [...scopes].sort((a, b) =>
+    `${a.scopeType}::${a.scopeId}`.localeCompare(
+      `${b.scopeType}::${b.scopeId}`,
+    ),
+  );
+}
+
+/**
+ * Enforce the one-config-per-scope invariant for a write that attaches
+ * `scopes` to the config identified by `exceptConfigId` (or a config
+ * about to be created): detach those scopes from whichever configs held
+ * them, and delete any config left with zero attachments. Callers hold
+ * the per-scope advisory locks and a transaction.
+ */
+async function claimScopes(
+  repo: ModelDefaultsRepository,
+  scopes: ScopeAttachment[],
+  opts: { exceptConfigId?: string } = {},
+): Promise<void> {
+  const held = await repo.findAttachmentsForScopes(scopes, opts);
+  if (held.length === 0) return;
+  await repo.deleteAttachments(held.map((h) => h.id));
+  await repo.deleteConfigsWithoutScopes(
+    Array.from(new Set(held.map((h) => h.configId))),
+  );
+}
+
+/**
  * Create a new ModelDefaultConfig with its scope attachments. Empty
  * configs (no valid keys) are rejected — a config is meaningless
- * without at least one model assignment.
+ * without at least one model assignment. Each attached scope is claimed
+ * exclusively: a scope belongs to at most one config, so whichever
+ * config held it before loses that attachment (and is deleted when
+ * nothing else keeps it alive).
  */
 export async function createConfig(
   ctx: Ctx,
@@ -160,17 +220,27 @@ export async function createConfig(
 ): Promise<{ id: string }> {
   const config = sanitizeConfig(params.config);
   if (Object.keys(config).length === 0) {
-    throw new Error(
-      "ModelDefaultConfig must carry at least one role or feature key.",
+    throw new ValidationError(
+      "Pick at least one model. A default-models config with every key on inherit has no effect.",
     );
   }
   if (params.scopes.length === 0) {
-    throw new Error("ModelDefaultConfig must attach to at least one scope.");
+    throw new ValidationError(
+      "Pick at least one scope for this default-models config.",
+    );
   }
-  return repoFor(ctx).create({
-    config,
-    scopes: dedupeScopes(params.scopes),
-    authorId: params.authorId ?? null,
+  const scopes = dedupeScopes(params.scopes);
+  return withScopeTransaction(ctx.prisma, async (tx) => {
+    const repo = new ModelDefaultsRepository(tx);
+    for (const s of sortForLocking(scopes)) {
+      await repo.lockScope(s.scopeType, s.scopeId);
+    }
+    await claimScopes(repo, scopes);
+    return repo.create({
+      config,
+      scopes,
+      authorId: params.authorId ?? null,
+    });
   });
 }
 
@@ -216,30 +286,40 @@ export async function updateConfig(
   // Replace-all semantics for scope attachments: empty array → delete
   // the config (an unattached config can never be hit by the
   // resolver). Otherwise compute the add/remove diff against the
-  // current set.
+  // current set. Newly added scopes are claimed exclusively: whichever
+  // config held them before loses the attachment, same invariant as
+  // `createConfig`.
   if (params.scopes.length === 0) {
     await repo.delete(params.id);
     return;
   }
-  const desired = new Map<string, ScopeAttachment>();
-  for (const s of params.scopes) {
-    desired.set(`${s.scopeType}::${s.scopeId}`, s);
-  }
-  const current = await repo.findScopesForConfig(params.id);
-  const currentByKey = new Map(
-    current.map((c) => [`${c.scopeType}::${c.scopeId}`, c]),
-  );
-  const toAdd = [...desired.values()].filter(
-    (s) => !currentByKey.has(`${s.scopeType}::${s.scopeId}`),
-  );
-  const toRemove = current.filter(
-    (c) => !desired.has(`${c.scopeType}::${c.scopeId}`),
-  );
-  await repo.updateConfigScopes({
-    id: params.id,
-    configPayload: data,
-    toAdd,
-    toRemoveIds: toRemove.map((c) => c.id),
+  const desiredScopes = dedupeScopes(params.scopes);
+  await withScopeTransaction(ctx.prisma, async (tx) => {
+    const txRepo = new ModelDefaultsRepository(tx);
+    for (const s of sortForLocking(desiredScopes)) {
+      await txRepo.lockScope(s.scopeType, s.scopeId);
+    }
+    const desired = new Map<string, ScopeAttachment>();
+    for (const s of desiredScopes) {
+      desired.set(`${s.scopeType}::${s.scopeId}`, s);
+    }
+    const current = await txRepo.findScopesForConfig(params.id);
+    const currentByKey = new Map(
+      current.map((c) => [`${c.scopeType}::${c.scopeId}`, c]),
+    );
+    const toAdd = [...desired.values()].filter(
+      (s) => !currentByKey.has(`${s.scopeType}::${s.scopeId}`),
+    );
+    const toRemove = current.filter(
+      (c) => !desired.has(`${c.scopeType}::${c.scopeId}`),
+    );
+    await claimScopes(txRepo, toAdd, { exceptConfigId: params.id });
+    await txRepo.updateConfigScopes({
+      id: params.id,
+      configPayload: data,
+      toAdd,
+      toRemoveIds: toRemove.map((c) => c.id),
+    });
   });
 }
 
