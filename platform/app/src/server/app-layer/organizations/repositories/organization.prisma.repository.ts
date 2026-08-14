@@ -122,6 +122,28 @@ async function lockActiveAdmins({
   `;
 }
 
+/**
+ * Refuses to disable the last remaining active admin of an organization.
+ *
+ * Extracted from `setMemberDisabled`'s transaction callback so that
+ * callback's cognitive complexity stays under the biome limit. The
+ * `FOR UPDATE` lock inside `lockActiveAdmins` is the same one the member-
+ * removal path uses: two concurrent disables aimed at the last two admins
+ * serialize here.
+ */
+async function guardLastAdmin(
+  tx: Prisma.TransactionClient,
+  organizationId: string,
+  member: { role: OrganizationUserRole },
+): Promise<void> {
+  if (member.role !== OrganizationUserRole.ADMIN) return;
+
+  const activeAdmins = await lockActiveAdmins({ tx, organizationId });
+  if (activeAdmins.length <= 1) {
+    throw new CannotDisableLastAdminError();
+  }
+}
+
 /** A credential-bearing settings value encrypted at rest; cleared values store null. */
 function encryptedOrNull(value: string | null): string | null {
   return value ? encrypt(value) : null;
@@ -1248,20 +1270,8 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         throw new MemberNotFoundError(userId);
       }
 
-      // Same guard as demoting the last admin: an organization with no admin
-      // who can sign in cannot be recovered from inside the product. Locked
-      // for the same reason the removal guard locks: a disable and a removal
-      // aimed at the two remaining admins would otherwise both pass.
-      if (disabled && member.role === OrganizationUserRole.ADMIN) {
-        const activeAdmins = await lockActiveAdmins({ tx, organizationId });
-
-        if (activeAdmins.length <= 1) {
-          // Handled rather than a TRPCError: the tRPC boundary maps a 400
-          // HandledError to BAD_REQUEST anyway, and the REST surface answers
-          // the stable code instead of flattening this refusal to an unknown
-          // 500.
-          throw new CannotDisableLastAdminError();
-        }
+      if (disabled) {
+        await guardLastAdmin(tx, organizationId, member);
       }
 
       const now = new Date();

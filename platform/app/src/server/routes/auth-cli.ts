@@ -476,36 +476,21 @@ export async function ensureActiveOrgMemberOr403(
     membership.disabledAt === null;
   if (active) return null;
 
-  // Sever the stale session before refusing: drop the presented access token
-  // so the offboarded caller's token stops authenticating immediately.
-  const token = bearerAccessToken(c.req.header("Authorization"));
-  if (token) {
-    try {
-      const redis = getRedis();
-      await redis.del(accessTokenKey(token));
-      await redis.srem(
-        userTokensIndexKey(tokenRecord.user_id),
-        accessTokenKey(token),
-      );
-    } catch (err) {
-      logger.warn(
-        { err, userId: tokenRecord.user_id },
-        "[auth-cli] failed to revoke stale access token on membership refusal",
-      );
-    }
-  }
+  await revokeStaleAccessToken(c, tokenRecord.user_id);
+
+  const reason = !user
+    ? "user_missing"
+    : user.deactivatedAt !== null
+      ? "user_deactivated"
+      : membership
+        ? "membership_disabled"
+        : "not_org_member";
 
   logger.info(
     {
       userId: tokenRecord.user_id,
       organizationId: tokenRecord.organization_id,
-      reason: !user
-        ? "user_missing"
-        : user.deactivatedAt !== null
-          ? "user_deactivated"
-          : membership
-            ? "membership_disabled"
-            : "not_org_member",
+      reason,
     },
     "[auth-cli] refusing key-minting request from non-active org member; session revoked",
   );
@@ -518,6 +503,25 @@ export async function ensureActiveOrgMemberOr403(
     },
     403,
   );
+}
+
+async function revokeStaleAccessToken(
+  c: Context,
+  userId: string,
+): Promise<void> {
+  const token = bearerAccessToken(c.req.header("Authorization"));
+  if (!token) return;
+
+  try {
+    const redis = getRedis();
+    await redis.del(accessTokenKey(token));
+    await redis.srem(userTokensIndexKey(userId), accessTokenKey(token));
+  } catch (err) {
+    logger.warn(
+      { err, userId },
+      "[auth-cli] failed to revoke stale access token on membership refusal",
+    );
+  }
 }
 
 /**
