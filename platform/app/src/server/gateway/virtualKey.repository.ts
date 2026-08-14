@@ -14,7 +14,7 @@ import type {
   VirtualKeyRoutingMode,
   VirtualKeyScope,
   VirtualKeyScopeType,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { keysetAfter } from "./wirePagination";
 
 /**

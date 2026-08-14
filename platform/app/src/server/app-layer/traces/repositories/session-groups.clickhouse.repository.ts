@@ -368,6 +368,7 @@ export class SessionGroupsClickHouseRepository
       errorCount: Number(row.SessionErrorCount),
       warningCount: Number(row.SessionWarningCount),
       totalSpans: Number(row.SessionSpans),
+      lastTraceId: row.LastTraceId,
       input: preview?.input ?? null,
       output: preview?.output ?? null,
     };

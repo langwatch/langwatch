@@ -53,7 +53,10 @@ vi.mock("~/server/api/rbac", async (importActual) => {
   return { ...actual, hasProjectPermission: vi.fn().mockResolvedValue(true) };
 });
 
+import type { Redis } from "ioredis";
 import { hasProjectPermission } from "~/server/api/rbac";
+import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
 import {
   startTestContainers,
@@ -104,9 +107,14 @@ async function approve(body: Record<string, unknown>) {
   };
 }
 
+/** The container's connection; /api/auth/cli/* requires one on the App. */
+let redisConnection: Redis | null = null;
+
 describe("CLI login personal-project guards", () => {
   beforeAll(async () => {
-    await startTestContainers();
+    ({ redisConnection } = await startTestContainers());
+    await resetApp();
+    globalForApp.__langwatch_app = createTestApp({ redis: redisConnection });
     await prisma.organization.create({
       data: {
         id: ORG_ID,
@@ -254,6 +262,7 @@ describe("CLI login personal-project guards", () => {
   // every later run's org delete into a silent no-op and the leak would be
   // invisible.
   afterAll(async () => {
+    await resetApp();
     delete process.env.FEATURE_FLAG_FORCE_ENABLE;
     delete process.env.RELEASE_UI_AI_GOVERNANCE_ENABLED;
     // organizationId, not principalUserId-in-list: the tenancy guard

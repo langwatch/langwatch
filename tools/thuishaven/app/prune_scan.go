@@ -98,12 +98,15 @@ func (o *Orchestrator) PlanPrune(repoRoot, selfDir string) ([]PruneRow, error) {
 	rows := make([]PruneRow, 0, len(worktrees))
 	for i, wt := range worktrees {
 		canon := canonicalPath(wt.Dir)
+		// slugForDir expects an already-canonicalised dir (DestroyWorktree
+		// canonicalises before calling it) — pass the same here. Its warnings are
+		// deliberately dropped: this plan re-runs on every hub refresh, and a
+		// slug-cache disagreement only matters when a destroy acts on it.
+		slug, _ := o.slugForDir(canon)
 		rows = append(rows, PruneRow{
 			Dir:    wt.Dir,
 			Branch: wt.Branch,
-			// resolveDestroySlug expects an already-canonicalised dir (DestroyWorktree
-			// canonicalises before calling it) — pass the same here.
-			Slug: o.resolveDestroySlug(canon),
+			Slug:   slug,
 			// worktrees[0] is git's primary checkout: `git worktree list` always emits
 			// it first. The same ordering DestroyWorktree's primary-guard relies on.
 			IsPrimary: i == 0,

@@ -1,10 +1,10 @@
 import { createLogger } from "@langwatch/observability";
-import type { CustomGraph, Prisma } from "@prisma/client";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
+import type { CustomGraph, Prisma } from "~/generated/prisma/client";
 import { dashboardBelongsToProject } from "~/server/analytics/dashboardBelongsToProject";
 import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";

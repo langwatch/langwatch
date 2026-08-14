@@ -15,19 +15,18 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import type {
-  GatewayGuardrailDirection,
-  GatewayGuardrailFailureMode,
-} from "@prisma/client";
 import { Archive, Pencil, Plus, Shield } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-
 import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { Drawer } from "~/components/ui/drawer";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { showErrorToast } from "~/features/errors";
+import type {
+  GatewayGuardrailDirection,
+  GatewayGuardrailFailureMode,
+} from "~/generated/prisma/client";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
@@ -74,7 +73,7 @@ function GuardrailsPage() {
     { projectId },
     { enabled: !!projectId, refetchOnWindowFocus: false },
   );
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   // executionMode AS_GUARDRAIL lives on Monitor (not Evaluator). A
   // guardrail-eligible binding is a Monitor with executionMode set and
@@ -365,7 +364,7 @@ function GuardrailDrawer({
   guardrailEvaluators: Array<{ id: string; name: string; slug: string }>;
   onClose: () => void;
 }) {
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [evaluatorId, setEvaluatorId] = useState("");

@@ -22,7 +22,7 @@ const DLQ_ROW_HEIGHT = 36;
 
 export function DlqCard({ queueNames }: { queueNames: string[] }) {
   const { hasAccess } = useOpsPermission();
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   const dlqQuery = api.ops.listAllDlqGroups.useQuery(undefined, {
     refetchInterval: 10000,
@@ -161,7 +161,7 @@ export function DlqCard({ queueNames }: { queueNames: string[] }) {
               variant="line"
               css={{ "& tr:last-child td": { borderBottom: "none" } }}
             >
-              <Table.Header position="sticky" top={0} zIndex={1} bg="bg">
+              <Table.Header position="sticky" top={0} zIndex={1} bg="bg.panel">
                 <Table.Row>
                   <Table.ColumnHeader>Queue</Table.ColumnHeader>
                   <Table.ColumnHeader>Group ID</Table.ColumnHeader>

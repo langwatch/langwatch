@@ -129,7 +129,7 @@ export function ApiKeysSection({
   const updateMutation = api.apiKey.update.useMutation();
   const revokeMutation = api.apiKey.revoke.useMutation();
   const regenerateMutation = api.project.regenerateApiKey.useMutation();
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
 
   const {
     open: isCreateOpen,
@@ -683,7 +683,7 @@ export function ApiKeysSection({
 
       <CreateApiKeyDrawer
         isOpen={isCreateOpen && !newToken}
-        isCreating={createMutation.isLoading}
+        isCreating={createMutation.isPending}
         myBindings={myBindings}
         orgProjects={orgProjects.data ?? []}
         orgTeams={orgTeams.data ?? []}
@@ -697,7 +697,7 @@ export function ApiKeysSection({
 
       <EditApiKeyDrawer
         apiKey={apiKeyToEdit}
-        isUpdating={updateMutation.isLoading}
+        isUpdating={updateMutation.isPending}
         myBindings={myBindings}
         orgProjects={orgProjects.data ?? []}
         orgTeams={orgTeams.data ?? []}
@@ -728,14 +728,14 @@ export function ApiKeysSection({
 
       <RevokeConfirmDialog
         apiKeyId={apiKeyToRevoke}
-        isRevoking={revokeMutation.isLoading}
+        isRevoking={revokeMutation.isPending}
         onCancel={() => setApiKeyToRevoke(null)}
         onConfirm={handleRevoke}
       />
 
       <RegenerateApiKeyDialog
         open={isRotateConfirmOpen}
-        isLoading={regenerateMutation.isLoading}
+        isLoading={regenerateMutation.isPending}
         onClose={() => setIsRotateConfirmOpen(false)}
         onConfirm={handleRotateProjectKey}
       />

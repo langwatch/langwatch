@@ -28,6 +28,8 @@ vi.mock("../../../src/utils/posthogErrorCapture", () => ({
 
 vi.mock("../../../src/server/app-layer/app", () => ({
   getApp: vi.fn(),
+  // Reached through the TtlCache this service claims on; null keeps it in-memory.
+  tryGetApp: () => null,
 }));
 
 vi.mock("../../../src/server/utils/dateUtils", () => ({

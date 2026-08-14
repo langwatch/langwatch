@@ -231,7 +231,7 @@ export function AddToAnnotationQueueDialog({
               setAnnotators={setAnnotators}
               queueDrawerOpen={newQueueDrawer}
               sendToQueue={sendToQueue}
-              isLoading={createQueueItem.isLoading}
+              isLoading={createQueueItem.isPending}
             />
           </Dialog.Body>
         </Dialog.Content>

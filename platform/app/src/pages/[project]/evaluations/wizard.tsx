@@ -1,7 +1,6 @@
-import { ExperimentType } from "@prisma/client";
 import { useEffect, useRef } from "react";
-
 import { LoadingScreen } from "~/components/LoadingScreen";
+import { ExperimentType } from "~/generated/prisma/client";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";

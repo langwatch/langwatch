@@ -25,7 +25,7 @@ const mockMutateAsync = vi.hoisted(() =>
 
 vi.mock("../../utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       experiments: {
         getEvaluationsV3BySlug: {
           invalidate: vi.fn(),

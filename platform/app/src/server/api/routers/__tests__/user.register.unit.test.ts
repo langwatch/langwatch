@@ -26,8 +26,6 @@ vi.mock("~/server/posthog", () => ({
   trackServerEvent: mockTrackServerEvent,
 }));
 
-vi.mock("~/server/redis", () => ({ connection: undefined }));
-
 vi.mock("~/server/rateLimit", () => ({
   rateLimit: vi.fn().mockResolvedValue({ allowed: true }),
 }));

@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { batchScopePermissions } from "~/server/api/rbac";
 import type { Session } from "~/server/auth";
 import { prisma as defaultPrisma } from "~/server/db";

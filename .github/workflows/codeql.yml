@@ -42,7 +42,6 @@ jobs:
           filters: |
             relevant:
               - 'platform/app/**'
-              - 'langwatch_server/**'
               - 'sdks/python/**'
               - 'sdks/typescript/**'
               - 'mcp/typescript/**'

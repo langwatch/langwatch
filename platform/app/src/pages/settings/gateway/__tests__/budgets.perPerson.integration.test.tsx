@@ -50,7 +50,7 @@ vi.mock("~/utils/api", () => ({
       list: { useQuery: listQuery },
       archive: { useMutation: () => ({ mutateAsync: vi.fn() }) },
     },
-    useContext: () => ({
+    useUtils: () => ({
       gatewayBudgets: { list: { invalidate: vi.fn() } },
     }),
   },

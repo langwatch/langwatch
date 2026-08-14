@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
-import { Currency } from "@prisma/client";
 import type Stripe from "stripe";
+import { Currency } from "~/generated/prisma/client";
 import {
   BillingCustomerDeletedError,
   UnsupportedBillingCurrencyError,

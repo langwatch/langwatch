@@ -1,6 +1,6 @@
-import type { PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
 import type { Session } from "~/server/auth";
 import { resolveScopeStorageUsage } from "~/server/data-retention/metering/storageMeter.read";

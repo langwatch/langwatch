@@ -79,6 +79,10 @@ const DEFAULT_TEST_ROOTS: string[] = [
   // assistant's rules are tested here (and nowhere else), so scenarios about
   // what an instruction teaches can only bind from this root.
   "skills/_tests",
+  // CI guards run under `node --test` from the workflow that uses them, not
+  // vitest, and their tests live beside them. Without this root, a scenario
+  // describing what a guard refuses could only ever be @unimplemented.
+  ".github/scripts",
 ];
 
 /**
@@ -152,6 +156,12 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // asserts it, so scenarios under specs/ci/ can only bind from this root.
   // Without it those feature files report "all bound" while binding nothing.
   "tools/ciguard",
+  // The README link checker, for the same reason: specs/ci/readme-link-check.feature
+  // describes what CI asserts about the README, and only these Go tests assert it.
+  "tools/linkcheck",
+  // The CLI half of the same tool: the verdict-to-exit-code step is the part
+  // CI gates on, so the "check fails" / "check passes" scenarios bind here.
+  "cmd/linkcheck",
 ];
 
 /**
@@ -164,7 +174,6 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
  */
 const DEFAULT_PYTHON_TEST_ROOTS: string[] = [
   "services/langevals",
-  "langwatch_server",
   "sdks/python",
 ];
 
@@ -388,7 +397,6 @@ const LEGACY_INERT: string[] = [
   "specs/event-sourcing/oversized-attribute-value-preview.feature",
   "specs/event-sourcing/payload-envelope.feature",
   "specs/event-sourcing/pipeline-model.feature",
-  "specs/event-sourcing/poison-group-park-guard.feature",
   "specs/event-sourcing/process-roles.feature",
   "specs/event-sourcing/reactors.feature",
   "specs/event-sourcing/redis-fold-cache.feature",

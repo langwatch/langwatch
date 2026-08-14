@@ -11,6 +11,8 @@ Project coding conventions. See also `../TESTING_PHILOSOPHY.md`.
 - **icon-button-labels.md** - Pair icon buttons with a text label; when icon-only is OK
 - **copywriting.md** - User-facing copy: write for first-time customers, never leak internals or history
 - **inline-fix-links.md** - Links to settings from a working context open in a new tab
+- **ops-dashboard.md** - Ops surfaces: space is proportional to trouble; identifiers, dual-axis charts, cross-tenant controls
+- **list-table.md** - Shared look for resource index tables
 - **drawers.md** - URL-routed drawers
 - **async-processing-ui.md** - Poll/banner/read-gate pattern for a processing→ready/failed resource
 - **soft-delete-vs-archive.md** - When to archive vs hard-delete
@@ -18,6 +20,7 @@ Project coding conventions. See also `../TESTING_PHILOSOPHY.md`.
 - **logging-and-tracing.md** - Logging infrastructure and context propagation
 - **local-observability.md** - Local LGTM stack (Grafana/Loki/Tempo/Prometheus); querying logs/traces as an agent with `gcx`
 - **dependency-age-gates.md** - Dependency release-age gates and emergency security exceptions
+- **vitest-performance.md** - Vitest pool/isolation settings and the RAM guardrails they protect
 - **typescript.md** - TypeScript patterns
 - **react.md** - React/Next.js patterns
 - **git.md** - Git workflow

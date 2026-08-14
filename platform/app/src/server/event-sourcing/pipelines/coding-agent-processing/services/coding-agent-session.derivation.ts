@@ -166,6 +166,7 @@ export function createInitCodingAgentSession(): CodingAgentSessionData {
     repositoryOwner: null,
     repositoryName: null,
     gitBranch: null,
+    gitBranches: [],
     gitWorktree: null,
     title: null,
 
@@ -746,7 +747,9 @@ export function applyLogToCodingAgentSession({
       // Repository identity and worktree are once-set: a session is one
       // checkout, so the first answer stands. The branch is the exception:
       // it moves during a session, and the branch a session ENDS on is the
-      // one its pull request comes from.
+      // one its pull request comes from. Every branch it passed through joins
+      // the set as well, because a session that moves on has still driven the
+      // branch it left, and the pull request it opened there.
       const branch = str(attrs[LANGWATCH.ATTR.BRANCH]);
       return {
         ...base,
@@ -758,6 +761,10 @@ export function applyLogToCodingAgentSession({
           base.repositoryName ?? str(attrs[LANGWATCH.ATTR.REPOSITORY_NAME]),
         gitWorktree: base.gitWorktree ?? str(attrs[LANGWATCH.ATTR.WORKTREE]),
         gitBranch: branch ?? base.gitBranch,
+        gitBranches:
+          branch !== null
+            ? addToBoundedSet(base.gitBranches, branch)
+            : base.gitBranches,
       };
     }
 
