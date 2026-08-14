@@ -90,9 +90,14 @@ describe("given default-model configs with scope attachments (real DB)", () => {
   // inherit whatever rows the previous ones left attached, and pass only
   // because claiming happens to clear the leftovers first: adding a test
   // above another would break it.
-  afterEach(async () => {
-    await prisma.modelDefaultConfig.deleteMany({ where: { organizationId } });
-  });
+  //
+  // Through cleanupTestRows, not a raw deleteMany: `organizationId` is
+  // assigned in beforeAll, so it is undefined exactly when setup failed,
+  // and Prisma drops an undefined filter rather than matching nothing
+  // (#6219). The scope rows cascade on the config foreign key.
+  afterEach(() =>
+    cleanupTestRows(prisma, [["modelDefaultConfig", { organizationId }]]),
+  );
 
   afterAll(async () => {
     await cleanupTestRows(prisma, [
