@@ -35,10 +35,13 @@ function bodyOf(text: string): ArrayBuffer {
  * body that decodes here is a broken fixture rather than a failed expectation,
  * so it throws.
  */
-function decodeFailureOf(
-  body: ArrayBuffer,
-  contentType?: string | null,
-): string {
+function decodeFailureOf({
+  body,
+  contentType,
+}: {
+  body: ArrayBuffer;
+  contentType?: string | null;
+}): string {
   const result = parseOtlpTraces(body, contentType);
   if (result.ok) throw new Error("fixture decoded; it was meant to fail");
   return result.error;
@@ -51,7 +54,10 @@ describe("given a trace body that cannot be decoded", () => {
       // Invalid JSON whose first offending token is the marker itself, which is
       // exactly what V8 quotes: `Unexpected token 'C', "CUSTOMERSE"... is not
       // valid JSON`.
-      const failure = decodeFailureOf(bodyOf(MARKER), "application/json");
+      const failure = decodeFailureOf({
+        body: bodyOf(MARKER),
+        contentType: "application/json",
+      });
 
       expect(failure).not.toContain(MARKER);
       expect(failure).not.toContain(MARKER.slice(0, 6));
@@ -59,10 +65,10 @@ describe("given a trace body that cannot be decoded", () => {
 
     /** @scenario The parser's quoted snippet of the body never survives */
     it("keeps no part of the body when the content type is absent", () => {
-      const failure = decodeFailureOf(
-        bodyOf(`{"resourceSpans": ${MARKER}}`),
-        null,
-      );
+      const failure = decodeFailureOf({
+        body: bodyOf(`{"resourceSpans": ${MARKER}}`),
+        contentType: null,
+      });
 
       expect(failure).not.toContain(MARKER);
       expect(failure).not.toContain(MARKER.slice(0, 6));
@@ -92,20 +98,20 @@ describe("given a trace body that cannot be decoded", () => {
         0x0a, 0xff, 0xfe, 0x10, 0x1e, 0x1a, 0x0c, 0x80, 0x9f, 0x00, 0x7f,
       ]);
 
-      const failure = decodeFailureOf(
-        bytes.buffer as ArrayBuffer,
-        "application/json",
-      );
+      const failure = decodeFailureOf({
+        body: bytes.buffer as ArrayBuffer,
+        contentType: "application/json",
+      });
 
       expect(failure).toMatch(/^[\x20-\x7E]*$/);
     });
 
     /** @scenario A decode failure carries only characters we can render */
     it("bounds the length of the reported failure", () => {
-      const failure = decodeFailureOf(
-        bodyOf("!".repeat(50_000)),
-        "application/json",
-      );
+      const failure = decodeFailureOf({
+        body: bodyOf("!".repeat(50_000)),
+        contentType: "application/json",
+      });
 
       expect(failure.length).toBeLessThanOrEqual(300);
     });
@@ -118,10 +124,10 @@ describe("given a trace body that cannot be decoded", () => {
       // the decoder fails on the length rather than on any value.
       const truncated = new Uint8Array([0x0a, 0xff, 0x01, 0x01, 0x02]);
 
-      const failure = decodeFailureOf(
-        truncated.buffer as ArrayBuffer,
-        "application/x-protobuf",
-      );
+      const failure = decodeFailureOf({
+        body: truncated.buffer as ArrayBuffer,
+        contentType: "application/x-protobuf",
+      });
 
       // The decoder's vocabulary is ours, not the sender's — it is what says
       // whether the sender truncated the body or we mis-read it.
@@ -132,13 +138,25 @@ describe("given a trace body that cannot be decoded", () => {
 
     /** @scenario A body that cannot be decoded reports the stage that rejected it */
     it("names both decoding stages that rejected it", () => {
-      const failure = decodeFailureOf(
-        bodyOf("not otlp at all"),
-        "application/json",
-      );
+      const failure = decodeFailureOf({
+        body: bodyOf("not otlp at all"),
+        contentType: "application/json",
+      });
 
       expect(failure).toMatch(/parse OTLP body/i);
       expect(failure).toMatch(/json/i);
+    });
+
+    /** @scenario A body that cannot be decoded reports the stage that rejected it */
+    it("carries the size of the body in bytes", () => {
+      // A size no parser would mention on its own, so finding it proves we put
+      // it there. ASCII, so the byte count and the character count agree.
+      const failure = decodeFailureOf({
+        body: bodyOf("!".repeat(4_096)),
+        contentType: "application/json",
+      });
+
+      expect(failure).toContain("4096 bytes");
     });
   });
 });

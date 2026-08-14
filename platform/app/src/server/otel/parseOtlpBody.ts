@@ -332,11 +332,16 @@ function parseWithFallback<T>(
       );
       return { ok: true, request };
     } catch (jsonErr) {
+      // The size is the one thing about the body that is ours to state: it says
+      // whether the sender truncated it or sent something else entirely, and a
+      // byte count cannot carry a byte of it.
       return {
         ok: false,
-        error:
-          `Failed to parse OTLP body: ${describeParseFailure(firstErr)}` +
-          ` (json fallback: ${describeParseFailure(jsonErr)})`,
+        error: (
+          `Failed to parse OTLP body (${body.byteLength} bytes): ` +
+          `${describeParseFailure(firstErr)}` +
+          ` (json fallback: ${describeParseFailure(jsonErr)})`
+        ).slice(0, MAX_FAILURE_MESSAGE),
       };
     }
   }
@@ -344,6 +349,14 @@ function parseWithFallback<T>(
 
 /** Long enough to keep a decoder's structural detail, short enough to log. */
 const MAX_FAILURE_DETAIL = 120;
+
+/**
+ * The whole reported failure is bounded here rather than left to add up from
+ * the parts. Two details and a byte count already sum to within a few
+ * characters of this, so the guarantee is stated once instead of re-derived
+ * every time one of the pieces changes width.
+ */
+const MAX_FAILURE_MESSAGE = 300;
 
 /**
  * A parser's error message, reduced to the part that is ours to repeat.
