@@ -299,8 +299,34 @@ describe("given the governed schema catalog", () => {
       )!;
       expect(dataset.columns.map((column) => column.gates)).toEqual([
         ["input"],
+        ["input"],
         ["input", "output"],
       ]);
+    });
+
+    /**
+     * The example is generated from columns' own gates, not the combined
+     * dataset-plus-column ones — combined, a whole-gated dataset has no
+     * ungated column and the example degenerates to `SELECT ` with nothing
+     * to select, published as "a runnable query over this dataset".
+     */
+    it("publishes a runnable example for the gated dataset", () => {
+      const dataset = schemaWith(FULLY_PERMITTED).datasets.find(
+        (candidate) => candidate.name === GATED_DATASET_QUALIFIED_NAME,
+      )!;
+      const result = validateGovernedSql({
+        sql: dataset.exampleSql,
+        allowedTables: governedAllowedTables({ database: DATABASE, views }),
+        gatedColumns: governedGatedColumns({
+          protections: FULLY_PERMITTED,
+          views,
+        }),
+        defaultDatabase: DATABASE,
+      });
+      expect(
+        result.ok ? [] : result.violations,
+        `${dataset.name}'s example query is refused by the gate`,
+      ).toEqual([]);
     });
 
     /**

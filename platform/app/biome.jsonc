@@ -373,9 +373,11 @@
 			}
 		},
 		{
-			// The governed-SQL proof suites (#6480). Both rules are off for
-			// these files only, and for the reason the repo-wide test-file
-			// block already names rather than a new one.
+			// The governed-SQL proof suites (#6480). noMisplacedAssertion is
+			// the rule this override uniquely disables; the repo-wide
+			// test-file block above already turns noExcessiveCognitiveComplexity
+			// off for every test file, and it is restated here so the reason
+			// below stays attached to the suites it explains.
 			//
 			// noMisplacedAssertion: this suite's assertions deliberately live
 			// in shared helpers, because every zero-row claim is paired with an

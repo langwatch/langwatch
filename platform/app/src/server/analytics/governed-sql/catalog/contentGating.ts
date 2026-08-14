@@ -26,6 +26,7 @@ import {
 } from "../../../data-privacy/dataPrivacy.types";
 import { CONTENT_KEY_CATALOG } from "../../../data-privacy/dropKeyCatalog";
 import type { FieldProtection } from "../../../traces/projection/catalog";
+import { clickHouseLiteral } from "../sqlText";
 
 /**
  * Which read-time gate governs each data-privacy content category.
@@ -93,11 +94,6 @@ export function isContentAttributeKey(key: string): boolean {
   );
 }
 
-/** ClickHouse string literal: backslash-escaped, single quotes doubled out. */
-function literal(value: string): string {
-  return `'${value.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
-}
-
 /**
  * The `mapFilter` lambda body that keeps a map key, as ClickHouse SQL.
  *
@@ -107,8 +103,9 @@ function literal(value: string): string {
  * the keys it was meant to remove.
  */
 export function contentKeyExclusionSql(keyParameter = "k"): string {
-  const keys = CONTENT_ATTRIBUTE_KEYS.map(literal).join(", ");
-  const prefixes = CONTENT_ATTRIBUTE_KEY_PREFIXES.map(literal).join(", ");
+  const keys = CONTENT_ATTRIBUTE_KEYS.map(clickHouseLiteral).join(", ");
+  const prefixes =
+    CONTENT_ATTRIBUTE_KEY_PREFIXES.map(clickHouseLiteral).join(", ");
   return (
     `${keyParameter} NOT IN (${keys}) ` +
     `AND NOT arrayExists(p -> startsWith(${keyParameter}, p), [${prefixes}])`

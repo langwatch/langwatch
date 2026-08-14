@@ -123,10 +123,25 @@ export function governedExampleSql({
   database: string;
   view: GovernedViewDefinition;
 }): string {
+  // The column's own gates, not the combined dataset-plus-column ones: a
+  // dataset gated as a whole is only *visible* to a caller who already holds
+  // its gates, so its ungated columns are runnable for everyone who can see
+  // the example — while the combined set would leave such a dataset with no
+  // columns at all and emit `SELECT ` with nothing to select.
   const projection = view.columns
-    .filter((column) => governedColumnGates({ view, column }).length === 0)
+    .filter((column) => column.gates.length === 0)
     .slice(0, EXAMPLE_COLUMN_COUNT)
     .map((column) => column.name);
+  if (projection.length === 0) {
+    // Every column carries its own gate: the one query still runnable by any
+    // caller who can see the dataset is a count. No ORDER BY — an aggregate
+    // without GROUP BY has nothing to order.
+    return (
+      `SELECT count() AS rows\n` +
+      `FROM ${database}.${view.name}\n` +
+      `WHERE ${view.timeColumn} >= subtractDays(now(), ${EXAMPLE_LOOKBACK_DAYS})`
+    );
+  }
   return (
     `SELECT ${projection.join(", ")}\n` +
     `FROM ${database}.${view.name}\n` +

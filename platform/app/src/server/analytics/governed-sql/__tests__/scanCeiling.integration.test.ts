@@ -116,10 +116,14 @@ describe("given the governed settings profile's scan ceilings", () => {
   }, 180_000);
 
   afterAll(async () => {
+    // A `beforeAll` that failed before the harness existed has nothing to
+    // restore or stop, and dereferencing it here would mask that startup
+    // failure with a TypeError.
+    if (!harness) return;
     // The container is reused, so a suite that left a one-row ceiling behind
     // would break whichever suite ran next against it.
     await provisionWith(DEFAULT_GOVERNED_RESOURCE_LIMITS);
-    await harness?.stop();
+    await harness.stop();
   });
 
   describe("when the shipped ceilings are in force", () => {

@@ -269,9 +269,12 @@ const presentations = {
       "The query declares parameters that weren't given values. Supply one for each and try again.",
   },
   governed_sql_unavailable: {
+    // Names the workspace administrator first: on a self-hosted deployment
+    // the reader's own operator controls whether this is provisioned, and
+    // LangWatch support cannot switch it on there.
     title: "Analytics SQL isn't available here",
     describe: () =>
-      "This feature isn't switched on for this workspace yet. Contact support to have it enabled.",
+      "This feature isn't switched on for this workspace yet. Ask your workspace administrator to enable it, or contact support.",
   },
   clickhouse_unavailable: {
     title: "Search is temporarily unavailable",
