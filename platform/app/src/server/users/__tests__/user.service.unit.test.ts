@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { UserService } from "../user.service";
 
-// An App carrying no Redis, so the revoke helper deactivate() calls takes its
-// Postgres-only path instead of talking to a real Redis from a unit test.
+// An App carrying no Redis, so revokeAllAccess() takes its Postgres-only path
+// instead of talking to a real Redis from a unit test.
 vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({ redis: null }),
   tryGetApp: () => ({ redis: null }),
@@ -16,8 +16,8 @@ function createMockPrisma() {
       update: vi.fn(),
     },
     session: {
-      // UserService.deactivate now also revokes all sessions for the user.
-      // Mock the session model so the revocation succeeds with zero rows.
+      // revokeAllAccess() clears the user's browser sessions; mock the
+      // session model so the revocation succeeds with zero rows.
       findMany: vi.fn().mockResolvedValue([]),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
@@ -33,21 +33,16 @@ describe("UserService", () => {
     service = UserService.create(prisma);
   });
 
-  describe("deactivate()", () => {
+  describe("revokeAllAccess()", () => {
     describe("when called with a valid user id", () => {
-      it("sets deactivatedAt to the current timestamp", async () => {
-        const mockUser = { id: "user-1", deactivatedAt: new Date() };
-        (prisma.user.update as ReturnType<typeof vi.fn>).mockResolvedValue(
-          mockUser,
-        );
+      // Writing the deactivation flag is the membership lifecycle's job
+      // (ADR-094 Decision 4) — this method only severs the live access the
+      // flag alone cannot reach, because it lives in Redis.
+      it("clears the user's browser sessions", async () => {
+        await service.revokeAllAccess({ userId: "user-1" });
 
-        const result = await service.deactivate({ id: "user-1" });
-
-        expect(prisma.user.update).toHaveBeenCalledWith({
-          where: { id: "user-1" },
-          data: { deactivatedAt: expect.any(Date) },
-        });
-        expect(result.deactivatedAt).toBeInstanceOf(Date);
+        expect(prisma.session.deleteMany).toHaveBeenCalled();
+        expect(prisma.user.update).not.toHaveBeenCalled();
       });
     });
   });

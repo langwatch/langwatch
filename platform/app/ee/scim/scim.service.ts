@@ -16,6 +16,7 @@ import {
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
 import { grantsService } from "~/server/app-layer/authz/runtime";
+import { MembershipLifecycleService } from "~/server/users/membership-lifecycle.service";
 import { UserService } from "~/server/users/user.service";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
@@ -57,6 +58,14 @@ export class ScimService {
     grants?: GrantsService;
     syncLifecycle?: ScimSyncLifecycle;
   };
+  /**
+   * Directory traffic is org-scoped by definition — the token that carried
+   * this request belongs to one organization's IdP. Every activate /
+   * deactivate below therefore goes through the membership lifecycle rather
+   * than the global account flag, or one tenant's directory decides a
+   * person's state inside every other tenant (#6976, ADR-094 Decision 4).
+   */
+  private readonly membershipLifecycle: MembershipLifecycleService;
 
   constructor({
     prisma,
@@ -74,6 +83,7 @@ export class ScimService {
     this.userService = UserService.create(prisma);
     this.departmentService = DepartmentService.create(prisma);
     this.directoryIdentity = ScimDirectoryIdentityService.create(prisma);
+    this.membershipLifecycle = MembershipLifecycleService.create(prisma);
     this.injected = { grants, syncLifecycle };
   }
 
@@ -384,9 +394,14 @@ export class ScimService {
         organizationId,
       });
 
-      if (existingUser.deactivatedAt) {
-        await this.userService.reactivate({ id: existingUser.id });
-      }
+      // Re-provisioning restores the membership in THIS organization and
+      // lifts the global flag only if it was set. It deliberately does not
+      // restore usage-attribution links — an admin relinks (ADR-094
+      // Decision 4).
+      await this.membershipLifecycle.onMembershipReactivated({
+        organizationId,
+        userId: existingUser.id,
+      });
 
       await this.syncCostCenterFromScim({
         userId: existingUser.id,
@@ -638,6 +653,7 @@ export class ScimService {
     if (!membership) {
       const returning = await this.reinstateSignIn({
         id,
+        organizationId,
         connectionId,
         active: request.active !== false,
       });
@@ -651,15 +667,18 @@ export class ScimService {
     const name = this.buildNameFromRequest(request);
     const active = request.active !== false;
 
-    const updatedUser = await this.userService.updateProfile({
+    await this.userService.updateProfile({
       id,
       name,
       email: request.userName,
     });
 
-    if (active && updatedUser.deactivatedAt) {
-      await this.reactivate({ id });
-    } else if (!active && !updatedUser.deactivatedAt) {
+    // Branch on the MEMBERSHIP, not the account: `active: false` from this
+    // directory ends this membership, and only the person's last active
+    // membership takes the account with it (ADR-094 Decision 4).
+    if (active && membership.disabledAt) {
+      await this.reactivate({ id, organizationId });
+    } else if (!active && !membership.disabledAt) {
       await this.deactivate({ id, organizationId, connectionId });
     }
 
@@ -718,7 +737,14 @@ export class ScimService {
         op: "deactivate_user",
       });
     }
-    await this.userService.deactivate({ id });
+    // The MEMBERSHIP ends here, not the account: a directory speaks for its
+    // own organization, and only the person's last active membership takes
+    // the account with it (#6976, ADR-094 Decision 4). The closing
+    // usage-attribution rows share this transaction.
+    await this.membershipLifecycle.onMembershipDeactivated({
+      organizationId,
+      userId: id,
+    });
   }
 
   /**
@@ -730,8 +756,17 @@ export class ScimService {
    * gone until an administrator gives it again, because nothing here knows
    * that it was ever meant.
    */
-  private async reactivate({ id }: { id: string }): Promise<void> {
-    await this.userService.reactivate({ id });
+  private async reactivate({
+    id,
+    organizationId,
+  }: {
+    id: string;
+    organizationId: string;
+  }): Promise<void> {
+    await this.membershipLifecycle.onMembershipReactivated({
+      organizationId,
+      userId: id,
+    });
   }
 
   /**
@@ -757,10 +792,12 @@ export class ScimService {
    */
   private async reinstateSignIn({
     id,
+    organizationId,
     connectionId,
     active,
   }: {
     id: string;
+    organizationId: string;
     connectionId: string | null;
     active: boolean;
   }): Promise<ScimUser | null> {
@@ -773,7 +810,10 @@ export class ScimService {
 
     const user = await this.userService.findById({ id });
     if (!user) return null;
-    if (user.deactivatedAt) await this.reactivate({ id });
+    // Still creates nothing: `onMembershipReactivated` only ever updates
+    // rows, so this lifts the sign-in block and re-enables a membership
+    // this organization had disabled, and leaves a removed one removed.
+    await this.reactivate({ id, organizationId });
 
     const reloaded = (await this.userService.findById({ id })) ?? user;
     return this.toScimUser(reloaded);
@@ -820,6 +860,7 @@ export class ScimService {
     if (!membership) {
       const returning = await this.reinstateSignIn({
         id,
+        organizationId,
         connectionId,
         active: patchRequest.Operations.some(
           (operation) => this.activeInPatchOp(operation) === true,
@@ -858,7 +899,7 @@ export class ScimService {
           await this.deactivate({ id, organizationId, connectionId });
           op = "deactivate";
         } else {
-          await this.reactivate({ id });
+          await this.reactivate({ id, organizationId });
         }
         continue;
       }
@@ -874,7 +915,7 @@ export class ScimService {
           await this.deactivate({ id, organizationId, connectionId });
           op = "deactivate";
         } else {
-          await this.reactivate({ id });
+          await this.reactivate({ id, organizationId });
         }
       }
 
@@ -949,6 +990,16 @@ export class ScimService {
     await this.directoryIdentity.assertWritable({ connectionId, userId: id });
 
     if (scimGrantsWritePathEnabled()) {
+      // The closing usage-attribution rows go FIRST, while the membership
+      // they are enumerated from still exists: `removeAccess` deletes the
+      // membership rows itself, and a crash past that point would lose the
+      // rows forever (ADR-094 Decision 4). It DISABLES rather than removes,
+      // so a rollback inside `removeAccess` leaves the person denied rather
+      // than restored — fail-safe, not fail-open.
+      await this.membershipLifecycle.onMembershipDeactivated({
+        organizationId,
+        userId: id,
+      });
       // Through the SERVICE, whose transaction re-collects the person's
       // effective permissions inside itself and rolls the whole thing back if
       // anything still resolves. The previous code called the ledger writer
@@ -982,12 +1033,17 @@ export class ScimService {
         revokedGrantIds: visibleGrants.map((row) => row.id),
         actor: ScimService.ACTOR,
       });
-      await this.prisma.organizationUser.delete({
-        where: { userId_organizationId: { userId: id, organizationId } },
+      // One transaction for the removal and the closing link rows. The old
+      // code committed the removal first and deactivated afterwards; a
+      // crash in that gap lost the rows forever, because the IdP's retry
+      // finds no membership and answers 404 before reaching step two.
+      await this.membershipLifecycle.onMembershipDeactivated({
+        organizationId,
+        userId: id,
+        membershipChange: "remove",
       });
     }
 
-    await this.userService.deactivate({ id });
     await this.forgetDirectoryIdentity({ connectionId, userId: id });
     await this.recordPush({
       organizationId,

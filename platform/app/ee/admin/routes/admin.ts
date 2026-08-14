@@ -29,6 +29,7 @@ import { assertLegacySsoStringWriteAllowed } from "~/server/app-layer/identity/l
 import { getServerAuthSession } from "~/server/auth";
 import { auth as betterAuth } from "~/server/better-auth";
 import { prisma } from "~/server/db";
+import { MembershipLifecycleService } from "~/server/users/membership-lifecycle.service";
 import { UserService } from "~/server/users/user.service";
 import { adminSurfaceHidden } from "../adminSurfaceHidden";
 import {
@@ -444,17 +445,21 @@ secured.access(adminAuth).post("/admin/:resource", async (c) => {
           payload: { id: userId, reactivate: true },
         });
       } else if (typeof v === "string" || v instanceof Date) {
-        await userService.deactivate({ id: userId });
-        delete data.deactivatedAt;
-        handledSideEffect = true;
         const pickedDate = v instanceof Date ? v : new Date(v);
         const isValidPickedDate = !Number.isNaN(pickedDate.getTime());
-        if (isValidPickedDate) {
-          await prisma.user.update({
-            where: { id: userId },
-            data: { deactivatedAt: pickedDate },
-          });
-        }
+        // The lifecycle hook is the single deactivation implementation
+        // (ADR-094 Decision 4): the account flag, the closing link rows for
+        // every organization the person was still active in, and the
+        // revocations. Passing the admin's picked date as the clock stamps
+        // both the flag and those rows with it, so the paper trail agrees
+        // with itself.
+        await MembershipLifecycleService.create(prisma).onUserDeactivated({
+          userId,
+          actorUserId: user?.id ?? null,
+          ...(isValidPickedDate ? { now: pickedDate } : {}),
+        });
+        delete data.deactivatedAt;
+        handledSideEffect = true;
         sideEffectAudit.push({
           action: "update/user",
           payload: {

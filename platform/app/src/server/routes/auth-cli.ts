@@ -465,7 +465,7 @@ function bearerAccessToken(
  *
  * Spec: specs/ai-governance/cli-onboarding/me-credentials.feature
  */
-async function ensureActiveOrgMemberOr403(
+export async function ensureActiveOrgMemberOr403(
   c: Context,
   tokenRecord: { user_id: string; organization_id: string },
 ): Promise<Response | null> {
