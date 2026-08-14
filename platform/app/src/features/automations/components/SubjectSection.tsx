@@ -124,22 +124,26 @@ export function SubjectSection({
  * stale list is still a working picker, so only a failure with nothing to
  * show replaces it. Loading is not emptiness either: deciding on an
  * in-flight first fetch would flash a false rejection before the data that
- * clears it has arrived. A prefilled draft (opened from a dashboard chart
- * card) already carries its graph, so neither replacement applies to it.
+ * clears it has arrived. A draft that already carries a graph — prefilled
+ * from a dashboard chart card, or an existing alert opened for editing —
+ * keeps the picker too: "go create a graph" would hide the selection the
+ * author came to inspect, even when the graph itself has since been removed.
  */
 function graphSubjectView({
   isPrefilled,
+  hasSelection,
   isLoading,
   isError,
   graphCount,
 }: {
   isPrefilled: boolean;
+  hasSelection: boolean;
   isLoading: boolean;
   isError: boolean;
   /** `null` when no list has loaded yet. */
   graphCount: number | null;
 }): "failed" | "empty" | "picker" {
-  if (isPrefilled) return "picker";
+  if (isPrefilled || hasSelection) return "picker";
   if (isError) return graphCount === null ? "failed" : "picker";
   if (isLoading) return "picker";
   return graphCount === 0 ? "empty" : "picker";
@@ -168,6 +172,7 @@ function GraphSubject({ prefilledGraphId }: { prefilledGraphId?: string }) {
 
   const view = graphSubjectView({
     isPrefilled,
+    hasSelection: !!draft.customGraphId,
     isLoading: graphs.isLoading,
     isError: graphs.isError,
     graphCount: graphs.data?.length ?? null,
@@ -327,16 +332,11 @@ function NoGraphsYet({ projectSlug }: { projectSlug?: string }) {
       </Text>
       {projectSlug ? (
         <>
-          <Link
-            href={`/${projectSlug}/analytics/custom`}
-            target="_blank"
-            rel="noopener noreferrer"
-            asChild
-          >
-            <Button size="xs" variant="outline">
+          <Button asChild size="xs" variant="outline">
+            <Link href={`/${projectSlug}/analytics/custom`} isExternal>
               <Plus size={13} /> Create a custom graph
-            </Button>
-          </Link>
+            </Link>
+          </Button>
           <Text textStyle="2xs" color="fg.muted">
             Opens in a new tab, so this alert stays exactly as you left it.
           </Text>

@@ -81,7 +81,7 @@ export function isPrefixOnly(field: string): boolean {
  *  the mechanism — the author doesn't need to know it's a query-language
  *  restriction, only what to change. */
 export const ATTRIBUTE_KEY_ERROR =
-  "This key can't be saved as written — remove any spaces, colons, or quotes.";
+  "This key can't be saved as written — remove any spaces or punctuation such as colons, quotes, or brackets.";
 
 /**
  * True unless `condition` is a completed custom-attribute row whose key
