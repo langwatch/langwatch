@@ -338,11 +338,11 @@ secured.access(requires("triggers:update")).patch(
     // provider resolves both against what it stored, so each of those keeps
     // the credential the automation already delivers with.
     if (body.actionParams !== undefined) {
-      data.actionParams = await persistPublicApiActionParams({
+      data.actionParams = (await persistPublicApiActionParams({
         action: trigger.action,
         incoming: body.actionParams,
         stored: trigger.actionParams,
-      });
+      })) as Prisma.InputJsonValue;
     }
 
     const updated = await prisma.trigger.update({
