@@ -99,9 +99,26 @@ const extractTextsFromParts = (parts: unknown[]): string[] => {
         isRecord(p.toolResult) &&
         Array.isArray((p.toolResult as Record<string, unknown>).content)
       ) {
-        const inner = extractTextsFromParts(
-          (p.toolResult as Record<string, unknown>).content as unknown[],
-        );
+        // Converse tool-result content is a union of {text} and {json} blocks;
+        // stringify the structured variant in place so block order survives.
+        const inner: string[] = [];
+        for (const block of (p.toolResult as Record<string, unknown>)
+          .content as unknown[]) {
+          if (
+            isRecord(block) &&
+            (block as Record<string, unknown>).json != null
+          ) {
+            try {
+              inner.push(
+                JSON.stringify((block as Record<string, unknown>).json),
+              );
+            } catch {
+              // ignore unstringifiable results
+            }
+          } else {
+            inner.push(...extractTextsFromParts([block]));
+          }
+        }
         if (inner.length > 0) texts.push(inner.join("\n"));
       }
     }

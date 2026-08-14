@@ -38,6 +38,12 @@ Feature: Bedrock Converse span I/O extraction
     Then the input text is the tool result's inner text
 
   @unit @canonicalisation
+  Scenario: Converse toolResult json block survives extraction
+    Given a gen_ai.prompt message whose content is [{toolResult: {content: [{json}]}}]
+    When trace I/O is extracted
+    Then the input text is the JSON of the tool result's structured content
+
+  @unit @canonicalisation
   Scenario: Converse toolResult block with empty content contributes nothing
     Given a gen_ai.prompt message whose content is [{toolResult: {content: []}}]
     When trace I/O is extracted

@@ -247,6 +247,34 @@ describe("given a Bedrock span whose messages sit under canonical gen_ai keys", 
     });
   });
 
+  describe("when a Converse toolResult block carries structured json content", () => {
+    /** @scenario Converse toolResult json block survives extraction */
+    it("extracts the stringified json as the input", () => {
+      const { input } = computeTraceIO(
+        makeSpan({
+          spanAttributes: {
+            "gen_ai.system": "aws.bedrock",
+            "gen_ai.prompt": JSON.stringify([
+              {
+                role: "user",
+                content: [
+                  {
+                    toolResult: {
+                      toolUseId: "tool-1",
+                      content: [{ json: { ok: true, items: 3 } }],
+                    },
+                  },
+                ],
+              },
+            ]),
+          },
+        }),
+      );
+
+      expect(input).toBe('{"ok":true,"items":3}');
+    });
+  });
+
   describe("when a Converse toolResult block has empty content", () => {
     /** @scenario Converse toolResult block with empty content contributes nothing */
     it("contributes no text and falls back to the span name", () => {
