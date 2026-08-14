@@ -34,22 +34,28 @@ const groupByLogin = (
 };
 
 /**
- * Does this login's timeline still land on this person?
+ * Does this login's timeline still land on this person, right now?
  *
- * Resolved at the timeline's own latest moment rather than at wall-clock now,
- * so the winner is the last row appended for this login whatever its effective
- * date — including a link an admin dated into the future.
+ * Resolved at wall-clock `now` — the same instant the closing row will carry —
+ * and NOT at the timeline's own latest `effectiveFrom`. Those two agreed only
+ * as long as nobody could date a row into the future. Now that the admin
+ * surface allows any `effectiveFrom` (backdating is how corrections work), a
+ * link dated for next quarter would drag the evaluation point forward with it
+ * and answer a question nobody asked: an offboarding today would consult the
+ * ownership that has not started yet, decide the person no longer holds the
+ * login, and skip the closing row their membership ending requires.
+ *
+ * `resolveOwnerAt(rows, now)` ignores future rows by construction, so the
+ * answer is about today. A future row that hands the login to somebody else is
+ * left standing: closing what the person holds today never reaches forward to
+ * cancel a handover an admin has already scheduled.
  */
 const stillOwnedBy = (
   timeline: readonly IdentityLinkRow[],
   userId: string,
+  now: Date,
 ): boolean => {
-  if (timeline.length === 0) return false;
-  const latest = timeline.reduce(
-    (max, row) => (row.effectiveFrom > max ? row.effectiveFrom : max),
-    timeline[0]!.effectiveFrom,
-  );
-  const owner = resolveOwnerAt(timeline, latest);
+  const owner = resolveOwnerAt(timeline, now);
   return owner.kind === "person" && owner.userId === userId;
 };
 
@@ -65,11 +71,11 @@ const stillOwnedBy = (
  * seat path holds a last-admin lock in that transaction) and this function
  * has no business unlocking them.
  *
- * "Still owns" is the timeline's own answer, not a `userId` match: the latest
- * row per (provider, connection, kind, id) — `effectiveFrom DESC, seq DESC` —
- * has to resolve to this person. A login they held and an admin has since
- * reassigned belongs to somebody else now, and closing it would take that
- * person's money away.
+ * "Still owns" is the timeline's answer AT `now`, not a `userId` match: the
+ * winning row for (provider, connection, kind, id) as of this instant —
+ * `effectiveFrom DESC, seq DESC` among rows already in force — has to resolve
+ * to this person. A login they held and an admin has since reassigned belongs
+ * to somebody else now, and closing it would take that person's money away.
  *
  * That check is also what makes this idempotent, which the reconciliation
  * sweep depends on: after one pass the latest row is the unlink, so a second
@@ -115,7 +121,7 @@ export const closeOpenLinksForMembership = async ({
   let closed = 0;
   for (const login of held) {
     const timeline = timelines.get(loginKey(login)) ?? [];
-    if (!stillOwnedBy(timeline, userId)) continue;
+    if (!stillOwnedBy(timeline, userId, now)) continue;
 
     await storage.appendLink({
       organizationId,
