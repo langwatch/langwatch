@@ -448,6 +448,18 @@ Feature: Comparison evaluator (pairwise or multi-candidate preference judging)
     And its reasoning column carries the judge's account of the disagreement
     And a row the judge never ran still exports three empty cells
 
+  # Each pass writes prose with its own commas, semicolons and parentheses.
+  # Joining two of them with more of the same nested to a depth no reader could
+  # follow: a 900-character run-on where the one thing needed first, where one
+  # pass's account ends and the other's begins, was the hardest thing to find.
+  @unit
+  Scenario: An unsettled row's account is readable, not a wall of text
+    Given a row whose two judge passes disagreed
+    When I read the judge's account of that row
+    Then it opens by saying the row establishes no winner
+    And each pass's pick and reasoning stand as their own block
+    And the caveat about what can be blamed for the disagreement comes last
+
   # Asking the judge for a winner is a request, not a guarantee: two of roughly
   # 200 live calls came back with nothing usable in them. Erroring the row
   # throws away both the money and the reason, when the honest report is that

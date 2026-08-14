@@ -203,15 +203,18 @@ describe("given a comparison row the judge ran and could not settle", () => {
 
     /** @scenario "A row the judge could not settle says so, and why" */
     it("does not wear the tie's colour either", () => {
-      const unsettled = resolveWinner(column, unsettledVerdict);
-      const tie = resolveWinner(column, {
-        ...unsettledVerdict,
-        isUnsettled: undefined,
+      const unsettled = resolveWinner({ column, verdict: unsettledVerdict });
+      const tie = resolveWinner({
+        column,
+        verdict: { ...unsettledVerdict, isUnsettled: undefined },
       });
-      const decided = resolveWinner(column, {
-        ...unsettledVerdict,
-        isUnsettled: undefined,
-        winnerId: "target-a",
+      const decided = resolveWinner({
+        column,
+        verdict: {
+          ...unsettledVerdict,
+          isUnsettled: undefined,
+          winnerId: "target-a",
+        },
       });
 
       // Telling the two apart in the data model is only half the job.

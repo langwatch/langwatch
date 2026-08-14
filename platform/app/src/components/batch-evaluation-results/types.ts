@@ -685,8 +685,9 @@ const detectComparisonColumns = (
         reasoning: string | null;
         candidateIds: string[];
         /**
-         * The judge ran and reached no verdict. Carried straight through to
-         * the verdict's own `isUnsettled`, whose doc names the causes.
+         * The comparison produced no verdict for the row. Carried straight
+         * through to the verdict's own `isUnsettled`, whose doc names the
+         * causes.
          */
         isUnsettled?: boolean;
       }>;
@@ -701,12 +702,13 @@ const detectComparisonColumns = (
       continue;
     }
     if (isSkippedComparison) {
-      // A comparison the judge declined to call. Counted for
+      // A comparison that reached no verdict: the row had too few outputs to
+      // judge, or it was judged and the answer could not be used. Counted for
       // `rowsWithoutVerdict`, which is the explanation for a win graph that
-      // later fails to connect, AND carried through as a verdict of its own
-      // so the row can say why instead of showing a bare dash. The judge
-      // wrote that explanation and, for a row that disagreed with itself, was
-      // paid twice for it.
+      // later fails to connect, AND carried through as a verdict of its own so
+      // the row can say which of those happened instead of showing a bare
+      // dash. Every one of them carries that explanation, and the ones that
+      // reached the judge were paid for.
       const skippedKey = ev.name ? `${ev.evaluator}::${ev.name}` : ev.evaluator;
       skippedByKey.set(skippedKey, (skippedByKey.get(skippedKey) ?? 0) + 1);
     }

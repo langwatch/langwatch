@@ -39,16 +39,16 @@ const CELL_MAX_HEIGHT = 140;
 type WinnerVisual = {
   label: string;
   /**
-   * One colour per outcome, because these are exactly the states a reader
-   * scanning the column has to tell apart at a glance:
+   * What the reader is meant to take from the badge at a glance:
    *
-   * - `green`  a winner. A win is a win, and the name says which.
-   * - `gray`   a tie. Settled, and neutral by definition.
-   * - `orange` no verdict. Not settled at all, so it cannot share the tie's
-   *   colour. These two already share a null winner id, and painting them
-   *   alike puts the distinction back out of reach of anyone reading the
-   *   page rather than querying it. Orange and not red: the row is
-   *   unresolved, not broken.
+   * - `green`  a winner, named.
+   * - `gray`   a tie, and the fallback for a winner this snapshot cannot
+   *   place. Both are muted for the same reason: neither points at a
+   *   candidate the reader can go and look at.
+   * - `orange` no verdict. Deliberately not the tie's gray: those two share a
+   *   null winner id, and painting them alike puts the distinction back out
+   *   of reach of anyone reading the page rather than querying it. Orange and
+   *   not red, because the row is unresolved rather than broken.
    */
   colorPalette: "green" | "gray" | "orange";
 };
@@ -58,10 +58,13 @@ type WinnerVisual = {
  * class with no attribute to read back, so the colour a verdict resolves to is
  * only assertable here, before it reaches the Badge.
  */
-export const resolveWinner = (
-  column: BatchComparisonColumn,
-  verdict: BatchComparisonVerdict,
-): WinnerVisual => {
+export const resolveWinner = ({
+  column,
+  verdict,
+}: {
+  column: BatchComparisonColumn;
+  verdict: BatchComparisonVerdict;
+}): WinnerVisual => {
   // Checked before the tie: an unsettled row also has no winner id, and
   // calling it a tie would report a result the judge explicitly refused to
   // reach.
@@ -136,7 +139,7 @@ export function ComparisonWinnerCell({
 
   const isUnsettled = verdict.isUnsettled === true;
   const isTie = !isUnsettled && verdict.winnerId === null;
-  const winner = resolveWinner(column, verdict);
+  const winner = resolveWinner({ column, verdict });
   const reasoning = verdict.reasoning?.trim();
   const winnerOutput = verdict.winnerOutput?.trim();
   const winnerColor = verdict.winnerId

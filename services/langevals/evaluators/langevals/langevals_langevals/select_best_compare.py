@@ -406,7 +406,7 @@ class SelectBestCompareEvaluator(
             )
             return {
                 "winner": winner1,
-                "reasoning": f"{confirmation} {verdict1['reasoning']}",
+                "reasoning": f"{confirmation}\n\n{verdict1['reasoning']}",
                 "cost": total_cost,
             }
 
@@ -424,21 +424,27 @@ class SelectBestCompareEvaluator(
         # establish a winner. Only the explanation has to be earned.
         pinned = self._effective_temperature() == 0.0
         cause = (
-            "The verdict changed with candidate order, so this row does not "
-            "establish a winner."
+            "The verdict changed with candidate order."
             if pinned
             else (
                 "The verdict did not survive being asked again with the "
-                "candidate order reversed, so this row does not establish a "
-                "winner. This judge does not run at a fixed temperature, so "
-                "the disagreement is not necessarily caused by the order."
+                "candidate order reversed. This judge does not run at a fixed "
+                "temperature, so the disagreement is not necessarily caused "
+                "by the order."
             )
         )
         label = "Order-sensitive verdict" if pinned else "Unreproducible verdict"
+        # Laid out as blocks rather than one paragraph. Each pass writes prose
+        # carrying its own commas, semicolons and parentheses, so joining two
+        # of them with more of the same buried the one thing the reader needs
+        # first — where one pass's account ends and the other's begins — under
+        # a wall of nested punctuation. The headline states the finding, each
+        # pass gets its own block, and the caveat lands last.
         details = (
-            f"{label}: original order picked {winner1} "
-            f"({verdict1['reasoning']}); reversed order picked {winner2} "
-            f"({verdict2['reasoning']}). {cause}"
+            f"{label}: this row does not establish a winner.\n\n"
+            f"Original order picked {winner1}:\n{verdict1['reasoning']}\n\n"
+            f"Reversed order picked {winner2}:\n{verdict2['reasoning']}\n\n"
+            f"{cause}"
         )
 
         # No winner, regardless of `allow_tie`.

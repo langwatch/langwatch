@@ -1571,6 +1571,72 @@ def test_disagreement_details_may_blame_order_when_the_judge_is_deterministic():
     assert "changed with candidate order" in result.details
 
 
+# @scenario "An unsettled row's account is readable, not a wall of text"
+def test_disagreement_details_separate_the_two_passes_into_blocks():
+    """The two accounts used to be joined into one paragraph with semicolons
+    and parentheses. Each pass writes prose containing both already, so the
+    result nested to a depth no reader could follow and the reader could not
+    see where one pass ended and the other began. Dogfooding produced a
+    900-character run-on for a row that had paid for two judge calls."""
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(randomize_order=False)
+    )
+    entry = _make_entry(num_candidates=2, row_index=0)
+
+    responses = [
+        _mock_completion_response("variant_0 is concise (and clear); direct", "A"),
+        _mock_completion_response("variant_1 is thorough (with examples)", "A"),
+    ]
+    with patch(
+        "langevals_langevals.select_best_compare.completion",
+        side_effect=responses,
+    ), patch(
+        "langevals_langevals.select_best_compare.completion_cost",
+        return_value=0.0001,
+    ):
+        result = evaluator.evaluate(entry)
+
+    assert result.status == "skipped"
+    assert result.details is not None
+    blocks = [b for b in result.details.split("\n\n") if b.strip()]
+    # Headline, one block per pass, and the caveat. Four, not one.
+    assert len(blocks) == 4, result.details
+    assert blocks[0].endswith("this row does not establish a winner.")
+    assert blocks[1].startswith("Original order picked ")
+    assert blocks[2].startswith("Reversed order picked ")
+    # Each pass's own words sit under its own heading rather than inside a
+    # parenthesis hanging off the previous clause.
+    assert "\n" in blocks[1]
+    assert "\n" in blocks[2]
+
+
+# @scenario "An unsettled row's account is readable, not a wall of text"
+def test_agreement_details_put_the_confirmation_on_its_own_line():
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(randomize_order=False)
+    )
+    entry = _make_entry(num_candidates=2, row_index=0)
+
+    responses = [
+        _mock_completion_response("variant_0 answers directly", "A"),
+        _mock_completion_response("variant_0 answers directly", "B"),
+    ]
+    with patch(
+        "langevals_langevals.select_best_compare.completion",
+        side_effect=responses,
+    ), patch(
+        "langevals_langevals.select_best_compare.completion_cost",
+        return_value=0.0001,
+    ):
+        result = evaluator.evaluate(entry)
+
+    assert result.details is not None
+    blocks = [b for b in result.details.split("\n\n") if b.strip()]
+    assert len(blocks) == 2, result.details
+    assert blocks[0].startswith("Confirmed")
+    assert blocks[1] == "variant_0 answers directly"
+
+
 def _mock_completion_response_without_winner(reasoning: str = "both are fine"):
     """A tool call whose arguments carry no `winner`, which is what two of
     roughly 200 live judge calls actually returned."""
