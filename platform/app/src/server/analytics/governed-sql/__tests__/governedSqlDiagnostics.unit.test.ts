@@ -496,6 +496,44 @@ describe("given a governed query that ran", () => {
         ),
       ).toEqual([]);
     });
+    /**
+     * The drift from a whole multiple grows with the gap, so a budget fixed at
+     * one bucket's worth misreads a hole as a change of period length. Here
+     * `width` is February — the shortest spacing — and the March-to-June gap is
+     * 3.29 of those, which a fixed 0.15 rejects. The series is told it has
+     * unequal periods, and the two absent months are never counted, because
+     * the gap rule skips exactly the gaps the alignment rule rejects.
+     */
+    it("reads a hole in a monthly series as missing months, not unequal periods", () => {
+      const diagnostics = diagnose({
+        sql:
+          "SELECT toStartOfMonth(OccurredAt) AS bucket, count() AS calls " +
+          "FROM analytics.traces " +
+          "WHERE OccurredAt >= toDateTime64('2026-01-01 00:00:00', 3) " +
+          "GROUP BY bucket ORDER BY bucket",
+        columns: [
+          { name: "bucket", type: "Date" },
+          { name: "calls", type: "UInt64" },
+        ],
+        rows: [
+          { bucket: "2026-01-01", calls: 1 },
+          { bucket: "2026-02-01", calls: 1 },
+          { bucket: "2026-03-01", calls: 1 },
+          // April and May absent.
+          { bucket: "2026-06-01", calls: 1 },
+        ],
+        // Past the end of June, so the newest period has closed and the
+        // unfinished-period rule stays out of what this test is about.
+        now: new Date("2026-07-15T00:00:00Z"),
+      });
+
+      expect(codesOf(diagnostics)).toEqual(["MISSING_TIME_BUCKETS"]);
+      expect(find(diagnostics, "MISSING_TIME_BUCKETS")!.meta).toMatchObject({
+        timeColumn: "bucket",
+        missingBucketCount: 2,
+        gapsAfter: ["2026-03-01T00:00:00.000Z"],
+      });
+    });
   });
 
   describe("when several things are worth reading twice at once", () => {

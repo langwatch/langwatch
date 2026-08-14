@@ -578,13 +578,18 @@ function unboundedTimeRangeDiagnostics({
 const MIN_BUCKETS_FOR_GAP_DETECTION = 3;
 
 /**
- * How far a spacing may drift from a whole multiple of the bucket width and
- * still count as aligned.
+ * How far a spacing may drift from a whole multiple of the bucket width, per
+ * bucket the spacing covers, and still count as aligned.
  *
  * A calendar bucket is not a fixed number of milliseconds — months differ by
  * up to three days and a daylight-saving day by an hour — so a tolerance
  * proportional to the width is what keeps `toStartOfMonth` from reporting
  * itself as misaligned.
+ *
+ * Per bucket, because the drift accumulates with the gap: `width` is the
+ * *shortest* spacing observed, so every longer bucket the gap spans adds its
+ * own difference. A budget fixed at one bucket's worth would hold for a gap of
+ * one and fail for a gap of three.
  */
 const BUCKET_ALIGNMENT_TOLERANCE = 0.15;
 
@@ -737,8 +742,16 @@ function missingBucketDiagnostics({
 /** Whether `value` is a whole number of `unit`s, within the calendar tolerance. */
 function isWholeMultiple(value: number, unit: number): boolean {
   const multiple = value / unit;
+  const nearest = Math.round(multiple);
+  // Scaled by the buckets the gap covers, not fixed: a three-month hole drifts
+  // roughly three times as far from a whole multiple of the shortest month as
+  // a one-month step does. Judged against a fixed budget it reads as "these
+  // periods are unequal lengths" while the truth is "two months are missing" —
+  // and `missingBucketDiagnostics` skips the same gap, so the count of absent
+  // buckets comes back zero.
   return (
-    Math.abs(multiple - Math.round(multiple)) <= BUCKET_ALIGNMENT_TOLERANCE
+    Math.abs(multiple - nearest) <=
+    BUCKET_ALIGNMENT_TOLERANCE * Math.max(1, nearest)
   );
 }
 
