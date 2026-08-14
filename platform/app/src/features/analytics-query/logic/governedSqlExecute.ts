@@ -60,7 +60,6 @@ export function createGovernedSqlExecute({
     mutate(
       GOVERNED_SQL_QUERY_PATH,
       {
-        projectId,
         ...request,
         // Instants on the wire, milliseconds in the draft: the draft compares
         // snapshots by value, and the endpoint reads a window. Converting here
@@ -73,6 +72,10 @@ export function createGovernedSqlExecute({
               },
             }
           : {}),
+        // `projectId` goes last so the bound project wins: spreading it first
+        // let any `projectId` carried on the request override the project this
+        // executor is bound to, which is the one thing the binding prevents.
+        projectId,
       },
       { signal },
     );

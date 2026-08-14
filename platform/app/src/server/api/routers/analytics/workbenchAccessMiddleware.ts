@@ -22,7 +22,7 @@ import { workbenchEnabled } from "~/server/analytics/workbenchFeatureGate";
 import type { PermissionMiddleware } from "~/server/api/rbac";
 
 /**
- * Refuses unless the workbench switch is on for this member and project.
+ * Refuses unless the workbench switch is on for this project.
  *
  * Reads refuse too, and deliberately: a surface that listed charts while it was
  * switched off would be announcing a feature the same member cannot use, and
@@ -33,7 +33,6 @@ export const enforceWorkbenchEnabled: PermissionMiddleware<{
 }> = async ({ ctx, input, next }) => {
   if (
     !(await workbenchEnabled({
-      userId: ctx.session.user.id,
       projectId: input.projectId,
       prisma: ctx.prisma,
     }))

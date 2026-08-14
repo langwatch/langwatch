@@ -143,14 +143,18 @@ function pushDescendants({
     return;
   }
   if (!Array.isArray(value)) return;
+  // Recurse rather than only pushing plain objects: an object one array deeper
+  // — `[[{ embedOptions: … }]]` — was never reported, and every blanket rule
+  // that walks these nodes (URL properties, embed options, string resources,
+  // image marks) skipped it, so the refusal had a hole exactly where a spec
+  // would hide one.
   value.forEach((item, index) => {
-    if (isPlainObject(item)) {
-      stack.push({
-        path: joinPointer(path, index),
-        node: item,
-        parentKey: key,
-      });
-    }
+    pushDescendants({
+      stack,
+      path: joinPointer(path, index),
+      key,
+      value: item,
+    });
   });
 }
 

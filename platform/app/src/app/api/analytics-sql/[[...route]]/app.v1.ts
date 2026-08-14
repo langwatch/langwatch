@@ -39,13 +39,13 @@ import {
   getGovernedSqlService,
   MAX_GOVERNED_SQL_LENGTH,
 } from "~/server/analytics/governed-sql";
+import { governedSqlEnabled } from "~/server/analytics/governed-sql/access";
 import { GovernedSqlNotEnabledError } from "~/server/analytics/governed-sql/errors";
 import { governedSqlTimeWindowSchema } from "~/server/analytics/governed-sql/timeWindowSchema";
 import { type createProjectApp, requires } from "~/server/api/security";
 import { getProtectionsForProject } from "~/server/api/utils";
 import { validator as zValidator } from "~/server/api/validation";
 import { prisma } from "~/server/db";
-import { featureFlagService } from "~/server/featureFlag";
 import { canonicalBaseResponses } from "../../shared/base-responses";
 
 const logger = createLogger("langwatch:api:analytics-sql");
@@ -173,21 +173,10 @@ function callerProject({
  * member behind it, so the project is the distinct identity.
  */
 async function requireGovernedSqlEnabled(project: Project): Promise<void> {
-  // The flag store's organization-scoped rules fail closed when the calling
-  // context has no organization, so the gate resolves the project's — without
-  // this, a rule enabling the surface for an organization could never match.
-  const team = await prisma.team.findUnique({
-    where: { id: project.teamId },
-    select: { organizationId: true },
+  const enabled = await governedSqlEnabled({
+    prisma,
+    projectId: project.id,
   });
-  const enabled = await featureFlagService.isEnabled(
-    "release_governed_sql_workbench",
-    {
-      distinctId: project.id,
-      projectId: project.id,
-      organizationId: team?.organizationId,
-    },
-  );
   if (!enabled) throw new GovernedSqlNotEnabledError();
 }
 

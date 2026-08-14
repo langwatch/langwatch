@@ -97,11 +97,11 @@ interface ResultChip {
 function resultChip({
   state,
   failure,
-  stale,
+  isStale,
 }: {
   state: GovernedSqlRequestState;
   failure: GovernedSqlFailure | undefined;
-  stale: boolean;
+  isStale: boolean;
 }): ResultChip | undefined {
   if (state.outcome?.kind === "error" && failure) {
     return failure.code === GOVERNED_SQL_TIMEOUT_CODE
@@ -117,7 +117,7 @@ function resultChip({
         };
   }
   if (state.outcome?.kind !== "result") return undefined;
-  if (stale) {
+  if (isStale) {
     return {
       label: "Previous submission",
       palette: "orange",
@@ -327,7 +327,12 @@ function ViewTabs({
 }: {
   view: GovernedSqlResultView;
   onViewChange: (view: GovernedSqlResultView) => void;
-  panelIdFor: (view: GovernedSqlResultView) => string;
+  /**
+   * The panel a tab controls, or `undefined` while that panel is not in the
+   * document — a tab pointing at a missing id reads to a screen reader as a
+   * broken tab relation, which is worse than no relation at all.
+   */
+  panelIdFor: (view: GovernedSqlResultView) => string | undefined;
 }) {
   const entries: readonly { value: GovernedSqlResultView; label: string }[] = [
     { value: "table", label: "Table" },
@@ -348,12 +353,13 @@ function ViewTabs({
     >
       {entries.map((entry) => {
         const selected = entry.value === view;
+        const panelId = panelIdFor(entry.value);
         return (
           <Button
             key={entry.value}
             role="tab"
             aria-selected={selected}
-            aria-controls={panelIdFor(entry.value)}
+            {...(panelId ? { "aria-controls": panelId } : {})}
             size="xs"
             height="24px"
             variant="plain"
@@ -384,10 +390,17 @@ export function GovernedSqlResultPane({
   // because unmounting would throw away an edited specification.
   const [chartAreaVisited, setChartAreaVisited] = useState(false);
   const panelIdBase = useId();
-  const panelIdFor = (target: GovernedSqlResultView) =>
-    `${panelIdBase}-${target}`;
+  const hasChartPanel = renderChartArea !== undefined && chartAreaVisited;
+  // Chart and Specification are two readings hosted by one panel: the chart
+  // area stays mounted across the switch so an edited specification survives
+  // it. Both tabs therefore name that one panel, and name nothing at all until
+  // the first visit puts it in the document.
+  const panelIdFor = (target: GovernedSqlResultView): string | undefined => {
+    if (target === "table") return `${panelIdBase}-table`;
+    return hasChartPanel ? `${panelIdBase}-chart-area` : undefined;
+  };
 
-  const { stale, failure, result, chip } = readPaneModel(state);
+  const { isStale, failure, result, chip } = readPaneModel(state);
 
   const changeView = (next: GovernedSqlResultView) => {
     if (next !== "table") setChartAreaVisited(true);
@@ -426,7 +439,7 @@ export function GovernedSqlResultPane({
           ) : undefined
         }
         chip={chip}
-        stale={stale}
+        isStale={isStale}
         onRun={onRun}
         inFlight={state.inFlight}
       />
@@ -439,7 +452,7 @@ export function GovernedSqlResultPane({
         <ResultBody
           result={result}
           view={view}
-          panelIdFor={panelIdFor}
+          panelIdBase={panelIdBase}
           chartArea={
             renderChartArea && chartAreaVisited
               ? renderChartArea(view, openSpecification)
@@ -453,7 +466,7 @@ export function GovernedSqlResultPane({
 
 /** What the last submission left to show, read once per render. */
 function readPaneModel(state: GovernedSqlRequestState) {
-  const stale = isGovernedSqlResultStale(state);
+  const isStale = isGovernedSqlResultStale(state);
   const failure =
     state.outcome?.kind === "error"
       ? readGovernedSqlFailure(state.outcome.error)
@@ -461,10 +474,10 @@ function readPaneModel(state: GovernedSqlRequestState) {
   const result =
     state.outcome?.kind === "result" ? state.outcome.result : undefined;
   return {
-    stale,
+    isStale,
     failure,
     result,
-    chip: resultChip({ state, failure, stale }),
+    chip: resultChip({ state, failure, isStale }),
   };
 }
 
@@ -496,13 +509,13 @@ function NoOutcomePane({
 function ResultHeader({
   tabs,
   chip,
-  stale,
+  isStale,
   onRun,
   inFlight,
 }: {
   tabs: ReactNode | undefined;
   chip: ResultChip | undefined;
-  stale: boolean;
+  isStale: boolean;
   onRun: () => void;
   inFlight: boolean;
 }) {
@@ -517,7 +530,7 @@ function ResultHeader({
     >
       {tabs}
       {chip && <ResultChipBadge chip={chip} />}
-      {stale && <StaleNotice onRun={onRun} />}
+      {isStale && <StaleNotice onRun={onRun} />}
       <Box flex="1" />
       {inFlight && (
         <HStack gap={2} color="fg.muted" data-testid="governed-sql-loading">
@@ -570,12 +583,12 @@ function FailureBlock({
 function ResultBody({
   result,
   view,
-  panelIdFor,
+  panelIdBase,
   chartArea,
 }: {
   result: GovernedSqlQueryResult;
   view: GovernedSqlResultView;
-  panelIdFor: (view: GovernedSqlResultView) => string;
+  panelIdBase: string;
   chartArea: ReactNode | undefined;
 }) {
   return (
@@ -587,7 +600,7 @@ function ResultBody({
         minHeight={0}
         overflow="auto"
         role="tabpanel"
-        id={panelIdFor("table")}
+        id={`${panelIdBase}-table`}
         display={view === "table" ? undefined : "none"}
       >
         <GovernedSqlResultTable result={result} />
@@ -601,11 +614,7 @@ function ResultBody({
           minHeight="280px"
           overflow="auto"
           role="tabpanel"
-          id={
-            view === "specification"
-              ? panelIdFor("specification")
-              : panelIdFor("chart")
-          }
+          id={`${panelIdBase}-chart-area`}
           display={view === "table" ? "none" : undefined}
           padding={view === "specification" ? 0 : 4}
         >

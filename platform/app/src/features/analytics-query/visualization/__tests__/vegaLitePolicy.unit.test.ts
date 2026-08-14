@@ -17,6 +17,7 @@ import { ALLOWED_VEGA_EXPRESSION_IDENTIFIERS } from "../vegaLiteExpressions";
 import {
   ALLOWED_VEGA_LITE_TRANSFORMS,
   applyGovernedVegaPolicy,
+  GOVERNED_VEGA_LIMITS,
 } from "../vegaLitePolicy";
 import { VEGA_LITE_SCHEMA_URL as S } from "../vegaLiteSchema";
 import type { VegaValidationError } from "../visualization.types";
@@ -250,10 +251,13 @@ describe("the governed Vega-Lite policy", () => {
 
         const pastTheTransformCeiling = bar({
           transform: [
-            ...Array.from({ length: 32 }, (_, i) => ({
-              calculate: "datum.total + 1",
-              as: `c${i}`,
-            })),
+            ...Array.from(
+              { length: GOVERNED_VEGA_LIMITS.maxTransforms },
+              (_, i) => ({
+                calculate: "datum.total + 1",
+                as: `c${i}`,
+              }),
+            ),
             {
               lookup: "model",
               from: {
@@ -397,6 +401,38 @@ describe("the governed Vega-Lite policy", () => {
         expect(ALLOWED_VEGA_EXPRESSION_IDENTIFIERS).toContain("datum");
         expect(ALLOWED_VEGA_EXPRESSION_IDENTIFIERS).not.toContain("data");
         expect(ALLOWED_VEGA_EXPRESSION_IDENTIFIERS).not.toContain("event");
+      });
+    });
+  });
+
+  describe("given the same forbidden expression in every slot that carries one", () => {
+    describe("when it is validated", () => {
+      /**
+       * Screening is per-key, so a slot missing from the key list is not
+       * screened *less* — it is not screened at all, and the expression reaches
+       * the same evaluator having been read by nothing. `condition.test` was
+       * exactly that slot: refused as a `filter`, accepted verbatim here.
+       */
+      it("refuses it in a conditional encoding, as it does in a filter", () => {
+        const forbidden = "window.parent.document.cookie";
+
+        expect(
+          refusalRules(bar({ transform: [{ filter: forbidden }] })),
+        ).toContain("expression.forbidden");
+
+        expect(
+          refusalRules(
+            bar({
+              encoding: {
+                x: { field: "model", type: "nominal" },
+                color: {
+                  condition: { test: forbidden, value: "red" },
+                  value: "blue",
+                },
+              },
+            }),
+          ),
+        ).toContain("expression.forbidden");
       });
     });
   });

@@ -105,7 +105,11 @@ export function scanGovernedChartValues({
 
     for (const field of fields) {
       scannedFields += 1;
-      const tally = tallyField({ rows, field, wide: isWide(types[field]) });
+      const tally = tallyField({
+        rows,
+        field,
+        isWideNumeric: isWide(types[field]),
+      });
       if (tally.nonEmpty > 0) fieldsWithValues += 1;
       warnings.push(...warningsFor({ dataset, field, tally }));
     }
@@ -139,10 +143,10 @@ type ValueVerdict = "empty" | "plottable" | "non-finite" | "wide-integer";
 
 function classify({
   value,
-  wide,
+  isWideNumeric,
 }: {
   value: unknown;
-  wide: boolean;
+  isWideNumeric: boolean;
 }): ValueVerdict {
   if (value === null || value === undefined || value === "") return "empty";
 
@@ -154,7 +158,7 @@ function classify({
   }
   // ClickHouse returns 64-bit and decimal columns as strings so no digits are
   // lost on the wire. Vega parses them to doubles, which is where they are.
-  if (wide && typeof value === "string" && exceedsSafeInteger(value)) {
+  if (isWideNumeric && typeof value === "string" && exceedsSafeInteger(value)) {
     return "wide-integer";
   }
   return "plottable";
@@ -163,16 +167,16 @@ function classify({
 function tallyField({
   rows,
   field,
-  wide,
+  isWideNumeric,
 }: {
   rows: GovernedDataset;
   field: string;
-  wide: boolean;
+  isWideNumeric: boolean;
 }): FieldTally {
   const tally: FieldTally = { nonEmpty: 0, nonFinite: 0, wideInteger: 0 };
 
   for (const row of rows) {
-    const verdict = classify({ value: row[field], wide });
+    const verdict = classify({ value: row[field], isWideNumeric });
     if (verdict === "empty") continue;
 
     tally.nonEmpty += 1;
@@ -183,13 +187,30 @@ function tallyField({
   return tally;
 }
 
+// ClickHouse formats a Decimal column with trailing or leading zeros
+// ("1.10", "007") that carry no digits a double would drop. Comparing the raw
+// wire string against `String(parsed)` would flag that formatting alone as
+// lost precision, so both sides are reduced to the same canonical shape
+// first: no leading zeros, no trailing fractional zeros, no signed zero.
+function canonicalDecimal(value: string): string {
+  const isNegative = value.startsWith("-");
+  const unsigned = isNegative ? value.slice(1) : value;
+  // `split` always yields at least one element, but `noUncheckedIndexedAccess`
+  // cannot see that; the default keeps the type honest without changing behaviour.
+  const [integerPart = "", fractionPart = ""] = unsigned.split(".");
+  const integer = integerPart.replace(/^0+(?=\d)/, "");
+  const fraction = fractionPart.replace(/0+$/, "");
+  const magnitude = fraction.length > 0 ? `${integer}.${fraction}` : integer;
+  return magnitude === "0" ? "0" : `${isNegative ? "-" : ""}${magnitude}`;
+}
+
 function exceedsSafeInteger(value: string): boolean {
   if (!/^-?\d+(\.\d+)?$/.test(value)) return false;
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return true;
   // Round-tripping is the honest test: it asks whether the double carries every
   // digit back, which covers both magnitude and decimal precision.
-  return String(parsed) !== value.replace(/^\+/, "");
+  return String(parsed) !== canonicalDecimal(value);
 }
 
 function warningsFor({

@@ -31,44 +31,42 @@ const scan = (rows: readonly Record<string, unknown>[], fields: string[]) =>
 
 describe("scanning the values a chart will encode", () => {
   describe("given rows holding zero, null, missing, NaN and infinity", () => {
-    describe("when they are scanned", () => {
-      /** @scenario "Values Vega cannot represent faithfully produce a warning, not a zero" */
-      it("leaves zero, null and missing alone and warns about the rest", () => {
-        const result = scan(
-          [
-            { model: "a", latency: 0 },
-            { model: "b", latency: null },
-            { model: "c" },
-            { model: "d", latency: Number.NaN },
-            { model: "e", latency: Number.POSITIVE_INFINITY },
-          ],
-          ["model", "latency"],
-        );
+    /** @scenario "Values Vega cannot represent faithfully produce a warning, not a zero" */
+    it("leaves zero, null and missing alone and warns about the rest", () => {
+      const result = scan(
+        [
+          { model: "a", latency: 0 },
+          { model: "b", latency: null },
+          { model: "c" },
+          { model: "d", latency: Number.NaN },
+          { model: "e", latency: Number.POSITIVE_INFINITY },
+        ],
+        ["model", "latency"],
+      );
 
-        expect(result.allEncodedValuesEmpty).toBe(false);
-        expect(result.warnings).toHaveLength(1);
+      expect(result.allEncodedValuesEmpty).toBe(false);
+      expect(result.warnings).toHaveLength(1);
 
-        const [warning] = result.warnings;
-        expect(warning?.code).toBe("unrepresentable-value");
-        expect(warning?.meta?.kind).toBe("non-finite");
-        expect(warning?.meta?.count).toBe(2);
-        expect(warning?.message).toContain("latency");
-        // The number itself is never renamed as a zero.
-        expect(warning?.message).not.toMatch(/^0/);
-      });
+      const [warning] = result.warnings;
+      expect(warning?.code).toBe("unrepresentable-value");
+      expect(warning?.meta?.kind).toBe("non-finite");
+      expect(warning?.meta?.count).toBe(2);
+      expect(warning?.message).toContain("latency");
+      // A non-finite value is reported as such, never substituted with 0.
+      expect(warning?.message).not.toContain("0");
+    });
 
-      it("says nothing when every value is one a chart can place", () => {
-        const result = scan(
-          [
-            { model: "a", latency: 0, total: 1 },
-            { model: "b", latency: -2.5, total: 0 },
-          ],
-          ["model", "latency", "total"],
-        );
+    it("says nothing when every value is one a chart can place", () => {
+      const result = scan(
+        [
+          { model: "a", latency: 0, total: 1 },
+          { model: "b", latency: -2.5, total: 0 },
+        ],
+        ["model", "latency", "total"],
+      );
 
-        expect(result.warnings).toEqual([]);
-        expect(result.allEncodedValuesEmpty).toBe(false);
-      });
+      expect(result.warnings).toEqual([]);
+      expect(result.allEncodedValuesEmpty).toBe(false);
     });
   });
 

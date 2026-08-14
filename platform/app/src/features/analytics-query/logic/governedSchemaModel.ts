@@ -111,7 +111,13 @@ export function governedSchemaModel(
   };
 }
 
-function matches(haystack: string, needle: string): boolean {
+function matches({
+  haystack,
+  needle,
+}: {
+  haystack: string;
+  needle: string;
+}): boolean {
   return haystack.toLowerCase().includes(needle);
 }
 
@@ -135,13 +141,17 @@ export function filterGovernedSchemaModel({
 
   const datasets: GovernedSchemaDatasetModel[] = [];
   for (const dataset of model.datasets) {
-    if (matches(dataset.name, needle) || matches(dataset.description, needle)) {
+    if (
+      matches({ haystack: dataset.name, needle }) ||
+      matches({ haystack: dataset.description, needle })
+    ) {
       datasets.push(dataset);
       continue;
     }
     const columns = dataset.columns.filter(
       (column) =>
-        matches(column.name, needle) || matches(column.description, needle),
+        matches({ haystack: column.name, needle }) ||
+        matches({ haystack: column.description, needle }),
     );
     if (columns.length > 0) datasets.push({ ...dataset, columns });
   }
@@ -230,14 +240,19 @@ export function governedSqlHoverFor({
   const wanted = identifier.trim().toLowerCase();
   if (wanted.length === 0) return undefined;
 
-  return hoverForDataset(model, wanted) ?? hoverForColumn(model, wanted);
+  return (
+    hoverForDataset({ model, wanted }) ?? hoverForColumn({ model, wanted })
+  );
 }
 
 /** The dataset a member named, qualified or bare. */
-function hoverForDataset(
-  model: GovernedSchemaModel,
-  wanted: string,
-): GovernedSqlHover | undefined {
+function hoverForDataset({
+  model,
+  wanted,
+}: {
+  model: GovernedSchemaModel;
+  wanted: string;
+}): GovernedSqlHover | undefined {
   const dataset = model.datasets.find((candidate) =>
     datasetSpellings(candidate).includes(wanted),
   );
@@ -256,10 +271,13 @@ function datasetSpellings(dataset: GovernedSchemaDatasetModel): string[] {
 }
 
 /** The column a member named, bare or qualified. Withheld columns answer nothing. */
-function hoverForColumn(
-  model: GovernedSchemaModel,
-  wanted: string,
-): GovernedSqlHover | undefined {
+function hoverForColumn({
+  model,
+  wanted,
+}: {
+  model: GovernedSchemaModel;
+  wanted: string;
+}): GovernedSqlHover | undefined {
   const column = model.datasets
     .flatMap((dataset) => dataset.columns)
     .find(

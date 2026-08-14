@@ -66,7 +66,12 @@ export interface GovernedVegaSpecBuild {
 }
 
 /**
- * Names every registered dataset the specification reads, in document order.
+ * Names every registered dataset the specification reads.
+ *
+ * The order is the traversal's, not the document's: `visitJsonObjects` pops a
+ * LIFO stack, so only the root is position-guaranteed. Nothing depends on the
+ * order — these names only key `view.data(name, rows)` calls — and saying
+ * "document order" would promise a guarantee the walk does not give.
  *
  * These are the names Vega-Lite keeps verbatim in the compiled specification,
  * which is what makes `view.data(name, rows)` addressable at all.

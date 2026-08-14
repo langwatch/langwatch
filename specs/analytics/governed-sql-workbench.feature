@@ -703,7 +703,9 @@ Feature: Governed SQL query workbench — native tables and governed Vega-Lite c
 #   → Scenario: Run query submits the draft and becomes Reload on success
 #   → Scenario: Reload reruns the submitted snapshot exactly
 #   → Scenario: Duplicate submissions are prevented while a request is in flight
-#   → Scenario: A backend query error is presented through the handled-error registry
+#   → Scenario: A statement the validator cannot parse renders registry copy at its location
+#   → Scenario: A statement the policy refuses names what to change
+#   → Scenario: A query that outruns the database ceiling renders a distinct timeout state
 # AC "editing SQL or parameters never leaves an old result looking current"
 #   → Scenario: Editing SQL or parameters marks the result stale and restores Run query
 #   → Scenario: A stale result stays labelled as belonging to the previous submission

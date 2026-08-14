@@ -127,10 +127,11 @@ const withChakra = (element: ReactElement) =>
 const switchView = (
   rerender: (element: ReactElement) => void,
   view: "chart" | "specification",
+  rest: { result?: GovernedSqlChartResult; submittedLabel?: string } = {},
 ) => {
   rerender(
     <ChakraProvider value={defaultSystem}>
-      <ChartModeHost view={view} />
+      <ChartModeHost view={view} {...rest} />
     </ChakraProvider>,
   );
 };
@@ -189,9 +190,11 @@ describe("chart mode", () => {
       it("describes the chart by the query it came from when the pane says so", async () => {
         withChakra(<ChartModeHost result={RESULT} submittedLabel="run 4" />);
 
-        await screen.findByRole("img", {
-          name: "Chart of the result of run 4",
-        });
+        expect(
+          await screen.findByRole("img", {
+            name: "Chart of the result of run 4",
+          }),
+        ).toBeInTheDocument();
       });
     });
 
