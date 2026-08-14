@@ -27,8 +27,8 @@ import {
   getGovernedSqlService,
   MAX_GOVERNED_SQL_LENGTH,
 } from "~/server/analytics/governed-sql";
+import { governedSqlEnabled } from "~/server/analytics/governed-sql/access";
 import { governedSqlTimeWindowSchema } from "~/server/analytics/governed-sql/timeWindowSchema";
-import { workbenchEnabled } from "~/server/analytics/workbenchFeatureGate";
 
 import { checkProjectPermission } from "../../rbac";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
@@ -87,7 +87,7 @@ const availability = protectedProcedure
   .input(projectScopeSchema)
   .use(checkProjectPermission("analytics:view"))
   .query(async ({ ctx, input }): Promise<GovernedSqlAvailability> => {
-    const enabled = await workbenchEnabled({
+    const enabled = await governedSqlEnabled({
       prisma: ctx.prisma,
       projectId: input.projectId,
     });

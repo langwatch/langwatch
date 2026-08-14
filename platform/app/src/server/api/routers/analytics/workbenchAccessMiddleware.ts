@@ -1,7 +1,7 @@
 /**
  * tRPC adapter for the governed SQL workbench's experimental switch.
  *
- * The decision itself stays in `workbenchEnabled`; this is only the shape that
+ * The decision itself stays in `governedSqlEnabled`; this is only the shape that
  * lets a procedure declare the gate instead of remembering to call it. Written
  * out by hand in every resolver, the gate held only for as long as nobody added
  * a sixth procedure and forgot the line — and a forgotten line does not fail,
@@ -12,13 +12,13 @@
  * touch the project should not learn from the answer whether the experiment is
  * switched on for it.
  *
- * @see ~/server/analytics/workbenchFeatureGate — the decision this adapts
+ * @see ~/server/analytics/governed-sql/access — the decision this adapts
  * @see specs/analytics/governed-sql-workbench.feature
  * @see specs/analytics/governed-sql-saved-charts.feature
  */
 
+import { governedSqlEnabled } from "~/server/analytics/governed-sql/access";
 import { GovernedSqlNotEnabledError } from "~/server/analytics/governed-sql/errors";
-import { workbenchEnabled } from "~/server/analytics/workbenchFeatureGate";
 import type { PermissionMiddleware } from "~/server/api/rbac";
 
 /**
@@ -32,7 +32,7 @@ export const enforceWorkbenchEnabled: PermissionMiddleware<{
   projectId: string;
 }> = async ({ ctx, input, next }) => {
   if (
-    !(await workbenchEnabled({
+    !(await governedSqlEnabled({
       projectId: input.projectId,
       prisma: ctx.prisma,
     }))
