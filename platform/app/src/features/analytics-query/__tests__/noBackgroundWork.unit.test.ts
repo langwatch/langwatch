@@ -7,9 +7,9 @@
  * own source instead, and fails the moment a timer, a polling option or a
  * persistence call appears anywhere in it.
  *
- * Scanning the whole feature directory (minus this one) is deliberate: the
- * promise is about the surface, not about the file that happens to hold the
- * request state today.
+ * Scanning the whole feature directory's production source, excluding every
+ * `__tests__` directory, is deliberate: the promise is about the surface, not
+ * about the file that happens to hold the request state today.
  *
  * Spec: specs/analytics/governed-sql-workbench.feature
  */

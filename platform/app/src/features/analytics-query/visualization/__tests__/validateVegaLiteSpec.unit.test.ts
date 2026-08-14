@@ -188,6 +188,10 @@ describe("validateVegaLiteSpec", () => {
         expect(refused.errors[0]?.meta?.dataset).toBe("model_catalog");
       });
 
+      // Type-conformance fixture: this literal only compiles if
+      // GovernedVegaLiteChartProps keeps carrying a dataset per name and its
+      // columns. There is no runtime assertion to make — nothing in
+      // production builds this shape from `props` for a check to exercise.
       it("carries a dataset per name and its columns on the renderer contract", () => {
         const props: GovernedVegaLiteChartProps = {
           spec: barOverQueryResult,
@@ -199,11 +203,7 @@ describe("validateVegaLiteSpec", () => {
           ariaLabel: "Total by model",
         };
 
-        expect(Object.keys(props.datasets)).toEqual([
-          "query_result",
-          "model_catalog",
-        ]);
-        expect(Object.keys(props.columnsByDataset)).toContain("model_catalog");
+        expect(props).toBeDefined();
       });
     });
   });

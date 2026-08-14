@@ -4,9 +4,10 @@
  *
  * They live here rather than beside one route file because there is more than
  * one now, and a copied gate is how a surface ends up switched on for a
- * population the other surface refuses: the flag lookup below resolves the
- * project's *organization*, and a second copy that forgot to would silently
- * answer "off" for every organization-scoped grant.
+ * population the other surface refuses. The flag itself is read in exactly one
+ * place — `governedSqlEnabled` — for the same reason: it resolves the project's
+ * *organization*, and a second copy that forgot to would silently answer "off"
+ * for every organization-scoped grant.
  *
  * @see specs/analytics/governed-sql-api.feature
  * @see specs/analytics/governed-sql-saved-charts.feature
@@ -15,9 +16,9 @@
 import { NotFoundError } from "@langwatch/handled-error";
 import type { Project } from "~/generated/prisma/client";
 
+import { governedSqlEnabled } from "~/server/analytics/governed-sql/access";
 import { GovernedSqlNotEnabledError } from "~/server/analytics/governed-sql/errors";
 import { prisma } from "~/server/db";
-import { featureFlagService } from "~/server/featureFlag";
 
 /**
  * The project this request runs for, having checked the URL agrees with the
@@ -58,21 +59,10 @@ export function callerProject({
 export async function requireGovernedSqlEnabled(
   project: Project,
 ): Promise<void> {
-  // The flag store's organization-scoped rules fail closed when the calling
-  // context has no organization, so the gate resolves the project's — without
-  // this, a rule enabling the surface for an organization could never match.
-  const team = await prisma.team.findUnique({
-    where: { id: project.teamId },
-    select: { organizationId: true },
-  });
-  const enabled = await featureFlagService.isEnabled(
-    "release_governed_sql_workbench",
-    {
-      distinctId: project.id,
-      projectId: project.id,
-      organizationId: team?.organizationId,
-    },
-  );
+  // Asked through `governedSqlEnabled` rather than evaluated here: it is the
+  // one place the flag is read, so this boundary and the tRPC one cannot drift
+  // into answering the same question differently.
+  const enabled = await governedSqlEnabled({ prisma, projectId: project.id });
   if (!enabled) throw new GovernedSqlNotEnabledError();
 }
 

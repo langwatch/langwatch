@@ -22,7 +22,37 @@ import {
 } from "~/features/analytics-query/logic/governedSqlFailure";
 import { HandledErrorState } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
+import { api, type RouterOutputs } from "~/utils/api";
+
+type AvailabilityReason =
+  RouterOutputs["analytics"]["governedSql"]["availability"]["reason"];
+
+/**
+ * The backend's own unavailable state, worded by the error registry rather
+ * than by this page. Two different refusals, both backend availability
+ * data: a switch the member's own administrator can turn on, and a
+ * deployment that has nothing to run the query as. A query failure is a
+ * third, distinct case — it carries no `reason` and must not be read as
+ * either, so it renders through the same registry unmapped.
+ */
+function AvailabilityFallback({
+  error,
+  reason,
+}: {
+  error: unknown;
+  reason: AvailabilityReason | undefined;
+}) {
+  if (error) {
+    return <HandledErrorState error={error} fullHeight={false} />;
+  }
+
+  const unavailableState =
+    reason === "disabled"
+      ? governedSqlNotEnabledPayload()
+      : governedSqlUnavailablePayload();
+
+  return <HandledErrorState error={unavailableState} fullHeight={false} />;
+}
 
 export function CustomQueryPage() {
   const { project } = useOrganizationTeamProject();
@@ -41,13 +71,6 @@ export function CustomQueryPage() {
 
   const available = availability.data?.available === true;
   const resolving = projectId.length === 0 || availability.isLoading;
-
-  // Two different refusals: a switch the member's own administrator can turn
-  // on, and a deployment that has nothing to run the query as.
-  const unavailableState =
-    availability.data?.reason === "disabled"
-      ? governedSqlNotEnabledPayload()
-      : governedSqlUnavailablePayload();
 
   return (
     <DashboardLayout>
@@ -74,12 +97,20 @@ export function CustomQueryPage() {
           display="flex"
           flexDirection="column"
         >
-          <GovernedSqlWorkbench projectId={projectId} />
+          {/*
+            Keyed on the project so switching projects starts a clean
+            workbench. The query controller holds the draft, the submitted
+            snapshot and the outcome; without this key they survive the switch,
+            the pane calls the carried-over result "Current", and "run again"
+            would submit the previous project's statement against the new one.
+          */}
+          <GovernedSqlWorkbench key={projectId} projectId={projectId} />
         </Box>
       ) : (
-        // The backend's own unavailable state, worded by the error registry
-        // rather than by this page.
-        <HandledErrorState error={unavailableState} fullHeight={false} />
+        <AvailabilityFallback
+          error={availability.error}
+          reason={availability.data?.reason}
+        />
       )}
     </DashboardLayout>
   );

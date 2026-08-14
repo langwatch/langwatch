@@ -103,6 +103,10 @@ function ExpandedValue({
       open={open}
       onOpenChange={(details) => setOpen(details.open)}
       positioning={{ placement: "bottom-start" }}
+      // Both default to false in Chakra v3, so without them every cell in a
+      // ten-thousand-row table keeps its expanded content mounted while closed.
+      lazyMount
+      unmountOnExit
     >
       <Popover.Trigger asChild>
         <Button
