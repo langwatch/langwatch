@@ -42,12 +42,25 @@ export interface StarterVegaLiteSpecInput {
   readonly datasetName: string;
 }
 
+/**
+ * A column name, safe to use as a Vega-Lite `field` reference.
+ *
+ * Vega-Lite reads an unescaped `.`, `[` or `]` as nested-field or array-index
+ * syntax rather than a literal character in the name (`fieldIsKnown` in
+ * `vegaLiteFields.ts` reverses this same escaping when it checks a spec's
+ * field against the columns a response actually carried). A result column
+ * named e.g. `a.b` would otherwise resolve to the wrong path, or to nothing.
+ */
+function escapeVegaLiteField(name: string): string {
+  return name.replace(/[\\.[\]]/g, "\\$&");
+}
+
 export function starterVegaLiteSpec({
   columns,
   datasetName,
 }: StarterVegaLiteSpecInput): Record<string, unknown> {
   const typed = columns.map((column) => ({
-    name: column.name,
+    name: escapeVegaLiteField(column.name),
     encoding: starterEncodingType(column.type),
   }));
 

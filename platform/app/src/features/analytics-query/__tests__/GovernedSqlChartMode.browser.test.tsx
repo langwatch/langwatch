@@ -109,18 +109,6 @@ function bars(): SVGGraphicsElement[] {
   );
 }
 
-async function poll(
-  check: () => boolean,
-  timeoutMs = 15_000,
-): Promise<boolean> {
-  const started = Date.now();
-  while (Date.now() - started < timeoutMs) {
-    if (check()) return true;
-    await new Promise((resolve) => setTimeout(resolve, 25));
-  }
-  return check();
-}
-
 beforeEach(async () => {
   await page.viewport(1280, 900);
 });
@@ -149,10 +137,11 @@ describe("governed chart mode in real Chromium", () => {
           </ChakraProvider>,
         );
 
-        const drawn = await poll(() => bars().length === RESULT.rows.length);
+        await expect
+          .poll(() => bars().length, { timeout: 15_000 })
+          .toBe(RESULT.rows.length);
         expect(screen.queryByTestId("governed-chart-failure")).toBeNull();
         expect(screen.queryByTestId("vega-spec-editor-problems")).toBeNull();
-        expect(drawn).toBe(true);
 
         // A real SVG that reached the ready state.
         expect(chartView()?.querySelector("svg")).not.toBeNull();
@@ -179,9 +168,11 @@ describe("governed chart mode in real Chromium", () => {
             '[data-testid="governed-vega-chart-view"] svg g.mark-text text',
           ),
         ).map((label) => label.textContent);
-        const categoryAxisName = document
-          .querySelector('[aria-roledescription="axis"]')
-          ?.getAttribute("aria-label");
+        const categoryAxis = document.querySelector(
+          '[aria-roledescription="axis"]',
+        );
+        expect(categoryAxis).not.toBeNull();
+        const categoryAxisName = categoryAxis?.getAttribute("aria-label") ?? "";
         for (const row of RESULT.rows) {
           expect(axisText).toContain(row.evaluator_name);
           expect(categoryAxisName).toContain(row.evaluator_name);

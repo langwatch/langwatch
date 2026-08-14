@@ -103,7 +103,7 @@ export function governedVegaEmbedOptions({
     actions: false,
     renderer: "svg",
     ast: true,
-    loader: createNoNetworkVegaLoader() as EmbedOptions["loader"],
+    loader: createNoNetworkVegaLoader(),
     config: themeConfig as EmbedOptions["config"],
     tooltip: { theme: colorMode },
   };
@@ -167,7 +167,12 @@ export function useGovernedVegaView({
     const observer = new ResizeObserver(() => {
       const result = resultRef.current;
       if (result === null) return;
-      void result.view.resize().runAsync();
+      void result.view
+        .resize()
+        .runAsync()
+        .catch((error: unknown) => {
+          finalizeInto({ result, resultRef, setState, error });
+        });
     });
     observer.observe(container);
     return () => observer.disconnect();

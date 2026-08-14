@@ -219,4 +219,9 @@ export const EXPRESSION_BEARING_KEYS = [
   "filter",
   "signal",
   "labelExpr",
+  // A conditional encoding carries its expression here — `{condition: {test:
+  // "...", value: "red"}}`. Omitting it left a slot that reaches the same
+  // evaluator as `filter` while never being screened, so an expression refused
+  // as a filter was accepted verbatim as a condition.
+  "test",
 ] as const;

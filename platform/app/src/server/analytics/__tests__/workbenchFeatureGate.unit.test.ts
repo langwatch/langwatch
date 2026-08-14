@@ -45,15 +45,17 @@ describe("the workbench feature gate", () => {
   describe("given a project that belongs to an organization", () => {
     describe("when the gate is consulted", () => {
       /** @scenario "The switch is decided for the project's organization, not for the project alone" */
-      it("offers the organization alongside the member and the project", async () => {
+      it("offers the organization alongside the project, which is also the identity", async () => {
         await workbenchEnabled({
-          userId: "user-1",
           projectId: "project-1",
           prisma: prismaAnswering({ team: { organizationId: "org-1" } }),
         });
 
+        // The project, never the member: the REST boundary is an API key with
+        // nobody behind it, so a member-keyed rule here would open the surface
+        // for one member of a project and close it for their teammate.
         expect(isEnabled).toHaveBeenCalledWith(GOVERNED_SQL_WORKBENCH_FLAG, {
-          distinctId: "user-1",
+          distinctId: "project-1",
           projectId: "project-1",
           organizationId: "org-1",
         });
@@ -66,7 +68,6 @@ describe("the workbench feature gate", () => {
       /** @scenario "The switch is decided for the project's organization, not for the project alone" */
       it("names no organization rather than guessing one", async () => {
         await workbenchEnabled({
-          userId: "user-1",
           projectId: "missing",
           prisma: prismaAnswering(null),
         });
@@ -79,7 +80,7 @@ describe("the workbench feature gate", () => {
         // organization must not be handed a value we invented.
         expect("organizationId" in options).toBe(false);
         expect(options).toEqual({
-          distinctId: "user-1",
+          distinctId: "missing",
           projectId: "missing",
         });
       });
@@ -93,7 +94,6 @@ describe("the workbench feature gate", () => {
 
         expect(
           await workbenchEnabled({
-            userId: "user-1",
             projectId: "project-1",
             prisma: prismaAnswering({ team: { organizationId: "org-1" } }),
           }),

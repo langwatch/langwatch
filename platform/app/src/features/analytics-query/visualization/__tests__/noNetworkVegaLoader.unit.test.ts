@@ -8,7 +8,7 @@
  *
  * Node environment on purpose — see `validateVegaLiteSpec.unit.test.ts`.
  */
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   createNoNetworkVegaLoader,
@@ -34,43 +34,55 @@ const refusalFrom = async (
 };
 
 describe("the no-network Vega loader", () => {
+  // Stubbed for every test in the suite, not just the ones that expect a
+  // refusal: if the loader ever regresses, a test that never meant to touch
+  // the network — like the credential-redaction test below — is exactly what
+  // would otherwise attempt a real request to `exfiltrate.example`.
+  let reachedTheNetwork: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    reachedTheNetwork = vi.fn(() => {
+      throw new Error("the loader must not reach the network");
+    });
+    vi.stubGlobal("fetch", reachedTheNetwork);
+  });
+
+  // A whole-suite invariant, not any one test's: it must hold across every test
+  // here, including the two below that never otherwise touch `reachedTheNetwork` —
+  // which is the point of guarding it here instead of per-test.
+  afterEach(() => {
+    // biome-ignore lint/suspicious/noMisplacedAssertion: shared guard for the whole suite, see comment above
+    expect(reachedTheNetwork).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
   describe("given a spec that slipped past static validation with a loadable resource", () => {
     describe("when the view asks the loader for it", () => {
       it("refuses every method, names the blocked resource, and issues no request", async () => {
-        const reachedTheNetwork = vi.fn(() => {
-          throw new Error("the loader must not reach the network");
-        });
-        vi.stubGlobal("fetch", reachedTheNetwork);
         const loader = createNoNetworkVegaLoader();
 
-        try {
-          // Thunks rather than promises: four already-rejected promises sitting
-          // in an array would be unhandled until the loop reached them.
-          const attempts: [string, () => Promise<unknown>][] = [
-            ["load", () => loader.load("https://exfiltrate.example/rows.json")],
-            [
-              "sanitize",
-              () => loader.sanitize("https://exfiltrate.example/rows.json"),
-            ],
-            ["http", () => loader.http("https://exfiltrate.example/rows.json")],
-            ["file", () => loader.file("/etc/passwd")],
-          ];
+        // Thunks rather than promises: four already-rejected promises sitting
+        // in an array would be unhandled until the loop reached them.
+        const attempts: [string, () => Promise<unknown>][] = [
+          ["load", () => loader.load("https://exfiltrate.example/rows.json")],
+          [
+            "sanitize",
+            () => loader.sanitize("https://exfiltrate.example/rows.json"),
+          ],
+          ["http", () => loader.http("https://exfiltrate.example/rows.json")],
+          ["file", () => loader.file("/etc/passwd")],
+        ];
 
-          for (const [method, attempt] of attempts) {
-            const error = await refusalFrom(attempt);
-            expect(error.detail.rule).toBe("loader.blocked");
-            expect(error.detail.code).toBe("loader-blocked");
-            expect(error.detail.path).toBe("/");
-            expect(error.detail.meta?.method).toBe(method);
-          }
-
-          const localFile = await refusalFrom(() => loader.file("/etc/shadow"));
-          expect(localFile.message).toContain("/etc/shadow");
-        } finally {
-          vi.unstubAllGlobals();
+        for (const [method, attempt] of attempts) {
+          const error = await refusalFrom(attempt);
+          expect(error.detail.rule).toBe("loader.blocked");
+          expect(error.detail.code).toBe("loader-blocked");
+          expect(error.detail.path).toBe("/");
+          expect(error.detail.meta?.method).toBe(method);
         }
 
-        expect(reachedTheNetwork).not.toHaveBeenCalled();
+        const localFile = await refusalFrom(() => loader.file("/etc/shadow"));
+        expect(localFile.message).toContain("/etc/shadow");
       });
 
       it("never repeats a credential, token, or fragment back in the refusal", async () => {

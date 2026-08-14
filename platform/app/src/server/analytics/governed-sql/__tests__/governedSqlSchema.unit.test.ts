@@ -268,7 +268,13 @@ describe("given the governed schema catalog", () => {
      */
     it("never puts the tenant scope column in its projection", () => {
       for (const dataset of schemaFor(FULLY_PERMITTED).datasets) {
-        const [projection] = dataset.exampleSql.split("\n");
+        const projection = /select\s+([\s\S]*?)\s+from\b/i.exec(
+          dataset.exampleSql,
+        )?.[1];
+        expect(
+          projection,
+          `${dataset.name}: no SELECT ... FROM found`,
+        ).toBeDefined();
         expect(projection, dataset.name).not.toContain("TenantId");
       }
     });

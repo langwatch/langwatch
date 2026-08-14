@@ -56,6 +56,12 @@ const COLUMN_SHAPES: readonly {
   { name: "no columns at all", columns: [] },
 ];
 
+const shapeNamed = (name: string): readonly GovernedDatasetColumn[] => {
+  const shape = COLUMN_SHAPES.find((entry) => entry.name === name);
+  if (!shape) throw new Error(`no column shape named ${name}`);
+  return shape.columns;
+};
+
 const validate = (spec: unknown, columns: readonly GovernedDatasetColumn[]) =>
   validateVegaLiteSpec({
     spec,
@@ -91,7 +97,7 @@ describe("the starting chart specification", () => {
       });
 
       it("puts time on the horizontal axis and draws a line for it", () => {
-        const columns = COLUMN_SHAPES[1]!.columns;
+        const columns = shapeNamed("a time bucket, a series and a number");
         const spec = starterVegaLiteSpec({ columns, datasetName: DATASET });
         const encoding = spec.encoding as Record<string, any>;
 
@@ -101,7 +107,7 @@ describe("the starting chart specification", () => {
       });
 
       it("counts rows when the result has nothing to measure", () => {
-        const columns = COLUMN_SHAPES[2]!.columns;
+        const columns = shapeNamed("only categories");
         const spec = starterVegaLiteSpec({ columns, datasetName: DATASET });
         const encoding = spec.encoding as Record<string, any>;
 
@@ -157,7 +163,7 @@ describe("the starting chart specification", () => {
 
     describe("when it is rendered as the editor's initial text", () => {
       it("is formatted JSON that parses back to the same specification", () => {
-        const columns = COLUMN_SHAPES[0]!.columns;
+        const columns = shapeNamed("a category and a number");
         const text = starterVegaLiteSpecText({ columns, datasetName: DATASET });
 
         expect(text).toContain("\n");

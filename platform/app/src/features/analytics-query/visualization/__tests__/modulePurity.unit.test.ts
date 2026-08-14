@@ -51,17 +51,31 @@ const MODULE_DIR = fileURLToPath(new URL("../", import.meta.url));
  * Imports that would drag a browser runtime into the policy. `vega-lite` is
  * absent from this list on purpose: the schema module imports its bundled JSON
  * schema, which is data and evaluates nothing.
+ *
+ * The lookahead excludes `import type` / `export type`: a type-only import is
+ * erased before anything evaluates it, so it drags in no runtime. That is what
+ * lets `noNetworkVegaLoader.ts` check its shape against vega's own `Loader`
+ * without importing vega.
  */
 const BROWSER_RUNTIME_IMPORT =
-  /from\s+["'](react|react-dom|react-vega|vega|vega-embed|vega-view|@chakra-ui\/[^"']+)["']/;
+  /(?<!\b(?:import|export)\s+type\b[^\n]*)from\s+["'](react|react-dom|react-vega|vega|vega-embed|vega-view|@chakra-ui\/[^"']+)["']/;
 
 const sourceFiles = () =>
-  readdirSync(MODULE_DIR)
-    .filter((name) => name.endsWith(".ts") && !name.endsWith(".d.ts"))
-    .map((name) => ({
-      name,
-      source: readFileSync(join(MODULE_DIR, name), "utf8"),
-    }));
+  readdirSync(MODULE_DIR, { recursive: true, withFileTypes: true })
+    .filter(
+      (entry) =>
+        entry.isFile() &&
+        /\.tsx?$/.test(entry.name) &&
+        !entry.name.endsWith(".d.ts") &&
+        !entry.parentPath.split(/[/\\]/).includes("__tests__"),
+    )
+    .map((entry) => {
+      const name = join(entry.parentPath, entry.name).slice(MODULE_DIR.length);
+      return {
+        name,
+        source: readFileSync(join(entry.parentPath, entry.name), "utf8"),
+      };
+    });
 
 describe("the Vega-Lite validator and policy modules", () => {
   describe("given the modules are imported outside a browser", () => {
@@ -135,7 +149,18 @@ describe("the Vega-Lite validator and policy modules", () => {
       it("keeps the rule identifiers, codes, limits and allowlists enumerable", () => {
         expect(GOVERNED_VEGA_RULE_IDS.length).toBe(GOVERNED_VEGA_RULES.length);
         expect(VEGA_VALIDATION_ERROR_CODES.length).toBeGreaterThan(0);
-        expect(Object.keys(GOVERNED_VEGA_LIMITS)).toHaveLength(10);
+        expect(Object.keys(GOVERNED_VEGA_LIMITS).sort()).toEqual([
+          "maxExpressionBytes",
+          "maxInteractiveParams",
+          "maxLayersPerView",
+          "maxNestingDepth",
+          "maxRowsAllDatasets",
+          "maxRowsPerDataset",
+          "maxSpecBytes",
+          "maxTotalExpressionBytes",
+          "maxTransforms",
+          "maxUnitViews",
+        ]);
         expect(ALLOWED_VEGA_LITE_TRANSFORMS).toContain("filter");
       });
     });

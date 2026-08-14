@@ -88,7 +88,6 @@ const availability = protectedProcedure
   .query(async ({ ctx, input }): Promise<GovernedSqlAvailability> => {
     const enabled = await workbenchEnabled({
       prisma: ctx.prisma,
-      userId: ctx.session.user.id,
       projectId: input.projectId,
     });
     if (!enabled) return { available: false, reason: "disabled" };

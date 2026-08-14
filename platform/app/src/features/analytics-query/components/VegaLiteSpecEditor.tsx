@@ -80,21 +80,21 @@ export function VegaLiteSpecEditor({
           options={EDITOR_OPTIONS}
         />
       </Box>
-      {errors.length > 0 && (
-        <Text
-          fontSize="12px"
-          color="fg.muted"
-          role="status"
-          paddingX={4}
-          paddingY={1}
-          borderTopWidth="1px"
-          borderColor="border"
-        >
-          {errors.length === 1
+      <Text
+        fontSize="12px"
+        color="fg.muted"
+        role="status"
+        paddingX={errors.length > 0 ? 4 : 0}
+        paddingY={errors.length > 0 ? 1 : 0}
+        borderTopWidth={errors.length > 0 ? "1px" : "0"}
+        borderColor="border"
+      >
+        {errors.length > 0
+          ? errors.length === 1
             ? "1 problem to fix"
-            : `${errors.length} problems to fix`}
-        </Text>
-      )}
+            : `${errors.length} problems to fix`
+          : ""}
+      </Text>
     </VStack>
   );
 }

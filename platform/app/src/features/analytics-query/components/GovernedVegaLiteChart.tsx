@@ -11,29 +11,14 @@
  */
 
 import { Box, Stack, Text, VStack } from "@chakra-ui/react";
-import { type RefObject, useId, useMemo } from "react";
+import { type RefObject, useId } from "react";
 
 import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
 
-import {
-  type GovernedVegaViewStatus,
-  useGovernedVegaView,
-} from "../hooks/useGovernedVegaView";
-import { useLangwatchVegaTokens } from "../hooks/useLangwatchVegaTokens";
-import { referencedDatasetNames } from "../visualization/buildGovernedVegaSpec";
-import { governedEmptyEncodingFailure } from "../visualization/governedChartFailures";
-import {
-  langwatchVegaConfig,
-  langwatchVegaPinnedConfig,
-} from "../visualization/langwatchVegaConfig";
-import {
-  encodedFieldsByDataset,
-  scanGovernedChartValues,
-} from "../visualization/scanGovernedChartValues";
-import { validateVegaLiteSpec } from "../visualization/validateVegaLiteSpec";
+import { useGovernedChartModel } from "../hooks/useGovernedChartModel";
+import type { GovernedVegaViewStatus } from "../hooks/useGovernedVegaView";
 import type {
   GovernedVegaLiteChartProps,
-  VegaValidationError,
   VegaValidationWarning,
 } from "../visualization/visualization.types";
 
@@ -48,76 +33,13 @@ export function GovernedVegaLiteChart({
   columnsByDataset,
   ariaLabel,
 }: GovernedVegaLiteChartProps) {
-  const { colorMode, tokens } = useLangwatchVegaTokens();
   const descriptionId = useId();
-
-  const themeConfig = useMemo(
-    () => langwatchVegaConfig({ colorMode, tokens }),
-    [colorMode, tokens],
-  );
-  const pinnedConfig = useMemo(
-    () => langwatchVegaPinnedConfig({ tokens }),
-    [tokens],
-  );
-
-  const validation = useMemo(
-    () =>
-      validateVegaLiteSpec({
-        spec,
-        columnsByDataset,
-        rowCountsByDataset: rowCounts(datasets),
-      }),
-    [spec, columnsByDataset, datasets],
-  );
-
-  const scan = useMemo(() => {
-    if (!validation.ok) return null;
-    const datasetNames = referencedDatasetNames({
-      spec: validation.normalized,
-      registered: Object.keys(datasets),
-    });
-    const fieldsByDataset = encodedFieldsByDataset({
-      spec: validation.normalized,
-      datasetNames,
-      columnsByDataset,
-    });
-    return {
-      fieldsByDataset,
-      ...scanGovernedChartValues({
-        encodedFieldsByDataset: fieldsByDataset,
-        datasets,
-        columnsByDataset,
-      }),
-    };
-  }, [validation, datasets, columnsByDataset]);
-
-  const drawable =
-    validation.ok && scan !== null && !scan.allEncodedValuesEmpty;
-
-  const { containerRef, state } = useGovernedVegaView({
-    spec: validation.ok ? validation.normalized : null,
-    datasets,
-    themeConfig,
-    pinnedConfig,
-    colorMode,
-    enabled: drawable,
-  });
-
-  const failures = collectFailures({
-    validation,
-    scan,
-    viewFailure: state.failure,
-  });
-  const warnings: readonly VegaValidationWarning[] = [
-    ...validation.warnings,
-    ...(scan?.warnings ?? []),
-  ];
-
-  const refused = failures.length > 0;
+  const { containerRef, state, failures, warnings, isRefused } =
+    useGovernedChartModel({ spec, datasets, columnsByDataset });
 
   return (
     <VStack align="stretch" gap={3} data-testid="governed-vega-chart">
-      {refused && <GovernedChartFailure errors={failures} />}
+      {isRefused && <GovernedChartFailure errors={failures} />}
       <GovernedChartWarnings warnings={warnings} />
       <IsolatedErrorBoundary scope="This chart could not be drawn">
         <GovernedChartCanvas
@@ -125,30 +47,25 @@ export function GovernedVegaLiteChart({
           ariaLabel={ariaLabel}
           descriptionId={descriptionId}
           status={state.status}
-          refused={refused}
+          isRefused={isRefused}
         />
       </IsolatedErrorBoundary>
     </VStack>
   );
 }
 
-/**
- * Where Vega draws, and the sentence that says what it drew.
- *
- * @param refused Whether a refusal is on screen above this.
- */
 function GovernedChartCanvas({
   containerRef,
   ariaLabel,
   descriptionId,
   status,
-  refused,
+  isRefused,
 }: {
   containerRef: RefObject<HTMLDivElement | null>;
   ariaLabel: string | undefined;
   descriptionId: string;
   status: GovernedVegaViewStatus;
-  refused: boolean;
+  isRefused: boolean;
 }) {
   /*
     The mount point stays in the tree while a refusal is shown, so a
@@ -161,7 +78,7 @@ function GovernedChartCanvas({
     nothing renders an empty plotting area.
   */
   return (
-    <Box hidden={refused} display={refused ? "none" : undefined}>
+    <Box hidden={isRefused} display={isRefused ? "none" : undefined}>
       <Box
         // The chart is a picture of the result. Its accessible name is the
         // whole of what a reader who cannot see it gets from this element —
@@ -188,35 +105,6 @@ function GovernedChartCanvas({
       </Text>
     </Box>
   );
-}
-
-/**
- * The refusals to show, in the order they were decided: a specification that
- * did not pass, then a result with nothing in it, then a failure from inside
- * the chart runtime. Only one kind is ever shown, because only one is ever
- * reached.
- */
-function collectFailures({
-  validation,
-  scan,
-  viewFailure,
-}: {
-  validation: ReturnType<typeof validateVegaLiteSpec>;
-  scan: {
-    fieldsByDataset: Readonly<Record<string, readonly string[]>>;
-    allEncodedValuesEmpty: boolean;
-  } | null;
-  viewFailure: VegaValidationError | null;
-}): readonly VegaValidationError[] {
-  if (!validation.ok) return validation.errors;
-  if (scan === null) return [];
-  if (scan.allEncodedValuesEmpty) {
-    return [
-      governedEmptyEncodingFailure({ fieldsByDataset: scan.fieldsByDataset }),
-    ];
-  }
-  if (viewFailure !== null) return [viewFailure];
-  return [];
 }
 
 function GovernedChartWarnings({
@@ -247,13 +135,5 @@ function GovernedChartWarnings({
         </Text>
       ))}
     </Stack>
-  );
-}
-
-function rowCounts(
-  datasets: GovernedVegaLiteChartProps["datasets"],
-): Record<string, number> {
-  return Object.fromEntries(
-    Object.entries(datasets).map(([name, rows]) => [name, rows.length]),
   );
 }
