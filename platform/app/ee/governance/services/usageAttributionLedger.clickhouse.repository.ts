@@ -97,20 +97,21 @@ export class UsageAttributionLedgerClickHouseRepository
    * summarise. Only the absence of a KPI row falls through to the payload's
    * `cost_usd`.
    *
-   * The KPI side is SUMMED per trace rather than picked, because a trace whose
-   * events straddle an hour legitimately holds several KPI rows — the table is
-   * keyed (TenantId, SourceId, HourBucket, TraceId).
+   * The KPI side is PICKED per trace, never summed: every row there is a
+   * cumulative snapshot of the whole trace's cost, so adding two of them bills
+   * the trace twice. See the query's own note for why one trace can hold rows
+   * under several HourBuckets in the first place — it is a backward-moving
+   * start time, not an hour-straddling trace.
    *
-   * BOTH sides are deduped to their latest version before anything is added
-   * up, and on the KPI side that is not a precaution — it is required for the
-   * number to mean anything. The KPI reactor is LEVEL-TRIGGERED: it writes the
-   * trace's RUNNING TOTALS on a throttle window, so a trace that emits over
-   * several windows leaves several rows under the same key, each carrying a
-   * larger cumulative figure. Summing them undeduped does not double-count a
-   * replay, it sums a trace's cost against itself as many times as the trace
-   * was flushed. The shipped `findSpendTotals` skips this deliberately for an
-   * anomaly evaluator comparing two windows, where the distortion is on both
-   * sides; a money report has no such luxury.
+   * BOTH sides are reduced to one row before anything is added up, and on the
+   * KPI side that is not a precaution — it is required for the number to mean
+   * anything. The reactor is LEVEL-TRIGGERED: it writes the trace's RUNNING
+   * TOTAL on a throttle window, so a trace flushed several times leaves
+   * several rows, each a larger snapshot of the same trace. Adding them up
+   * sums a trace's cost against itself once per flush. The shipped
+   * `findSpendTotals` sums without reducing, deliberately, for an anomaly
+   * evaluator comparing two windows where the distortion lands on both sides;
+   * a money report has no such luxury.
    *
    * The KPI window bound is tight rather than generous, and that is load-
    * bearing. Both reactors take their timestamp from the same
@@ -160,28 +161,38 @@ export class UsageAttributionLedgerClickHouseRepository
             )
         ),
         trace_spend AS (
-          SELECT TraceId, sum(KeySpendUsd) AS TraceSpendUsd
-          FROM (
-            -- argMax, NOT the IN-tuple dedup the sibling reads use. That
-            -- pattern only collapses duplicates when the version column
-            -- strictly increases per write, and this one does not:
-            -- LastEventOccurredAt is set from the trace's own
-            -- foldState.occurredAt, a fact about the DATA rather than a
-            -- clock. Re-deliver the same reactor event and both rows carry an
-            -- identical version, both satisfy the tuple, and a plain sum adds
-            -- the trace's cost to itself. argMax picks one row per key
-            -- whatever the versions do, and where they tie the rows are
-            -- identical copies, so either is the same answer.
-            SELECT
-              TraceId,
-              argMax(SpendUsd, LastEventOccurredAt) AS KeySpendUsd
-            FROM ${KPIS_TABLE}
-            WHERE TenantId = {tenantId:String}
-              AND HourBucket >= toStartOfHour(fromUnixTimestamp64Milli({fromMs:UInt64}))
-              AND HourBucket < fromUnixTimestamp64Milli({toMs:UInt64})
-            GROUP BY TenantId, SourceId, HourBucket, TraceId
-          )
-          GROUP BY TraceId
+          -- ONE row per trace: its latest cumulative snapshot. Never a sum.
+          --
+          -- Every governance_kpis row carries the WHOLE trace's running total
+          -- (the reactor writes foldState.totalCost), so two rows for one
+          -- trace are two snapshots of the same money, not two parts of it.
+          -- Summing them bills the trace twice.
+          --
+          -- A trace can hold rows under several HourBuckets, and the reason is
+          -- not that its events straddled an hour. HourBucket is derived from
+          -- foldState.occurredAt, which is the hour the trace STARTED as
+          -- currently known — and that value moves BACKWARD, because span
+          -- timing folds it as min(state.occurredAt, span.startTimeUnixMs).
+          -- An earlier-starting span arriving after a flush (the OTel root
+          -- span is typically exported last) drags occurredAt back, and if it
+          -- crosses an hour boundary the next flush lands under a different
+          -- bucket. Both rows are then whole-trace snapshots and the older one
+          -- is simply stale.
+          --
+          -- Versioned on CreatedAt, NOT LastEventOccurredAt. The writer never
+          -- sends CreatedAt, so ClickHouse fills it from DEFAULT now64(3) — a
+          -- real clock, which is what "latest" has to mean here.
+          -- LastEventOccurredAt is that same backward-moving occurredAt, so
+          -- ordering by it picks the snapshot with the earliest-starting span
+          -- rather than the most recent write, and under-counts.
+          SELECT
+            TraceId,
+            argMax(SpendUsd, CreatedAt) AS TraceSpendUsd
+          FROM ${KPIS_TABLE}
+          WHERE TenantId = {tenantId:String}
+            AND HourBucket >= toStartOfHour(fromUnixTimestamp64Milli({fromMs:UInt64}))
+            AND HourBucket < fromUnixTimestamp64Milli({toMs:UInt64})
+          GROUP BY TenantId, TraceId
         )
         SELECT
           e.SourceId AS sourceId,

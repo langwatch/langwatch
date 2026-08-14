@@ -240,33 +240,41 @@ beforeAll(async () => {
     }),
   ]);
 
+  // EVERY row here is a whole-trace CUMULATIVE snapshot — the reactor writes
+  // foldState.totalCost, not a delta. Two rows for one trace are two pictures
+  // of the same money, and the trace's spend is the latest picture, never the
+  // sum. Inserted one at a time so CreatedAt (the server clock the read
+  // versions on) strictly increases in the order written.
+  //
+  // The trace's own money: 2.0 flushed first, then the cumulative total 5.0.
   await insert("governance_kpis", [
-    // The pushed trace, split across two hour buckets — the per-trace spend is
-    // the SUM of them, not either one.
-    kpiRow({ traceId: `trace-push-${ns}`, spendUsd: 3 }),
-    kpiRow({
-      traceId: `trace-push-${ns}`,
-      spendUsd: 4,
-      hourBucket: new Date("2026-03-10T13:00:00Z"),
-      lastEventOccurredAt: new Date("2026-03-10T13:00:00Z"),
-    }),
-    // A replayed KPI contribution for that first bucket: same key, later
-    // version, restated value. Without the dedup this inflates the total.
-    kpiRow({
-      traceId: `trace-push-${ns}`,
-      spendUsd: 5,
-      lastEventOccurredAt: new Date("2026-03-12T12:00:00Z"),
-    }),
-    // A byte-identical re-delivery of the FIRST bucket's contribution. Its
-    // version is `LastEventOccurredAt`, which the reactor takes from the
-    // trace's own occurredAt — a fact about the data, not a clock — so a
-    // replay ties rather than advancing. The IN-tuple dedup admits both rows
-    // of a tie and sums them; only picking one per key survives this.
+    kpiRow({ traceId: `trace-push-${ns}`, spendUsd: 2 }),
+  ]);
+  // The SECOND flush, and the trap the probe found. It carries the larger
+  // cumulative total, but lands under an EARLIER HourBucket with an EARLIER
+  // LastEventOccurredAt — because an earlier-starting span arrived late and
+  // dragged foldState.occurredAt backward across the hour boundary. Ordering
+  // on LastEventOccurredAt picks the stale 2.0; summing the buckets bills 7.0.
+  // Only "latest by CreatedAt" answers 5.0.
+  await insert("governance_kpis", [
     kpiRow({
       traceId: `trace-push-${ns}`,
       spendUsd: 5,
-      lastEventOccurredAt: new Date("2026-03-12T12:00:00Z"),
+      hourBucket: new Date("2026-03-10T11:00:00Z"),
+      lastEventOccurredAt: new Date("2026-03-10T11:30:00Z"),
     }),
+  ]);
+  // A byte-identical re-delivery of that snapshot: same key, same value, same
+  // occurredAt. A dedup that keeps "every row at the max version" keeps both.
+  await insert("governance_kpis", [
+    kpiRow({
+      traceId: `trace-push-${ns}`,
+      spendUsd: 5,
+      hourBucket: new Date("2026-03-10T11:00:00Z"),
+      lastEventOccurredAt: new Date("2026-03-10T11:30:00Z"),
+    }),
+  ]);
+  await insert("governance_kpis", [
     kpiRow({ traceId: `trace-zero-${ns}`, spendUsd: 0 }),
   ]);
 });
@@ -316,11 +324,34 @@ describe("UsageAttributionLedgerClickHouseRepository against real ClickHouse", (
   });
 
   describe("given a pushed trace with KPI rows", () => {
-    it("sums them, and ignores the payload's own number", async () => {
+    it("takes the latest snapshot, and ignores the payload's own number", async () => {
       const rows = byTrace(await findLedger());
-      // 5 (the restated first bucket) + 4 (the second) — never 3 + 4 + 5, and
-      // never the payload's 999.
-      expect(rows[`trace-push-${ns}`]!.spendUsd).toBeCloseTo(9, 6);
+      // The trace cost 5.00. Not 7.00 (2 + 5, summing two snapshots of the
+      // same money), not 2.00 (the stale snapshot, which is what ordering on
+      // LastEventOccurredAt would pick here), and not the payload's 999.
+      expect(rows[`trace-push-${ns}`]!.spendUsd).toBeCloseTo(5, 6);
+    });
+
+    describe("and a later flush landed under an EARLIER hour bucket", () => {
+      /**
+       * The regression this pins, found by executing the query against real
+       * ClickHouse rather than by reading it.
+       *
+       * HourBucket is the hour the trace STARTED as currently known, and that
+       * moves BACKWARD: span timing folds occurredAt as
+       * min(state.occurredAt, span.startTimeUnixMs), so a late-arriving root
+       * span drags it back, and across an hour boundary the next flush lands
+       * under a different bucket. Both rows are then whole-trace snapshots.
+       *
+       * Summing per bucket returned 7.00 for a trace that cost 5.00 — a 40%
+       * over-bill on somebody's name, from a query that looked correct.
+       */
+      it("bills the trace once, at its most recently WRITTEN total", async () => {
+        const rows = byTrace(await findLedger());
+        expect(rows[`trace-push-${ns}`]!.spendUsd).toBeCloseTo(5, 6);
+        expect(rows[`trace-push-${ns}`]!.spendUsd).not.toBeCloseTo(7, 6);
+        expect(rows[`trace-push-${ns}`]!.spendUsd).not.toBeCloseTo(2, 6);
+      });
     });
 
     describe("and the KPI rows sum to zero", () => {
@@ -341,14 +372,12 @@ describe("UsageAttributionLedgerClickHouseRepository against real ClickHouse", (
     });
 
     describe("and the replay's version TIES rather than advancing", () => {
-      // The version comes from the trace's own occurredAt, so a re-delivered
-      // reactor event writes an identical row with an identical version. A
-      // dedup that keeps "every row at the max version" keeps both of them.
+      // A re-delivered reactor event writes a byte-identical row: same key,
+      // same value, same occurredAt. A dedup that keeps "every row at the max
+      // version" keeps both copies and adds them.
       it("still counts the trace's spend once", async () => {
         const rows = byTrace(await findLedger());
-        // 5 (the first bucket, whichever of the two tied copies wins) + 4
-        // (the second bucket). Never 5 + 5 + 4.
-        expect(rows[`trace-push-${ns}`]!.spendUsd).toBeCloseTo(9, 6);
+        expect(rows[`trace-push-${ns}`]!.spendUsd).toBeCloseTo(5, 6);
       });
     });
   });
@@ -367,7 +396,7 @@ describe("UsageAttributionLedgerClickHouseRepository against real ClickHouse", (
       false,
     );
     const total = rows.reduce((sum, row) => sum + row.spendUsd, 0);
-    expect(total).toBeCloseTo(20 + 9 + 0 + 1, 6);
+    expect(total).toBeCloseTo(20 + 5 + 0 + 1, 6);
   });
 
   it("attributes each group at its first event", async () => {
@@ -444,9 +473,9 @@ describe("the report's totals conserve (ADR-094 Invariants)", () => {
     expect(report.totals.attributed.spendUsd).toBeCloseTo(20, 6);
     // The declared service principal, whatever its cost.
     expect(report.totals.unattributable.spendUsd).toBeCloseTo(1, 6);
-    // mem-2 (9) and mem-3 (0) are person-kind and unlinked.
-    expect(report.totals.unattributed.spendUsd).toBeCloseTo(9, 6);
-    expect(report.totals.ledger.spendUsd).toBeCloseTo(30, 6);
+    // mem-2 (5) and mem-3 (0) are person-kind and unlinked.
+    expect(report.totals.unattributed.spendUsd).toBeCloseTo(5, 6);
+    expect(report.totals.ledger.spendUsd).toBeCloseTo(26, 6);
 
     const attributedRow = report.rows.find(
       (row) => row.bucket === "attributed",
