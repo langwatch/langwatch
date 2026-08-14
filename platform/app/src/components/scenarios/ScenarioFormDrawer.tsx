@@ -4,7 +4,9 @@ import {
   GridItem,
   Heading,
   HStack,
+  Skeleton,
   Text,
+  VStack,
 } from "@chakra-ui/react";
 import { generate } from "@langwatch/ksuid";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -162,10 +164,17 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
 
   const isOpen = props.open !== false && props.open !== undefined;
   const onClose = props.onClose ?? closeDrawer;
-  const { data: scenario } = api.scenarios.getById.useQuery(
-    { projectId: project?.id ?? "", id: scenarioId ?? "" },
-    { enabled: !!project && !!scenarioId },
-  );
+  const { data: scenario, isLoading: isScenarioLoading } =
+    api.scenarios.getById.useQuery(
+      { projectId: project?.id ?? "", id: scenarioId ?? "" },
+      { enabled: !!project && !!scenarioId },
+    );
+  // Editing an existing scenario means the fields are empty until the query
+  // answers. Without this the drawer renders a complete, blank form, which
+  // reads as "the scenario has no name and no criteria" rather than "not
+  // loaded yet" — and the person who just asked an agent to write it cannot
+  // tell the difference.
+  const isHydrating = !!scenarioId && isScenarioLoading;
   const createMutation = api.scenarios.create.useMutation({
     onSuccess: (data: Scenario) => {
       void utils.scenarios.getAll.invalidate({ projectId: project?.id ?? "" });
@@ -486,8 +495,11 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       <Drawer.Content bg="bg">
         <Drawer.CloseTrigger />
         <Drawer.Header borderBottomWidth="1px">
+          {/* Being pointed at a scenario is enough to be editing one. Keying
+              this off the loaded record alone retitled the drawer "Create
+              Scenario" for the whole of the read. */}
           <Heading size="md">
-            {scenario ? "Edit Scenario" : "Create Scenario"}
+            {scenarioId || scenario ? "Edit Scenario" : "Create Scenario"}
           </Heading>
         </Drawer.Header>
         <Drawer.Body padding={0} overflow="hidden">
@@ -499,12 +511,18 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
               borderRightWidth="1px"
               borderColor="border"
             >
-              {formInstance && <FormServerError form={formInstance} />}
-              <ScenarioForm
-                key={scenarioId ?? "new"}
-                defaultValues={defaultValues}
-                formRef={setFormRef}
-              />
+              {isHydrating ? (
+                <ScenarioFormSkeleton />
+              ) : (
+                <>
+                  {formInstance && <FormServerError form={formInstance} />}
+                  <ScenarioForm
+                    key={scenarioId ?? "new"}
+                    defaultValues={defaultValues}
+                    formRef={setFormRef}
+                  />
+                </>
+              )}
             </GridItem>
             {/* Right: Help Sidebar */}
             <GridItem overflowY="auto" padding={4} bg="bg.muted">
@@ -514,11 +532,14 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         </Drawer.Body>
         {/* Bottom Bar */}
         <Drawer.Footer borderTopWidth="1px" justifyContent="space-between">
-          {formInstance && <FooterLabels form={formInstance} />}
+          {formInstance && !isHydrating && <FooterLabels form={formInstance} />}
           <HStack gap={2} flexShrink={0}>
             <Button variant="outline" size="sm" onClick={onClose}>
               Cancel
             </Button>
+            {/* Saving before the scenario has been read would take `scenario`
+                as absent and create a second one instead of updating this
+                one, so the actions stay busy until it has arrived. */}
             <SaveAndRunMenu
               selectedTarget={selectedTarget}
               onTargetChange={handleTargetChange}
@@ -526,7 +547,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
               onSaveWithoutRunning={handleSaveWithoutRunning}
               onCreateAgent={handleCreateAgent}
               onCreatePrompt={() => setPromptDrawerOpen(true)}
-              isLoading={isSubmitting}
+              isLoading={isSubmitting || isHydrating}
             />
           </HStack>
         </Drawer.Footer>
@@ -570,6 +591,33 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         }}
       />
     </Drawer.Root>
+  );
+}
+
+/**
+ * Stands in for the form while an existing scenario is being read.
+ *
+ * Shaped like the form it replaces (name, situation, criteria) so the drawer
+ * does not reflow when the real fields arrive.
+ */
+function ScenarioFormSkeleton() {
+  return (
+    <VStack align="stretch" gap={6} data-testid="scenario-form-skeleton">
+      <VStack align="stretch" gap={3}>
+        <Skeleton height="12px" width="48px" />
+        <Skeleton height="40px" />
+      </VStack>
+      <VStack align="stretch" gap={3}>
+        <Skeleton height="12px" width="72px" />
+        <Skeleton height="32px" />
+        <Skeleton height="120px" />
+      </VStack>
+      <VStack align="stretch" gap={3}>
+        <Skeleton height="12px" width="60px" />
+        <Skeleton height="32px" />
+        <Skeleton height="96px" />
+      </VStack>
+    </VStack>
   );
 }
 

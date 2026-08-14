@@ -49,6 +49,7 @@ import { prisma } from "~/server/db";
 import { AiCallFailedError } from "~/server/modelProviders/aiCallFailedError";
 import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
 import { ModelProviderDisabledError } from "~/server/modelProviders/modelProviderDisabledError";
+import { createWarnThrottle } from "~/server/observability/warnThrottle";
 import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 import { captureException, toError } from "../../utils/posthogErrorCapture";
 import type { OpsScope, PermissionMiddleware } from "./rbac";
@@ -922,6 +923,41 @@ const handledErrorMiddleware = t.middleware(async ({ next }) => {
   return result;
 });
 
+/**
+ * How long a call may take before its record is raised from info to warning.
+ *
+ * A call that succeeds slowly used to log exactly like one that succeeded
+ * instantly, so the only way to find one was for a customer to say a screen
+ * felt broken. That is how the scenario editor's multi-second load went
+ * unnoticed: every procedure on the path reported success, and the duration
+ * was already on the record but never changed the level.
+ *
+ * Deliberately generous. Some procedures are legitimately long (a model
+ * generating a draft, an export), and the warning for those is still true:
+ * it states what the call cost, which is worth knowing even when expected.
+ * The throttle is what keeps that honest rather than noisy.
+ */
+const DEFAULT_SLOW_CALL_MS = 3000;
+
+const SLOW_CALL_THROTTLE_MS = 60_000;
+
+const slowCallThrottle = createWarnThrottle(SLOW_CALL_THROTTLE_MS);
+
+/** Zero or negative turns the warning off; unset or unparseable keeps the default. */
+export function resolveSlowCallBudgetMs(
+  env: NodeJS.ProcessEnv = process.env,
+): number {
+  const raw = env.TRPC_SLOW_CALL_MS;
+  if (typeof raw !== "string" || raw.trim() === "") return DEFAULT_SLOW_CALL_MS;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : DEFAULT_SLOW_CALL_MS;
+}
+
+/** Test seam: the throttle is process-wide state and must not leak between tests. */
+export function resetSlowCallThrottle(): void {
+  slowCallThrottle.reset();
+}
+
 /** Processes a tRPC call result and logs accordingly. Extracted for testability. */
 export function handleTrpcCallLogging({
   result,
@@ -932,6 +968,8 @@ export function handleTrpcCallLogging({
   statusCode,
   log,
   capture,
+  slowCallBudgetMs = resolveSlowCallBudgetMs(),
+  now = Date.now(),
 }: {
   result: { ok: boolean; error?: unknown };
   path: string;
@@ -941,6 +979,8 @@ export function handleTrpcCallLogging({
   statusCode: number | null;
   log: Pick<ReturnType<typeof createLogger>, "info" | "warn" | "error">;
   capture: (error: Error | string) => void;
+  slowCallBudgetMs?: number;
+  now?: number;
 }): void {
   const logData: Record<string, any> = {
     path,
@@ -996,9 +1036,28 @@ export function handleTrpcCallLogging({
         : "error"
       : getLogLevelFromStatusCode(resolvedStatus);
     log[logLevel](logData, "trpc call");
-  } else {
-    log.info(logData, "trpc call");
+    return;
   }
+
+  // The call succeeded, so this is not a failure and the record carries no
+  // cause. It is raised only because the time it took is worth watching by
+  // rate, which is what warning means here.
+  if (slowCallBudgetMs > 0 && duration > slowCallBudgetMs) {
+    const suppressed = slowCallThrottle.claim(path, now);
+    if (suppressed !== undefined) {
+      log.warn(
+        {
+          ...logData,
+          budgetMs: slowCallBudgetMs,
+          suppressedSincePrevious: suppressed,
+        },
+        "trpc call",
+      );
+      return;
+    }
+  }
+
+  log.info(logData, "trpc call");
 }
 
 /**
@@ -1021,7 +1080,7 @@ function isSilencedPath(path: string): boolean {
   return SILENCED_LOG_PATH_PREFIXES.some((p) => path.startsWith(p));
 }
 
-function isSilencedCall(path: string, type: string): boolean {
+export function isSilencedCall(path: string, type: string): boolean {
   return isSilencedPath(path) || SILENCED_LOG_TYPES.has(type);
 }
 
