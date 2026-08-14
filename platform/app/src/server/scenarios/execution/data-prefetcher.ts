@@ -208,13 +208,6 @@ export type PrefetchResult =
 // ============================================================================
 
 /**
- * Pre-fetch all data needed for scenario execution.
- *
- * @param context - Execution context with project/scenario IDs
- * @param target - Target configuration (prompt or http)
- * @param deps - Injected dependencies for data fetching
- */
-/**
  * Everything the child's environment needs, which is a strict subset of a full
  * prefetch and resolves much earlier. See `onChildEnvReady`.
  */
@@ -223,22 +216,33 @@ export interface ChildEnvInputs {
   telemetry: { endpoint: string; apiKey: string };
 }
 
-export async function prefetchScenarioData(
-  context: ExecutionContext,
-  target: TargetConfig,
-  deps: DataPrefetcherDependencies,
-  /**
-   * Called once, as soon as the scenario and project resolve, with the only
-   * two prefetched values the child's environment depends on. It exists so the
-   * caller can start the child booting against the rest of this function
-   * rather than after it; a caller that does not care may omit it.
-   *
-   * Never called when the run is doomed — a missing scenario, a failed project
-   * lookup or a project with no API key all skip it, so no child is started
-   * for a run that is about to fail.
-   */
-  onChildEnvReady?: (inputs: ChildEnvInputs) => void,
-): Promise<PrefetchResult> {
+/**
+ * Pre-fetch all data needed for scenario execution.
+ *
+ * @param context - Execution context with project/scenario IDs
+ * @param target - Target configuration (prompt or http)
+ * @param deps - Injected dependencies for data fetching
+ * @param onChildEnvReady - Called once, as soon as the scenario and project
+ *   resolve, with the only two prefetched values the child's environment
+ *   depends on. It exists so the caller can start the child booting against
+ *   the rest of this function rather than after it; a caller that does not
+ *   care may omit it.
+ *
+ *   Never called when the run is doomed — a missing scenario, a failed project
+ *   lookup or a project with no API key all skip it, so no child is started
+ *   for a run that is about to fail.
+ */
+export async function prefetchScenarioData({
+  context,
+  target,
+  deps,
+  onChildEnvReady,
+}: {
+  context: ExecutionContext;
+  target: TargetConfig;
+  deps: DataPrefetcherDependencies;
+  onChildEnvReady?: (inputs: ChildEnvInputs) => void;
+}): Promise<PrefetchResult> {
   logger.debug(
     {
       projectId: context.projectId,

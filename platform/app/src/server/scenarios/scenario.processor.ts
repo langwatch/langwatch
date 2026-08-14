@@ -295,17 +295,17 @@ export async function executeScenarioRun(
     jobLogger.info("Processing scenario job");
 
     const prefetchDeps = createDataPrefetcherDependencies();
-    const prefetchResult = await prefetchScenarioData(
-      {
+    const prefetchResult = await prefetchScenarioData({
+      context: {
         projectId: jobData.projectId,
         scenarioId: jobData.scenarioId,
         setId: jobData.setId,
         batchRunId: jobData.batchRunId,
         scenarioRunId: jobData.scenarioRunId,
       },
-      jobData.target,
-      prefetchDeps,
-    );
+      target: jobData.target,
+      deps: prefetchDeps,
+    });
 
     // Check if cancellation was requested while we were prefetching
     if (pool.wasCancelled(jobData.scenarioRunId)) {
