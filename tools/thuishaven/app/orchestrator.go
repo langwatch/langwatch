@@ -54,7 +54,7 @@ type Orchestrator struct {
 
 // Deps is the injected object graph. A struct rather than a positional
 // parameter list, because thirteen positional dependencies is a call nobody can
-// read and one whose neighbours can be transposed without the compiler noticing.
+// read and one whose neighbors can be transposed without the compiler noticing.
 type Deps struct {
 	Cfg       Config
 	Proxy     Proxy
@@ -150,9 +150,19 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 	// ports[0..nSvc-1] back the routed services (app/gateway/nlp/langyagent, in
 	// PerWorktreeServices order); ports[nSvc] is the API backend behind app's /api,
 	// ports[nSvc+1] the worker metrics endpoint.
+	redisDB, exclusive := o.allocateRedisDB(slug)
+	if !exclusive {
+		fmt.Printf(
+			"  warning: all %d Redis databases are in use, so %q shares db %d with another stack.\n"+
+				"  They will share a job queue while writing to separate ClickHouse databases,\n"+
+				"  which lands work in the wrong stack. Take a stack down before continuing.\n",
+			domain.RedisDBCount, slug, redisDB,
+		)
+	}
+
 	st := domain.Stack{
 		Slug: slug, WorktreeDir: p.WorktreeDir, Branch: p.Branch,
-		LauncherPID: o.sys.Getpid(), RedisDB: domain.RedisDBForSlug(slug),
+		LauncherPID: o.sys.Getpid(), RedisDB: redisDB,
 		APIPort: ports[nSvc], WorkerMetricsPort: ports[nSvc+1], LocalAPIKey: o.cfg.LocalAPIKey, IsBaseline: p.IsBaseline,
 		// Mirror planChildren: a separate `workers` lane exists only when workers
 		// are requested AND not hosted in-process. Persist it so restart targets
@@ -727,4 +737,39 @@ func (o *Orchestrator) printStack(st domain.Stack) {
 	}
 	scheme, port := o.proxy.Endpoint()
 	fmt.Printf("    %-10s %s\n\n", "hub", o.cfg.Naming.URL(domain.HubService, "", scheme, port))
+}
+
+// allocateRedisDB picks this stack's Redis database, keeping the one it already
+// holds when it has one and otherwise avoiding every database a live stack is
+// using.
+//
+// Reusing the registered value is what makes the assignment stable across
+// restarts: the slug's hash is only a starting point, so a stack that had to
+// probe away from it once must not drift back on the next `up`.
+func (o *Orchestrator) allocateRedisDB(slug string) (int, bool) {
+	taken := map[int]bool{}
+	stacks := o.store.Stacks()
+	for i := range stacks {
+		if stacks[i].Slug == slug {
+			return stacks[i].RedisDB, true
+		}
+		taken[stacks[i].RedisDB] = true
+	}
+	return domain.AllocateRedisDB(slug, taken)
+}
+
+// redisDBFor reports the Redis database a slug's stack uses, preferring the
+// value recorded when it was provisioned.
+//
+// Recomputing the hash here instead would report a different database than the
+// stack actually runs on, for any stack that had to probe away from its
+// preferred index — which is precisely the stacks a collision affected.
+func (o *Orchestrator) redisDBFor(slug string) int {
+	stacks := o.store.Stacks()
+	for i := range stacks {
+		if stacks[i].Slug == slug {
+			return stacks[i].RedisDB
+		}
+	}
+	return domain.RedisDBForSlug(slug)
 }
