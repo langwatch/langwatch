@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  type LinkTimelineRow,
   resolveOwnerAt,
   splitPeriodByOwnership,
-  type LinkTimelineRow,
 } from "../resolution";
 
 const at = (iso: string) => new Date(iso);

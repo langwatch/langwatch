@@ -3,7 +3,7 @@
 // access-control code must not depend on the identity-link package, enforced
 // here so a future "who is this?" permission check gets a red build, not a
 // code-review comment.
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";

@@ -1,11 +1,11 @@
 import {
-  EMAIL_EXTERNAL_KINDS,
-  isEmailKind,
   type AppendLinkInput,
+  EMAIL_EXTERNAL_KINDS,
   type EraseIdentifiersInput,
   type EraseIdentifiersResult,
   type IdentityLinkRow,
   type IdentityLinkStorage,
+  isEmailKind,
   type LinkSource,
   type LoginRef,
 } from "@langwatch/identity-links";
