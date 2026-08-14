@@ -558,7 +558,19 @@ export class SimulationRunStateFoldProjection
       MetCriteria: results?.metCriteria ?? [],
       UnmetCriteria: results?.unmetCriteria ?? [],
       Error: results?.error ?? null,
-      DurationMs: event.data.durationMs ?? null,
+      // Derived when the event does not carry it, which is every real run:
+      // the SDK ingest path dispatches finishRun with results and status only.
+      // Left underived, DurationMs was null for every run a customer actually
+      // executed, and populated only for runs seeded with a synthetic event.
+      //
+      // The fold already holds both ends, so this needs no new field on the
+      // wire. A supplied value still wins — the runner knows its own elapsed
+      // time better than two projected timestamps do.
+      DurationMs:
+        event.data.durationMs ??
+        (state.StartedAt !== null && event.occurredAt >= state.StartedAt
+          ? event.occurredAt - state.StartedAt
+          : null),
       FinishedAt: event.occurredAt,
     };
   }
