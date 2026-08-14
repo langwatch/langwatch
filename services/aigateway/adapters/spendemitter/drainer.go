@@ -26,6 +26,7 @@ type Drainer struct {
 
 	cancelMu sync.Mutex
 	cancel   context.CancelFunc
+	done     chan struct{}
 }
 
 // DrainerOptions configures NewDrainer.
@@ -62,23 +63,42 @@ func NewDrainer(opts DrainerOptions) *Drainer {
 // called. Matches the lifecycle.Worker shape, which is fire-and-forget: a
 // Start that blocks wedges the whole lifecycle group before it arms its
 // signal handler, and the process then dies on the first SIGTERM with no
-// graceful shutdown at all. The cancel func is installed before the loop
-// launches so a Stop that lands immediately after Start cannot miss it.
+// graceful shutdown at all. The cancel func and the done channel are
+// installed before the loop launches, so a Stop that lands immediately after
+// Start can neither miss the cancel nor wait on a nil channel.
 func (d *Drainer) Start(ctx context.Context) {
 	ctx, cancel := context.WithCancel(ctx)
+	done := make(chan struct{})
+
 	d.cancelMu.Lock()
 	d.cancel = cancel
+	d.done = done
 	d.cancelMu.Unlock()
-	go d.run(ctx)
+
+	go func() {
+		defer close(done)
+		d.run(ctx)
+	}()
 }
 
-// Stop cancels a running Start.
+// Stop cancels a running Start and waits for the drain loop to actually exit.
+//
+// Waiting is the point. Shutdown stops this drainer before it closes the
+// spool, but canceling alone only asks the loop to stop, so a drainOnce in
+// the middle of reading a segment or acking it would still be running against
+// a spool that is being closed underneath it. lifecycle.Worker bounds this
+// wait by the shutdown budget, so a shipper that ignores its context costs
+// the budget rather than hanging shutdown forever.
 func (d *Drainer) Stop() {
 	d.cancelMu.Lock()
-	defer d.cancelMu.Unlock()
-	if d.cancel != nil {
-		d.cancel()
+	cancel, done := d.cancel, d.done
+	d.cancelMu.Unlock()
+
+	if cancel == nil {
+		return // never started
 	}
+	cancel()
+	<-done
 }
 
 // nextBackoff advances the retry ladder one step: floor on the first

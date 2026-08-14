@@ -66,8 +66,16 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 		lifecycle.WithDrainDelay(time.Duration(cfg.Server.DrainDelaySeconds)*time.Second),
 		lifecycle.WithHealth(deps.Health),
 	)
-	addManagedServices(g, deps, statusMon, srv)
+	addManagedServices(g, deps, ownServices{Status: statusMon, HTTP: srv})
 	return g.Run(ctx)
+}
+
+// ownServices are the services Serve constructs for itself, as distinct from
+// the collaborators injected through Deps. Both sets are registered together,
+// in one order, because that order is what shutdown correctness depends on.
+type ownServices struct {
+	Status *statusprobe.Monitor
+	HTTP   *http.Server
 }
 
 // addManagedServices registers every managed service in start order.
@@ -79,7 +87,7 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 // listener last would throw away the spend of every request that completed
 // during the drain. Telemetry is registered first, so it is torn down last
 // and the shutdown itself is still traced.
-func addManagedServices(g *lifecycle.Group, deps *Deps, statusMon *statusprobe.Monitor, srv *http.Server) {
+func addManagedServices(g *lifecycle.Group, deps *Deps, own ownServices) {
 	g.Add(
 		lifecycle.Closer("otel", deps.OTel.Shutdown),
 		lifecycle.Closer("customer-trace-bridge", deps.TraceBridge.Shutdown),
@@ -92,8 +100,8 @@ func addManagedServices(g *lifecycle.Group, deps *Deps, statusMon *statusprobe.M
 	}
 	g.Add(
 		lifecycle.Worker("auth", deps.Auth.Start, deps.Auth.Stop),
-		lifecycle.Worker("statusprobe", statusMon.Start, statusMon.Stop),
-		lifecycle.ListenServer("http", srv),
+		lifecycle.Worker("statusprobe", own.Status.Start, own.Status.Stop),
+		lifecycle.ListenServer("http", own.HTTP),
 	)
 }
 

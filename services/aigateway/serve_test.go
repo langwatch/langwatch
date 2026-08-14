@@ -183,7 +183,7 @@ func TestServe_ManagedServices_DrainTheListenerBeforeTheSpendPipeline(t *testing
 	addManagedServices(g, &Deps{
 		SpendSpool:   spool,
 		SpendDrainer: spendemitter.NewDrainer(spendemitter.DrainerOptions{Spool: spool}),
-	}, nil, unstartedServer())
+	}, ownServices{HTTP: unstartedServer()})
 
 	started := g.ServiceNames()
 	require.Contains(t, started, "http")
@@ -213,7 +213,7 @@ func TestServe_ManagedServices_DrainTheListenerBeforeTheSpendPipeline(t *testing
 // @scenario "an absent spend pipeline still leaves the listener draining first"
 func TestServe_ManagedServices_ListenerDrainsFirstWithoutSpend(t *testing.T) {
 	g := lifecycle.New()
-	addManagedServices(g, &Deps{}, nil, unstartedServer())
+	addManagedServices(g, &Deps{}, ownServices{HTTP: unstartedServer()})
 
 	started := g.ServiceNames()
 	require.NotContains(t, started, "spend-spool")

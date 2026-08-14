@@ -234,34 +234,46 @@ Feature: Gateway service — public HTTP surface and operational basics
       When the gateway loads its configuration
       Then Server.GracefulSeconds exceeds the 45s non-streaming heartbeat interval
 
-  Rule: Shutdown drains the listener before the spend pipeline
+  Rule: A request that finishes during shutdown still has its spend recorded
 
-    # Stop runs in reverse registration order, so the listener is registered
-    # last in order to be stopped first. That ordering is load bearing rather
-    # than cosmetic: Spool.Append counts and discards every record handed to
-    # it after Close, so closing the spool before the listener has drained
-    # throws away the spend of every request that finishes during the drain.
-    # Such a request has already had its admitSpend shipped, which leaves an
-    # admitted spend that is never confirmed.
+    # An operator sees this as money, not as ordering: a request billed on the
+    # way out of a rolling deploy must still be charged. It is worth stating
+    # because the failure is silent. Spool.Append counts and discards every
+    # record handed to it after Close, so a spend pipeline torn down before
+    # the listener has drained loses the spend of every request that finishes
+    # during the drain. Such a request has already had its admitSpend shipped,
+    # which leaves an admitted spend that is never confirmed.
     #
-    # Telemetry is registered first, so it is torn down last and the shutdown
-    # itself is still traced.
-    # Bindings: services/aigateway/serve_test.go
+    # Two things produce the behavior: the listener is stopped before the
+    # spend pipeline, and stopping the drainer waits for a drain already in
+    # flight rather than only asking it to stop. Telemetry is torn down last,
+    # so the shutdown itself is still traced.
+    #
+    # The unit bindings assert those mechanisms, since the ordering is what a
+    # regression would change; the end-to-end behavior was verified against a
+    # real gateway binary, where reverting the order alone lost a confirmSpend.
+    # Bindings: services/aigateway/serve_test.go,
+    # services/aigateway/adapters/spendemitter/drainer_lifecycle_test.go
 
     @unit @regression
     Scenario: the listener drains before the spend spool and drainer
-      Given a gateway wired with a spend spool and a spend drainer
-      When the managed services are registered
-      Then the stop order drains the HTTP listener before the spend drainer
-      And the spend drainer stops before the spool it reads from closes
-      And telemetry is the last thing torn down
+      Given a gateway shutting down with spend recording configured
+      When a request completes during the drain
+      Then its spend is still recorded rather than dropped
+      And the shutdown itself is still traced
 
     @unit @regression
     Scenario: an absent spend pipeline still leaves the listener draining first
-      Given a gateway wired with neither a spend spool nor a spend drainer
-      When the managed services are registered
-      Then no spend services are registered
-      And the HTTP listener is registered last, so it is still stopped first
+      Given a gateway running with no spend recording configured
+      When it shuts down
+      Then in-flight requests are still drained before anything else stops
+
+    @unit @regression
+    Scenario: a drain already in flight finishes before the spool closes
+      Given a spend drain is mid-flight when shutdown begins
+      When the drainer is stopped
+      Then the in-flight drain finishes before the spool it reads from closes
+      And a shipper that ignores cancellation costs the shutdown budget rather than hanging shutdown
 
   Rule: Seconds-valued configuration is range-checked before it becomes a duration
 
