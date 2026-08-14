@@ -271,9 +271,11 @@ export function postgresReaderRoleStatements({
         `a role with no readable relation cannot serve the mapped tables`,
     );
   }
-  if (!Number.isInteger(reader.connectionLimit)) {
+  // Positive, not merely an integer: PostgreSQL reads `CONNECTION LIMIT -1`
+  // as unlimited, which silently inverts the budget this limit exists to hold.
+  if (!Number.isInteger(reader.connectionLimit) || reader.connectionLimit < 1) {
     throw new Error(
-      `governed-sql provisioning: connectionLimit must be an integer, got ${reader.connectionLimit}`,
+      `governed-sql provisioning: connectionLimit must be a positive integer, got ${reader.connectionLimit}`,
     );
   }
   return [

@@ -503,16 +503,25 @@ describe("given the governed view catalog", () => {
     });
 
     it("adds the dataset's permissions to every column's own", () => {
+      // By name rather than by index, so a column added to the fixture cannot
+      // silently shift which shape each assertion exercises.
+      const column = (name: string) => {
+        const found = GATED_DATASET.columns.find(
+          (candidate) => candidate.name === name,
+        );
+        if (!found) throw new Error(`fixture lost its ${name} column`);
+        return found;
+      };
       expect(
         governedColumnGates({
           view: GATED_DATASET,
-          column: GATED_DATASET.columns[0]!,
+          column: column("TranscriptId"),
         }),
       ).toEqual(["input"]);
       expect(
         governedColumnGates({
           view: GATED_DATASET,
-          column: GATED_DATASET.columns[1]!,
+          column: column("Spoken"),
         }),
       ).toEqual(["input", "output"]);
     });
