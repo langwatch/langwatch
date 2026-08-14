@@ -28,7 +28,11 @@ function renderEditor() {
 
   render(
     <ChakraProvider value={defaultSystem}>
-      <GovernedSqlParametersEditor onChange={onChange} missingParameters={[]} />
+      <GovernedSqlParametersEditor
+        onChange={onChange}
+        missingParameters={[]}
+        reservedParameters={[]}
+      />
     </ChakraProvider>,
   );
 
