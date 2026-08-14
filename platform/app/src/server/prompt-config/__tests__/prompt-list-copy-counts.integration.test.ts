@@ -21,11 +21,7 @@ describe("Feature: The prompt list reports live copy counts", () => {
   let copyProjectB: Project;
   let service: PromptService;
 
-  const projectIds = () => [
-    sourceProject.id,
-    copyProjectA.id,
-    copyProjectB.id,
-  ];
+  const projectIds = () => [sourceProject.id, copyProjectA.id, copyProjectB.id];
 
   beforeEach(async () => {
     testOrganization = await prisma.organization.create({
