@@ -84,36 +84,25 @@ const extractTextsFromParts = (parts: unknown[]): string[] => {
       } else if (p.type === "tool_result" && Array.isArray(p.content)) {
         const inner = extractTextsFromParts(p.content);
         if (inner.length > 0) texts.push(inner.join("\n"));
-      } else if (
-        isRecord(p.toolUse) &&
-        (p.toolUse as Record<string, unknown>).input != null
-      ) {
+      } else if (isRecord(p.toolUse) && p.toolUse.input != null) {
         try {
-          texts.push(
-            JSON.stringify((p.toolUse as Record<string, unknown>).input),
-          );
+          texts.push(JSON.stringify(p.toolUse.input));
         } catch {
           // ignore unstringifiable inputs
         }
       } else if (
         isRecord(p.toolResult) &&
-        Array.isArray((p.toolResult as Record<string, unknown>).content)
+        Array.isArray(p.toolResult.content)
       ) {
         // Converse tool-result content is a union; we handle the {text} and
         // {json} variants and ignore the rest (document, image, video,
         // searchResult). The json variant is stringified in place so block
         // order survives.
         const inner: string[] = [];
-        for (const block of (p.toolResult as Record<string, unknown>)
-          .content as unknown[]) {
-          if (
-            isRecord(block) &&
-            (block as Record<string, unknown>).json != null
-          ) {
+        for (const block of p.toolResult.content) {
+          if (isRecord(block) && block.json != null) {
             try {
-              inner.push(
-                JSON.stringify((block as Record<string, unknown>).json),
-              );
+              inner.push(JSON.stringify(block.json));
             } catch {
               // ignore unstringifiable results
             }
