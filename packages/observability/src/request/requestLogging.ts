@@ -102,11 +102,15 @@ const UNCAUSED_SERVER_ERROR = "UncausedServerError";
  * it. Only the levels where that name would misrepresent the record are
  * re-keyed.
  */
-function attachCause(
-  logData: Record<string, unknown>,
-  error: unknown,
-  level: "info" | "warn" | "error",
-): void {
+function attachCause({
+  logData,
+  error,
+  level,
+}: {
+  logData: Record<string, unknown>;
+  error: unknown;
+  level: "info" | "warn" | "error";
+}): void {
   if (level === "error") {
     logData.error = error;
   } else {
@@ -129,10 +133,13 @@ function attachCause(
  * the request was handled: that message is the only thing distinguishing it
  * from a success in every log view that does not print the status.
  */
-function requestLogMessage(
-  error: unknown,
-  level: "info" | "warn" | "error",
-): string {
+function requestLogMessage({
+  error,
+  level,
+}: {
+  error: unknown;
+  level: "info" | "warn" | "error";
+}): string {
   if (error) return "error handling request";
   return level === "error"
     ? "request failed without a cause attached"
@@ -170,7 +177,7 @@ export function logHttpRequest(logger: Logger, data: RequestLogData): void {
   const level = getLogLevelForRequest(data.error, data.statusCode);
 
   if (data.error) {
-    attachCause(logData, data.error, level);
+    attachCause({ logData, error: data.error, level });
   } else if (level === "error") {
     // A route can answer 5xx by RETURNING the response rather than throwing, so
     // nothing reaches the middleware to attach. The status still forces error
@@ -184,7 +191,7 @@ export function logHttpRequest(logger: Logger, data: RequestLogData): void {
     logData.errorType = UNCAUSED_SERVER_ERROR;
   }
 
-  logger[level](logData, requestLogMessage(data.error, level));
+  logger[level](logData, requestLogMessage({ error: data.error, level }));
 }
 
 /**
