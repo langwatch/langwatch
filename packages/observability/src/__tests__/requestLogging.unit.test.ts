@@ -183,8 +183,11 @@ describe("requestLogging", () => {
         });
       });
 
+    });
+
+    describe("when the response succeeds", () => {
       /** @scenario A successful request is still reported as handled */
-      it("leaves a successful request reported as handled", () => {
+      it("still reports the request as handled", () => {
         const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
         logHttpRequest(logger, {
           method: "GET",
