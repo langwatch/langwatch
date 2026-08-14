@@ -41,6 +41,7 @@ describe("the governed SQL feature gate's identity", () => {
   });
 
   describe("given a project that resolves to an organization", () => {
+    /** @scenario "The switch is decided for the project's organization, not for the project alone" */
     it("buckets on the project, never on a member", async () => {
       await governedSqlEnabled({
         prisma: prismaResolving({ organizationId: "org-1" }),
@@ -56,6 +57,7 @@ describe("the governed SQL feature gate's identity", () => {
   });
 
   describe("given a project that cannot be read", () => {
+    /** @scenario "The switch is decided for the project's organization, not for the project alone" */
     it("omits the organization key rather than passing it as undefined", async () => {
       await governedSqlEnabled({
         prisma: prismaResolving(null),
