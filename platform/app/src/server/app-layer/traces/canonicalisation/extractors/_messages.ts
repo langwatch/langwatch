@@ -103,6 +103,9 @@ const extractTextsFromParts = (parts: unknown[]): string[] => {
         // order survives.
         const inner: string[] = [];
         for (const block of part.toolResult.content) {
+          // Key presence, not value: the union is discriminated by which key
+          // exists, and {json: null} is a real block whose payload is JSON
+          // null. A value check (`block.json != null`) drops it.
           if (isRecord(block) && "json" in block) {
             const s = safeStringify(block.json);
             if (s !== null) inner.push(s);
