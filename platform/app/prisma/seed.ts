@@ -410,6 +410,7 @@ async function main() {
     await seedDemoPlatform({
       prisma,
       projectId: project.id,
+      organizationId: organization.id,
       userId: user.id,
     });
   }

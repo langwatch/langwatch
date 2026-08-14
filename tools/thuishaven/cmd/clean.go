@@ -48,12 +48,23 @@ func runClean(ctx context.Context, d deps, inv invocation) error {
 		return nil
 	}
 	threshold := pruneStaleThreshold(inv)
+	if d.isAgent {
+		rows, err := d.orch.PlanPrune(d.worktree, d.worktree)
+		if err != nil {
+			return err
+		}
+		return printPruneReport(ctx, d, rows, threshold)
+	}
+	return runInteractiveClean(ctx, d, threshold)
+}
+
+// runInteractiveClean is the terminal cleanup flow — the picker plus the
+// always-safe orphan reaping — shared by `haven clean` and the hub's "c"
+// handoff.
+func runInteractiveClean(ctx context.Context, d deps, threshold time.Duration) error {
 	rows, err := d.orch.PlanPrune(d.worktree, d.worktree)
 	if err != nil {
 		return err
-	}
-	if d.isAgent {
-		return printPruneReport(ctx, d, rows, threshold)
 	}
 	if err := prunetui.Run(ctx, d.pruneActions(rows, threshold)); err != nil {
 		return err
