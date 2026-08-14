@@ -1,6 +1,8 @@
 /**
- * Branch 2 of langwatch-saas#1040: is "N empty traces" counted through
- * `POST /api/trace/search` a MEASUREMENT ARTIFACT rather than missing content?
+ * Trace-search read path: `POST /api/trace/search` serves traces from
+ * `trace_summaries` alone, without the span tree — this test pins that a
+ * trace read through search carries its Computed input/output but no spans,
+ * while the same trace read with `includeSpans: true` returns its spans.
  *
  * The route (`src/server/routes/traces-legacy.ts`, `POST /trace/search`) calls
  * `getAllTracesForProject` with `{ downloadMode: true, scrollId }` and never
@@ -16,8 +18,8 @@
  *
  * Trace-level `input`/`output` are asserted present on the search path too:
  * they come from `trace_summaries.Computed*`, so a trace that reads empty in
- * THOSE fields is empty for a different and real reason. That distinction is
- * what decides branch 2 against branch 1.
+ * THOSE fields is empty for a different and real reason (missing content,
+ * not a read-path artifact).
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
@@ -32,13 +34,14 @@ import {
 import { ClickHouseTraceService } from "../clickhouse-trace.service";
 import { openProtections } from "./open-protections";
 
-const tenantId = `test-1040-${nanoid()}`;
-const traceId = `trace-1040-${nanoid()}`;
+const tenantId = `test-trace-search-${nanoid()}`;
+const traceId = `trace-search-${nanoid()}`;
 const now = Date.now();
 
 /**
- * Content deliberately shaped like an AWS Bedrock Converse span: typeless
- * `{"text": ...}` content blocks, which is the shape the repo models nowhere.
+ * Trace-read fixture: pre-computed summary I/O seeded directly into
+ * `trace_summaries`, with values shaped like AWS Bedrock Converse content
+ * blocks so the assertion strings are recognisably Bedrock-flavoured.
  */
 const BEDROCK_INPUT = JSON.stringify({
   type: "text",

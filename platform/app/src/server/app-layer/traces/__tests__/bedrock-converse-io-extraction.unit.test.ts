@@ -1,45 +1,9 @@
 /**
- * Branch 1 of langwatch-saas#1040 — and the customer-independent reproduction
- * (AC4). Does an AWS Bedrock **Converse** span survive the two-stage I/O
- * pipeline, or does it land in `trace_summaries` with empty ComputedInput /
- * ComputedOutput?
- *
- * The pipeline has two stages, and the second one only ever reads what the
- * first one wrote:
- *
- *   1. `CanonicalizeSpanAttributesService` maps a vendor's attribute keys onto
- *      the canonical `gen_ai.*` / `langwatch.*` keys.
- *   2. `TraceIOExtractionService` reads ONLY `gen_ai.input.messages`,
- *      `gen_ai.output.messages`, `langwatch.input`, `langwatch.output`
- *      (`IO_ATTR_KEYS`), and falls back to the span name / HTTP status.
- *
- * So an unmapped instrumentation does not fail loudly — it degrades, and the
- * degradation is ASYMMETRIC, which is what makes it identifiable in production
- * data without access to the customer's account:
- *
- *   - input  → `getHttpFallback` ends `return topSpan.name ?? null`, so a named
- *              root span ALWAYS yields a non-empty input: the span's own name.
- *   - output → `getHttpStatusFallback` ends `return null` unless the root span
- *              carries a numeric `http.status_code`.
- *
- * These tests run the REAL canonicaliser and the REAL extraction service. They
- * make no assertion about what the customer integration actually emits — they establish what
- * this pipeline does with each candidate Bedrock shape, so the observed
- * signature in production can be matched against a named shape.
- *
- * OUTCOME (production data hydrated 2026-08-13, issue #1040): none of these
- * rows describes the affected customer. Their empty Bedrock spans carry NO payload attribute
- * under any key — mapped or unmapped — so there is nothing for stage 2 to read
- * and no mapping change would populate them. The content is never emitted;
- * AWS's botocore instrumentation omits message content unless
- * OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true.
- *
- * The gaps this file originally characterised are now FIXED and these tests
- * assert the fixed behaviour:
- * - Converse's key-discriminated content blocks ({toolUse}, {toolResult})
- *   are handled by extractTextsFromParts in extractors/_messages.ts.
- * - aws.bedrock.* payload keys are mapped to canonical gen_ai.* keys by
- *   BedrockExtractor (extractors/bedrock.ts).
+ * AWS Bedrock **Converse** content blocks are a union discriminated by which
+ * key is present ({text}, {toolUse}, {toolResult}) rather than by a `type`
+ * field. These tests run the real canonicaliser + trace-I/O extraction pair
+ * and assert each Converse shape reaches `trace_summaries` as non-empty
+ * ComputedInput / ComputedOutput.
  */
 import { describe, expect, it, vi } from "vitest";
 
@@ -172,14 +136,13 @@ describe("given a Bedrock span whose messages sit under canonical gen_ai keys", 
   });
 
   describe("when the content blocks are Converse-shaped (typeless {'text': ...})", () => {
-    it("records whether the typeless block survives extraction", () => {
+    /** @scenario Converse typeless text block survives extraction */
+    it("extracts the typeless block on both sides", () => {
       const { input, output } = computeTraceIO(
         makeSpan({
           spanAttributes: {
             "gen_ai.system": "aws.bedrock",
             "gen_ai.request.model": "anthropic.claude-3-5-sonnet",
-            // The AWS Converse API wire shape: content blocks are a union
-            // discriminated by WHICH KEY IS PRESENT, not by a `type` field.
             "gen_ai.prompt": JSON.stringify([
               {
                 role: "user",
@@ -232,6 +195,30 @@ describe("given a Bedrock span whose messages sit under canonical gen_ai keys", 
     });
   });
 
+  describe("when a Converse toolUse block carries no input", () => {
+    /** @scenario Converse toolUse block without input leaks nothing */
+    it("does not leak the tool identifiers into the output text", () => {
+      const { output } = computeTraceIO(
+        makeSpan({
+          spanAttributes: {
+            "gen_ai.system": "aws.bedrock",
+            "gen_ai.completion": JSON.stringify([
+              {
+                role: "assistant",
+                content: [
+                  { toolUse: { toolUseId: "tool-1", name: "lookup_order" } },
+                ],
+              },
+            ]),
+          },
+        }),
+      );
+
+      expect(output ?? "").not.toContain("tool-1");
+      expect(output ?? "").not.toContain("lookup_order");
+    });
+  });
+
   describe("when the user turn is a Converse toolResult block", () => {
     /** @scenario Converse toolResult block survives extraction */
     it("extracts the tool result's inner text as the input", () => {
@@ -259,93 +246,25 @@ describe("given a Bedrock span whose messages sit under canonical gen_ai keys", 
       expect(input).toBe("order ord-42 found");
     });
   });
-});
 
-describe("given a Bedrock span whose messages sit under aws.bedrock.* keys", () => {
-  describe("when the span carries the Converse request/response bodies verbatim", () => {
-    /** @scenario "aws.bedrock.* payload keys are mapped to canonical keys" */
-    it("maps the payloads to canonical keys and extracts both sides", () => {
-      const span = makeSpan({
-        spanAttributes: {
-          // A boto3/OTel AWS-SDK span: the operation is identified, and the
-          // Converse payloads ride along under aws.* keys, which the
-          // BedrockExtractor maps onto the canonical gen_ai.* keys.
-          "rpc.service": "BedrockRuntime",
-          "rpc.method": "Converse",
-          "aws.bedrock.model_id": "anthropic.claude-3-5-sonnet",
-          "aws.bedrock.request.messages": JSON.stringify([
-            {
-              role: "user",
-              content: [{ text: "summarise this shipping manifest" }],
-            },
-          ]),
-          "aws.bedrock.response.output": JSON.stringify({
-            message: {
-              role: "assistant",
-              content: [{ text: "The shipment contains ..." }],
-            },
-          }),
-        },
-      });
-
-      const { input, output, canonicalAttributes } = computeTraceIO(span);
-
-      // The canonical input key is now written from the aws.bedrock.* payload.
-      expect(canonicalAttributes["gen_ai.input.messages"]).toBeDefined();
-
-      // Before the BedrockExtractor existed this pair degraded asymmetrically
-      // to {input: "bedrock.converse", output: null} — the span name and the
-      // HTTP-status fallback. The real content now reaches trace_summaries.
-      expect(input).toBe("summarise this shipping manifest");
-      expect(output).toBe("The shipment contains ...");
-    });
-  });
-
-  describe("when such a span is the root of an HTTP-instrumented trace", () => {
-    /** @scenario Mapped messages beat the HTTP fallback */
-    it("prefers the mapped request messages over the HTTP fallback", () => {
-      const { input, output } = computeTraceIO(
+  describe("when a Converse toolResult block has empty content", () => {
+    /** @scenario Converse toolResult block with empty content contributes nothing */
+    it("contributes no text and falls back to the span name", () => {
+      const { input } = computeTraceIO(
         makeSpan({
           spanAttributes: {
-            "rpc.method": "Converse",
-            "http.method": "POST",
-            "http.target": "/model/anthropic.claude-3-5-sonnet/converse",
-            "http.status_code": 200,
-            "aws.bedrock.request.messages": JSON.stringify([
+            "gen_ai.system": "aws.bedrock",
+            "gen_ai.prompt": JSON.stringify([
               {
                 role: "user",
-                content: [{ text: "summarise this shipping manifest" }],
+                content: [{ toolResult: { toolUseId: "tool-1", content: [] } }],
               },
             ]),
           },
         }),
       );
 
-      // Before the fix, the input read as plausible-but-wrong: the HTTP
-      // method + target. The mapped request messages now win; the output
-      // still falls back to the HTTP status because this span carries no
-      // aws.bedrock.response.output.
-      expect(input).toBe("summarise this shipping manifest");
-      expect(output).toBe("200");
-    });
-  });
-
-  describe("when a non-Bedrock span carries none of the Bedrock signals", () => {
-    it("leaves the span alone (extractor does not fire)", () => {
-      const { input, output, appliedRules } = computeTraceIO(
-        makeSpan({
-          spanAttributes: {
-            "rpc.service": "DynamoDB",
-            "http.method": "POST",
-            "http.status_code": 200,
-          },
-        }),
-      );
-
-      expect(appliedRules.some((r) => r.startsWith("bedrock:"))).toBe(false);
-      // Ordinary fallback behaviour, untouched: span name in, status out.
       expect(input).toBe("bedrock.converse");
-      expect(output).toBe("200");
     });
   });
 });

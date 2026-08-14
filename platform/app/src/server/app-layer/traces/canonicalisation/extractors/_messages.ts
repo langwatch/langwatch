@@ -84,10 +84,14 @@ const extractTextsFromParts = (parts: unknown[]): string[] => {
       } else if (p.type === "tool_result" && Array.isArray(p.content)) {
         const inner = extractTextsFromParts(p.content);
         if (inner.length > 0) texts.push(inner.join("\n"));
-      } else if (isRecord(p.toolUse)) {
-        const input = (p.toolUse as Record<string, unknown>).input;
+      } else if (
+        isRecord(p.toolUse) &&
+        (p.toolUse as Record<string, unknown>).input != null
+      ) {
         try {
-          texts.push(JSON.stringify(input ?? p.toolUse));
+          texts.push(
+            JSON.stringify((p.toolUse as Record<string, unknown>).input),
+          );
         } catch {
           // ignore unstringifiable inputs
         }
