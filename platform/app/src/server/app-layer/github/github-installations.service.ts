@@ -123,6 +123,18 @@ export class GithubInstallationsService {
     return this.repo.findAllForOrganization(organizationId);
   }
 
+  /**
+   * One stored installation row, by its GitHub id.
+   *
+   * Not gated on `configured`, unlike the mint and resolve paths. Those need
+   * the App private key to do anything, so an unconfigured instance answering
+   * from stored rows alone would promise access it cannot deliver. This read
+   * reaches no credential: its callers use the row to attribute a webhook to an
+   * organization and to check that an installation belongs to the organization
+   * asking about it, and both answers are correct whether or not the key is
+   * set. Gating it would drop pull-request announcements the payload alone can
+   * be written from, and would hide the uninstall link for a row that exists.
+   */
   getByInstallationId(
     installationId: string,
   ): Promise<GithubInstallationRow | null> {

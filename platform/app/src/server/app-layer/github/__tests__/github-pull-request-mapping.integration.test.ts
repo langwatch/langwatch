@@ -71,6 +71,7 @@ function apiPullRequest(over: Partial<Record<string, unknown>> = {}) {
     mergedAt: null,
     closedAt: null,
     createdAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+    updatedAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
     authorLogin: "someone",
     ...over,
   } as never;
@@ -151,6 +152,7 @@ function pullRequestDelivery({
   mergedAt = null,
   closedAt = null,
   title = "Link sessions to pull requests",
+  updatedAt = new Date(Date.now() - 30 * 60 * 1000).toISOString(),
 }: {
   action?: string;
   number?: number;
@@ -159,6 +161,8 @@ function pullRequestDelivery({
   mergedAt?: string | null;
   closedAt?: string | null;
   title?: string;
+  /** GitHub's own `updated_at`: what orders this delivery against another. */
+  updatedAt?: string;
 } = {}) {
   return {
     action,
@@ -177,6 +181,7 @@ function pullRequestDelivery({
       merged_at: mergedAt,
       closed_at: closedAt,
       created_at: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+      updated_at: updatedAt,
       user: { login: "someone" },
       head: { ref: branch, repo: { full_name: REPO_FULL_NAME } },
     },
@@ -389,9 +394,8 @@ describe("branch pull-request mapping", () => {
      * read followed by a write, so both sessions read "nothing stored yet"
      * before either wrote, and both called GitHub. One statement cannot split
      * that way.
-     *
-     * @scenario "Concurrent sessions on one branch ask GitHub once"
      */
+    /** @scenario "Concurrent sessions on one branch ask GitHub once" */
     it("asks GitHub once when two sessions map the same branch at the same time", async () => {
       await seedInstallation();
       // Held open until both callers have raced the claim, so the second
@@ -780,6 +784,7 @@ describe("branch pull-request mapping", () => {
           state: "closed",
           mergedAt,
           closedAt: mergedAt,
+          updatedAt: mergedAt,
         }),
       );
 
@@ -871,6 +876,201 @@ describe("branch pull-request mapping", () => {
       expect(
         (await storedFor("feat/missed-hook")).map((r) => r.prNumber),
       ).toEqual([99]);
+    });
+  });
+
+  describe("given deliveries that describe the same pull request out of order", () => {
+    const AN_HOUR_AGO = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const TEN_MINUTES_AGO = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+
+    /**
+     * GitHub does not promise delivery order, and the two timestamps a late
+     * delivery would clear are the ones session-to-pull-request attribution
+     * reads: a resurrected row takes the sessions that ran after the pull
+     * request closed and prices them under it.
+     */
+    /** @scenario "A late delivery about an earlier state does not roll the pull request back" */
+    it("keeps a merged pull request merged when an older delivery arrives after it", async () => {
+      await seedInstallation();
+      const { mapping } = servicesWith({ listPullRequestsForHead: vi.fn() });
+
+      await deliver(
+        mapping,
+        pullRequestDelivery({
+          branch: "feat/late-delivery",
+          number: 101,
+          action: "closed",
+          state: "closed",
+          mergedAt: TEN_MINUTES_AGO,
+          closedAt: TEN_MINUTES_AGO,
+          updatedAt: TEN_MINUTES_AGO,
+        }),
+      );
+
+      // The edit GitHub sent an hour ago finally lands.
+      await deliver(
+        mapping,
+        pullRequestDelivery({
+          branch: "feat/late-delivery",
+          number: 101,
+          action: "edited",
+          state: "open",
+          title: "The title it had an hour ago",
+          updatedAt: AN_HOUR_AGO,
+        }),
+      );
+
+      const stored = await storedFor("feat/late-delivery");
+      expect(stored).toHaveLength(1);
+      expect(stored[0]?.state).toBe("closed");
+      expect(stored[0]?.prMergedAt).not.toBeNull();
+      expect(stored[0]?.prClosedAt).not.toBeNull();
+      expect(stored[0]?.title).toBe("Link sessions to pull requests");
+    });
+
+    it("keeps a closed pull request closed when an older reopen arrives after it", async () => {
+      await seedInstallation();
+      const { mapping } = servicesWith({ listPullRequestsForHead: vi.fn() });
+
+      await deliver(
+        mapping,
+        pullRequestDelivery({
+          branch: "feat/late-reopen",
+          number: 102,
+          action: "closed",
+          state: "closed",
+          closedAt: TEN_MINUTES_AGO,
+          updatedAt: TEN_MINUTES_AGO,
+        }),
+      );
+
+      await deliver(
+        mapping,
+        pullRequestDelivery({
+          branch: "feat/late-reopen",
+          number: 102,
+          action: "reopened",
+          state: "open",
+          updatedAt: AN_HOUR_AGO,
+        }),
+      );
+
+      const stored = await storedFor("feat/late-reopen");
+      expect(stored[0]?.state).toBe("closed");
+      expect(stored[0]?.prClosedAt).not.toBeNull();
+    });
+
+    /**
+     * The same race with the other writer. A listing is asked for the branch,
+     * and while it is in flight GitHub announces the merge, so the answer that
+     * arrives describes a state that is already old.
+     */
+    /** @scenario "A listing that answers after a newer announcement does not roll it back" */
+    it("keeps the announced state when a listing answers with an older one", async () => {
+      await seedInstallation();
+      let releaseListing: () => void = () => undefined;
+      const inFlight = new Promise<void>((resolve) => {
+        releaseListing = resolve;
+      });
+      const listPullRequestsForHead = vi.fn().mockImplementation(async () => {
+        await inFlight;
+        return [
+          apiPullRequest({
+            number: 103,
+            htmlUrl: `https://github.com/${REPO_FULL_NAME}/pull/103`,
+            state: "open",
+            updatedAt: AN_HOUR_AGO,
+          }),
+        ];
+      });
+      const { mapping } = servicesWith({ listPullRequestsForHead });
+      const target = {
+        organizationId,
+        repositoryHost: "github.com",
+        repositoryOwner: `acme-${tag}`,
+        repositoryName: "widgets",
+        headBranch: "feat/slow-listing",
+      };
+
+      const listing = mapping.mapBranch(target);
+      // The merge is announced while the listing is still waiting on GitHub.
+      await deliver(
+        mapping,
+        pullRequestDelivery({
+          branch: "feat/slow-listing",
+          number: 103,
+          action: "closed",
+          state: "closed",
+          mergedAt: TEN_MINUTES_AGO,
+          closedAt: TEN_MINUTES_AGO,
+          updatedAt: TEN_MINUTES_AGO,
+        }),
+      );
+      releaseListing();
+      await listing;
+
+      expect(listPullRequestsForHead).toHaveBeenCalledTimes(1);
+      const stored = await storedFor("feat/slow-listing");
+      expect(stored[0]?.state).toBe("closed");
+      expect(stored[0]?.prMergedAt).not.toBeNull();
+    });
+
+    it("writes a redelivery whose update time equals the stored one", async () => {
+      await seedInstallation();
+      const { mapping } = servicesWith({ listPullRequestsForHead: vi.fn() });
+      const payload = pullRequestDelivery({
+        branch: "feat/equal-times",
+        number: 104,
+        updatedAt: TEN_MINUTES_AGO,
+      });
+
+      await deliver(mapping, payload);
+      // Drift the stored title, so a skipped write would be visible.
+      await prisma.githubPullRequest.updateMany({
+        where: { organizationId, prNumber: 104 },
+        data: { title: "drifted" },
+      });
+      await deliver(mapping, payload);
+
+      expect((await storedFor("feat/equal-times"))[0]?.title).toBe(
+        "Link sessions to pull requests",
+      );
+    });
+
+    it("accepts the next write for a row stored before the update time was kept", async () => {
+      await seedInstallation();
+      const { mapping } = servicesWith({ listPullRequestsForHead: vi.fn() });
+      await deliver(
+        mapping,
+        pullRequestDelivery({
+          branch: "feat/no-stored-time",
+          number: 105,
+          updatedAt: TEN_MINUTES_AGO,
+        }),
+      );
+      // A row written before the column existed carries no source timestamp.
+      await prisma.githubPullRequest.updateMany({
+        where: { organizationId, prNumber: 105 },
+        data: { prUpdatedAt: null },
+      });
+
+      await deliver(
+        mapping,
+        pullRequestDelivery({
+          branch: "feat/no-stored-time",
+          number: 105,
+          action: "closed",
+          state: "closed",
+          mergedAt: TEN_MINUTES_AGO,
+          closedAt: TEN_MINUTES_AGO,
+          updatedAt: TEN_MINUTES_AGO,
+        }),
+      );
+
+      const stored = await storedFor("feat/no-stored-time");
+      expect(stored[0]?.state).toBe("closed");
+      // And it carries the timestamp from now on.
+      expect(stored[0]?.prUpdatedAt).toEqual(new Date(TEN_MINUTES_AGO));
     });
   });
 

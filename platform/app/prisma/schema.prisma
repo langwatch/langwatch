@@ -1271,6 +1271,12 @@ model GithubPullRequest {
   prCreatedAt        DateTime
   prClosedAt         DateTime?
   prMergedAt         DateTime?
+  /// GitHub's own `updated_at` for the snapshot this row holds, and the
+  /// freshness guard on every write to it: a snapshot older than the stored one
+  /// is skipped. GitHub may deliver webhooks out of order, and without the
+  /// guard a late `opened` lands after `closed` and reopens a merged pull
+  /// request. NULL means the row predates the column, so any write is accepted.
+  prUpdatedAt        DateTime?
   /// When this row was first mapped to its branch.
   mappedAt           DateTime     @default(now())
   /// When the snapshot columns were last refreshed from GitHub.

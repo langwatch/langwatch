@@ -83,13 +83,22 @@ function serviceWith(getPullRequest: ReturnType<typeof vi.fn>) {
   });
 }
 
+/** The source timestamp the seeded snapshot carries. */
+const SEEDED_PR_UPDATED_AT = new Date(Date.now() - 60 * 60 * 1000);
+
 /**
  * The stored snapshot as the mapping first wrote it, under the folded spelling
  * the store keys by. Re-applied per test because a live read that finds GitHub
  * has moved on writes the new state back, which is the behaviour one of these
  * tests is about.
+ *
+ * The row is dropped first rather than written over: a write only lands when
+ * its source timestamp is at least as fresh as the stored one, so re-seeding
+ * an older snapshot over a test that stored a newer one would be skipped and
+ * leak that test's state into the next.
  */
 async function seedOpenSnapshot(): Promise<void> {
+  await prisma.githubPullRequest.deleteMany({ where: { organizationId } });
   await repository.upsertPullRequests({
     pullRequests: [
       {
@@ -106,6 +115,7 @@ async function seedOpenSnapshot(): Promise<void> {
         prCreatedAt: new Date(Date.now() - 60 * 60 * 1000),
         prClosedAt: null,
         prMergedAt: null,
+        prUpdatedAt: SEEDED_PR_UPDATED_AT,
       },
     ],
   });
@@ -163,6 +173,7 @@ describe("live pull-request status", () => {
         mergedAt: null,
         closedAt: null,
         createdAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+        updatedAt: new Date().toISOString(),
         authorLogin: "someone",
       });
       const service = serviceWith(getPullRequest);
@@ -221,6 +232,7 @@ describe("live pull-request status", () => {
           mergedAt,
           closedAt: mergedAt,
           createdAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+          updatedAt: mergedAt,
           authorLogin: "someone",
         }),
       );
@@ -242,6 +254,49 @@ describe("live pull-request status", () => {
         },
         { timeout: 5_000, interval: 100 },
       );
+    });
+  });
+
+  describe("given a refresh carrying a state older than the stored one", () => {
+    /**
+     * A live read is answered while the page is open, so a webhook can store a
+     * newer snapshot between GitHub answering and the refresh landing. The
+     * refresh carries the source timestamp of the state it read, so it loses
+     * rather than reopening a merged pull request.
+     */
+    it("leaves the stored snapshot alone", async () => {
+      const mergedAt = new Date(Date.now() - 5 * 60 * 1000);
+      const refreshWith = (
+        over: Partial<Parameters<typeof repository.refreshSnapshot>[0]>,
+      ) =>
+        repository.refreshSnapshot({
+          organizationId,
+          repositoryHost: FOLDED_HOST,
+          repositoryFullName: FOLDED_REPO_FULL_NAME,
+          prNumber: PR_NUMBER,
+          title: "Link sessions to pull requests",
+          state: "open",
+          isDraft: false,
+          prClosedAt: null,
+          prMergedAt: null,
+          prUpdatedAt: SEEDED_PR_UPDATED_AT,
+          ...over,
+        });
+
+      await refreshWith({
+        state: "closed",
+        prClosedAt: mergedAt,
+        prMergedAt: mergedAt,
+        prUpdatedAt: mergedAt,
+      });
+      await refreshWith({});
+
+      const stored = await repository.findByNumber({
+        organizationId,
+        ...REF,
+      });
+      expect(stored?.state).toBe("closed");
+      expect(stored?.prMergedAt).not.toBeNull();
     });
   });
 });

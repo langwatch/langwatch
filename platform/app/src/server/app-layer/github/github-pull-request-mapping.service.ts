@@ -641,5 +641,9 @@ function toUpsertInput({
     prCreatedAt: new Date(pull.createdAt),
     prClosedAt: pull.closedAt ? new Date(pull.closedAt) : null,
     prMergedAt: pull.mergedAt ? new Date(pull.mergedAt) : null,
+    // The ordering key the store writes behind. Both a webhook and a listing
+    // can arrive after a newer snapshot was already stored, and this is what
+    // stops either from rolling the row back.
+    prUpdatedAt: new Date(pull.updatedAt),
   };
 }

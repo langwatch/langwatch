@@ -106,6 +106,13 @@ export interface GithubPullRequestSummary {
   closedAt: string | null;
   /** ISO-8601. */
   createdAt: string;
+  /**
+   * ISO-8601: GitHub's own `updated_at` for this snapshot, and the ordering
+   * key the store writes behind. Both sources carry it, because both can
+   * arrive late: GitHub permits out-of-order webhook delivery, and a slow REST
+   * listing can answer after a webhook already applied a newer state.
+   */
+  updatedAt: string;
   authorLogin: string | null;
 }
 
@@ -196,6 +203,7 @@ export interface GithubApiPullRequest {
   merged_at?: string | null;
   closed_at?: string | null;
   created_at: string;
+  updated_at: string;
   user?: { login?: string } | null;
 }
 
@@ -211,6 +219,7 @@ export function toPullRequestSummary(
     mergedAt: pull.merged_at ?? null,
     closedAt: pull.closed_at ?? null,
     createdAt: pull.created_at,
+    updatedAt: pull.updated_at,
     authorLogin: pull.user?.login ?? null,
   };
 }

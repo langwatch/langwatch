@@ -164,6 +164,24 @@ Rule: A pull request links itself the moment GitHub announces it
     When GitHub delivers it a second time
     Then the branch still carries exactly one pull request, unchanged
 
+  # GitHub does not promise the order it delivers announcements in, and a
+  # pull request's close and merge times are what decide which sessions are
+  # priced under it. A late announcement written over a newer one reopens a
+  # merged pull request and takes the sessions that ran after it closed.
+  @integration
+  Scenario: A late delivery about an earlier state does not roll the pull request back
+    Given a pull request stored as merged
+    When an announcement about its earlier state arrives after the merge
+    Then the pull request still reads as merged
+    And its close and merge times are unchanged
+    And its title is not put back to the earlier one
+
+  @integration
+  Scenario: A listing that answers after a newer announcement does not roll it back
+    Given a listing of a branch's pull requests still waiting on GitHub
+    When the pull request is announced as merged before the listing answers
+    Then the listing's older answer leaves the stored pull request as merged
+
   # Deliveries get missed, installations get suspended and resumed, and a
   # self-hosted instance may never be reachable by GitHub at all. The recheck
   # is the floor under the announcement, not something it replaces.

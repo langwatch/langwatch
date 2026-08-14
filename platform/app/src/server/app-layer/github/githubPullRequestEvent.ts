@@ -69,6 +69,13 @@ const githubPullRequestEventSchema = z.object({
     merged_at: z.string().nullish(),
     closed_at: z.string().nullish(),
     created_at: z.string(),
+    /**
+     * Required, because it is what orders one delivery against another. GitHub
+     * sends it on every `pull_request` event and permits deliveries to arrive
+     * out of order, so a delivery without it cannot be placed in the sequence
+     * and must not be allowed to overwrite a newer stored snapshot.
+     */
+    updated_at: z.string(),
     user: z.object({ login: z.string().optional() }).nullish(),
     head: z.object({
       ref: z.string().min(1),

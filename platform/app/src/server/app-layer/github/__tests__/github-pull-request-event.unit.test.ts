@@ -35,6 +35,7 @@ function delivery(over: Record<string, unknown> = {}) {
       merged_at: null,
       closed_at: null,
       created_at: "2026-08-01T10:00:00.000Z",
+      updated_at: "2026-08-01T11:00:00.000Z",
       user: { login: "someone" },
       head: { ref: "feat/linkage", repo: { full_name: "acme/widgets" } },
     },
@@ -97,7 +98,22 @@ describe("pull request announcements", () => {
         state: "open",
         isDraft: false,
         authorLogin: "someone",
+        // The delivery's own `updated_at`, carried through so the store can
+        // order this write against another delivery about the same row.
+        prUpdatedAt: new Date("2026-08-01T11:00:00.000Z"),
       });
+    });
+  });
+
+  describe("when the announcement carries no update time", () => {
+    it("does not parse, because it cannot be ordered against another delivery", () => {
+      const { updated_at: _dropped, ...rest } = delivery().pull_request as {
+        updated_at: string;
+      } & Record<string, unknown>;
+
+      expect(
+        parseGithubPullRequestEvent(delivery({ pull_request: rest })),
+      ).toBeNull();
     });
   });
 

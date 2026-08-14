@@ -487,6 +487,7 @@ describe("POST /api/github/webhook", () => {
           merged_at: null,
           closed_at: null,
           created_at: "2026-08-01T10:00:00.000Z",
+          updated_at: "2026-08-01T11:00:00.000Z",
           user: { login: "someone" },
           head: { ref: "feat/linkage", repo: { full_name: "acme/widgets" } },
         },
