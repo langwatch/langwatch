@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
@@ -465,6 +466,39 @@ func TestDestroyWorktree(t *testing.T) {
 			}
 		})
 	})
+}
+
+// @scenario "Refreshing the hub is silent"
+func TestSlugResolutionIsSilentOnReadPaths(t *testing.T) {
+	// The regression this pins: the hub refreshes its worktree list every two
+	// seconds through the prune plan, and the slug resolver used to WARN on a
+	// cache/registry disagreement on every pass — scribbling a log line over
+	// the TUI (and flooding the daemon log) forever. Reads are silent; only the
+	// destroy path, where the signal matters, speaks.
+	const dir = "/repos/worktrees/scenario-child-startup"
+	store := &fakeStore{
+		stacks:    []domain.Stack{{Slug: "pr-6946", WorktreeDir: dir, LauncherPID: 100}},
+		slugCache: map[string]string{dir: "scenario-child-startup"},
+	}
+	sys := &fakeSystem{alive: map[int]bool{100: true}}
+	hyg := &fakeHygiene{worktrees: []Worktree{{Dir: "/repos/langwatch", Branch: "main"}, {Dir: dir, Branch: "pr"}}}
+	core, logs := observer.New(zap.WarnLevel)
+	o := hubOrchestrator(store, sys, &fakeProxy{}, &fakeDBServer{}, &fakeDBServer{}, hyg)
+	o.log = zap.New(core)
+
+	if _, err := o.PlanPrune("/repos/langwatch", "/repos/langwatch"); err != nil {
+		t.Fatalf("PlanPrune: %v", err)
+	}
+	if got := logs.Len(); got != 0 {
+		t.Fatalf("a read-path refresh must log nothing, got %d entries: %v", got, logs.All())
+	}
+
+	if slug := o.resolveDestroySlug(dir); slug != "pr-6946" {
+		t.Fatalf("registry slug must win, got %q", slug)
+	}
+	if logs.Len() != 1 {
+		t.Fatalf("the destroy path must still surface the disagreement, got %d entries", logs.Len())
+	}
 }
 
 // --- HubView ------------------------------------------------------------------

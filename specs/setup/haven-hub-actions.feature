@@ -80,26 +80,33 @@ Feature: The haven hub — one place to see and act on every stack
 
   # --- The whole machine, not just the launchers ---
   # The old footprint was each stack's launcher process group and nothing
-  # else, so the summary undercounted everything a dev machine actually
-  # spends: the shared database servers, the container VM, the coding agents
-  # and the dev tooling running beside the stacks. The partitioner reads ONE
-  # process listing and attributes every process exactly once: its group
-  # puts it in a stack, otherwise its command names a shared server, an
-  # agent, or dev tooling.
+  # else — and supervised children lead their OWN groups so it saw only the
+  # ~20MB launcher, while the shared database servers, the container VM, the
+  # coding agents and the dev tooling never appeared at all. The partitioner
+  # reads ONE process listing and attributes every process exactly once:
+  # shared servers by what they are, then stack lineage (descendants of a
+  # launcher), then agents and tooling, and everything else as its own slice.
 
   @unit
   Scenario: The hub shows the machine's whole memory picture
     Given stacks, shared database servers, coding agents and dev tooling are all running
     When the hub computes the footprint
-    Then each stack is charged its whole process group
-    And the shared servers, agents and tooling are attributed by what they are
+    Then each stack is charged its whole process tree
+    And the shared servers, agents, tooling and everything else are attributed by what they are
     And no process is ever counted in two buckets
 
   @unit
-  Scenario: A stack's own processes are never misfiled as tooling
-    Given a stack whose supervised services include node processes
+  Scenario: A stack is charged its whole process tree, not just its launcher
+    Given a stack whose supervised services each lead their own process group
     When the hub computes the footprint
-    Then those processes count toward the stack, not toward tooling
+    Then the stack's number includes every descendant of its launcher
+    And its own processes are never misfiled as tooling or agents
+
+  @unit
+  Scenario: What is not dev work still shows on the chart
+    Given the machine also runs browsers and other non-dev processes
+    When the hub renders the memory chart
+    Then dev work and everything else appear as separate colours against the machine total
 
   # --- Every worktree, not just the running ones ---
   @unit
@@ -108,6 +115,20 @@ Feature: The haven hub — one place to see and act on every stack
     When the hub assembles its rows
     Then the worktree appears with its branch, marked as having nothing running
     And the primary checkout and the current worktree are marked protected
+
+  @unit
+  Scenario: Idle worktrees stay out of the way while stacks run
+    Given stacks are running and idle worktrees exist
+    When the hub opens
+    Then the worktree list stays hidden behind a one-key toggle
+    And with nothing running the worktrees show by default
+
+  @unit
+  Scenario: Refreshing the hub is silent
+    Given a worktree whose slug cache disagrees with the registry
+    When the hub refreshes its rows
+    Then nothing is logged over the terminal
+    And the destroy path still surfaces the disagreement
 
   # --- Actions: cleanup, the web view, and the reaping monitor ---
   @unit
@@ -135,3 +156,11 @@ Feature: The haven hub — one place to see and act on every stack
     When the reap happens
     Then an event with the kind, target and reason is appended to the record
     And the record keeps only the most recent events, dropping the oldest past its cap
+
+  # --- The web dashboard shows the same machine ---
+  @unit
+  Scenario: The web dashboard shows the same machine picture
+    Given the daemon serves the web dashboard
+    When the page renders
+    Then the memory chart, the idle worktrees and the recent reaping appear
+    And the shared servers are stated once instead of repeating on every stack card

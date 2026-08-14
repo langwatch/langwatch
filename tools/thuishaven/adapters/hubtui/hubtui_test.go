@@ -183,6 +183,7 @@ func TestHubModel(t *testing.T) {
 }
 
 // @scenario "Worktrees without a running stack are listed too"
+// @scenario "Idle worktrees stay out of the way while stacks run"
 func TestHubWorktreeRows(t *testing.T) {
 	view := View{
 		Stacks: []Row{{Slug: "alpha", Dir: "/wt/alpha", Branch: "feat/a", IsLive: true}},
@@ -193,20 +194,34 @@ func TestHubWorktreeRows(t *testing.T) {
 	}
 	var downed, destroyed []string
 
-	t.Run("when rendered, the stackless worktrees appear with their protection", func(t *testing.T) {
+	t.Run("when stacks are running, the worktrees stay hidden until t", func(t *testing.T) {
 		m := newModel(context.Background(), mutableActions(&view, &downed, &destroyed))
 		out := m.View()
-		if !strings.Contains(out, "worktrees") || !strings.Contains(out, "beta") {
-			t.Error("stackless worktrees should be listed")
+		if strings.Contains(out, "feat/b") {
+			t.Fatal("idle worktrees should stay out of the way while stacks run")
 		}
-		if !strings.Contains(out, "primary — protected") {
-			t.Error("the primary checkout should be marked protected")
+		if !strings.Contains(out, "hidden") {
+			t.Error("the hub should say the worktrees are hidden and how to show them")
+		}
+		m = press(t, m, "t")
+		out = m.View()
+		if !strings.Contains(out, "beta") || !strings.Contains(out, "primary — protected") {
+			t.Error("t should reveal the worktrees with their protection")
+		}
+	})
+
+	t.Run("when no stacks run, the worktrees show by default", func(t *testing.T) {
+		stackless := View{Worktrees: view.Worktrees}
+		m := newModel(context.Background(), mutableActions(&stackless, &downed, &destroyed))
+		if !strings.Contains(m.View(), "beta") {
+			t.Error("with nothing running, the worktrees are the content")
 		}
 	})
 
 	t.Run("when x is typed on a stackless worktree, it destroys by directory", func(t *testing.T) {
 		downed, destroyed = nil, nil
 		m := newModel(context.Background(), mutableActions(&view, &downed, &destroyed))
+		m = press(t, m, "t") // reveal worktrees
 		m = press(t, m, "j") // primary (protected)
 		m = press(t, m, "j") // beta
 		m = press(t, m, "x")
@@ -222,6 +237,7 @@ func TestHubWorktreeRows(t *testing.T) {
 	t.Run("when x is pressed on a protected worktree, the hub refuses", func(t *testing.T) {
 		downed, destroyed = nil, nil
 		m := newModel(context.Background(), mutableActions(&view, &downed, &destroyed))
+		m = press(t, m, "t")
 		m = press(t, m, "j") // primary
 		m = press(t, m, "x")
 		if m.mode != modeBrowse {
@@ -302,6 +318,7 @@ func TestHubActionsKeys(t *testing.T) {
 }
 
 // @scenario "The hub shows the machine's whole memory picture"
+// @scenario "What is not dev work still shows on the chart"
 func TestHubHeaderShowsTheMachine(t *testing.T) {
 	a := Actions{Refresh: func() View {
 		return View{Summary: Summary{
@@ -311,15 +328,21 @@ func TestHubHeaderShowsTheMachine(t *testing.T) {
 			AgentRSS:   4 << 30,
 			AgentCount: 2,
 			ToolingRSS: 1 << 30,
+			OtherRSS:   5 << 30,
 			Pressure:   "amber",
 		}}
 	}}
 	m := newModel(context.Background(), a)
 	out := m.View()
-	for _, want := range []string{"stacks ~3.0GB", "servers ~3.0GB", "agents ~4.0GB (2)", "tooling ~1.0GB", "amber"} {
+	for _, want := range []string{"stacks ~3.0GB", "servers ~3.0GB", "agents ~4.0GB (2)", "tooling ~1.0GB", "other ~5.0GB", "amber"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("header should contain %q\n%s", want, out)
 		}
+	}
+	// The chart carries both occupied colors: dev (11/16 of the bar's 24
+	// cells = 16) and other (5/16 = 7), against the dim free track.
+	if !strings.Contains(out, strings.Repeat("█", 16)) {
+		t.Error("the dev slice should fill its share of the bar")
 	}
 }
 

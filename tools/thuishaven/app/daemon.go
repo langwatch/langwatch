@@ -326,16 +326,17 @@ func (o *Orchestrator) recordReap(kind, target, reason string) {
 	}
 }
 
-// fattestStack names the live stack with the largest process-group footprint.
-// Approximate by construction — GroupRSS double-counts shared pages — which is
-// fine for "which one should I look at first" and is why it is never a control
-// input.
+// fattestStack names the live stack with the largest whole-tree footprint.
+// Approximate by construction — summed RSS double-counts shared pages — which
+// is fine for "which one should I look at first" and is why it is never a
+// control input.
 func (o *Orchestrator) fattestStack() (slug string, rss uint64) {
+	stackRSS := o.StackRSSByLauncher()
 	for _, s := range o.store.Stacks() {
 		if !o.sys.ProcessAlive(s.LauncherPID) {
 			continue
 		}
-		if got := o.sys.GroupRSS(s.LauncherPID); got > rss {
+		if got := stackRSS[s.LauncherPID]; got > rss {
 			slug, rss = s.Slug, got
 		}
 	}

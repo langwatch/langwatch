@@ -155,7 +155,8 @@ type Child struct {
 // ProcessSample is one live process as the tsgo governor's sampler sees it.
 type ProcessSample struct {
 	PID      int
-	PGID     int // process group, for attributing a process to a stack's launcher group
+	PPID     int // parent, for attributing a process to a stack launcher's tree
+	PGID     int // process group, the fallback stack-membership signal
 	RSSBytes int64
 	CPUTime  time.Duration // total CPU clock, for idle detection across ticks
 	Elapsed  time.Duration // wall-clock age

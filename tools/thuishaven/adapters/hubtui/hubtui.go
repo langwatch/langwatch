@@ -61,8 +61,9 @@ func (w WorktreeRow) Name() string {
 // enforces again).
 func (w WorktreeRow) Protected() bool { return w.IsPrimary || w.IsCurrent }
 
-// Summary is the machine header: the RAM picture with every dev-work process
-// attributed once, plus the daemon's pressure reading.
+// Summary is the machine header: the RAM picture with every process attributed
+// once — the dev buckets by name, everything else as Other — plus the daemon's
+// pressure reading.
 type Summary struct {
 	TotalRAM   uint64
 	StacksRSS  uint64
@@ -70,6 +71,7 @@ type Summary struct {
 	AgentRSS   uint64
 	AgentCount int
 	ToolingRSS uint64
+	OtherRSS   uint64 // not dev work — its own color in the chart
 	Pressure   string // the daemon's pressure level ("green" hidden, others shown)
 }
 
@@ -189,6 +191,10 @@ type model struct {
 	outcome     Outcome
 	busy        bool
 	showMonitor bool
+	// wtOverride is the user's explicit worktree-section toggle ("t"); nil means
+	// automatic — visible only while no stacks are running, so the running work
+	// owns the screen and the idle trees stay out of the way.
+	wtOverride *bool
 }
 
 func newModel(ctx context.Context, a Actions) model {
@@ -203,12 +209,21 @@ func (m *model) refresh() {
 	for i := range m.view.Stacks {
 		m.items = append(m.items, item{stack: &m.view.Stacks[i]})
 	}
-	for i := range m.view.Worktrees {
-		m.items = append(m.items, item{wt: &m.view.Worktrees[i]})
+	if m.worktreesVisible() {
+		for i := range m.view.Worktrees {
+			m.items = append(m.items, item{wt: &m.view.Worktrees[i]})
+		}
 	}
 	if m.cursor >= len(m.items) {
 		m.cursor = max(0, len(m.items)-1)
 	}
+}
+
+func (m model) worktreesVisible() bool {
+	if m.wtOverride != nil {
+		return *m.wtOverride
+	}
+	return len(m.view.Stacks) == 0
 }
 
 func (m model) Init() tea.Cmd { return tick() }
@@ -310,6 +325,10 @@ func (m model) updateBrowse(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "m":
 		m.showMonitor = !m.showMonitor
+	case "t":
+		visible := !m.worktreesVisible()
+		m.wtOverride = &visible
+		m.refresh()
 	case "x":
 		if it, ok := m.selected(); ok {
 			if it.wt != nil && it.wt.Protected() {
@@ -427,6 +446,9 @@ var (
 	styleWarn    = lipgloss.NewStyle().Foreground(lipgloss.Color("203")).Bold(true)
 	styleSection = lipgloss.NewStyle().Bold(true).Faint(true)
 	styleBarOn   = lipgloss.NewStyle().Foreground(accent)
+	// styleBarOther colors the non-dev slice of the RAM bar: a muted violet so
+	// it reads as "occupied, not ours" next to the accent's "ours".
+	styleBarOther = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#7c3aed", Dark: "#a78bfa"})
 )
 
 const hubWidth = 72
@@ -461,9 +483,9 @@ func (m model) viewHeader(b *strings.Builder) {
 
 	s := m.view.Summary
 	if s.TotalRAM > 0 && s.DevRSS() > 0 {
-		bar := memBar(s.DevRSS(), s.TotalRAM, 24)
-		fmt.Fprintf(b, " %s %s  dev work ~%s of %s\n",
-			styleSection.Render("machine"), bar, humanBytes(s.DevRSS()), humanBytes(s.TotalRAM))
+		bar := s.memBar(24)
+		fmt.Fprintf(b, " %s %s  dev ~%s · other ~%s · %s RAM\n",
+			styleSection.Render("machine"), bar, humanBytes(s.DevRSS()), humanBytes(s.OtherRSS), humanBytes(s.TotalRAM))
 		b.WriteString(styleDim.Render("         "+strings.Join(summaryParts(s), " · ")) + "\n")
 	}
 	b.WriteString("\n")
@@ -537,6 +559,10 @@ func renderStackDetail(b *strings.Builder, r *Row) {
 
 func (m model) viewWorktrees(b *strings.Builder) {
 	if len(m.view.Worktrees) == 0 {
+		return
+	}
+	if !m.worktreesVisible() {
+		b.WriteString("\n" + styleDim.Render(fmt.Sprintf(" %d idle worktree(s) hidden — t shows them", len(m.view.Worktrees))) + "\n")
 		return
 	}
 	b.WriteString("\n" + styleSection.Render(" worktrees — nothing running") + "\n")
@@ -618,6 +644,9 @@ func (m model) viewFooter(b *strings.Builder) {
 func (m model) keyHints() []string {
 	keys := append([]string{"↑↓ select", "enter git"}, m.stackKeys()...)
 	keys = append(keys, "x destroy")
+	if len(m.view.Worktrees) > 0 {
+		keys = append(keys, "t worktrees")
+	}
 	if m.actions.HasCleanup {
 		keys = append(keys, "c cleanup")
 	}
@@ -654,13 +683,20 @@ func (m model) itemSelected(it item) bool {
 	return sel.wt == it.wt
 }
 
-// memBar renders dev work's share of machine RAM as a fixed-width bar.
-func memBar(used, total uint64, width int) string {
-	if total == 0 {
+// memBar renders the machine's RAM as a fixed-width bar: dev work in the
+// accent color, everything else in its own color, free space dim. Summed RSS
+// double-counts shared pages, so the segments are clamped to the bar.
+func (s Summary) memBar(width int) string {
+	if s.TotalRAM == 0 {
 		return ""
 	}
-	on := int(min(uint64(width), used*uint64(width)/total))
-	return styleBarOn.Render(strings.Repeat("█", on)) + styleDim.Render(strings.Repeat("░", width-on))
+	w := uint64(width)
+	devW := min(w, s.DevRSS()*w/s.TotalRAM)
+	otherW := min(w-devW, s.OtherRSS*w/s.TotalRAM)
+	free := width - int(devW) - int(otherW)
+	return styleBarOn.Render(strings.Repeat("█", int(devW))) +
+		styleBarOther.Render(strings.Repeat("█", int(otherW))) +
+		styleDim.Render(strings.Repeat("░", free))
 }
 
 func sumValues(m map[string]uint64) uint64 {

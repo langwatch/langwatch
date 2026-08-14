@@ -136,21 +136,26 @@ after a crash or a `down`.
 
 **The hub.** Bare `haven` opens the interactive machine view. The header is
 the machine's real memory picture from one process listing, every process
-attributed once: each stack charged its whole process group, plus the shared
-servers (ClickHouse, Postgres, Redis, the container VM), the coding agents and
-the dev tooling running beside them — with the daemon's pressure level when it
-is not green. Below it, every stack (liveness, branch, service health, RAM)
-and every worktree, including the ones with nothing running. Actions run on
-the selected row — enter/`g` opens its git view (and returns to the hub on
-quit), `o` opens the stack's app, `r` restarts it, `d` shuts it down keeping
-its databases, and `x` destroys the worktree entirely: stack stopped,
-ClickHouse + Postgres databases dropped, directory deleted, confirmed by
-typing the name. The primary checkout and the worktree haven runs from can
-never be destroyed. One-key handoffs: `c` opens the interactive cleanup picker
-and returns, `w` opens the machine's web dashboard, and `m` toggles the
-monitor panel — the shared servers' footprints plus the daemon's recent
-reaping (stacks, test containers, governed processes, idle databases), newest
-first, from the persisted event record.
+attributed once: each stack charged its whole process **tree** (supervised
+children lead their own process groups, so a group sum sees only the ~20MB
+launcher), the shared servers (ClickHouse, Postgres, Redis, the container VM),
+the coding agents and dev tooling beside them, and everything that is not dev
+work as its own colour in the chart — with the daemon's pressure level when it
+is not green. Below it, every stack (liveness, branch, service health, RAM);
+idle worktrees stay collapsed behind `t` while stacks run and show by default
+otherwise. Actions run on the selected row — enter/`g` opens its git view (and
+returns to the hub on quit), `o` opens the stack's app, `r` restarts it, `d`
+shuts it down keeping its databases, and `x` destroys the worktree entirely:
+stack stopped, ClickHouse + Postgres databases dropped, directory deleted,
+confirmed by typing the name. The primary checkout and the worktree haven runs
+from can never be destroyed. One-key handoffs: `c` opens the interactive
+cleanup picker and returns, `w` opens the machine's web dashboard, and `m`
+toggles the monitor panel — the shared servers' footprints plus the daemon's
+recent reaping (stacks, test containers, governed processes, idle databases),
+newest first, from the persisted event record. The web dashboard
+(`langwatch.localhost`) shows the same machine: the memory chart, the stack
+cards (their own services only — the shared servers are stated once), the idle
+worktrees, and the reaping feed.
 
 **Seeding.** `haven db seed` reseeds in place — an idempotent upsert that can
 only add or refresh, never discard — and `haven db reset` is the destructive

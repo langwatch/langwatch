@@ -3,11 +3,13 @@ package app
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"slices"
 	"time"
 
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
@@ -111,37 +113,70 @@ func (o *Orchestrator) stopAndDropForDir(ctx context.Context, canonDir string) {
 	o.dropWorktreeDatabases(ctx, dbSlug)
 }
 
-// resolveDestroySlug picks the slug whose databases DestroyWorktree may drop.
-// The registry is authoritative: a stack registered for dir carries the slug
-// haven itself assigned, so it wins over the worktree-local slug cache
-// (.langwatch-slug), which a hostile branch checked out via `haven pr` can forge
-// to name another worktree's slug. The cache is consulted only as a fallback
-// when no stack is registered for dir, and even then a cached slug that collides
-// with a *different* registered worktree's slug is refused. Returns "" when no
-// safe slug can be established (nothing is dropped).
+// resolveDestroySlug picks the slug whose databases DestroyWorktree may drop,
+// logging any slug-cache disagreement — the destroy path is where that
+// tampering signal matters.
 func (o *Orchestrator) resolveDestroySlug(dir string) string {
+	slug, warns := o.slugForDir(dir)
+	for _, w := range warns {
+		o.log.Warn("destroy: "+w.message, w.fields...)
+	}
+	return slug
+}
+
+type slugWarning struct {
+	message string
+	fields  []zap.Field
+}
+
+// slugForDir picks the slug that owns dir's databases, silently. The registry
+// is authoritative: a stack registered for dir carries the slug haven itself
+// assigned, so it wins over the worktree-local slug cache (.langwatch-slug),
+// which a hostile branch checked out via `haven pr` can forge to name another
+// worktree's slug. The cache is consulted only as a fallback when no stack is
+// registered for dir, and even then a cached slug that collides with a
+// *different* registered worktree's slug is refused. Returns "" when no safe
+// slug can be established (nothing is dropped). Read-only surfaces (the hub's
+// worktree list, the prune plan) call this on every refresh, so it returns its
+// warnings instead of logging them — only the destroy path speaks.
+func (o *Orchestrator) slugForDir(dir string) (string, []slugWarning) {
+	if slug, warns, ok := o.registrySlugForDir(dir); ok {
+		return slug, warns
+	}
+	return o.cachedSlugForDir(dir)
+}
+
+// registrySlugForDir answers from the registry (ok=false when no stack is
+// registered for dir), warning when the worktree-local cache disagrees.
+func (o *Orchestrator) registrySlugForDir(dir string) (string, []slugWarning, bool) {
 	for _, st := range o.store.Stacks() {
 		if canonicalPath(st.WorktreeDir) != dir {
 			continue
 		}
+		var warns []slugWarning
 		if cached, ok := o.store.ReadSlugCache(dir); ok && cached != "" && cached != st.Slug {
-			o.log.Warn("destroy: ignoring worktree slug cache that disagrees with the registry",
-				zap.String("dir", dir), zap.String("cached", cached), zap.String("registry", st.Slug))
+			warns = append(warns, slugWarning{"ignoring worktree slug cache that disagrees with the registry",
+				[]zap.Field{zap.String("dir", dir), zap.String("cached", cached), zap.String("registry", st.Slug)}})
 		}
-		return st.Slug
+		return st.Slug, warns, true
 	}
+	return "", nil, false
+}
+
+// cachedSlugForDir is the fallback: the worktree-local cache, refused when the
+// cached slug collides with a different registered worktree's slug.
+func (o *Orchestrator) cachedSlugForDir(dir string) (string, []slugWarning) {
 	cached, ok := o.store.ReadSlugCache(dir)
 	if !ok || cached == "" {
-		return ""
+		return "", nil
 	}
 	for _, st := range o.store.Stacks() {
 		if st.Slug == cached && canonicalPath(st.WorktreeDir) != dir {
-			o.log.Warn("destroy: refusing to drop databases — cached slug belongs to another registered worktree",
-				zap.String("dir", dir), zap.String("cached", cached), zap.String("owner", st.WorktreeDir))
-			return ""
+			return "", []slugWarning{{"refusing to drop databases — cached slug belongs to another registered worktree",
+				[]zap.Field{zap.String("dir", dir), zap.String("cached", cached), zap.String("owner", st.WorktreeDir)}}}
 		}
 	}
-	return cached
+	return cached, nil
 }
 
 // dropWorktreeDatabases drops the ClickHouse + Postgres databases for slug — a
@@ -249,7 +284,10 @@ type HubFootprint struct {
 	AgentRSS   uint64
 	AgentCount int
 	ToolingRSS uint64
-	Pressure   domain.Pressure
+	// OtherRSS is everything alive that is not dev work — shown in its own
+	// color so the chart reflects the whole machine.
+	OtherRSS uint64
+	Pressure domain.Pressure
 }
 
 // DevRSS is everything the partitioner attributed to dev work, summed.
@@ -299,9 +337,23 @@ func (o *Orchestrator) partitionMachine(stacks []domain.Stack) domain.Footprint 
 	samples := o.sys.ProcessSamples()
 	fpSamples := make([]domain.FootprintSample, 0, len(samples))
 	for _, s := range samples {
-		fpSamples = append(fpSamples, domain.FootprintSample{PID: s.PID, PGID: s.PGID, RSS: s.RSSBytes, Command: s.Command})
+		fpSamples = append(fpSamples, domain.FootprintSample{PID: s.PID, PPID: s.PPID, PGID: s.PGID, RSS: s.RSSBytes, Command: s.Command})
 	}
 	return domain.PartitionFootprint(fpSamples, launchers)
+}
+
+// StackRSSByLauncher is each live stack's whole-tree resident set, keyed by
+// launcher pid — the one number every reporting surface (hub, status, session,
+// the daemon's pressure hint) should agree on. Group RSS is wrong for this:
+// supervised children lead their own process groups, so a group sum sees only
+// the launcher itself.
+func (o *Orchestrator) StackRSSByLauncher() map[int]uint64 {
+	part := o.partitionMachine(o.store.Stacks())
+	out := make(map[int]uint64, len(part.StackRSS))
+	for pid, rss := range part.StackRSS {
+		out[pid] = uint64(max(rss, 0))
+	}
+	return out
 }
 
 func (o *Orchestrator) hubStackRow(st *domain.Stack, part domain.Footprint) HubStack {
@@ -327,6 +379,7 @@ func (o *Orchestrator) hubFootprint(part domain.Footprint) HubFootprint {
 		AgentRSS:   uint64(max(part.AgentRSS, 0)),
 		AgentCount: part.AgentCount,
 		ToolingRSS: uint64(max(part.ToolingRSS, 0)),
+		OtherRSS:   uint64(max(part.OtherRSS, 0)),
 	}
 	for name, rss := range part.ServerRSS {
 		f.ServerRSS[name] = uint64(max(rss, 0))
@@ -370,6 +423,21 @@ func (o *Orchestrator) hubWorktrees(gitDir, selfDir string, stacks []domain.Stac
 func (o *Orchestrator) DashboardURL() string {
 	scheme, port := o.proxy.Endpoint()
 	return o.cfg.Naming.URL(domain.HubService, "", scheme, port)
+}
+
+// RedirectLogsToFile sends this orchestrator's logs to a file under the haven
+// home instead of stderr — for commands that own the terminal with a
+// full-screen TUI, where a stray log line scribbles over the interface. If the
+// file cannot be opened the logs are dropped: a corrupted TUI is worse than a
+// lost warning.
+func (o *Orchestrator) RedirectLogsToFile(name string) {
+	f, err := os.OpenFile(filepath.Join(o.cfg.Home, name), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		o.log = zap.NewNop()
+		return
+	}
+	enc := zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig())
+	o.log = zap.New(zapcore.NewCore(enc, zapcore.AddSync(f), zap.InfoLevel))
 }
 
 func newestFirst(events []domain.ReapEvent) []domain.ReapEvent {

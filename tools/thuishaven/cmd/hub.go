@@ -9,6 +9,7 @@ import (
 
 	"github.com/0xdeafcafe/moron/tui"
 
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/dashboard"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/hubtui"
 	"github.com/langwatch/langwatch/tools/thuishaven/app"
 )
@@ -22,6 +23,9 @@ func runHub(ctx context.Context, d deps) error {
 	if d.isAgent {
 		return d.orch.Status(false, d.worktree)
 	}
+	// The TUI owns the terminal: a stray zap line would scribble over the
+	// interface, so the orchestrator's logs go to a file for this command.
+	d.orch.RedirectLogsToFile("hub.log")
 	for {
 		out, err := hubtui.Run(ctx, d.hubActions())
 		if err != nil {
@@ -77,6 +81,7 @@ func hubView(v app.HubView) hubtui.View {
 		AgentRSS:   v.Footprint.AgentRSS,
 		AgentCount: v.Footprint.AgentCount,
 		ToolingRSS: v.Footprint.ToolingRSS,
+		OtherRSS:   v.Footprint.OtherRSS,
 		Pressure:   v.Footprint.Pressure.String(),
 	}}
 	for i := range v.Stacks {
@@ -109,6 +114,40 @@ func hubView(v app.HubView) hubtui.View {
 	}
 	for _, ev := range v.Events {
 		out.Events = append(out.Events, hubtui.Event{
+			At: ev.At, Kind: ev.Kind, Target: ev.Target, Reason: ev.Reason,
+		})
+	}
+	return out
+}
+
+// dashboardExtras maps the app view onto the web dashboard's own types — same
+// composition-root translation the TUI gets, for the same reason: the adapter
+// never imports the app core.
+func dashboardExtras(v app.HubView) dashboard.Extras {
+	out := dashboard.Extras{
+		Summary: dashboard.SummaryView{
+			TotalRAM:   v.Footprint.TotalRAM,
+			StacksRSS:  v.Footprint.StacksRSS,
+			ServerRSS:  v.Footprint.ServerRSS,
+			AgentRSS:   v.Footprint.AgentRSS,
+			AgentCount: v.Footprint.AgentCount,
+			ToolingRSS: v.Footprint.ToolingRSS,
+			OtherRSS:   v.Footprint.OtherRSS,
+			Pressure:   v.Footprint.Pressure.String(),
+		},
+		StackRSS: map[int]uint64{},
+	}
+	for i := range v.Stacks {
+		out.StackRSS[v.Stacks[i].Stack.LauncherPID] = v.Stacks[i].RSS
+	}
+	for _, wt := range v.Worktrees {
+		out.Worktrees = append(out.Worktrees, dashboard.WorktreeView{
+			Slug: wt.Slug, Branch: wt.Branch, Dir: wt.Dir,
+			IsPrimary: wt.IsPrimary, IsCurrent: wt.IsCurrent,
+		})
+	}
+	for _, ev := range v.Events {
+		out.Events = append(out.Events, dashboard.EventView{
 			At: ev.At, Kind: ev.Kind, Target: ev.Target, Reason: ev.Reason,
 		})
 	}

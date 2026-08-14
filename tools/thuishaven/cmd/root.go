@@ -221,19 +221,23 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		ShouldDisableGoogleDLP:    shouldDisableGoogleDLP(disableDLP, disableDLPSet),
 	}
 
+	orch := app.New(app.Deps{
+		Cfg: cfg, Proxy: proxy, Store: store, Sup: sup, Sys: sys,
+		CH: ch, PG: pg, RDS: rds, Obs: obs, Hyg: hyg, Sem: sem,
+		Container: rt, Janitor: dockerjanitor.New(rt),
+		ProcTel: procmetrics.New(observabilityEndpoints().OTLPHTTPPort),
+		Claude:  claudesettings.New(), Log: logger,
+	})
 	return deps{
-		orch: app.New(app.Deps{
-			Cfg: cfg, Proxy: proxy, Store: store, Sup: sup, Sys: sys,
-			CH: ch, PG: pg, RDS: rds, Obs: obs, Hyg: hyg, Sem: sem,
-			Container: rt, Janitor: dockerjanitor.New(rt),
-			ProcTel: procmetrics.New(observabilityEndpoints().OTLPHTTPPort),
-			Claude:  claudesettings.New(), Log: logger,
-		}),
-		dash: dashboard.New(store.Stacks, sharedURL, dashboard.Probes{
-			PortInUse:    sys.PortInUse,
-			ProcessAlive: sys.ProcessAlive,
-			GroupRSS:     sys.GroupRSS,
-			TotalMemory:  sys.TotalMemory,
+		orch: orch,
+		dash: dashboard.New(dashboard.Config{
+			Stacks:    store.Stacks,
+			SharedURL: sharedURL,
+			Probes: dashboard.Probes{
+				PortInUse:    sys.PortInUse,
+				ProcessAlive: sys.ProcessAlive,
+			},
+			Extras: func() dashboard.Extras { return dashboardExtras(orch.HubView(worktree, worktree)) },
 		}),
 		params:   app.UpParams{WorktreeDir: worktree, LwDir: lwDir, Branch: gitBranch(worktree), ExplicitSlug: os.Getenv("LANGWATCH_SLUG"), IsBaseline: os.Getenv("HAVEN_BASELINE") == "1", IsLinkedWorktree: gitIsLinkedWorktree(worktree), UntrustedCheckout: os.Getenv("HAVEN_UNTRUSTED_CHECKOUT") == "1"},
 		opts:     optionsFromEnv(worktree),
