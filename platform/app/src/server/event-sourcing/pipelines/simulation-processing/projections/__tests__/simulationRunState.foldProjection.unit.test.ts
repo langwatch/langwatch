@@ -503,6 +503,46 @@ describe("simulationRunStateFoldProjection", () => {
       expect(state.FinishedAt).toBe(3000);
     });
 
+    it("derives DurationMs from the run's own timestamps when the event omits it", () => {
+      // Every real run takes this path: the SDK ingest dispatches finishRun
+      // with results and status only, so an underived DurationMs was null for
+      // every run a customer executed and set only for seeded ones.
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createRunFinishedEvent({
+          results: { verdict: "success", metCriteria: [], unmetCriteria: [] },
+        }),
+      ]);
+
+      expect(state.StartedAt).toBe(1000);
+      expect(state.FinishedAt).toBe(3000);
+      expect(state.DurationMs).toBe(2000);
+    });
+
+    it("prefers a supplied duration over the derived one", () => {
+      // The runner knows its own elapsed time better than two projected
+      // timestamps do.
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createRunFinishedEvent({
+          results: { verdict: "success", metCriteria: [], unmetCriteria: [] },
+          durationMs: 42,
+        }),
+      ]);
+
+      expect(state.DurationMs).toBe(42);
+    });
+
+    it("leaves DurationMs null when the run never started", () => {
+      const state = foldEvents([
+        createRunFinishedEvent({
+          results: { verdict: "success", metCriteria: [], unmetCriteria: [] },
+        }),
+      ]);
+
+      expect(state.DurationMs).toBeNull();
+    });
+
     it("sets FAILURE status for failure verdict", () => {
       const state = foldEvents([
         createRunStartedEvent(),
