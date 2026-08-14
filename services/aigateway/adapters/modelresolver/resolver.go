@@ -120,7 +120,13 @@ func (r *Resolver) Resolve(ctx context.Context, req *domain.Request, config doma
 		modelID := parts[1]
 
 		if !config.AllowsResolvedModel(providerID, modelID) {
-			return nil, herr.New(ctx, domain.ErrModelNotAllowed, herr.M{"message": "model not allowed: " + modelID})
+			// Echo the spelling the caller sent. Naming the bare model here
+			// reads as a different refusal than the one they asked for, since
+			// the same model under another provider is a separate allowance.
+			return nil, herr.New(ctx, domain.ErrModelNotAllowed, herr.M{
+				"message": "model not allowed: " + target,
+				"fault":   "customer",
+			})
 		}
 
 		return &domain.ResolvedModel{
@@ -132,7 +138,10 @@ func (r *Resolver) Resolve(ctx context.Context, req *domain.Request, config doma
 
 	// 3. Implicit: infer provider from first credential
 	if !modelAllowed(config, target) {
-		return nil, herr.New(ctx, domain.ErrModelNotAllowed, herr.M{"message": "model not allowed: " + target})
+		return nil, herr.New(ctx, domain.ErrModelNotAllowed, herr.M{
+			"message": "model not allowed: " + target,
+			"fault":   "customer",
+		})
 	}
 
 	return &domain.ResolvedModel{

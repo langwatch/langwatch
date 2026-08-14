@@ -348,3 +348,44 @@ func TestResolve_ExplicitFormatAcceptsQualifiedAllowance(t *testing.T) {
 	require.Error(t, err)
 	assert.True(t, herr.IsCode(err, domain.ErrModelNotAllowed))
 }
+
+// Every refusal the resolver authors is the caller's to fix, and the wire body
+// only carries a fault when the meta does. Two of the three branches were
+// silent, so the same code reached one customer annotated and another not.
+//
+// @scenario "Every model refusal names the caller as the fault"
+func TestResolve_RefusalsAreAttributedToTheCaller(t *testing.T) {
+	r := New()
+	cfg := domain.BundleConfig{
+		AllowedModels: []string{"openai/gpt-5.6-sol"},
+		ModelAliases: map[string]domain.ModelAlias{
+			"coding": {ProviderID: domain.ProviderOpenAI, Model: "gpt-5-mini"},
+		},
+	}
+
+	for _, model := range []string{"coding", "openai/gpt-5-mini", "gpt-5-mini"} {
+		_, err := r.Resolve(context.Background(), chatRequest(model), cfg)
+		require.Error(t, err, model)
+		assert.True(t, herr.IsCode(err, domain.ErrModelNotAllowed), model)
+
+		var e herr.E
+		require.ErrorAs(t, err, &e, model)
+		assert.Equal(t, "customer", e.Meta["fault"], model)
+	}
+}
+
+// A key can allow a model under one provider and not another, so a refusal
+// that drops the provider half describes a rule the caller did not hit.
+//
+// @scenario "A refused provider-qualified model is named the way it was sent"
+func TestResolve_RefusalEchoesTheSpellingTheCallerSent(t *testing.T) {
+	r := New()
+	cfg := domain.BundleConfig{AllowedModels: []string{"openai/gpt-4"}}
+
+	_, err := r.Resolve(context.Background(), chatRequest("anthropic/gpt-4"), cfg)
+	require.Error(t, err)
+
+	var e herr.E
+	require.ErrorAs(t, err, &e)
+	assert.Contains(t, e.Meta["message"], "anthropic/gpt-4")
+}

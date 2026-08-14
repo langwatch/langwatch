@@ -71,8 +71,19 @@ const FAST_ALIASES = [
  */
 const REASONING_PARAMETERS = ["reasoning", "reasoning_effort"];
 
+/**
+ * A model a caller can send a tier to: it takes a conversation and answers
+ * with text.
+ *
+ * `mode` alone is not enough. The catalog marks music and speech models
+ * "chat" too, and their modality is what separates them: `lyria-3-pro` is
+ * `text+image->text+audio`, which answers with audio and would fail the
+ * first chat completion sent to it.
+ */
 function isChatModel(entry: LLMModelEntry): boolean {
-  return entry.mode === "chat";
+  if (entry.mode !== "chat") return false;
+  const output = entry.modality?.split("->")[1];
+  return !output || output.split("+").includes("text");
 }
 
 function supportsReasoning(entry: LLMModelEntry): boolean {
@@ -83,18 +94,36 @@ function supportsReasoning(entry: LLMModelEntry): boolean {
 }
 
 /**
- * Cost of one average request. Input carries the larger weight because a chat
- * completion reads far more tokens than it emits, and the output rate is
- * folded in so a model priced cheaply to read and dearly to answer does not
- * rank as a bargain.
+ * Cost of one average request, or null when the catalog cannot price the
+ * model. Input carries the larger weight because a chat completion reads far
+ * more tokens than it emits, and the output rate is folded in so a model
+ * priced cheaply to read and dearly to answer does not rank as a bargain.
+ *
+ * Null rather than a sentinel. Price is the ranking for two tiers that sort
+ * in opposite directions, so any stand-in number is wrong in one of them: a
+ * placeholder meaning "unknown" sorted every unpriced model to the top of
+ * "most capable", which is how a music model came to lead the list.
+ * A model we cannot price is one we cannot rank, so it is not offered.
  */
-function blendedCostPerToken(entry: LLMModelEntry): number {
+function blendedCostPerToken(entry: LLMModelEntry): number | null {
   const pricing = entry.pricing;
-  if (!pricing) return Number.POSITIVE_INFINITY;
+  if (!pricing) return null;
   const input = pricing.inputCostPerToken ?? 0;
   const output = pricing.outputCostPerToken ?? 0;
-  if (input <= 0 && output <= 0) return Number.POSITIVE_INFINITY;
+  // A zero or negative rate is the catalog saying it does not know, not that
+  // the model is free.
+  if (input <= 0 && output <= 0) return null;
   return input * 0.75 + output * 0.25;
+}
+
+/** Models the catalog can price, which is the only set worth ranking. */
+function pricedCandidates(candidates: LLMModelEntry[]): LLMModelEntry[] {
+  return candidates.filter((entry) => blendedCostPerToken(entry) !== null);
+}
+
+/** Blended cost for a model already known to be priced. */
+function priceOf(entry: LLMModelEntry): number {
+  return blendedCostPerToken(entry) ?? 0;
 }
 
 function providerAllowed({
@@ -172,26 +201,26 @@ function tierOrderedRest({
   catalog: LLMModelEntry[];
   exclude: ReadonlySet<string>;
 }): LLMModelEntry[] {
-  const candidates = catalog.filter((entry) => !exclude.has(entry.id));
+  const candidates = pricedCandidates(
+    catalog.filter((entry) => !exclude.has(entry.id)),
+  );
   if (tier === "reasoning") {
     // Most expensive first: within the models that reason, price tracks how
     // much thinking the model is built to do, and this tier is the one a
     // caller picks when they want that.
     return candidates
       .filter(supportsReasoning)
-      .sort((a, b) => blendedCostPerToken(b) - blendedCostPerToken(a));
+      .sort((a, b) => priceOf(b) - priceOf(a));
   }
   if (tier === "fast") {
-    return candidates.sort(
-      (a, b) => blendedCostPerToken(a) - blendedCostPerToken(b),
-    );
+    return candidates.sort((a, b) => priceOf(a) - priceOf(b));
   }
   // complex: the catalog carries no capability score, so price descending is
   // the available proxy, with context length breaking ties between models
   // priced the same.
   return candidates.sort(
     (a, b) =>
-      blendedCostPerToken(b) - blendedCostPerToken(a) ||
+      priceOf(b) - priceOf(a) ||
       (b.contextLength ?? 0) - (a.contextLength ?? 0),
   );
 }

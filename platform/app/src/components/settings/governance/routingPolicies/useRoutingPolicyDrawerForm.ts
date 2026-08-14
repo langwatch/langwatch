@@ -147,13 +147,23 @@ function useProviderOptions({
     [providers],
   );
 
+  // Before any provider is picked, fall back to every provider the
+  // organization has. A new policy starts with none selected, and offering
+  // the whole catalog then means the first thing an operator sees is a list
+  // of models they cannot reach.
   const boundProviderTypes = useMemo(() => {
+    const all = (providers ?? []).map((provider) => provider.provider);
+    if (selectedIds.length === 0) return [...new Set(all)];
     const byId = new Map(
       (providers ?? []).map((provider) => [provider.id, provider.provider]),
     );
-    return selectedIds
-      .map((id) => byId.get(id))
-      .filter((type): type is string => !!type);
+    return [
+      ...new Set(
+        selectedIds
+          .map((id) => byId.get(id))
+          .filter((type): type is string => !!type),
+      ),
+    ];
   }, [selectedIds, providers]);
 
   return { providerOptions, boundProviderTypes };

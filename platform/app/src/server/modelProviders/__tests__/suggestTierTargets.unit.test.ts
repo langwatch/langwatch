@@ -43,6 +43,36 @@ describe("given a tier and no provider filter", () => {
   });
 });
 
+describe("given the models the catalog cannot rank", () => {
+  // Found by dogfooding the drawer: a music model led the "most capable"
+  // list. It is marked mode "chat" and priced at zero, and the zero was
+  // read as "unknown", which sorted it to the top of a descending sort.
+  it("never offers a model that answers with something other than text", () => {
+    for (const tier of MODEL_TIERS) {
+      const ids = suggestTierTargets({ tier, limit: 50 }).map((s) => s.modelId);
+      expect(ids).not.toContain("gemini/lyria-3-pro-preview");
+      expect(ids).not.toContain("gemini/lyria-3-clip-preview");
+    }
+  });
+
+  it("never offers a model the catalog cannot price", () => {
+    // A router priced -1 means "depends", not "free". Ranking on price
+    // cannot place it, and the two tiers sort in opposite directions, so
+    // any stand-in is wrong in one of them.
+    for (const tier of MODEL_TIERS) {
+      const ids = suggestTierTargets({ tier, limit: 50 }).map((s) => s.modelId);
+      expect(ids).not.toContain("openrouter/auto");
+      expect(ids).not.toContain("openrouter/auto-beta");
+    }
+  });
+
+  it("leads the most capable tier with a real flagship", () => {
+    const top = suggestTierTargets({ tier: "complex" })[0]!;
+    expect(top.recommended).toBe(true);
+    expect(["openai", "anthropic", "gemini"]).toContain(top.provider);
+  });
+});
+
 describe("given a policy bound to one provider", () => {
   it("never offers a model that provider cannot serve", () => {
     const suggestions = suggestTierTargets({
