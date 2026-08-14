@@ -69,7 +69,7 @@ Forces and constraints (locked 2026-08-14):
 
 | Name | Value | Purpose |
 |---|---|---|
-| SAML sub prefix | `"samlp\|"` (7 chars, trailing pipe included) | The only strategy prefix granted the override; trailing pipe prevents matching a hypothetical `samlpx` strategy |
+| SAML sub prefix | `"samlp\|"` (6 chars, trailing pipe included) | The only strategy prefix granted the override; trailing pipe prevents matching a hypothetical `samlpx` strategy |
 
 ## Invariants
 
@@ -85,7 +85,7 @@ Forces and constraints (locked 2026-08-14):
 | Assumption | What breaks if false |
 |---|---|
 | Auth0 SAML subs always start `samlp\|` | Fix silently doesn't fire; user stays locked out — incomplete, not wrong. Verified against Auth0 docs; first real sign-in (debug logs are on) confirms on our tenant |
-| No self-signup path yields a `samlp\|` sub | Account takeover via linking. Holds by construction: SAML connections are operator-created in Auth0 |
+| No tenant-side self-signup path yields a `samlp\|` sub | Account takeover via linking. Holds tenant-side: Auth0 database signups mint `auth0\|` subs, and only operator-created SAML connections mint `samlp\|`. IdP-side self-registration (an open-registration IdP behind a SAML connection) is NOT excluded by construction — that risk is the load-bearing assumption below |
 | Every SAML connection in the tenant maps `email` from an IdP-controlled attribute | **This is the load-bearing assumption (red-team, v2).** `samlp\|` proves *authenticated via SAML*, not *owns this email*. If any SAML connection in the configured Auth0 tenant sources email from a user-editable attribute or an open-registration IdP, an attacker can assert a victim's email and link into their existing account — the exact link today's code refuses. The domain guard does not stop it: existing users are soft-flagged, only first-time signups hard-block (`hooks.ts`). Holds when the operator creates connections deliberately against trusted corporate IdPs — the same trust class as the tenant's client secret |
 | `mapProfileToUser` return overrides the claim | Fix is a no-op. Verified by reading BetterAuth 1.6.23 source (`routes.mjs:~209`) — pinned-version fact, re-check on BetterAuth upgrades |
 
