@@ -275,6 +275,34 @@ describe("given a Bedrock span whose messages sit under canonical gen_ai keys", 
     });
   });
 
+  describe("when a Converse toolResult json block carries a null value", () => {
+    /** @scenario Converse toolResult json:null block is preserved, not dropped */
+    it("extracts the literal null rather than dropping the block", () => {
+      const { input } = computeTraceIO(
+        makeSpan({
+          spanAttributes: {
+            "gen_ai.system": "aws.bedrock",
+            "gen_ai.prompt": JSON.stringify([
+              {
+                role: "user",
+                content: [
+                  {
+                    toolResult: {
+                      toolUseId: "tool-1",
+                      content: [{ json: null }],
+                    },
+                  },
+                ],
+              },
+            ]),
+          },
+        }),
+      );
+
+      expect(input).toBe("null");
+    });
+  });
+
   describe("when a Converse toolResult block has empty content", () => {
     /** @scenario Converse toolResult block with empty content contributes nothing */
     it("contributes no text and falls back to the span name", () => {

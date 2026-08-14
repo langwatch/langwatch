@@ -6,8 +6,8 @@ import {
   isMessageLike,
   isRecord,
   isUnknownArray,
-  safeStringify,
   type MessageLike,
+  safeStringify,
 } from "./_guards";
 import { isReplyTextPart } from "./_parts";
 
@@ -101,7 +101,7 @@ const extractTextsFromParts = (parts: unknown[]): string[] => {
         // order survives.
         const inner: string[] = [];
         for (const block of p.toolResult.content) {
-          if (isRecord(block) && block.json != null) {
+          if (isRecord(block) && "json" in block) {
             const s = safeStringify(block.json);
             if (s !== null) inner.push(s);
           } else {
