@@ -15,5 +15,5 @@
 -- AlterTable
 ALTER TABLE "GithubPullRequest" ADD COLUMN "prUpdatedAt" TIMESTAMP(3);
 
--- Down (manual): reverses this migration; run only to roll back.
+-- To roll back, uncomment and run manually.
 --   ALTER TABLE "GithubPullRequest" DROP COLUMN "prUpdatedAt";

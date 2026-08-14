@@ -105,8 +105,8 @@ describe("pull request announcements", () => {
     });
   });
 
-  describe("when the announcement carries no update time", () => {
-    it("does not parse, because it cannot be ordered against another delivery", () => {
+  describe("when the announcement carries no usable update time", () => {
+    it("does not parse without one, because it cannot be ordered against another delivery", () => {
       const { updated_at: _dropped, ...rest } = delivery().pull_request as {
         updated_at: string;
       } & Record<string, unknown>;
@@ -114,6 +114,27 @@ describe("pull request announcements", () => {
       expect(
         parseGithubPullRequestEvent(delivery({ pull_request: rest })),
       ).toBeNull();
+    });
+
+    it("does not parse one that is not an instant, rather than storing an invalid date", () => {
+      const malformed = delivery({
+        pull_request: { ...delivery().pull_request, updated_at: "yesterday" },
+      });
+
+      expect(parseGithubPullRequestEvent(malformed)).toBeNull();
+    });
+
+    it("parses an update time carrying a zone offset", () => {
+      const offset = delivery({
+        pull_request: {
+          ...delivery().pull_request,
+          updated_at: "2026-08-01T13:00:00+02:00",
+        },
+      });
+
+      expect(parsed(offset).pullRequest.updatedAt).toBe(
+        "2026-08-01T13:00:00+02:00",
+      );
     });
   });
 

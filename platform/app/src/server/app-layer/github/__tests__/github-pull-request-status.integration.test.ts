@@ -284,12 +284,15 @@ describe("live pull-request status", () => {
         });
 
       await refreshWith({
+        title: "The title it carries now",
         state: "closed",
         prClosedAt: mergedAt,
         prMergedAt: mergedAt,
         prUpdatedAt: mergedAt,
       });
-      await refreshWith({});
+      // The older refresh names a different title, so a write that landed
+      // would be visible on every column it touches, not only the state.
+      await refreshWith({ title: "The title it had an hour ago" });
 
       const stored = await repository.findByNumber({
         organizationId,
@@ -297,6 +300,8 @@ describe("live pull-request status", () => {
       });
       expect(stored?.state).toBe("closed");
       expect(stored?.prMergedAt).not.toBeNull();
+      expect(stored?.prClosedAt).not.toBeNull();
+      expect(stored?.title).toBe("The title it carries now");
     });
   });
 });

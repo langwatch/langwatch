@@ -39,7 +39,19 @@ These are the only repository permissions the app requests:
 | Pull requests | Read and write |
 | Metadata | Read |
 
-The app subscribes to the `pull_request` event, plus the installation lifecycle that GitHub sends automatically (`installation`, `installation_repositories`). The `pull_request` event carries the pull request number, title, state and head branch, which is what links a pull request to the coding-agent sessions that worked on it. It carries no file content and no diff.
+The app subscribes to the `pull_request` event, plus the installation lifecycle that GitHub sends automatically (`installation`, `installation_repositories`). The event is what links a pull request to the coding-agent sessions that worked on it.
+
+These are the fields the platform keeps from it:
+
+| Field | Kept as |
+|---|---|
+| Number, title, web URL | The row the Pull Requests page shows |
+| State, draft flag | The status the page draws |
+| Head branch | The key that matches sessions to the pull request |
+| Author login | The GitHub account that opened it, shown as the contributor |
+| Created, updated, closed and merged times | The pull request's lifetime, which decides the sessions counted under it |
+
+The event carries no file content and no diff.
 
 <Note>
 `Contents: Read and write` is what lets Langy clone a repository, create a branch, and push commits to that branch. It does not let Langy merge; merging a pull request is a separate action that a human takes in GitHub after review.

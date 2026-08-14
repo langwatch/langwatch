@@ -70,12 +70,15 @@ const githubPullRequestEventSchema = z.object({
     closed_at: z.string().nullish(),
     created_at: z.string(),
     /**
-     * Required, because it is what orders one delivery against another. GitHub
-     * sends it on every `pull_request` event and permits deliveries to arrive
-     * out of order, so a delivery without it cannot be placed in the sequence
-     * and must not be allowed to overwrite a newer stored snapshot.
+     * Required, and validated as an instant rather than as any string,
+     * because it is what orders one delivery against another. GitHub sends it
+     * on every `pull_request` event and permits deliveries to arrive out of
+     * order, so a delivery without a usable one cannot be placed in the
+     * sequence and must not be allowed to overwrite a newer stored snapshot.
+     * A value `new Date` cannot read would reach the store as an Invalid Date
+     * and fail the write there, which is a worse place to find out.
      */
-    updated_at: z.string(),
+    updated_at: z.string().datetime({ offset: true }),
     user: z.object({ login: z.string().optional() }).nullish(),
     head: z.object({
       ref: z.string().min(1),
