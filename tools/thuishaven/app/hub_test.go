@@ -27,6 +27,7 @@ type fakeStore struct {
 	hasWrittenPressure bool
 	heavyRuns          int
 	observed           map[string]time.Duration
+	reapEvents         []domain.ReapEvent
 }
 
 func (f *fakeStore) SaveStack(domain.Stack) error { return nil }
@@ -108,6 +109,11 @@ func (f *fakeStore) ObserveDuration(key string, took time.Duration) {
 	}
 	f.observed[key] = took
 }
+func (f *fakeStore) AppendReapEvent(ev domain.ReapEvent) error {
+	f.reapEvents = domain.AppendReapEvent(f.reapEvents, ev)
+	return nil
+}
+func (f *fakeStore) ReapEvents() []domain.ReapEvent { return f.reapEvents }
 
 // fakeClaudeSettings records what `haven setup` asked to install.
 type fakeClaudeSettings struct {
@@ -137,10 +143,12 @@ type fakeSystem struct {
 	orphanMarker string
 	procSamples  []ProcessSample
 	killed       []int
+	totalMemory  uint64
+	portsInUse   map[int]bool
 }
 
 func (f *fakeSystem) FreePorts(n int) ([]int, error) { return make([]int, n), nil }
-func (f *fakeSystem) PortInUse(int) bool             { return false }
+func (f *fakeSystem) PortInUse(port int) bool        { return f.portsInUse[port] }
 func (f *fakeSystem) ProcessAlive(pid int) bool      { return f.alive[pid] }
 func (f *fakeSystem) Terminate(pid int) {
 	f.terminated = append(f.terminated, pid)
@@ -161,7 +169,7 @@ func (f *fakeSystem) PIDsOnPort(port int) []int                    { return f.pi
 func (f *fakeSystem) SpawnDetached([]string, string, string) error { return nil }
 func (f *fakeSystem) Now() time.Time                               { return f.now }
 func (f *fakeSystem) Getpid() int                                  { return 1 }
-func (f *fakeSystem) TotalMemory() uint64                          { return 0 }
+func (f *fakeSystem) TotalMemory() uint64                          { return f.totalMemory }
 func (f *fakeSystem) GroupRSS(int) uint64                          { return 0 }
 func (f *fakeSystem) MemStat() domain.MemStat                      { return f.memStat }
 func (f *fakeSystem) DemoteGroup(pid int)                          { f.demoted = append(f.demoted, pid) }
@@ -456,5 +464,83 @@ func TestDestroyWorktree(t *testing.T) {
 				t.Errorf("must not drop another worktree's database, got %v", pg.dropped)
 			}
 		})
+	})
+}
+
+// --- HubView ------------------------------------------------------------------
+
+// @scenario "Worktrees without a running stack are listed too"
+func TestHubViewAssemblesTheWholeMachine(t *testing.T) {
+	const primary = "/repos/langwatch"
+	const stackDir = "/repos/worktrees/alpha"
+	const idleDir = "/repos/worktrees/beta"
+
+	store := &fakeStore{stacks: []domain.Stack{{
+		Slug: "alpha", WorktreeDir: stackDir, LauncherPID: 100,
+		Services: []domain.Service{{Name: "app", Port: 5560, URL: "https://app.alpha.langwatch.localhost"}},
+	}}}
+	store.reapEvents = []domain.ReapEvent{
+		{Kind: "stack", Target: "old", Reason: "launcher died"},
+		{Kind: "testcontainer", Target: "tc-ryuk", Reason: "leaked"},
+	}
+	sys := &fakeSystem{
+		alive:       map[int]bool{100: true},
+		totalMemory: 16 << 30,
+		portsInUse:  map[int]bool{5560: true},
+		procSamples: []ProcessSample{
+			{PID: 100, PGID: 100, RSSBytes: 1 << 30, Command: "node scripts/dev.mjs"},
+			{PID: 101, PGID: 100, RSSBytes: 2 << 30, Command: "node vite dev"},
+			{PID: 200, PGID: 200, RSSBytes: 1 << 30, Command: "redis-server *:6379"},
+			{PID: 300, PGID: 300, RSSBytes: 3 << 30, Command: "claude --continue"},
+		},
+	}
+	hyg := &fakeHygiene{worktrees: []Worktree{
+		{Dir: primary, Branch: "main"},
+		{Dir: stackDir, Branch: "feat/alpha"},
+		{Dir: idleDir, Branch: "feat/beta"},
+	}}
+	o := hubOrchestrator(store, sys, &fakeProxy{}, &fakeDBServer{}, &fakeDBServer{}, hyg)
+
+	view := o.HubView(primary, idleDir)
+
+	t.Run("charges the stack its whole process group and probes its services", func(t *testing.T) {
+		if len(view.Stacks) != 1 {
+			t.Fatalf("expected 1 stack row, got %d", len(view.Stacks))
+		}
+		row := view.Stacks[0]
+		if row.RSS != 3<<30 {
+			t.Errorf("stack RSS should be its whole group (3GiB), got %d", row.RSS)
+		}
+		if row.PortsUp != 1 || !row.ServiceUp["app"] {
+			t.Errorf("the app service's port probe should be up, got %+v", row)
+		}
+	})
+
+	t.Run("lists only the worktrees with no running stack, protection marked", func(t *testing.T) {
+		if len(view.Worktrees) != 2 {
+			t.Fatalf("expected the primary and the idle worktree, got %+v", view.Worktrees)
+		}
+		if view.Worktrees[0].Dir != primary || !view.Worktrees[0].IsPrimary {
+			t.Errorf("the primary checkout must be listed and marked, got %+v", view.Worktrees[0])
+		}
+		if view.Worktrees[1].Dir != idleDir || !view.Worktrees[1].IsCurrent {
+			t.Errorf("the current worktree must be listed and marked, got %+v", view.Worktrees[1])
+		}
+	})
+
+	t.Run("attributes servers and agents beside the stacks", func(t *testing.T) {
+		f := view.Footprint
+		if f.TotalRAM != 16<<30 {
+			t.Errorf("machine total, got %d", f.TotalRAM)
+		}
+		if f.StacksRSS != 3<<30 || f.ServerRSS["redis"] != 1<<30 || f.AgentRSS != 3<<30 || f.AgentCount != 1 {
+			t.Errorf("footprint misattributed: %+v", f)
+		}
+	})
+
+	t.Run("hands the reap events over newest first", func(t *testing.T) {
+		if len(view.Events) != 2 || view.Events[0].Kind != "testcontainer" {
+			t.Errorf("events must be newest first, got %+v", view.Events)
+		}
 	})
 }

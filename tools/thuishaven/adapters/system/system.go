@@ -335,29 +335,31 @@ const psCommandColumns = 2
 // needs (ADR-095). A row whose numbers do not parse is dropped: the governor
 // makes kill decisions from these samples, so it never guesses.
 func (System) ProcessSamples() []app.ProcessSample {
-	out, err := probe("ps", "-ax", "-o", "pid=,rss=,cputime=,etime=,command=")
+	out, err := probe("ps", "-ax", "-o", "pid=,pgid=,rss=,cputime=,etime=,command=")
 	if err != nil {
 		return nil
 	}
 	var samples []app.ProcessSample
 	for line := range strings.SplitSeq(string(out), "\n") {
 		fields := strings.Fields(line)
-		if len(fields) < 5 {
+		if len(fields) < 6 {
 			continue
 		}
 		pid, pidErr := strconv.Atoi(fields[0])
-		rssKB, rssErr := strconv.ParseInt(fields[1], 10, 64)
-		cpu, cpuOK := domain.ParsePSDuration(fields[2])
-		elapsed, elapsedOK := domain.ParsePSDuration(fields[3])
-		if pidErr != nil || rssErr != nil || !cpuOK || !elapsedOK {
+		pgid, pgidErr := strconv.Atoi(fields[1])
+		rssKB, rssErr := strconv.ParseInt(fields[2], 10, 64)
+		cpu, cpuOK := domain.ParsePSDuration(fields[3])
+		elapsed, elapsedOK := domain.ParsePSDuration(fields[4])
+		if pidErr != nil || pgidErr != nil || rssErr != nil || !cpuOK || !elapsedOK {
 			continue
 		}
 		samples = append(samples, app.ProcessSample{
 			PID:      pid,
+			PGID:     pgid,
 			RSSBytes: rssKB << 10,
 			CPUTime:  cpu,
 			Elapsed:  elapsed,
-			Command:  strings.Join(fields[4:], " "),
+			Command:  strings.Join(fields[5:], " "),
 		})
 	}
 	return samples

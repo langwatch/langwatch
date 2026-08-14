@@ -6,12 +6,13 @@ Feature: The haven hub — one place to see and act on every stack
   view, shut it down, or destroy the worktree entirely.
 
   # Behavior lives in tools/thuishaven: `cmd/hub.go` + `app/hub.go`
-  # (DownStack, DestroyWorktree and their guards) and `adapters/hubtui/`
-  # (the TUI itself). Scenarios are bound by Go tests (`go test ./...` in
-  # tools/thuishaven): `adapters/hubtui/hubtui_test.go` (TestHubModel:
-  # enter/g opens git, d+confirm downs, x+type-the-name destroys) and
-  # `app/hub_test.go` (TestDownStack, TestDestroyWorktree with the
-  # primary-checkout and running-from refusals). The parity checker
+  # (DownStack, DestroyWorktree and their guards), `domain/footprint.go`
+  # (the memory partitioner) and `adapters/hubtui/` (the TUI itself).
+  # Scenarios are bound by Go tests (`go test ./...` in tools/thuishaven):
+  # `adapters/hubtui/hubtui_test.go` (TestHubModel: enter/g opens git,
+  # d+confirm downs, x+type-the-name destroys) and `app/hub_test.go`
+  # (TestDownStack, TestDestroyWorktree with the primary-checkout and
+  # running-from refusals). The parity checker
   # (`platform/app/scripts/check-feature-parity.ts`) scans tools/thuishaven's
   # Go tests: @unit scenarios are bound by `// @scenario` annotations above
   # those test funcs; the live-terminal flows remain `@unimplemented`.
@@ -76,3 +77,61 @@ Feature: The haven hub — one place to see and act on every stack
     Given the selected entry is the worktree I launched haven from
     When I try to destroy it
     Then the hub refuses and explains why
+
+  # --- The whole machine, not just the launchers ---
+  # The old footprint was each stack's launcher process group and nothing
+  # else, so the summary undercounted everything a dev machine actually
+  # spends: the shared database servers, the container VM, the coding agents
+  # and the dev tooling running beside the stacks. The partitioner reads ONE
+  # process listing and attributes every process exactly once: its group
+  # puts it in a stack, otherwise its command names a shared server, an
+  # agent, or dev tooling.
+
+  @unit
+  Scenario: The hub shows the machine's whole memory picture
+    Given stacks, shared database servers, coding agents and dev tooling are all running
+    When the hub computes the footprint
+    Then each stack is charged its whole process group
+    And the shared servers, agents and tooling are attributed by what they are
+    And no process is ever counted in two buckets
+
+  @unit
+  Scenario: A stack's own processes are never misfiled as tooling
+    Given a stack whose supervised services include node processes
+    When the hub computes the footprint
+    Then those processes count toward the stack, not toward tooling
+
+  # --- Every worktree, not just the running ones ---
+  @unit
+  Scenario: Worktrees without a running stack are listed too
+    Given a worktree with no registered stack
+    When the hub assembles its rows
+    Then the worktree appears with its branch, marked as having nothing running
+    And the primary checkout and the current worktree are marked protected
+
+  # --- Actions: cleanup, the web view, and the reaping monitor ---
+  @unit
+  Scenario: Cleanup is one key away
+    Given the hub is open in a terminal
+    When I press "c"
+    Then the hub hands the terminal to the interactive cleanup picker
+    And closing the picker returns me to the hub
+
+  @unit
+  Scenario: The machine dashboard is one key away
+    Given the hub is open in a terminal
+    When I press "w"
+    Then the machine's web dashboard opens in the browser
+
+  @unit
+  Scenario: The daemon's reaping is visible from the hub
+    Given the daemon has reaped stacks, containers or processes recently
+    When I press "m"
+    Then the hub shows the most recent reap events, newest first, with what was reaped and why
+
+  @unit
+  Scenario: Reaping is recorded as it happens
+    Given the daemon reaps a stack, a test container, or a governed process
+    When the reap happens
+    Then an event with the kind, target and reason is appended to the record
+    And the record keeps only the most recent events, dropping the oldest past its cap

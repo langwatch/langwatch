@@ -162,6 +162,11 @@ func (o *Orchestrator) monitorLoop(ctx context.Context) {
 					o.proxy.Remove(svc.Name, s.Slug)
 				}
 				o.store.RemoveStack(s.Slug)
+				reason := "launcher died"
+				if stale && !dead {
+					reason = "heartbeat stale past the idle TTL"
+				}
+				o.recordReap("stack", s.Slug, reason)
 				o.log.Info("reaped stack", zap.String("slug", s.Slug), zap.Bool("dead", dead), zap.Bool("stale", stale))
 			}
 			o.governPressure()
@@ -307,7 +312,17 @@ func (o *Orchestrator) sweepOrphanedWorkers() {
 		o.sys.KillGroup(pid)
 	}
 	if len(orphans) > 0 {
+		o.recordReap("orphans", fmt.Sprintf("%d test worker(s)", len(orphans)), "parented to PID 1 by an interrupted run")
 		o.log.Info("reclaimed orphaned test workers", zap.Int("count", len(orphans)))
+	}
+}
+
+// recordReap appends one reclamation to the store's bounded record — the hub's
+// "what has the reaper been doing" feed. Losing an event never stops a reap.
+func (o *Orchestrator) recordReap(kind, target, reason string) {
+	ev := domain.ReapEvent{At: o.sys.Now(), Kind: kind, Target: target, Reason: reason}
+	if err := o.store.AppendReapEvent(ev); err != nil {
+		o.log.Warn("could not record reap event", zap.String("kind", kind), zap.Error(err))
 	}
 }
 
@@ -387,6 +402,7 @@ func (o *Orchestrator) pruneIdleDatabases(ctx context.Context) {
 		}
 		o.store.RemoveDBActivity(slug)
 		if existsSomewhere {
+			o.recordReap("database", db, "worktree idle past the database TTL")
 			o.log.Info("pruned idle databases", zap.String("slug", slug), zap.String("db", db), zap.Duration("idle", now.Sub(lastSeen)))
 		}
 	}
@@ -414,6 +430,9 @@ func (o *Orchestrator) reapTestContainers(ctx context.Context) {
 		return
 	}
 	if len(names) > 0 {
+		for _, name := range names {
+			o.recordReap("testcontainer", name, "left behind by an interrupted test run")
+		}
 		o.log.Info("reaped leaked test containers", zap.Strings("containers", names))
 	}
 }
@@ -427,6 +446,7 @@ func (o *Orchestrator) reapClickHouse() {
 	}
 	if len(o.store.Stacks()) == 0 && o.ch.Running() {
 		o.ch.Stop()
+		o.recordReap("clickhouse", "clickhouse-server", "no stacks running")
 		o.log.Info("stopped idle managed clickhouse-server (no stacks running)")
 	}
 }

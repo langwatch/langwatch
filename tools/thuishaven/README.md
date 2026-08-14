@@ -56,8 +56,9 @@ One name per command, one meaning per flag, no aliases (ADR-064). The daily
 surface is six verbs; `db` and `clean` are the only destructive nouns.
 
 ```text
-haven            the hub: every stack + actions on the selected one (agents/pipes
-                 get the plain status report)
+haven            the hub: the whole machine — stacks, worktrees, RAM by owner,
+                 the daemon's reaping — with actions on the selected row
+                 (agents/pipes get the plain status report)
 haven up         start or reconcile this worktree's stack — in a terminal it
                  runs in the BACKGROUND under an attached log view: ←/→/tab/digits
                  switch between "all" and per-service logs, q detaches (the stack
@@ -133,13 +134,23 @@ size-capped files whether the stack runs attached or detached — so `haven
 logs` works from any terminal, filters by plain argument, and still reads
 after a crash or a `down`.
 
-**The hub.** Bare `haven` opens the interactive fleet view:
-every stack with its liveness, branch, service health, and RAM footprint.
-Actions run on the selected stack — enter/`g` opens its git view (and returns
-to the hub on quit), `d` shuts it down keeping its databases, and `x` destroys
-the worktree entirely: stack stopped, ClickHouse + Postgres databases dropped,
-directory deleted, confirmed by typing the stack's name. The primary checkout
-and the worktree haven runs from can never be destroyed.
+**The hub.** Bare `haven` opens the interactive machine view. The header is
+the machine's real memory picture from one process listing, every process
+attributed once: each stack charged its whole process group, plus the shared
+servers (ClickHouse, Postgres, Redis, the container VM), the coding agents and
+the dev tooling running beside them — with the daemon's pressure level when it
+is not green. Below it, every stack (liveness, branch, service health, RAM)
+and every worktree, including the ones with nothing running. Actions run on
+the selected row — enter/`g` opens its git view (and returns to the hub on
+quit), `o` opens the stack's app, `r` restarts it, `d` shuts it down keeping
+its databases, and `x` destroys the worktree entirely: stack stopped,
+ClickHouse + Postgres databases dropped, directory deleted, confirmed by
+typing the name. The primary checkout and the worktree haven runs from can
+never be destroyed. One-key handoffs: `c` opens the interactive cleanup picker
+and returns, `w` opens the machine's web dashboard, and `m` toggles the
+monitor panel — the shared servers' footprints plus the daemon's recent
+reaping (stacks, test containers, governed processes, idle databases), newest
+first, from the persisted event record.
 
 **Seeding.** `haven db seed` reseeds in place — an idempotent upsert that can
 only add or refresh, never discard — and `haven db reset` is the destructive
