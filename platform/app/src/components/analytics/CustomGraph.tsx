@@ -571,7 +571,7 @@ const CustomGraph_ = React.memo(
         input.series.map(
           (series) =>
             resolveSeriesValueFormat({
-              asPercent: series.asPercent,
+              isPercent: series.asPercent,
               aggregation: series.aggregation,
               metricFormat: getMetric(series.metric)?.format,
             }) ?? "0a",
@@ -613,7 +613,7 @@ const CustomGraph_ = React.memo(
       );
       const metric = series?.metric && getMetric(series.metric);
       const effectiveFormat = resolveSeriesValueFormat({
-        asPercent: series?.asPercent,
+        isPercent: series?.asPercent,
         aggregation: series?.aggregation,
         metricFormat: metric?.format,
       });
@@ -1364,7 +1364,7 @@ const shapeDataForSummary = (
               ...metric,
               format:
                 resolveSeriesValueFormat({
-                  asPercent: series?.asPercent,
+                  isPercent: series?.asPercent,
                   aggregation: series?.aggregation,
                   metricFormat: metric.format,
                 }) ?? metric.format,

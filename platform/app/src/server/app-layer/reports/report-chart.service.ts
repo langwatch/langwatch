@@ -56,9 +56,9 @@ const logger = createLogger("langwatch:report-chart");
 export class TerminalReportPanelError extends Error {
   constructor(
     message: string,
-    /** The graph(s) this failure applies to, comma-joined when it covers
-     *  every panel in the report rather than one. */
-    public readonly graphId: string,
+    /** The graph(s) this failure applies to — one for a single panel, every
+     *  panel's id when the whole report failed. */
+    public readonly graphIds: readonly string[],
   ) {
     super(message);
     this.name = "TerminalReportPanelError";
@@ -110,7 +110,7 @@ function parseGraphConfig(graph: CustomGraph): CustomGraphInput {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
     throw new TerminalReportPanelError(
       `Graph "${graph.id}" has no usable stored configuration`,
-      graph.id,
+      [graph.id],
     );
   }
   return raw as unknown as CustomGraphInput;
@@ -243,7 +243,7 @@ export async function loadReportCharts({
   if (graphs.length > 0 && delivered.length === 0) {
     throw new TerminalReportPanelError(
       "Every panel in this report failed to evaluate",
-      graphs.map((graph) => graph.id).join(","),
+      graphs.map((graph) => graph.id),
     );
   }
 

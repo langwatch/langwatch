@@ -393,7 +393,7 @@ describe("dispatchScheduledReport", () => {
 
     // B5.1 regression: the dashboard branch used to drop `source.dashboardId`
     // entirely and link to the generic, dashboard-less `/analytics` route.
-    /** @scenario "The report email links to its own dashboard" */
+    /** @scenario "The delivered report links to its own dashboard" */
     it("links to its own dashboard, not the generic analytics page", async () => {
       const { deps, sendSlack } = makeDeps(
         makeReportTrigger({

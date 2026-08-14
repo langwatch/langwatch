@@ -6,7 +6,7 @@
  *
  * A `cardinality` aggregation always overrides the metric's own format: it
  * counts distinct things, so the metric's usual unit (ms, USD, …) is wrong
- * for it regardless of what is being counted. `asPercent` overrides both —
+ * for it regardless of what is being counted. `isPercent` (the series' stored `asPercent`) overrides both —
  * a percentage series is never displayed in the metric's native unit, it is
  * always a share of a whole, formatted 0-100 with a trailing `%` the way
  * `numeral`'s `%` token already renders a 0-1 fraction (matches the existing
@@ -14,15 +14,15 @@
  * `server/analytics/registry.ts`).
  */
 export function resolveSeriesValueFormat({
-  asPercent,
+  isPercent,
   aggregation,
   metricFormat,
 }: {
-  asPercent?: boolean;
+  isPercent?: boolean;
   aggregation?: string;
   metricFormat?: string | ((value: number) => string);
 }): string | ((value: number) => string) | undefined {
-  if (asPercent) return "0%";
+  if (isPercent) return "0%";
   if (aggregation === "cardinality") return "0a";
   return metricFormat;
 }

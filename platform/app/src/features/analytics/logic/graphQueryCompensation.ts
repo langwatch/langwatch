@@ -23,8 +23,9 @@ const DAY_SCALE_MINUTES = 1440;
  *
  * Summary charts are forced to "full" — a summary aggregates the whole
  * window into one figure, and a numeric bucket size returns no rows for it.
- * Pie and donut charts keep their numeric `timeScale` (they get grouped data
- * via `withGroupedPipeline` instead).
+ * Pie and donut charts are not forced to "full" — they keep a numeric
+ * `timeScale` (grouped data comes via `withGroupedPipeline` instead), which
+ * also means the short-window downgrade below applies to them.
  *
  * A short window (`daysDifference` <= 2) additionally downgrades a
  * day-or-coarser bucket to hourly, so a two-day report does not collapse to
@@ -63,22 +64,30 @@ export function resolveGraphTimeScale({
  * Pie and donut charts grouped by a field need a pipeline to populate
  * grouped buckets at all — a numeric `timeScale` with `groupBy` and no
  * pipeline comes back empty. Adds the same default pipeline (`sum` over
- * `trace_id`) the UI injects, only when the graph does not already define
- * one of its own.
+ * `trace_id`) the UI injects to each series that does not already define
+ * one of its own; an author's explicit pipeline is never overwritten.
  */
 export function withGroupedPipeline(input: CustomGraphInput): CustomGraphInput {
-  const needsPipeline =
+  const isGroupedRound =
     (input.graphType === "pie" || input.graphType === "donnut") &&
-    !!input.groupBy &&
-    !input.series.some((series) => series.pipeline);
+    !!input.groupBy;
 
-  if (!needsPipeline) return input;
+  if (!isGroupedRound || input.series.every((series) => series.pipeline)) {
+    return input;
+  }
 
   return {
     ...input,
-    series: input.series.map((series) => ({
-      ...series,
-      pipeline: { field: "trace_id" as const, aggregation: "sum" as const },
-    })),
+    series: input.series.map((series) =>
+      series.pipeline
+        ? series
+        : {
+            ...series,
+            pipeline: {
+              field: "trace_id" as const,
+              aggregation: "sum" as const,
+            },
+          },
+    ),
   };
 }
