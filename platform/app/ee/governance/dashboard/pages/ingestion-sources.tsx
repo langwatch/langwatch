@@ -59,6 +59,14 @@ import { api, type RouterOutputs } from "~/utils/api";
  */
 
 type Source = RouterOutputs["ingestionSources"]["list"][number];
+/** The one-time secret reveal, shown after a create or a rotate. */
+type SecretDetails = {
+  title: string;
+  secret: string;
+  sourceId: string;
+  sourceName: string;
+  sourceType: SourceType;
+};
 type SourceType =
   | "otel_generic"
   | "claude_code"
@@ -249,7 +257,305 @@ function fmtRelative(date: Date | string | null): string {
   return `${days}d ago`;
 }
 
-function IngestionSourcesPage() {
+/**
+ * The pull config the create call should carry, or `null` when the form is not
+ * yet valid. Returning a wrapper rather than the bare config keeps "no pull
+ * config for this source type" (a valid `{ pullConfig: null }`) distinct from
+ * "the form is wrong" (`null`), which a bare return would collapse.
+ */
+function resolvePullConfig(
+  composer: ComposerState,
+): { pullConfig: Record<string, unknown> | null } | null {
+  const pullAdapter = PULL_ADAPTER_FOR_SOURCE[composer.sourceType];
+  // For BYO `http_custom` we send the FULL HttpPollingConfig shape so the
+  // generic adapter can run unmodified. The locked-shape reference pullers
+  // (copilot_studio / openai_compliance / claude_compliance) only need the
+  // adapter id - their validateConfig override returns the frozen config.
+  const builders: Partial<
+    Record<SourceType, [() => unknown | null, string, string]>
+  > = {
+    http_custom: [
+      () => buildHttpCustomPullConfig(composer),
+      "Missing required HTTP source fields",
+      "URL, auth header value, token, events JSONPath, cursor JSONPath, and event mapping are all required.",
+    ],
+    databricks_genie: [
+      () => buildDatabricksGeniePullConfig(composer),
+      "Missing required Databricks fields",
+      "Workspace URL and workspace token are both required.",
+    ],
+    anthropic_admin: [
+      () => buildAnthropicAdminPullConfig(composer),
+      "Missing or invalid Anthropic fields",
+      "Admin API key is required, report must be `usage` or `cost`, bucket width is usage-only and must be 1m/1h/1d, and the backfill start must be a calendar date (2026-08-01) or an instant carrying a timezone (2026-08-01T00:00:00Z).",
+    ],
+  };
+
+  const builder = builders[composer.sourceType];
+  if (builder) {
+    const [build, title, description] = builder;
+    const pullConfig = build();
+    if (!pullConfig) {
+      toaster.create({ title, description, type: "error" });
+      return null;
+    }
+    return { pullConfig: pullConfig as Record<string, unknown> };
+  }
+  return { pullConfig: pullAdapter ? { adapter: pullAdapter } : null };
+}
+
+function IngestionSourcesHeader({
+  isEnterprise,
+  sourceCount,
+  onAdd,
+}: {
+  isEnterprise: boolean;
+  sourceCount: number;
+  onAdd: () => void;
+}) {
+  return (
+    <HStack alignItems="end">
+      <VStack align="start" gap={0}>
+        <HStack gap={2}>
+          <Heading size="md">Ingestion Sources</Heading>
+          <Badge colorPalette="purple" size="sm" variant="surface">
+            Preview
+          </Badge>
+        </HStack>
+        <Text color="fg.muted" fontSize="sm" maxW="3xl">
+          Configure cross-platform feeds for the activity monitor. Each source
+          maps an external AI platform into the normalised activity stream via
+          OTel push, webhook, or S3 audit drops.{" "}
+          <Link href="/governance" color="blue.600">
+            Back to governance
+          </Link>
+          .
+        </Text>
+      </VStack>
+      <Spacer />
+      <VStack align="end" gap={1}>
+        <Button
+          size="sm"
+          colorPalette="blue"
+          disabled={
+            !isEnterprise && sourceCount >= NON_ENTERPRISE_INGESTION_SOURCE_CAP
+          }
+          onClick={onAdd}
+        >
+          <Plus size={14} /> Add source
+        </Button>
+        {!isEnterprise && (
+          <Text fontSize="xs" color="fg.muted">
+            {sourceCount} / {NON_ENTERPRISE_INGESTION_SOURCE_CAP} sources used.
+            Upgrade to Enterprise for unlimited.
+          </Text>
+        )}
+      </VStack>
+    </HStack>
+  );
+}
+
+/**
+ * The id a per-row mutation is currently working on, so a row can show its own
+ * spinner without every row spinning. Null while idle.
+ */
+function pendingId(mutation: {
+  isPending: boolean;
+  variables?: { id: string } | undefined;
+}): string | null {
+  return mutation.isPending ? (mutation.variables?.id ?? null) : null;
+}
+
+const MODE_COPY: Record<"push" | "pull" | "s3", [string, string]> = {
+  push: [
+    "Push (OTLP / webhooks)",
+    "Upstream pushes events to LangWatch in near-real-time.",
+  ],
+  pull: [
+    "Pull (admin API polling)",
+    "LangWatch polls upstream's admin API on a cadence.",
+  ],
+  s3: ["S3 audit drops", "LangWatch reads JSONL drops from an S3 bucket."],
+};
+
+function SourceModeSection({
+  mode,
+  sources,
+  knowsFleetIsEmpty,
+  rotatingId,
+  archivingId,
+  onEdit,
+  onRotate,
+  onArchive,
+}: {
+  mode: "push" | "pull" | "s3";
+  sources: Source[];
+  knowsFleetIsEmpty: boolean;
+  rotatingId: string | null;
+  archivingId: string | null;
+  onEdit: (id: string) => void;
+  onRotate: (id: string) => void;
+  onArchive: (id: string) => void;
+}) {
+  const [title, blurb] = MODE_COPY[mode];
+  return (
+    <Box
+      borderWidth="1px"
+      borderColor="border.muted"
+      borderRadius="md"
+      padding={4}
+    >
+      <HStack alignItems="start" marginBottom={3}>
+        <VStack align="start" gap={0}>
+          <Text fontSize="sm" fontWeight="semibold">
+            {title}
+          </Text>
+          <Text fontSize="xs" color="fg.muted">
+            {blurb}
+          </Text>
+        </VStack>
+        <Spacer />
+      </HStack>
+      <VStack align="stretch" gap={2}>
+        {sources.length === 0 && knowsFleetIsEmpty && (
+          <Text fontSize="sm" color="fg.muted">
+            No {mode}-mode sources configured.
+          </Text>
+        )}
+        {sources.map((source) => (
+          <SourceRow
+            key={source.id}
+            source={source}
+            isPendingRotate={rotatingId === source.id}
+            isPendingArchive={archivingId === source.id}
+            onEdit={() => onEdit(source.id)}
+            onRotate={() => onRotate(source.id)}
+            onArchive={() => onArchive(source.id)}
+          />
+        ))}
+      </VStack>
+    </Box>
+  );
+}
+
+/**
+ * The create payload for the composer, or `null` when the form is not ready —
+ * either unnamed, or carrying a pull config the adapter cannot honour (which
+ * `resolvePullConfig` has already toasted about).
+ */
+function buildCreateInput(composer: ComposerState, organizationId: string) {
+  if (!composer.name.trim()) return null;
+  const resolved = resolvePullConfig(composer);
+  if (!resolved) return null;
+  const pullAdapter = PULL_ADAPTER_FOR_SOURCE[composer.sourceType];
+  return {
+    organizationId,
+    sourceType: composer.sourceType,
+    name: composer.name.trim(),
+    description: composer.description.trim() || null,
+    parserConfig: buildParserConfig(composer),
+    pullConfig: resolved.pullConfig,
+    pullSchedule: pullAdapter
+      ? composer.pullSchedule.trim() ||
+        PULL_SCHEDULE_DEFAULTS[pullAdapter] ||
+        null
+      : null,
+  };
+}
+
+/** Sources split into the three sections the page renders. */
+function useGroupedSources(sources: Source[] | undefined) {
+  return useMemo(() => {
+    const out: Record<"push" | "pull" | "s3", Source[]> = {
+      push: [],
+      pull: [],
+      s3: [],
+    };
+    for (const s of sources ?? []) {
+      const meta = SOURCE_TYPE_OPTIONS.find((o) => o.value === s.sourceType);
+      out[meta?.mode ?? "push"].push(s);
+    }
+    return out;
+  }, [sources]);
+}
+
+/** The four mutations the page drives, with their toasts and cache busting. */
+function useIngestionSourceMutations({
+  refetch,
+  setComposing,
+  setComposer,
+  setEditingSourceId,
+  setSecretModal,
+}: {
+  refetch: () => unknown;
+  setComposing: (open: boolean) => void;
+  setComposer: (next: ComposerState) => void;
+  setEditingSourceId: (id: string | null) => void;
+  setSecretModal: (details: SecretDetails | null) => void;
+}) {
+  const create = api.ingestionSources.create.useMutation({
+    onSuccess: (data) => {
+      void refetch();
+      setComposing(false);
+      setComposer(blankComposer());
+      setSecretModal({
+        title: "Source created - paste this secret upstream",
+        secret: data.ingestSecret,
+        sourceId: data.source.id,
+        sourceName: data.source.name,
+        sourceType: data.source.sourceType as SourceType,
+      });
+    },
+    onError: (e) =>
+      showErrorToast({ error: e, fallbackTitle: "Couldn't create the source" }),
+  });
+
+  const rotate = api.ingestionSources.rotateSecret.useMutation({
+    onSuccess: (data) => {
+      void refetch();
+      setSecretModal({
+        title: "New secret minted - old one valid for 24h",
+        secret: data.ingestSecret,
+        sourceId: data.source.id,
+        sourceName: data.source.name,
+        sourceType: data.source.sourceType as SourceType,
+      });
+    },
+    onError: (e) =>
+      showErrorToast({ error: e, fallbackTitle: "Couldn't rotate the secret" }),
+  });
+
+  const update = api.ingestionSources.update.useMutation({
+    onSuccess: () => {
+      void refetch();
+      setEditingSourceId(null);
+      toaster.create({ title: "Source updated", type: "success" });
+    },
+    onError: (e) =>
+      showErrorToast({ error: e, fallbackTitle: "Couldn't update the source" }),
+  });
+
+  const archive = api.ingestionSources.archive.useMutation({
+    onSuccess: () => {
+      void refetch();
+      toaster.create({ title: "Source archived", type: "success" });
+    },
+    onError: (e) =>
+      showErrorToast({
+        error: e,
+        fallbackTitle: "Couldn't archive the source",
+      }),
+  });
+
+  return { create, rotate, update, archive };
+}
+
+/**
+ * Everything the page needs: the org it is scoped to, the source list, the
+ * composer/edit/secret state and the mutations that drive them. State and
+ * callbacks only — the component owns the markup.
+ */
+function useIngestionSourcesPage() {
   const { organization } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
@@ -267,196 +573,78 @@ function IngestionSourcesPage() {
   const [composing, setComposing] = useState(false);
   const [composer, setComposer] = useState<ComposerState>(blankComposer());
   const [editingSourceId, setEditingSourceId] = useState<string | null>(null);
-  const [secretModal, setSecretModal] = useState<{
-    title: string;
-    secret: string;
-    sourceId: string;
-    sourceName: string;
-    sourceType: SourceType;
-  } | null>(null);
+  const [secretModal, setSecretModal] = useState<SecretDetails | null>(null);
 
-  const createMutation = api.ingestionSources.create.useMutation({
-    onSuccess: (data) => {
-      void refetch();
-      setComposing(false);
-      setComposer(blankComposer());
-      setSecretModal({
-        title: "Source created - paste this secret upstream",
-        secret: data.ingestSecret,
-        sourceId: data.source.id,
-        sourceName: data.source.name,
-        sourceType: data.source.sourceType as SourceType,
-      });
-    },
-    onError: (e) =>
-      showErrorToast({ error: e, fallbackTitle: "Couldn't create the source" }),
-  });
-
-  const rotateMutation = api.ingestionSources.rotateSecret.useMutation({
-    onSuccess: (data) => {
-      void refetch();
-      setSecretModal({
-        title: "New secret minted - old one valid for 24h",
-        secret: data.ingestSecret,
-        sourceId: data.source.id,
-        sourceName: data.source.name,
-        sourceType: data.source.sourceType as SourceType,
-      });
-    },
-    onError: (e) =>
-      showErrorToast({ error: e, fallbackTitle: "Couldn't rotate the secret" }),
-  });
-
-  const updateMutation = api.ingestionSources.update.useMutation({
-    onSuccess: () => {
-      void refetch();
-      setEditingSourceId(null);
-      toaster.create({ title: "Source updated", type: "success" });
-    },
-    onError: (e) =>
-      showErrorToast({ error: e, fallbackTitle: "Couldn't update the source" }),
-  });
-
-  const archiveMutation = api.ingestionSources.archive.useMutation({
-    onSuccess: () => {
-      void refetch();
-      toaster.create({ title: "Source archived", type: "success" });
-    },
-    onError: (e) =>
-      showErrorToast({
-        error: e,
-        fallbackTitle: "Couldn't archive the source",
-      }),
+  const mutations = useIngestionSourceMutations({
+    refetch,
+    setComposing,
+    setComposer,
+    setEditingSourceId,
+    setSecretModal,
   });
 
   const onSubmit = () => {
-    if (!composer.name.trim()) return;
-    const pullAdapter = PULL_ADAPTER_FOR_SOURCE[composer.sourceType];
-    // For BYO `http_custom` we send the FULL HttpPollingConfig shape so the
-    // generic adapter can run unmodified. The locked-shape reference pullers
-    // (copilot_studio / openai_compliance / claude_compliance) only need the
-    // adapter id - their validateConfig override returns the frozen config.
-    const pullConfig =
-      composer.sourceType === "http_custom"
-        ? buildHttpCustomPullConfig(composer)
-        : composer.sourceType === "databricks_genie"
-          ? buildDatabricksGeniePullConfig(composer)
-          : composer.sourceType === "anthropic_admin"
-            ? buildAnthropicAdminPullConfig(composer)
-            : pullAdapter
-              ? { adapter: pullAdapter }
-              : null;
-    if (composer.sourceType === "http_custom" && !pullConfig) {
-      // buildHttpCustomPullConfig returns null when required fields are
-      // empty - keep the drawer open so the user can fix the form.
-      toaster.create({
-        title: "Missing required HTTP source fields",
-        description:
-          "URL, auth header value, token, events JSONPath, cursor JSONPath, and event mapping are all required.",
-        type: "error",
-      });
-      return;
-    }
-    if (composer.sourceType === "anthropic_admin" && !pullConfig) {
-      toaster.create({
-        title: "Missing or invalid Anthropic fields",
-        description:
-          "Admin API key is required, report must be `usage` or `cost`, bucket width is usage-only and must be 1m/1h/1d, and the backfill start must be a calendar date (2026-08-01) or an instant carrying a timezone (2026-08-01T00:00:00Z).",
-        type: "error",
-      });
-      return;
-    }
-    if (composer.sourceType === "databricks_genie" && !pullConfig) {
-      toaster.create({
-        title: "Missing required Databricks fields",
-        description: "Workspace URL and workspace token are both required.",
-        type: "error",
-      });
-      return;
-    }
-    createMutation.mutate({
-      organizationId: orgId,
-      sourceType: composer.sourceType,
-      name: composer.name.trim(),
-      description: composer.description.trim() || null,
-      parserConfig: buildParserConfig(composer),
-      pullConfig,
-      pullSchedule: pullAdapter
-        ? composer.pullSchedule.trim() ||
-          PULL_SCHEDULE_DEFAULTS[pullAdapter] ||
-          null
-        : null,
-    });
+    const input = buildCreateInput(composer, orgId);
+    // A null input means a required field is missing or malformed;
+    // resolvePullConfig has already said which, and the drawer stays open so
+    // the user can fix it.
+    if (input) mutations.create.mutate(input);
   };
 
-  const grouped = useMemo(() => {
-    const out: Record<"push" | "pull" | "s3", Source[]> = {
-      push: [],
-      pull: [],
-      s3: [],
-    };
-    for (const s of sourcesQuery.data ?? []) {
-      const meta = SOURCE_TYPE_OPTIONS.find((o) => o.value === s.sourceType);
-      const mode = meta?.mode ?? "push";
-      out[mode].push(s);
-    }
-    return out;
-  }, [sourcesQuery.data]);
+  return {
+    orgId,
+    isEnterprise,
+    sourcesQuery,
+    grouped: useGroupedSources(sourcesQuery.data),
+    composing,
+    setComposing,
+    composer,
+    setComposer,
+    editingSourceId,
+    setEditingSourceId,
+    secretModal,
+    setSecretModal,
+    mutations,
+    onSubmit,
+  };
+}
+
+function IngestionSourcesPage() {
+  const {
+    orgId,
+    isEnterprise,
+    sourcesQuery,
+    grouped,
+    composing,
+    setComposing,
+    composer,
+    setComposer,
+    editingSourceId,
+    setEditingSourceId,
+    secretModal,
+    setSecretModal,
+    mutations,
+    onSubmit,
+  } = useIngestionSourcesPage();
 
   return (
     <GovernanceLayout pageTitle="Ingestion Sources · Governance · LangWatch">
       <VStack align="stretch" gap={6} width="full" maxW="container.xl">
-        <HStack alignItems="end">
-          <VStack align="start" gap={0}>
-            <HStack gap={2}>
-              <Heading size="md">Ingestion Sources</Heading>
-              <Badge colorPalette="purple" size="sm" variant="surface">
-                Preview
-              </Badge>
-            </HStack>
-            <Text color="fg.muted" fontSize="sm" maxW="3xl">
-              Configure cross-platform feeds for the activity monitor. Each
-              source maps an external AI platform into the normalised activity
-              stream via OTel push, webhook, or S3 audit drops.{" "}
-              <Link href="/governance" color="blue.600">
-                Back to governance
-              </Link>
-              .
-            </Text>
-          </VStack>
-          <Spacer />
-          <VStack align="end" gap={1}>
-            <Button
-              size="sm"
-              colorPalette="blue"
-              disabled={
-                !isEnterprise &&
-                (sourcesQuery.data?.length ?? 0) >=
-                  NON_ENTERPRISE_INGESTION_SOURCE_CAP
-              }
-              onClick={() => {
-                setComposer(blankComposer());
-                setComposing(true);
-              }}
-            >
-              <Plus size={14} /> Add source
-            </Button>
-            {!isEnterprise && (
-              <Text fontSize="xs" color="fg.muted">
-                {sourcesQuery.data?.length ?? 0} /{" "}
-                {NON_ENTERPRISE_INGESTION_SOURCE_CAP} sources used. Upgrade to
-                Enterprise for unlimited.
-              </Text>
-            )}
-          </VStack>
-        </HStack>
+        <IngestionSourcesHeader
+          isEnterprise={isEnterprise}
+          sourceCount={sourcesQuery.data?.length ?? 0}
+          onAdd={() => {
+            setComposer(blankComposer());
+            setComposing(true);
+          }}
+        />
 
         <SourceComposerDrawer
           isOpen={composing}
           organizationId={orgId}
           composer={composer}
           setComposer={setComposer}
-          isPending={createMutation.isPending}
+          isPending={mutations.create.isPending}
           onSubmit={onSubmit}
           onClose={() => {
             setComposing(false);
@@ -476,70 +664,23 @@ function IngestionSourcesPage() {
         />
 
         {(["push", "pull", "s3"] as const).map((mode) => (
-          <Box
+          <SourceModeSection
             key={mode}
-            borderWidth="1px"
-            borderColor="border.muted"
-            borderRadius="md"
-            padding={4}
-          >
-            <HStack alignItems="start" marginBottom={3}>
-              <VStack align="start" gap={0}>
-                <Text fontSize="sm" fontWeight="semibold">
-                  {mode === "push"
-                    ? "Push (OTLP / webhooks)"
-                    : mode === "pull"
-                      ? "Pull (admin API polling)"
-                      : "S3 audit drops"}
-                </Text>
-                <Text fontSize="xs" color="fg.muted">
-                  {mode === "push"
-                    ? "Upstream pushes events to LangWatch in near-real-time."
-                    : mode === "pull"
-                      ? "LangWatch polls upstream's admin API on a cadence."
-                      : "LangWatch reads JSONL drops from an S3 bucket."}
-                </Text>
-              </VStack>
-              <Spacer />
-            </HStack>
-            <VStack align="stretch" gap={2}>
-              {/* "None configured" is a claim about the fleet, and we can
-                  only make it when we actually know. The alert above says
-                  what went wrong instead. */}
-              {grouped[mode].length === 0 && !sourcesQuery.error && (
-                <Text fontSize="sm" color="fg.muted">
-                  No {mode}-mode sources configured.
-                </Text>
-              )}
-              {grouped[mode].map((source) => (
-                <SourceRow
-                  key={source.id}
-                  source={source}
-                  isPendingRotate={
-                    rotateMutation.isPending &&
-                    rotateMutation.variables?.id === source.id
-                  }
-                  isPendingArchive={
-                    archiveMutation.isPending &&
-                    archiveMutation.variables?.id === source.id
-                  }
-                  onEdit={() => setEditingSourceId(source.id)}
-                  onRotate={() =>
-                    rotateMutation.mutate({
-                      organizationId: orgId,
-                      id: source.id,
-                    })
-                  }
-                  onArchive={() =>
-                    archiveMutation.mutate({
-                      organizationId: orgId,
-                      id: source.id,
-                    })
-                  }
-                />
-              ))}
-            </VStack>
-          </Box>
+            mode={mode}
+            sources={grouped[mode]}
+            // Only claim "none configured" when we actually know: on a load
+            // failure the alert above says what went wrong instead.
+            knowsFleetIsEmpty={!sourcesQuery.error}
+            rotatingId={pendingId(mutations.rotate)}
+            archivingId={pendingId(mutations.archive)}
+            onEdit={setEditingSourceId}
+            onRotate={(id) =>
+              mutations.rotate.mutate({ organizationId: orgId, id })
+            }
+            onArchive={(id) =>
+              mutations.archive.mutate({ organizationId: orgId, id })
+            }
+          />
         ))}
       </VStack>
 
@@ -553,8 +694,8 @@ function IngestionSourcesPage() {
             : null
         }
         onClose={() => setEditingSourceId(null)}
-        onSubmit={(input) => updateMutation.mutate(input)}
-        isPending={updateMutation.isPending}
+        onSubmit={(input) => mutations.update.mutate(input)}
+        isPending={mutations.update.isPending}
       />
     </GovernanceLayout>
   );
@@ -1636,13 +1777,7 @@ function SecretModal({
   details,
   onClose,
 }: {
-  details: {
-    title: string;
-    secret: string;
-    sourceId: string;
-    sourceName: string;
-    sourceType: SourceType;
-  } | null;
+  details: SecretDetails | null;
   onClose: () => void;
 }) {
   const [copied, setCopied] = useState(false);
