@@ -60,7 +60,7 @@ interface Recognizer {
    * value that is exclusively one identifier-shaped token
    * (see {@link isIdentifierShapedValue}).
    */
-  selfProving?: boolean;
+  isSelfProving?: boolean;
 }
 
 function luhnValid(raw: string): boolean {
@@ -129,7 +129,7 @@ const RECOGNIZERS: Recognizer[] = [
   {
     entity: "EMAIL_ADDRESS",
     regex: /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g,
-    selfProving: true,
+    isSelfProving: true,
   },
   {
     entity: "IP_ADDRESS",
@@ -145,19 +145,19 @@ const RECOGNIZERS: Recognizer[] = [
     entity: "CREDIT_CARD",
     regex: /\b\d(?:[ -]?\d){12,18}\b/g,
     validate: luhnValid,
-    selfProving: true,
+    isSelfProving: true,
   },
   {
     entity: "IBAN_CODE",
     regex: /\b[A-Z]{2}\d{2}[A-Z0-9]{11,30}\b/g,
     validate: ibanValid,
-    selfProving: true,
+    isSelfProving: true,
   },
-  { entity: "CRYPTO", regex: /\b0x[a-fA-F0-9]{40}\b/g, selfProving: true },
+  { entity: "CRYPTO", regex: /\b0x[a-fA-F0-9]{40}\b/g, isSelfProving: true },
   {
     entity: "CRYPTO",
     regex: /\b(?:bc1[a-z0-9]{25,62}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})\b/g,
-    selfProving: true,
+    isSelfProving: true,
   },
   // Hyphenated US SSN is distinctive enough to fire without context.
   { entity: "US_SSN", regex: /\b\d{3}-\d{2}-\d{4}\b/g },
@@ -242,7 +242,7 @@ const RECOGNIZERS: Recognizer[] = [
     entity: "BR_CPF",
     regex: /\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/g,
     validate: cpfValid,
-    selfProving: true,
+    isSelfProving: true,
   },
 ];
 
@@ -483,14 +483,14 @@ function recognizedSpanFor({
 function recognizerRuns({
   recognizer,
   allowed,
-  identifierValue,
+  isIdentifierShaped,
 }: {
   recognizer: Recognizer;
   allowed: ReadonlySet<string> | null;
-  identifierValue: boolean;
+  isIdentifierShaped: boolean;
 }): boolean {
   if (allowed && !allowed.has(recognizer.entity)) return false;
-  return !identifierValue || recognizer.selfProving === true;
+  return !isIdentifierShaped || recognizer.isSelfProving === true;
 }
 
 /**
@@ -503,16 +503,16 @@ function collectRecognizerSpans({
   text,
   allowed,
   excepted,
-  identifierValue,
+  isIdentifierShaped,
 }: {
   text: string;
   allowed: ReadonlySet<string> | null;
   excepted: (span: Span) => boolean;
-  identifierValue: boolean;
+  isIdentifierShaped: boolean;
 }): Span[] {
   const spans: Span[] = [];
   for (const recognizer of RECOGNIZERS) {
-    if (!recognizerRuns({ recognizer, allowed, identifierValue })) continue;
+    if (!recognizerRuns({ recognizer, allowed, isIdentifierShaped })) continue;
     for (const match of text.matchAll(recognizer.regex)) {
       const span = recognizedSpanFor({ recognizer, match, text, excepted });
       if (span) spans.push(span);
@@ -536,14 +536,14 @@ function collectPhoneSpans({
   text,
   allowed,
   excepted,
-  identifierValue,
+  isIdentifierShaped,
 }: {
   text: string;
   allowed: ReadonlySet<string> | null;
   excepted: (span: Span) => boolean;
-  identifierValue: boolean;
+  isIdentifierShaped: boolean;
 }): Span[] {
-  if (identifierValue) return [];
+  if (isIdentifierShaped) return [];
   if (allowed && !allowed.has("PHONE_NUMBER")) return [];
   const spans: Span[] = [];
   try {
@@ -577,13 +577,13 @@ function collectCandidateSpans({
   allowed,
   exceptPatterns,
   protectedRanges,
-  identifierValue,
+  isIdentifierShaped,
 }: {
   text: string;
   allowed: ReadonlySet<string> | null;
   exceptPatterns: readonly RegExp[] | undefined;
   protectedRanges: ProtectedRange[];
-  identifierValue: boolean;
+  isIdentifierShaped: boolean;
 }): Span[] {
   const excepted = (span: Span): boolean => {
     const veto =
@@ -595,8 +595,8 @@ function collectCandidateSpans({
   };
 
   return [
-    ...collectRecognizerSpans({ text, allowed, excepted, identifierValue }),
-    ...collectPhoneSpans({ text, allowed, excepted, identifierValue }),
+    ...collectRecognizerSpans({ text, allowed, excepted, isIdentifierShaped }),
+    ...collectPhoneSpans({ text, allowed, excepted, isIdentifierShaped }),
   ];
 }
 
@@ -679,7 +679,7 @@ export function redactEssentialPiiInText({
     allowed: entities ? new Set(entities) : null,
     exceptPatterns,
     protectedRanges,
-    identifierValue: isAttributeValue && isIdentifierShapedValue(text),
+    isIdentifierShaped: isAttributeValue && isIdentifierShapedValue(text),
   });
   if (spans.length === 0) return { text, redactedCount: 0 };
 
