@@ -26,10 +26,21 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
+// A key that sends an ElevenLabs model holds an ElevenLabs credential: a
+// provider the key cannot reach is refused before dispatch rather than sent
+// to whichever provider the chain has left.
+func elevenLabsCredential() domain.Credential {
+	return domain.Credential{
+		ID:         "cred-elevenlabs",
+		ProviderID: domain.ProviderElevenLabs,
+		APIKey:     "sk-eleven-test",
+	}
+}
+
 func audioRouter(capture *domain.Request) http.Handler {
 	auth := &mockAuth{
 		resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
-			return testBundle(), nil
+			return testBundle(elevenLabsCredential()), nil
 		},
 	}
 	provider := &mockProvider{
@@ -416,7 +427,7 @@ func TestAudioSpeech_UpstreamProviderErrorPassesThrough(t *testing.T) {
 	}
 	auth := &mockAuth{
 		resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
-			return testBundle(), nil
+			return testBundle(elevenLabsCredential()), nil
 		},
 	}
 	router := buildRouter(

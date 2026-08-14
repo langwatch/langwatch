@@ -19,9 +19,10 @@ func TestEligibleCredentials(t *testing.T) {
 	}
 
 	tests := []struct {
-		name     string
-		resolved *domain.ResolvedModel
-		wantIDs  []string
+		name            string
+		resolved        *domain.ResolvedModel
+		wantIDs         []string
+		wantUnreachable domain.ProviderID
 	}{
 		{
 			name:     "explicit anthropic provider keeps both anthropic creds in order",
@@ -69,9 +70,21 @@ func TestEligibleCredentials(t *testing.T) {
 			wantIDs:  []string{"anthropic_1", "openai_1", "gemini_1", "anthropic_2"},
 		},
 		{
-			name:     "no matching provider falls back to original chain (defensive)",
-			resolved: &domain.ResolvedModel{ProviderID: domain.ProviderBedrock, ModelID: "bedrock-only"},
-			wantIDs:  []string{"anthropic_1", "openai_1", "gemini_1", "anthropic_2"},
+			// A provider the request named and the key cannot reach is refused.
+			// Dispatching it to whatever is left sent an Anthropic model to
+			// Gemini and answered with Gemini's own model-not-found.
+			name:            "a named provider the key cannot reach is refused, not rerouted",
+			resolved:        &domain.ResolvedModel{ProviderID: domain.ProviderBedrock, ModelID: "bedrock-only"},
+			wantIDs:         nil,
+			wantUnreachable: domain.ProviderBedrock,
+		},
+		{
+			// The inference is a guess from a short prefix table, so it keeps
+			// the whole chain rather than refusing a request the key could
+			// have served.
+			name:     "an inferred provider the key cannot reach leaves the chain untouched",
+			resolved: &domain.ResolvedModel{ProviderID: "", ModelID: "claude-3-5-sonnet"},
+			wantIDs:  []string{"anthropic_1", "anthropic_2"},
 		},
 		{
 			name:     "nil resolved leaves chain untouched",
@@ -87,7 +100,10 @@ func TestEligibleCredentials(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := eligibleCredentials(mkCreds(), tc.resolved)
+			got, unreachable := eligibleCredentials(mkCreds(), tc.resolved)
+			if unreachable != tc.wantUnreachable {
+				t.Errorf("unreachable: got %q want %q", unreachable, tc.wantUnreachable)
+			}
 			gotIDs := make([]string, len(got))
 			for i, c := range got {
 				gotIDs[i] = c.ID
@@ -100,7 +116,7 @@ func TestEligibleCredentials(t *testing.T) {
 }
 
 func TestEligibleCredentialsEmptyChain(t *testing.T) {
-	got := eligibleCredentials(nil, &domain.ResolvedModel{ModelID: "gpt-4o"})
+	got, _ := eligibleCredentials(nil, &domain.ResolvedModel{ModelID: "gpt-4o"})
 	if got != nil {
 		t.Errorf("expected nil slice, got %v", got)
 	}
@@ -114,7 +130,7 @@ func TestEligibleCredentialsPreservesPriority(t *testing.T) {
 		{ID: "openai_first", ProviderID: domain.ProviderOpenAI},
 		{ID: "secondary_anthropic", ProviderID: domain.ProviderAnthropic},
 	}
-	got := eligibleCredentials(creds, &domain.ResolvedModel{ProviderID: domain.ProviderAnthropic})
+	got, _ := eligibleCredentials(creds, &domain.ResolvedModel{ProviderID: domain.ProviderAnthropic})
 	if len(got) != 2 {
 		t.Fatalf("got %d creds, want 2", len(got))
 	}

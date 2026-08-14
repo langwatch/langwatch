@@ -22,8 +22,11 @@ import (
 // The test walks both directions on one bundle: every name the list offers
 // must dispatch, and every name that dispatches must be offered.
 func TestListModels_AgreesWithDispatch(t *testing.T) {
-	bundle := testBundle()
-	bundle.Config.AllowedModels = []string{"openai/gpt-5-mini", "claude-*"}
+	bundle := testBundle(
+		domain.Credential{ID: "cred-openai", ProviderID: domain.ProviderOpenAI, APIKey: "sk-test"},
+		domain.Credential{ID: "cred-anthropic", ProviderID: domain.ProviderAnthropic, APIKey: "sk-test"},
+	)
+	bundle.Config.AllowedModels = []string{"openai/gpt-5-mini", "claude-*", "vertex/gemini-2.5-pro"}
 	bundle.Config.ModelAliases = map[string]domain.ModelAlias{
 		// Allowed through the provider-qualified spelling.
 		"fast": {ProviderID: domain.ProviderOpenAI, Model: "gpt-5-mini"},
@@ -33,6 +36,10 @@ func TestListModels_AgreesWithDispatch(t *testing.T) {
 		"forbidden": {ProviderID: domain.ProviderOpenAI, Model: "gpt-4o"},
 		// Inside the allowlist, but the policy denies what it resolves to.
 		"denied": {ProviderID: domain.ProviderAnthropic, Model: "claude-haiku-4-5"},
+		// Allowed and undenied, but pointed at a provider this key holds no
+		// credential for, the state an allowlist lands in when an admin
+		// removes a provider.
+		"unreachable": {ProviderID: domain.ProviderVertex, Model: "claude-opus-4-5"},
 	}
 	bundle.Config.PolicyRules = []domain.PolicyRule{
 		{Pattern: "^anthropic/claude-haiku.*", Type: domain.PolicyDeny, Target: domain.PolicyTargetModel},
@@ -65,7 +72,11 @@ func TestListModels_AgreesWithDispatch(t *testing.T) {
 		return err == nil
 	}
 
+	names := []string{"vertex/gemini-2.5-pro", "openai/gpt-5-mini"}
 	for name := range bundle.Config.ModelAliases {
+		names = append(names, name)
+	}
+	for _, name := range names {
 		served := dispatches(name)
 		assert.Equal(t, served, offered[name],
 			"%q: listed=%v but dispatchable=%v; the list and POST disagree",
@@ -78,6 +89,10 @@ func TestListModels_AgreesWithDispatch(t *testing.T) {
 	assert.True(t, offered["complex"], "a bare wildcard allowance must be offered")
 	assert.False(t, offered["forbidden"], "an alias outside models_allowed must not be offered")
 	assert.False(t, offered["denied"], "an alias the policy denies must not be offered")
+	assert.False(t, offered["unreachable"],
+		"an alias on a provider the key cannot reach must not be offered")
+	assert.False(t, offered["vertex/gemini-2.5-pro"],
+		"an allowed model on a provider the key cannot reach must not be offered")
 }
 
 // The same rule for models the provider catalog reports rather than ones an

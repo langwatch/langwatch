@@ -133,6 +133,12 @@ each vendor's own model, or point a tier at each one.
 The gateway also drops a provider the key can no longer reach, for
 example when an admin removes it from the key's scope.
 
+A model name that gives a provider, such as `openai/gpt-5-mini`, only
+runs on that provider. When the key cannot reach it, the request gets
+an error. The gateway does not send it to another vendor. A tier or a
+mapping that points at a provider you removed behaves the same way,
+and `GET /v1/models` stops listing it.
+
 ## Defaults
 
 One policy for each scope can be the default. Marking a policy

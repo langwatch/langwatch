@@ -22,28 +22,33 @@ import (
 // Filtering rules:
 //
 //  1. Resolved.ProviderID set (explicit prefix or alias-resolved): keep
-//     only credentials whose ProviderID matches.
+//     only credentials whose ProviderID matches. Nothing matching is
+//     reported through `unreachable` rather than dispatched elsewhere:
+//     the caller, or the policy alias they hit, named this provider, and
+//     serving the request from another vendor answers a question nobody
+//     asked. It also reads as a governance hole on a key whose whole
+//     purpose is to bound which providers it can reach.
 //  2. Resolved.ProviderID empty (implicit model name): infer the
-//     provider from the model name prefix and keep matching creds. If
-//     no provider knows the prefix, leave the chain untouched (fall
-//     back to existing behavior).
-//
-// Safety net: if the filter empties the chain entirely, return the
-// original creds. We never want this helper to convert "the user has
-// a usable provider somewhere" into a hard-fail; a wrong-provider
-// dispatch surfaces a clear error from Bifrost, but no-providers
-// surfaces an opaque internal error to the caller.
-func eligibleCredentials(creds []domain.Credential, resolved *domain.ResolvedModel) []domain.Credential {
+//     provider from the model name prefix and keep matching creds. If no
+//     provider knows the prefix, or the inference matches nothing the key
+//     holds, leave the chain untouched. The inference is a guess from a
+//     short prefix table, and a guess must not refuse a request the key
+//     could have served.
+func eligibleCredentials(
+	creds []domain.Credential,
+	resolved *domain.ResolvedModel,
+) (kept []domain.Credential, unreachable domain.ProviderID) {
 	if len(creds) == 0 || resolved == nil {
-		return creds
+		return creds, ""
 	}
 
-	target := resolved.ProviderID
+	named := resolved.ProviderID
+	target := named
 	if target == "" {
 		target = inferProviderFromModel(resolved.ModelID)
 	}
 	if target == "" {
-		return creds
+		return creds, ""
 	}
 
 	out := make([]domain.Credential, 0, len(creds))
@@ -53,9 +58,12 @@ func eligibleCredentials(creds []domain.Credential, resolved *domain.ResolvedMod
 		}
 	}
 	if len(out) == 0 {
-		return creds
+		if named != "" {
+			return nil, named
+		}
+		return creds, ""
 	}
-	return out
+	return out, ""
 }
 
 // inferProviderFromModel maps a bare model name to the provider that

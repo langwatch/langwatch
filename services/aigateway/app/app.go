@@ -184,12 +184,16 @@ func (a *App) ListModels(ctx context.Context, bundle *domain.Bundle) ([]domain.M
 	// Its own name is not a model, so the pass at the end cannot do it:
 	// that runs on the listed id, which for an alias is the alias name.
 	allowedByPolicy := modelPolicyFilter(cfg.PolicyRules, a.logger)
+	reachable := reachableProviders(bundle.Credentials)
 	for name, alias := range cfg.ModelAliases {
 		target := domain.Model{ID: alias.Model, ProviderID: alias.ProviderID}
 		if !cfg.AllowsResolvedModel(alias.ProviderID, alias.Model) {
 			continue
 		}
 		if !allowedByPolicy(target) {
+			continue
+		}
+		if !reachable(alias.ProviderID) {
 			continue
 		}
 		add(domain.Model{ID: name, Name: name, ProviderID: alias.ProviderID})
@@ -212,6 +216,16 @@ func (a *App) ListModels(ctx context.Context, bundle *domain.Bundle) ([]domain.M
 			// discovery instead.
 			if domain.ModelPatternIsWildcard(id) {
 				hasWildcards = true
+				continue
+			}
+			// A qualified entry names its own provider, and outranks the
+			// chain-wide guess. Left in an allowlist after the provider it
+			// names is removed, it is a name no request can reach.
+			if qualified, _, ok := domain.SplitModelSpelling(id); ok {
+				if !reachable(qualified) {
+					continue
+				}
+				add(domain.Model{ID: id, Name: id, ProviderID: qualified})
 				continue
 			}
 			add(domain.Model{ID: id, Name: id, ProviderID: providerID})
@@ -260,6 +274,31 @@ func (a *App) addDiscovered(ctx context.Context, bundle *domain.Bundle, cfg doma
 		add(m)
 	}
 	return gaps, nil
+}
+
+// reachableProviders reports, for one credential chain, whether a name
+// pointing at a given provider can be served at all.
+//
+// The listing owes this the same way it owes the allowlist and the policy
+// rules: dispatch refuses a name whose provider the key holds no credential
+// for, so offering it advertises a model every request for it will be
+// refused. An unattributed name has no provider to judge and stays.
+//
+// A chain with no credentials narrows nothing. Nothing dispatches for such a
+// key at all, so singling out its provider-qualified names would not make the
+// list truer, only empty, and a key still being wired up keeps a model list
+// that shows what it is configured to reach.
+func reachableProviders(creds []domain.Credential) func(domain.ProviderID) bool {
+	if len(creds) == 0 {
+		return func(domain.ProviderID) bool { return true }
+	}
+	held := make(map[domain.ProviderID]bool, len(creds))
+	for _, cred := range creds {
+		held[cred.ProviderID] = true
+	}
+	return func(providerID domain.ProviderID) bool {
+		return providerID == "" || held[providerID]
+	}
 }
 
 // soleCredentialProviderID returns the credential chain's provider when

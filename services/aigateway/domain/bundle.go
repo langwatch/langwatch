@@ -198,6 +198,44 @@ func ModelSpellings(providerID ProviderID, modelID string) []string {
 	return []string{modelID, string(providerID) + "/" + modelID}
 }
 
+// NormalizeProviderID maps the provider half of a model name onto the id the
+// gateway routes by, accepting the spellings clients write. An unrecognized
+// qualifier passes through as itself, which is what makes a customer's own
+// provider id usable without a table entry here.
+func NormalizeProviderID(raw string) ProviderID {
+	switch raw {
+	case "azure_openai", "azure":
+		return ProviderAzure
+	case "google_vertex", "vertex":
+		return ProviderVertex
+	case "aws_bedrock", "bedrock":
+		return ProviderBedrock
+	case "google_gemini", "gemini":
+		return ProviderGemini
+	case "anthropic":
+		return ProviderAnthropic
+	case "openai":
+		return ProviderOpenAI
+	default:
+		return ProviderID(raw)
+	}
+}
+
+// SplitModelSpelling splits a provider-qualified model name into the provider
+// the request would be dispatched to and the model id sent upstream, the same
+// way the resolver reads it. A name with no qualifier reports ok false.
+//
+// One function so the model listing and the dispatcher cannot disagree about
+// which provider a name means, which is how a listing came to advertise names
+// that dispatch refused.
+func SplitModelSpelling(spelling string) (ProviderID, string, bool) {
+	qualifier, model, ok := strings.Cut(spelling, "/")
+	if !ok || qualifier == "" || model == "" {
+		return "", spelling, false
+	}
+	return NormalizeProviderID(qualifier), model, true
+}
+
 // AllowsResolvedModel reports whether a model the resolver settled on
 // satisfies models_allowed, in either spelling. This is the check every
 // resolution path owes the allowlist: the model that actually reaches a

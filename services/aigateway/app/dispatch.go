@@ -120,7 +120,9 @@ func translateWalkError(ctx context.Context, err error) error {
 // in fallback order, or the error that explains why there are none:
 //
 //  1. Model-aware trim: providers that cannot serve the resolved model are
-//     skipped (eligibleCredentials, with its keep-something safety net).
+//     skipped (eligibleCredentials). A provider the request named that the
+//     key cannot reach refuses here rather than dispatching to whichever
+//     vendor happens to be left.
 //  2. Provider allowlist: a key narrowed to specific providers cannot
 //     dispatch outside them even if the bundle's credential chain is stale
 //     or hand-crafted. The control plane already materializes the chain
@@ -133,7 +135,13 @@ func translateWalkError(ctx context.Context, err error) error {
 //     iterated; with several simultaneous exclusions any of them is an
 //     accurate answer to "why was nothing dispatchable").
 func (a *App) candidateChain(ctx context.Context, call *pipeline.Call) ([]domain.Credential, error) {
-	creds := eligibleCredentials(call.Bundle.Credentials, call.Request.Resolved)
+	creds, unreachable := eligibleCredentials(
+		call.Bundle.Credentials,
+		call.Request.Resolved,
+	)
+	if unreachable != "" {
+		return nil, errProviderUnreachable(ctx, unreachable, call.Request.Resolved)
+	}
 	if len(creds) == 0 {
 		return nil, errNoProviderConfigured(ctx)
 	}
@@ -275,6 +283,25 @@ func (a *App) dispatchProvider(call *pipeline.Call, creds []domain.Credential, e
 func errNoProviderConfigured(ctx context.Context) error {
 	return herr.New(ctx, domain.ErrNoProviderConfigured, herr.M{
 		"message": "no model provider configured for this organization — add a provider API key in Settings → Model Providers",
+	})
+}
+
+// errProviderUnreachable answers a request that named a provider this key has
+// no credential for. Separate copy from errNoProviderConfigured: the
+// organization does have providers, so "add a provider API key" is the wrong
+// thing to tell someone whose real choice is to name a different model.
+func errProviderUnreachable(
+	ctx context.Context,
+	provider domain.ProviderID,
+	resolved *domain.ResolvedModel,
+) error {
+	message := "this key cannot reach any " + string(provider) + " provider"
+	if resolved != nil && resolved.ModelID != "" {
+		message += `, so it cannot serve "` + resolved.ModelID + `"`
+	}
+	return herr.New(ctx, domain.ErrNoProviderConfigured, herr.M{
+		"message": message,
+		"fault":   "customer",
 	})
 }
 
