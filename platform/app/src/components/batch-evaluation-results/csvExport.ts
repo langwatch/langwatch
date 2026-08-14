@@ -58,17 +58,17 @@ const TIE_WINNER = "tie";
 const UNRESOLVED_WINNER = "unresolved";
 
 /**
- * Written when the row was judged and established no winner: the two passes
- * named different winners, the judge answered without naming one, or the row
- * had too few candidate outputs to compare at all.
+ * Written when a comparison produced no winner: the two judge passes named
+ * different winners, the judge answered without naming one, or the row had too
+ * few candidate outputs to compare at all.
  *
  * One token for all of them because the stored row cannot tell them apart: the
  * SDKs report `inconclusive` and `skipped` as distinct verdicts but record both
  * under the same batch status, so naming either one here would be a guess. The
  * reasoning cell beside it says which happened, in the judge's own words.
  *
- * These used to export as three empty cells, which read exactly like a row the
- * judge never ran, and dropped an explanation the reader had paid for.
+ * These used to export as three empty cells, which read exactly like a row with
+ * no comparison result at all, and dropped the explanation with them.
  */
 const NO_VERDICT_WINNER = "no_verdict";
 

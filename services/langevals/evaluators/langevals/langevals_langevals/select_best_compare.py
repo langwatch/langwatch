@@ -693,6 +693,15 @@ class SelectBestCompareEvaluator(
             # still yields a processed result naming a real candidate.
             winner_id = slot_to_candidate[_slot_label(0)].id
 
+        # `reasoning` is free text in the tool schema, and a provider that does
+        # not strictly enforce the schema can put an object, a list or a number
+        # there. Anything that is not text is the same as no explanation: it
+        # cannot be read by the customer, and it cannot be slot-translated
+        # below, where a non-string would raise instead of returning a verdict.
+        explanation = arguments.get("reasoning")
+        if not isinstance(explanation, str) or not explanation.strip():
+            explanation = "The judge gave no explanation."
+
         # The judge argues in terms of the slot labels it was shown, so the
         # reasoning is translated before it leaves `_judge`, with the same
         # mapping the winner above is translated with. Slot order differs per
@@ -701,10 +710,7 @@ class SelectBestCompareEvaluator(
         # against the wrong candidates.
         return {
             "winner": winner_id,
-            "reasoning": _translate_slot_references(
-                arguments.get("reasoning") or "The judge gave no explanation.",
-                slot_to_candidate,
-            ),
+            "reasoning": _translate_slot_references(explanation, slot_to_candidate),
             "cost": call_cost,
         }
 

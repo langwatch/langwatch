@@ -667,7 +667,7 @@ A verdict carries four things: the `status`, the `winner`, the judge's `reasonin
 |--------|---------------|
 | `decided` | The judge picked a winner, named in `winner` |
 | `tie` | The judge compared the candidates and found none better than the rest, so there is no winner |
-| `inconclusive` | The judge established no winner. Under swap and reconcile that is usually its two passes disagreeing, so this row does not separate these candidates. That is a finding about them, and it is deliberately not a tie, which would claim they are equally good. It also covers a judge that answered with nothing usable in it, which `reasoning` says plainly. Either way the calls were made and billed, so the row still reports its cost |
+| `inconclusive` | The judge ran and no winner came out of it. Under swap and reconcile that is usually its two passes disagreeing, so this row does not separate these candidates. That is a finding about them, and it is deliberately not a tie, which would claim they are equally good. It also covers a judge that answered with nothing usable in it, which `reasoning` says plainly. Either way the calls were made and billed, so the row still reports its cost |
 | `skipped` | Fewer than two targets produced a non-empty output, so no judge ran. `reasoning` names the targets that produced nothing |
 | `error` | The judge failed or could not be reached, so nothing was measured about the candidates at all |
 

@@ -18,11 +18,13 @@
  * behaviour on click — same pattern BatchTargetCell already uses for
  * long prompt / agent outputs so the table reads as one cohesive design.
  *
- * A row the judge never ran renders a subtle dash so the column width is
- * preserved and the table doesn't reflow between reruns. A row it DID run and
- * could not settle is not that: it reads "No verdict" and shows the judge's
- * account of why, which is the most expensive text on the page (an
- * unsettled row is two judge calls) and was previously thrown away.
+ * A row with no comparison result at all renders a subtle dash so the column
+ * width is preserved and the table doesn't reflow between reruns. A row that
+ * has a result but no winner is not that: it reads "No verdict" and shows the
+ * account of why, text the page used to throw away. Most of those rows were
+ * judged twice, which makes that account the most expensive text on the page;
+ * a row with too few candidate outputs to compare reaches the same state with
+ * no judge call behind it.
  */
 
 import { Badge, Box, HStack, Portal, Text, VStack } from "@chakra-ui/react";

@@ -1800,6 +1800,46 @@ def test_a_tool_call_with_no_function_on_it_is_reported_as_no_verdict():
 
 
 # @scenario "A judge answer that names no winner is reported, not raised"
+@pytest.mark.parametrize(
+    "unusable_reasoning",
+    [{"why": "A"}, ["A wins"], 42, True, None, "   "],
+    ids=["object", "array", "number", "boolean", "null", "blank"],
+)
+def test_a_winner_with_an_unreadable_reason_still_counts_as_a_verdict(
+    unusable_reasoning,
+):
+    """`reasoning` is free text in the tool schema, so a provider that does not
+    strictly enforce it can put a whole object there. The judge still named a
+    winner, which is the part the row turns on, so the row stays a verdict and
+    only the explanation falls back. Reading the value as text without checking
+    it raised on the slot translation, taking a decided row down with it."""
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(swap_and_reconcile=False)
+    )
+    entry = _make_entry(num_candidates=3, row_index=0)
+
+    arguments_json = json.dumps({"winner": "A", "reasoning": unusable_reasoning})
+    tool_call = SimpleNamespace(function=SimpleNamespace(arguments=arguments_json))
+    message = SimpleNamespace(tool_calls=[tool_call])
+    response = SimpleNamespace(choices=[SimpleNamespace(message=message)])
+
+    with patch(
+        "langevals_langevals.select_best_compare.completion",
+        return_value=response,
+    ), patch(
+        "langevals_langevals.select_best_compare.completion_cost",
+        return_value=0.0002,
+    ):
+        result = evaluator.evaluate(entry)
+
+    assert result.status == "processed"
+    assert result.label is not None
+    assert result.label != "tie"
+    assert result.details is not None
+    assert "The judge gave no explanation." in result.details
+
+
+# @scenario "A judge answer that names no winner is reported, not raised"
 def test_one_unusable_pass_is_not_read_as_a_disagreement():
     """Reconciliation compares two answers. When one of them never arrived
     there is nothing to compare, and calling that a disagreement would tell
