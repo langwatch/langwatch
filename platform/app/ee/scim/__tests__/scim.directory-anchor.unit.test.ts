@@ -7,6 +7,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { User } from "~/generated/prisma/client";
 import { ScimService } from "../scim.service";
+import {
+  scimCreateGroupRequestSchema,
+  scimCreateUserRequestSchema,
+} from "../scim.types";
 
 vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({ redis: null }),
@@ -282,6 +286,80 @@ describe("the SCIM directory anchor", () => {
       });
 
       expect(result.active).toBe(false);
+    });
+  });
+
+  // Entra sends an explicit null when the mapped attribute is empty. Both
+  // /Users routes safeParse and answer 400 on failure, so a schema that
+  // rejects null does not degrade — it breaks provisioning outright for that
+  // directory, on a payload the endpoint accepted before the field was
+  // declared at all.
+  describe("given a directory that sends an explicit null externalId", () => {
+    it("is accepted by the user schema rather than rejected as a 400", () => {
+      const parsed = scimCreateUserRequestSchema.safeParse({
+        schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
+        userName: "alice@acme.com",
+        externalId: null,
+      });
+
+      expect(parsed.success).toBe(true);
+    });
+
+    it("is accepted by the group schema too", () => {
+      const parsed = scimCreateGroupRequestSchema.safeParse({
+        schemas: ["urn:ietf:params:scim:schemas:core:2.0:Group"],
+        displayName: "Engineering",
+        externalId: null,
+      });
+
+      expect(parsed.success).toBe(true);
+    });
+
+    it("provisions the user, storing no anchor and no directory marker", async () => {
+      prisma.user.create.mockResolvedValue(buildUser());
+
+      const result = await service.createUser({
+        organizationId: "org-1",
+        request: {
+          schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
+          userName: "alice@acme.com",
+          externalId: null,
+        },
+      });
+
+      expect(result).not.toHaveProperty("status");
+      const created = prisma.organizationUser.create.mock.calls[0]![0] as {
+        data: Record<string, unknown>;
+      };
+      expect(created.data).not.toHaveProperty("externalId");
+      expect(created.data).not.toHaveProperty("scimSource");
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it("leaves a stored anchor alone on replace — null is absent, not 'clear it'", async () => {
+      // The anchor has no history to recover from, so a sync that happened to
+      // carry an empty attribute must not detach the person from it.
+      prisma.organizationUser.findUnique.mockResolvedValue({
+        userId: "user-1",
+        organizationId: "org-1",
+        disabledAt: null,
+        externalId: ENTRA_OBJECT_ID,
+      });
+      prisma.user.update.mockResolvedValue(buildUser());
+      prisma.user.findUnique.mockResolvedValue(buildUser());
+
+      const result = await service.replaceUser({
+        id: "user-1",
+        organizationId: "org-1",
+        request: {
+          schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
+          userName: "alice@acme.com",
+          externalId: null,
+        },
+      });
+
+      expect(prisma.organizationUser.updateMany).not.toHaveBeenCalled();
+      expect(result).toHaveProperty("externalId", ENTRA_OBJECT_ID);
     });
   });
 

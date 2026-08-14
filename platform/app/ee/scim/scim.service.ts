@@ -688,6 +688,11 @@ export class ScimService {
    * The anchor columns to write when the membership row is CREATED, so the
    * directory's id lands with the row rather than in a follow-up update that
    * could be lost between the two.
+   *
+   * A null externalId means "this payload carries no anchor" and writes
+   * nothing — Entra sends an explicit null when the mapped attribute is empty,
+   * and a directory that has not populated the attribute yet must not be read
+   * as one asserting the person has no directory id.
    */
   private anchorFromRequest({
     request,
@@ -696,12 +701,10 @@ export class ScimService {
     request: ScimCreateUserRequest;
     organizationId: string;
   }): { externalId?: string; scimSource?: string } {
-    if (request.externalId === undefined) return {};
-    this.warnIfAnchorLooksMutable({
-      externalId: request.externalId,
-      organizationId,
-    });
-    return { externalId: request.externalId, scimSource: SCIM_SOURCE };
+    const externalId = request.externalId;
+    if (externalId == null) return {};
+    this.warnIfAnchorLooksMutable({ externalId, organizationId });
+    return { externalId, scimSource: SCIM_SOURCE };
   }
 
   /** The SCIM view of a person, with their membership of this organization. */
@@ -725,6 +728,11 @@ export class ScimService {
    * not "externalId is set" (ADR-094 Decision 7). Storing the anchor creates
    * NO usage-attribution link: matching a login to a person stays an admin
    * decision, and this only gives that decision something to propose from.
+   *
+   * Null is absent, not "clear it". Writing null over a stored anchor would
+   * quietly detach a person from their directory identity on any sync where
+   * the attribute happened to be empty, and the anchor has no history to
+   * recover it from.
    */
   private async persistAnchor({
     userId,
@@ -733,9 +741,9 @@ export class ScimService {
   }: {
     userId: string;
     organizationId: string;
-    externalId: string | undefined;
+    externalId: string | null | undefined;
   }): Promise<void> {
-    if (externalId === undefined) return;
+    if (externalId == null) return;
     this.warnIfAnchorLooksMutable({ externalId, organizationId });
     await this.prisma.organizationUser.updateMany({
       where: { userId, organizationId },

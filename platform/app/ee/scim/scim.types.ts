@@ -95,8 +95,16 @@ export const scimCreateUserRequestSchema = z
      * directory anchor now (ADR-094 Decision 7) and Entra matches users on it
      * — a dropped externalId makes a retrieve return nothing, and Entra's next
      * move on an empty result is to provision a duplicate person.
+     *
+     * `nullish`, not `optional`: Entra sends an explicit null when the mapped
+     * attribute is empty, and `optional` REJECTS null. Declaring the field
+     * with `optional` would have turned a payload this endpoint accepts today
+     * (it fell through `.passthrough()` before it was declared) into a 400 on
+     * every create and replace — breaking provisioning outright for a
+     * directory that sends one. A null means "no anchor in this payload" and
+     * is never written over a stored one.
      */
-    externalId: z.string().optional(),
+    externalId: z.string().nullish(),
     userName: z.string().email(),
     name: z
       .object({
@@ -149,8 +157,13 @@ export const scimCreateGroupRequestSchema = z.object({
    * NOT `.passthrough()`, so the group service's cast was reading a field zod
    * had already stripped — every SCIM group has been created with a null
    * anchor.
+   *
+   * `nullish` for the same reason the user schema is: this object is not
+   * `.passthrough()` either, so an `optional` declaration would turn an
+   * explicit null — which Entra sends when the mapped attribute is empty —
+   * into a 400 on group create, where today it is simply dropped.
    */
-  externalId: z.string().optional(),
+  externalId: z.string().nullish(),
   displayName: z.string(),
   members: z.array(scimGroupMemberSchema).optional(),
 });
