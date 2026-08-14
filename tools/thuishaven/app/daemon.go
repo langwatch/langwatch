@@ -55,6 +55,11 @@ func (o *Orchestrator) RunDaemon(ctx context.Context, dash Dashboard) error {
 		fmt.Println("haven daemon already running")
 		return nil
 	}
+	if o.procTel != nil {
+		// The final process-watch sample is flushed on the way out; without
+		// this the periodic reader's last 30-second window dies with us.
+		defer o.procTel.Close()
+	}
 	ports, err := o.sys.FreePorts(1)
 	if err != nil {
 		return err
@@ -124,8 +129,10 @@ func (o *Orchestrator) monitorLoop(ctx context.Context) {
 			}
 			// Every ~10 min, refresh the idle clock of every registered stack's
 			// databases, and prune databases whose worktree has not been up in
-			// DBIdleTTL — the unattended counterpart of `haven down --drop-db`.
+			// DBIdleTTL — the unattended counterpart of the interactive reclaim in
+			// `haven clean` (`down` itself never discards data).
 			if cycles%60 == 1 {
+				o.reapTestContainers(ctx)
 				// Fail closed: this clock guards destructive pruning, so if any
 				// refresh cannot be persisted, skip pruning this cycle rather
 				// than risk dropping a recently used database off a stale clock.
@@ -158,6 +165,7 @@ func (o *Orchestrator) monitorLoop(ctx context.Context) {
 				o.log.Info("reaped stack", zap.String("slug", s.Slug), zap.Bool("dead", dead), zap.Bool("stale", stale))
 			}
 			o.governPressure()
+			o.governProcesses()
 			o.refreshObservability(ctx)
 			o.reapClickHouse()
 		}
@@ -381,6 +389,32 @@ func (o *Orchestrator) pruneIdleDatabases(ctx context.Context) {
 		if existsSomewhere {
 			o.log.Info("pruned idle databases", zap.String("slug", slug), zap.String("db", db), zap.Duration("idle", now.Sub(lastSeen)))
 		}
+	}
+}
+
+// reapTestContainers removes containers a testcontainers run left behind —
+// the library's own reaper (Ryuk) dies with the run that started it, so an
+// interrupted integration test leaves its ClickHouse/Redis running in the
+// shared VM until something else sweeps them. Stopped containers get the short
+// TTL; running ones a much longer one, because a running container may still
+// be serving a live run whatever its birthday says (withReuse keeps the
+// original CreatedAt across runs). The running TTL never undercuts the stopped
+// one, so a single misconfigured knob cannot make live containers the more
+// eagerly reaped kind.
+func (o *Orchestrator) reapTestContainers(ctx context.Context) {
+	ttl := o.cfg.TestContainerTTL
+	if o.janitor == nil || ttl <= 0 {
+		return
+	}
+	runningTTL := max(o.cfg.RunningTestContainerTTL, ttl)
+	now := o.sys.Now()
+	names, err := o.janitor.ReapTestContainers(ctx, now.Add(-ttl), now.Add(-runningTTL))
+	if err != nil {
+		o.log.Warn("test-container sweep failed", zap.Error(err))
+		return
+	}
+	if len(names) > 0 {
+		o.log.Info("reaped leaked test containers", zap.Strings("containers", names))
 	}
 }
 

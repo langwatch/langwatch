@@ -1,0 +1,89 @@
+Feature: tsgo can never take the machine down
+  A whole-tree tsgo run peaks around ten gigabytes, the check queue bounds how
+  many run at once but not how big each gets, and language-server instances
+  accumulate one per worktree, exempt from every admission control by design.
+  Gating spawn paths is whack-a-mole — every new package, editor or daemon
+  that spawns tsgo reopens the hole. So the guarantee moves to where every
+  process is visible: the haven daemon watches tsgo itself, caps it softly at
+  spawn where haven owns the spawn, and reclaims it forcibly when the machine
+  is at stake. See dev/docs/adr/095-haven-tsgo-governor.md.
+
+  # Behavior lives in tools/thuishaven: `domain/tsgowatch.go` decides what to
+  # reclaim, `app/daemon.go` samples and enforces on the monitor tick, and
+  # `dev/scripts/check-queue.mjs` sets the soft memory cap on the runs it
+  # spawns. Knobs: HAVEN_TSGO_RUN_MAX_RSS_MB, HAVEN_TSGO_LSP_MAX_RSS_MB,
+  # HAVEN_TSGO_LSP_IDLE_TTL, HAVEN_TSGO_TOTAL_BUDGET_MB (0 disables each).
+
+  @unit
+  Scenario: A runaway whole-tree run is stopped at the hard ceiling
+    Given a whole-tree tsgo run whose memory exceeds the per-run ceiling
+    When the daemon takes its next sample
+    Then that run is stopped
+    And the reason, size and age are logged
+
+  @unit
+  Scenario: A run under every ceiling is left alone
+    Given a whole-tree tsgo run within the per-run ceiling
+    And the combined tsgo footprint is within the machine budget
+    When the daemon takes its next sample
+    Then nothing is stopped
+
+  @unit
+  Scenario: Over the machine budget, idle language servers go first
+    Given the combined tsgo footprint exceeds the machine budget
+    And an idle language server and two whole-tree runs are live
+    When the daemon takes its next sample
+    Then the idle language server is reclaimed before any run
+
+  @unit
+  Scenario: Over the machine budget, the youngest run goes before the oldest
+    Given the combined tsgo footprint exceeds the machine budget
+    And no idle language server is left to reclaim
+    When the daemon takes its next sample
+    Then the youngest whole-tree run is stopped first
+    And the oldest keeps running
+
+  @unit
+  Scenario: An idle language server is evicted after the idle period
+    Given a language server whose CPU clock has not moved for the idle period
+    When the daemon takes its next sample
+    Then it is evicted
+    And a language server actively serving requests is never idle-evicted
+
+  @unit
+  Scenario: An oversized language server is evicted regardless of activity
+    Given a language server above the language-server ceiling
+    When the daemon takes its next sample
+    Then it is evicted
+
+  @unit
+  Scenario: The governor only ever touches tsgo
+    Given processes of every other kind on the machine
+    When the daemon takes its next sample
+    Then none of them is ever a candidate
+
+  @unit
+  Scenario: Coding agents, dev servers and test workers are observed, never touched
+    Given enormous node, coding-agent and test-worker processes
+    When the daemon takes its next sample
+    Then their footprint is recorded
+    But none of them is ever a removal candidate
+
+  @unit
+  Scenario: Every watched tool's footprint becomes queryable history
+    Given watched processes of several classes are live
+    When the daemon takes its next sample
+    Then each class's footprint is shipped to the local observability stack
+    And every governor enforcement is counted there with its reason
+
+  @unit
+  Scenario: The operator can disable the governor
+    Given the per-run ceiling is disabled via the environment
+    When the daemon takes its next sample
+    Then no tsgo process is considered at all
+
+  @unit
+  Scenario: Queued whole-tree runs get a soft memory cap at spawn
+    Given the check queue spawns a whole-tree tsgo run
+    Then the Go runtime memory limit is set from the machine's memory
+    But an operator's explicit limit is never overridden

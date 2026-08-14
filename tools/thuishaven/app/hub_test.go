@@ -135,6 +135,8 @@ type fakeSystem struct {
 	// asserting on the kills would pass with an EMPTY marker, which in production
 	// matches every process on the machine and group-kills the result.
 	orphanMarker string
+	procSamples  []ProcessSample
+	killed       []int
 }
 
 func (f *fakeSystem) FreePorts(n int) ([]int, error) { return make([]int, n), nil }
@@ -168,6 +170,8 @@ func (f *fakeSystem) OrphanedWorkers(marker string) []int {
 	f.orphanMarker = marker
 	return f.orphans
 }
+func (f *fakeSystem) ProcessSamples() []ProcessSample { return f.procSamples }
+func (f *fakeSystem) Kill(pid int)                    { f.killed = append(f.killed, pid) }
 
 type fakeProxy struct{ removed []string }
 

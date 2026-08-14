@@ -103,6 +103,11 @@ haven switch     print a worktree's dir by name; with `eval "$(haven shell-init)
                  it becomes a real cd, tab-completed
 haven shell-init emit that shell function + completion
 haven hmr        AI-gated HMR: `on [--ttl 30s]` defers Vite reloads, `off` resumes
+haven slot       run any command under the machine-wide check slot:
+                 `slot run [--label <l>] -- <cmd> [args…]` waits for a slot,
+                 runs with stdio passed through, releases; `slot explain`
+                 prints the resolved limit. check-queue.mjs delegates every
+                 whole-repo check here when haven is installed
 haven typecheck  pnpm typecheck under a machine-wide RAM slot
 haven upgrade    reinstall the haven binary from this checkout
 haven help       exhaustive, copy-pasteable reference
@@ -239,7 +244,34 @@ registry, and dashboard stay the same.
   no zero-copy). The server lifecycle is automatic; `haven db url clickhouse`
   prints this stack's URL, `haven db reset` gives it a fresh database, and the
   daemon prunes databases whose worktree hasn't been up for `HAVEN_DB_TTL`
-  (default 14 days).
+  (default 4 days). `LANGWATCH_HAVEN_CH_STOP_IDLE=1` additionally stops the
+  server once no stack is running (opt-in: native-mode tests and
+  `haven db url clickhouse` reach it with no stack up) — the next `up`
+  restarts it over the same data in seconds.
+- **tsgo can never take the machine down.** The daemon watches every tsgo
+  process on the machine — however it was spawned — and reclaims runaways: a
+  whole-tree run past `HAVEN_TSGO_RUN_MAX_RSS_MB` (default 12 GiB), a language
+  server past `HAVEN_TSGO_LSP_MAX_RSS_MB` (default 4 GiB) or idle past
+  `HAVEN_TSGO_LSP_IDLE_TTL` (default 45m), and — over
+  `HAVEN_TSGO_TOTAL_BUDGET_MB` (default two thirds of RAM, never below the
+  per-run ceiling) — the youngest run
+  until the rest fits. The check queue also sets `GOMEMLIMIT` on the runs it
+  spawns so the common case degrades to "slower", not "10 GiB resident". The
+  same watch observes gopls, biome, vitest workers, node, bun and claude
+  agents (never touched — observed only) and ships every class's footprint to
+  the local Grafana as `haven_proc_*` metrics. See
+  `dev/docs/adr/095-haven-tsgo-governor.md`.
+- **Leaked test containers are reaped.** An interrupted integration-test run
+  leaves its Testcontainers (a stray ClickHouse, a Redis) running in the shared
+  VM forever — the library's own reaper (Ryuk) dies with the run, and reused
+  containers are skipped by it entirely. The daemon removes
+  Testcontainers-labelled containers: terminally stopped ones (exited or dead)
+  older than `HAVEN_TESTCONTAINER_TTL` (default 10m; 0 disables the sweep),
+  every other state only past the greater of that and `HAVEN_TESTCONTAINER_RUNNING_TTL`
+  (default 2h) since a running (or paused, or mid-restart) container may still
+  be serving a live run whatever its age. Ryuk itself is never touched, and the
+  sweep never boots the VM just to clean it. See
+  `specs/setup/haven-testcontainer-reaper.feature`.
 - **Always migrate + seed, fully static identity.** Every `up` migrates *and*
   seeds idempotently. Nothing about the local dev identity is ever randomly
   generated — the same admin login, org/team/project/user IDs, and API

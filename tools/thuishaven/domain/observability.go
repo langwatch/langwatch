@@ -96,8 +96,11 @@ type ObservabilityLimits struct {
 // at all and the ceiling is what keeps it from competing with the dev stack it
 // exists to observe.
 func DefaultObservabilityLimits(totalRAMBytes uint64, numCPU int) ObservabilityLimits {
-	memMB := clampInt(int(totalRAMBytes/(1<<20))/8, 1536, 2560)
-	cpus := clampFloat(float64(numCPU)/4, 1, 2)
+	// A seventh of the machine rather than the old eighth, and half a core more
+	// at the top: with two stacks feeding it the bundle sat pinned at its 2-CPU
+	// cap, which shows up as laggy dashboards exactly when you are debugging.
+	memMB := clampInt(int(totalRAMBytes/(1<<20))/7, 1536, 3072)
+	cpus := clampFloat(float64(numCPU)/4, 1, 2.5)
 	return ObservabilityLimits{
 		MemoryMB:        memMB,
 		CPUs:            cpus,
@@ -138,7 +141,10 @@ type ColimaLimits struct {
 // resizing someone's running VM out from under them is not haven's business.
 func DefaultColimaLimits(totalRAMBytes uint64, numCPU int) ColimaLimits {
 	return ColimaLimits{
-		CPUs:      clampInt(numCPU/2, 2, 4),
+		// Ceiling 6, not 4: the VM hosts ClickHouse + the LGTM bundle (+ langy
+		// tiers), whose caps alone add up past 4 cores on a big machine. Only
+		// applied at creation — an existing profile keeps its shape.
+		CPUs:      clampInt(numCPU/2, 2, 6),
 		MemoryGiB: clampInt(int(totalRAMBytes/(1<<30))/4, 4, 8),
 		DiskGiB:   30,
 	}

@@ -105,6 +105,10 @@ function runCheck({ name, args }: { name: string; args: string[] }): {
       // A slot the run can always take, so counting shows up as an entry
       // rather than as a wait.
       CHECK_SLOTS: "1",
+      // Pin the JS queue: on a machine with haven installed the wrapper
+      // would otherwise delegate this run to `haven slot run`, and the
+      // entry-file assertions below read the JS queue's ledger.
+      CHECK_QUEUE_IMPL: "js",
     },
   });
   return { stdout: result.stdout, status: result.status };

@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/netports"
+	"github.com/langwatch/langwatch/tools/thuishaven/app"
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
@@ -329,6 +330,47 @@ func parseProcessGroups(listing string) map[int][]int {
 // psCommandColumns is how many leading numeric columns the orphan listing asks
 // for before the command itself (ppid, pid).
 const psCommandColumns = 2
+
+// ProcessSamples lists every live process with the facts the tsgo governor
+// needs (ADR-095). A row whose numbers do not parse is dropped: the governor
+// makes kill decisions from these samples, so it never guesses.
+func (System) ProcessSamples() []app.ProcessSample {
+	out, err := probe("ps", "-ax", "-o", "pid=,rss=,cputime=,etime=,command=")
+	if err != nil {
+		return nil
+	}
+	var samples []app.ProcessSample
+	for line := range strings.SplitSeq(string(out), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 5 {
+			continue
+		}
+		pid, pidErr := strconv.Atoi(fields[0])
+		rssKB, rssErr := strconv.ParseInt(fields[1], 10, 64)
+		cpu, cpuOK := domain.ParsePSDuration(fields[2])
+		elapsed, elapsedOK := domain.ParsePSDuration(fields[3])
+		if pidErr != nil || rssErr != nil || !cpuOK || !elapsedOK {
+			continue
+		}
+		samples = append(samples, app.ProcessSample{
+			PID:      pid,
+			RSSBytes: rssKB << 10,
+			CPUTime:  cpu,
+			Elapsed:  elapsed,
+			Command:  strings.Join(fields[4:], " "),
+		})
+	}
+	return samples
+}
+
+// Kill SIGKILLs one process — never its group (see the port's contract: the
+// governor's targets live in process groups whose other members must survive).
+func (System) Kill(pid int) {
+	if pid <= 0 {
+		return
+	}
+	_ = syscall.Kill(pid, syscall.SIGKILL)
+}
 
 // OrphanedWorkers lists test-worker processes whose parent is PID 1 — on macOS
 // that is launchd, and it means an interrupted run left them behind.
