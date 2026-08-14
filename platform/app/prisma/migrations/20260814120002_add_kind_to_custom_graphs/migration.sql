@@ -17,8 +17,20 @@ ALTER TABLE "CustomGraph"
 -- in-memory filter as the other kind's row count grows.
 CREATE INDEX "CustomGraph_projectId_kind_idx" ON "CustomGraph"("projectId", "kind");
 
--- Down (manual rollback only; Prisma does not execute this block):
--- DROP INDEX "CustomGraph_projectId_kind_idx";
--- ALTER TABLE "CustomGraph" DROP COLUMN "kind";
--- WARNING: dropping "kind" removes the builder/workbench discriminator, so any
--- saved workbench chart rows would become indistinguishable from builder rows.
+-- IRREVERSIBLE: there is no safe down migration once a workbench chart is saved.
+--
+-- Dropping "kind" does not restore the prior state, it corrupts it. The
+-- discriminator is the only thing separating the two payload shapes living in
+-- "graph"; without it, every saved workbench definition — { sql, parameters,
+-- vegaLiteSpec } — is left in a table the chart builder reads unfiltered, and
+-- the builder parser receives a payload it has no case for. The rows are still
+-- there, which is precisely the problem: a DROP COLUMN that leaves data behind
+-- under no label is data corruption wearing a rollback's clothes.
+--
+-- To reverse this deliberately, the workbench rows must be dealt with FIRST,
+-- while the discriminator can still identify them — exported and deleted, or
+-- migrated to a payload the builder understands — and only then may the column
+-- go. That is a data decision, not a schema one, so it is not scripted here.
+--
+-- Dropping the index alone is safe and independent:
+--   DROP INDEX "CustomGraph_projectId_kind_idx";
