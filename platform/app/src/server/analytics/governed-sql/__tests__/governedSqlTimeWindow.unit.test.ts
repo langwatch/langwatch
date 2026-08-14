@@ -131,6 +131,21 @@ describe("given a declared parameter type", () => {
         expect(isGovernedSqlDateTimeParameterType(type), type).toBe(false);
       }
     });
+
+    /** @scenario "A reserved period parameter declared as anything but a date-time is refused" */
+    it("refuses a zone other than UTC, which would silently shift the window", () => {
+      // The injected value is a UTC wall clock with no zone designator, so a
+      // declaration read in another zone moves every boundary by that zone's
+      // offset — with nothing on screen to say so.
+      for (const type of [
+        "DateTime('Asia/Tokyo')",
+        "DateTime('America/New_York')",
+        "DateTime64(3, 'Asia/Tokyo')",
+        "DateTime('utc')",
+      ]) {
+        expect(isGovernedSqlDateTimeParameterType(type), type).toBe(false);
+      }
+    });
   });
 });
 

@@ -40,6 +40,7 @@ import {
   MAX_GOVERNED_SQL_LENGTH,
 } from "~/server/analytics/governed-sql";
 import { GovernedSqlNotEnabledError } from "~/server/analytics/governed-sql/errors";
+import { governedSqlTimeWindowSchema } from "~/server/analytics/governed-sql/timeWindowSchema";
 import { type createProjectApp, requires } from "~/server/api/security";
 import { getProtectionsForProject } from "~/server/api/utils";
 import { validator as zValidator } from "~/server/api/validation";
@@ -77,9 +78,7 @@ const governedSqlQuerySchema = z.object({
    * reserved `period_start` / `period_end` parameters the statement declares —
    * which is also why sending either of those under `parameters` is refused.
    */
-  timeWindow: z
-    .object({ start: z.coerce.date(), end: z.coerce.date() })
-    .optional(),
+  timeWindow: governedSqlTimeWindowSchema.optional(),
 });
 
 // Response schemas exist for the published OpenAPI document. The service owns

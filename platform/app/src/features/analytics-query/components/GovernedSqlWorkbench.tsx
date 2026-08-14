@@ -134,16 +134,27 @@ function followsTimeWindowOf(
  * The page's period is the default rather than a starting value that then drifts
  * — an unoverridden workbench follows the period selector for as long as it is
  * open, which is what makes authoring behave the way the dashboard will.
+ *
+ * The override is scoped to the opened chart's revision the same way the
+ * specification draft is: a window held while chart A was open must not become
+ * the window chart B runs with the moment it is opened.
  */
 function useWorkbenchTimeWindow({
   query,
+  openedRevision,
 }: {
   query: ReturnType<typeof useGovernedSqlQuery>;
+  /** Bumped whenever a saved chart is opened. */
+  openedRevision: number;
 }) {
   const { period } = usePeriodSelector();
-  const [override, setOverride] = useState<GovernedSqlTimeWindowValues | null>(
-    null,
-  );
+  const [override, setOverride] = useState<{
+    revision: number;
+    window: GovernedSqlTimeWindowValues;
+  } | null>(null);
+  // Whether the editor's visible text names a window that can run. Held here
+  // so the Run gate and the editor read one answer.
+  const [sendable, setSendable] = useState(true);
 
   const pagePeriod = useMemo(
     () => ({
@@ -152,7 +163,11 @@ function useWorkbenchTimeWindow({
     }),
     [period.startDate, period.endDate],
   );
-  const value = override ?? pagePeriod;
+  const held =
+    override !== null && override.revision === openedRevision
+      ? override.window
+      : null;
+  const value = held ?? pagePeriod;
 
   const { setTimeWindow } = query;
   useEffect(() => {
@@ -161,8 +176,14 @@ function useWorkbenchTimeWindow({
 
   return {
     value,
-    overridden: override !== null,
-    onOverride: setOverride,
+    overridden: held !== null,
+    sendable,
+    onSendableChange: setSendable,
+    onOverride: useCallback(
+      (window: GovernedSqlTimeWindowValues) =>
+        setOverride({ revision: openedRevision, window }),
+      [openedRevision],
+    ),
     onFollowPage: useCallback(() => setOverride(null), []),
   };
 }
@@ -383,7 +404,10 @@ export function GovernedSqlWorkbench({ projectId }: GovernedSqlWorkbenchProps) {
   });
   const failure = useMemo(() => failureView(query.state), [query.state]);
   const wiring = useSavedChartWiring({ projectId, query });
-  const timeWindow = useWorkbenchTimeWindow({ query });
+  const timeWindow = useWorkbenchTimeWindow({
+    query,
+    openedRevision: wiring.openedRevision,
+  });
   const { shownSpecText, setEditedSpecText } = useSpecDraft(wiring);
 
   return (
@@ -527,6 +551,7 @@ function QueryCard({
         runnable={
           draft.sql.trim().length > 0 &&
           parametersSendable &&
+          timeWindow.sendable &&
           !query.state.inFlight
         }
         inFlight={query.state.inFlight}
@@ -570,6 +595,7 @@ function QueryCard({
           onOverride={timeWindow.onOverride}
           onFollowPage={timeWindow.onFollowPage}
           followsTimeWindow={followsTimeWindowOf(query.state)}
+          onSendableChange={timeWindow.onSendableChange}
         />
 
         <GovernedSqlParametersEditor
