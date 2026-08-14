@@ -74,13 +74,26 @@ export class IdentityErasureTokenService {
    * start is the recoverable outcome.
    */
   static fromEnv(): IdentityErasureTokenService {
-    const secret = env.LW_IDENTITY_ERASURE_SECRET;
-    if (!secret) {
+    const service = IdentityErasureTokenService.fromEnvOrNull();
+    if (!service) {
       throw new Error(
         "LW_IDENTITY_ERASURE_SECRET is not set — erasure and erased-timeline matching both need it",
       );
     }
-    return new IdentityErasureTokenService(secret);
+    return service;
+  }
+
+  /**
+   * For readers rather than erasers. The report wants the key so an erased
+   * person keeps matching their own timeline, but a missing key must not take
+   * the whole report down: an instance that has never erased anybody has
+   * nothing to match, and one that has necessarily had the key set, because
+   * {@link fromEnv} refuses without it. Callers log the degradation rather
+   * than failing on it.
+   */
+  static fromEnvOrNull(): IdentityErasureTokenService | null {
+    const secret = env.LW_IDENTITY_ERASURE_SECRET;
+    return secret ? new IdentityErasureTokenService(secret) : null;
   }
 
   /**
