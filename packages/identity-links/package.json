@@ -1,0 +1,29 @@
+{
+	"name": "@langwatch/identity-links",
+	"version": "0.0.1",
+	"private": true,
+	"description": "ADR-094 provider-login → person links: the vocabulary, the add-only storage contract and the per-period resolution that answers \"who owned this provider login at this moment?\". Reporting only — exposes nothing shaped like a permission check, and the access-control packages must never depend on it.",
+	"type": "module",
+	"packageManager": "pnpm@10.24.0",
+	"main": "src/index.ts",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"scripts": {
+		"typecheck": "tsc --noEmit",
+		"test": "vitest",
+		"test:unit": "vitest run"
+	},
+	"keywords": [
+		"langwatch",
+		"identity",
+		"attribution",
+		"governance"
+	],
+	"license": "MIT",
+	"devDependencies": {
+		"@types/node": "^26.0.1",
+		"typescript": "^7.0.2",
+		"vitest": "^4.1.9"
+	}
+}
