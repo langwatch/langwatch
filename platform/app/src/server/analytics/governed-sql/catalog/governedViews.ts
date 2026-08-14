@@ -17,16 +17,57 @@
  * merely unselected.
  *
  * Event-sourcing bookkeeping (`ProjectionId`, `Version`, `LastProcessedEventId`,
- * `LastEventOccurredAt`, `CreatedAt`) is absent for the same structural reason
- * and a different substantive one: it describes how a row got written, which is
- * not something the API promises to keep stable.
+ * `LastEventOccurredAt`, `CreatedAt`, `EarliestSpanStartMs`, `_retention_days`)
+ * is absent for the same structural reason and a different substantive one: it
+ * describes how a row got written or how long it is kept, which is not
+ * something the API promises to keep stable.
+ *
+ * ## Two datasets over one trace, and why that is not two answers
+ *
+ * `traces` and `trace_metrics` are both one row per trace, and `evaluations`
+ * and `evaluation_metrics` are both one row per evaluation, because the write
+ * path maintains two projections of each. They are folded from the *same*
+ * events by the *same* services, so the values they share agree; what differs
+ * is which questions each is shaped for, and each carries columns the other
+ * does not:
+ *
+ *  - `traces` / `evaluations` are the complete record — captured input and
+ *    output, prompt lineage, the evaluator's explanation — sorted for point
+ *    lookups by id.
+ *  - `trace_metrics` / `evaluation_metrics` are the analytics projections:
+ *    time-sorted for range scans, carrying the hoisted `UserId`,
+ *    `ConversationId`, `CustomerId` and `Origin` dimensions, and carrying no
+ *    captured content at all because the fold never writes any onto them.
+ *  - `trace_metrics_by_minute` / `evaluation_metrics_by_minute` are
+ *    pre-aggregated per minute, for a metric a caller wants without touching
+ *    per-row data.
+ *
+ * Note the `_by_minute` rollups count only what was final when the row was
+ * written: a trace contributes to `TraceCount` through its root span, so a
+ * trace whose root span never arrived contributes sums and no count. A
+ * distinct-trace count is a question for `trace_metrics`.
  *
  * ## Grain
  *
- * Every source table is a `ReplacingMergeTree` carrying more than one version
+ * Most source tables are `ReplacingMergeTree`s carrying more than one version
  * of a row until merges catch up, so each view deduplicates and each entry
- * states the identity of the row that survives. See `../views.ts` for how, and
- * for the measurement behind the choice.
+ * states two things about its rows. `dedup.keyColumns` is the source's whole
+ * `ORDER BY` — the key the *engine* collapses on, which is what `FINAL` can
+ * promise and nothing more. `grainColumns` is what one row of the *dataset* is,
+ * declared only where the two differ, which is where the sort key leads with a
+ * business time so that range scans are monotonic. Both analytics projections
+ * are sorted that way, and they answer it differently: `trace_analytics` freezes
+ * its `OccurredAt` as a storage anchor, so the engine's key and the trace are
+ * the same row, while `evaluation_analytics` writes its progress watermark into
+ * `OccurredAt`, which moves — so that entry pins the `in-tuple` strategy and is
+ * deduplicated by the evaluation rather than by the engine's key.
+ *
+ * The `_by_minute` rollups are `AggregatingMergeTree`s instead, whose rows for
+ * one key are summed rather than superseded — which their entries declare,
+ * because reading one as if it had versions would expose each unmerged partial
+ * row as its own answer. Their measures declare `summed` and the cast back to a
+ * plain type is derived from it. See `../views.ts` for how, and for the
+ * measurement behind the default.
  *
  * @see ./types.ts — the shapes, and the derivations the validator reads
  * @see specs/analytics/governed-sql-api.feature
@@ -763,6 +804,873 @@ const SIMULATIONS: GovernedViewDefinition = {
 };
 
 /**
+ * Trace metrics: one row per trace, the analytics projection of the same fold.
+ *
+ * One row per trace is the *grain*; the source's `ORDER BY` is wider, leading
+ * with `OccurredAt` so that range scans are monotonic over a part. The two
+ * agree for every row the current fold writes, because `OccurredAt` here is a
+ * storage anchor written once and frozen (migration 00061, ADR-071). Where they
+ * can still come apart is a row written before that freeze, or one whose anchor
+ * a post-miss rebuild re-stamped: those carry two `OccurredAt`s, which the
+ * engine reads as two keys and `FINAL` therefore keeps — so `uniqExact(TraceId)`
+ * is the honest way to count traces here, as the description says.
+ */
+const TRACE_METRICS: GovernedViewDefinition = {
+  name: "trace_metrics",
+  sourceTable: "trace_analytics",
+  description:
+    "One row per trace, time-sorted, carrying its metrics and the user, conversation, customer and origin dimensions. Count traces with uniqExact(TraceId).",
+  gates: [],
+  grain:
+    "one row per (TenantId, OccurredAt, TraceId), latest version only; one row per trace wherever OccurredAt held still",
+  // No `grainColumns`: `FINAL` merges on the sort key and nothing narrower, so
+  // declaring `(TenantId, TraceId)` would publish a grain the engine cannot
+  // deliver — a pre-freeze row whose anchor moved carries two `OccurredAt`s and
+  // comes back as two rows (see the doc above). The join below is still the
+  // right one; the fanout diagnostic honestly reporting `OccurredAt` unmatched
+  // is the price of not overstating the grain.
+  joinKeys: ["TenantId", "TraceId"],
+  timeColumn: "OccurredAt",
+  freshness: PROJECTION_FRESHNESS,
+  dedup: {
+    keyColumns: ["TenantId", "OccurredAt", "TraceId"],
+    versionColumn: "UpdatedAt",
+  },
+  columns: [
+    {
+      name: "TenantId",
+      type: "String",
+      description: "Project the trace belongs to.",
+      gates: [],
+      sourceColumns: ["TenantId"],
+    },
+    {
+      name: "TraceId",
+      type: "String",
+      description: "Trace identifier, unique within the project.",
+      gates: [],
+      sourceColumns: ["TraceId"],
+    },
+    {
+      name: "OccurredAt",
+      type: "DateTime64(3)",
+      description:
+        "When the trace was first observed. Filter on this to prune partitions.",
+      gates: [],
+      sourceColumns: ["OccurredAt"],
+    },
+    {
+      name: "UpdatedAt",
+      type: "DateTime64(3)",
+      description: "When this version of the row was written.",
+      gates: [],
+      sourceColumns: ["UpdatedAt"],
+    },
+    {
+      name: "TraceName",
+      type: "String",
+      description: "Display name of the trace, empty when none was recorded.",
+      gates: [],
+      sourceColumns: ["TraceName"],
+    },
+    {
+      name: "TopicId",
+      type: "Nullable(String)",
+      description: "Topic the trace was clustered into.",
+      gates: [],
+      sourceColumns: ["TopicId"],
+    },
+    {
+      name: "SubTopicId",
+      type: "Nullable(String)",
+      description: "Sub-topic the trace was clustered into.",
+      gates: [],
+      sourceColumns: ["SubTopicId"],
+    },
+    // The three identifiers below name the *customer's* end user, thread and
+    // account, not a LangWatch colleague — they are the dimensions the product
+    // groups by, hoisted out of the attribute map onto typed columns. The
+    // data-privacy catalog classifies none of the attributes they come from as
+    // content ("metadata keys … are deliberately absent", `dropKeyCatalog.ts`),
+    // so they already survive a content drop and reach a caller through
+    // `Attributes` today. Withholding the typed column would gate one spelling
+    // of a value and not the other.
+    {
+      name: "UserId",
+      type: "Nullable(String)",
+      description: "End user the trace was recorded for, as the SDK reported.",
+      gates: [],
+      sourceColumns: ["UserId"],
+    },
+    {
+      name: "ConversationId",
+      type: "Nullable(String)",
+      description: "Conversation or thread the trace belongs to.",
+      gates: [],
+      sourceColumns: ["ConversationId"],
+    },
+    {
+      name: "CustomerId",
+      type: "Nullable(String)",
+      description: "Customer account the trace was recorded for.",
+      gates: [],
+      sourceColumns: ["CustomerId"],
+    },
+    {
+      name: "Origin",
+      type: "String",
+      description: "Which product surface produced the trace.",
+      gates: [],
+      sourceColumns: ["Origin"],
+    },
+    {
+      name: "Models",
+      type: "Array(String)",
+      description: "Every model used anywhere in the trace.",
+      gates: [],
+      sourceColumns: ["Models"],
+    },
+    {
+      name: "Labels",
+      type: "Array(String)",
+      description: "Labels the SDK attached to the trace.",
+      gates: [],
+      sourceColumns: ["Labels"],
+    },
+    {
+      name: "TotalCost",
+      type: "Nullable(Float64)",
+      unit: "USD",
+      description: "Billed cost of the trace, in USD.",
+      gates: ["costs"],
+      sourceColumns: ["TotalCost"],
+    },
+    {
+      name: "NonBilledCost",
+      type: "Nullable(Float64)",
+      unit: "USD",
+      description: "Cost of the trace that is not billed, in USD.",
+      gates: ["costs"],
+      sourceColumns: ["NonBilledCost"],
+    },
+    {
+      name: "TotalDurationMs",
+      type: "Int64",
+      unit: "ms",
+      description: "Wall-clock duration of the whole trace, in milliseconds.",
+      gates: [],
+      sourceColumns: ["TotalDurationMs"],
+    },
+    {
+      name: "TimeToFirstTokenMs",
+      type: "Nullable(UInt32)",
+      unit: "ms",
+      description: "Milliseconds until the first generated token.",
+      gates: [],
+      sourceColumns: ["TimeToFirstTokenMs"],
+    },
+    {
+      name: "TokensPerSecond",
+      type: "Nullable(UInt32)",
+      unit: "tokens/s",
+      description: "Generation throughput over the trace.",
+      gates: [],
+      sourceColumns: ["TokensPerSecond"],
+    },
+    {
+      name: "PromptTokens",
+      type: "Nullable(UInt32)",
+      unit: "tokens",
+      description: "Prompt tokens across the trace.",
+      gates: [],
+      sourceColumns: ["PromptTokens"],
+    },
+    {
+      name: "CompletionTokens",
+      type: "Nullable(UInt32)",
+      unit: "tokens",
+      description: "Completion tokens across the trace.",
+      gates: [],
+      sourceColumns: ["CompletionTokens"],
+    },
+    {
+      name: "CacheReadTokens",
+      type: "Nullable(UInt32)",
+      unit: "tokens",
+      description: "Tokens served from the provider's prompt cache.",
+      gates: [],
+      sourceColumns: ["CacheReadTokens"],
+    },
+    {
+      name: "CacheWriteTokens",
+      type: "Nullable(UInt32)",
+      unit: "tokens",
+      description: "Tokens written into the provider's prompt cache.",
+      gates: [],
+      sourceColumns: ["CacheWriteTokens"],
+    },
+    {
+      name: "ReasoningTokens",
+      type: "Nullable(UInt32)",
+      unit: "tokens",
+      description: "Tokens the model spent reasoning.",
+      gates: [],
+      sourceColumns: ["ReasoningTokens"],
+    },
+    {
+      name: "HasError",
+      type: "Bool",
+      description: "Whether any span of the trace ended in an error status.",
+      gates: [],
+      sourceColumns: ["HasError"],
+    },
+    // `HasAnnotation` is left out here for exactly the reason it is left out of
+    // `traces`: it is folded from a best-effort dual-write of the annotation
+    // ids, while `annotations` reads PostgreSQL directly, and publishing both
+    // would answer "how many traces were annotated" two ways with nothing in
+    // the schema saying which is authoritative. The authoritative one is
+    // `annotations`.
+    //
+    // `EarliestSpanStartMs` is left out as fold working state: migration 00061
+    // split it off `OccurredAt` so `store.get()` can decode the fold's span
+    // timing baseline, which is how a row gets written rather than anything
+    // about the trace.
+    //
+    // `Attributes` is withheld: the fold's size trim
+    // (`analytics-attribute-trim.service.ts`) can evict keys with nothing in
+    // the row saying it happened, so a caller cannot tell an absent key from a
+    // trimmed one — a silently incomplete map read as complete. `traces`
+    // carries the attributes; re-add here once the trim marks what it dropped.
+  ],
+};
+
+/**
+ * Trace metrics per minute: the pre-aggregated fast path.
+ *
+ * The source rollup breaks each minute down by (Model, SpanType); this view
+ * groups that breakdown away, because half its measures are trace facts
+ * (TraceCount, ErrorCount, DurationSum) that a per-model split would
+ * misstate. The span-fact breakdown is `model_usage_by_minute`.
+ */
+const TRACE_METRICS_BY_MINUTE: GovernedViewDefinition = {
+  name: "trace_metrics_by_minute",
+  sourceTable: "trace_analytics_rollup",
+  description:
+    "Trace and span metrics summed per minute. Every measure is a sum: divide by TraceCount for a per-trace average.",
+  gates: [],
+  grain: "one row per (TenantId, BucketStart), every measure summed",
+  grainColumns: ["TenantId", "BucketStart"],
+  // The grain itself: the source's (Model, SpanType) breakdown is grouped away
+  // in the view, so a minute join meets exactly one row. The per-model
+  // breakdown lives in `model_usage_by_minute`.
+  joinKeys: ["TenantId", "BucketStart"],
+  timeColumn: "BucketStart",
+  freshness: PROJECTION_FRESHNESS,
+  dedup: {
+    // The source's whole `ORDER BY` — the key the `AggregatingMergeTree`
+    // merges on — which is wider than the published grain, so the view is
+    // rendered as a `GROUP BY` over the grain rather than with `FINAL`.
+    keyColumns: ["TenantId", "BucketStart", "Model", "SpanType"],
+    aggregating: true,
+  },
+  columns: [
+    {
+      name: "TenantId",
+      type: "String",
+      description: "Project the bucket belongs to.",
+      gates: [],
+      sourceColumns: ["TenantId"],
+    },
+    {
+      name: "BucketStart",
+      type: "DateTime64(3)",
+      description:
+        "Start of the minute the measures cover. Filter on this to prune partitions.",
+      gates: [],
+      sourceColumns: ["BucketStart"],
+    },
+    {
+      name: "SpanCount",
+      type: "UInt64",
+      description: "Spans recorded in the bucket.",
+      gates: [],
+      sourceColumns: ["SpanCount"],
+      summed: true,
+    },
+    {
+      name: "TraceCount",
+      type: "UInt64",
+      description:
+        "Traces started in the bucket. Counts a trace once its root span arrives, so a trace with no root span contributes measures and no count.",
+      gates: [],
+      sourceColumns: ["TraceCount"],
+      summed: true,
+    },
+    {
+      name: "ErrorCount",
+      type: "UInt64",
+      description:
+        "Traces in the bucket whose root span ended in an error status.",
+      gates: [],
+      sourceColumns: ["ErrorCount"],
+      summed: true,
+    },
+    {
+      name: "CostSum",
+      type: "Float64",
+      unit: "USD",
+      description: "Total cost of the bucket's spans, in USD.",
+      gates: ["costs"],
+      sourceColumns: ["CostSum"],
+      summed: true,
+    },
+    {
+      name: "NonBilledCostSum",
+      type: "Float64",
+      unit: "USD",
+      description:
+        "Cost of the bucket's spans that is not billed, in USD. Billed cost is the difference from CostSum.",
+      gates: ["costs"],
+      sourceColumns: ["NonBilledCostSum"],
+      summed: true,
+    },
+    {
+      name: "DurationSum",
+      type: "Int64",
+      unit: "ms",
+      description:
+        "Total wall-clock duration of the bucket's traces, in milliseconds.",
+      gates: [],
+      sourceColumns: ["DurationSum"],
+      summed: true,
+    },
+    {
+      name: "PromptTokensSum",
+      type: "UInt64",
+      unit: "tokens",
+      description: "Prompt tokens across the bucket's spans.",
+      gates: [],
+      sourceColumns: ["PromptTokensSum"],
+      summed: true,
+    },
+    {
+      name: "CompletionTokensSum",
+      type: "UInt64",
+      unit: "tokens",
+      description: "Completion tokens across the bucket's spans.",
+      gates: [],
+      sourceColumns: ["CompletionTokensSum"],
+      summed: true,
+    },
+    {
+      name: "CacheReadTokensSum",
+      type: "UInt64",
+      unit: "tokens",
+      description:
+        "Tokens served from the provider's prompt cache across the bucket's spans.",
+      gates: [],
+      sourceColumns: ["CacheReadTokensSum"],
+      summed: true,
+    },
+    {
+      name: "CacheWriteTokensSum",
+      type: "UInt64",
+      unit: "tokens",
+      description:
+        "Tokens written into the provider's prompt cache across the bucket's spans.",
+      gates: [],
+      sourceColumns: ["CacheWriteTokensSum"],
+      summed: true,
+    },
+    {
+      name: "ReasoningTokensSum",
+      type: "UInt64",
+      unit: "tokens",
+      description: "Reasoning tokens across the bucket's spans.",
+      gates: [],
+      sourceColumns: ["ReasoningTokensSum"],
+      summed: true,
+    },
+  ],
+};
+
+/**
+ * Model usage per minute: the (Model, SpanType) breakdown of the trace rollup.
+ *
+ * Span facts only. The rollup also carries trace facts — TraceCount,
+ * ErrorCount, DurationSum — which belong to a whole trace and would be
+ * misleading broken out by the model of individual spans, so they are
+ * published on `trace_metrics_by_minute` and withheld here.
+ */
+const MODEL_USAGE_BY_MINUTE: GovernedViewDefinition = {
+  name: "model_usage_by_minute",
+  sourceTable: "trace_analytics_rollup",
+  description:
+    "Span metrics summed per minute, per model and span type: span counts, costs and tokens.",
+  gates: [],
+  grain:
+    "one merged row per (TenantId, BucketStart, Model, SpanType), every measure summed",
+  // The whole bucket key: every column here is a *sum*, so a join that
+  // matches less than the key meets several buckets and multiplies them —
+  // a wrong number rather than a repeated row.
+  joinKeys: ["TenantId", "BucketStart", "Model", "SpanType"],
+  timeColumn: "BucketStart",
+  freshness: PROJECTION_FRESHNESS,
+  dedup: {
+    // The source's whole `ORDER BY`, because that is the key the
+    // `AggregatingMergeTree` merges on.
+    keyColumns: ["TenantId", "BucketStart", "Model", "SpanType"],
+    aggregating: true,
+  },
+  columns: [
+    {
+      name: "TenantId",
+      type: "String",
+      description: "Project the bucket belongs to.",
+      gates: [],
+      sourceColumns: ["TenantId"],
+    },
+    {
+      name: "BucketStart",
+      type: "DateTime64(3)",
+      description:
+        "Start of the minute the measures cover. Filter on this to prune partitions.",
+      gates: [],
+      sourceColumns: ["BucketStart"],
+    },
+    {
+      name: "Model",
+      type: "LowCardinality(String)",
+      description:
+        "Model the spans in this bucket used, empty when they recorded none.",
+      gates: [],
+      sourceColumns: ["Model"],
+    },
+    {
+      name: "SpanType",
+      type: "LowCardinality(String)",
+      description:
+        "Kind of span the bucket covers, empty when the spans recorded none.",
+      gates: [],
+      sourceColumns: ["SpanType"],
+    },
+    {
+      name: "SpanCount",
+      type: "UInt64",
+      description: "Spans recorded in the bucket.",
+      gates: [],
+      sourceColumns: ["SpanCount"],
+      summed: true,
+    },
+    {
+      name: "CostSum",
+      type: "Float64",
+      unit: "USD",
+      description: "Total cost of the bucket's spans, in USD.",
+      gates: ["costs"],
+      sourceColumns: ["CostSum"],
+      summed: true,
+    },
+    {
+      name: "NonBilledCostSum",
+      type: "Float64",
+      unit: "USD",
+      description:
+        "Cost of the bucket's spans that is not billed, in USD. Billed cost is the difference from CostSum.",
+      gates: ["costs"],
+      sourceColumns: ["NonBilledCostSum"],
+      summed: true,
+    },
+    {
+      name: "PromptTokensSum",
+      type: "UInt64",
+      unit: "tokens",
+      description: "Prompt tokens across the bucket's spans.",
+      gates: [],
+      sourceColumns: ["PromptTokensSum"],
+      summed: true,
+    },
+    {
+      name: "CompletionTokensSum",
+      type: "UInt64",
+      unit: "tokens",
+      description: "Completion tokens across the bucket's spans.",
+      gates: [],
+      sourceColumns: ["CompletionTokensSum"],
+      summed: true,
+    },
+    {
+      name: "CacheReadTokensSum",
+      type: "UInt64",
+      unit: "tokens",
+      description:
+        "Tokens served from the provider's prompt cache across the bucket's spans.",
+      gates: [],
+      sourceColumns: ["CacheReadTokensSum"],
+      summed: true,
+    },
+    {
+      name: "CacheWriteTokensSum",
+      type: "UInt64",
+      unit: "tokens",
+      description:
+        "Tokens written into the provider's prompt cache across the bucket's spans.",
+      gates: [],
+      sourceColumns: ["CacheWriteTokensSum"],
+      summed: true,
+    },
+    {
+      name: "ReasoningTokensSum",
+      type: "UInt64",
+      unit: "tokens",
+      description: "Reasoning tokens across the bucket's spans.",
+      gates: [],
+      sourceColumns: ["ReasoningTokensSum"],
+      summed: true,
+    },
+  ],
+};
+
+/**
+ * Evaluation metrics: one row per evaluation, the analytics projection.
+ *
+ * The one entry in the catalog that does not take the shipped dedup strategy.
+ * `evaluation_analytics` is sorted `(TenantId, OccurredAt, EvaluationId)`,
+ * and the fold writes its progress watermark — `max(previous, event time)` —
+ * straight into `OccurredAt`, so an evaluation that received a second lifecycle
+ * event carries two sort keys. `FINAL` merges by the sort key and nothing else,
+ * so it would keep both rows: not a visible duplicate, but every `count`, `sum`
+ * and `avg` a caller writes over this dataset silently counting that evaluation
+ * twice. The owning repository refuses `FINAL` on this table for the same
+ * reason, and deduplicates the way this entry does — `max(UpdatedAt)` per
+ * evaluation, whatever `OccurredAt` each version carries.
+ */
+const EVALUATION_METRICS: GovernedViewDefinition = {
+  name: "evaluation_metrics",
+  sourceTable: "evaluation_analytics",
+  description:
+    "One row per evaluation, its latest state, time-sorted, carrying its outcome, cost and the trace dimensions it inherited.",
+  gates: [],
+  grain: "one row per (TenantId, EvaluationId), latest version only",
+  grainColumns: ["TenantId", "EvaluationId"],
+  joinKeys: ["TenantId", "TraceId"],
+  timeColumn: "OccurredAt",
+  freshness: PROJECTION_FRESHNESS,
+  dedup: {
+    strategy: "in-tuple",
+    keyColumns: ["TenantId", "OccurredAt", "EvaluationId"],
+    versionColumn: "UpdatedAt",
+  },
+  columns: [
+    {
+      name: "TenantId",
+      type: "String",
+      description: "Project the evaluation belongs to.",
+      gates: [],
+      sourceColumns: ["TenantId"],
+    },
+    {
+      name: "EvaluationId",
+      type: "String",
+      description: "Evaluation run identifier.",
+      gates: [],
+      sourceColumns: ["EvaluationId"],
+    },
+    {
+      name: "OccurredAt",
+      type: "DateTime64(3)",
+      description:
+        "When the evaluation reached its latest state. Filter on this to prune partitions.",
+      gates: [],
+      sourceColumns: ["OccurredAt"],
+    },
+    {
+      name: "UpdatedAt",
+      type: "DateTime64(3)",
+      description: "When this version of the row was written.",
+      gates: [],
+      sourceColumns: ["UpdatedAt"],
+    },
+    {
+      name: "TraceId",
+      type: "Nullable(String)",
+      description: "Trace the evaluation ran against, when it ran against one.",
+      gates: [],
+      sourceColumns: ["TraceId"],
+    },
+    {
+      name: "EvaluatorType",
+      type: "LowCardinality(String)",
+      description: "Kind of evaluator.",
+      gates: [],
+      sourceColumns: ["EvaluatorType"],
+    },
+    {
+      name: "EvaluatorName",
+      type: "Nullable(String)",
+      description: "Display name of the evaluator.",
+      gates: [],
+      sourceColumns: ["EvaluatorName"],
+    },
+    {
+      name: "Status",
+      type: "LowCardinality(String)",
+      description: "Terminal state of the run: processed, skipped, or error.",
+      gates: [],
+      sourceColumns: ["Status"],
+    },
+    {
+      name: "IsGuardrail",
+      type: "Bool",
+      description: "Whether the evaluator ran as a guardrail.",
+      gates: [],
+      sourceColumns: ["IsGuardrail"],
+    },
+    {
+      name: "Passed",
+      type: "Nullable(Bool)",
+      description: "Pass/fail outcome, when the evaluator produced one.",
+      gates: [],
+      sourceColumns: ["Passed"],
+    },
+    {
+      name: "Score",
+      type: "Nullable(Float64)",
+      description: "Numeric score, when the evaluator produced one.",
+      gates: [],
+      sourceColumns: ["Score"],
+    },
+    {
+      name: "Label",
+      type: "Nullable(String)",
+      description: "Categorical outcome, when the evaluator produced one.",
+      gates: [],
+      sourceColumns: ["Label"],
+    },
+    {
+      name: "Model",
+      type: "Nullable(String)",
+      description:
+        "Model the evaluator itself used, not the model under evaluation.",
+      gates: [],
+      sourceColumns: ["Model"],
+    },
+    // Lifted off the evaluated trace's own row, so they carry the meaning they
+    // carry on `trace_metrics` — and, for the same reason set out there, no
+    // gate in the visibility policy applies to them.
+    {
+      name: "UserId",
+      type: "Nullable(String)",
+      description: "End user of the trace the evaluation ran against.",
+      gates: [],
+      sourceColumns: ["UserId"],
+    },
+    {
+      name: "ConversationId",
+      type: "Nullable(String)",
+      description:
+        "Conversation the trace the evaluation ran against belongs to.",
+      gates: [],
+      sourceColumns: ["ConversationId"],
+    },
+    {
+      name: "CustomerId",
+      type: "Nullable(String)",
+      description: "Customer account the evaluated trace was recorded for.",
+      gates: [],
+      sourceColumns: ["CustomerId"],
+    },
+    {
+      name: "Origin",
+      type: "Nullable(String)",
+      description: "Which product surface produced the evaluated trace.",
+      gates: [],
+      sourceColumns: ["Origin"],
+    },
+    {
+      name: "DurationMs",
+      type: "Int64",
+      unit: "ms",
+      description:
+        "How long the evaluation took, in milliseconds. Zero when it was reported atomically.",
+      gates: [],
+      sourceColumns: ["DurationMs"],
+    },
+    {
+      name: "TotalCost",
+      type: "Nullable(Float64)",
+      unit: "USD",
+      description: "Billed cost of running the evaluator, in USD.",
+      gates: ["costs"],
+      sourceColumns: ["TotalCost"],
+    },
+    {
+      name: "NonBilledCost",
+      type: "Nullable(Float64)",
+      unit: "USD",
+      description: "Cost of running the evaluator that is not billed, in USD.",
+      gates: ["costs"],
+      sourceColumns: ["NonBilledCost"],
+    },
+    // The evaluator's payload and its explanation (`Inputs`, `Details`,
+    // `Error`, `ErrorDetails`) are not on this table at all — the analytics
+    // fold never writes them. `evaluations` is where a caller permitted to see
+    // captured input reads them.
+    {
+      name: "Attributes",
+      type: "Map(String, String)",
+      description:
+        "Evaluation-level attributes, with every captured-content key removed.",
+      gates: [],
+      sourceColumns: ["Attributes"],
+      expression: (source) => contentFilteredMapSql(source("Attributes")),
+    },
+  ],
+};
+
+/** Evaluation metrics per minute: the pre-aggregated fast path. */
+const EVALUATION_METRICS_BY_MINUTE: GovernedViewDefinition = {
+  name: "evaluation_metrics_by_minute",
+  sourceTable: "evaluation_analytics_rollup",
+  description:
+    "Evaluation outcomes summed per minute, per evaluator type and terminal status. Every measure is a sum: pass rate is PassCount over PassCount plus FailCount.",
+  gates: [],
+  grain:
+    "one merged row per (TenantId, BucketStart, EvaluatorType, Status), every measure summed",
+  // The whole bucket key: every column here is a *sum*, so a join that
+  // matches less than the key meets several buckets and multiplies them —
+  // a wrong number rather than a repeated row.
+  joinKeys: ["TenantId", "BucketStart", "EvaluatorType", "Status"],
+  timeColumn: "BucketStart",
+  freshness: PROJECTION_FRESHNESS,
+  dedup: {
+    keyColumns: ["TenantId", "BucketStart", "EvaluatorType", "Status"],
+    aggregating: true,
+  },
+  columns: [
+    {
+      name: "TenantId",
+      type: "String",
+      description: "Project the bucket belongs to.",
+      gates: [],
+      sourceColumns: ["TenantId"],
+    },
+    {
+      name: "BucketStart",
+      type: "DateTime64(3)",
+      description:
+        "Start of the minute the measures cover. Filter on this to prune partitions.",
+      gates: [],
+      sourceColumns: ["BucketStart"],
+    },
+    {
+      name: "EvaluatorType",
+      type: "LowCardinality(String)",
+      description: "Kind of evaluator the bucket covers.",
+      gates: [],
+      sourceColumns: ["EvaluatorType"],
+    },
+    {
+      name: "Status",
+      type: "LowCardinality(String)",
+      description:
+        "Terminal state the bucket covers: processed, skipped, or error.",
+      gates: [],
+      sourceColumns: ["Status"],
+    },
+    {
+      name: "EvalCount",
+      type: "UInt64",
+      description: "Evaluations that finished in the bucket.",
+      gates: [],
+      sourceColumns: ["EvalCount"],
+      summed: true,
+    },
+    {
+      name: "PassCount",
+      type: "UInt64",
+      description:
+        "Evaluations in the bucket the evaluator passed. Zero for evaluators that emit only a score.",
+      gates: [],
+      sourceColumns: ["PassCount"],
+      summed: true,
+    },
+    {
+      name: "FailCount",
+      type: "UInt64",
+      description:
+        "Evaluations in the bucket the evaluator failed. Zero for evaluators that emit only a score.",
+      gates: [],
+      sourceColumns: ["FailCount"],
+      summed: true,
+    },
+    {
+      name: "ErrorCount",
+      type: "UInt64",
+      description: "Evaluations in the bucket that ended in an error.",
+      gates: [],
+      sourceColumns: ["ErrorCount"],
+      summed: true,
+    },
+    {
+      name: "SkippedCount",
+      type: "UInt64",
+      description: "Evaluations in the bucket that were skipped.",
+      gates: [],
+      sourceColumns: ["SkippedCount"],
+      summed: true,
+    },
+    {
+      name: "ScoreSum",
+      type: "Float64",
+      description:
+        "Scores added up across the bucket. Divide by ScoreCount for the average score.",
+      gates: [],
+      sourceColumns: ["ScoreSum"],
+      summed: true,
+    },
+    {
+      name: "ScoreCount",
+      type: "UInt64",
+      description:
+        "Evaluations in the bucket that emitted a numeric score, the denominator for ScoreSum.",
+      gates: [],
+      sourceColumns: ["ScoreCount"],
+      summed: true,
+    },
+    {
+      name: "DurationSum",
+      type: "Int64",
+      unit: "ms",
+      description:
+        "Total wall-clock duration of the bucket's evaluations, in milliseconds.",
+      gates: [],
+      sourceColumns: ["DurationSum"],
+      summed: true,
+    },
+    {
+      name: "CostSum",
+      type: "Float64",
+      unit: "USD",
+      description: "Total cost of the bucket's evaluations, in USD.",
+      gates: ["costs"],
+      sourceColumns: ["CostSum"],
+      summed: true,
+    },
+    {
+      name: "NonBilledCostSum",
+      type: "Float64",
+      unit: "USD",
+      description:
+        "Cost of the bucket's evaluations that is not billed, in USD. Billed cost is the difference from CostSum.",
+      gates: ["costs"],
+      sourceColumns: ["NonBilledCostSum"],
+      summed: true,
+    },
+  ],
+};
+
+/**
  * The governed schema, in the order the schema endpoint should publish it:
  * the ClickHouse-resident facts, then the PostgreSQL-resident entities and
  * dimensions that name them.
@@ -783,6 +1691,11 @@ export const GOVERNED_VIEW_CATALOG: readonly GovernedViewDefinition[] = [
   SPANS,
   EVALUATIONS,
   SIMULATIONS,
+  TRACE_METRICS,
+  TRACE_METRICS_BY_MINUTE,
+  MODEL_USAGE_BY_MINUTE,
+  EVALUATION_METRICS,
+  EVALUATION_METRICS_BY_MINUTE,
   ...GOVERNED_POSTGRES_CATALOG,
 ];
 

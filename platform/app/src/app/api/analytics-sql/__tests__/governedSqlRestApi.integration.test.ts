@@ -268,6 +268,127 @@ async function seedTenant({
       UpdatedAt: SEED_AT,
     })),
   });
+
+  // The analytics projections and their rollups: the same traces and
+  // evaluations again, folded the way the analytics path folds them.
+  await admin.insert({
+    table: `${database}.trace_analytics`,
+    format: "JSONEachRow",
+    values: traceIds.map((traceId, index) => ({
+      TenantId: tenantId,
+      TraceId: traceId,
+      Version: "1",
+      OccurredAt: SEED_AT,
+      CreatedAt: SEED_AT,
+      UpdatedAt: SEED_AT,
+      TraceName: "checkout",
+      TopicId: "checkout",
+      UserId: `${tenantId}-end-user`,
+      ConversationId: `${tenantId}-thread`,
+      CustomerId: `${tenantId}-customer`,
+      Origin: "sdk",
+      Models: ["gpt-5-mini"],
+      Labels: ["checkout"],
+      TotalCost: 0.0042,
+      NonBilledCost: 0.0001,
+      TotalDurationMs: 100 * (index + 1),
+      TimeToFirstTokenMs: 120,
+      TokensPerSecond: 42,
+      PromptTokens: 100,
+      CompletionTokens: 20,
+      CacheReadTokens: 5,
+      CacheWriteTokens: 3,
+      ReasoningTokens: 7,
+      HasError: false,
+      Attributes: {
+        "gen_ai.request.model": "gpt-5-mini",
+        "gen_ai.prompt": `${marks.spanInput}-prompt`,
+      },
+    })),
+  });
+
+  await admin.insert({
+    table: `${database}.evaluation_analytics`,
+    format: "JSONEachRow",
+    values: [...Array(SEEDED_EVALUATIONS).keys()].map((index) => ({
+      TenantId: tenantId,
+      EvaluationId: `${tenantId}-eval-${index}`,
+      Version: "1",
+      OccurredAt: SEED_AT,
+      CreatedAt: SEED_AT,
+      UpdatedAt: SEED_AT,
+      EvaluatorType: "llm_judge",
+      EvaluatorName: "Quality",
+      Status: "processed",
+      IsGuardrail: false,
+      Passed: index % 2 === 0,
+      Score: 0.5 + index / 10,
+      Label: "good",
+      Model: "gpt-5-mini",
+      TraceId: traceIds[index % traceIds.length],
+      UserId: `${tenantId}-end-user`,
+      ConversationId: `${tenantId}-thread`,
+      CustomerId: `${tenantId}-customer`,
+      Origin: "sdk",
+      DurationMs: 340,
+      TotalCost: 0.0009,
+      NonBilledCost: 0,
+      Attributes: {
+        "gen_ai.request.model": "gpt-5-mini",
+        "gen_ai.prompt": `${marks.spanInput}-prompt`,
+      },
+    })),
+  });
+
+  await admin.insert({
+    table: `${database}.trace_analytics_rollup`,
+    format: "JSONEachRow",
+    values: [
+      {
+        TenantId: tenantId,
+        BucketStart: SEED_AT,
+        Model: "gpt-5-mini",
+        SpanType: "llm",
+        SpanCount: SEEDED_TRACES,
+        TraceCount: SEEDED_TRACES,
+        ErrorCount: 0,
+        CostSum: 0.0042 * SEEDED_TRACES,
+        NonBilledCostSum: 0.0001 * SEEDED_TRACES,
+        // The sum of `100 * (index + 1)` over the seeded traces above.
+        DurationSum: 2100,
+        PromptTokensSum: 100 * SEEDED_TRACES,
+        CompletionTokensSum: 20 * SEEDED_TRACES,
+        CacheReadTokensSum: 5 * SEEDED_TRACES,
+        CacheWriteTokensSum: 3 * SEEDED_TRACES,
+        ReasoningTokensSum: 7 * SEEDED_TRACES,
+      },
+    ],
+  });
+
+  await admin.insert({
+    table: `${database}.evaluation_analytics_rollup`,
+    format: "JSONEachRow",
+    values: [
+      {
+        TenantId: tenantId,
+        BucketStart: SEED_AT,
+        EvaluatorType: "llm_judge",
+        Status: "processed",
+        EvalCount: SEEDED_EVALUATIONS,
+        // The seeds above pass on even indices: half pass, half fail.
+        PassCount: SEEDED_EVALUATIONS / 2,
+        FailCount: SEEDED_EVALUATIONS / 2,
+        ErrorCount: 0,
+        SkippedCount: 0,
+        // The sum of `0.5 + index / 10` over the seeded evaluations above.
+        ScoreSum: 2.6,
+        ScoreCount: SEEDED_EVALUATIONS,
+        DurationSum: 340 * SEEDED_EVALUATIONS,
+        CostSum: 0.0009 * SEEDED_EVALUATIONS,
+        NonBilledCostSum: 0,
+      },
+    ],
+  });
 }
 
 describe("given the governed analytics SQL REST endpoints", () => {

@@ -218,6 +218,67 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
     And no ungated column is built over a content-carrying key
     And a caller whose permissions are unresolved has every gated column withheld
 
+  @unit
+  Scenario: A pre-aggregated dataset declares that its rows merge rather than supersede
+    Given the governed analytics schema catalog
+    When a dataset whose source aggregates is inspected
+    Then it declares every key its rows merge on
+    And it declares no version column, because no version supersedes another
+    And a dataset whose source keeps versions still declares the column that picks the survivor
+
+  @unit
+  Scenario: The analytics-optimised datasets expose no captured content
+    Given the governed analytics schema catalog
+    When the datasets built over the analytics projections are inspected
+    Then none of them exposes a content-gated column
+    And every attribute map any dataset exposes has the content keys filtered out
+
+  @unit
+  Scenario: A pre-aggregated dataset advertises its whole bucket key as its join keys
+    Given the governed analytics schema catalog
+    When a dataset whose rows are pre-aggregated buckets is inspected
+    Then every column of its bucket key is advertised as a join key
+    And a dataset whose rows are records may still advertise a key it is not unique on
+
+  @unit
+  Scenario: A summed measure reads the column it is named after
+    Given the governed analytics schema catalog
+    When a pre-aggregated measure is inspected
+    Then it reads the column it is named after
+    And it is read back as the numeric type the schema publishes for it
+    And it cannot carry SQL of its own that says otherwise
+
+  @unit
+  Scenario: A dataset whose sort key moves declares the strategy that deduplicates it
+    Given the governed analytics schema catalog
+    When a dataset whose source sorts by a column its write path moves is inspected
+    Then it declares that one row is one record rather than one sort key
+    And a dataset that declares a grain narrower than its engine's key declares a strategy that can deliver it
+    And the datasets whose sort keys hold still keep the shipped default
+
+  @integration
+  Scenario: A pre-aggregated dataset returns one merged row per bucket
+    Given a rollup table holding two partial rows for the same bucket
+    And the restricted identity carries tenant-a's valid key-hash context
+    When it reads that bucket through the governed view
+    Then one row is returned
+    And every measure is the sum of its own column's partial rows
+
+  @integration
+  Scenario: A dataset whose sort key moves is deduplicated by its own identity
+    Given a fact table holding two versions of one record under two different sort keys
+    And the restricted identity carries tenant-a's valid key-hash context
+    When it reads that record through the governed view
+    Then one row is returned
+    And it carries the newer version's values
+
+  @integration
+  Scenario: Every governed view's dedup declaration matches the table it reads
+    Given the shipped ClickHouse migrations applied to the test server
+    When each governed view's declared keys are compared with its source table
+    Then the declared keys are the columns that table sorts by
+    And the declared merge behaviour is the engine that table uses
+
   @integration
   Scenario: The catalog's declared columns match the tables the views read
     Given the shipped ClickHouse migrations applied to the test server
@@ -748,10 +809,40 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
 #   → Scenario: Every governed view declares its grain, join keys, and time column
 #   → Scenario: The catalog's declared columns match the tables the views read
 #   → Scenario: Every governed view names the column that prunes its partitions
+#   → Scenario: A pre-aggregated dataset declares that its rows merge rather than supersede
+#     (issue #6856: the analytics projections and their per-minute rollups join
+#      the catalog, and a rollup's source is an AggregatingMergeTree — its rows
+#      for one key are SUMMED rather than superseded, which is a third answer to
+#      "which row survives" and cannot be inferred from the other two)
+#   → Scenario: A pre-aggregated dataset returns one merged row per bucket
+#     (the same claim proven against the shipped table: partial rows in
+#      separate parts, one summed row out, every measure read back against a
+#      total no other measure shares — a bucket whose measures share a value
+#      cannot tell a mislabelled measure from a correct one)
+#   → Scenario: A summed measure reads the column it is named after
+#     (the declaration is single-sourced: name, published type and "this is a
+#      sum" are stated once and the SQL is derived, because a cast returns a
+#      number whatever column it reads)
+#   → Scenario: A pre-aggregated dataset advertises its whole bucket key as its join keys
+#     (every column of a bucket is a sum, so a join matching part of the key
+#      adds several buckets together rather than repeating a row)
+#   → Scenario: A dataset whose sort key moves declares the strategy that deduplicates it
+#   → Scenario: A dataset whose sort key moves is deduplicated by its own identity
+#     (evaluation_analytics folds a moving watermark into OccurredAt, which is
+#      part of its sort key, so FINAL keeps every lifecycle version and every
+#      aggregate counts the evaluation once per version)
+#   → Scenario: Every governed view's dedup declaration matches the table it reads
+#     (the rule the catalog states and nothing enforced: the declared keys are
+#      the source's sort key, and the declared merge behaviour is its engine)
 # AC "Derive content-gated fields from the existing visibility stack — never a second
 #     handwritten gated-field list; keep a parity test"
 #   → Scenario: The gated column set is derived from the data privacy policy, not hand-listed
 #   → Scenario: Captured content is reachable only through the gated columns
+#   → Scenario: The analytics-optimised datasets expose no captured content
+#     (issue #6856: the analytics projections carry no captured input or output
+#      at all, and every attribute map in the catalog is filtered against the
+#      same policy — the map is the one place a view can leak content without
+#      naming a gated column)
 # (supporting invariants of the same proof: the views are bounded by the same row
 #  policies as the tables under them, the grant is the exposed surface, and the
 #  views are usable at scale)
