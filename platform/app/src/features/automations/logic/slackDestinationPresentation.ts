@@ -38,6 +38,17 @@ export type SlackDestinationPresentation =
       tooltipUrl: string | null;
     };
 
+/** The value, only when it parses as a real https URL — a bare "https://"
+ *  or a redaction placeholder wearing the prefix is not a URL to show. */
+function safeHttpsUrl(value: string | undefined): string | null {
+  if (!value) return null;
+  try {
+    return new URL(value).protocol === "https:" ? value : null;
+  } catch {
+    return null;
+  }
+}
+
 export function slackDestinationPresentation(
   actionParams: Pick<
     TriggerActionParams,
@@ -53,10 +64,9 @@ export function slackDestinationPresentation(
     case "bot":
       return { kind: "bot", channelId: actionParams.slackChannelId ?? null };
     case "webhook": {
-      const webhook = actionParams.slackWebhook;
       return {
         kind: "webhook",
-        tooltipUrl: webhook?.startsWith("https://") ? webhook : null,
+        tooltipUrl: safeHttpsUrl(actionParams.slackWebhook),
       };
     }
   }

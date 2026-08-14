@@ -68,4 +68,15 @@ describe("given a webhook-delivery Slack automation", () => {
       expect(absent).toEqual({ kind: "webhook", tooltipUrl: null });
     });
   });
+
+  describe("when the stored value wears the https prefix without being a URL", () => {
+    it("offers no tooltip rather than showing a value that is not a URL", () => {
+      expect(
+        slackDestinationPresentation({
+          slackDelivery: "webhook",
+          slackWebhook: "https://",
+        }),
+      ).toEqual({ kind: "webhook", tooltipUrl: null });
+    });
+  });
 });
