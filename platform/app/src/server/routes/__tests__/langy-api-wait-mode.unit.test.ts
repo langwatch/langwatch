@@ -293,6 +293,42 @@ describe("/api/langy wait mode (Prefer: wait)", () => {
     expect(body.reply.text).toBe("late but here");
   });
 
+  /** @scenario "A plain-text message is accepted without the parts structure" */
+  it("normalizes a `content` string message into a single text part", async () => {
+    const res = await testApp.request(TURN_URL, {
+      method: "POST",
+      headers: {
+        "X-Auth-Token": "test-token",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        idempotencyKey: "idem-2",
+        messages: [
+          { role: "user", content: "hello from a plain client" },
+          // parts wins over content when both are present
+          {
+            role: "assistant",
+            content: "ignored",
+            parts: [{ type: "text", text: "kept" }],
+          },
+        ],
+      }),
+    });
+
+    expect(res.status).toBe(202);
+    expect(mockStartConversationTurn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messages: [
+          {
+            role: "user",
+            parts: [{ type: "text", text: "hello from a plain client" }],
+          },
+          { role: "assistant", parts: [{ type: "text", text: "kept" }] },
+        ],
+      }),
+    );
+  });
+
   /** @scenario "An expired wait degrades to the asynchronous acceptance" */
   it("degrades to the exact async 202 when the wait expires unsettled", async () => {
     mockGetEventsAfter.mockResolvedValue(emptyTail);

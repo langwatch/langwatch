@@ -138,11 +138,25 @@ const secured = createServiceApp({
   errorEnvelope: "canonical",
 });
 
-/** One user turn on the wire. Parts stay opaque; the app layer bounds them. */
-const messageSchema = z.object({
-  role: z.enum(["user", "assistant", "system"]),
-  parts: z.array(z.record(z.string(), z.unknown())).default([]),
-});
+/**
+ * One user turn on the wire. Parts stay opaque; the app layer bounds them.
+ *
+ * `content` is the plain-text shorthand a generic HTTP client (a script, a
+ * scenario HTTP agent's body template) can produce without restructuring its
+ * own message shape; it normalizes to a single text part. When both are sent,
+ * `parts` wins — it is the richer form.
+ */
+const messageSchema = z
+  .object({
+    role: z.enum(["user", "assistant", "system"]),
+    parts: z.array(z.record(z.string(), z.unknown())).optional(),
+    content: z.string().optional(),
+  })
+  .transform(({ role, parts, content }) => ({
+    role,
+    parts:
+      parts ?? (content === undefined ? [] : [{ type: "text", text: content }]),
+  }));
 
 const turnBodySchema = z.object({
   messages: z.array(messageSchema).min(1),

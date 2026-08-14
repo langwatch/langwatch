@@ -119,6 +119,13 @@ Feature: Starting Langy conversations with a project API key
     And it carries the turn's failed status and error with no assistant reply
 
   @unit
+  Scenario: A plain-text message is accepted without the parts structure
+    Given a caller whose message shape is plain role-and-text
+    When it starts a turn with a project API key
+    Then the message is accepted as a single text part
+    And a message carrying both shapes keeps its structured parts
+
+  @unit
   Scenario: An expired wait degrades to the asynchronous acceptance
     Given a request waiting on its own accepted turn
     When the wait window expires before the turn settles
@@ -225,7 +232,8 @@ Feature: Starting Langy conversations with a project API key
 #           turn this request started / A failed turn settles the wait as a
 #           domain outcome, not a transport refusal / An expired wait degrades
 #           to the asynchronous acceptance — the `Prefer: wait` delivery path
-#           for that output)
+#           for that output; A plain-text message is accepted without the
+#           parts structure — the wire shape a generic client can produce)
 # AC 3:  "incremental turn events before the turn completes, at least two"
 #          -> Scenario: The caller observes incremental events before the turn completes
 # AC 4:  "langy:view but not langy:create refused 403, no worker provisioned"
