@@ -27,6 +27,7 @@ func reaperOrch(janitor ContainerJanitor, ttl, runningTTL time.Duration, now tim
 		cfg:     Config{TestContainerTTL: ttl, RunningTestContainerTTL: runningTTL},
 		sys:     &fakeSystem{now: now},
 		janitor: janitor,
+		store:   &fakeStore{},
 		log:     zap.NewNop(),
 	}
 }
@@ -50,6 +51,16 @@ func TestDaemonSweepsWithTheConfiguredGracePeriod(t *testing.T) {
 				}
 				if got, want := janitor.runningCutoffs[0], now.Add(-4*time.Hour); !got.Equal(want) {
 					t.Fatalf("running cutoff = %v, want %v", got, want)
+				}
+			})
+
+			t.Run("the reap lands in the record the hub reads", func(t *testing.T) {
+				events := o.store.ReapEvents()
+				if len(events) != 1 {
+					t.Fatalf("expected one recorded reap, got %d", len(events))
+				}
+				if events[0].Kind != "testcontainer" || events[0].Target != "lucid_goodall" {
+					t.Errorf("recorded event should name what was reaped, got %+v", events[0])
 				}
 			})
 		})

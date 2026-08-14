@@ -92,6 +92,12 @@ type Store interface {
 	// ObserveDuration records how long a run actually took, so the next one can
 	// be decided on evidence rather than a default.
 	ObserveDuration(command string, took time.Duration)
+	// AppendReapEvent records one daemon reclamation (bounded ring, oldest
+	// dropped) and ReapEvents reads the record newest-last — the hub's "what
+	// has the reaper been doing" feed. Append failures are the daemon's to
+	// log; losing an event must never stop a reap.
+	AppendReapEvent(ev domain.ReapEvent) error
+	ReapEvents() []domain.ReapEvent
 }
 
 // ClaudeSettings writes another tool's configuration, which is why it is not on
@@ -149,6 +155,8 @@ type Child struct {
 // ProcessSample is one live process as the tsgo governor's sampler sees it.
 type ProcessSample struct {
 	PID      int
+	PPID     int // parent, for attributing a process to a stack launcher's tree
+	PGID     int // process group, the fallback stack-membership signal
 	RSSBytes int64
 	CPUTime  time.Duration // total CPU clock, for idle detection across ticks
 	Elapsed  time.Duration // wall-clock age
