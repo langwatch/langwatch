@@ -292,11 +292,24 @@ export class ExperimentsApiService {
     return result.data as T;
   }
 
-  async startRun(slug: string): Promise<ExperimentRunStartResponse> {
+  /**
+   * Start a saved experiment by slug.
+   *
+   * The body stays off the wire entirely when no overrides are given, so the
+   * run uses the inputs the experiment is configured with.
+   */
+  async startRun(
+    slug: string,
+    options: {
+      parameters?: Record<string, string | number | boolean>;
+    } = {},
+  ): Promise<ExperimentRunStartResponse> {
+    const body = toRunStartRequest({ parameters: options.parameters });
     const { data, error } = await this.apiClient.POST(
       "/api/experiments/{slug}/run",
       {
         params: { path: { slug } },
+        ...(body !== undefined ? { body } : {}),
       },
     );
     if (error) this.handleApiError(`start experiment run for "${slug}"`, error);

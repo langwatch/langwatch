@@ -75,6 +75,7 @@
             "pages": [
               "agent-simulations/introduction",
               "agent-simulations/getting-started",
+              "agent-simulations/scenario-parameters",
               "agent-simulations/authenticated-agents",
               "agent-simulations/voice-agents",
               "agent-simulations/red-teaming"

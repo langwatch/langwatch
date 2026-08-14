@@ -148,4 +148,27 @@ describe("ChildProcessJobDataSchema", () => {
       expect(roleModelParams.judge.model).toBe("openai/judge-model");
     });
   });
+
+  describe("given a payload queued before parameters existed", () => {
+    it("parses with an empty record, so the child can read its keys", () => {
+      const { parameters: _omitted, ...withoutParameters } = {
+        ...basePayload,
+        modelParams: litellmParams,
+        parameters: undefined,
+      };
+
+      const result = ChildProcessJobDataSchema.safeParse(withoutParameters);
+
+      expect(result.success).toBe(true);
+      if (!result.success) {
+        expect.fail("expected a payload without parameters to parse");
+        return;
+      }
+      // The child reads Object.keys(parameters) to decide whether to record
+      // them, so an absent field has to arrive as a record rather than as
+      // undefined; otherwise a job queued across the deploy takes the process
+      // down before the run reports anything.
+      expect(result.data.parameters).toEqual({});
+    });
+  });
 });

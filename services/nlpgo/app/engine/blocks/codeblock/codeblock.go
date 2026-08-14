@@ -138,6 +138,12 @@ type Request struct {
 	// user code as a `secrets` namespace so `secrets.NAME` works —
 	// parity with the Python executor's build_secrets_preamble.
 	Secrets map[string]string
+	// Params are the run's user-defined parameters (from the workflow
+	// DSL's `params` map). When non-empty the runner exposes them to user
+	// code as a `params` namespace so `params.NAME` works, the same shape
+	// as secrets. Values are typed: a number configured as a number
+	// arrives in Python as an int/float, not as a string.
+	Params  map[string]any
 	Timeout time.Duration
 }
 
@@ -218,6 +224,7 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 		"inputs":  req.Inputs,
 		"outputs": req.DeclaredOutputs,
 		"secrets": req.Secrets,
+		"params":  req.Params,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("codeblock: marshal request: %w", err)
