@@ -2,14 +2,14 @@
 title: Scenario Run Parameters
 sidebarTitle: Run parameters
 keywords: langwatch, agent simulations, scenario parameters, run parameters, params, suite run, plan, tenant, fixture, test account
-description: Run the same scenario with different values, like a plan or a test account, without a copy of the scenario for each value.
+description: Run the same scenario with different parameters, to set different setup conditions or fixtures for your agent.
 ---
 
 # Scenario Run Parameters
 
-A scenario tests a customer who asks to cancel a subscription. On the `free` plan, the agent must cancel right away. On the `enterprise` plan, it must offer a retention call first. Without parameters, testing both plans takes two copies of the scenario. With a `plan` parameter, one scenario covers both.
+A run parameter is a named value that a scenario receives when a run starts. The scenario declares the parameter, with an optional default value. The scenario text and the target configuration read it as `{{ params.NAME }}`. You supply the values when you start the run, from the platform, the API, the CLI or an SDK.
 
-Write `{{ params.plan }}` in the scenario text:
+For example, a scenario that tests subscription cancellation can declare a `plan` parameter, so one scenario covers each plan's policy:
 
 ```text title="Situation"
 A customer on the {{ params.plan }} plan asks to cancel their subscription.
@@ -36,7 +36,7 @@ Each run records the values it used, so every result shows which plan it tested.
 - **Values your agent's API needs.** An HTTP target puts `{{ params.NAME }}` in its URL or request body, so your endpoint receives the value on every request.
 
 <Warning>
-  Do not put credentials in parameters. Every value is recorded on the run, and every user who can open the run can read it. Put an API key in a project secret and read it as `{{ secrets.NAME }}`. See [Testing agents behind authentication](/agent-simulations/authenticated-agents).
+  Do not put credentials in parameters. The run records every value, and every user who can open the run can read it. Put an API key in a project secret and read it as `{{ secrets.NAME }}`. See [Testing agents behind authentication](/agent-simulations/authenticated-agents).
 </Warning>
 
 ## Declare the parameters on the scenario
@@ -47,7 +47,7 @@ Open the scenario and click **Parameters**, next to **Labels** at the bottom of 
 
 - **Name** is what `{{ params.NAME }}` reads. Letters, digits and underscores, and the first character is a letter or an underscore.
 - **Description** appears beside the field when someone starts a run.
-- **Default value** is used when the run does not set the value. `42` is a number, `true` is a boolean, and everything else is text. Quote a value to force text: `"007"`.
+- **Default value** applies when the run does not set the value. `42` is a number, `true` is a boolean, and everything else is text. Quote a value to force text: `"007"`.
 
 A scenario can declare up to 20 parameters.
 
@@ -55,9 +55,9 @@ The API accepts the same declarations: `POST /api/scenarios` and `PATCH /api/sce
 
 ## Use the values in the scenario text
 
-The situation and the criteria read a value as `{{ params.NAME }}`, as in the example above. Both are rendered before the run starts, so the simulated user acts on the value and the judge scores against the same value.
+The situation and the criteria read a value as `{{ params.NAME }}`, as in the example above. Both render before the run starts, so the simulated user acts on the value and the judge scores against the same value.
 
-A scenario with no declared parameters is not a template. Its text is never rendered, so `{{` or `{%` in prose stays exactly as written. Declaring a parameter turns the scenario text into a template.
+A scenario with no declared parameters is not a template. Its text does not render, so `{{` or `{%` in prose stays exactly as written. Declaring a parameter turns the scenario text into a template.
 
 ## Use the values in the target
 
@@ -115,7 +115,7 @@ class Code:
         return {"output": response.json()["reply"]}
 ```
 
-`params` is injected into the module globals. Do not import a module named `params`, and do not assign over it. When a run resolves no parameters, `params` is undefined and `params.plan` raises `NameError`, the same behavior as `secrets`.
+The sandbox injects `params` into the module globals. Do not import a module named `params`, and do not assign over it. When a run resolves no parameters, `params` is undefined and `params.plan` raises `NameError`, the same behavior as `secrets`.
 
 ### Workflow targets
 
@@ -231,7 +231,7 @@ console.log(result.batchRunId);
 | `scenario_parameter_missing` | The situation or a criterion reads a name with no value: the run set none and the scenario has no default. The message names the parameter and the field. | Set a value for the run, or give the parameter a default. |
 | `scenario_parameter_template_invalid` | A field references a parameter in a form that cannot be rendered. | Write the reference as `{{ params.name }}`. |
 
-All checks run before any job is scheduled. A rejected run starts no jobs.
+The platform runs these checks before it schedules any jobs. A rejected run schedules nothing.
 
 ## Where the values are recorded
 
