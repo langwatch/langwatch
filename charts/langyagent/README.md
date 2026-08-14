@@ -34,21 +34,34 @@ than half-deploying. To run without the assistant, set
 
 ### The sandboxed runtime
 
-The agent runs LLM-written shell, so the default pins the pod to a `gvisor`
-RuntimeClass. On a cluster without one, the pod stays Pending (RuntimeClass
-not found) while everything else runs: GKE ships the class managed (GKE
-Sandbox), on AKS point `runtimeClassName` at your Kata VM isolation class, on
-EKS install gVisor on the node group. To run without a sandbox, say so
-explicitly:
+The agent runs LLM-written shell, so a pod-to-host sandbox is worth having.
+It is not required, and not the default: `runtimeClassName` ships empty with
+`acceptUnsandboxedRuntime` true, so the agent installs and runs on any
+cluster and hardening is a deliberate later step. GKE ships a sandboxed class
+managed (GKE Sandbox), on AKS point `runtimeClassName` at your Kata VM
+isolation class, on EKS install gVisor on the node group. To pin one:
 
 ```yaml
 langyagent:
-  runtimeClassName: ""
-  acceptUnsandboxedRuntime: true
+  runtimeClassName: "gvisor"
+  acceptUnsandboxedRuntime: false
 ```
 
-The chart refuses a blank runtime without the acceptance, so an unsandboxed
-deploy is always deliberate.
+Blanking the class afterwards while `acceptUnsandboxedRuntime` stays false is
+refused at render time, so a cluster that has hardened cannot quietly lose its
+sandbox.
+
+Pin a class the cluster does not define and no pod is created at all.
+Kubernetes rejects it at admission (`pod rejected: RuntimeClass "..." not
+found`), so `kubectl get pods` lists nothing rather than showing something
+Pending, and the reason lands on the Deployment instead:
+
+```bash
+kubectl -n <namespace> get deploy <release>-langyagent \
+  -o jsonpath='{.status.conditions[?(@.type=="ReplicaFailure")].message}'
+```
+
+Everything else in the install keeps running either way.
 
 Unsandboxed, you keep per-worker UID isolation, the per-worker opencode
 password, and the NetworkPolicy; you give up the pod-to-host sandbox. A

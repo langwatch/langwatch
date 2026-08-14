@@ -2,7 +2,6 @@ import {
   Badge,
   Box,
   Button,
-  Card,
   Center,
   EmptyState,
   HStack,
@@ -22,6 +21,39 @@ import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { useReplayStatus } from "~/hooks/useReplayStatus";
 import { api } from "~/utils/api";
 import { TenantSelector } from "./TenantSelector";
+
+/**
+ * One numbered step of the replay flow, drawer-native: a flat section with a
+ * heading row instead of a nested card, dimmed until its preconditions hold.
+ */
+function WizardStep({
+  step,
+  title,
+  action,
+  disabled,
+  children,
+}: {
+  step: number;
+  title: string;
+  action?: React.ReactNode;
+  disabled?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <Box
+      opacity={disabled ? 0.5 : 1}
+      pointerEvents={disabled ? "none" : "auto"}
+    >
+      <HStack justify="space-between" marginBottom={2}>
+        <Text textStyle="sm" fontWeight="medium">
+          {step}. {title}
+        </Text>
+        {action}
+      </HStack>
+      {children}
+    </Box>
+  );
+}
 
 export function BulkReplayWizard({
   onReplayStarted,
@@ -198,116 +230,103 @@ export function BulkReplayWizard({
   if (!projectionsQuery.data) return null;
 
   return (
-    <VStack align="stretch" gap={4}>
-      {/* Step 1: Select tenants */}
-      <Card.Root>
-        <Card.Body padding={4}>
-          <HStack marginBottom={3} justify="space-between">
-            <Text textStyle="sm" fontWeight="medium">
-              1. Select tenants
-            </Text>
-            <Checkbox
-              size="sm"
-              checked={allTenants}
-              onCheckedChange={(e) => {
-                setAllTenants(!!e.checked);
-                if (e.checked) setTenantIds([]);
-              }}
-            >
-              <Text textStyle="xs">All tenants</Text>
-            </Checkbox>
-          </HStack>
-          <Box
-            opacity={allTenants ? 0.4 : 1}
-            pointerEvents={allTenants ? "none" : "auto"}
+    <VStack align="stretch" gap={5}>
+      <WizardStep
+        step={1}
+        title="Select tenants"
+        action={
+          <Checkbox
+            size="sm"
+            checked={allTenants}
+            onCheckedChange={(e) => {
+              setAllTenants(!!e.checked);
+              if (e.checked) setTenantIds([]);
+            }}
           >
-            <TenantSelector
-              tenantIds={tenantIds}
-              onTenantIdsChange={setTenantIds}
+            <Text textStyle="xs">All tenants</Text>
+          </Checkbox>
+        }
+      >
+        <Box
+          opacity={allTenants ? 0.4 : 1}
+          pointerEvents={allTenants ? "none" : "auto"}
+        >
+          <TenantSelector
+            tenantIds={tenantIds}
+            onTenantIdsChange={setTenantIds}
+          />
+        </Box>
+        {!hasTenants && !allTenants && (
+          <Text textStyle="xs" color="orange.500" marginTop={2}>
+            At least 1 tenant is required to proceed
+          </Text>
+        )}
+      </WizardStep>
+
+      <WizardStep step={2} title="Choose date range" disabled={!hasTenants}>
+        <HStack gap={3} alignItems="end" flexWrap="wrap">
+          <Box maxWidth="220px">
+            <Text textStyle="xs" color="fg.muted" marginBottom={1}>
+              Replay events since
+            </Text>
+            <Input
+              type="date"
+              size="sm"
+              value={since}
+              onChange={(e) => setSince(e.target.value)}
             />
           </Box>
-          {!hasTenants && !allTenants && (
-            <Text textStyle="xs" color="orange.500" marginTop={2}>
-              At least 1 tenant is required to proceed
-            </Text>
-          )}
-        </Card.Body>
-      </Card.Root>
-
-      {/* Step 2: Choose date range */}
-      <Card.Root
-        opacity={hasTenants ? 1 : 0.5}
-        pointerEvents={hasTenants ? "auto" : "none"}
-      >
-        <Card.Body padding={4}>
-          <Text textStyle="sm" fontWeight="medium" marginBottom={3}>
-            2. Choose date range
-          </Text>
-          <HStack gap={3} alignItems="end" flexWrap="wrap">
-            <Box maxWidth="220px">
-              <Text textStyle="xs" color="fg.muted" marginBottom={1}>
-                Replay events since
-              </Text>
-              <Input
-                type="date"
-                size="sm"
-                value={since}
-                onChange={(e) => setSince(e.target.value)}
-              />
-            </Box>
-            <HStack gap={1}>
-              {[
-                { label: "This month", months: 0 },
-                { label: "2 months", months: 2 },
-                { label: "3 months", months: 3 },
-                { label: "6 months", months: 6 },
-              ].map(({ label, months }) => {
-                const d = new Date();
-                if (months === 0) {
-                  d.setDate(1);
-                } else {
-                  d.setMonth(d.getMonth() - months);
-                }
-                const value = d.toISOString().slice(0, 10);
-                return (
-                  <Button
-                    key={label}
-                    size="sm"
-                    height="36px"
-                    variant={since === value ? "solid" : "outline"}
-                    onClick={() => setSince(value)}
-                  >
-                    {label}
-                  </Button>
-                );
-              })}
-            </HStack>
+          <HStack gap={1}>
+            {[
+              { label: "This month", months: 0 },
+              { label: "2 months", months: 2 },
+              { label: "3 months", months: 3 },
+              { label: "6 months", months: 6 },
+            ].map(({ label, months }) => {
+              const d = new Date();
+              if (months === 0) {
+                d.setDate(1);
+              } else {
+                d.setMonth(d.getMonth() - months);
+              }
+              const value = d.toISOString().slice(0, 10);
+              return (
+                <Button
+                  key={label}
+                  size="sm"
+                  height="36px"
+                  variant={since === value ? "solid" : "outline"}
+                  onClick={() => setSince(value)}
+                >
+                  {label}
+                </Button>
+              );
+            })}
           </HStack>
+        </HStack>
 
-          {canDiscover && discoverQuery.isFetching && (
-            <HStack gap={2} marginTop={3}>
-              <Spinner size="xs" />
-              <Text textStyle="xs" color="fg.muted">
-                Discovering aggregates...
-              </Text>
-            </HStack>
-          )}
-        </Card.Body>
-      </Card.Root>
+        {canDiscover && discoverQuery.isFetching && (
+          <HStack gap={2} marginTop={3}>
+            <Spinner size="xs" />
+            <Text textStyle="xs" color="fg.muted">
+              Discovering aggregates...
+            </Text>
+          </HStack>
+        )}
+      </WizardStep>
 
-      {/* Step 3: Select projections */}
       {hasDiscovered && (
         <>
-          <Card.Root>
-            <Card.Body padding={0} overflowX="auto">
-              <HStack paddingX={4} paddingY={3} justify="space-between">
-                <Text textStyle="sm" fontWeight="medium">
-                  3. Select projections to replay
-                </Text>
-                <Button variant="ghost" size="xs" onClick={selectAllRelevant}>
-                  Select all with data
-                </Button>
-              </HStack>
+          <WizardStep
+            step={3}
+            title="Select projections to replay"
+            action={
+              <Button variant="ghost" size="xs" onClick={selectAllRelevant}>
+                Select all with data
+              </Button>
+            }
+          >
+            <Table.ScrollArea borderRadius="lg" overflow="hidden">
               <Table.Root size="sm" variant="line">
                 <Table.Header>
                   <Table.Row>
@@ -372,7 +391,7 @@ export function BulkReplayWizard({
                         </Table.Cell>
                         <Table.Cell>
                           <Text textStyle="xs" color="fg.muted">
-                            {meta?.pipelineName ?? "\u2014"}
+                            {meta?.pipelineName ?? "—"}
                           </Text>
                         </Table.Cell>
                         <Table.Cell textAlign="end">
@@ -389,119 +408,116 @@ export function BulkReplayWizard({
                   })}
                 </Table.Body>
               </Table.Root>
-            </Card.Body>
-          </Card.Root>
+            </Table.ScrollArea>
+          </WizardStep>
 
-          {/* Summary + Actions */}
           {selectedProjections.size > 0 && (
-            <Card.Root>
-              <Card.Body padding={4}>
-                <HStack gap={6} marginBottom={4}>
-                  <Stat.Root>
-                    <Stat.Label>Selected Aggregates</Stat.Label>
-                    <Stat.ValueText>{totalAggregates}</Stat.ValueText>
-                  </Stat.Root>
-                  <Stat.Root>
-                    <Stat.Label>Projections</Stat.Label>
-                    <Stat.ValueText>{selectedProjections.size}</Stat.ValueText>
-                  </Stat.Root>
-                  <Stat.Root>
-                    <Stat.Label>Tenants</Stat.Label>
-                    <Stat.ValueText>
-                      {allTenants ? "All" : tenantIds.length}
-                    </Stat.ValueText>
-                  </Stat.Root>
-                </HStack>
+            <Box borderTop="1px solid" borderColor="border" paddingTop={4}>
+              <HStack gap={6} marginBottom={4}>
+                <Stat.Root>
+                  <Stat.Label>Selected Aggregates</Stat.Label>
+                  <Stat.ValueText>{totalAggregates}</Stat.ValueText>
+                </Stat.Root>
+                <Stat.Root>
+                  <Stat.Label>Projections</Stat.Label>
+                  <Stat.ValueText>{selectedProjections.size}</Stat.ValueText>
+                </Stat.Root>
+                <Stat.Root>
+                  <Stat.Label>Tenants</Stat.Label>
+                  <Stat.ValueText>
+                    {allTenants ? "All" : tenantIds.length}
+                  </Stat.ValueText>
+                </Stat.Root>
+              </HStack>
 
-                {hasAccess && (
-                  <VStack align="stretch" gap={3}>
-                    <Box>
-                      <Text textStyle="xs" color="fg.muted" marginBottom={1}>
-                        Description (for audit log)
+              {hasAccess && (
+                <VStack align="stretch" gap={3}>
+                  <Box>
+                    <Text textStyle="xs" color="fg.muted" marginBottom={1}>
+                      Description (for audit log)
+                    </Text>
+                    <Textarea
+                      size="sm"
+                      placeholder="Describe the reason for this replay..."
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      rows={2}
+                    />
+                  </Box>
+                  <Box>
+                    <Checkbox
+                      checked={fullRebuild}
+                      onCheckedChange={(e) => setFullRebuild(!!e.checked)}
+                    >
+                      <Text textStyle="sm">Rebuild from scratch</Text>
+                    </Checkbox>
+                    <Text
+                      textStyle="xs"
+                      color="fg.muted"
+                      marginTop={1}
+                      marginLeft={6}
+                    >
+                      Clears replay markers first. Use it when the target table
+                      was truncated or swapped empty; otherwise the run resumes
+                      and skips finished aggregates.
+                    </Text>
+                  </Box>
+                  <HStack gap={2}>
+                    <Button
+                      size="sm"
+                      colorPalette="orange"
+                      disabled={isReplayRunning || totalAggregates === 0}
+                      loading={startReplayMutation.isPending}
+                      onClick={handleStartReplay}
+                    >
+                      {fullRebuild ? "Start Full Rebuild" : "Start Full Replay"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={isReplayRunning || totalAggregates === 0}
+                      loading={dryRunMutation.isPending}
+                      onClick={handleDryRun}
+                    >
+                      Dry Run (5 aggregates)
+                    </Button>
+                    {isReplayRunning && (
+                      <Text textStyle="xs" color="orange.500">
+                        A replay is already running
                       </Text>
-                      <Textarea
-                        size="sm"
-                        placeholder="Describe the reason for this replay..."
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        rows={2}
-                      />
-                    </Box>
-                    <Box>
-                      <Checkbox
-                        checked={fullRebuild}
-                        onCheckedChange={(e) => setFullRebuild(!!e.checked)}
-                      >
-                        <Text textStyle="sm">Rebuild from scratch</Text>
-                      </Checkbox>
+                    )}
+                  </HStack>
+                  <Text textStyle="xs" color="fg.muted">
+                    Full replay pauses projections, drains active jobs, replays
+                    events from ClickHouse, then unpauses. Dry run processes 5
+                    sample aggregates in memory without writing.
+                  </Text>
+
+                  {dryRunResult && (
+                    <Box
+                      borderLeft="2px solid"
+                      borderColor="blue.400"
+                      paddingLeft={3}
+                      paddingY={1}
+                    >
                       <Text
                         textStyle="xs"
-                        color="fg.muted"
-                        marginTop={1}
-                        marginLeft={6}
+                        fontWeight="medium"
+                        color="blue.500"
+                        marginBottom={1}
                       >
-                        Clears replay markers first. Use it when the target
-                        table was truncated or swapped empty; otherwise the run
-                        resumes and skips finished aggregates.
+                        Dry Run Result
+                      </Text>
+                      <Text textStyle="sm">{dryRunResult.message}</Text>
+                      <Text textStyle="xs" color="fg.muted" marginTop={1}>
+                        Projections: {dryRunResult.projectionNames.join(", ")} |
+                        Sample size: {dryRunResult.sampleSize}
                       </Text>
                     </Box>
-                    <HStack gap={2}>
-                      <Button
-                        size="sm"
-                        colorPalette="orange"
-                        disabled={isReplayRunning || totalAggregates === 0}
-                        loading={startReplayMutation.isPending}
-                        onClick={handleStartReplay}
-                      >
-                        {fullRebuild
-                          ? "Start Full Rebuild"
-                          : "Start Full Replay"}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={isReplayRunning || totalAggregates === 0}
-                        loading={dryRunMutation.isPending}
-                        onClick={handleDryRun}
-                      >
-                        Dry Run (5 aggregates)
-                      </Button>
-                      {isReplayRunning && (
-                        <Text textStyle="xs" color="orange.500">
-                          A replay is already running
-                        </Text>
-                      )}
-                    </HStack>
-                    <Text textStyle="xs" color="fg.muted">
-                      Full replay pauses projections, drains active jobs,
-                      replays events from ClickHouse, then unpauses. Dry run
-                      processes 5 sample aggregates in memory without writing.
-                    </Text>
-
-                    {dryRunResult && (
-                      <Card.Root borderColor="blue.200" borderWidth="1px">
-                        <Card.Body padding={3}>
-                          <Text
-                            textStyle="xs"
-                            fontWeight="medium"
-                            color="blue.500"
-                            marginBottom={1}
-                          >
-                            Dry Run Result
-                          </Text>
-                          <Text textStyle="sm">{dryRunResult.message}</Text>
-                          <Text textStyle="xs" color="fg.muted" marginTop={1}>
-                            Projections:{" "}
-                            {dryRunResult.projectionNames.join(", ")} | Sample
-                            size: {dryRunResult.sampleSize}
-                          </Text>
-                        </Card.Body>
-                      </Card.Root>
-                    )}
-                  </VStack>
-                )}
-              </Card.Body>
-            </Card.Root>
+                  )}
+                </VStack>
+              )}
+            </Box>
           )}
         </>
       )}

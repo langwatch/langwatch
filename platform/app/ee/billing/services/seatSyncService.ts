@@ -1,6 +1,6 @@
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import { PricingModel, type PrismaClient } from "@prisma/client";
+import { PricingModel, type PrismaClient } from "~/generated/prisma/client";
 import type { SeatEventSubscriptionFns } from "./seatEventSubscription";
 
 const logger = createLogger("langwatch:billing:seatSync");

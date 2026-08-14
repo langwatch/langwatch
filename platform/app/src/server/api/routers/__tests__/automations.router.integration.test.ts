@@ -3,12 +3,39 @@
  *
  * Router-level tests for automation filter validation and update sanitization.
  */
-import { TriggerAction } from "@prisma/client";
+import {
+  type RedisConnection,
+  RedisConnectionService,
+} from "@langwatch/redis-client";
 import { nanoid } from "nanoid";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { connection } from "~/server/redis";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
+import { TriggerAction } from "~/generated/prisma/client";
 import { globalForApp } from "../../../app-layer/app";
 import { createTestApp } from "../../../app-layer/presets";
+
+/** Handed to the test App so the cap paths reach the same Redis this file does. */
+let connection: RedisConnection | null = null;
+
+beforeAll(() => {
+  connection = new RedisConnectionService().connect({
+    url: process.env.REDIS_URL,
+    clusterEndpoints: process.env.REDIS_CLUSTER_ENDPOINTS,
+    dbIndex: process.env.REDIS_DB_INDEX,
+  });
+});
+
+afterAll(() => {
+  connection?.disconnect();
+});
 
 const {
   mockEnforceLicenseLimit,
@@ -165,6 +192,9 @@ describe("automationRouter", () => {
     });
     globalForApp.__langwatch_app = createTestApp({
       triggers: triggerService,
+      // The cap counters this suite asserts on live on the real Redis, and
+      // both the router's read and the direct consume calls take it from here.
+      redis: connection,
     });
     caller = createTestCaller();
   });

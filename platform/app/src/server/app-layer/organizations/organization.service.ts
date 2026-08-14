@@ -1,13 +1,13 @@
 import { generate } from "@langwatch/ksuid";
-import type { PrismaClient, User } from "@prisma/client";
+import { TRPCError } from "@trpc/server";
+import type { PrismaClient, User } from "~/generated/prisma/client";
 import {
   type OrganizationIntent,
   type OrganizationUserRole,
   PricingModel,
   RoleBindingScopeType,
   type TeamUserRole,
-} from "@prisma/client";
-import { TRPCError } from "@trpc/server";
+} from "~/generated/prisma/client";
 import type { RoleBindingForSynthesis } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
 import { createLicenseEnforcementService } from "~/server/license-enforcement";
 import { LicenseEnforcementRepository } from "~/server/license-enforcement/license-enforcement.repository";

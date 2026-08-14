@@ -131,7 +131,7 @@ export function VirtualKeyCreateDrawer({
     });
   }, [open, project?.id, availableProjects, availableTeams]);
 
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const createMutation = api.virtualKeys.create.useMutation({
     onSuccess: async () => {
       await utils.virtualKeys.list.invalidate({ organizationId });

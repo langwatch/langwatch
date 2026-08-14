@@ -1,4 +1,4 @@
-import type { JsonArray } from "@prisma/client/runtime/library";
+import type { JsonArray } from "@prisma/client/runtime/client";
 import type { Edge, Node } from "@xyflow/react";
 import { useMemo } from "react";
 import { getInputsOutputs } from "../optimization_studio/utils/nodeUtils";

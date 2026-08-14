@@ -9,6 +9,8 @@
  * endpoints.
  */
 import type { BaseApp } from "@langwatch/api";
+import type { Context } from "hono";
+import { z } from "zod";
 import {
   type Organization,
   OrganizationIntent,
@@ -16,9 +18,7 @@ import {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import type { Context } from "hono";
-import { z } from "zod";
+} from "~/generated/prisma/client";
 import { MemberSeatLimitReachedError } from "~/server/app-layer/organizations/errors";
 import type { OrganizationService } from "~/server/app-layer/organizations/organization.service";
 import type { OrganizationMemberSummary } from "~/server/app-layer/organizations/repositories/organization.repository";

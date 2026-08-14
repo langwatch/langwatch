@@ -29,6 +29,7 @@ function session(
     repositoryOwner: "",
     repositoryName: "",
     gitBranch: "",
+    gitBranches: [],
     gitWorktree: "",
     title: "",
     modelCalls: 10,

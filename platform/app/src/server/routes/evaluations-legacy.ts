@@ -13,9 +13,7 @@
 import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import type { Project } from "@prisma/client";
-import { CostReferenceType, CostType, ExperimentType } from "@prisma/client";
-import type { JsonArray } from "@prisma/client/runtime/library";
+import type { JsonArray } from "@prisma/client/runtime/client";
 import { TRPCError } from "@trpc/server";
 import type { Edge, Node } from "@xyflow/react";
 import type { Context } from "hono";
@@ -27,6 +25,12 @@ import { zodToJsonSchema } from "zod-to-json-schema";
 import { fromZodError } from "zod-validation-error";
 import { LEGACY_PAIRWISE_EVALUATOR_TYPE } from "~/experiments-v3/types";
 import { resolveDispatchEvaluatorType } from "~/experiments-v3/utils/normalizeComparison";
+import type { Project } from "~/generated/prisma/client";
+import {
+  CostReferenceType,
+  CostType,
+  ExperimentType,
+} from "~/generated/prisma/client";
 import type { Workflow } from "~/optimization_studio/types/dsl";
 import { getInputsOutputs } from "~/optimization_studio/utils/nodeUtils";
 import { getWorkflowEntryOutputs } from "~/optimization_studio/utils/workflowFields";
@@ -1062,6 +1066,29 @@ export const resolveEvaluatorSettingsDefaults = async (
 
 // --- Evaluator call handler (used by evaluations + guardrails routes) ---
 
+/**
+ * The verdict fields of a `reportEvaluation` payload, gated on the run
+ * actually completing. A verdict is only real when the evaluator ran to
+ * completion — an errored/skipped run's stray passed/score/label must not
+ * reach analytics or triggers as a real result (#6833). Same gate as the
+ * shared verdictGate helpers applied at the executeEvaluation command
+ * boundary. Property presence is no defense: the custom-evaluator error
+ * path spreads the raw evaluator result, so score/passed survive on it.
+ */
+function gatedVerdictFields(result: {
+  status: string;
+  score?: number | null;
+  passed?: boolean | null;
+  label?: string | null;
+}): { score?: number; passed?: boolean; label?: string } {
+  if (result.status !== "processed") return {};
+  return {
+    score: typeof result.score === "number" ? result.score : undefined,
+    passed: result.passed ?? undefined,
+    label: result.label ?? undefined,
+  };
+}
+
 async function handleEvaluatorCall(
   c: Context,
   evaluatorSlug: string,
@@ -1448,9 +1475,10 @@ async function handleEvaluatorCall(
         traceId: params.trace_id ?? undefined,
         isGuardrail: isGuardrail ?? undefined,
         status: result!.status,
-        score: "score" in result! ? result!.score : undefined,
-        passed: "passed" in result! ? result!.passed : undefined,
-        label: "label" in result! ? result!.label : undefined,
+        // The custom-evaluator error path spreads the raw evaluator result
+        // (`{ ...result, status: "error" }`), so `"score" in result` is NOT
+        // protective here — gate on status instead (#6833).
+        ...gatedVerdictFields(result!),
         details: "details" in result! ? result!.details : undefined,
         costId: costId ?? null,
         occurredAt: Date.now(),
@@ -1716,10 +1744,7 @@ const dispatchToClickHouse = async (
           evaluatorType: evaluation.evaluator,
           evaluatorName: evaluation.name ?? undefined,
           status: evaluation.status,
-          score:
-            typeof evaluation.score === "number" ? evaluation.score : undefined,
-          passed: evaluation.passed ?? undefined,
-          label: evaluation.label ?? undefined,
+          ...gatedVerdictFields(evaluation),
           details: evaluation.details ?? undefined,
           occurredAt: Date.now(),
         })

@@ -95,19 +95,26 @@ dev's Personal Workspace at https://<your-host>/me .
     normal runtime, so a worker that escapes its container faces the node
     kernel. Hardening that last step is a sandboxed RuntimeClass:
       https://docs.langwatch.ai/self-hosting/langy/setup#hardening-a-sandboxed-runtime
-{{- /* Non-blocking hint: only when the cluster already offers a sandboxed class
-       that this install is not using. `lookup` is empty during `helm template`
-       and GitOps renders, so this stays silent there rather than guessing. */}}
-{{- $sandboxed := list }}
-{{- range (lookup "node.k8s.io/v1" "RuntimeClass" "" "").items }}
-{{- if or (eq .handler "runsc") (hasPrefix "kata" .handler) }}
-{{- $sandboxed = append $sandboxed .metadata.name }}
-{{- end }}
-{{- end }}
-{{- if $sandboxed }}
-    → This cluster already offers {{ join ", " $sandboxed }}. To use it:
-      langyagent.runtimeClassName={{ first $sandboxed }}  langyagent.acceptUnsandboxedRuntime=false
-{{- end }}
+{{- /* Deliberately NO `lookup` here, and do not reintroduce one. Naming the
+       cluster's own sandboxed classes would take a cluster-scoped list of
+       RuntimeClass, and `lookup` reports an RBAC denial as a template error
+       rather than as an empty result. Where the installer may not list
+       cluster-scoped resources, that turned this optional hint into a hard
+       UPGRADE FAILED, and a Go template cannot recover from it. So the
+       operator runs the check instead, where a denial costs them nothing.
+       No `helm template` catches a regression here: with no cluster behind
+       the render every lookup returns empty. ./tests/restricted-rbac.sh does. */}}
+    To see whether this cluster already offers one:
+      kubectl get runtimeclass
+    If that is denied, nothing is broken: it is a cluster-scoped read, which
+    is exactly what a namespace-scoped operator does not have. Langy keeps
+    running as it is — ask whoever administers the cluster whether a class
+    exists to pin.
+    gVisor reports a handler of runsc; Kata ships under several, such as
+    kata-qemu or kata-mshv-vm-isolation. Handler names are runtime- and
+    platform-specific, so confirm against your platform's documentation
+    rather than the name alone. To pin Langy to a class:
+      langyagent.runtimeClassName=<class>  langyagent.acceptUnsandboxedRuntime=false
 {{- end }}
 {{- if (index .Values "langyagent").enableForAllUsers }}
     It is available to everyone in this install. Give it a model to talk to

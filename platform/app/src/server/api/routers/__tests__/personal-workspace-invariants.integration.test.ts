@@ -33,11 +33,6 @@
  */
 
 import { generate } from "@langwatch/ksuid";
-import {
-  OrganizationUserRole,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "@prisma/client";
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -49,6 +44,11 @@ import {
   it,
   vi,
 } from "vitest";
+import {
+  OrganizationUserRole,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "~/generated/prisma/client";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { PersonalWorkspaceService } from "../../../../../ee/governance/services/personalWorkspace.service";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";

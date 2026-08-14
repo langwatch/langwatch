@@ -72,7 +72,7 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
   const { closeDrawer } = useDrawer();
   const drawerParams = useDrawerParams();
   const complexProps = getComplexProps();
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   const evaluatorId =
     props.evaluatorId ??

@@ -5,7 +5,7 @@
  * Feature lists and currency helpers used by SubscriptionPage and PlansComparisonPage.
  */
 
-import { Currency } from "@prisma/client";
+import { Currency } from "~/generated/prisma/client";
 import { formatNumber } from "~/utils/formatNumber";
 import { UNLIMITED_MESSAGES } from "../../../ee/billing/planLimits";
 import type { PlanInfo } from "../../../ee/licensing/planInfo";

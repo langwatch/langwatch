@@ -33,7 +33,11 @@
  * are ee/-only).
  */
 import { createLogger } from "@langwatch/observability";
-import type { AnomalyRule, Prisma, PrismaClient } from "@prisma/client";
+import type {
+  AnomalyRule,
+  Prisma,
+  PrismaClient,
+} from "~/generated/prisma/client";
 import { AnomalyAlertDispatcherService } from "./activity-monitor/anomalyAlertDispatcher.service";
 import { safeParseSpendSpikeThresholdConfig } from "./activity-monitor/thresholdConfig.schema";
 import type { GovernanceKpisClickHouseRepository } from "./governanceKpis.clickhouse.repository";

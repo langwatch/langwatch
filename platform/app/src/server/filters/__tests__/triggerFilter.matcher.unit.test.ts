@@ -613,6 +613,16 @@ describe("matchesEvaluationFilters", () => {
       };
       expect(matchesEvaluationFilters(evals, filters)).toBe(false);
     });
+
+    it("does not match a verdict attached to an errored run", () => {
+      const evals = [
+        makeEval({ evaluatorId: "eval-abc", status: "error", passed: false }),
+      ];
+      const filters: TriggerFilters = {
+        "evaluations.evaluator_id.has_passed": ["eval-abc"],
+      };
+      expect(matchesEvaluationFilters(evals, filters)).toBe(false);
+    });
   });
 
   describe("when filtering by evaluations.evaluator_id.has_score", () => {
@@ -626,6 +636,16 @@ describe("matchesEvaluationFilters", () => {
 
     it("does not match when score is null", () => {
       const evals = [makeEval({ evaluatorId: "eval-abc", score: null })];
+      const filters: TriggerFilters = {
+        "evaluations.evaluator_id.has_score": ["eval-abc"],
+      };
+      expect(matchesEvaluationFilters(evals, filters)).toBe(false);
+    });
+
+    it("does not match a score attached to an errored run", () => {
+      const evals = [
+        makeEval({ evaluatorId: "eval-abc", status: "error", score: 0.85 }),
+      ];
       const filters: TriggerFilters = {
         "evaluations.evaluator_id.has_score": ["eval-abc"],
       };
@@ -652,6 +672,16 @@ describe("matchesEvaluationFilters", () => {
 
     it("does not match when label is empty", () => {
       const evals = [makeEval({ evaluatorId: "eval-abc", label: "" })];
+      const filters: TriggerFilters = {
+        "evaluations.evaluator_id.has_label": ["eval-abc"],
+      };
+      expect(matchesEvaluationFilters(evals, filters)).toBe(false);
+    });
+
+    it("does not match a label attached to an errored run", () => {
+      const evals = [
+        makeEval({ evaluatorId: "eval-abc", status: "error", label: "toxic" }),
+      ];
       const filters: TriggerFilters = {
         "evaluations.evaluator_id.has_label": ["eval-abc"],
       };
@@ -691,6 +721,26 @@ describe("matchesEvaluationFilters", () => {
       };
       expect(matchesEvaluationFilters(evals, filters)).toBe(false);
     });
+
+    it("does not fire on a false verdict attached to an errored run (provider timeout is not a quality regression)", () => {
+      const evals = [
+        makeEval({ evaluatorId: "eval-abc", status: "error", passed: false }),
+      ];
+      const filters: TriggerFilters = {
+        "evaluations.passed": { "eval-abc": ["false"] },
+      };
+      expect(matchesEvaluationFilters(evals, filters)).toBe(false);
+    });
+
+    it("does not fire on a verdict attached to a skipped run", () => {
+      const evals = [
+        makeEval({ evaluatorId: "eval-abc", status: "skipped", passed: true }),
+      ];
+      const filters: TriggerFilters = {
+        "evaluations.passed": { "eval-abc": ["true"] },
+      };
+      expect(matchesEvaluationFilters(evals, filters)).toBe(false);
+    });
   });
 
   describe("when filtering by evaluations.score (double-keyed)", () => {
@@ -704,6 +754,16 @@ describe("matchesEvaluationFilters", () => {
 
     it("does not match when score differs", () => {
       const evals = [makeEval({ evaluatorId: "eval-abc", score: 0.5 })];
+      const filters: TriggerFilters = {
+        "evaluations.score": { "eval-abc": { score: ["0.85"] } },
+      };
+      expect(matchesEvaluationFilters(evals, filters)).toBe(false);
+    });
+
+    it("does not match a score attached to an errored run", () => {
+      const evals = [
+        makeEval({ evaluatorId: "eval-abc", status: "error", score: 0.85 }),
+      ];
       const filters: TriggerFilters = {
         "evaluations.score": { "eval-abc": { score: ["0.85"] } },
       };
@@ -754,6 +814,20 @@ describe("matchesEvaluationFilters", () => {
         "evaluations.label": { "eval-abc": ["positive", "negative"] },
       };
       expect(matchesEvaluationFilters(evals, filters)).toBe(true);
+    });
+
+    it("does not match a label attached to an errored run", () => {
+      const evals = [
+        makeEval({
+          evaluatorId: "eval-abc",
+          status: "error",
+          label: "positive",
+        }),
+      ];
+      const filters: TriggerFilters = {
+        "evaluations.label": { "eval-abc": ["positive"] },
+      };
+      expect(matchesEvaluationFilters(evals, filters)).toBe(false);
     });
 
     it("does not match when label is not in filter values", () => {

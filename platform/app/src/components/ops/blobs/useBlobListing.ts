@@ -1,3 +1,4 @@
+import { keepPreviousData } from "@tanstack/react-query";
 import { useState } from "react";
 
 import type { OpsBlobSort, OpsBlobSummary } from "~/server/app-layer/ops/types";
@@ -46,7 +47,7 @@ export function useBlobListing(): BlobListing {
     {
       enabled: !!selectedQueue,
       refetchInterval: 30_000,
-      keepPreviousData: true,
+      placeholderData: keepPreviousData,
       getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     },
   );
@@ -64,9 +65,9 @@ export function useBlobListing(): BlobListing {
     blobs: blobs.data?.pages.flatMap((page) => page.blobs) ?? [],
     rankedFromSample: firstPage?.rankedFromSample ?? false,
     sampled: firstPage?.sampled ?? 0,
-    // isInitialLoading, not isLoading: a disabled query (no queue yet) reports
+    // isLoading, not isLoading: a disabled query (no queue yet) reports
     // "loading" forever, which would pin the spinner before anything is armed.
-    isLoading: blobs.isInitialLoading || queues.isLoading,
+    isLoading: blobs.isLoading || queues.isLoading,
     hasMore: blobs.hasNextPage ?? false,
     loadMore: () => void blobs.fetchNextPage(),
     isLoadingMore: blobs.isFetchingNextPage,

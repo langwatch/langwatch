@@ -13,7 +13,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { HelpCircle, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
@@ -23,6 +22,7 @@ import {
   useFieldArray,
   useWatch,
 } from "react-hook-form";
+import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import { ConfirmDialog } from "../../components/gateway/ConfirmDialog";
 import { ProjectAvatar } from "../../components/ProjectAvatar";
 import { Link } from "../../components/ui/link";
@@ -121,7 +121,7 @@ export const TeamForm = ({
   const { hasOrgPermission } = useOrganizationTeamProject();
   const canManageOrganization = hasOrgPermission("organization:manage");
 
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
   const { project } = useOrganizationTeamProject();
   const [projectToArchive, setProjectToArchive] = useState<{
     id: string;
@@ -405,7 +405,7 @@ export const TeamForm = ({
               message={`Are you sure you want to archive "${projectToArchive?.name ?? ""}"? This will hide the project and all its data. Contact LangWatch support to restore it.`}
               confirmLabel="Archive"
               tone="danger"
-              loading={archiveProject.isLoading}
+              loading={archiveProject.isPending}
               onConfirm={() => {
                 if (!project || !projectToArchive) return;
                 archiveProject.mutate({

@@ -1,11 +1,11 @@
 import { createLogger } from "@langwatch/observability";
+import { nanoid } from "nanoid";
+import type Stripe from "stripe";
 import {
   Currency,
   type OrganizationUserRole,
   type PrismaClient,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import type Stripe from "stripe";
+} from "~/generated/prisma/client";
 import {
   AmbiguousSubscriptionError,
   NoActiveSubscriptionError,

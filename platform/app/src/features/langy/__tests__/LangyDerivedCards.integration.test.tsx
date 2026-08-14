@@ -33,7 +33,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({}),
+    useUtils: () => ({}),
     dashboards: {
       getAll: { useQuery: () => ({ data: [] }) },
       create: { useMutation: () => ({ mutateAsync: vi.fn() }) },

@@ -1,5 +1,5 @@
-import { Currency } from "@prisma/client";
 import { z } from "zod";
+import { Currency } from "~/generated/prisma/client";
 import { checkOrganizationPermission } from "../../src/server/api/rbac";
 import {
   createTRPCRouter,

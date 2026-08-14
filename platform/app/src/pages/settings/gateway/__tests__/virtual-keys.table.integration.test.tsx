@@ -101,7 +101,7 @@ const SPEND = [
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       virtualKeys: { list: { invalidate: vi.fn() } },
     }),
     virtualKeys: {

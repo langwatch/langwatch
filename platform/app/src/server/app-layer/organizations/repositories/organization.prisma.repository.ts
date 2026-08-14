@@ -1,6 +1,7 @@
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
-import type { User } from "@prisma/client";
+import { TRPCError } from "@trpc/server";
+import type { User } from "~/generated/prisma/client";
 import {
   type Currency,
   type OrganizationIntent,
@@ -10,8 +11,7 @@ import {
   type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { TRPCError } from "@trpc/server";
+} from "~/generated/prisma/client";
 import { findSharedTeamIds } from "~/server/role-bindings/personal-team-scope";
 import { projectAdminUserIdsWithoutDirectRole } from "~/server/teams/effective-team-admins";
 import { KSUID_RESOURCES } from "~/utils/constants";

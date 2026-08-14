@@ -2,7 +2,7 @@ import type {
   Currency,
   OrganizationUserRole,
   Subscription,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 export type BillingInterval = "monthly" | "annual";
 
 /** A Stripe invoice projected for UI display. */

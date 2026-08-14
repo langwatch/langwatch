@@ -165,7 +165,7 @@ const boundImports = (source: string): string[] => {
  *
  * Two forms are TYPES, erased at compile time, and following them would report
  * leaks that do not exist: `typeof import("x")`, and the type-query member
- * access `import("x").Foo` (as in `import("@prisma/client").PrismaClient`).
+ * access `import("x").Foo` (as in `import("~/generated/prisma/client").PrismaClient`).
  * `(await import("x")).foo` puts a paren between the specifier and the dot, so
  * it survives the member-access filter. `import("x").then(...)` is skipped along
  * with them — that under-reports rather than over-reports, which is the safe
@@ -590,7 +590,7 @@ describe("browser-only UI never reaches the backend", () => {
         path.join(SRC, "server/api/routers/gatewayBudgets.ts"),
       );
 
-      expect(specs).not.toContain("@prisma/client");
+      expect(specs).not.toContain("~/generated/prisma/client");
     });
   });
 });

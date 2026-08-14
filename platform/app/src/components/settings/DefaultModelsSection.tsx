@@ -128,7 +128,7 @@ export function DefaultModelsSection({
   const setFilter = onFilterChange ?? setLocalFilter;
   const { openDrawer } = useDrawer();
 
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const deleteMutation =
     api.modelProvider.deleteDefaultModelsConfig.useMutation();
   const handleDelete = async (c: ConfigRow) => {
@@ -285,6 +285,7 @@ export function DefaultModelsSection({
             configs={visibleConfigs}
             allConfigs={data.configs}
             features={data.features}
+            hierarchy={effectiveHierarchy}
             onEdit={openEdit}
             onDelete={handleDelete}
             onAdd={openAdd}
@@ -303,6 +304,7 @@ function AllConfigsView({
   configs,
   allConfigs,
   features,
+  hierarchy,
   onEdit,
   onDelete,
   onAdd,
@@ -316,6 +318,8 @@ function AllConfigsView({
    *  see at runtime. */
   allConfigs: ConfigRow[];
   features: Payload["features"];
+  /** Org graph the cascade walk resolves parent-scope ids from. */
+  hierarchy: ScopeHierarchy;
   onEdit: (c: ConfigRow) => void;
   onDelete: (c: ConfigRow) => void;
   onAdd: () => void;
@@ -386,6 +390,7 @@ function AllConfigsView({
                   features={features}
                   configs={allConfigs}
                   anchorScope={mostSpecificScope(c.scopes)}
+                  hierarchy={hierarchy}
                   onEdit={() => onEdit(c)}
                   enabledProviderKeys={enabledProviderKeys}
                   displayNames={displayNames}
@@ -451,6 +456,7 @@ function ConfigCell({
   features,
   configs,
   anchorScope,
+  hierarchy,
   onEdit,
   enabledProviderKeys,
   displayNames,
@@ -460,6 +466,8 @@ function ConfigCell({
   features: Payload["features"];
   configs: ConfigRow[];
   anchorScope: { type: "ORGANIZATION" | "TEAM" | "PROJECT"; id: string } | null;
+  /** Org graph the cascade walk resolves parent-scope ids from. */
+  hierarchy: ScopeHierarchy;
   /** Open the row's edit drawer. Wired to the hover-revealed pencil
    *  next to each chip so the user can jump straight from "I want to
    *  change this model" to the drawer without hunting for the 3-dot
@@ -481,7 +489,7 @@ function ConfigCell({
   // update; AI features for this role are disabled at this scope until
   // they do.
   const resolvedRole = anchorScope
-    ? resolveAtScope(role, configs, anchorScope.type, anchorScope.id)
+    ? resolveAtScope({ key: role, configs, anchor: anchorScope, hierarchy })
     : null;
   const resolvedRoleModel = resolvedRole?.model ?? config[role] ?? null;
 
@@ -590,31 +598,58 @@ function mostSpecificScope(
   return null;
 }
 
+type AnchorScope = { type: "ORGANIZATION" | "TEAM" | "PROJECT"; id: string };
+
 /**
- * Cascading walk for a single key at a given scope. Walks
- * PROJECT → TEAM → ORG from the anchor scope, within each tier sorting
- * configs by createdAt DESC and taking the first that has the key.
- * Returns null if no config in the visible set carries the key.
+ * The anchor's own parent chain, most specific first: a project walks
+ * project, its own team, then the organization; a team walks team then
+ * organization. A parent tier whose id can't be resolved from the
+ * hierarchy is skipped rather than loosely matched.
  */
-function resolveAtScope(
-  key: string,
-  configs: ConfigRow[],
-  scopeType: "ORGANIZATION" | "TEAM" | "PROJECT",
-  scopeId: string,
-): NonNullable<Payload["effective"][ModelRoleKey]> | null {
-  const tier =
-    scopeType === "PROJECT"
-      ? ["PROJECT", "TEAM", "ORGANIZATION"]
-      : scopeType === "TEAM"
-        ? ["TEAM", "ORGANIZATION"]
-        : ["ORGANIZATION"];
-  for (const t of tier) {
+function cascadeChainFor(
+  anchor: AnchorScope,
+  hierarchy: ScopeHierarchy,
+): AnchorScope[] {
+  const organizationId = hierarchy.organization?.id ?? null;
+  const chain: AnchorScope[] = [anchor];
+  if (anchor.type === "PROJECT") {
+    const teamId =
+      (hierarchy.projects ?? []).find((p) => p.id === anchor.id)?.teamId ??
+      null;
+    if (teamId) chain.push({ type: "TEAM", id: teamId });
+  }
+  if (anchor.type !== "ORGANIZATION" && organizationId) {
+    chain.push({ type: "ORGANIZATION", id: organizationId });
+  }
+  return chain;
+}
+
+/**
+ * Cascading walk for a single key at a given scope, mirroring the
+ * server resolver's chain: the anchor scope, then the anchor's OWN
+ * parent scopes (a project's team, then the organization). Within each
+ * tier configs sort by createdAt DESC and the first carrying the key
+ * wins. Returns null if nothing in the anchor's chain carries the key.
+ *
+ * The chain ids come from `hierarchy`: matching parent tiers by TYPE
+ * alone displayed values from any team in the organization, including
+ * teams the anchor project does not belong to, values the runtime
+ * would never serve. Exported for tests.
+ */
+export function resolveAtScope({
+  key,
+  configs,
+  anchor,
+  hierarchy,
+}: {
+  key: string;
+  configs: ConfigRow[];
+  anchor: AnchorScope;
+  hierarchy: ScopeHierarchy;
+}): NonNullable<Payload["effective"][ModelRoleKey]> | null {
+  for (const t of cascadeChainFor(anchor, hierarchy)) {
     const matching = configs
-      .filter((c) =>
-        c.scopes.some((s) =>
-          t === scopeType ? s.type === t && s.id === scopeId : s.type === t,
-        ),
-      )
+      .filter((c) => c.scopes.some((s) => s.type === t.type && s.id === t.id))
       .filter((c) => (c.config as Record<string, string>)[key])
       .sort(
         (a, b) =>
@@ -623,8 +658,8 @@ function resolveAtScope(
     if (matching[0]) {
       return {
         model: (matching[0].config as Record<string, string>)[key]!,
-        source: t === scopeType ? "role_default" : "role_default",
-        scope: t.toLowerCase(),
+        source: "role_default",
+        scope: t.type.toLowerCase(),
       } as NonNullable<Payload["effective"][ModelRoleKey]>;
     }
   }
