@@ -42,7 +42,7 @@ const (
 	drainBackoffCap   = 60 * time.Second
 )
 
-// NewDrainer builds a drainer; run it with Start (blocking, lifecycle-style).
+// NewDrainer builds a drainer; run it with Start.
 func NewDrainer(opts DrainerOptions) *Drainer {
 	if opts.Tick <= 0 {
 		opts.Tick = 2 * time.Second
@@ -58,14 +58,18 @@ func NewDrainer(opts DrainerOptions) *Drainer {
 	}
 }
 
-// Start runs the drain loop until ctx is canceled or Stop is called.
-// Signature matches lifecycle.Worker.
+// Start launches the drain loop, which runs until ctx is canceled or Stop is
+// called. Matches the lifecycle.Worker shape, which is fire-and-forget: a
+// Start that blocks wedges the whole lifecycle group before it arms its
+// signal handler, and the process then dies on the first SIGTERM with no
+// graceful shutdown at all. The cancel func is installed before the loop
+// launches so a Stop that lands immediately after Start cannot miss it.
 func (d *Drainer) Start(ctx context.Context) {
 	ctx, cancel := context.WithCancel(ctx)
 	d.cancelMu.Lock()
 	d.cancel = cancel
 	d.cancelMu.Unlock()
-	d.run(ctx)
+	go d.run(ctx)
 }
 
 // Stop cancels a running Start.
