@@ -39338,7 +39338,7 @@ A verdict carries four things: the `status`, the `winner`, the judge's `reasonin
 |--------|---------------|
 | `decided` | The judge picked a winner, named in `winner` |
 | `tie` | The judge compared the candidates and found none better than the rest, so there is no winner |
-| `inconclusive` | The judge established no winner. Under swap and reconcile that is its two passes disagreeing, so this row does not separate these candidates. That is a finding about them, and it is deliberately not a tie, which would claim they are equally good |
+| `inconclusive` | The judge ran and no winner came out of it. Under swap and reconcile that is usually its two passes disagreeing, so this row does not separate these candidates. That is a finding about them, and it is deliberately not a tie, which would claim they are equally good. It also covers a judge that answered with nothing usable in it, which `reasoning` says plainly. Either way the calls were made and billed, so the row still reports its cost |
 | `skipped` | Fewer than two targets produced a non-empty output, so no judge ran. `reasoning` names the targets that produced nothing |
 | `error` | The judge failed or could not be reached, so nothing was measured about the candidates at all |
 
@@ -39688,7 +39688,7 @@ A comparison grades the row as a whole rather than one target, so it gets its ow
 
 | Column Pattern | Description | Example |
 |----------------|-------------|---------|
-| `{comparison}_winner` | Name of the winning target, `tie`, `unresolved`, or empty | `comparison_winner` → `gpt-5-mini` |
+| `{comparison}_winner` | Name of the winning target, `tie`, `no_verdict`, `unresolved`, or empty | `comparison_winner` → `gpt-5-mini` |
 | `{comparison}_candidates` | The targets compared on this row, comma separated | `comparison_candidates` → `gpt-5-mini, claude-sonnet-5` |
 | `{comparison}_reasoning` | The judge's explanation for the verdict | `comparison_reasoning` → `"gpt-5-mini gives the exact reset link"` |
 
@@ -39698,11 +39698,13 @@ What each [verdict](#the-verdict) writes into those three cells:
 |---------|-----------------------|---------------------------|--------------------------|
 | `decided` | The winning target's name | The targets judged on this row | The judge's explanation |
 | `tie` | `tie` | The targets judged on this row | The judge's explanation |
-| `inconclusive` | Empty | Empty | Empty |
-| `skipped` | Empty | Empty | Empty |
+| `inconclusive` | `no_verdict` | The targets judged on this row | Why the verdict did not hold |
+| `skipped` | `no_verdict` | The candidates the row did have | Why the row could not be compared |
 | `error` | Empty | Empty | Empty |
 
-An empty winner is never a tie. The three cells go empty together for `inconclusive`, `skipped` and `error`, and for a row the comparison never ran on, so `tie` in the winner column always means the judge saw the candidates and called the row even.
+An empty winner is never a tie. The three cells go empty together for `error` and for a row the comparison never ran on, so `tie` in the winner column always means the judge saw the candidates and called the row even.
+
+`no_verdict` is the shared export token for `inconclusive` and `skipped`. The two are separate in code, on the `verdict.status` your call returns, but they are recorded under one status, so a row read back from a completed run cannot be sorted into one or the other and naming either in the export would be a guess. The reasoning cell explains why no verdict was recorded, either in the judge's own words or, when the judge itself never answered, in the evaluator's account of what came back. Keep the two apart by reading `verdict.status` at the point of comparison.
 
 A row's candidates can be fewer than the comparison's full set of targets, because a target that produced no output for that row is left out of the matchup. The winner reads `unresolved` on the rare row where the judge's answer matches none of the candidates it was shown, and a winner naming a target the run no longer lists is written under its own name.
 
