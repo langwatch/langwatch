@@ -44,7 +44,7 @@ import { getProtectionsForProject } from "~/server/api/utils";
 import { validator as zValidator } from "~/server/api/validation";
 import { prisma } from "~/server/db";
 import { featureFlagService } from "~/server/featureFlag";
-import { baseResponses } from "../../shared/base-responses";
+import { canonicalBaseResponses } from "../../shared/base-responses";
 
 const logger = createLogger("langwatch:api:analytics-sql");
 
@@ -194,7 +194,7 @@ export function registerGovernedSqlRoutes(
         `Diagnostics are advisory and never reject a query. ${GOVERNED_SQL_CLEAN_DIAGNOSTICS_MEANING}`,
       tags: ["Analytics / Governed SQL"],
       responses: {
-        ...baseResponses,
+        ...canonicalBaseResponses,
         200: {
           description:
             "The query ran, and the result is scoped to the caller's project",
@@ -238,7 +238,7 @@ export function registerGovernedSqlRoutes(
         "Lists the governed analytics datasets this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join keys, partition-pruning time column, freshness and a runnable example query.",
       tags: ["Analytics / Governed SQL"],
       responses: {
-        ...baseResponses,
+        ...canonicalBaseResponses,
         200: {
           description:
             "The governed schema, scoped to the caller's permissions",
