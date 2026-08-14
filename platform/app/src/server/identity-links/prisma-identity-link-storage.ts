@@ -82,7 +82,7 @@ export class PrismaIdentityLinkStorage implements IdentityLinkStorage {
   async eraseIdentifiers(
     input: EraseIdentifiersInput,
   ): Promise<EraseIdentifiersResult> {
-    const { organizationId, userId, emailTokenByExternalId, erasedAt } = input;
+    const { organizationId, userId, emailTokenByExternalId } = input;
 
     return await this.prisma.$transaction(async (tx) => {
       const touched = await tx.providerIdentityLink.findMany({
@@ -91,8 +91,6 @@ export class PrismaIdentityLinkStorage implements IdentityLinkStorage {
           OR: [
             { userId },
             { actorUserId: userId },
-            // Same email value under a non-email kind (a collision, not a
-            // person reference) must not be swapped or stamped.
             {
               externalKind: { in: [...EMAIL_EXTERNAL_KINDS] },
               externalId: { in: [...emailTokenByExternalId.keys()] },
@@ -111,16 +109,7 @@ export class PrismaIdentityLinkStorage implements IdentityLinkStorage {
       for (const row of touched) {
         await tx.providerIdentityLink.update({
           where: { id: row.id },
-          data: {
-            userId: row.userId === userId ? null : row.userId,
-            actorUserId: row.actorUserId === userId ? null : row.actorUserId,
-            externalId:
-              isEmailKind(row.externalKind) &&
-              emailTokenByExternalId.has(row.externalId)
-                ? emailTokenByExternalId.get(row.externalId)!
-                : row.externalId,
-            erasedAt,
-          },
+          data: erasedRowData(row, input),
         });
       }
 
@@ -146,4 +135,24 @@ export class PrismaIdentityLinkStorage implements IdentityLinkStorage {
     });
     return rows.map(toRow);
   }
+}
+
+type ErasableRow = Pick<
+  DbLinkRow,
+  "userId" | "actorUserId" | "externalKind" | "externalId"
+>;
+
+function erasedRowData(row: ErasableRow, erasure: EraseIdentifiersInput) {
+  const { userId, emailTokenByExternalId, erasedAt } = erasure;
+  const erasedExternalId =
+    isEmailKind(row.externalKind) && emailTokenByExternalId.has(row.externalId)
+      ? emailTokenByExternalId.get(row.externalId)!
+      : row.externalId;
+
+  return {
+    userId: row.userId === userId ? null : row.userId,
+    actorUserId: row.actorUserId === userId ? null : row.actorUserId,
+    externalId: erasedExternalId,
+    erasedAt,
+  };
 }
