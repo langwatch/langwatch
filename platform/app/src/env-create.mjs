@@ -355,6 +355,19 @@ export function createEnvConfig() {
       // the same floor as the gateway secrets: one value provisions
       // organizations across the whole instance.
       LANGWATCH_INSTANCE_ADMIN_API_KEY: z.string().min(32).optional(),
+      // Master secret the per-organization erased-email key is HKDF-derived
+      // from (ADR-094 Decision 9). Erasure swaps an email-shaped provider
+      // login id for a keyed hash of it, and the usage report re-derives the
+      // same hash from ClickHouse's raw emails so an erased person's timeline
+      // keeps matching instead of silently falling into "unattributed".
+      //
+      // ONE KEY VERSION, ROTATION PROHIBITED. Re-deriving an already-erased
+      // row's token would need the email erasure destroyed, so a rotation can
+      // only orphan the rows it was meant to protect. Losing this value has
+      // the same effect. 32 characters minimum, the same floor as the other
+      // instance-wide secrets. Absent, erasure refuses to run rather than
+      // blanking emails behind a token nothing can reproduce.
+      LW_IDENTITY_ERASURE_SECRET: z.string().min(32).optional(),
       // Browser tracing (ADR-058). Off unless explicitly enabled: it adds
       // frontend telemetry volume, and the ingest route it exports to is
       // inert without OTEL_EXPORTER_OTLP_ENDPOINT anyway.
@@ -645,6 +658,8 @@ export function createEnvConfig() {
       // the whole deployment down over an optional credential.
       LANGWATCH_INSTANCE_ADMIN_API_KEY:
         process.env.LANGWATCH_INSTANCE_ADMIN_API_KEY || undefined,
+      LW_IDENTITY_ERASURE_SECRET:
+        process.env.LW_IDENTITY_ERASURE_SECRET || undefined,
       RUM_ENABLED:
         process.env.RUM_ENABLED === "1" ||
         process.env.RUM_ENABLED?.toLowerCase() === "true",

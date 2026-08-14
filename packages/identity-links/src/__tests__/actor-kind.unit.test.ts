@@ -5,8 +5,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   ACTOR_KINDS,
+  actorKindFromOcsf,
   DEFAULT_ACTOR_KIND,
   isActorKind,
+  isPersonKind,
   ocsfActorType,
   toActorKind,
 } from "../actor-kind";
@@ -52,5 +54,53 @@ describe("actor kinds", () => {
         JSON.stringify(ocsfActorType("bot")),
       );
     });
+  });
+});
+
+describe("actorKindFromOcsf — reading the bucket back at report time", () => {
+  // The whole point of keeping the reverse map beside the forward one: ingest
+  // and report cannot drift into two answers about whose money a row is.
+  it("round-trips every kind the adapter can stamp", () => {
+    for (const kind of ACTOR_KINDS) {
+      expect(actorKindFromOcsf(ocsfActorType(kind))).toBe(kind);
+    }
+  });
+
+  describe("when the row carries only the coarse OCSF type_id", () => {
+    // `type_id` is lossy — service principals and bots share 3 — but both are
+    // unattributable, so the report's answer is the same either way.
+    it("reads 3 as the machine side and 1 or 2 as a human", () => {
+      expect(actorKindFromOcsf({ type_id: 3 })).toBe("service_principal");
+      expect(actorKindFromOcsf({ type_id: 1 })).toBe("person");
+      expect(actorKindFromOcsf({ type_id: 2 })).toBe("person");
+      expect(actorKindFromOcsf({ type_id: "3" })).toBe("service_principal");
+    });
+  });
+
+  describe("when the row carries nothing readable", () => {
+    // Push-path rows (the trace reactor) write no actor type at all. Inventing
+    // "can never resolve" for them would hide a linkable person behind a
+    // bucket nobody is expected to act on.
+    it("falls back to person rather than inventing unattributable", () => {
+      expect(actorKindFromOcsf({})).toBe(DEFAULT_ACTOR_KIND);
+      expect(actorKindFromOcsf({ type: "nonsense", type_id: "x" })).toBe(
+        "person",
+      );
+      expect(actorKindFromOcsf({ type_id: null })).toBe("person");
+    });
+  });
+
+  describe("when type and type_id disagree", () => {
+    it("believes the exact bucket, which is the authoritative one", () => {
+      expect(actorKindFromOcsf({ type: "bot", type_id: 1 })).toBe("bot");
+    });
+  });
+});
+
+describe("isPersonKind — which rows can ever resolve to somebody", () => {
+  it("is true only for person", () => {
+    expect(isPersonKind("person")).toBe(true);
+    expect(isPersonKind("service_principal")).toBe(false);
+    expect(isPersonKind("bot")).toBe(false);
   });
 });

@@ -130,4 +130,51 @@ describe("MembershipLifecycleService against a real database", () => {
       ).toBeNull();
     });
   });
+
+  describe("when both organizations offboard the person at the same moment", () => {
+    /**
+     * Two directories can withdraw a person's last two memberships
+     * concurrently, and under READ COMMITTED each transaction counts
+     * memberships before the other commits — so both can see one left and
+     * neither escalates, leaving a live account with no memberships.
+     *
+     * The interleaving is not forced here, because forcing it needs two
+     * connections held open at chosen points and the harness has one client.
+     * What is deterministic is the OUTCOME: whether or not the race happens on
+     * a given run, the account must end up off. Without the post-commit
+     * re-check this assertion fails whenever the race does occur, and passes
+     * otherwise — which is precisely the flake a real deployment shows.
+     */
+    it("still turns the account off, whichever of them commits last", async () => {
+      const service = MembershipLifecycleService.create(prisma);
+      await service.onMembershipReactivated({
+        organizationId: orgAId,
+        userId,
+      });
+      await service.onMembershipReactivated({
+        organizationId: orgBId,
+        userId,
+      });
+
+      await Promise.all([
+        service.onMembershipDeactivated({
+          organizationId: orgAId,
+          userId,
+          now: OFFBOARDED_AT,
+        }),
+        service.onMembershipDeactivated({
+          organizationId: orgBId,
+          userId,
+          now: OFFBOARDED_AT,
+        }),
+      ]);
+
+      expect((await membership(orgAId))?.disabledAt).toEqual(OFFBOARDED_AT);
+      expect((await membership(orgBId))?.disabledAt).toEqual(OFFBOARDED_AT);
+      expect(
+        (await prisma.user.findUnique({ where: { id: userId } }))
+          ?.deactivatedAt,
+      ).not.toBeNull();
+    });
+  });
 });

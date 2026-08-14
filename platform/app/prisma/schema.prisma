@@ -3289,6 +3289,12 @@ model DiscoveredAgent {
   /// erasure (ADR-094 Decision 9).
   snapshot Json?
 
+  /// Set only by erasure, when person references were blanked out of this
+  /// row's snapshot — the same audit trail ProviderIdentityLink carries, so
+  /// "we forgot somebody who appeared here" stays distinguishable from "the
+  /// provider never sent an owner" forever (ADR-094 Decision 9).
+  erasedAt DateTime?
+
   @@unique([organizationId, providerConnectionId, providerAgentKey])
 }
 
