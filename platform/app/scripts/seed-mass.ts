@@ -349,12 +349,21 @@ async function waitForProjections({
   return counts;
 }
 
+/** The demo platform content, bound to the static local-dev identity. */
+const seedDemoContent = (prisma: PrismaClient) =>
+  seedDemoPlatform({
+    prisma,
+    projectId: PROJECT_ID,
+    organizationId: ORG_ID,
+    userId: USER_ID,
+  });
+
 async function main(): Promise<void> {
   const prisma = new PrismaClient({
     adapter: createPrismaPgAdapter(process.env.DATABASE_URL ?? ""),
   });
   try {
-    await seedDemoPlatform({ prisma, projectId: PROJECT_ID, userId: USER_ID });
+    await seedDemoContent(prisma);
     const now = Date.now();
     const timeline = buildMassTimeline({ months: MONTHS, now });
     const metrics = buildMassMetrics({ months: MONTHS, now });

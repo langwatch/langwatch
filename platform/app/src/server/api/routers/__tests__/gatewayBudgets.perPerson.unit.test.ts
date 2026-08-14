@@ -40,6 +40,8 @@ const breakdown = vi.hoisted(() => vi.fn());
 // The router takes the budget ledger from the App, so standing in for the
 // store means standing in for `getApp()`.
 vi.mock("~/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: () => ({
     gateway: {
       budgets: {

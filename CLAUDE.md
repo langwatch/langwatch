@@ -167,7 +167,7 @@ make service-watch svc=nlpgo # live reload via air
 
 ## Commands
 
-Inside langwatch/
+From the repo root (it proxies these to `@langwatch/web`)
 
 ```bash
 pnpm typecheck        # Type check (uses tsgo, fast)
@@ -183,7 +183,11 @@ seconds of wall clock. That is fine once and ruinous four times over, so
 `lint:plugins` and `format` all go through `dev/scripts/check-queue.mjs`. It
 counts the runs live across every worktree, terminal and agent on the machine
 against **one** counter (they compete for the same cores), and a run past the
-limit waits its turn instead of piling on. With a slot free it prints nothing
+limit waits its turn instead of piling on. With haven installed the wrapper
+delegates the run to `haven slot run`, which gates on the same flock semaphore
+`haven typecheck` holds — the queue's decisions are Go code in
+`tools/thuishaven`, and the JS queue is only the fallback for machines without
+haven (`CHECK_QUEUE_IMPL=js` forces it). With a slot free it prints nothing
 and is otherwise transparent (same stdio, same exit code). Queued, it says so on
 stderr, which is what tells you a slow run was waiting rather than hung.
 `CHECK_SLOTS=N` overrides the limit and `CHECK_SLOTS=0` turns the queue off;
@@ -217,12 +221,15 @@ When debugging locally, **prefer the observability stack over the log file if it
 
 ```
 platform/app/        # Vite app (main product)
-langwatch_server/    # Python server
 services/nlpgo/      # Go NLP engine (:5561, built as langwatch/langwatch_nlp)
 services/aigateway/  # Go AI Gateway data plane (:5563)
-charts/gateway/ # Helm sub-chart for the gateway
+services/langevals/  # Python evaluators
+charts/gateway/      # Helm sub-chart for the gateway
+packages/            # Shared TypeScript workspace packages
 sdks/python/         # Python SDK
 sdks/typescript/     # TypeScript SDK
+sdks/go/             # Go SDK
+mcp/typescript/      # MCP server
 specs/               # BDD feature specs
 ```
 
@@ -291,10 +298,10 @@ specs/               # BDD feature specs
 | Running `pnpm typecheck` and assuming the TypeScript is checked | `tsconfig.tsgo.json` excludes `**/*.test.ts`, `**/*.test.tsx` and `**/__tests__/**`, so `pnpm typecheck` never looks at a test file. CI runs `pnpm typecheck` **and** `pnpm typecheck:tests` as separate steps in the same job. Use `pnpm typecheck:all`, which is both, or a change confined to a test file will typecheck clean locally and fail CI |
 | Assuming `go build`, `go test` and `gofmt` are enough before pushing Go | Run `golangci-lint run ./services/aigateway/... ./services/nlpgo/... ./pkg/... ./cmd/... ./tools/migrationorder/...`, which is exactly what `go-ci / lint` runs. It catches a class the other three never will, most often `misspell` (it enforces US spelling, so `behaviour`, `unrecognised`, `labelled` and `funnelled` all fail even though the repo's prose uses British forms), `nolintlint` (a `//nolint` for a code already in the global `gosec.excludes` is flagged as unused) and `testifylint`. The pinned version is in `.golangci.yml`; `golangci-lint run --fix` handles misspell and nolintlint automatically |
 | Rewriting `assert.Equal(t, 1.0, ...)` to `assert.InEpsilon` because testifylint's `float-compare` says so | Check whether the expectation can be zero first. `InEpsilon` divides by the expected value, so it returns false even for `InEpsilon(0.0, 0.0)`, and a counter assertion meaning "this did not move" becomes one that always fails. For Prometheus counters, which are exact integers in a float64, `assert.Equal` is correct and `float-compare` is a false positive; `.golangci.yml` scopes an exclusion to `adapters/gatewaymetrics/*_test.go` rather than contorting the assertions |
-| Installing from inside `langwatch/`, `typescript-sdk/`, `mcp-server/` or `skills/` | One `pnpm install` at the **repo root** covers every JavaScript project — the repo is a single pnpm workspace with one lockfile (ADR-076). Installing from a subdirectory resolves the whole workspace anyway, because pnpm walks up to the root. To install just one project, filter from the root: `pnpm install --filter "@langwatch/web..."` (the trailing `...` includes its workspace dependencies) |
+| Installing from inside `platform/app/`, `sdks/typescript/`, `mcp/typescript/` or `skills/` | One `pnpm install` at the **repo root** covers every JavaScript project — the repo is a single pnpm workspace with one lockfile (ADR-076). Installing from a subdirectory resolves the whole workspace anyway, because pnpm walks up to the root. To install just one project, filter from the root: `pnpm install --filter "@langwatch/web..."` (the trailing `...` includes its workspace dependencies) |
 | Adding a security `override` to a single project's `package.json` | pnpm honours `overrides` only at the workspace root, so put it in the root `pnpm-workspace.yaml`. A `pnpm` block in a member package.json is silently ignored — it looks active and does nothing. This is why the pins used to drift when the repo had six install roots |
-| Referring to the app as the `langwatch` package | The app is `@langwatch/web` (in `langwatch/`). `langwatch` is the published TypeScript SDK, in `typescript-sdk/`. They collided until ADR-076; `pnpm --filter langwatch` now unambiguously means the SDK |
-| `cd langwatch` before every command | The repo root proxies the common ones, so `pnpm dev`, `pnpm test:unit`, `pnpm typecheck`, `pnpm lint`, `pnpm prisma:migrate` and friends work from wherever you are. `cd` only when you want a script the root does not proxy — `pnpm --filter @langwatch/web <script>` reaches any of them |
+| Referring to the app as the `langwatch` package | The app is `@langwatch/web` (in `platform/app/`). `langwatch` is the published TypeScript SDK, in `sdks/typescript/`. They collided until ADR-076; `pnpm --filter langwatch` now unambiguously means the SDK |
+| `cd platform/app` before every command | The repo root proxies the common ones, so `pnpm dev`, `pnpm test:unit`, `pnpm typecheck`, `pnpm lint`, `pnpm prisma:migrate` and friends work from wherever you are. `cd` only when you want a script the root does not proxy — `pnpm --filter @langwatch/web <script>` reaches any of them |
 | Importing a component into server code to reuse a constant it happens to export | **Enforced:** no *value*-import chain from server code may reach a browser-only package (React, Chakra, Ark, Emotion, react-router, lucide-react, browser OTel) — `src/server/__tests__/frontend-boundary.unit.test.ts` walks the real graph transitively and fails the build. One such import pulled 2,020 modules / 212 MB RSS into every backend process. `src/server/mailer/**` is the one exception, since react-email renders templates server-side. **Convention on top (not enforced):** don't value-import a `**/components/**` file at all, even a framework-free one — it invites exactly that chain later. A few such imports predate the guard (`server/datasets/upload-utils.ts`, `server/app-layer/langy/streaming/langyTurnRelay.ts`, `server/scenarios/execution/data-prefetcher.ts`); don't add more. Move the shared value into a framework-free module both sides import (`import type` is always fine — types are erased) |
 
 ## TypeScript
@@ -321,4 +328,4 @@ specs/               # BDD feature specs
 | Not filtering on the partition key column in WHERE | Always include `StartedAt`/`OccurredAt`/`StartTime` range in WHERE when a date range is available — this enables partition pruning. Without it, ClickHouse scans ALL partitions including cold storage on S3, turning 100ms queries into 1-2s |
 | Writing down migrations in ClickHouse migration files | Always comment out down migrations to prevent accidental data loss. Add a note: "To roll back, uncomment and run manually" |
 | Putting multiple ALTER TABLE statements in one StatementBegin block | ClickHouse does not support multi-statement queries. Each ALTER TABLE needs its own `-- +goose StatementBegin` / `-- +goose StatementEnd` block |
-| Getting "Cannot find module" errors for generated files (.prisma/client, types.generated, evaluators.generated) | Run `pnpm start:prepare:files` in the `langwatch/` directory to regenerate all generated types (Prisma, Zod, SDK versions, langevals) — run it in the `platform/app/` directory. This is needed after fresh clones, worktree creation, or any schema changes |
+| Getting "Cannot find module" errors for generated files (.prisma/client, types.generated, evaluators.generated) | Run `pnpm start:prepare:files` in the `platform/app/` directory to regenerate all generated types (Prisma, Zod, SDK versions, langevals). This is needed after fresh clones, worktree creation, or any schema changes |

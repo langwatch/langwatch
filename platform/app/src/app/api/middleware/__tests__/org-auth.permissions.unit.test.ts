@@ -13,7 +13,6 @@ import { Hono, type MiddlewareHandler } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("~/server/db", () => ({ prisma: {} }));
-vi.mock("~/server/redis", () => ({ connection: undefined }));
 
 const resolveApiKeyPermission = vi.fn();
 vi.mock("~/server/rbac/role-binding-resolver", () => ({

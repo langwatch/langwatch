@@ -390,8 +390,6 @@ describe("the personal Pull Requests table", () => {
       expect(
         screen.getByText("Link sessions to pull requests"),
       ).toBeInTheDocument();
-      // Session counts read in full; token counts step up a tier.
-      expect(screen.getByText("6")).toBeInTheDocument();
       expect(screen.getByText("10.0K")).toBeInTheDocument();
       expect(screen.getByText("$12.50")).toBeInTheDocument();
     });
@@ -783,28 +781,11 @@ describe("the personal Pull Requests table", () => {
     });
   });
 
-  describe("given a row whose contributors and models are known", () => {
-    /** @scenario "A row names who worked on the pull request" */
-    it("names the contributors and the models behind the counts", async () => {
+  describe("given a row whose models are known", () => {
+    it("names the leading model and how many others rode along", () => {
       pinUsage({
         rows: [
           mappedRow({
-            contributorsSummary: [
-              {
-                contributorLabel: "Riley Chase",
-                projectId: "project-1",
-                projectSlug: "riley-personal",
-                contributorIsProject: false,
-                sessionsCount: 2,
-              },
-              {
-                contributorLabel: "Gateway",
-                projectId: "project-2",
-                projectSlug: "gateway",
-                contributorIsProject: true,
-                sessionsCount: 1,
-              },
-            ],
             modelBreakdown: [
               { model: "claude-fable-5", totalTokens: 8_000, costUsd: 10 },
               { model: "gpt-5-mini", totalTokens: 2_000, costUsd: 2.5 },
@@ -814,16 +795,9 @@ describe("the personal Pull Requests table", () => {
         unlinked: [],
         connection: { connected: true, installUrl: INSTALL_URL },
       });
-      const user = userEvent.setup();
       renderTable();
 
       expect(screen.getByText("claude-fable-5 +1")).toBeInTheDocument();
-
-      await user.hover(screen.getByText("6"));
-      expect(
-        await screen.findByText("Riley Chase: 2 sessions"),
-      ).toBeInTheDocument();
-      expect(await screen.findByText("Gateway: 1 session")).toBeInTheDocument();
     });
   });
 

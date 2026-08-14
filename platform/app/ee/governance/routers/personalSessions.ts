@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 /**
- * tRPC router for /me/devices — Phase 8 Sessions/Devices dashboard.
+ * tRPC router for the devices inventory — Phase 8 Sessions/Devices dashboard.
  *
  * Three procedures:
  *   - list: list every active CLI session for the authenticated user

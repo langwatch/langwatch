@@ -17,12 +17,12 @@
 # -----------------------------------------------------------------------------
 # Stage 1: build the Go manager binary.
 # -----------------------------------------------------------------------------
-# Pin an explicit Go toolchain patch (1.26.5) at or above the go.mod language
-# floor (`go 1.26.5`) so every build uses the same compiler. Bump this tag when
+# Pin an explicit Go toolchain patch (1.26.6) at or above the go.mod language
+# floor (`go 1.26.6`) so every build uses the same compiler. Bump this tag when
 # raising the go.mod floor -- the official images set GOTOOLCHAIN=local, so a
 # tag BELOW the floor does not download a newer toolchain, it fails the build
 # with "go.mod requires go >= X (running go Y)".
-FROM --platform=$BUILDPLATFORM golang:1.26.5-bookworm AS builder
+FROM --platform=$BUILDPLATFORM golang:1.26.6-bookworm AS builder
 
 WORKDIR /src
 
