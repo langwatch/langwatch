@@ -20,11 +20,11 @@ Feature: Automations list pages, providers, and shared copy
   Rule: Deleting a row asks for confirmation and names its kind
 
     @integration
-    Scenario: Confirming the dialog deletes the row and the drawer cache
+    Scenario: Confirming the dialog deletes the row everywhere it could reappear
       Given the delete confirmation dialog is open for an automation
       When the user confirms the deletion
       Then the automation is removed from the list
-      And a stale copy of the row can no longer be read from the drawer cache
+      And reopening the drawer can no longer show the deleted automation
 
     @integration
     Scenario: Deleting a report names it as a report, not an automation
@@ -56,7 +56,7 @@ Feature: Automations list pages, providers, and shared copy
       When the user selects "+ Create New" in the dataset picker
       Then a create-dataset drawer opens
       And saving it selects the newly created dataset in the picker
-      Without requiring any dataset to have existed beforehand
+      And no dataset had to exist beforehand
 
   Rule: The annotation-queue "Send to" selection is clickable everywhere it renders
 

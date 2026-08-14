@@ -264,7 +264,13 @@ function AutomationsPage() {
   const toggleTrigger = api.automation.toggleTrigger.useMutation();
   const deleteTriggerMutation = api.automation.deleteById.useMutation();
 
-  const handleToggleTrigger = (trigger: EnhancedTrigger, active: boolean) => {
+  const handleToggleTrigger = ({
+    trigger,
+    active,
+  }: {
+    trigger: EnhancedTrigger;
+    active: boolean;
+  }) => {
     const noun = presetLabels(triggerSource(trigger), false).noun;
     toggleTrigger.mutate(
       { triggerId: trigger.id, active, projectId: project?.id ?? "" },
@@ -511,7 +517,7 @@ function AutomationsPage() {
             checked={trigger.active}
             inputProps={{ "aria-label": `Toggle ${trigger.name}` }}
             onCheckedChange={({ checked }) => {
-              handleToggleTrigger(trigger, checked);
+              handleToggleTrigger({ trigger, active: checked });
             }}
           />
           {/* An automation that is running but silently dropping matches is
