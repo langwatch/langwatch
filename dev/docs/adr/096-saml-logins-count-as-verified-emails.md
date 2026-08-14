@@ -93,12 +93,16 @@ Forces and constraints (locked 2026-08-14):
 
 | Path | Reversible? | Blast radius | Gate |
 |---|---|---|---|
-| SAML sign-in links to existing user | Code-revert yes; a wrong link made in the window is not | High (auth boundary) | Human review of the PR + invariant unit tests + first real sign-in verified against Auth0 debug logs before announcing |
-| Fresh SAML user created with `emailVerified: true` | Yes (flag flip in DB) | Small — skips a verification email for users their own IdP already vouched for | none |
+| SAML sign-in links to existing user | Code-revert yes; a wrong link made in the window is not | High (auth boundary) | Human review of the PR + invariant unit tests + first real sign-in verified end-to-end before announcing: Auth0 debug logs (the IdP side) AND the resulting `Account` row linked to the pre-existing `User` (read-only production query on `Account.providerAccountId LIKE 'samlp\|%'`) — Auth0 logs alone don't prove BetterAuth persisted the link |
+| Fresh SAML user created with `emailVerified: true` | Yes (flag flip in DB) | Small — skips a verification email for users their own IdP already vouched for | Covered by the same first-sign-in verification: the created `User` row's `emailVerified` is checked in the same read-only query |
 
 ## Schema
 
-None. No migrations, no env vars, no config keys.
+None. No migrations, no env vars, no config keys, no Helm values, no
+dataplane impact — the change is app-layer auth and ships in the app
+image. Rollback is a redeploy of the previous image; note that rollback
+does NOT undo `emailVerified` flags persisted or account links created
+while the change was live — those would need manual review.
 
 ## Rejected alternatives
 
