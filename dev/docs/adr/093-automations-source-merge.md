@@ -266,7 +266,7 @@ Templates always create a **new** graph rather than binding an existing one: `cu
 ## Deferred — explicitly out of this ADR
 
 - **Multi-channel delivery** (one automation → email + Slack + webhook at once). Future ADR. The open data-model question (a `TriggerDelivery` junction vs a `deliveries` JSON array, and how dispatch keys off `action`) is *not* pre-decided here; this ADR only refuses to obstruct it: source/rule stay independent of delivery count, and the project-level token removes the per-delivery credential problem.
-- **Team/org-shared Slack integrations** (one workspace serving many projects). The `@unique projectId` table migrates into the scoped-resources junction shape if wanted.
+- **Team/org-shared Slack integrations** (one workspace serving many projects). §5's table already carries the scoped-resources shape (`@@unique([scopeType, scopeId])`), so widening is a new `scopeType` value and new rows — a data change, not a schema rework.
 - **Automatic healing of legacy tokens** (falling through to the project token when a stored token fails `invalid_auth`). Attractive, but it reintroduces silent retargeting through the back door; revisit with delivery-failure surfacing (#6716 G3 territory).
 - **Reports inside the wizard.** Report keeps its current composer path; unifying its authoring shell can ride a later polish pass without design risk.
 - **Slack-app OAuth install flow.** ADR-041's deferral stands; §5 decides only save-time identity pinning via `auth.test`.
