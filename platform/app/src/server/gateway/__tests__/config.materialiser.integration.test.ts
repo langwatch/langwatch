@@ -635,8 +635,12 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
       const vk = await repo.findById(VK_NO_RP_ID, ORG_ID);
       const mat = new GatewayConfigMaterialiser(prisma, null);
       const bundle = await mat.materialise(vk!);
-      expect(bundle.providers.length).toBeGreaterThan(0);
+      // Naming the LLM provider that must survive, rather than just
+      // asserting a non-empty list, keeps this from passing vacuously if
+      // the filter ever drops dispatchable providers too.
+      expect(bundle.providers.map((p) => p.id)).toContain(MP_ID);
       expect(bundle.providers.map((p) => p.id)).not.toContain(MP_SAFETY_ID);
+      expect(bundle.fallback.chain).toContain(MP_ID);
       expect(bundle.fallback.chain).not.toContain(MP_SAFETY_ID);
     });
 

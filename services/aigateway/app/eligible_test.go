@@ -169,3 +169,20 @@ func TestEligibleCredentialsImplicitNoMatchKeepsSafetyNet(t *testing.T) {
 		t.Errorf("safety net not applied: got %v", got)
 	}
 }
+
+func TestEligibleCredentialsEmptyChainDefersToNoProviderConfigured(t *testing.T) {
+	// A VK with zero credentials is a different customer problem than a
+	// VK missing one provider: the org has configured nothing at all, so
+	// "bind a bedrock slot" is the wrong advice. This helper stays silent
+	// and lets candidateChain raise no_provider_configured, which names
+	// the actual next step. Both are 400s, so the status contract holds.
+	got, err := eligibleCredentials(context.Background(), nil, &domain.ResolvedModel{
+		ProviderID: domain.ProviderBedrock, ModelID: "anthropic.claude-3-5-sonnet",
+	})
+	if err != nil {
+		t.Fatalf("empty chain must not hard-fail here: %v", err)
+	}
+	if len(got) != 0 {
+		t.Errorf("expected empty chain to pass through, got %v", got)
+	}
+}
