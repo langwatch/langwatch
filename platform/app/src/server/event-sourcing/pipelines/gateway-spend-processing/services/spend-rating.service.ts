@@ -64,6 +64,13 @@ export function rateSpendNanoUsd({
         outputTokens: usage.output_tokens,
         cacheReadTokens: usage.cache_read_input_tokens,
         cacheCreationTokens: usage.cache_creation_input_tokens,
+        cacheCreation1hTokens: usage.cache_creation_1h_tokens,
+        inputAudioTokens: usage.input_audio_tokens,
+        outputAudioTokens: usage.output_audio_tokens,
+        inputCharacters: usage.input_chars,
+        // The one conversion of the duration quantity: it is integer
+        // milliseconds everywhere else, and per-second rates apply here.
+        audioSeconds: usage.audio_ms / 1000,
       })
     : 0;
   return {

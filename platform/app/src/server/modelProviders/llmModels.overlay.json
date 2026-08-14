@@ -227,6 +227,73 @@
 			"supportsImageOutput": false,
 			"supportsAudioOutput": true
 		},
+		"openai/gpt-realtime": {
+			"id": "openai/gpt-realtime",
+			"name": "OpenAI: GPT Realtime",
+			"provider": "openai",
+			"pricing": {
+				"inputCostPerToken": 4e-6,
+				"outputCostPerToken": 1.6e-5,
+				"inputCacheReadPerToken": 4e-7,
+				"audioCostPerToken": 3.2e-5,
+				"audioOutputCostPerToken": 6.4e-5
+			},
+			"contextLength": 32000,
+			"maxCompletionTokens": null,
+			"supportedParameters": [],
+			"defaultParameters": null,
+			"modality": "audio+text->audio+text",
+			"mode": "chat",
+			"description": "OpenAI's speech-to-speech realtime model. Audio tokens cost eight times text tokens ($32 against $4 per million in, $64 against $16 out), so the audio split has to be priced apart. Rates from https://developers.openai.com/api/docs/pricing (verified 2026-08-14). The cached-token rate here is the text one; a cached audio token is $0.40 per million on this model, the same figure.",
+			"supportsImageInput": false,
+			"supportsAudioInput": true,
+			"supportsImageOutput": false,
+			"supportsAudioOutput": true
+		},
+		"openai/gpt-realtime-mini": {
+			"id": "openai/gpt-realtime-mini",
+			"name": "OpenAI: GPT Realtime mini",
+			"provider": "openai",
+			"pricing": {
+				"inputCostPerToken": 6e-7,
+				"outputCostPerToken": 2.4e-6,
+				"inputCacheReadPerToken": 6e-8,
+				"audioCostPerToken": 1e-5,
+				"audioOutputCostPerToken": 2e-5
+			},
+			"contextLength": 32000,
+			"maxCompletionTokens": null,
+			"supportedParameters": [],
+			"defaultParameters": null,
+			"modality": "audio+text->audio+text",
+			"mode": "chat",
+			"description": "The smaller speech-to-speech realtime model. Its own entry because the prefix-anchored match would otherwise price it at the full gpt-realtime rate, roughly three times higher on audio. Rates from https://developers.openai.com/api/docs/pricing (verified 2026-08-14). The cached-token rate here is the text one ($0.06 per million); a cached audio token is $0.30 per million.",
+			"supportsImageInput": false,
+			"supportsAudioInput": true,
+			"supportsImageOutput": false,
+			"supportsAudioOutput": true
+		},
+		"elevenlabs/convai": {
+			"id": "elevenlabs/convai",
+			"name": "ElevenLabs: Conversational AI",
+			"provider": "elevenlabs",
+			"pricing": {
+				"inputCostPerToken": 0,
+				"outputCostPerToken": 0,
+				"inputCostPerSecond": 0.0013333333333333333
+			},
+			"contextLength": 0,
+			"maxCompletionTokens": null,
+			"supportedParameters": [],
+			"defaultParameters": null,
+			"modality": "audio->audio",
+			"mode": "audio",
+			"description": "ElevenLabs conversational agents, priced by conversation duration at $0.08 per minute (https://elevenlabs.io/pricing/api, verified 2026-08-14). The figure is per second, $0.08 divided by 60. LLM cost is not included in it.",
+			"supportsImageInput": false,
+			"supportsAudioInput": true,
+			"supportsImageOutput": false,
+			"supportsAudioOutput": true
+		},
 		"elevenlabs/eleven_turbo_v2_5": {
 			"id": "elevenlabs/eleven_turbo_v2_5",
 			"name": "ElevenLabs: Turbo v2.5",
