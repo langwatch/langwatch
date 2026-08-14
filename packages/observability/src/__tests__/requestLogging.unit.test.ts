@@ -146,6 +146,58 @@ describe("requestLogging", () => {
       });
     });
 
+    describe("when the response is a server error but no cause reached the logger", () => {
+      const uncaused = () => {
+        const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
+        logHttpRequest(logger, {
+          method: "POST",
+          url: "/api/otel/v1/traces",
+          statusCode: 500,
+          duration: 100,
+          userAgent: null,
+          // A route that RETURNS a 500 rather than throwing leaves the
+          // middleware nothing to attach.
+        });
+        return logger;
+      };
+
+      /** @scenario A server error with no cause attached says so */
+      it("does not claim the request was handled", () => {
+        expect(uncaused().error.mock.calls[0][1]).not.toBe("request handled");
+      });
+
+      /** @scenario A server error with no cause attached says so */
+      it("states that no cause was attached", () => {
+        const [data, message] = uncaused().error.mock.calls[0];
+        expect(message).toMatch(/without a cause/i);
+        expect(data.errorType).toBe("UncausedServerError");
+      });
+
+      /** @scenario A server error with no cause attached says so */
+      it("is still logged at error level with its status", () => {
+        const logger = uncaused();
+        expect(logger.error).toHaveBeenCalledTimes(1);
+        expect(logger.warn).not.toHaveBeenCalled();
+        expect(logger.error.mock.calls[0][0]).toMatchObject({
+          statusCode: 500,
+        });
+      });
+
+      /** @scenario A successful request is still reported as handled */
+      it("leaves a successful request reported as handled", () => {
+        const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
+        logHttpRequest(logger, {
+          method: "GET",
+          url: "/ok",
+          statusCode: 200,
+          duration: 1,
+          userAgent: null,
+        });
+        expect(logger.info.mock.calls[0][1]).toBe("request handled");
+        expect(logger.info.mock.calls[0][0]).not.toHaveProperty("errorType");
+      });
+    });
+
     describe("when the error is a handled error", () => {
       const handled = (fault: string, httpStatus: number) =>
         Object.assign(new Error("handled"), {
