@@ -631,7 +631,18 @@ model OrganizationUser {
   /// seat-reconciliation.feature.
   disabledAt DateTime?
 
+  /// SCIM provenance, mirroring Group (externalId + scimSource): the
+  /// DIRECTORY's id for this member. Unlike VirtualKey/GatewayBudget
+  /// .externalId ("customer-supplied id"), this means "IdP-owned id" —
+  /// different concept, same word. Null for members the directory does
+  /// not manage. ADR-094 Decision 7.
+  externalId String?
+  /// Ownership discriminator shipped code keys on (e.g. "azure-ad",
+  /// "okta") — "directory-managed" when set. ADR-094 Decision 7.
+  scimSource String?
+
   @@id([userId, organizationId])
+  @@unique([organizationId, externalId])
   @@index([organizationId])
   @@index([userId])
   @@index([departmentId])
@@ -3888,6 +3899,74 @@ model IngestionSource {
   @@index([organizationId])
   @@index([teamId])
   @@index([sourceType])
+}
+
+/// Add-only list: which provider login belongs to which person, when, per
+/// connection. Reporting only — never read by any permission check
+/// (ADR-094 Decision 10). Rows are never edited; a correction is a new row
+/// that wins the (effectiveFrom, seq) ordering. The single exception is
+/// erasure (Decision 9), which blanks identifying values in place and
+/// stamps erasedAt.
+model ProviderIdentityLink {
+  id  String @id @default(nanoid())
+  /// Tie-break only, when two rows share effectiveFrom (precedent:
+  /// GatewayChangeEvent.revision).
+  seq BigInt @default(autoincrement())
+
+  /// Registered in ORG_SCOPED_MODELS.
+  organizationId String
+
+  provider             String
+  /// In the key: two connections to one provider are legitimate. Plain id,
+  /// no relation (relationMode="prisma") — the service checks the
+  /// IngestionSource belongs to organizationId before insert.
+  providerConnectionId String
+  /// Which id namespace externalId lives in — enum lives in code, per
+  /// provider (ADR-094 Constants), so adapters add kinds without
+  /// migrations.
+  externalKind         String
+  /// The provider's login id. Kept on erasure; email-kind values are
+  /// swapped for the org-scoped keyed-hash token.
+  externalId           String
+
+  /// Null = unlink row ("nobody owns this login from effectiveFrom on").
+  /// Blanked on erasure.
+  userId        String?
+  /// May be set in the past — that is how corrections work. Never updated
+  /// after insert.
+  effectiveFrom DateTime
+  recordedAt    DateTime  @default(now())
+  /// manual | external_id | email_suggestion_accepted | offboarding
+  /// (ADR-094 Constants).
+  source        String
+  /// Who made the change — from the session, never the request body.
+  /// Blanked on erasure.
+  actorUserId   String?
+  /// Set only by erasure — distinguishes "person forgotten" from
+  /// "admin unlinked".
+  erasedAt      DateTime?
+
+  @@index([organizationId, provider, providerConnectionId, externalKind, externalId, effectiveFrom(sort: Desc)])
+  /// Erasure and offboarding find rows by person.
+  @@index([organizationId, userId])
+}
+
+/// Inventory of bots/agents seen in providers. Our id is the reference; the
+/// (connection, providerAgentKey) combination is the recognition rule
+/// (ADR-094 Decision 8).
+model DiscoveredAgent {
+  id             String @id @default(nanoid())
+  organizationId String
+  /// Plain id, no relation — same regime as ProviderIdentityLink.
+  providerConnectionId String
+  /// Provider labels joined per adapter, e.g. "environmentId/botId".
+  providerAgentKey     String
+  /// Provider-side state (name, ownerUserId?, quarantined, …) — inventory
+  /// data, never our status. Person references inside are blanked on
+  /// erasure (ADR-094 Decision 9).
+  snapshot Json?
+
+  @@unique([organizationId, providerConnectionId, providerAgentKey])
 }
 
 /// Admin-defined anomaly detection rule. Evaluated server-side at
