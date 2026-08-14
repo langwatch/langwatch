@@ -167,6 +167,7 @@ export const APP_ERROR_CODES = [
   "missing_provider",
   "missing_slack_bot_token",
   "missing_slack_webhook",
+  "model_default_scope_forbidden",
   "model_not_configured",
   "model_provider_anchor_required",
   "model_provider_credentials_would_be_dropped",
