@@ -101,6 +101,110 @@ const warnIfMisconfigured = (options: SetupObservabilityOptions, langwatch: Retu
   }
 };
 
+type TerminationSignal = "SIGINT" | "SIGTERM";
+
+/**
+ * Registers the flush-on-exit handlers that back `advanced.disableAutoShutdown`.
+ *
+ * Observability tooling must never terminate its host. Node runs *every* listener
+ * registered for a termination signal, so an SDK that calls `process.exit()` when its
+ * own flush finishes ends the process out from under everybody else's: a host draining
+ * a queue, finishing in-flight database writes or closing connections loses the rest of
+ * its shutdown a second or two in. So the handlers below flush and then hand the
+ * decision about the process back to whoever else is listening.
+ *
+ * That leaves one case to protect. A signal that has at least one listener no longer
+ * performs Node's default action, so a bare "flush and do nothing" would silently
+ * neuter Ctrl+C for a one-shot script whose only listener is ours. The two candidate
+ * fixes were (a) keep exiting but only when we installed the sole listener, and (b) drop
+ * the exit entirely and accept that such a script hangs. Neither is quite right: (a)
+ * still reports a success status for a process that was signalled, and (b) regresses
+ * every CLI that uses the SDK. So we do neither literally — after flushing we remove our
+ * own listeners and, if that leaves the signal with no listeners at all, re-raise the
+ * same signal at ourselves. Node then applies the default action and the process ends
+ * exactly as it would have without the SDK loaded, reporting the signal (128+n) instead
+ * of the `process.exit(0)` this code used to fake. Removing our listeners first is also
+ * what makes the count trustworthy when several SDK instances are registered: each one
+ * drops out as it finishes, and only the last one out re-raises.
+ */
+const registerAutoShutdownHandlers = ({
+  sdk,
+  logger,
+  exitProcessAfterShutdown,
+}: {
+  sdk: NodeSDK;
+  logger: Logger;
+  exitProcessAfterShutdown: boolean;
+}): void => {
+  let isShuttingDown = false;
+  const registrations: { event: "beforeExit" | TerminationSignal; handler: () => void }[] = [];
+
+  const register = (event: "beforeExit" | TerminationSignal, handler: () => void) => {
+    registrations.push({ event, handler });
+    process.on(event, handler);
+  };
+
+  // Our handlers are one-shot: once a shutdown has begun there is nothing left for them
+  // to do, and staying registered would keep the process from ever seeing the default
+  // disposition of a repeated signal.
+  const unregisterAll = () => {
+    for (const { event, handler } of registrations) {
+      process.removeListener(event, handler);
+    }
+    registrations.length = 0;
+  };
+
+  const flush = async (reason: string): Promise<void> => {
+    logger.debug(`${reason}: shutting down OpenTelemetry...`);
+    try {
+      await sdk.shutdown();
+      logger.debug("OpenTelemetry shutdown complete");
+    } catch (err) {
+      logger.error("Error shutting down OpenTelemetry", err);
+    }
+  };
+
+  const beginShutdown = (): boolean => {
+    if (isShuttingDown) return false;
+    isShuttingDown = true;
+    unregisterAll();
+    return true;
+  };
+
+  // Normal process exit when the event loop drains (e.g. CLI scripts, one-shot programs).
+  // Nothing is terminating here, so there is nothing to re-raise or exit.
+  register("beforeExit", () => {
+    if (!beginShutdown()) return;
+    void flush("beforeExit");
+  });
+
+  // Ctrl+C, and external kill / Docker stop / Kubernetes pod termination.
+  for (const signal of ["SIGINT", "SIGTERM"] as const) {
+    register(signal, () => {
+      if (!beginShutdown()) return;
+
+      void flush(signal).then(() => {
+        if (exitProcessAfterShutdown) {
+          logger.debug(`${signal}: flush complete, exiting because UNSAFE_exitProcessAfterAutoShutdown is set`);
+          process.exit(0);
+          return;
+        }
+
+        const otherListenerCount = process.listenerCount(signal);
+        if (otherListenerCount > 0) {
+          logger.debug(
+            `${signal}: flush complete, leaving the process to the ${otherListenerCount} other listener(s)`,
+          );
+          return;
+        }
+
+        logger.debug(`${signal}: flush complete and nothing else is listening, re-raising`);
+        process.kill(process.pid, signal);
+      });
+    });
+  }
+};
+
 export function setupObservability(options: SetupObservabilityOptions = {}): ObservabilityHandle {
   const logger = options.debug?.logger ?? new ConsoleLogger({
     level: options.debug?.logLevel ?? 'warn',
@@ -473,38 +577,10 @@ export function createAndStartNodeSdk(
   }
 
   if (!options.advanced?.disableAutoShutdown) {
-    let isShuttingDown = false;
-
-    const gracefulShutdown = async ({ signal, exitAfter }: { signal: string; exitAfter: boolean }) => {
-      if (isShuttingDown) return;
-      isShuttingDown = true;
-
-      logger.debug(`${signal}: shutting down OpenTelemetry...`);
-      try {
-        await sdk.shutdown();
-        logger.debug('OpenTelemetry shutdown complete');
-      } catch (err) {
-        logger.error('Error shutting down OpenTelemetry', err);
-      } finally {
-        if (exitAfter) {
-          process.exit(0);
-        }
-      }
-    };
-
-    // Normal process exit when event loop drains (e.g. CLI scripts, one-shot programs)
-    process.on('beforeExit', () => {
-      void gracefulShutdown({ signal: 'beforeExit', exitAfter: false });
-    });
-
-    // Ctrl+C
-    process.on('SIGINT', () => {
-      void gracefulShutdown({ signal: 'SIGINT', exitAfter: true });
-    });
-
-    // External kill / Docker stop / k8s pod termination
-    process.on('SIGTERM', () => {
-      void gracefulShutdown({ signal: 'SIGTERM', exitAfter: true });
+    registerAutoShutdownHandlers({
+      sdk,
+      logger,
+      exitProcessAfterShutdown: options.advanced?.UNSAFE_exitProcessAfterAutoShutdown ?? false,
     });
   }
 

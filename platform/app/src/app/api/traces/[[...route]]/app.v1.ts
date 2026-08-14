@@ -112,6 +112,12 @@ export function registerTracesRoutes(
                       .describe(
                         "Number of traces dropped from this page because they failed to serialize. Present only when non-zero, so a caller can tell that traces.length is below the page size for a reason other than reaching the end of the result set.",
                       ),
+                    updatedThrough: z
+                      .number()
+                      .optional()
+                      .describe(
+                        "Only when dateField is 'updated'. Epoch milliseconds: the upper bound this scroll actually covered, which is at or before the endDate you asked for. The scroll reads every trace as of the moment it started, so anything written after that instant belongs to the next pull. Start your next incremental pull from this value — resuming from the endDate you requested would step over the difference and lose those traces. The bound is inclusive on both sides, so a trace last written at exactly this millisecond arrives in this pull and again in the next one: pulls are at-least-once, and applying them idempotently is what keeps that from becoming a duplicate.",
+                      ),
                   }),
                   schema: z
                     .object({
@@ -271,6 +277,10 @@ export function registerTracesRoutes(
         totalHits: results.totalHits,
         scrollId: results.scrollId,
         ...(skippedCount > 0 ? { skipped: skippedCount } : {}),
+        // Updated axis only, and the value a CDC client should resume from.
+        ...(results.updatedThrough !== undefined
+          ? { updatedThrough: results.updatedThrough }
+          : {}),
       });
 
       // When a projection is active the envelope gains a `schema` field describing

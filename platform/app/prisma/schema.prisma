@@ -2,7 +2,8 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -11,7 +12,8 @@ datasource db {
   // Further reading:
   // https://next-auth.js.org/adapters/prisma#create-the-prisma-schema
   // https://www.prisma.io/docs/reference/api-reference/prisma-schema-reference#string
-  url          = env("DATABASE_URL")
+  // The connection URL lives in prisma.config.ts (Prisma 7); the runtime
+  // client connects through the pg driver adapter in src/server/db.ts.
   relationMode = "prisma"
 }
 
@@ -828,6 +830,12 @@ model Trigger {
   createdAt            DateTime                  @default(now())
   updatedAt            DateTime                  @default(now()) @updatedAt
   active               Boolean                   @default(true)
+  // Why the platform paused this automation, and when. NULL means it was not
+  // paused by the platform: `active = false` alone cannot distinguish an
+  // automation a customer switched off from one runaway containment stopped,
+  // and resuming must clear both. Today the only value is "runaway_volume".
+  pausedReason         String?
+  pausedAt             DateTime? @db.Timestamptz(3)
   message              String?
   deleted              Boolean                   @default(false)
   alertType            AlertType?
@@ -3550,6 +3558,12 @@ model ProcessManagerInbox {
 
   @@unique([processName, projectId, sourceEventKey])
   @@index([processName, projectId, processKey, consumedAt])
+  // Do not add an index on `consumedAt` here. The retention sweep can use one,
+  // but a deploy-time CREATE INDEX holds a SHARE lock that blocks INSERT on
+  // this table, the highest-volume write path in the system. The index is
+  // ops-managed instead: built with CREATE INDEX CONCURRENTLY, see
+  // dev/docs/runbooks/process-manager-table-purge.md. The sweep works without
+  // it on the bounded table it maintains.
 }
 
 enum ProcessManagerOutboxStatus {
@@ -3583,6 +3597,13 @@ model ProcessManagerOutbox {
   @@unique([processName, projectId, messageKey])
   @@index([processName, projectId, processKey, createdAt])
   @@index([status, nextAttemptAt, leasedUntil])
+  // Do not add an index on `dispatchedAt` here. The retention sweep can use a
+  // partial one (WHERE status = 'dispatched'), but Prisma cannot express a
+  // partial index and a deploy-time CREATE INDEX holds a SHARE lock that
+  // blocks INSERT on this table, the highest-volume write path in the system.
+  // The index is ops-managed instead: built with CREATE INDEX CONCURRENTLY,
+  // see dev/docs/runbooks/process-manager-table-purge.md. The sweep works
+  // without it on the bounded table it maintains.
 }
 
 /// Per-project topic clustering run status (ADR-051): the rebuildable

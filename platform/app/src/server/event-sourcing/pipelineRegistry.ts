@@ -19,8 +19,9 @@ import type {
   LangyMessageProjectionRecord,
 } from "@langwatch/langy";
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "@prisma/client";
 import type { Cluster, Redis } from "ioredis";
+import type { PrismaClient } from "~/generated/prisma/client";
+import { recordTrackedEventSpan } from "~/server/app-layer/events/track-event.service";
 import { reapExpiredLangySessionApiKeys } from "~/server/app-layer/langy/langyApiKey";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { DatasetRepository } from "~/server/datasets/dataset.repository";
@@ -147,6 +148,7 @@ import {
   MetricSeriesCatalogAppendStore,
   MetricTimeRollupAppendStore,
 } from "./pipelines/metric-processing/projections/stores";
+import { createProcessManagerMaintenancePipeline } from "./pipelines/process-manager-maintenance/pipeline";
 import {
   COMPUTE_METRICS_RETRY_DELAY_MS,
   ComputeRunMetricsCommand,
@@ -193,6 +195,7 @@ import { createProjectMetadataReactor } from "./pipelines/trace-processing/react
 import { createSimulationMetricsSyncReactor } from "./pipelines/trace-processing/reactors/simulationMetricsSync.reactor";
 import { createSpanStorageBroadcastReactor } from "./pipelines/trace-processing/reactors/spanStorageBroadcast.reactor";
 import { createTraceUpdateBroadcastReactor } from "./pipelines/trace-processing/reactors/traceUpdateBroadcast.reactor";
+import { createTrackedEventSyncReactor } from "./pipelines/trace-processing/reactors/trackedEventSync.reactor";
 import type { ResolveOriginCommandData } from "./pipelines/trace-processing/schemas/commands";
 import type { ProcessStore } from "./process-manager";
 import type { FoldProjectionStore } from "./projections/foldProjection.types";
@@ -454,6 +457,27 @@ export class PipelineRegistry {
           sweep: () => blobSweeper.sweep(),
           deleteDispatchedBefore: (params) =>
             this.deps.repositories.processStore.deleteDispatchedBefore(params),
+        },
+      }),
+    );
+
+    // Retention for the process-manager substrate's own tables. Registered
+    // unconditionally and independently of any domain: it reaps by predicate
+    // across every processName, so no process manager has to opt in and none
+    // added later can be forgotten.
+    this.deps.eventSourcing.register(
+      createProcessManagerMaintenancePipeline({
+        retentionSweep: {
+          deleteDispatchedOutboxBatch: (params) =>
+            this.deps.repositories.processStore.deleteDispatchedOutboxBatch(
+              params,
+            ),
+          deleteDeadOutboxBatch: (params) =>
+            this.deps.repositories.processStore.deleteDeadOutboxBatch(params),
+          deleteConsumedInboxBatch: (params) =>
+            this.deps.repositories.processStore.deleteConsumedInboxBatch(
+              params,
+            ),
         },
       }),
     );
@@ -923,6 +947,20 @@ export class PipelineRegistry {
       evaluationExecution: this.deps.evaluations.execution,
       costRecorder: this.deps.costRecorder,
       azureSafetyEnvResolver: getAzureSafetyEnvFromProject,
+      // Emergency operator rollback for the langwatch#6397 settings recovery.
+      // Without this line the flag is inert: the command defaults an absent
+      // resolver to "not disabled", so /ops/feature-flags would report the
+      // switch as available while flipping it changed nothing. The command
+      // catches a rejection here and stays on the shipped default (recovery
+      // ACTIVE) — an unreadable kill switch must not fail evaluations.
+      isSettingsRecoveryDisabled: () =>
+        featureFlagService.isEnabled(
+          "ops_evaluator_settings_recovery_disabled",
+          {
+            distinctId: "evaluator-settings-recovery",
+            defaultValue: false,
+          },
+        ),
       // ADR-040: offload oversized evaluator inputs to durable object storage
       // before the event is built. ON by default (this bounds the fat-payload
       // class behind the 2026-07-10 outage); the SYSTEM flag
@@ -1030,6 +1068,14 @@ export class PipelineRegistry {
       reportEvaluation: evalCommands.reportEvaluation,
     });
 
+    // Live span feedback (langwatch.event) → tracked event. Routes through the
+    // same recordTrackedEventSpan path as REST POST /api/events/track so an
+    // SDK-emitted thumbs_up_down lands identically to a REST call.
+    const trackedEventSyncReactor = createTrackedEventSyncReactor({
+      recordTrackedEvent: ({ tenantId, body, eventId }) =>
+        recordTrackedEventSpan({ project: { id: tenantId }, body, eventId }),
+    });
+
     const traceUpdateBroadcastReactor = createTraceUpdateBroadcastReactor({
       broadcast: this.deps.broadcast,
       hasRedis: !!this.deps.eventSourcing.redisConnection,
@@ -1110,6 +1156,7 @@ export class PipelineRegistry {
         evaluationTriggerReactor,
         automations,
         customEvaluationSyncReactor,
+        trackedEventSyncReactor,
         traceUpdateBroadcastReactor,
         projectMetadataReactor,
         simulationMetricsSyncReactor,

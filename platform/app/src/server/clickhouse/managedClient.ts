@@ -19,6 +19,21 @@ const logger = createLogger("langwatch:clickhouse:managed-client");
 export const SHARED_INSTANCE = "shared";
 
 /**
+ * How long one statement may spend on the wire before the driver gives up.
+ *
+ * 30s is the value the driver already applied as its own default, so stating it
+ * changes no behaviour today — that is the point. It was the largest single
+ * term in an observed 46-second failure and nothing in this repo had chosen it,
+ * which also meant a driver upgrade could move it silently.
+ *
+ * It is deliberately longer than the queue wait in `./statementLimit.ts`: a
+ * statement that has reached the wire is doing work, while one still queued has
+ * not started, and the one worth abandoning first is the one that has spent
+ * nothing.
+ */
+export const CLICKHOUSE_REQUEST_TIMEOUT_MS = 30_000;
+
+/**
  * The only place in the platform that builds a ClickHouse client.
  *
  * Every policy the platform applies to a statement is assembled here, in one
@@ -75,6 +90,13 @@ export function createManagedClickHouseClient({
       date_time_input_format: "best_effort",
     },
     max_open_connections: maxOpenConnections,
+    // Stated rather than inherited. It was previously the driver's own default,
+    // which meant the bound on a statement was a number nobody in this repo had
+    // chosen and a driver upgrade could move without anyone noticing. Naming it
+    // also makes the two waits add up: what a caller actually observed on a
+    // stuck insert was this, plus however long it had queued in
+    // `./statementLimit.ts` — which is why that wait is bounded too.
+    request_timeout: CLICKHOUSE_REQUEST_TIMEOUT_MS,
     keep_alive: {
       enabled: true,
       idle_socket_ttl: 1500,

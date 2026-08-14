@@ -190,6 +190,6 @@ export function useCodexDeviceSignIn({
     begin,
     cancel,
     disconnect,
-    disconnecting: deleteProvider.isLoading,
+    disconnecting: deleteProvider.isPending,
   };
 }

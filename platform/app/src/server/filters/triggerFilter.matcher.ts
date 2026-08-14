@@ -65,6 +65,29 @@ export function triggerFiltersReferenceEvents(
 }
 
 /**
+ * Whether this filter set actually narrows anything.
+ *
+ * A present-but-empty field selects nothing and is therefore not a condition:
+ * `{ "metadata.labels": [] }` reads like a filter and matches every trace, the
+ * same as `{}`. The server-side mirror of the drawer's `filtersAreSet`, so a
+ * shape the browser refuses cannot be saved through an API instead.
+ *
+ * It shares `filterValueHasActionableCondition` with the matcher deliberately.
+ * A validator that counted a key-selector wrapper as a condition while the
+ * matcher discarded it would accept exactly the automations that go on to fire
+ * on every trace: `{ "metadata.attributes": { region: [] } }` has an outer key
+ * but no leaf, and constrains nothing.
+ */
+export function hasActionableTriggerFilters(
+  // Widened past `TriggerFilters` on purpose: the REST surface validates
+  // filters as an open record, and its callers need the same answer without
+  // first proving the field names are known ones.
+  filters: Record<string, unknown>,
+): boolean {
+  return Object.values(filters).some(filterValueHasActionableCondition);
+}
+
+/**
  * Splits trigger filters into trace-time-available and evaluation-time-available groups.
  */
 export function classifyTriggerFilters(filters: TriggerFilters): {
@@ -207,25 +230,14 @@ export function matchesTriggerFilters(
  * Whether a filter value carries at least one non-empty (actionable) condition.
  * Empty arrays — at any nesting depth — are vacuous and do not constrain the
  * match, mirroring the ClickHouse builder which emits no SQL for them.
+ *
+ * Recursive rather than depth-limited so it cannot be fooled by a shape one
+ * level deeper than whatever the key selectors happen to nest today.
  */
-function filterValueHasActionableCondition(
-  filterValue: TriggerFilterValue,
-): boolean {
-  if (Array.isArray(filterValue)) {
-    return filterValue.length > 0;
-  }
-
-  for (const subValue of Object.values(filterValue)) {
-    if (Array.isArray(subValue)) {
-      if (subValue.length > 0) return true;
-    } else if (typeof subValue === "object" && subValue !== null) {
-      for (const values of Object.values(subValue)) {
-        if (Array.isArray(values) && values.length > 0) return true;
-      }
-    }
-  }
-
-  return false;
+function filterValueHasActionableCondition(filterValue: unknown): boolean {
+  if (Array.isArray(filterValue)) return filterValue.length > 0;
+  if (typeof filterValue !== "object" || filterValue === null) return false;
+  return Object.values(filterValue).some(filterValueHasActionableCondition);
 }
 
 /**
@@ -266,7 +278,18 @@ function matchField(
     } else if (typeof subValue === "object" && subValue !== null) {
       // Record<string, Record<string, string[]>> — resolve with key + subkey
       for (const [subkey, values] of Object.entries(subValue)) {
-        if (!Array.isArray(values) || values.length === 0) continue;
+        if (!Array.isArray(values)) {
+          // Nesting deeper than key/subkey is a condition this matcher cannot
+          // evaluate. Counting it as actionable makes the field fail closed:
+          // the recursive save-time validation accepts the shape as "a
+          // condition", so treating it as vacuous here would turn it into a
+          // match-everything automation, the exact hole the validation closes.
+          if (filterValueHasActionableCondition(values)) {
+            hasActionableCondition = true;
+          }
+          continue;
+        }
+        if (values.length === 0) continue;
         hasActionableCondition = true;
         if (matchSimpleArray(traceData, field, values, key, subkey)) {
           return true;
@@ -452,6 +475,19 @@ function matchEvaluationField(
   return true;
 }
 
+/**
+ * A verdict (passed/score) is only real when the evaluation ran to
+ * completion. Producers can attach `passed: false` alongside `status:
+ * "error"` (the SDKs expose them as independent params), and the run feed is
+ * unfiltered — without this guard a trigger configured as "evaluations.passed
+ * = false" pages someone for a quality regression that is actually a
+ * provider timeout (#6833). Status-based filters (`evaluations.state`) are
+ * the intended way to alert on errored evaluators.
+ */
+function hasVerdict(e: EvaluationRunData): boolean {
+  return e.status === "processed";
+}
+
 function matchEvaluatorIdFilter(
   evaluations: EvaluationRunData[],
   field: FilterField,
@@ -468,18 +504,25 @@ function matchEvaluatorIdFilter(
 
     case "evaluations.evaluator_id.has_passed":
       return evaluations.some(
-        (e) => evaluatorIds.includes(e.evaluatorId) && e.passed !== null,
+        (e) =>
+          evaluatorIds.includes(e.evaluatorId) &&
+          hasVerdict(e) &&
+          e.passed !== null,
       );
 
     case "evaluations.evaluator_id.has_score":
       return evaluations.some(
-        (e) => evaluatorIds.includes(e.evaluatorId) && e.score !== null,
+        (e) =>
+          evaluatorIds.includes(e.evaluatorId) &&
+          hasVerdict(e) &&
+          e.score !== null,
       );
 
     case "evaluations.evaluator_id.has_label":
       return evaluations.some(
         (e) =>
           evaluatorIds.includes(e.evaluatorId) &&
+          hasVerdict(e) &&
           e.label !== null &&
           e.label !== "",
       );
@@ -497,12 +540,16 @@ function matchEvaluationValues(
   switch (field) {
     case "evaluations.passed":
       return evaluations.some(
-        (e) => e.passed !== null && values.includes(String(e.passed)),
+        (e) =>
+          hasVerdict(e) &&
+          e.passed !== null &&
+          values.includes(String(e.passed)),
       );
 
     case "evaluations.score":
       return evaluations.some(
-        (e) => e.score !== null && values.includes(String(e.score)),
+        (e) =>
+          hasVerdict(e) && e.score !== null && values.includes(String(e.score)),
       );
 
     case "evaluations.state":
@@ -510,7 +557,7 @@ function matchEvaluationValues(
 
     case "evaluations.label":
       return evaluations.some(
-        (e) => e.label !== null && values.includes(e.label),
+        (e) => hasVerdict(e) && e.label !== null && values.includes(e.label),
       );
 
     default:

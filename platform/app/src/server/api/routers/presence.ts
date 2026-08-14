@@ -94,7 +94,6 @@ export const presenceRouter = createTRPCRouter({
 
       try {
         for await (const eventArgs of on(emitter, "presence_updated", {
-          // @ts-expect-error - signal is not typed
           signal: opts.signal,
         })) {
           const payload = eventArgs[0] as { event: string; timestamp: number };
@@ -187,7 +186,6 @@ export const presenceRouter = createTRPCRouter({
 
       try {
         for await (const eventArgs of on(emitter, "presence_cursor", {
-          // @ts-expect-error - signal is not typed
           signal: opts.signal,
         })) {
           const payload = eventArgs[0] as { event: string; timestamp: number };

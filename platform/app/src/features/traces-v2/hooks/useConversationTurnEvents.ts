@@ -1,3 +1,4 @@
+import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { api } from "~/utils/api";
 import { useIsReadOnlyTrace } from "../context/TraceViewerContext";
@@ -55,15 +56,15 @@ export function useConversationTurnEvents(
       enabled,
       staleTime: 60_000,
       refetchOnWindowFocus: false,
-      keepPreviousData: true,
+      placeholderData: keepPreviousData,
       trpc: { context: { skipBatch: true } },
     },
   );
 
-  // `keepPreviousData` hands back the previous thread's rollups with
-  // `isLoading` already false, so a turn of the new thread would find no entry
-  // of its own and read as eventless while it is still waiting.
-  const isLoading = enabled && (query.isLoading || query.isPreviousData);
+  // `placeholderData: keepPreviousData` hands back the previous thread's
+  // rollups with `isLoading` already false, so a turn of the new thread would
+  // find no entry of its own and read as eventless while it is still waiting.
+  const isLoading = enabled && (query.isLoading || query.isPlaceholderData);
 
   return useMemo(
     () =>

@@ -6,6 +6,11 @@ on:
       - published
   workflow_dispatch:
 
+# A publish run drains — see publish-docker-app.
+concurrency:
+  group: sdk-python-cd-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
 

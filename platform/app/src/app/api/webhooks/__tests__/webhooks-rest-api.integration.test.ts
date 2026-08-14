@@ -1,14 +1,14 @@
 import { createServer, type Server } from "node:http";
 import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import { generate } from "@langwatch/ksuid";
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   type Organization,
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+} from "~/generated/prisma/client";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
@@ -27,6 +27,8 @@ import { KSUID_RESOURCES } from "~/utils/constants";
 // route's own inline resolver).
 let planHasWebhookEndpoints = true;
 vi.mock("~/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: () => ({
     planProvider: {
       getActivePlan: async () => ({
@@ -56,6 +58,14 @@ describe("Feature: Webhook endpoints REST API", () => {
     Authorization: `Bearer ${apiKeyToken}`,
     "Content-Type": "application/json",
   });
+
+  /** The created range the events log requires, as query-string params. */
+  const eventsWindow = () => {
+    // One clock read: two would let a backward step invert the range and turn
+    // an assertion about the page into a 422 about the window.
+    const now = Date.now();
+    return `from=${now - 24 * 60 * 60 * 1000}&to=${now}`;
+  };
 
   beforeAll(async () => {
     organization = await prisma.organization.create({
@@ -678,9 +688,10 @@ describe("Feature: Webhook endpoints REST API", () => {
         "gateway.budget.breached",
         "gateway.virtual_key.created",
       ]) {
-        const res = await app.request(`/api/webhooks/v1/events?type=${type}`, {
-          headers: headers(),
-        });
+        const res = await app.request(
+          `/api/webhooks/v1/events?type=${type}&${eventsWindow()}`,
+          { headers: headers() },
+        );
         expect(res.status).toBe(200);
         const body = (await res.json()) as {
           data: unknown[];
@@ -689,6 +700,50 @@ describe("Feature: Webhook endpoints REST API", () => {
         expect(body.data).toEqual([]);
         expect(body.next_cursor).toBeNull();
       }
+    });
+
+    /** @scenario The events log refuses a read with no created range */
+    it("refuses a listing that names no window, naming the missing bound", async () => {
+      planHasWebhookEndpoints = true;
+      // Unbounded, the walk sorts the whole 13-month spend table under FINAL
+      // on every page, so the range is part of the contract rather than a
+      // filter. Half a range is refused for the same reason as none.
+      const now = Date.now();
+      const cases = [
+        { query: "", missing: "from" },
+        { query: `?from=${now - 60_000}`, missing: "to" },
+        { query: `?to=${now}`, missing: "from" },
+      ] as const;
+      for (const { query, missing } of cases) {
+        const res = await app.request(`/api/webhooks/v1/events${query}`, {
+          headers: headers(),
+        });
+        const error = await expectCanonicalError(res, {
+          status: 400,
+          type: "bad_request",
+          code: "validation_error",
+        });
+        expect(error.meta?.target).toBe("query");
+        expect(error.meta?.fields).toEqual(expect.arrayContaining([missing]));
+      }
+    });
+
+    /** @scenario The events log refuses an inverted created range */
+    it("refuses a window that ends before it starts", async () => {
+      planHasWebhookEndpoints = true;
+      const now = Date.now();
+      const res = await app.request(
+        `/api/webhooks/v1/events?from=${now}&to=${now - 60_000}`,
+        { headers: headers() },
+      );
+      const error = await expectCanonicalError(res, {
+        status: 400,
+        type: "bad_request",
+        code: "validation_error",
+      });
+      // Without this the case passes for a validation error about anything at
+      // all, including a body the route does not take.
+      expect(error.meta?.target).toBe("query");
     });
   });
 });

@@ -6,6 +6,13 @@ on:
       - published
   workflow_dispatch:
 
+# A publish run drains — see publish-docker-app. PyPI rejects a re-upload of an
+# existing version outright, so the loser of a race fails the release rather
+# than producing a wrong one, but it fails loudly and for no reason.
+concurrency:
+  group: langevals-publish-pypi-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
 
@@ -23,7 +30,11 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
-          version: "latest"
+          # The other three setup-uv call sites in this repo cache and this one
+          # did not, so every publish re-resolved and re-downloaded the whole
+          # langevals dependency tree. Same lockfile glob they use.
+          enable-cache: true
+          cache-dependency-glob: "services/langevals/uv.lock"
 
       - name: Set up Python
         run: uv python install 3.11

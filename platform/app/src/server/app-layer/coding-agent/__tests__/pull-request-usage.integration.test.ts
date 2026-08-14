@@ -16,13 +16,13 @@
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { HandledError } from "@langwatch/handled-error";
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+} from "~/generated/prisma/client";
 import type { Permission } from "~/server/api/rbac";
 import { prisma } from "~/server/db";
 import type { CodingAgentSessionEventRecord } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSessionEvents.mapProjection";

@@ -11,11 +11,11 @@ import {
 } from "@ee/webhooks/webhookEvents.service";
 import { WebhookHealthService } from "@ee/webhooks/webhookHealth.service";
 import { createLogger } from "@langwatch/observability";
-import type { Organization } from "@prisma/client";
 import type { Context, Next } from "hono";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
+import type { Organization } from "~/generated/prisma/client";
 import {
   IDEMPOTENCY_KEY_HEADER,
   readIdempotencyKey,
@@ -122,13 +122,20 @@ const deliveriesQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(200).optional().default(50),
 });
 
-const eventsQuerySchema = z.object({
-  type: z.string().min(1).max(200).optional(),
-  from: z.coerce.number().int().positive().optional(),
-  to: z.coerce.number().int().positive().optional(),
-  cursor: z.string().max(500).optional(),
-  limit: z.coerce.number().int().positive().max(200).optional().default(50),
-});
+const eventsQuerySchema = z
+  .object({
+    type: z.string().min(1).max(200).optional(),
+    // The events log is a RANGED read by contract, the same contract the
+    // spend-events pull carries and over the same table: without bounds the
+    // walk sorts the whole 13-month table under FINAL on every page.
+    from: z.coerce.number().int().positive().safe(),
+    to: z.coerce.number().int().positive().safe(),
+    cursor: z.string().max(500).optional(),
+    limit: z.coerce.number().int().positive().max(200).optional().default(50),
+  })
+  .refine((q) => q.from <= q.to, {
+    message: "from must be less than or equal to to",
+  });
 
 function endpointResponse(endpoint: {
   id: string;
@@ -750,7 +757,7 @@ secured.access(requires("webhookEndpoints:view")).get(
     tags: ["Webhooks"],
     summary: "List emitted events",
     description:
-      "The organization's emitted-events log for the request families: cursor-paged, newest first, filter by type and created range. Webhooks are push over this log, never the only copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page rather than an error, so a client can probe forward-compatibly.",
+      "The organization's emitted-events log for the request families: cursor-paged, newest first, filter by type. `from` and `to` bound the created range in epoch milliseconds, are REQUIRED, and `from` must not be later than `to` — a range that ends before it starts is rejected rather than answered with an empty page. They are required because the log is a ranged read over the 13-month spend table and an unbounded walk sorts all of it on every page. Webhooks are push over this log, never the only copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page rather than an error, so a client can probe forward-compatibly.",
     responses: okResponse(
       "One page of emitted-event envelopes, newest first",
       z.object({

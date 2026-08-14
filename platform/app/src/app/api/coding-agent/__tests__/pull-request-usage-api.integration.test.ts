@@ -15,15 +15,15 @@
  * @see specs/coding-agent/pull-request-linkage.feature
  */
 import { generate } from "@langwatch/ksuid";
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   type Organization,
   OrganizationUserRole,
   RoleBindingScopeType,
   type Team,
   TeamUserRole,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+} from "~/generated/prisma/client";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { CodingAgentSessionService } from "~/server/app-layer/coding-agent/coding-agent-session.service";

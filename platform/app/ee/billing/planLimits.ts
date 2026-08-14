@@ -141,6 +141,12 @@ export const PLAN_LIMITS: Record<PlanType, PlanInfo> = {
     name: "Enterprise",
     maxMembers: 1000,
     maxMessagesPerMonth: 1_000_000,
+    // Stated here as well as in the tier map (`ee/licensing/planEntitlements`),
+    // and deliberately not in PAID_FEATURES, which every paid plan shares.
+    // The preset is what this plan sells; the tier map is the net that catches
+    // a contract resolved some other way, such as a license signed before the
+    // feature existed.
+    webhookEndpointsEnabled: true,
     prices: {
       USD: 999,
       EUR: 999,

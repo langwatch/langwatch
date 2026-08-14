@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_LIMIT } from "../constants";
 import { generateLicenseKey } from "../licenseGenerationService";
-import { GROWTH_TEMPLATE } from "../planTemplates";
+import { ENTERPRISE_TEMPLATE, GROWTH_TEMPLATE } from "../planTemplates";
 import { validateLicense } from "../validation";
 import { TEST_PRIVATE_KEY, TEST_PUBLIC_KEY } from "./fixtures/testKeys";
 
@@ -301,6 +301,70 @@ dQIDAQAB
       });
 
       expect(result.valid).toBe(false);
+    });
+  });
+});
+
+describe("generateLicenseKey overrides", () => {
+  const enterpriseParams = {
+    ...baseParams,
+    planType: "ENTERPRISE",
+    maxMembers: 10_000,
+  };
+
+  describe("given no overrides", () => {
+    it("takes the template's numbers and a one-year expiry", () => {
+      const { licenseData } = generateLicenseKey(enterpriseParams);
+
+      expect(licenseData.plan.maxMembersLite).toBe(
+        ENTERPRISE_TEMPLATE.maxMembersLite,
+      );
+      expect(licenseData.plan.maxMessagesPerMonth).toBe(
+        ENTERPRISE_TEMPLATE.maxMessagesPerMonth,
+      );
+      expect(licenseData.expiresAt).toBe("2026-06-15T12:00:00.000Z");
+    });
+  });
+
+  describe("given the numbers a negotiated contract sets", () => {
+    it("mints those rather than quietly cutting them to the template", () => {
+      const { licenseData } = generateLicenseKey({
+        ...enterpriseParams,
+        maxMembersLite: 10_000,
+        maxMessagesPerMonth: 10_000_000_000,
+        expiresAt: new Date("2030-02-05T00:00:00.000Z"),
+      });
+
+      expect(licenseData.plan.maxMembersLite).toBe(10_000);
+      expect(licenseData.plan.maxMessagesPerMonth).toBe(10_000_000_000);
+      expect(licenseData.expiresAt).toBe("2030-02-05T00:00:00.000Z");
+    });
+
+    it("still round-trips signature validation", () => {
+      const { licenseKey } = generateLicenseKey({
+        ...enterpriseParams,
+        maxMembersLite: 10_000,
+        expiresAt: new Date("2030-02-05T00:00:00.000Z"),
+      });
+
+      expect(
+        validateLicense({
+          licenseKey,
+          publicKey: TEST_PUBLIC_KEY,
+          now: baseParams.now,
+        }).valid,
+      ).toBe(true);
+    });
+  });
+
+  describe("given an expiry that has already passed", () => {
+    it("refuses to mint a license that is dead on arrival", () => {
+      expect(() =>
+        generateLicenseKey({
+          ...enterpriseParams,
+          expiresAt: new Date("2025-06-14T12:00:00Z"),
+        }),
+      ).toThrow(/future/i);
     });
   });
 });

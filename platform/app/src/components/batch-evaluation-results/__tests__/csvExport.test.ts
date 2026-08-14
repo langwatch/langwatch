@@ -5,7 +5,11 @@ import {
   buildCsvHeaders,
   generateCsvContent,
 } from "../csvExport";
-import type { BatchEvaluationData, BatchTargetOutput } from "../types";
+import type {
+  BatchComparisonColumn,
+  BatchEvaluationData,
+  BatchTargetOutput,
+} from "../types";
 import { transformBatchEvaluationData } from "../types";
 
 const createMinimalData = (
@@ -842,6 +846,468 @@ describe("csvExport", () => {
       expect(rows[0]).toContain("Claude answer");
       expect(rows[1]).toContain("GPT-4 answer 2");
       // Claude's column should be empty for row 1
+    });
+  });
+
+  /**
+   * A comparison grades the whole row rather than any one target, so it has no
+   * target block to hang under. Without a block of its own, a customer who runs
+   * an n-way comparison, reads the Winner column on the results page and then
+   * exports gets a file with no trace of the comparison at all.
+   */
+  describe("given a run that recorded comparison verdicts", () => {
+    const VARIANTS = [
+      { id: "gpt-5-mini", name: "gpt-5-mini" },
+      { id: "claude-sonnet-5", name: "claude-sonnet-5" },
+      { id: "gemini-flash", name: "gemini-flash" },
+    ];
+
+    const ALL_CANDIDATES = VARIANTS.map((variant) => variant.id);
+
+    const ROW_0_REASONING =
+      "gpt-5-mini gives the exact reset link; the others bury it in preamble.";
+    const ROW_1_REASONING =
+      "Both answers state the same policy with the same caveats.";
+    const ROW_3_REASONING =
+      "gemini-flash produced nothing for this row, so it was not judged.";
+
+    const createComparisonColumn = (
+      overrides: Partial<BatchComparisonColumn> = {},
+    ): BatchComparisonColumn => ({
+      evaluatorId: "langevals/select_best_compare",
+      name: "Comparison",
+      variants: VARIANTS,
+      verdictsByRow: {},
+      ...overrides,
+    });
+
+    /**
+     * The exported row as a header-to-value record, so an assertion names the
+     * column it is about instead of counting positions.
+     */
+    const exportedRow = (
+      data: BatchEvaluationData,
+      rowIndex: number,
+    ): Record<string, string> => {
+      const { headers, rows } = buildCsvData(data);
+      const values = rows[rowIndex] ?? [];
+      return Object.fromEntries(
+        headers.map((header, position) => [header, values[position] ?? ""]),
+      );
+    };
+
+    /** One target, one dataset column, one comparison over three candidates. */
+    const createComparisonData = (
+      column: BatchComparisonColumn,
+    ): BatchEvaluationData =>
+      createMinimalData({
+        datasetColumns: [{ name: "input", hasImages: false }],
+        targetColumns: [
+          {
+            id: "gpt-5-mini",
+            name: "gpt-5-mini",
+            type: "custom",
+            outputFields: ["output"],
+          },
+        ],
+        comparisonColumns: [column],
+        rows: [0, 1, 2, 3].map((index) => ({
+          index,
+          datasetEntry: { input: `question ${index}` },
+          targets: {
+            "gpt-5-mini": createTargetOutput({
+              targetId: "gpt-5-mini",
+              output: { output: `gpt-5-mini answer ${index}` },
+            }),
+          },
+        })),
+      });
+
+    const FULL_RUN_COLUMN = createComparisonColumn({
+      verdictsByRow: {
+        0: {
+          rowIndex: 0,
+          winnerId: "gpt-5-mini",
+          reasoning: ROW_0_REASONING,
+          candidateIds: ALL_CANDIDATES,
+          isUnresolved: false,
+        },
+        1: {
+          rowIndex: 1,
+          winnerId: null,
+          reasoning: ROW_1_REASONING,
+          candidateIds: ALL_CANDIDATES,
+          isUnresolved: false,
+        },
+        // Row 2 has no verdict at all.
+        3: {
+          rowIndex: 3,
+          winnerId: "claude-sonnet-5",
+          reasoning: ROW_3_REASONING,
+          candidateIds: ["gpt-5-mini", "claude-sonnet-5"],
+          isUnresolved: false,
+        },
+      },
+    });
+
+    describe("given a run with one comparison over three candidates", () => {
+      describe("when the headers are built", () => {
+        /** @scenario "CSV contains the comparison verdict" */
+        it("adds the winner, candidates and reasoning columns after the target block", () => {
+          const headers = buildCsvHeaders(
+            createComparisonData(FULL_RUN_COLUMN),
+          );
+
+          expect(headers).toEqual([
+            "index",
+            "input",
+            "gpt-5-mini_output",
+            "gpt-5-mini_cost",
+            "gpt-5-mini_duration_ms",
+            "gpt-5-mini_error",
+            "gpt-5-mini_trace_id",
+            "comparison_winner",
+            "comparison_candidates",
+            "comparison_reasoning",
+          ]);
+        });
+
+        // The results page deliberately hides the verdict's numeric score: on
+        // its own, 1.0 or 0.5 reads as noise next to the name of the winner.
+        it("adds no score column for the verdict", () => {
+          const headers = buildCsvHeaders(
+            createComparisonData(FULL_RUN_COLUMN),
+          );
+
+          expect(headers).not.toContain("comparison_score");
+          expect(headers.filter((header) => header.endsWith("_score"))).toEqual(
+            [],
+          );
+        });
+      });
+
+      describe("when a row was decided", () => {
+        it("names the winning target and lines the values up with the headers", () => {
+          const { rows } = buildCsvData(createComparisonData(FULL_RUN_COLUMN));
+
+          expect(rows[0]).toEqual([
+            "0",
+            "question 0",
+            "gpt-5-mini answer 0",
+            "",
+            "",
+            "",
+            "",
+            "gpt-5-mini",
+            "gpt-5-mini, claude-sonnet-5, gemini-flash",
+            ROW_0_REASONING,
+          ]);
+        });
+      });
+
+      describe("when a row was called a tie", () => {
+        it("writes tie in place of a winner and keeps the reasoning", () => {
+          const row = exportedRow(createComparisonData(FULL_RUN_COLUMN), 1);
+
+          expect(row.comparison_winner).toBe("tie");
+          expect(row.comparison_candidates).toBe(
+            "gpt-5-mini, claude-sonnet-5, gemini-flash",
+          );
+          expect(row.comparison_reasoning).toBe(ROW_1_REASONING);
+        });
+      });
+
+      describe("when a row carries no verdict", () => {
+        it("leaves the whole comparison block empty rather than claiming a tie", () => {
+          const row = exportedRow(createComparisonData(FULL_RUN_COLUMN), 2);
+
+          expect(row.comparison_winner).toBe("");
+          expect(row.comparison_candidates).toBe("");
+          expect(row.comparison_reasoning).toBe("");
+        });
+      });
+
+      describe("when a row judged fewer candidates than the comparison has variants", () => {
+        // A target with no output for the row is dropped from that row's
+        // matchup, and a win over one opponent is not a win over two.
+        it("names only the candidates that row actually compared", () => {
+          const row = exportedRow(createComparisonData(FULL_RUN_COLUMN), 3);
+
+          expect(row.comparison_winner).toBe("claude-sonnet-5");
+          expect(row.comparison_candidates).toBe("gpt-5-mini, claude-sonnet-5");
+          expect(row.comparison_reasoning).toBe(ROW_3_REASONING);
+        });
+      });
+
+      describe("when a verdict names a candidate the run no longer knows", () => {
+        it("falls back to the raw identifier instead of blanking the winner", () => {
+          const column = createComparisonColumn({
+            verdictsByRow: {
+              0: {
+                rowIndex: 0,
+                winnerId: "retired-target",
+                reasoning: "It answered first.",
+                candidateIds: ["gpt-5-mini", "retired-target"],
+                isUnresolved: false,
+              },
+            },
+          });
+          const row = exportedRow(createComparisonData(column), 0);
+
+          expect(row.comparison_winner).toBe("retired-target");
+          expect(row.comparison_candidates).toBe("gpt-5-mini, retired-target");
+        });
+      });
+
+      describe("when the judge answered with a label nothing could be matched to", () => {
+        // A tie is evidence shared between the candidates; an unplaceable
+        // answer is no evidence at all. Exporting it as a tie would hand the
+        // reader a result nobody produced.
+        it("marks the row unresolved rather than as a tie", () => {
+          const column = createComparisonColumn({
+            verdictsByRow: {
+              0: {
+                rowIndex: 0,
+                winnerId: null,
+                reasoning: "Candidate B is clearer.",
+                candidateIds: ALL_CANDIDATES,
+                isUnresolved: true,
+              },
+            },
+          });
+          const row = exportedRow(createComparisonData(column), 0);
+
+          expect(row.comparison_winner).toBe("unresolved");
+          expect(row.comparison_reasoning).toBe("Candidate B is clearer.");
+        });
+      });
+
+      describe("when a verdict carries no candidate list", () => {
+        // Old runs recorded no candidates. Naming the column-wide variant list
+        // instead would assert a matchup that may never have happened.
+        it("leaves the candidates empty rather than assuming every variant", () => {
+          const column = createComparisonColumn({
+            verdictsByRow: {
+              0: {
+                rowIndex: 0,
+                winnerId: "gemini-flash",
+                reasoning: null,
+              },
+            },
+          });
+          const row = exportedRow(createComparisonData(column), 0);
+
+          expect(row.comparison_winner).toBe("gemini-flash");
+          expect(row.comparison_candidates).toBe("");
+          expect(row.comparison_reasoning).toBe("");
+        });
+      });
+    });
+
+    describe("given a run with two distinct comparisons", () => {
+      const helpfulness = createComparisonColumn({
+        evaluatorId: "comparison-helpfulness",
+        name: "Helpfulness",
+        verdictsByRow: {
+          0: {
+            rowIndex: 0,
+            winnerId: "gpt-5-mini",
+            reasoning: "Answers the question asked.",
+            candidateIds: ALL_CANDIDATES,
+            isUnresolved: false,
+          },
+        },
+      });
+      const brandVoice = createComparisonColumn({
+        evaluatorId: "comparison-brand-voice",
+        name: "Brand voice",
+        verdictsByRow: {
+          0: {
+            rowIndex: 0,
+            winnerId: "claude-sonnet-5",
+            reasoning: "Keeps the support tone.",
+            candidateIds: ALL_CANDIDATES,
+            isUnresolved: false,
+          },
+        },
+      });
+
+      const twoComparisonData = createMinimalData({
+        targetColumns: [],
+        comparisonColumns: [helpfulness, brandVoice],
+        rows: [{ index: 0, datasetEntry: {}, targets: {} }],
+      });
+
+      describe("when the export is built", () => {
+        it("keeps one block per comparison, each named after its own judge", () => {
+          const { headers, rows } = buildCsvData(twoComparisonData);
+
+          expect(headers).toEqual([
+            "index",
+            "helpfulness_winner",
+            "helpfulness_candidates",
+            "helpfulness_reasoning",
+            "brand_voice_winner",
+            "brand_voice_candidates",
+            "brand_voice_reasoning",
+          ]);
+          expect(rows[0]).toEqual([
+            "0",
+            "gpt-5-mini",
+            "gpt-5-mini, claude-sonnet-5, gemini-flash",
+            "Answers the question asked.",
+            "claude-sonnet-5",
+            "gpt-5-mini, claude-sonnet-5, gemini-flash",
+            "Keeps the support tone.",
+          ]);
+        });
+      });
+    });
+
+    describe("given rows whose indexes are not their positions in the table", () => {
+      // Verdicts are keyed by the dataset row index, which stops matching the
+      // array position as soon as a row is missing from the run.
+      it("matches each verdict to its own row index", () => {
+        const data = createMinimalData({
+          comparisonColumns: [
+            createComparisonColumn({
+              verdictsByRow: {
+                5: {
+                  rowIndex: 5,
+                  winnerId: "gpt-5-mini",
+                  reasoning: "Row five.",
+                  candidateIds: ALL_CANDIDATES,
+                  isUnresolved: false,
+                },
+                9: {
+                  rowIndex: 9,
+                  winnerId: "gemini-flash",
+                  reasoning: "Row nine.",
+                  candidateIds: ALL_CANDIDATES,
+                  isUnresolved: false,
+                },
+              },
+            }),
+          ],
+          rows: [
+            { index: 5, datasetEntry: {}, targets: {} },
+            { index: 9, datasetEntry: {}, targets: {} },
+          ],
+        });
+
+        const { rows } = buildCsvData(data);
+
+        expect(rows[0]?.[1]).toBe("gpt-5-mini");
+        expect(rows[1]?.[1]).toBe("gemini-flash");
+      });
+    });
+
+    describe("given a run with no comparison at all", () => {
+      it("emits no comparison columns", () => {
+        const withoutKey = createMinimalData({ comparisonColumns: undefined });
+        const withEmptyList = createMinimalData({ comparisonColumns: [] });
+
+        expect(buildCsvHeaders(withoutKey)).toEqual(["index"]);
+        expect(buildCsvHeaders(withEmptyList)).toEqual(["index"]);
+      });
+    });
+
+    describe("given a comparison whose reasoning contains commas and quotes", () => {
+      it("escapes the reasoning in the generated CSV", () => {
+        const reasoning = 'It is "clearer", and shorter';
+        const data = createMinimalData({
+          comparisonColumns: [
+            createComparisonColumn({
+              verdictsByRow: {
+                0: {
+                  rowIndex: 0,
+                  winnerId: "gpt-5-mini",
+                  reasoning,
+                  candidateIds: ALL_CANDIDATES,
+                  isUnresolved: false,
+                },
+              },
+            }),
+          ],
+          rows: [{ index: 0, datasetEntry: {}, targets: {} }],
+        });
+
+        const csv = generateCsvContent(data);
+
+        expect(csv).toContain("comparison_winner");
+        expect(csv).toContain('"It is ""clearer"", and shorter"');
+        expect(csv).toContain('"gpt-5-mini, claude-sonnet-5, gemini-flash"');
+      });
+    });
+
+    describe("given a stored run whose verdicts belong to the row rather than to a target", () => {
+      // What the code-first SDK writes: no target id on the verdict, the winner
+      // named by target name, and every candidate it judged in the inputs.
+      const sdkRun: ExperimentRunWithItems = {
+        experimentId: "exp-1",
+        runId: "run-1",
+        projectId: "project-1",
+        timestamps: { createdAt: 1705320000000, updatedAt: 1705320000000 },
+        targets: [
+          { id: "gpt-5-mini", name: "gpt-5-mini", type: "custom" },
+          { id: "claude-sonnet-5", name: "claude-sonnet-5", type: "custom" },
+        ],
+        dataset: [0, 1].flatMap((index) =>
+          ["gpt-5-mini", "claude-sonnet-5"].map((targetId) => ({
+            index,
+            targetId,
+            entry: { input: `question ${index}` },
+            predicted: { output: `${targetId} answer ${index}` },
+          })),
+        ),
+        evaluations: [
+          {
+            evaluator: "langevals/select_best_compare",
+            name: "Comparison",
+            status: "processed",
+            index: 0,
+            label: "gpt-5-mini",
+            details: "It answers the question asked.",
+            inputs: {
+              candidates: [{ id: "gpt-5-mini" }, { id: "claude-sonnet-5" }],
+            },
+          },
+          {
+            evaluator: "langevals/select_best_compare",
+            name: "Comparison",
+            status: "processed",
+            index: 1,
+            label: "tie",
+            details: "Nothing separates them.",
+            inputs: {
+              candidates: [{ id: "gpt-5-mini" }, { id: "claude-sonnet-5" }],
+            },
+          },
+        ],
+      };
+
+      describe("when the transformed run is exported", () => {
+        it("carries the verdict through to the CSV under the judge's own name", () => {
+          const data = transformBatchEvaluationData(sdkRun);
+          const { headers } = buildCsvData(data);
+
+          expect(headers.slice(-3)).toEqual([
+            "comparison_winner",
+            "comparison_candidates",
+            "comparison_reasoning",
+          ]);
+          expect(exportedRow(data, 0)).toMatchObject({
+            comparison_winner: "gpt-5-mini",
+            comparison_candidates: "gpt-5-mini, claude-sonnet-5",
+            comparison_reasoning: "It answers the question asked.",
+          });
+          expect(exportedRow(data, 1)).toMatchObject({
+            comparison_winner: "tie",
+            comparison_candidates: "gpt-5-mini, claude-sonnet-5",
+            comparison_reasoning: "Nothing separates them.",
+          });
+        });
+      });
     });
   });
 });

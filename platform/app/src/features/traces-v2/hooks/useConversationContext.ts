@@ -1,3 +1,4 @@
+import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { api } from "~/utils/api";
 import { useSharedTrace } from "../context/SharedTraceContext";
@@ -81,8 +82,8 @@ export function useConversationContext(
     {
       enabled: fetchEnabled,
       staleTime: 30_000,
-      cacheTime: 1_800_000,
-      keepPreviousData: true,
+      gcTime: 1_800_000,
+      placeholderData: keepPreviousData,
       refetchOnWindowFocus: false,
     },
   );

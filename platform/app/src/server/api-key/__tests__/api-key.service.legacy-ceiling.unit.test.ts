@@ -1,5 +1,5 @@
-import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 
 /**
  * The legacy-membership half of the API-key ceiling.

@@ -1,4 +1,5 @@
 import {
+  Badge,
   Box,
   Button,
   Code,
@@ -8,7 +9,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { Monitor, TriggerAction } from "@prisma/client";
 import { useMemo } from "react";
 import {
   Calendar,
@@ -46,10 +46,12 @@ import {
   SectionHeader,
   TableShell,
 } from "~/features/automations/components/page/AutomationTableCells";
+import { RUNAWAY_PAUSE_REASON } from "~/features/automations/logic/pauseReasons";
 import type { TriggerActionParams } from "~/features/automations/logic/triggerActionParams";
 import { CLIENT_PROVIDERS } from "~/features/automations/providers/registry";
 import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
 import { automationContextChip } from "~/features/langy/logic/langyContextChips";
+import type { Monitor, TriggerAction } from "~/generated/prisma/client";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
@@ -118,6 +120,14 @@ function AutomationsPage() {
   const statsByTriggerId = useMemo(
     () => new Map((triggerStats.data ?? []).map((s) => [s.triggerId, s])),
     [triggerStats.data],
+  );
+
+  // How much each automation has been throttled today. Read separately from
+  // the trigger rows because the counters live in Redis, not Postgres, and a
+  // Redis outage should cost the page these badges rather than the whole list.
+  const capStatus = api.automation.getDailyCapStatus.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id },
   );
 
   // A report's cron only DESCRIBES its schedule; the scheduler owns the real
@@ -433,21 +443,51 @@ function AutomationsPage() {
     onClick: () => openDrawer("viewAutomation", { automationId: trigger.id }),
   });
 
-  const activeCell = (trigger: EnhancedTrigger) => (
-    <Table.Cell
-      textAlign="center"
-      onClick={(event) => {
-        event.stopPropagation();
-      }}
-    >
-      <Switch
-        checked={trigger.active}
-        onCheckedChange={({ checked }) => {
-          handleToggleTrigger(trigger.id, checked);
+  const activeCell = (trigger: EnhancedTrigger) => {
+    const skipped = capStatus.data?.counts[trigger.id]?.skipped ?? 0;
+    const pausedForVolume = trigger.pausedReason === RUNAWAY_PAUSE_REASON;
+    return (
+      <Table.Cell
+        textAlign="center"
+        onClick={(event) => {
+          event.stopPropagation();
         }}
-      />
-    </Table.Cell>
-  );
+      >
+        <VStack gap={1} align="center">
+          <Switch
+            checked={trigger.active}
+            inputProps={{ "aria-label": `Toggle ${trigger.name}` }}
+            onCheckedChange={({ checked }) => {
+              handleToggleTrigger(trigger.id, checked);
+            }}
+          />
+          {/* An automation that is running but silently dropping matches is
+              the confusing case: without this the customer sees it switched
+              on and no records appearing, with nothing to explain the gap.
+              `tabIndex` is what makes the tooltip reachable: Badge renders a
+              plain span, and a span with no tab stop can be hovered but never
+              focused, so the explanation would be mouse-only. */}
+          {pausedForVolume ? (
+            <Tooltip content="This automation matched almost every trace in the project, so we paused it. Narrow its condition, then switch it back on.">
+              <Badge colorPalette="red" size="sm" tabIndex={0}>
+                Paused
+              </Badge>
+            </Tooltip>
+          ) : skipped > 0 ? (
+            <Tooltip
+              content={`This automation passed its daily limit of ${(
+                capStatus.data?.cap ?? 0
+              ).toLocaleString()} matches. It starts again tomorrow.`}
+            >
+              <Badge colorPalette="orange" size="sm" tabIndex={0}>
+                {skipped.toLocaleString()} skipped today
+              </Badge>
+            </Tooltip>
+          ) : null}
+        </VStack>
+      </Table.Cell>
+    );
+  };
 
   const isLoading = triggers.isLoading;
 

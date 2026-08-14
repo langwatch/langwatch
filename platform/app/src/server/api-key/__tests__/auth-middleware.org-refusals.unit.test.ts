@@ -11,15 +11,14 @@
  * there (ADR-045: infra is never dressed up as handled).
  */
 import { HandledError } from "@langwatch/handled-error";
-import type { PrismaClient } from "@prisma/client";
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 
 // auth-middleware → api/rbac → ~/server/auth → ~/server/better-auth → redis +
 // db. Mock both so no real connection keeps the worker alive (established
 // pattern; see auth-middleware.unit.test.ts).
 vi.mock("~/server/db", () => ({ prisma: {} }));
-vi.mock("~/server/redis", () => ({ connection: undefined }));
 
 const resolveOrgOnly = vi.fn();
 const markUsed = vi.fn();

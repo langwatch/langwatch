@@ -92,12 +92,12 @@ vi.mock("~/experiments-v3/components/SavedDatasetLoaders", () => ({
 }));
 
 // The page body calls tRPC hooks at the top level (api.*.useMutation +
-// api.useContext). DashboardLayout is mocked away, but the page module still
+// api.useUtils). DashboardLayout is mocked away, but the page module still
 // executes these on render, so stub the api boundary like the sibling
 // experiments-v3 workbench tests (see ExecutionControls.integration.test.tsx).
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({}),
+    useUtils: () => ({}),
     evaluators: {
       create: { useMutation: () => ({ mutate: vi.fn() }) },
       update: { useMutation: () => ({ mutate: vi.fn() }) },

@@ -26,8 +26,8 @@
  * Docs: docs/ai-governance/mcp.mdx
  */
 
-import type { PrismaClient } from "@prisma/client";
 import { type ZodRawShape, z } from "zod";
+import type { PrismaClient } from "~/generated/prisma/client";
 
 type ToolCallback = (
   // The MCP SDK passes parsed input as the first arg; we don't currently

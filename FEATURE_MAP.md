@@ -7,6 +7,7 @@ Near-complete coverage landed across three PRs:
 - **[#3168](https://github.com/langwatch/langwatch/pull/3168)** — Full CLI, API, and MCP coverage for all platform features
 - **[#3210](https://github.com/langwatch/langwatch/pull/3210)** — All platform features exposed via TypeScript and Python SDKs
 - **[#3274](https://github.com/langwatch/langwatch/pull/3274)** — Skills made CLI-only, added `langwatch docs` / `scenario-docs` commands
+- **[#4998](https://github.com/langwatch/langwatch/pull/4998)** — Go SDK brought to parity on tracing and the typed REST client, adding a third SDK surface
 
 ## Information Architecture
 
@@ -57,52 +58,55 @@ Fields point to **namespaces**, not individual methods (e.g. `langwatch.experime
 
 Legend: ✅ present · — absent · `—` no SDK/CLI/skill/MCP by design
 
-| Feature | SDK py | SDK ts | CLI | Skill (code) | UI | MCP | Skill (platform) | API | Docs |
-|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
-| **Observability** | | | | | | | | | |
-| Tracing | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ |
-| Analytics | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| User Events | ✅ | — | — | — | — | — | — | ✅ | ✅ |
-| Annotations | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | ✅ | ✅ |
-| **Evaluations** | | | | | | | | | |
-| Experiments | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ |
-| Online Evaluation (Monitors) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ |
-| **Agent Simulations** | | | | | | | | | |
-| Scenarios | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Runs | — | ✅ | ✅ | — | ✅ | ✅ | — | ✅ | ✅ |
-| Suites (Run Plans) | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | ✅ | — |
-| **Prompt Management** | | | | | | | | | |
-| Prompts | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ |
-| Prompt Playground | — | — | — | — | ✅ | — | — | ✅ | ✅ |
-| **Library** | | | | | | | | | |
-| Agents | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | ✅ | — |
-| Workflows | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | ✅ | ✅ |
-| Evaluators | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Datasets | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ |
-| **Cross-cutting** | | | | | | | | | |
-| Dashboards | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | ✅ | — |
-| Triggers | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | ✅ | — |
-| **AI Gateway** | | | | | | | | | |
-| Virtual Keys | — | — | ✅ | — | ✅ | — | — | ✅ | ✅ |
-| Budgets | — | — | ✅ | — | ✅ | — | — | ✅ | ✅ |
-| Governance | — | — | ✅ | — | ✅ | — | — | ✅ | ✅ |
-| Ingestion Sources | — | — | ✅ | — | ✅ | — | — | ✅ | ✅ |
-| **Settings** | | | | | | | | | |
-| Model Providers | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | ✅ | ✅ |
-| Model Defaults | — | — | ✅ | — | ✅ | — | — | ✅ | — |
-| Project Secrets | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | ✅ | — |
-| Agent Skills | — | — | ✅ | — | — | — | — | — | ✅ |
-| Organization | — | — | ✅ | — | ✅ | — | — | ✅ | — |
-| Members and Invites | — | — | ✅ | — | ✅ | — | — | ✅ | — |
-| Teams | — | — | ✅ | — | ✅ | — | — | ✅ | — |
-| Access Groups | — | — | ✅ | — | ✅ | — | — | ✅ | — |
-| Custom Roles | — | — | ✅ | — | ✅ | — | — | ✅ | — |
-| Role Bindings | — | — | ✅ | — | ✅ | — | — | ✅ | — |
-| SCIM Provisioning | — | — | ✅ | — | ✅ | — | — | ✅ | — |
+| Feature | SDK py | SDK ts | SDK go | CLI | Skill (code) | UI | MCP | Skill (platform) | API | Docs |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
+| **Observability** | | | | | | | | | | |
+| Tracing | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ |
+| Analytics | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| User Events | ✅ | — | ✅ | — | — | — | — | — | ✅ | ✅ |
+| Annotations | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | ✅ | ✅ |
+| **Evaluations** | | | | | | | | | | |
+| Experiments | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ |
+| Online Evaluation (Monitors) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ |
+| **Agent Simulations** | | | | | | | | | | |
+| Scenarios | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Runs | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | ✅ | ✅ |
+| Suites (Run Plans) | ✅ | ✅ | — | ✅ | — | ✅ | ✅ | — | ✅ | — |
+| **Prompt Management** | | | | | | | | | | |
+| Prompts | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ |
+| Prompt Playground | — | — | — | — | — | ✅ | — | — | ✅ | ✅ |
+| **Library** | | | | | | | | | | |
+| Agents | ✅ | ✅ | — | ✅ | — | ✅ | ✅ | — | ✅ | — |
+| Workflows | ✅ | ✅ | — | ✅ | — | ✅ | ✅ | — | ✅ | ✅ |
+| Evaluators | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Datasets | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ |
+| **Cross-cutting** | | | | | | | | | | |
+| Dashboards | ✅ | ✅ | — | ✅ | — | ✅ | ✅ | — | ✅ | — |
+| Triggers | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | ✅ | — |
+| **AI Gateway** | | | | | | | | | | |
+| Virtual Keys | — | — | — | ✅ | — | ✅ | — | — | ✅ | ✅ |
+| Budgets | — | — | — | ✅ | — | ✅ | — | — | ✅ | ✅ |
+| Governance | — | — | — | ✅ | — | ✅ | — | — | ✅ | ✅ |
+| Ingestion Sources | — | — | — | ✅ | — | ✅ | — | — | ✅ | ✅ |
+| **Settings** | | | | | | | | | | |
+| Projects | — | — | ✅ | ✅ | — | ✅ | ✅ | — | ✅ | — |
+| Model Providers | ✅ | ✅ | — | ✅ | — | ✅ | ✅ | — | ✅ | ✅ |
+| Model Defaults | — | — | — | ✅ | — | ✅ | — | — | ✅ | — |
+| Project Secrets | ✅ | ✅ | — | ✅ | — | ✅ | ✅ | — | ✅ | — |
+| Agent Skills | — | — | — | ✅ | — | — | — | — | — | ✅ |
+| Organization | — | — | — | ✅ | — | ✅ | — | — | ✅ | — |
+| Members and Invites | — | — | — | ✅ | — | ✅ | — | — | ✅ | — |
+| Teams | — | — | — | ✅ | — | ✅ | — | — | ✅ | — |
+| Access Groups | — | — | — | ✅ | — | ✅ | — | — | ✅ | — |
+| Custom Roles | — | — | — | ✅ | — | ✅ | — | — | ✅ | — |
+| Role Bindings | — | — | — | ✅ | — | ✅ | — | — | ✅ | — |
+| SCIM Provisioning | — | — | — | ✅ | — | ✅ | — | — | ✅ | — |
 
 ### Coverage notes
 
-- **User Events** — Python-only SDK (`langwatch.track_event`). No TS, CLI, UI, or MCP by design.
+- **User Events** — Python (`langwatch.track_event`) and Go (`client.Events`, plus `langwatch.Span.RecordEvent` on the tracing side). No TS, CLI, UI, or MCP by design.
+- **SDK go** — The Go SDK splits across two modules: `github.com/langwatch/langwatch/sdks/go` (tracing, spans, evaluations, events, prompt telemetry, data-capture controls, and the eight provider instrumentations under `instrumentation/`) and `github.com/langwatch/langwatch/sdks/go/client` (the typed REST client, whose `Client` fields name the covered features). Table entries read `langwatch.*` for the tracing module and `client.*` for the REST client.
+- **Go gaps** — Analytics, Experiments, Suites, Agents, Workflows, Evaluators, Dashboards, Model Providers, Project Secrets, Model Defaults, Agent Skills, API Keys, and every AI Gateway feature have no Go surface: the REST client exposes only Prompts, Datasets, Traces, Annotations, Events, Evaluations, Triggers, Monitors, Scenarios, and Projects.
 - **Prompt Playground** — Pure UI feature; no SDK/CLI/MCP planned.
 - **AI Gateway** — CLI/UI/API only (no SDK or MCP surface yet). `ingest` is read-only by design; `ingest install` is a hidden scripting primitive and deliberately not in the map.
 - **Agent Skills** — CLI-only by design: `langwatch skills list/get/install/uninstall/update` installs the bundled agent skills (compiled from `skills/` into the CLI at build time) into `~/.agents/skills`. No platform surface — the skills repo (`langwatch/skills`) and `npx skills add` remain the browser-side distribution.
@@ -137,6 +141,7 @@ Legend: ✅ present · — absent · `—` no SDK/CLI/skill/MCP by design
 ### SDKs
 - **Python** — `sdks/python/src/langwatch/` (lazy-loaded facades in `__init__.py`)
 - **TypeScript** — `sdks/typescript/src/index.ts` (`LangWatch` class with per-feature accessors)
+- **Go** — `sdks/go/` (tracing: `tracer.go`, `span.go`, `evaluation.go`, `event.go`, `datacapture.go`; instrumentations: `sdks/go/instrumentation/{openai,azureopenai,gopenai,anthropic,bedrock,googlegenai,ollama,genkit}`) and `sdks/go/client/` (`Client` struct in `client.go`, one file per service)
 - **Scenario SDK** — separate: `@langwatch/scenario` / `langwatch-scenario`
 
 ### Skills

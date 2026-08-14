@@ -1,9 +1,15 @@
-import { type Prisma, type Trigger, TriggerKind } from "@prisma/client";
+import { createLogger } from "@langwatch/observability";
 import type { Cluster, Redis } from "ioredis";
+import {
+  type Prisma,
+  type Trigger,
+  TriggerKind,
+} from "~/generated/prisma/client";
 import { computeNextRunAt } from "~/server/app-layer/scheduler/nextRunAt";
 import { SchedulerService } from "~/server/app-layer/scheduler/scheduler.service";
 import type { ScheduledJobRepository } from "~/server/app-layer/scheduler/scheduler.types";
 import { TtlCache } from "~/server/utils/ttlCache";
+import { isMatchEverythingTrigger } from "./matchEverything";
 import {
   extractReportFromTriggerRow,
   REPORT_SCHEDULER_TARGET_TYPE,
@@ -12,6 +18,8 @@ import type {
   TriggerRepository,
   TriggerSummary,
 } from "./repositories/trigger.repository";
+
+const logger = createLogger("langwatch:automations:trigger-service");
 
 export class TriggerService {
   private static readonly TTL_MS = 60_000;
@@ -45,7 +53,41 @@ export class TriggerService {
     if (cached) return cached;
     const all = await this.repo.findActiveForProject(projectId);
     await this.cache.set(projectId, all);
+    this.reportGrandfatheredMatchEverything(projectId, all);
     return all;
+  }
+
+  /**
+   * Automations with no condition at all are refused on every write path now,
+   * but rows saved before that rule keep running. They are the most expensive
+   * shape we serve — one match record per active trigger per trace, forever —
+   * so how many remain is worth knowing.
+   *
+   * Emitted from the cache FILL rather than from each read, which is what
+   * bounds it to roughly one line per project per minute instead of one per
+   * ingested trace. Best-effort: a logging failure must never break a read
+   * that dispatch depends on.
+   */
+  private reportGrandfatheredMatchEverything(
+    projectId: string,
+    triggers: TriggerSummary[],
+  ): void {
+    try {
+      const grandfathered = triggers.filter(isMatchEverythingTrigger);
+      if (grandfathered.length === 0) return;
+      logger.warn(
+        {
+          projectId,
+          count: grandfathered.length,
+          triggerIds: grandfathered.map((trigger) => trigger.id),
+        },
+        "Project still has automations with no condition; they match every " +
+          "trace and can no longer be saved in this shape",
+      );
+    } catch {
+      // Intentionally silent: this is observability about the read, not the
+      // read itself.
+    }
   }
 
   /**

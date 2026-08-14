@@ -33,5 +33,5 @@ export function useLangyFeedback() {
     [project?.id, mutation],
   );
 
-  return { submit, isSubmitting: mutation.isLoading };
+  return { submit, isSubmitting: mutation.isPending };
 }

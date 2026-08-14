@@ -29,17 +29,18 @@ import type {
   Workflow,
 } from "~/optimization_studio/types/dsl";
 import { getMappingSurfaceInputs } from "~/optimization_studio/utils/nodeUtils";
-import type {
-  AgentComponentConfig,
-  TypedAgent,
-} from "~/server/agents/agent.repository";
+import type { AgentComponentConfig } from "~/server/agents/agent.repository";
+import {
+  type AgentWithFields,
+  linkedWorkflowId,
+} from "~/server/agents/agent-fields";
 import { computeBestMatchMappings } from "~/server/scenarios/execution/resolve-field-mappings";
 import { api } from "~/utils/api";
 
 export type AgentWorkflowEditorDrawerProps = {
   open?: boolean;
   onClose?: () => void;
-  onSave?: (agent: TypedAgent) => void;
+  onSave?: (agent: AgentWithFields) => void;
   /** If provided, loads an existing workflow agent for editing. */
   agentId?: string;
 };
@@ -99,7 +100,7 @@ export function AgentWorkflowEditorDrawer(
   const { project } = useOrganizationTeamProject();
   const { closeDrawer, canGoBack, goBack } = useDrawer();
   const drawerParams = useDrawerParams();
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   const onClose = props.onClose ?? closeDrawer;
   const onSave = props.onSave;
@@ -126,16 +127,10 @@ export function AgentWorkflowEditorDrawer(
     { enabled: !!agentId && !!project?.id && isOpen },
   );
 
-  // Derive linked workflowId from the agent (falling back to the DSL field).
-  const workflowId = useMemo(() => {
-    if (!agentQuery.data) return undefined;
-    const fromAgent = (
-      agentQuery.data as TypedAgent & { workflowId?: string | null }
-    ).workflowId;
-    if (fromAgent) return fromAgent;
-    const fromConfig = getWorkflowConfig(agentQuery.data.config).workflow_id;
-    return fromConfig;
-  }, [agentQuery.data]);
+  const workflowId = useMemo(
+    () => (agentQuery.data ? linkedWorkflowId(agentQuery.data) : undefined),
+    [agentQuery.data],
+  );
 
   // Fetch the linked workflow so we can derive its real inputs/outputs.
   const workflowQuery = api.workflow.getById.useQuery(

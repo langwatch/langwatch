@@ -17159,7 +17159,7 @@ The pattern is `governance_<resource_with_underscores>_<verb_with_underscores>`,
 
 ## Authentication
 
-Governance MCP tools register inside LangWatch's existing MCP server (mounted at `/api/mcp/*` on the same host that serves the dashboard), there is **no separate `langwatch mcp serve` binary**. Clients connect over HTTP using either streamable-HTTP at `/mcp` or SSE at `/sse`, and authenticate with one of:
+Governance MCP tools register inside LangWatch's existing MCP server (served on the same host that serves the dashboard), there is **no separate `langwatch mcp serve` binary**. Clients connect over HTTP using either streamable-HTTP at `/mcp` or SSE at `/sse`, and authenticate with one of:
 
 - **Project API key as Bearer** (`Authorization: Bearer <projectApiKey>`), the plain read tools work immediately. Sufficient to call `governance_*_list` and `governance_*_get`. Admin reads (`governance_*_admin_list`, which expose `ottlRules`) and every write tool require a user-bound session and reject a project-key-only caller.
 - **OAuth (PKCE) flow** at `/api/mcp/authorize` → `/oauth/token`, required for write tools and admin reads. The OAuth flow captures the user's id at authorize time, threads it through the session token cache, and surfaces it to governance tools as `ctx.callerUserId`. Without it, a write tool returns an `AUTH_REQUIRED:` error pointing the client at the OAuth flow.
@@ -17170,7 +17170,9 @@ Governance MCP tools register inside LangWatch's existing MCP server (mounted at
 {
   "mcpServers": {
     "langwatch-governance": {
-      "url": "https://app.langwatch.ai/api/mcp"
+      "url": "https://app.langwatch.ai/mcp"
+      // Clients that speak the older SSE transport use
+      // https://app.langwatch.ai/sse instead.
       // Read-only access: add Authorization: Bearer <projectApiKey>.
       // Read+write access: complete the OAuth PKCE flow at /api/mcp/authorize.
     }
@@ -30300,6 +30302,18 @@ See the [API Keys guide](/platform/api-keys#creating-a-personal-api-key) for ste
 <Step title="Configure your MCP">
 
 
+### Claude Desktop
+
+1. Go to **Settings → Connectors**
+2. Click **Add custom connector**
+3. Enter the server URL: `https://app.langwatch.ai/sse`
+4. Click **Connect**: you'll be redirected to sign in and authorize access to your project
+
+The same steps work in Claude Cowork and in Claude chat on the web.
+
+*Requires a paid Claude plan.*
+
+
 ### Claude Code
 
 Run this command to add the MCP server:
@@ -30353,26 +30367,16 @@ Under the `servers` object, add an entry named `langwatch` with these fields:
 *Requires a Plus or Team plan.*
 
 
-### Claude Chat
-
-1. Go to **Settings → Connectors**
-2. Click **Add custom connector**
-3. Enter the server URL: `https://app.langwatch.ai/mcp`
-4. Click **Connect**: you'll be redirected to sign in and authorize access to your project
-
-*Requires a Pro or Max plan.*
-
-
 ### BoltAI, Other MCP Clients
 
 For any MCP client that supports remote servers with OAuth:
 
 1. Add a new remote MCP server
-2. Enter the endpoint URL: `https://app.langwatch.ai/mcp`
+2. Enter the endpoint URL: `https://app.langwatch.ai/sse`
 3. Select **OAuth (browser)** authentication
 4. Click **Connect**: you'll be redirected to sign in and authorize access to your project
 
-The server supports OAuth Authorization Code + PKCE with Dynamic Client Registration, so any standards-compliant MCP client should work automatically.
+The server supports OAuth Authorization Code + PKCE with Dynamic Client Registration, so any standards-compliant MCP client should work automatically. Clients that speak the Streamable HTTP transport can point at `https://app.langwatch.ai/mcp` instead.
 
 
 ### Other
@@ -30404,7 +30408,7 @@ Open your AI assistant chat (e.g., `Cmd/Ctrl + I` in Cursor, or `Cmd/Ctrl + Shif
 The MCP server runs in two modes:
 
 - **Local (stdio)**: Default. Runs as a subprocess of your coding assistant (Claude Code, Copilot, Cursor). API key set via `--apiKey` flag or `LANGWATCH_API_KEY` env var.
-- **Remote (HTTP/SSE)**: For web-based assistants (ChatGPT, Claude Chat, BoltAI, etc.). Hosted at `https://app.langwatch.ai`. Uses OAuth Authorization Code + PKCE, click Connect and sign in via your browser to authorize access to your project. Supports both Streamable HTTP (`/mcp`) and SSE (`/sse`) transports.
+- **Remote (HTTP/SSE)**: For chat assistants (Claude Desktop, ChatGPT, BoltAI, etc.). Hosted at `https://app.langwatch.ai`. Uses OAuth Authorization Code + PKCE, click Connect and sign in via your browser to authorize access to your project. Supports both SSE (`/sse`) and Streamable HTTP (`/mcp`) transports.
 
 ## Usage Examples
 
@@ -36199,7 +36203,9 @@ Endpoint deliveries and the [webhooks fired by your automation triggers](#signin
 **Do not reconcile billing against this log.** It holds only the request families, it is a delivery-recovery aid rather than the money record, and it carries no retention contract. Reconcile against the spend ledger: [`spend-summaries` and `spend-events`](/ai-gateway/billing-events#reconciliation-two-grains-one-ledger), which include settled rows and keep 13 months.
 </Warning>
 
-`GET /api/webhooks/v1/events?type=&from=&to=&cursor=&limit=` is the organization's emitted-events log: cursor-paged, newest first, filterable by type and `created` range (unix milliseconds). Webhooks are push over this log, never the only copy of it, so a consumer that missed deliveries can list what was emitted and recover.
+`GET /api/webhooks/v1/events?from=&to=&type=&cursor=&limit=` is the organization's emitted-events log: cursor-paged, newest first, filterable by type. Webhooks are push over this log, never the only copy of it, so a consumer that missed deliveries can list what was emitted and recover.
+
+`from` and `to` bound the `created` range in unix milliseconds and are **required**, and `from` must be less than or equal to `to`. The log reads the same 13-month spend table the reconciliation pull reads, so an unbounded listing sorts every month the organization has, cold storage included, to serve one page. A read with no range, with only one of the two bounds, or with a range that ends before it starts is rejected with the canonical `400` this surface answers every validation failure with, naming the offending parameter.
 
 `GET /api/webhooks/v1/events/{id}` reads one event back by the `id` its envelope carried. A `404` means the log cannot answer for that id, and deliberately does not say which reason applies.
 
@@ -38849,6 +38855,7 @@ evaluation.log("coherence", {
 
 When comparing different models, prompts, or configurations, use targets to organize your results.
 Both SDKs provide a `target()`, `withTarget()` context that automatically captures latency and enables context inference.
+Once a row's targets have each produced an output, [Comparison](#comparison) judges them against each other and names a winner.
 
 
   ### Python
@@ -39144,11 +39151,15 @@ await evaluation.run(dataset, async ({ item, index }) => {
   Browse our complete list of [available evaluators](/evaluations/evaluators/list) including metrics for RAG quality, hallucination detection, safety, and more.
 </Info>
 
-### Pairwise Compare
+## Comparison
 
-`langevals/pairwise_compare` compares two candidate outputs for the same input and asks a judge model to pick the better one. This is useful when you want to compare two prompts, models, or agent configurations directly instead of scoring each one independently.
+Scoring each target on its own leaves you calibrating numbers: is `0.78` better than `0.74` for your users, or is that noise? Comparison asks the easier question instead. It shows a judge every target output for the same row and asks which one is best.
 
-The example below was verified against the live SDK path using `evaluation.evaluate("langevals/pairwise_compare", ...)`.
+`compare()` is the code-first way in. It uses the same judge as the [Comparison evaluator](/evaluations/experiments/ui/pairwise-compare) in the workbench, so a comparison you run from a notebook and one you set up in the UI read the same way on the results page.
+
+### Comparing a row
+
+Every target that produced a non-empty output for the row is a candidate, and one comparison weighs all of them together rather than a round of one-against-one matchups. Behind it the judge is called twice per row by default, the second time with the candidate order reversed, which is what [`swap_and_reconcile`](#options) does; turn that off and one comparison is one judge call. There is no candidate list to assemble, and no judge prompt you have to choose, since the shipped one runs unless you [write your own](#customizing-the-judge-prompt):
 
 
   ### Python
@@ -39156,39 +39167,232 @@ The example below was verified against the live SDK path using `evaluation.evalu
 ```python
 import langwatch
 
-ROWS = [
-    {
-        "input": "Write a function that checks if a given integer is a prime number.",
-        "golden": "def is_prime(n): ...",
-        "candidate_a_id": "variant-a",
-        "candidate_a_output": "def is_prime(n: int) -> bool: ...",
-        "candidate_b_id": "variant-b",
-        "candidate_b_output": "def is_prime(n: int) -> bool: ...",
-    }
-]
+evaluation = langwatch.experiment.init("model-comparison")
 
-evaluation = langwatch.experiment.init("pairwise-sdk-verification")
+for index, row in evaluation.loop(df.iterrows()):
+    with evaluation.target("gpt-5-mini", {"model": "openai/gpt-5-mini"}):
+        evaluation.log_response(ask_gpt(row["question"]))
 
-for index, row in evaluation.loop(list(enumerate(ROWS))):
-    evaluation.evaluate(
-        "langevals/pairwise_compare",
-        index=index,
-        data={
-            "input": row["input"],
-            "golden": row["golden"],
-            "candidate_a_id": row["candidate_a_id"],
-            "candidate_a_output": row["candidate_a_output"],
-            "candidate_b_id": row["candidate_b_id"],
-            "candidate_b_output": row["candidate_b_output"],
-        },
-        settings={
-            "model": "openai/gpt-5-mini",
-            "has_golden_answer": True,
-            "swap_and_confirm": True,
-            "allow_tie": True,
-            "include_metrics": ["cost", "duration"],
-        },
-    )
+    with evaluation.target("claude-sonnet-5", {"model": "anthropic/claude-sonnet-5"}):
+        evaluation.log_response(ask_claude(row["question"]))
+
+    verdict = evaluation.compare(index, input=row["question"])
+    print(verdict.winner, verdict.reasoning)
+```
+
+The candidates are whatever `log_response()` recorded inside each `target()` block.
+
+  ### TypeScript
+
+```typescript
+const evaluation = await langwatch.experiments.init("model-comparison");
+
+await evaluation.run(dataset, async ({ item }) => {
+  await Promise.all([
+    evaluation.withTarget("gpt-5-mini", { model: "openai/gpt-5-mini" }, () =>
+      askGpt(item.question)
+    ),
+    evaluation.withTarget("claude-sonnet-5", { model: "anthropic/claude-sonnet-5" }, () =>
+      askClaude(item.question)
+    ),
+  ]);
+
+  const verdict = await evaluation.compare({ input: item.question });
+  console.log(verdict.winner, verdict.reasoning);
+});
+```
+
+The candidates are whatever each `withTarget()` callback returned.
+
+
+
+The winner comes back named with the target name you registered. Two candidates is not a different call from five: `compare()` judges however many the row has, and a target that produced nothing for the row, or only an empty output, is simply not a candidate.
+
+<Info>
+  Compare a row once its targets have finished. In Python that is after the row's last `target()` block has closed, and in TypeScript after its `withTarget()` calls have settled, which under the usual `Promise.all` is right after the `await`.
+</Info>
+
+<Note>
+  `compare()` names the row the way `log()` does in the same SDK. Python is handed the index by `loop()`, so it passes it on as the first argument, and it needs a whole number. TypeScript infers it from the iteration the comparison runs in, so `index` is only needed when you compare outside a `run()` callback, and it is a whole number there too.
+
+  Candidate order is shuffled per row by default, seeded by the row index, so re-comparing the same row presents the candidates in the same order and a different row shuffles differently. `randomize_order` / `randomizeOrder` governs it: turn it off and the judge sees the candidates in the order their targets were registered.
+</Note>
+
+### Judging against a reference answer
+
+By default the judge compares the candidates on their own merits, with no reference answer involved. Pass `golden` to have it judge each candidate against a reference instead. That one option is the whole switch, so there is no second flag to forget:
+
+
+  ### Python
+
+```python
+verdict = evaluation.compare(
+    index,
+    input=row["question"],
+    golden=row["expected_answer"],
+)
+```
+
+  ### TypeScript
+
+```typescript
+const verdict = await evaluation.compare({
+  input: item.question,
+  golden: item.expectedAnswer,
+});
+```
+
+
+
+<Tip>
+  Use a reference answer when correctness is the question. Leave it out for open-ended work, where tone, completeness, structure or policy adherence decide the winner and no single answer is the right one.
+</Tip>
+
+### Customizing the judge prompt
+
+Leave `prompt` unset and the judge picks the shipped prompt matching what the row actually carries: a reference answer, task context, both, or neither. The framing for whatever the row lacks is dropped rather than left empty, which is why the default is worth keeping unless you have a rubric of your own.
+
+When you do have one, pass it and it is used exactly as written. Three placeholders are filled in for you:
+
+| Placeholder | Filled with |
+|-------------|-------------|
+| `{input}` | The `input` you passed, or nothing when you passed none |
+| `{golden}` | The `golden` you passed, or nothing when you passed none |
+| `{candidates}` | The candidate outputs, one per line, each behind a slot label |
+
+
+  ### Python
+
+```python
+SUPPORT_RUBRIC = """\
+Pick the reply a support agent could send to the customer unedited.
+
+Question:
+{input}
+
+Candidates:
+{candidates}
+
+Weigh them in this order: factual accuracy first, then whether every part
+of the question is answered, then tone. Length is not quality. Explain
+briefly which candidate wins on those criteria, then pick its slot label.
+"""
+
+verdict = evaluation.compare(
+    index,
+    input=row["question"],
+    prompt=SUPPORT_RUBRIC,
+)
+```
+
+  ### TypeScript
+
+```typescript
+const supportRubric = `Pick the reply a support agent could send to the customer unedited.
+
+Question:
+{input}
+
+Candidates:
+{candidates}
+
+Weigh them in this order: factual accuracy first, then whether every part
+of the question is answered, then tone. Length is not quality. Explain
+briefly which candidate wins on those criteria, then pick its slot label.`;
+
+const verdict = await evaluation.compare({
+  input: item.question,
+  prompt: supportRubric,
+});
+```
+
+
+
+<Note>
+  Only those three placeholders are substituted, and they are substituted literally. Any other braces in your prompt reach the judge as written, so a rubric that says `score out of {10}` is passed through unchanged.
+</Note>
+
+### Options
+
+Every option is optional, because the judge already has a default for each one. An option you do not set is not sent at all, so the judge's default applies to it.
+
+| Option | Default | What it does |
+|--------|---------|--------------|
+| `targets` | Every target that produced a non-empty output for the row | Restricts the comparison to the targets you name |
+| `input` | No task context | The task the candidates were answering, for the judge to weigh them against |
+| `golden` | No reference answer, so candidates are judged on their own merits | A reference answer to judge each candidate against, and the switch that turns reference judging on |
+| `prompt` | The shipped prompt matching what the row carries | Your own judge prompt, used exactly as written |
+| `model` | Your project's configured evaluator model | The judge model, for example `openai/gpt-5-mini` |
+| `allow_tie` / `allowTie` | `true` | Lets the judge answer "tie" when no candidate is clearly better |
+| `randomize_order` / `randomizeOrder` | `true` | Shuffles candidate order per row, seeded by the row index, so a candidate's position never sways the verdict |
+| `swap_and_reconcile` / `swapAndReconcile` | `true` | Judges each row a second time with the candidate order reversed, and establishes no winner when the two passes disagree. Doubles the judge cost per row |
+| `include_metrics` / `includeMetrics` | Nothing | Puts each candidate's `"duration"` in front of the judge, so it can prefer a faster candidate when quality is comparable. The time each target took is recorded for you. Cost is not on offer: the platform works a target's cost out from its traces after the run, so the SDK has none to show at the moment it asks for a verdict |
+| `temperature` | `0` | The judge's sampling temperature. Models that only run at their own fixed temperature, the gpt-5 family among them, ignore it |
+| `name` | `"comparison"` | The name the verdict is recorded under. Give each one its own name if you compare a row more than once |
+
+### The verdict
+
+A verdict carries four things: the `status`, the `winner`, the judge's `reasoning`, and `candidates`, the target names it actually judged.
+
+| Status | What it means |
+|--------|---------------|
+| `decided` | The judge picked a winner, named in `winner` |
+| `tie` | The judge compared the candidates and found none better than the rest, so there is no winner |
+| `inconclusive` | The judge established no winner. Under swap and reconcile that is its two passes disagreeing, so this row does not separate these candidates. That is a finding about them, and it is deliberately not a tie, which would claim they are equally good |
+| `skipped` | Fewer than two targets produced a non-empty output, so no judge ran. `reasoning` names the targets that produced nothing |
+| `error` | The judge failed or could not be reached, so nothing was measured about the candidates at all |
+
+<Note>
+  A comparison never raises when a judge fails, and never raises on a row too thin to judge. One unreachable judge in a thousand-row run costs you that row, not the run.
+</Note>
+
+<Warning>
+  Naming a target in `targets` that recorded no output for the row does raise. Comparing whatever remains would hand you a two-way verdict where you asked for a three-way one, which is worse than a failure.
+</Warning>
+
+### Seeing the results
+
+Verdicts show up on the experiment's results page:
+
+- A **Winner** column names the winning target on each row, with the judge's reasoning underneath it, so you can see why a row went the way it did.
+- A **win-rate chart** gives each target its share of the wins, plus a bar for ties. A target that never won a single row is still charted, with zero wins.
+
+With three or more targets there is also a leaderboard that ranks them from every matchup at once, with a confidence interval so the ranking's own uncertainty is visible. It is being rolled out gradually, so ask us to turn it on for your organization if you want it.
+
+### A complete comparison
+
+Three variants, one comparison per row, and a closing summary that fails a [CI build](/evaluations/experiments/ci-cd) when the run had failures:
+
+
+  ### Python
+
+```python
+import langwatch
+
+df = langwatch.dataset.get_dataset("your-dataset-id").to_pandas()
+
+evaluation = langwatch.experiment.init("support-reply-comparison")
+
+for index, row in evaluation.loop(df.iterrows(), threads=4):
+    def task(index, row):
+        with evaluation.target("gpt-5-mini", {"model": "openai/gpt-5-mini"}):
+            evaluation.log_response(ask_gpt(row["question"]))
+
+        with evaluation.target("claude-sonnet-5", {"model": "anthropic/claude-sonnet-5"}):
+            evaluation.log_response(ask_claude(row["question"]))
+
+        with evaluation.target("gemini-flash", {"model": "gemini/gemini-2.5-flash"}):
+            evaluation.log_response(ask_gemini(row["question"]))
+
+        verdict = evaluation.compare(
+            index,
+            input=row["question"],
+            golden=row["expected_answer"],
+            include_metrics=["duration"],
+        )
+        print(f"row {index}: {verdict.status} {verdict.winner or ''}")
+
+    evaluation.submit(task, index, row)
 
 evaluation.print_summary()
 ```
@@ -39200,50 +39404,83 @@ import { LangWatch } from 'langwatch';
 
 const langwatch = new LangWatch();
 
-const rows = [
-  {
-    input: "Write a function that checks if a given integer is a prime number.",
-    golden: "function isPrime(n) { ... }",
-    candidateAId: "variant-a",
-    candidateAOutput: "function isPrime(n) { ... }",
-    candidateBId: "variant-b",
-    candidateBOutput: "function isPrime(n) { ... }",
-  },
-];
+const dataset = await loadDataset();
 
-const evaluation = await langwatch.experiments.init("pairwise-sdk-verification");
+const evaluation = await langwatch.experiments.init("support-reply-comparison");
 
-await evaluation.run(rows, async ({ item, index }) => {
-  await evaluation.evaluate("langevals/pairwise_compare", {
-    index,
-    data: {
-      input: item.input,
-      golden: item.golden,
-      candidate_a_id: item.candidateAId,
-      candidate_a_output: item.candidateAOutput,
-      candidate_b_id: item.candidateBId,
-      candidate_b_output: item.candidateBOutput,
-    },
-    settings: {
-      model: "openai/gpt-5-mini",
-      has_golden_answer: true,
-      swap_and_confirm: true,
-      allow_tie: true,
-      include_metrics: ["cost", "duration"],
-    },
+await evaluation.run(dataset, async ({ item, index }) => {
+  await Promise.all([
+    evaluation.withTarget("gpt-5-mini", { model: "openai/gpt-5-mini" }, () =>
+      askGpt(item.question)
+    ),
+    evaluation.withTarget("claude-sonnet-5", { model: "anthropic/claude-sonnet-5" }, () =>
+      askClaude(item.question)
+    ),
+    evaluation.withTarget("gemini-flash", { model: "gemini/gemini-2.5-flash" }, () =>
+      askGemini(item.question)
+    ),
+  ]);
+
+  const verdict = await evaluation.compare({
+    input: item.question,
+    golden: item.expectedAnswer,
+    includeMetrics: ["duration"],
   });
-});
+  console.log(`row ${index}: ${verdict.status} ${verdict.winner ?? ""}`);
+}, { concurrency: 4 });
 
 evaluation.printSummary();
 ```
 
 
 
-`swap_and_confirm` performs two judge calls with A/B order reversed on the second pass. If the two calls disagree, the evaluator returns a tie. Set `has_golden_answer` to `false` when you want a pure head-to-head comparison without a reference answer.
+### Comparing from an async loop
 
-The SDK result also records the pairwise judge's own evaluator cost and duration. In exported results, those appear under the evaluator columns for `langevals/pairwise_compare`; they are separate from `include_metrics`, which injects each candidate target's cost or duration into the judge prompt.
 
-If you already have your own local pairwise judge, publish its result with `evaluation.log(...)` by sending a `score`, `label`, and `details`. Those custom results are tracked like any other SDK metric. The dedicated pairwise column visualization currently comes from the built-in Pairwise Compare evaluator configuration.
+  ### Python
+
+In async-native mode, use `acompare()` so the judge is awaited rather than blocked on, leaving the event loop free for the rows running alongside it. It takes the same options and records the same verdict:
+
+```python
+evaluation = langwatch.experiment.init("async-comparison")
+
+async def task(index, row):
+    with evaluation.target("gpt-5-mini"):
+        evaluation.log_response(await ask_gpt(row["question"]))
+
+    with evaluation.target("claude-sonnet-5"):
+        evaluation.log_response(await ask_claude(row["question"]))
+
+    verdict = await evaluation.acompare(index, input=row["question"])
+    print(verdict.winner)
+
+index = 0
+async for row in evaluation.aloop(dataset, concurrency=4):
+    evaluation.asubmit(task, index, row)
+    index += 1
+```
+
+  ### TypeScript
+
+`compare()` is already awaited, so nothing changes: awaiting one row's verdict never holds up the rows running beside it. Raise `concurrency` and every row reaches the judge as soon as its own targets have settled.
+
+```typescript
+await evaluation.run(dataset, async ({ item }) => {
+  await Promise.all([
+    evaluation.withTarget("gpt-5-mini", () => askGpt(item.question)),
+    evaluation.withTarget("claude-sonnet-5", () => askClaude(item.question)),
+  ]);
+
+  const verdict = await evaluation.compare({ input: item.question });
+  console.log(verdict.winner);
+}, { concurrency: 8 });
+```
+
+
+
+<Note>
+  The older `langevals/pairwise_compare` evaluator is deprecated. Existing calls keep working, because they are routed to the same judge described here, but new code should use `compare()`: it takes any number of candidates, names the winner with your own target name, and needs no candidate columns to assemble.
+</Note>
 
 ## Complete Example
 
@@ -39445,7 +39682,29 @@ For each evaluator applied to a target:
 | `{target}_{evaluator}_cost` | Cost of running the evaluator | `gpt-4_faithfulness_cost` → `0.0005` |
 | `{target}_{evaluator}_duration_ms` | Evaluator execution time | `gpt-4_faithfulness_duration_ms` → `850` |
 
-For `langevals/pairwise_compare`, the evaluator cost and duration columns describe the pairwise judge run itself. When `swap_and_confirm` is enabled, that judge run may include two model calls.
+#### Comparison Columns (per comparison)
+
+A comparison grades the row as a whole rather than one target, so it gets its own block of columns after every target block, named after the comparison:
+
+| Column Pattern | Description | Example |
+|----------------|-------------|---------|
+| `{comparison}_winner` | Name of the winning target, `tie`, `unresolved`, or empty | `comparison_winner` → `gpt-5-mini` |
+| `{comparison}_candidates` | The targets compared on this row, comma separated | `comparison_candidates` → `gpt-5-mini, claude-sonnet-5` |
+| `{comparison}_reasoning` | The judge's explanation for the verdict | `comparison_reasoning` → `"gpt-5-mini gives the exact reset link"` |
+
+What each [verdict](#the-verdict) writes into those three cells:
+
+| Verdict | `{comparison}_winner` | `{comparison}_candidates` | `{comparison}_reasoning` |
+|---------|-----------------------|---------------------------|--------------------------|
+| `decided` | The winning target's name | The targets judged on this row | The judge's explanation |
+| `tie` | `tie` | The targets judged on this row | The judge's explanation |
+| `inconclusive` | Empty | Empty | Empty |
+| `skipped` | Empty | Empty | Empty |
+| `error` | Empty | Empty | Empty |
+
+An empty winner is never a tie. The three cells go empty together for `inconclusive`, `skipped` and `error`, and for a row the comparison never ran on, so `tie` in the winner column always means the judge saw the candidates and called the row even.
+
+A row's candidates can be fewer than the comparison's full set of targets, because a target that produced no output for that row is left out of the matchup. The winner reads `unresolved` on the rare row where the judge's answer matches none of the candidates it was shown, and a winner naming a target the run no longer lists is written under its own name.
 
 ### Example CSV Output
 
@@ -39768,7 +40027,7 @@ Use it when you want to:
 - **Choose a winner among finalists.** Compare a baseline prompt against a proposed rewrite, a current model against a cheaper one, or several agent configurations against each other in one pass.
 - **Evaluate subjective quality.** Tone, helpfulness, concision, formatting, and reasoning quality often have no single golden answer, but one output can still be clearly better than the rest.
 - **Review row-level tradeoffs.** Results show which variant won each row, and where the judge sees no meaningful difference.
-- **Reduce position bias.** Candidate order is shuffled deterministically per row before being shown to the judge, so the same row re-evaluated gives a comparable verdict without depending on which candidate happened to appear first.
+- **Reduce position bias.** Candidate order is shuffled deterministically per row by default before being shown to the judge, so the same row re-evaluated gives a comparable verdict without depending on which candidate happened to appear first.
 - **Factor in operational metrics.** Include candidate cost or duration in the judge context when you want the better answer to also account for latency or spend.
 
 ## When to use it
@@ -39802,13 +40061,13 @@ You can compare variants even when they have the same display name. LangWatch nu
 
 ## How the verdict works
 
-Comparison shuffles candidate order deterministically (seeded per row) and asks the judge to pick the best candidate in a single call:
+By default Comparison shuffles candidate order deterministically (seeded per row) and asks the judge to pick the best candidate, weighing every variant in one comparison:
 
-1. Candidates are presented to the judge in a shuffled order that's stable for that row — re-evaluating the same row produces the same order and a comparable verdict.
+1. Candidates are presented to the judge in a shuffled order that's stable for that row, so re-evaluating the same row produces the same order and a comparable verdict. `randomize_order` governs the shuffle: turn it off and the judge sees the candidates in the order their targets were registered.
 2. The judge picks the single best candidate, or a tie if none is clearly better and ties are allowed.
 3. The verdict is mapped back to the winning candidate's real identifier before it's shown to you — never the shuffled slot position.
 
-This uses exactly one judge call per row, regardless of how many variants are being compared — half the token cost of the old two-call swap-and-confirm approach, with the same protection against position bias.
+One comparison covers every variant at once, however many there are, instead of a round of one-against-one matchups. The judge is asked twice per row, the second time with the candidate order reversed, and a row whose two answers disagree is recorded with no winner rather than as a tie: an answer that flips when the order flips has not separated the candidates.
 
 The verdict names the winning candidate's own identifier (for a prompt variant, its prompt handle) rather than a generic slot label. The details include the judge's reasoning so you can inspect why a row went the way it did.
 
@@ -39822,11 +40081,11 @@ Use a golden answer when correctness is the primary question. Use direct prefere
 
 Comparison is designed so the result column contains the information you need to review the judgment without opening a separate panel:
 
-- **Who won:** each row shows the winning variant's name, or a tie when no candidate is clearly better.
+- **Who won:** each row shows the winning variant's name, a tie when no candidate is clearly better, or no winner at all when the two passes disagreed. No winner is a third outcome, not a tie: a tie says the candidates are equally good, an unsettled row says this row did not separate them.
 - **What won:** the cell shows the winning variant's actual output so you can immediately inspect the answer the judge preferred.
 - **Why it won:** the judge reasoning appears below the output.
 
-The results page also includes a win-rate chart alongside the cost and latency charts, with one bar per variant plus a bar for ties — every variant is counted, including ones that never won a single row.
+The results page also includes a win-rate chart alongside the cost and latency charts, with one bar per variant plus a bar for ties. Every variant is counted, including ones that never won a single row. An unsettled row is on none of those bars: it is not a win for any variant, and it is not a tie.
 
 In the workbench, the Comparison column header names the overall winner across the current run. Hover the header to see the full win tally broken down per variant, including ties.
 
@@ -39836,6 +40095,7 @@ Review the aggregate result and the row-level explanations together:
 
 - A large win margin usually indicates a clear preference.
 - A high tie count often means the variants are equivalent for the dataset, or the judge instructions are not specific enough.
+- Many unsettled rows mean the judge keeps changing its answer when the candidate order changes. Running more rows will not fix that: change the judge model, or make the instructions more specific.
 - Split wins are useful signal: inspect the rows each variant wins to understand which use cases improved or regressed.
 
 ## Settings
@@ -39846,14 +40106,17 @@ Review the aggregate result and the row-level explanations together:
 | `has_golden_answer` | `true` | Compare each candidate against a reference answer. Disable it to compare the candidates directly. |
 | `randomize_order` | `true` | Shuffle candidate order per row (deterministically, seeded by row index) before presenting them to the judge, to reduce position bias. |
 | `allow_tie` | `true` | Allow the judge to return a tie when the candidates are effectively equivalent. |
+| `swap_and_reconcile` | `true` | Ask the judge a second time with the candidate order reversed, and record no winner when the two answers disagree. Doubles the judge cost per row. |
 | `include_metrics` | `[]` | Include per-candidate metrics such as cost or duration in the judge context. |
 | `prompt` | — | Optional custom judge instructions. |
 
 ## Using it from the SDK
 
-The SDKs do not currently expose the Comparison evaluator directly — a comparison's variants are target ids scoped to one workbench experiment, so there isn't yet a portable way for an SDK caller to name candidates the same way. If you run your own comparison judge locally, you can still publish its score, label, and details with `evaluation.log(...)`; those custom results render as standard evaluator results, though the dedicated Comparison column visualization is driven by the built-in evaluator's configuration.
+Comparison is available from the Python and TypeScript SDKs for code-first experiments. Register one target per candidate in your loop, then compare the row once: `evaluation.compare(index)` in Python, `await evaluation.compare()` in TypeScript, which infers the row from the iteration it runs in. The candidates are the targets that recorded an output for that row, so you never name them twice, and the verdict appears on the results page with the same winner column and win-rate chart as a comparison configured here.
 
-The legacy two-candidate `langevals/pairwise_compare` evaluator remains callable from the SDK for existing integrations — see [Experiments via SDK](/evaluations/experiments/sdk#pairwise-compare) — but new work should use Comparison from the workbench UI instead.
+See [Experiments via SDK](/evaluations/experiments/sdk) for the full set of judge options, including judging against a reference answer and replacing the judge prompt.
+
+The legacy two-candidate `langevals/pairwise_compare` evaluator stays callable for existing integrations and is handled by this same judge, so nothing to change if you already use it. New work should use Comparison, either here or with `compare()` from an SDK.
 
 ## What's Next?
 
@@ -45493,7 +45756,7 @@ Instrument my code with LangWatch
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Add LangWatch Tracing to Your Code
@@ -45530,7 +45793,7 @@ Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. L
 
 If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
-If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team. No login needed, secrets and personal data are redacted locally, and it directly shapes what gets fixed. `npx langwatch report --help` explains the options.
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`, so preview with `--dry-run` when the session touched sensitive data. `npx langwatch report --help` explains the options.
 
 **Projects and API keys: target a real project, not a personal one.**
 
@@ -45657,7 +45920,7 @@ Set up experiments for my agent
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Run Experiments for Your Agent
@@ -45688,7 +45951,7 @@ For a general request such as "test my agent":
 1. Read the agent code, system prompt, tools, and relevant git history.
 2. Identify the behavior most likely to regress.
 3. Create a domain-specific dataset.
-4. Select evaluators that measure the intended behavior.
+4. Select evaluators that measure the intended behavior, or a comparison when the goal is picking a winner between candidates.
 5. Create and run a real experiment.
 6. Interpret the results and recommend concrete improvements.
 
@@ -45721,7 +45984,7 @@ Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. L
 
 If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
-If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team. No login needed, secrets and personal data are redacted locally, and it directly shapes what gets fixed. `npx langwatch report --help` explains the options.
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`, so preview with `--dry-run` when the session touched sensitive data. `npx langwatch report --help` explains the options.
 
 **Projects and API keys: target a real project, not a personal one.**
 
@@ -45808,6 +46071,54 @@ await experiment.run(dataset, async ({ item, index }) => {
 
 Read `langwatch docs evaluations/evaluators/list` before choosing an evaluator, and take the type slug from `langwatch evaluator types --format json` — never from memory. If an evaluation fails with a `validation_error` naming the slug and an `expected` list, correct it from that list and retry once. Reuse project evaluators when appropriate. A scoring function is part of the experiment, not the experiment itself.
 
+## Compare Targets to Pick a Winner
+
+An evaluator answers "does this output pass?". A comparison answers "which of these is better?". For subjective quality, a judge ranking candidates side by side is usually more informative than each one getting an absolute score on its own.
+
+Register one target per candidate inside the loop, then compare the row once. Every target that recorded an output for the row is a candidate, so the candidates are never named twice, and the verdict is recorded against the row, so the results page renders it with no extra logging.
+
+### Python
+
+```python
+for index, row in experiment.loop(dataset.iterrows()):
+    with experiment.target("gpt-5-mini"):
+        experiment.log_response(call_gpt(row["input"]))
+
+    with experiment.target("claude-sonnet-5"):
+        experiment.log_response(call_claude(row["input"]))
+
+    verdict = experiment.compare(index, input=row["input"])
+```
+
+Inside an async loop, await `experiment.acompare(...)`, which takes the same options.
+
+### TypeScript
+
+```typescript
+await experiment.run(dataset, async ({ item, index }) => {
+  await Promise.all([
+    experiment.withTarget("gpt-5-mini", () => callGpt(item.input)),
+    experiment.withTarget("claude-sonnet-5", () => callClaude(item.input)),
+  ]);
+
+  const verdict = await experiment.compare({ index, input: item.input });
+});
+```
+
+Pass `golden` with a known-good answer to judge every candidate against it. Leave it out, which is the default, and the candidates are judged on their own merits.
+
+Read `verdict.status`, and keep its five answers apart:
+
+- `decided`: the judge picked a winner, named in `verdict.winner`.
+- `tie`: the judge compared the candidates and found none better than the rest.
+- `inconclusive`: no winner was established, which with the default second pass over the reversed candidate order means the two passes disagreed.
+- `skipped`: the row had fewer than two outputs, so no judge ran.
+- `error`: the judge failed, so nothing was measured about the candidates at all.
+
+A tie, an inconclusive row and an errored row are three different answers. Reporting any of them as one of the others claims a measurement the run never made.
+
+`prompt` replaces the judge prompt verbatim, with `{input}`, `{golden}` and `{candidates}` placeholders. Leave it unset unless the user asks for their own, because unset is what lets the judge use the prompt matching what each row carries. The remaining judge options are in `langwatch docs evaluations/experiments/sdk`.
+
 ## Run and Verify
 
 Always execute the experiment. An unrun experiment is incomplete.
@@ -45841,6 +46152,7 @@ Do NOT ask permission before Phase 1 and 2. Deliver value first. Do NOT ask gene
 - Do not configure production monitoring or guardrails from this skill.
 - Do not call a batch run an online evaluation.
 - Do not use placeholder datasets.
+- Do not report an inconclusive or errored comparison as a tie.
 - Do not guess SDK APIs when the installed documentation is available.
 - Do not stop after writing the experiment. Run it and inspect the real result.
 ````
@@ -45897,7 +46209,7 @@ Set up online evaluations for my agent
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Set Up Online Evaluations and Guardrails
@@ -45954,7 +46266,7 @@ Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. L
 
 If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
-If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team. No login needed, secrets and personal data are redacted locally, and it directly shapes what gets fixed. `npx langwatch report --help` explains the options.
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`, so preview with `--dry-run` when the session touched sensitive data. `npx langwatch report --help` explains the options.
 
 **Projects and API keys: target a real project, not a personal one.**
 
@@ -46125,7 +46437,7 @@ Help me evaluate my agent
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Route an Evaluation Request
@@ -46232,7 +46544,7 @@ Add scenario tests for my agent
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Test Your Agent with Scenarios
@@ -46307,7 +46619,7 @@ Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. L
 
 If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
-If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team. No login needed, secrets and personal data are redacted locally, and it directly shapes what gets fixed. `npx langwatch report --help` explains the options.
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`, so preview with `--dry-run` when the session touched sensitive data. `npx langwatch report --help` explains the options.
 
 **Projects and API keys: target a real project, not a personal one.**
 
@@ -47191,7 +47503,7 @@ Version my prompts with LangWatch
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Version Your Prompts with LangWatch Prompts CLI
@@ -47238,7 +47550,7 @@ Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. L
 
 If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
-If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team. No login needed, secrets and personal data are redacted locally, and it directly shapes what gets fixed. `npx langwatch report --help` explains the options.
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`, so preview with `--dry-run` when the session touched sensitive data. `npx langwatch report --help` explains the options.
 
 **Projects and API keys: target a real project, not a personal one.**
 
@@ -47425,7 +47737,7 @@ Run `langwatch prompt list` to confirm everything synced, or open the Prompts se
 ````text
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Generate Evaluation Datasets
@@ -47910,7 +48222,7 @@ Take my agent to the next level
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Add LangWatch Tracing to Your Code
@@ -47947,7 +48259,7 @@ Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. L
 
 If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
-If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team. No login needed, secrets and personal data are redacted locally, and it directly shapes what gets fixed. `npx langwatch report --help` explains the options.
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`, so preview with `--dry-run` when the session touched sensitive data. `npx langwatch report --help` explains the options.
 
 **Projects and API keys: target a real project, not a personal one.**
 
@@ -48207,7 +48519,7 @@ For a general request such as "test my agent":
 1. Read the agent code, system prompt, tools, and relevant git history.
 2. Identify the behavior most likely to regress.
 3. Create a domain-specific dataset.
-4. Select evaluators that measure the intended behavior.
+4. Select evaluators that measure the intended behavior, or a comparison when the goal is picking a winner between candidates.
 5. Create and run a real experiment.
 6. Interpret the results and recommend concrete improvements.
 
@@ -48294,6 +48606,54 @@ await experiment.run(dataset, async ({ item, index }) => {
 
 Read `langwatch docs evaluations/evaluators/list` before choosing an evaluator, and take the type slug from `langwatch evaluator types --format json` — never from memory. If an evaluation fails with a `validation_error` naming the slug and an `expected` list, correct it from that list and retry once. Reuse project evaluators when appropriate. A scoring function is part of the experiment, not the experiment itself.
 
+## Compare Targets to Pick a Winner
+
+An evaluator answers "does this output pass?". A comparison answers "which of these is better?". For subjective quality, a judge ranking candidates side by side is usually more informative than each one getting an absolute score on its own.
+
+Register one target per candidate inside the loop, then compare the row once. Every target that recorded an output for the row is a candidate, so the candidates are never named twice, and the verdict is recorded against the row, so the results page renders it with no extra logging.
+
+### Python
+
+```python
+for index, row in experiment.loop(dataset.iterrows()):
+    with experiment.target("gpt-5-mini"):
+        experiment.log_response(call_gpt(row["input"]))
+
+    with experiment.target("claude-sonnet-5"):
+        experiment.log_response(call_claude(row["input"]))
+
+    verdict = experiment.compare(index, input=row["input"])
+```
+
+Inside an async loop, await `experiment.acompare(...)`, which takes the same options.
+
+### TypeScript
+
+```typescript
+await experiment.run(dataset, async ({ item, index }) => {
+  await Promise.all([
+    experiment.withTarget("gpt-5-mini", () => callGpt(item.input)),
+    experiment.withTarget("claude-sonnet-5", () => callClaude(item.input)),
+  ]);
+
+  const verdict = await experiment.compare({ index, input: item.input });
+});
+```
+
+Pass `golden` with a known-good answer to judge every candidate against it. Leave it out, which is the default, and the candidates are judged on their own merits.
+
+Read `verdict.status`, and keep its five answers apart:
+
+- `decided`: the judge picked a winner, named in `verdict.winner`.
+- `tie`: the judge compared the candidates and found none better than the rest.
+- `inconclusive`: no winner was established, which with the default second pass over the reversed candidate order means the two passes disagreed.
+- `skipped`: the row had fewer than two outputs, so no judge ran.
+- `error`: the judge failed, so nothing was measured about the candidates at all.
+
+A tie, an inconclusive row and an errored row are three different answers. Reporting any of them as one of the others claims a measurement the run never made.
+
+`prompt` replaces the judge prompt verbatim, with `{input}`, `{golden}` and `{candidates}` placeholders. Leave it unset unless the user asks for their own, because unset is what lets the judge use the prompt matching what each row carries. The remaining judge options are in `langwatch docs evaluations/experiments/sdk`.
+
 ## Run and Verify
 
 Always execute the experiment. An unrun experiment is incomplete.
@@ -48327,6 +48687,7 @@ Do NOT ask permission before Phase 1 and 2. Deliver value first. Do NOT ask gene
 - Do not configure production monitoring or guardrails from this skill.
 - Do not call a batch run an online evaluation.
 - Do not use placeholder datasets.
+- Do not report an inconclusive or errored comparison as a tie.
 - Do not guess SDK APIs when the installed documentation is available.
 - Do not stop after writing the experiment. Run it and inspect the real result.
 
@@ -49409,7 +49770,7 @@ What should I do next to improve my agent?
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Improve Your Agent, Hypothesis by Hypothesis
@@ -49432,7 +49793,7 @@ Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. L
 
 If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
-If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team. No login needed, secrets and personal data are redacted locally, and it directly shapes what gets fixed. `npx langwatch report --help` explains the options.
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`, so preview with `--dry-run` when the session touched sensitive data. `npx langwatch report --help` explains the options.
 
 **Projects and API keys: target a real project, not a personal one.**
 
@@ -49591,7 +49952,7 @@ How is my agent performing?
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Diagnose Your Agent's Production Behavior
@@ -49614,7 +49975,7 @@ Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. L
 
 If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
-If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team. No login needed, secrets and personal data are redacted locally, and it directly shapes what gets fixed. `npx langwatch report --help` explains the options.
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`, so preview with `--dry-run` when the session touched sensitive data. `npx langwatch report --help` explains the options.
 
 **Projects and API keys: target a real project, not a personal one.**
 
@@ -49765,7 +50126,7 @@ Where can I improve our agent development best practices?
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Improve Your Agent Development Best Practices
@@ -49901,7 +50262,7 @@ After each improvement:
 ````text
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Debug Your LangWatch Instrumentation
@@ -49924,7 +50285,7 @@ Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. L
 
 If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
-If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team. No login needed, secrets and personal data are redacted locally, and it directly shapes what gets fixed. `npx langwatch report --help` explains the options.
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`, so preview with `--dry-run` when the session touched sensitive data. `npx langwatch report --help` explains the options.
 
 ## Step 1: Fetch Recent Traces
 
@@ -50016,6 +50377,294 @@ langwatch trace export --format jsonl --limit 50 -o traces.jsonl
 
 <div className="lw-accordion">
   <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="false">
+    <span className="lw-accordion-title">Root-cause a production issue with my agent</span>
+    <svg className="lw-accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9L12 15L18 9" /></svg>
+  </div>
+  <div className="lw-accordion-body">
+    <div className="lw-accordion-commands">
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Install via CLI</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"npx skills add langwatch/skills/recipes/debug-with-langwatch"} data-track="docs_copy_skill_install" data-track-title={"Root-cause a production issue with my agent"} data-track-skill={"langwatch/skills/recipes/debug-with-langwatch"}>
+          <code>npx skills add langwatch/skills/recipes/debug-with-langwatch</code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Skill Usage</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"/debug-with-langwatch"} data-track="docs_copy_slash_command" data-track-title={"Root-cause a production issue with my agent"} data-track-command={"/debug-with-langwatch"}>
+          <code><span className="lw-slash-command">/debug-with-langwatch</span></code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+    </div>
+    <div className="lw-accordion-actions">
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-copy-source="prompt" data-track="docs_copy_prompt" data-track-title={"Root-cause a production issue with my agent"} data-track-skill={"langwatch/skills/recipes/debug-with-langwatch"}>
+        <span className="lw-accordion-action-icon lw-copy-line-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+        <span className="lw-accordion-action-icon lw-copy-line-check" style={{ display: "none" }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Copy Full Prompt</span>
+          <span className="lw-accordion-action-subtitle">Run skill without installing</span>
+        </span>
+        <div className="lw-prompt-source">
+
+````text
+You are using LangWatch for your AI agent project. Follow these instructions.
+
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
+
+# Debug Production Issues with LangWatch
+
+A structured diagnostic workflow: errored traces → span inspection → monitor/evaluator scores → root cause. Work the steps in order; each narrows the search space for the next.
+
+If traces themselves look broken (empty inputs/outputs, disconnected spans), switch to the `debug-instrumentation` recipe instead. That is an instrumentation problem, not an application problem.
+
+## Prerequisites
+
+Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
+
+```bash
+langwatch docs                                    # Docs index
+langwatch docs integration/python/guide           # Python integration
+langwatch docs integration/typescript/guide       # TypeScript integration
+langwatch docs prompt-management/cli              # Prompts CLI
+langwatch scenario-docs                           # Scenario docs index
+```
+
+Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
+
+If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`, so preview with `--dry-run` when the session touched sensitive data. `npx langwatch report --help` explains the options.
+
+## Step 0: Point the CLI at the Right Project
+
+```bash
+langwatch status
+```
+
+A fast sanity check that the API key, endpoint, and project are the ones you mean to debug. Fix auth first (see the `setup-lw` recipe): every later step reads from this project.
+
+## Step 1: Find the Errored Traces
+
+```bash
+langwatch trace search --limit 25 -o json
+langwatch trace search -q "timeout" --start-date 2026-01-01 -o json
+```
+
+- `--start-date`/`--end-date` bound the window (ISO strings or epoch ms; default is the last 24h).
+- `-q` does a text search: the error message, a user id, a thread id.
+- The result is `{ "traces": [...], "pagination": { "totalHits": N } }`. Pull fields out with `--jq` instead of reading the whole payload:
+
+```bash
+langwatch trace search --limit 50 -o json --jq ".traces[].traceId"
+langwatch trace search -q "refund" -o json --jq ".traces | length"
+```
+
+Look for: traces with error statuses, empty or truncated outputs, outliers in latency or cost, and repeats of the same failure across users/threads (a pattern, not a one-off).
+
+## Step 2: Inspect the Failing Spans
+
+```bash
+langwatch trace get <traceId>            # human-readable digest
+langwatch trace get <traceId> -o json    # full span hierarchy
+```
+
+Read the span tree top-down:
+
+- **Which span failed?** The error is usually in one span (an LLM call, a tool call), not the whole trace. Note its input: a bad input upstream often explains a failure downstream.
+- **What did the model see?** Check the prompt/messages on the failing LLM span. Missing context, truncated history, and stale retrieved documents are the usual suspects.
+- **Retries and timeouts:** repeated identical spans suggest retry loops; a long-running span before the failure suggests a timeout.
+
+## Step 3: Check Monitors and Evaluator Scores
+
+Production quality signals live in monitors (online evaluation) and their evaluators:
+
+```bash
+langwatch monitor list -o json           # which monitors exist, are they enabled/firing?
+langwatch monitor get <id> -o json       # one monitor's config and recent state
+langwatch evaluator list -o json         # the evaluators the monitors run
+```
+
+- A firing monitor names the failure mode (toxicity, hallucination, PII). Corroborate it against the spans from Step 2.
+- No monitor for the failure mode you found? That is a gap worth closing once the root cause is fixed (`langwatch monitor create`).
+
+For a quantitative view of the blast radius:
+
+```bash
+langwatch analytics query -m trace-count -a sum --group-by metadata.model -o json
+```
+
+## Step 4: Root Cause and Verify
+
+1. Form a hypothesis from the failing span's input + the monitor's failure mode: prompt change, model change, bad retrieval, code regression. `git log` on the agent's code and prompts tells you what changed when the failures started.
+2. Apply the fix (prompt, code, or configuration).
+3. Generate fresh traffic, then re-run Step 1: the errored traces should stop appearing.
+4. If the failure was a regression, add a scenario so it stays fixed. The `scenarios` skill covers this.
+
+## Discovery
+
+The full command surface, with per-command usage hints, is one command away:
+
+```bash
+langwatch commands -o json     # machine-readable catalog of every command
+langwatch help-tree            # compact annotated tree (fits in context)
+langwatch <group> --help       # flags for one group
+```
+
+Pass `--agent` to any command for compact single-line JSON with colour and spinners off (auto-detected under most coding agents).
+````
+
+        </div>
+      </div>
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-download-url="https://raw.githubusercontent.com/langwatch/skills/main/recipes/debug-with-langwatch/SKILL.md" data-download-name="SKILL.md" data-track="docs_download_skill" data-track-title={"Root-cause a production issue with my agent"} data-track-skill={"langwatch/skills/recipes/debug-with-langwatch"}>
+        <span className="lw-accordion-action-icon"><svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15.25 3.75H2.75C1.64543 3.75 0.75 4.64543 0.75 5.75V12.25C0.75 13.3546 1.64543 14.25 2.75 14.25H15.25C16.3546 14.25 17.25 13.3546 17.25 12.25V5.75C17.25 4.64543 16.3546 3.75 15.25 3.75Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M8.75 11.25V6.75H8.356L6.25 9.5L4.144 6.75H3.75V11.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M11.5 9.5L13.25 11.25L15 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M13.25 11.25V6.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Download SKILL.md</span>
+          <span className="lw-accordion-action-subtitle">Manual installation</span>
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div className="lw-accordion">
+  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="false">
+    <span className="lw-accordion-title">Triage my failing experiments and evaluations</span>
+    <svg className="lw-accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9L12 15L18 9" /></svg>
+  </div>
+  <div className="lw-accordion-body">
+    <div className="lw-accordion-commands">
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Install via CLI</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"npx skills add langwatch/skills/recipes/eval-triage"} data-track="docs_copy_skill_install" data-track-title={"Triage my failing experiments and evaluations"} data-track-skill={"langwatch/skills/recipes/eval-triage"}>
+          <code>npx skills add langwatch/skills/recipes/eval-triage</code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Skill Usage</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"/eval-triage"} data-track="docs_copy_slash_command" data-track-title={"Triage my failing experiments and evaluations"} data-track-command={"/eval-triage"}>
+          <code><span className="lw-slash-command">/eval-triage</span></code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+    </div>
+    <div className="lw-accordion-actions">
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-copy-source="prompt" data-track="docs_copy_prompt" data-track-title={"Triage my failing experiments and evaluations"} data-track-skill={"langwatch/skills/recipes/eval-triage"}>
+        <span className="lw-accordion-action-icon lw-copy-line-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+        <span className="lw-accordion-action-icon lw-copy-line-check" style={{ display: "none" }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Copy Full Prompt</span>
+          <span className="lw-accordion-action-subtitle">Run skill without installing</span>
+        </span>
+        <div className="lw-prompt-source">
+
+````text
+You are using LangWatch for your AI agent project. Follow these instructions.
+
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
+
+# Triage Failing Experiments and Evaluations
+
+From "the run failed" to the specific rows, evaluators, and inputs responsible, then to a root cause. Work the steps in order.
+
+## Prerequisites
+
+Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
+
+```bash
+langwatch docs                                    # Docs index
+langwatch docs integration/python/guide           # Python integration
+langwatch docs integration/typescript/guide       # TypeScript integration
+langwatch docs prompt-management/cli              # Prompts CLI
+langwatch scenario-docs                           # Scenario docs index
+```
+
+Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
+
+If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`, so preview with `--dry-run` when the session touched sensitive data. `npx langwatch report --help` explains the options.
+
+## Step 1: Find the Failing Run
+
+```bash
+langwatch experiment list --limit 20 -o json          # experiments in the project
+langwatch experiment list-runs <slug> -o json         # runs for one experiment
+langwatch experiment status <slug> -o json            # latest run: status, progress, errors
+langwatch experiment status <slug> --run-id <id> -o json
+```
+
+A run can fail two ways, and they triage differently:
+
+- **Execution failure**: the run errored out or stalled. `status` shows the error; jump to Step 4.
+- **Score regression**: the run completed but evaluator scores dropped or rows failed. Continue to Step 2.
+
+## Step 2: Isolate the Failing Rows
+
+```bash
+langwatch experiment results <slug> --filter failed -o json
+langwatch experiment results <slug> --filter failed --evaluator <name> -o json
+langwatch experiment results <slug> --run-id <id> --limit 50 -o json
+```
+
+- `--filter failed` keeps only the rows that failed at least one evaluator. Start there, not with the full result set.
+- `--evaluator <name>` shows one evaluator's column when several ran: is the regression concentrated in one evaluator (a scoring problem) or spread across all of them (a real behavior regression)?
+
+For each failing row, note the input, the expected output (from the dataset), and the actual output. Rows that fail the SAME way point at one root cause; rows that fail differently suggest flakiness or a noisy evaluator.
+
+## Step 3: Inspect the Evaluators
+
+```bash
+langwatch evaluator list -o json
+langwatch evaluator get <idOrSlug> -o json
+```
+
+Before blaming the agent, rule out the scorer:
+
+- **LLM-judge evaluators**: check the model in `settings`. A judge model that changed, is rate-limited, or is too weak for the rubric produces score swings that have nothing to do with the agent.
+- **Thresholds**: a score of 0.49 vs a pass threshold of 0.5 is a borderline judge, not a regression. Look at the score distribution across rows, not just pass/fail.
+- **Deterministic evaluators** (exact match, JSON validity): these don't drift; failures here are real.
+
+## Step 4: Root Cause
+
+1. Compare the failing run against the last passing one: what changed (prompt version, model, dataset, code)? `git log` on prompts and agent code usually answers this directly.
+2. If rows fail on retrieval or context: inspect a production trace of the same path (`langwatch trace search` / `langwatch trace get`; see the `debug-with-langwatch` recipe).
+3. If the dataset itself looks wrong (stale expected outputs, bad rows), fix the dataset. Use `langwatch dataset get <slugOrId>` to inspect it.
+4. Apply the fix and re-run:
+
+```bash
+langwatch experiment run <slug> --wait
+langwatch experiment status <slug> -o json
+```
+
+## Step 5: Prevent the Recurrence
+
+- If the failure mode wasn't covered by any evaluator, add one (`langwatch evaluator create`) and wire it into the experiment.
+- If it only shows up in production, set up a monitor (`langwatch monitor create`) so online evaluation catches it before the next experiment does.
+````
+
+        </div>
+      </div>
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-download-url="https://raw.githubusercontent.com/langwatch/skills/main/recipes/eval-triage/SKILL.md" data-download-name="SKILL.md" data-track="docs_download_skill" data-track-title={"Triage my failing experiments and evaluations"} data-track-skill={"langwatch/skills/recipes/eval-triage"}>
+        <span className="lw-accordion-action-icon"><svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15.25 3.75H2.75C1.64543 3.75 0.75 4.64543 0.75 5.75V12.25C0.75 13.3546 1.64543 14.25 2.75 14.25H15.25C16.3546 14.25 17.25 13.3546 17.25 12.25V5.75C17.25 4.64543 16.3546 3.75 15.25 3.75Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M8.75 11.25V6.75H8.356L6.25 9.5L4.144 6.75H3.75V11.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M11.5 9.5L13.25 11.25L15 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M13.25 11.25V6.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Download SKILL.md</span>
+          <span className="lw-accordion-action-subtitle">Manual installation</span>
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div className="lw-accordion">
+  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="false">
     <span className="lw-accordion-title">Evaluate my multimodal agent</span>
     <svg className="lw-accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9L12 15L18 9" /></svg>
   </div>
@@ -50051,7 +50700,7 @@ langwatch trace export --format jsonl --limit 50 -o traces.jsonl
 ````text
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Evaluate Your Multimodal Agent
@@ -50218,7 +50867,7 @@ Run the evaluation, review results, fix issues, re-run until quality is acceptab
 ````text
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Generate a RAG Evaluation Dataset
@@ -50352,6 +51001,137 @@ Before using the dataset:
 
 <div className="lw-accordion">
   <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="false">
+    <span className="lw-accordion-title">Set up and troubleshoot the LangWatch CLI</span>
+    <svg className="lw-accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9L12 15L18 9" /></svg>
+  </div>
+  <div className="lw-accordion-body">
+    <div className="lw-accordion-commands">
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Install via CLI</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"npx skills add langwatch/skills/recipes/setup-lw"} data-track="docs_copy_skill_install" data-track-title={"Set up and troubleshoot the LangWatch CLI"} data-track-skill={"langwatch/skills/recipes/setup-lw"}>
+          <code>npx skills add langwatch/skills/recipes/setup-lw</code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Skill Usage</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"/setup-lw"} data-track="docs_copy_slash_command" data-track-title={"Set up and troubleshoot the LangWatch CLI"} data-track-command={"/setup-lw"}>
+          <code><span className="lw-slash-command">/setup-lw</span></code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+    </div>
+    <div className="lw-accordion-actions">
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-copy-source="prompt" data-track="docs_copy_prompt" data-track-title={"Set up and troubleshoot the LangWatch CLI"} data-track-skill={"langwatch/skills/recipes/setup-lw"}>
+        <span className="lw-accordion-action-icon lw-copy-line-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+        <span className="lw-accordion-action-icon lw-copy-line-check" style={{ display: "none" }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Copy Full Prompt</span>
+          <span className="lw-accordion-action-subtitle">Run skill without installing</span>
+        </span>
+        <div className="lw-prompt-source">
+
+````text
+You are using LangWatch for your AI agent project. Follow these instructions.
+
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
+
+# Set Up the LangWatch CLI
+
+Get the CLI authenticated and talking to the right LangWatch project, then verify. The troubleshooting table at the end covers the common failure modes.
+
+## Step 1: Credentials
+
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+
+For CI and agents, configure non-interactively, and never block on a browser. Have the runner inject the key from your secret store into `LANGWATCH_API_KEY`, which is what the CLI reads:
+
+```yaml
+# GitHub Actions; any secret store works the same way
+env:
+  LANGWATCH_API_KEY: ${{ secrets.LANGWATCH_API_KEY }}
+  LANGWATCH_ENDPOINT: https://lw.acme.internal   # self-hosted only; omit for cloud
+```
+
+That variable is the whole of the CI setup: every command resolves the key from the environment, so there is no `login` call to make. Keep the key off the command line: an argument is readable by every other process on the machine, and in a shell it lands in your history file.
+
+Locally, run plain `langwatch login`. It asks where you are logging in (cloud or self-hosted) and how you will use LangWatch (AI tools, project SDK key, or both), then finishes in the browser. No credential is ever typed or pasted into the terminal: you pick the project on the approval page and its key comes back to the CLI over the same channel, so none of it reaches your shell history. A project SDK key lands as `LANGWATCH_API_KEY` in `.env` in the current directory, so keep `.env` out of version control; an AI-tools login lands in `~/.langwatch/config.json`. `langwatch login --device` skips the questions and goes straight to that RFC 8628 device flow via company SSO.
+
+`langwatch login --api-key <key>` writes a key you already hold straight to `.env`, with no browser and no prompts. It is the only non-interactive way to hand `login` a key, and the key travels through the process argument list, so it is not how a runner should supply one: with `LANGWATCH_API_KEY` set the CLI already has the key, and the flag adds nothing but the file. Reach for it when something downstream genuinely needs the key on disk. It rewrites an existing `LANGWATCH_API_KEY` line rather than adding a second one, which is why it beats appending to `.env` from a shell: a second line makes the credential ambiguous, and one re-run of an append is all it takes to get one.
+
+`langwatch login --project <slug>` writes a project's key to `.env` with no key on the command line either, but it authenticates through an existing device login, so it suits a developer machine or a long-lived agent box rather than a fresh CI runner.
+
+`--endpoint https://lw.acme.internal` combines with any of these to pin a self-hosted instance. It pins the CLI; your instrumented app reads `LANGWATCH_ENDPOINT` from the environment, so a self-hosted setup needs both.
+
+## Step 2: Endpoint and Project
+
+- **Cloud** (app.langwatch.ai) needs no endpoint configuration.
+- **Self-hosted**: the endpoint resolves flag > env > config > default. Persist it with `langwatch config set endpoint https://lw.acme.internal`, or export `LANGWATCH_ENDPOINT` per shell.
+- **Project**: the API key determines the project. Check you're in the right one:
+
+```bash
+langwatch projects list -o json
+```
+
+A personal access token (PAT) instead of a project key also needs `LANGWATCH_PROJECT_ID` set.
+
+## Step 3: Verify
+
+```bash
+langwatch whoami          # device-session identity (governance plane)
+langwatch status          # resource counts: proves auth + endpoint + project in one shot
+```
+
+`langwatch status` printing resource counts means the setup is done. Everything else (traces, evaluations, scenarios) builds on this.
+
+## Step 4: Discover What You Can Do
+
+Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
+
+```bash
+langwatch docs                                    # Docs index
+langwatch docs integration/python/guide           # Python integration
+langwatch docs integration/typescript/guide       # TypeScript integration
+langwatch docs prompt-management/cli              # Prompts CLI
+langwatch scenario-docs                           # Scenario docs index
+```
+
+Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
+
+If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`, so preview with `--dry-run` when the session touched sensitive data. `npx langwatch report --help` explains the options.
+
+## Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---------|--------------|-----|
+| `401` / `unauthorized` on every command | Wrong, revoked, or missing API key | Re-run `langwatch login`; check `LANGWATCH_API_KEY` in `.env` and the shell (shell wins) |
+| `401` with a PAT | Missing project id | `export LANGWATCH_PROJECT_ID=<your-project-id>` |
+| Connection refused / DNS errors | Self-hosted endpoint wrong or unreachable | Check `langwatch config get endpoint` and `LANGWATCH_ENDPOINT`; verify the instance URL loads in a browser from this machine |
+| Right credentials, wrong data | Talking to the wrong project or instance | `langwatch projects list`; re-login with a key from the intended project |
+| Old shell ignores new `.env` | Env vars already exported | Start a new shell, or `unset LANGWATCH_API_KEY LANGWATCH_ENDPOINT` so `.env` is re-read |
+| A command hangs waiting for input | Interactive prompt in a non-interactive context | No flag answers prompts globally. Set `LANGWATCH_API_KEY` so nothing needs `login`, then pass the flag that command takes: `--force` for `prompt tag delete`, `--force-local` or `--force-remote` for `prompt push`, `-y` for `logout`, `skills install`, `skills uninstall` and `skills update`. `-o json` only selects an output format; on `skills` it turns the confirmation into an error rather than a prompt, elsewhere it changes nothing |
+````
+
+        </div>
+      </div>
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-download-url="https://raw.githubusercontent.com/langwatch/skills/main/recipes/setup-lw/SKILL.md" data-download-name="SKILL.md" data-track="docs_download_skill" data-track-title={"Set up and troubleshoot the LangWatch CLI"} data-track-skill={"langwatch/skills/recipes/setup-lw"}>
+        <span className="lw-accordion-action-icon"><svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15.25 3.75H2.75C1.64543 3.75 0.75 4.64543 0.75 5.75V12.25C0.75 13.3546 1.64543 14.25 2.75 14.25H15.25C16.3546 14.25 17.25 13.3546 17.25 12.25V5.75C17.25 4.64543 16.3546 3.75 15.25 3.75Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M8.75 11.25V6.75H8.356L6.25 9.5L4.144 6.75H3.75V11.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M11.5 9.5L13.25 11.25L15 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M13.25 11.25V6.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Download SKILL.md</span>
+          <span className="lw-accordion-action-subtitle">Manual installation</span>
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div className="lw-accordion">
+  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="false">
     <span className="lw-accordion-title">Check my agent doesn't give prescriptive advice</span>
     <svg className="lw-accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9L12 15L18 9" /></svg>
   </div>
@@ -50387,7 +51167,7 @@ Before using the dataset:
 ````text
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Test Your Agent's Compliance Boundaries
@@ -50593,7 +51373,7 @@ Create reusable criteria for your domain:
 ````text
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Test Your CLI's Agent Usability
@@ -50764,7 +51544,7 @@ How is my agent performing?
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Diagnose Your Agent's Production Behavior
@@ -50787,7 +51567,7 @@ Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. L
 
 If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
-If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team. No login needed, secrets and personal data are redacted locally, and it directly shapes what gets fixed. `npx langwatch report --help` explains the options.
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`, so preview with `--dry-run` when the session touched sensitive data. `npx langwatch report --help` explains the options.
 
 **Projects and API keys: target a real project, not a personal one.**
 
@@ -50913,7 +51693,7 @@ Add scenario tests for my agent
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Test Your Agent with Scenarios
@@ -50988,7 +51768,7 @@ Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. L
 
 If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
-If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team. No login needed, secrets and personal data are redacted locally, and it directly shapes what gets fixed. `npx langwatch report --help` explains the options.
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`, so preview with `--dry-run` when the session touched sensitive data. `npx langwatch report --help` explains the options.
 
 **Projects and API keys: target a real project, not a personal one.**
 
@@ -51847,7 +52627,7 @@ Help me evaluate my agent
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Route an Evaluation Request
@@ -53749,13 +54529,100 @@ Precedence, evaluated in this order: a per-project BYOC S3 bucket (if configured
 |----------|-------------|---------|
 | `STORED_OBJECTS_BACKEND` | Explicit write-destination toggle: `azure`, or `s3` (the default when unset). `s3` selects nothing by itself — S3 is still chosen by `S3_BUCKET_NAME`, so the value only exists to say "not azure" | — |
 | `AZURE_BLOB_ACCOUNT_NAME` | Azure Storage account name | — |
-| `AZURE_BLOB_ACCOUNT_KEY` | Azure Storage account key (SharedKey auth) | — |
+| `AZURE_BLOB_ACCOUNT_KEY` | Azure Storage account key. Required by — and only by — `AZURE_BLOB_AUTH_MODE=sharedKey` | — |
+| `AZURE_BLOB_AUTH_MODE` | How to authenticate: `sharedKey`, `workloadIdentity`, `managedIdentity`, or `azureCli` | `sharedKey` |
+| `AZURE_BLOB_AUTHORITY_HOST` | Entra authority host. Required for sovereign clouds | Public cloud |
+| `AZURE_BLOB_TOKEN_AUDIENCE` | Token audience override. Sovereign clouds only | `https://storage.azure.com` |
 | `AZURE_BLOB_CONTAINER` | Azure Blob container name | — |
 | `AZURE_BLOB_ENDPOINT` | Blob endpoint base URL. Optional on the Azure public cloud; required for sovereign clouds (`*.usgovcloudapi.net`, `*.chinacloudapi.cn`), private endpoints, and the Azurite emulator | `https://{accountName}.blob.core.windows.net` |
 
 <Warning>
-When `STORED_OBJECTS_BACKEND=azure` is set, all three of `AZURE_BLOB_ACCOUNT_NAME`, `AZURE_BLOB_ACCOUNT_KEY`, and `AZURE_BLOB_CONTAINER` are required together. An incomplete config fails loud when the destination is resolved, naming the missing variable — it never silently falls back to S3 or the local filesystem. During an S3→Azure migration, keep `S3_BUCKET_NAME` set: legacy S3 surfaces (persisted `s3://` objects, the trace spool, staged payloads) continue to read from and write to the S3 bucket, while new stored-objects and dataset writes target Azure. On an azure-only install (no `S3_BUCKET_NAME`), those legacy S3 surfaces are unavailable and fail with a clear error instead of writing to a bucket nobody reads. In the Helm chart, set `app.dataplane.legacyS3ReadBucket` to the pre-migration bucket (keeping the `awsS3` credential fields populated) to get exactly this state; leave it empty on a greenfield Azure install. Set `AZURE_BLOB_ENDPOINT` (chart: `app.dataplane.providers.azureBlob.endpoint`) for sovereign clouds or private endpoints; it defaults to `https://{accountName}.blob.core.windows.net`. Authentication is SharedKey only; workload identity and per-project Azure BYOC are tracked separately (issues #6087, #6088).
+When `STORED_OBJECTS_BACKEND=azure` is set, `AZURE_BLOB_ACCOUNT_NAME` and `AZURE_BLOB_CONTAINER` are required, plus `AZURE_BLOB_ACCOUNT_KEY` when `AZURE_BLOB_AUTH_MODE` is `sharedKey` (the default). Under an identity mode the key must be absent — see below. An incomplete active Azure configuration fails loudly and never falls back to S3 or the local filesystem. Inactive Azure settings are validated only when an `azure-blob://` address is used, so they cannot break global or private-bucket S3 traffic. Set `AZURE_BLOB_ENDPOINT` (chart: `app.dataplane.providers.azureBlob.endpoint`) for sovereign clouds or private endpoints; it defaults to `https://{accountName}.blob.core.windows.net`. Per-project Azure BYOC is tracked separately (issue #6088).
 </Warning>
+
+### Migrating an existing installation
+
+Do not switch `STORED_OBJECTS_BACKEND` before copying existing data. The migration task uses its own `OBJECT_STORAGE_MIGRATION_*` credentials, so source reads and destination writes do not depend on the app's active provider:
+
+```bash
+pnpm run task migrateObjectStorage plan
+pnpm run task migrateObjectStorage copy
+
+# Stop all app and worker read/write traffic, drain GroupQueue, then:
+OBJECT_STORAGE_MIGRATION_WRITES_PAUSED=1 \
+OBJECT_STORAGE_MIGRATION_READS_PAUSED=1 \
+  pnpm run task migrateObjectStorage finalize
+
+# Switch STORED_OBJECTS_BACKEND and active credentials, then deploy while
+# traffic remains paused.
+pnpm run task migrateObjectStorage verify
+```
+
+`plan` is read-only. `copy` is resumable, verifies SHA-256 at the destination, and repairs a mismatched destination object. `finalize` refuses to run unless both reads and writes are explicitly paused, dataset uploads are idle, and GroupQueue has no pending, delayed, active, blocked, or staged durable references. Reads must remain paused because finalization publishes destination storage addresses before the target-provider deployment is active. It publishes newer ClickHouse stored-object rows only after the final verified copy; it does not rewrite or delete history. No phase deletes source bytes.
+
+After `finalize` succeeds, update `STORED_OBJECTS_BACKEND` and the active provider credentials while traffic remains paused, deploy that configuration, run `verify`, then resume traffic. A global migration excludes projects with private S3 buckets; they remain on their tenant-owned S3 destination.
+
+**Keep the source provider's read credentials configured through the rollback window.** Finalization rewrites stored-object addresses to the destination scheme, so a rollback that reverts `STORED_OBJECTS_BACKEND` *and* removes the destination provider's credentials leaves every rewritten address unreadable — the bytes still exist on both providers (no phase deletes them), but the deployment can no longer serve that scheme. Concretely:
+
+- **S3 → Azure**: after cutover, keep `S3_BUCKET_NAME` + S3 credentials configured (Helm: `app.dataplane.legacyS3ReadBucket`) so pre-migration `s3://` history stays readable. If you roll back to S3, keep the `AZURE_BLOB_*` settings configured (Helm: `app.dataplane.legacyAzureRead: true`) so the finalized `azure-blob://` addresses stay readable.
+- **Azure → S3**: the mirror image — keep `AZURE_BLOB_*` (Helm: `legacyAzureRead`) after cutover, and keep the S3 settings if you roll back.
+
+A rollback with the flag set is fully non-destructive: reads resolve per address scheme, and a reverse migration can later re-home the bytes. Also note: the plan reports rows addressed by a scheme outside both providers (for example `file://` from a local-storage era) — those rows are out of the migration's scope, stay on their current addresses, and remain readable as long as that scheme's backend stays configured.
+
+| Migration variable | Description |
+|---|---|
+| `OBJECT_STORAGE_MIGRATION_SOURCE_PROVIDER` | `s3` or `azure` |
+| `OBJECT_STORAGE_MIGRATION_TARGET_PROVIDER` | The other provider |
+| `OBJECT_STORAGE_MIGRATION_WRITES_PAUSED` | Must be `1` for `finalize` |
+| `OBJECT_STORAGE_MIGRATION_READS_PAUSED` | Must be `1` for `finalize` |
+| `OBJECT_STORAGE_MIGRATION_S3_BUCKET` | Global S3 source or destination bucket |
+| `OBJECT_STORAGE_MIGRATION_S3_ENDPOINT` | Optional custom S3 endpoint |
+| `OBJECT_STORAGE_MIGRATION_S3_REGION` | Optional S3 region. AWS uses its normal SDK region chain when omitted; custom endpoints default to `auto` |
+| `OBJECT_STORAGE_MIGRATION_S3_ACCESS_KEY_ID` | Optional explicit migration access key |
+| `OBJECT_STORAGE_MIGRATION_S3_SECRET_ACCESS_KEY` | Optional explicit migration secret key |
+| `OBJECT_STORAGE_MIGRATION_S3_SESSION_TOKEN` | Optional temporary-session token |
+| `OBJECT_STORAGE_MIGRATION_AZURE_ACCOUNT_NAME` | Azure source or destination account |
+| `OBJECT_STORAGE_MIGRATION_AZURE_CONTAINER` | Azure source or destination container |
+| `OBJECT_STORAGE_MIGRATION_AZURE_ENDPOINT` | Optional sovereign/private endpoint |
+| `OBJECT_STORAGE_MIGRATION_AZURE_AUTH_MODE` | `sharedKey`, `workloadIdentity`, `managedIdentity`, or `azureCli` |
+| `OBJECT_STORAGE_MIGRATION_AZURE_ACCOUNT_KEY` | Required only for `sharedKey` |
+| `OBJECT_STORAGE_MIGRATION_AZURE_AUTHORITY_HOST` | Optional sovereign authority host |
+| `OBJECT_STORAGE_MIGRATION_AZURE_TOKEN_AUDIENCE` | Optional sovereign token audience |
+
+### Authenticating without an account key
+
+`AZURE_BLOB_AUTH_MODE` selects how the app proves who it is. It defaults to `sharedKey`, so existing installs are unaffected.
+
+Many organisations set `allowSharedKeyAccess=false` on the storage account, frequently enforced through Azure Policy. On such an account the shared-key mode does not degrade — **every request is refused**. Use one of the identity modes instead:
+
+| Mode | Where it fits | Requires |
+| --- | --- | --- |
+| `sharedKey` | Anywhere account keys are permitted | `AZURE_BLOB_ACCOUNT_KEY` |
+| `workloadIdentity` | AKS. The enterprise path | A ServiceAccount annotated with the identity's client id, and the pod label `azure.workload.identity/use: "true"`. Both are chart values — see below |
+| `managedIdentity` | Azure VM, VMSS, App Service | The identity assigned to the machine |
+| `azureCli` | A developer laptop | Being signed in with `az login` |
+
+Whichever identity you use, grant it **Storage Blob Data Contributor** on the storage account or the specific container. The control-plane **Contributor** role does *not* grant data access — this is the single most common setup mistake, and it surfaces as a permission error rather than a sign-in error.
+
+Three rules worth knowing before you configure it:
+
+- **There is no fallback.** If an identity mode is selected and the identity is missing or unauthorised, storage fails loudly and stays down until it is fixed. It never quietly reverts to an account key, because that would reverse your security decision at the moment you are least likely to notice.
+- **An account key alongside an identity mode is rejected.** A key that would be silently ignored is worse than no key, since you would believe it was in use.
+- **Bearer tokens require HTTPS.** A plaintext `AZURE_BLOB_ENDPOINT` is refused before any token is sent.
+
+In the chart, set `app.dataplane.providers.azureBlob.authMode` and enable `global.serviceAccount` (`create: true` plus the `azure.workload.identity/client-id` annotation). The chart refuses to render `workloadIdentity` without a ServiceAccount, since the identity would have nothing to bind to. Federated Kubernetes identity is supported on **AKS only** — the token injection depends on the Azure workload-identity webhook. On clusters without it, use `managedIdentity` or `sharedKey`.
+
+On AKS, three things must line up or the token exchange fails with `AADSTS70021` before any storage call is made. The app surfaces that code and this remedy in the error, but they are easier to get right up front:
+
+- The **federated identity credential's issuer** must match the cluster's OIDC issuer exactly — *including the trailing slash*. Read it with `az aks show --query oidcIssuerProfile.issuerUrl`. If the cluster is ever recreated the issuer changes and every federated credential silently stops working.
+- Its **subject** must be `system:serviceaccount:<namespace>:<service-account-name>`, matched case-exactly against the ServiceAccount the chart creates.
+- Its **audience** must be `api://AzureADTokenExchange`.
+
+The pod label and the ServiceAccount annotation are both emitted by the chart; the federated credential itself is configured on the Azure side and is the piece the chart cannot do for you.
+
+The ServiceAccount and the workload-identity label are applied to the app and the workers only. Cron pods call the app over HTTP and never touch storage themselves, so giving them a Blob-capable token would grant every cron image storage access it has no use for.
+
+The same identity must be available to any out-of-band job that writes bytes, such as the dataset backfill task; run it with the same ServiceAccount as the app and workers.
 
 ## Email
 
@@ -53878,13 +54745,18 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 | `app.evaluators.google.enabled` | `GOOGLE_EVALUATOR_ENABLED` |
 | `app.evaluators.google.credentials.value` | `GOOGLE_CREDENTIALS_JSON` |
 | `app.telemetry.usage.enabled` | Inverse of `DISABLE_USAGE_STATS` |
-| `app.dataplane.enabled` | `USE_S3_STORAGE` (provider: `awsS3`) or `STORED_OBJECTS_BACKEND=azure` (provider: `azureBlob`) |
+| `app.dataplane.enabled` | `STORED_OBJECTS_BACKEND=s3` + `USE_S3_STORAGE` (provider: `awsS3`) or `STORED_OBJECTS_BACKEND=azure` (provider: `azureBlob`) |
 | `app.dataplane.bucket` | `S3_BUCKET_NAME` |
 | `app.dataplane.providers.azureBlob.accountName.value` | `AZURE_BLOB_ACCOUNT_NAME` |
-| `app.dataplane.providers.azureBlob.accountKey.value` | `AZURE_BLOB_ACCOUNT_KEY` |
+| `app.dataplane.providers.azureBlob.accountKey.value` | `AZURE_BLOB_ACCOUNT_KEY` (sharedKey mode only) |
+| `app.dataplane.providers.azureBlob.authMode` | `AZURE_BLOB_AUTH_MODE` |
+| `global.serviceAccount.create` / `.name` / `.annotations` | ServiceAccount the cloud identity binds to (also enables AWS IRSA) |
 | `app.dataplane.providers.azureBlob.container.value` | `AZURE_BLOB_CONTAINER` |
 | `app.dataplane.providers.azureBlob.endpoint.value` | `AZURE_BLOB_ENDPOINT` (sovereign clouds, private endpoints, emulator) |
-| `app.dataplane.legacyS3ReadBucket` | `S3_BUCKET_NAME` — set during an S3→Azure migration so pre-migration objects stay readable; leave empty on a greenfield Azure install |
+| `app.dataplane.providers.azureBlob.authorityHost.value` | `AZURE_BLOB_AUTHORITY_HOST` — required alongside a sovereign endpoint in a token-based mode |
+| `app.dataplane.providers.azureBlob.tokenAudience.value` | `AZURE_BLOB_TOKEN_AUDIENCE` — sovereign storage audience override |
+| `app.dataplane.legacyS3ReadBucket` | Keeps persisted `s3://` stored-object URIs and true legacy bucket/key consumers readable after moving writes to Azure. It does not route provider-derived dataset chunks or GroupQueue durable payloads; run the migration and drain GroupQueue before switching |
+| `app.dataplane.legacyAzureRead` | Keeps `AZURE_BLOB_*` settings emitted after moving writes to S3 so persisted `azure-blob://` stored objects remain readable. It is not a dataset migration mechanism: dataset chunks require a verified copy before switching providers |
 | `postgresql.external.connectionString.value` | `DATABASE_URL` |
 | `redis.external.connectionString.value` | `REDIS_URL` |
 | `workers.enabled` | Inverse of `START_WORKERS` |
@@ -64101,7 +64973,7 @@ It works with no login and no API key, and comes in two shapes:
      --summary "langwatch scenario create returned HTTP 500 with ..."
    ```
 
-**Privacy**: everything is redacted locally before upload. API keys and tokens, private-key blocks, passwords inside connection URLs, values of secret-named environment variables, email addresses, phone numbers, credit card numbers, and public IP addresses are all replaced with typed markers. The redaction rules are [open source and auditable](https://github.com/langwatch/langwatch/blob/main/packages/redaction/src/sessionReport.ts), and `--dry-run` previews exactly what would be sent without sending it.
+**Privacy**: the title, summary and transcript are scrubbed locally by pattern before upload. API keys and tokens, private-key blocks, passwords inside connection URLs, values of secret-named environment variables, email addresses, phone numbers, credit card numbers, and public IPv4 addresses are replaced with typed markers. Anything no pattern matches is sent as written, including a contact address passed with `--email`. The redaction rules are [open source and auditable](https://github.com/langwatch/langwatch/blob/main/packages/redaction/src/sessionReport.ts), and `--dry-run` previews exactly what would be sent without sending it.
 
 **Consent**: agents must ask the user for permission before sending, then pass `--user-approved`.
 

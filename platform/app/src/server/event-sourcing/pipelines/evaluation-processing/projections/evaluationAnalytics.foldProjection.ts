@@ -20,6 +20,7 @@ import {
   evaluationScheduledEventSchema,
   evaluationStartedEventSchema,
 } from "../schemas/events";
+import { verdictPassedOf, verdictScoreOf } from "../verdictGate";
 
 /**
  * ADR-034 Phase 6 — slim per-evaluation fold projection.
@@ -90,7 +91,17 @@ const evaluationAnalyticsEvents = [
  *  read-back path uses it as the discriminator: a row carrying an OLDER version
  *  predates those columns, so its nulls cannot be told apart from a genuinely
  *  unstarted evaluation and it is treated as a store miss (see
- *  `EvaluationAnalyticsStore.getWithApplied`). */
+ *  `EvaluationAnalyticsStore.getWithApplied`).
+ *
+ *  NOT bumped for the #6833 verdict gate (Passed/Score null unless
+ *  status === "processed"), deliberately: any event that rewrites the row
+ *  overwrites Passed/Score wholesale from the (now gated) event data, a row
+ *  that receives no further event is never re-projected regardless of the
+ *  stamp, and nothing filters on Version at read time — historical rows are
+ *  covered by the Status predicates in the rollup/slim query builders
+ *  instead. A bump here would only trigger a refold wave and reset the
+ *  refoldOnStoreMiss deletion clock (dev/docs/adr/066, ADR-071) for no
+ *  correctness gain. */
 export const EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST =
   "2026-07-27" as const;
 
@@ -551,8 +562,8 @@ export class EvaluationAnalyticsFoldProjection
       ...state,
       evaluationId: state.evaluationId || event.data.evaluationId,
       status: event.data.status,
-      score: typeof event.data.score === "number" ? event.data.score : null,
-      passed: event.data.passed ?? null,
+      score: verdictScoreOf(event.data),
+      passed: verdictPassedOf(event.data),
       label: event.data.label ?? null,
       completedAt: event.occurredAt,
       costId: event.data.costId ?? null,
@@ -573,8 +584,8 @@ export class EvaluationAnalyticsFoldProjection
       traceId: event.data.traceId ?? null,
       isGuardrail: event.data.isGuardrail ?? false,
       status: event.data.status,
-      score: typeof event.data.score === "number" ? event.data.score : null,
-      passed: event.data.passed ?? null,
+      score: verdictScoreOf(event.data),
+      passed: verdictPassedOf(event.data),
       label: event.data.label ?? null,
       startedAt: event.occurredAt,
       completedAt: event.occurredAt,

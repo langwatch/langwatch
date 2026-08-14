@@ -708,7 +708,7 @@ describe("PrismaProcessStore", () => {
 
       await expect(
         prisma.$executeRawUnsafe(
-          `INSERT INTO pre_fix_inbox VALUES ($1, $2, $3)`,
+          `-- @tenancy: probe against a session-local temp table\nINSERT INTO pre_fix_inbox VALUES ($1, $2, $3)`,
           processName,
           "project-1",
           oversized(),
@@ -910,6 +910,287 @@ describe("PrismaProcessStore", () => {
       expect(leased.map((m) => m.messageKey)).toEqual([
         "send:endpoint-b:222222",
       ]);
+    });
+  });
+
+  // The retention sweep is the one caller that deliberately has no processName
+  // predicate: it reaps by age across every process manager, which is what
+  // makes it cover the six processes that never registered a prune of their
+  // own. That breadth is also why these fixtures sit at epoch 1970 — a cutoff
+  // of a few thousand milliseconds cannot reach any other suite's rows, which
+  // all timestamp from `Date.now()`, so the exact counts below stay exact even
+  // when integration files run in parallel against the same database.
+  describe("given retention-eligible rows across every process name", () => {
+    describe("when the retention sweep runs", () => {
+      const ancient = 1_000;
+      const recent = 900_000;
+      const cutoff = 500_000;
+
+      /** Commits one message and drives it to `dispatched` at `dispatchedAt`. */
+      async function dispatchedRow({
+        processKey,
+        messageKey,
+        sourceEventId,
+        dispatchedAt,
+        overrideProcessName,
+      }: {
+        processKey: string;
+        messageKey: string;
+        sourceEventId: string;
+        dispatchedAt: number;
+        overrideProcessName?: string;
+      }): Promise<void> {
+        const name = overrideProcessName ?? processName;
+        const target: ProcessRef = {
+          processName: name,
+          projectId: "project-1",
+          processKey,
+        };
+        await store.commit(
+          commit({
+            target,
+            sourceEventId,
+            messages: [message(messageKey)],
+            now: ancient,
+          }),
+        );
+        const leased = await store.leaseDueMessages({
+          now: ancient,
+          limit: 10,
+          leaseDurationMs: 30_000,
+          processNames: [name],
+        });
+        const lease = leased.find((row) => row.messageKey === messageKey)!;
+        await store.markDispatched({
+          identity: { processName: name, projectId: "project-1", messageKey },
+          leaseToken: lease.leaseToken,
+          now: dispatchedAt,
+        });
+      }
+
+      /** @scenario "Dispatched outbox rows past the retention window are deleted" */
+      it("deletes dispatched rows past the cutoff and keeps the ones inside it", async () => {
+        await dispatchedRow({
+          processKey: "expired",
+          messageKey: "expired-msg",
+          sourceEventId: "event-expired",
+          dispatchedAt: ancient,
+        });
+        await dispatchedRow({
+          processKey: "inside-window",
+          messageKey: "inside-window-msg",
+          sourceEventId: "event-inside",
+          dispatchedAt: recent,
+        });
+
+        const deleted = await store.deleteDispatchedOutboxBatch({
+          before: cutoff,
+          limit: 5_000,
+        });
+
+        expect(deleted).toBe(1);
+        const remaining = await prisma.processManagerOutbox.findMany({
+          where: { processName, projectId: "project-1" },
+          select: { messageKey: true },
+        });
+        expect(remaining.map((row) => row.messageKey)).toEqual([
+          "inside-window-msg",
+        ]);
+      });
+
+      /** @scenario "Pending outbox rows are never swept" */
+      it("keeps a pending row that is older than every retention window", async () => {
+        await store.commit(
+          commit({
+            target: ref("still-pending", "project-1"),
+            sourceEventId: "event-pending",
+            messages: [message("pending-msg")],
+            now: ancient,
+          }),
+        );
+
+        expect(
+          await store.deleteDispatchedOutboxBatch({
+            before: cutoff,
+            limit: 5_000,
+          }),
+        ).toBe(0);
+        expect(
+          await store.deleteDeadOutboxBatch({ before: cutoff, limit: 5_000 }),
+        ).toBe(0);
+
+        const leased = await store.leaseDueMessages({
+          now: recent,
+          limit: 10,
+          leaseDurationMs: 30_000,
+          processNames: [processName],
+        });
+        expect(leased.map((row) => row.messageKey)).toEqual(["pending-msg"]);
+      });
+
+      /** @scenario "Dead outbox rows are kept far longer than dispatched ones" */
+      it("keeps a dead row until its own longer window elapses", async () => {
+        const deadAt = 200_000;
+        await store.commit(
+          commit({
+            target: ref("dead-letter", "project-1"),
+            sourceEventId: "event-dead",
+            messages: [message("dead-msg")],
+            now: ancient,
+          }),
+        );
+        const leased = await store.leaseDueMessages({
+          now: ancient,
+          limit: 10,
+          leaseDurationMs: 30_000,
+          processNames: [processName],
+        });
+        await store.markFailed({
+          identity: {
+            processName,
+            projectId: "project-1",
+            messageKey: "dead-msg",
+          },
+          leaseToken: leased[0]!.leaseToken,
+          now: deadAt,
+          nextAttemptAt: deadAt,
+          dead: true,
+        });
+
+        // The dispatched family must not touch it, and neither must a dead sweep
+        // whose cutoff it still predates.
+        expect(
+          await store.deleteDispatchedOutboxBatch({
+            before: cutoff,
+            limit: 5_000,
+          }),
+        ).toBe(0);
+        expect(
+          await store.deleteDeadOutboxBatch({ before: deadAt, limit: 5_000 }),
+        ).toBe(0);
+        expect(
+          await prisma.processManagerOutbox.count({
+            where: { processName, projectId: "project-1" },
+          }),
+        ).toBe(1);
+
+        expect(
+          await store.deleteDeadOutboxBatch({ before: recent, limit: 5_000 }),
+        ).toBe(1);
+        expect(
+          await prisma.processManagerOutbox.count({
+            where: { processName, projectId: "project-1" },
+          }),
+        ).toBe(0);
+      });
+
+      /** @scenario "Consumed inbox rows past the retention window are deleted" */
+      it("deletes inbox rows consumed before the cutoff and keeps later ones", async () => {
+        await store.commit(
+          commit({
+            target: ref("old-inbox", "project-1"),
+            sourceEventId: "event-old-inbox",
+            messages: [],
+            now: ancient,
+          }),
+        );
+        await store.commit(
+          commit({
+            target: ref("recent-inbox", "project-1"),
+            sourceEventId: "event-recent-inbox",
+            messages: [],
+            now: recent,
+          }),
+        );
+
+        const deleted = await store.deleteConsumedInboxBatch({
+          before: cutoff,
+          limit: 5_000,
+        });
+
+        expect(deleted).toBe(1);
+        const remaining = await prisma.processManagerInbox.findMany({
+          where: { processName, projectId: "project-1" },
+          select: { sourceEventId: true },
+        });
+        expect(remaining.map((row) => row.sourceEventId)).toEqual([
+          "event-recent-inbox",
+        ]);
+      });
+
+      /** @scenario "The sweep reaches process names that never registered retention" */
+      it("deletes rows of every process name in one pass", async () => {
+        await dispatchedRow({
+          processKey: "first",
+          messageKey: "first-msg",
+          sourceEventId: "event-first",
+          dispatchedAt: ancient,
+        });
+        await dispatchedRow({
+          processKey: "second",
+          messageKey: "second-msg",
+          sourceEventId: "event-second",
+          dispatchedAt: ancient,
+          overrideProcessName: `${processName}-other`,
+        });
+
+        const deleted = await store.deleteDispatchedOutboxBatch({
+          before: cutoff,
+          limit: 5_000,
+        });
+
+        expect(deleted).toBe(2);
+        expect(
+          await prisma.processManagerOutbox.count({
+            where: {
+              processName: { in: [processName, `${processName}-other`] },
+              projectId: "project-1",
+            },
+          }),
+        ).toBe(0);
+      });
+
+      /** @scenario "Process instances are left alone" */
+      it("leaves the process instance row and its revision untouched", async () => {
+        await dispatchedRow({
+          processKey: "with-instance",
+          messageKey: "with-instance-msg",
+          sourceEventId: "event-with-instance",
+          dispatchedAt: ancient,
+        });
+        const before = await store.findByRef({ ref: ref("with-instance") });
+
+        await store.deleteDispatchedOutboxBatch({
+          before: cutoff,
+          limit: 5_000,
+        });
+        await store.deleteConsumedInboxBatch({ before: cutoff, limit: 5_000 });
+
+        const after = await store.findByRef({ ref: ref("with-instance") });
+        expect(after).not.toBeNull();
+        expect(after!.revision).toBe(before!.revision);
+      });
+
+      it("never deletes more than the batch limit in one call", async () => {
+        for (const index of [1, 2, 3]) {
+          await dispatchedRow({
+            processKey: `batched-${index}`,
+            messageKey: `batched-${index}-msg`,
+            sourceEventId: `event-batched-${index}`,
+            dispatchedAt: ancient,
+          });
+        }
+
+        expect(
+          await store.deleteDispatchedOutboxBatch({ before: cutoff, limit: 2 }),
+        ).toBe(2);
+        expect(
+          await store.deleteDispatchedOutboxBatch({ before: cutoff, limit: 2 }),
+        ).toBe(1);
+        expect(
+          await store.deleteDispatchedOutboxBatch({ before: cutoff, limit: 2 }),
+        ).toBe(0);
+      });
     });
   });
 });

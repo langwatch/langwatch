@@ -84,12 +84,12 @@
  */
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
+import { nanoid } from "nanoid";
 import {
   type IdempotencyReceipt,
   Prisma,
   type PrismaClient,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
+} from "~/generated/prisma/client";
 
 import {
   sha256,

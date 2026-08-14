@@ -10,23 +10,28 @@ import type { SlackActionParams } from "@langwatch/automations/providers/slack";
 import { WEBHOOK_HEADER_VALUE_KEPT } from "@langwatch/automations/providers/webhook";
 import { HandledError } from "@langwatch/handled-error";
 import { generate as ksuid } from "@langwatch/ksuid";
+import { TRPCError } from "@trpc/server";
+import { z } from "zod";
 import {
   AlertType,
   type Prisma,
   TriggerAction,
   TriggerKind,
-} from "@prisma/client";
-import { TRPCError } from "@trpc/server";
-import { z } from "zod";
+} from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
 import { AutomationCustomGraphService } from "~/server/app-layer/automations/custom-graph.service";
 import { listSlackChannels } from "~/server/app-layer/automations/delivery/slackWebApi";
+import {
+  readPersistCapCounts,
+  resolvePersistDailyCap,
+} from "~/server/app-layer/automations/dispatch/persistCap";
 import { NOTIFY_TRIGGER_ACTIONS } from "~/server/app-layer/automations/dispatch/triggerActionDispatch";
 import {
   InvalidEmailRecipientError,
   MissingAnnotatorError,
   NotificationDeliveryError,
   ProjectNotFoundError,
+  TriggerFiltersRequiredError,
 } from "~/server/app-layer/automations/errors";
 import {
   buildGraphAlertTriggerData,
@@ -60,6 +65,7 @@ import { MonitorService } from "~/server/app-layer/monitors/monitor.service";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
 import { isDispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import { featureFlagService } from "~/server/featureFlag";
+import { hasActionableTriggerFilters } from "~/server/filters/triggerFilter.matcher";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
   sanitizeTriggerFilters,
@@ -299,10 +305,16 @@ export const automationRouter = createTRPCRouter({
         });
       }
 
+      // This path only ever writes AUTOMATION rows (it carries no graph or
+      // report shape), so the condition is always required here.
+      if (!hasActionableTriggerFilters(input.filters)) {
+        throw toTemplateTRPCError(new TriggerFiltersRequiredError());
+      }
+
       const project = await getApp().projects.getById(input.projectId);
 
       if (!project) {
-        throw new Error(`Project with id ${input.projectId} not found`);
+        throw toTemplateTRPCError(new ProjectNotFoundError(input.projectId));
       }
 
       if (input.action === TriggerAction.ADD_TO_ANNOTATION_QUEUE) {
@@ -455,6 +467,47 @@ export const automationRouter = createTRPCRouter({
 
       return enhancedTriggers;
     }),
+  /**
+   * The plan's daily ceiling on persist actions, on its own. The authoring
+   * drawer only advises against the ceiling and never reads a count, so it
+   * takes this rather than the status below and skips a scan it would discard.
+   */
+  getDailyCap: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkProjectPermission("triggers:view"))
+    .query(async ({ input }) => ({
+      cap: await resolvePersistDailyCap(input.projectId),
+    })),
+  /**
+   * Today's confirmed-match count and skipped count per automation, so the
+   * list can say "N matches skipped today" instead of leaving the customer to
+   * wonder why an automation they can see running produced nothing. A Redis
+   * outage degrades to showing no skips rather than failing the page.
+   *
+   * The automations it covers are read here rather than taken from the caller.
+   * The page renders every automation in the project, so a caller-supplied list
+   * either has to be unbounded, which puts the read's size in the caller's
+   * hands, or capped, which silently drops the badge from every automation past
+   * the cap. Reading the ids here bounds the work by what the project actually
+   * owns, which is the same set the page is already rendering.
+   */
+  getDailyCapStatus: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkProjectPermission("triggers:view"))
+    .query(async ({ ctx, input }) => {
+      const cap = await resolvePersistDailyCap(input.projectId);
+      const triggers = await ctx.prisma.trigger.findMany({
+        where: { projectId: input.projectId },
+        select: { id: true },
+      });
+      const counts = await readPersistCapCounts({
+        projectId: input.projectId,
+        triggerIds: triggers.map((trigger) => trigger.id),
+        now: new Date(),
+        cap,
+      });
+      return { cap, counts };
+    }),
   getTriggerStats: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("triggers:view"))
@@ -573,6 +626,11 @@ export const automationRouter = createTRPCRouter({
         projectId: input.projectId,
         data: {
           active: input.active,
+          // Resuming clears the platform's pause record. Leaving it behind
+          // would make a running automation keep claiming it was paused for
+          // runaway volume, and the next genuine pause would be
+          // indistinguishable from the stale one.
+          ...(input.active ? { pausedReason: null, pausedAt: null } : {}),
         },
       });
 
@@ -662,6 +720,30 @@ export const automationRouter = createTRPCRouter({
           message:
             "This automation only contains unsupported legacy filters. Add at least one supported filter before saving.",
         });
+      }
+
+      // Editing is the other way to end up with a match-everything automation:
+      // create it with a real condition, then clear it here. The existing row
+      // decides whether that is allowed — an automation whose condition lives
+      // in its query keeps a legitimately empty structured set, and alerts and
+      // reports have no trace condition to require in the first place.
+      if (!hasActionableTriggerFilters(sanitized)) {
+        const existing = await getApp().triggers.getById({
+          triggerId: input.triggerId,
+          projectId: input.projectId,
+        });
+        if (!existing) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Automation not found in this project.",
+          });
+        }
+        if (
+          existing.triggerKind === TriggerKind.AUTOMATION &&
+          (existing.filterQuery ?? "").trim() === ""
+        ) {
+          throw toTemplateTRPCError(new TriggerFiltersRequiredError());
+        }
       }
 
       const trigger = await getApp().triggers.update({
@@ -1068,6 +1150,20 @@ export const automationRouter = createTRPCRouter({
             }`,
           });
         }
+      }
+
+      // A trace automation must say which traces it is about. Checked after
+      // the query is normalised, so a whitespace-only query counts as absent
+      // exactly as it does everywhere else. Graph alerts and reports are
+      // exempt: an alert's condition is its threshold and a report's is its
+      // schedule, and both persist `filters: {}` by construction.
+      if (
+        !isGraphAlert &&
+        !isReport &&
+        filterQuery === null &&
+        !hasActionableTriggerFilters(input.filters)
+      ) {
+        throw toTemplateTRPCError(new TriggerFiltersRequiredError());
       }
 
       // ADR-041 Slack bot delivery: encrypt a freshly-entered bot token (or

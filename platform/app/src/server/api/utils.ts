@@ -4,7 +4,7 @@ import {
   type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
 import { VisibilityWindowService } from "~/server/app-layer/traces/visibility-window.service";
 import type { Session } from "~/server/auth";

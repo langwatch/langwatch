@@ -1,7 +1,9 @@
-import type { PrismaClient } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 
 vi.mock("~/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: () => ({
     notifications: {
       sendSlackSignupEvent: vi.fn().mockResolvedValue(undefined),

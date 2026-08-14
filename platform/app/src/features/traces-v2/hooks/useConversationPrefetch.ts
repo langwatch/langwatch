@@ -35,7 +35,7 @@ export function useConversationPrefetch(
 ): void {
   const projectId = useDrawerProjectId();
   const { turns } = useConversationContext(conversationId, currentTraceId);
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   useEffect(() => {
     if (!projectId || !currentTraceId || turns.length === 0) return;

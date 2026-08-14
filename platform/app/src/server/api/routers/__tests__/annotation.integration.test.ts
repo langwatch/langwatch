@@ -6,11 +6,7 @@
  * performs a best-effort ClickHouse sync (stubbed here) that must never block
  * the mutation.
  */
-import {
-  OrganizationUserRole,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "@prisma/client";
+
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -21,6 +17,11 @@ import {
   it,
   vi,
 } from "vitest";
+import {
+  OrganizationUserRole,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "~/generated/prisma/client";
 import { getAnnotatedTraceIds } from "~/server/filters/annotations";
 import { mapTraceToDatasetEntry } from "~/server/tracer/tracesMapping";
 import type { Trace } from "~/server/tracer/types";
@@ -40,6 +41,8 @@ const { mockAddAnnotation, mockRemoveAnnotation } = vi.hoisted(() => ({
 }));
 
 vi.mock("~/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: () => ({
     traces: {
       addAnnotation: mockAddAnnotation,

@@ -55,13 +55,12 @@ import {
   hasProjectPermission,
 } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
-import { getApp } from "~/server/app-layer/app";
+import { getApp, tryGetApp } from "~/server/app-layer/app";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { featureFlagService } from "~/server/featureFlag";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
-import { connection as redisConnection } from "~/server/redis";
 
 const logger = createLogger("langwatch:auth-cli");
 
@@ -335,6 +334,7 @@ function pollRateKey(deviceCode: string): string {
 }
 
 function getRedis() {
+  const redisConnection = tryGetApp()?.redis ?? null;
   if (!redisConnection) {
     throw new Error(
       "Redis connection unavailable — CLI auth requires Redis to be configured (REDIS_URL / REDIS_CLUSTER_ENDPOINTS).",
@@ -1871,10 +1871,10 @@ secured.access(CLI_POLICY).get("/lookup", async (c: Context) => {
       status: record.status,
       created_at: record.created_at,
       expires_at: record.expires_at,
-      // The browser approval page branches its UX on this — `device_session`
-      // shows today's approve-only flow, `project_api_key` shows a project
-      // picker + "Generate" CTA. Defaults to device_session for back-compat
-      // with records minted before this field existed.
+      // The browser approval page branches its UX on this: `device_session`
+      // shows the approve-only flow, `project_api_key` shows a project picker
+      // whose key is sent to the CLI. Defaults to device_session for
+      // back-compat with records minted before this field existed.
       credential_type: record.credential_type ?? "device_session",
     },
     200,

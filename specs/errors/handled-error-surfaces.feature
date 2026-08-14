@@ -261,3 +261,32 @@ Feature: Knowable failures reach the customer as themselves
     Given the member and team governance refusals
     When each is presented
     Then none of them falls through to the generic validation copy
+
+  # ---------------------------------------------------------------------------
+  # The SDK error mappers
+  #
+  # A refusal the platform wrote prose for reaches the caller as that prose, in
+  # every SDK. Python used to answer with a word derived from the status alone,
+  # so a plan gate served as a 403 arrived as "authentication failed" and
+  # nothing else: the operator was sent to rotate credentials that were never
+  # the problem, while the sentence explaining the plan went unread.
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: A refusal the platform explained keeps its explanation in the SDK
+    Given the platform refuses a gateway read and writes why
+    When the SDK raises for that response
+    Then the raised error carries the platform's sentence
+    And it does not report the credential as the problem
+
+  @unit
+  Scenario: A refusal keeps its explanation however the platform shapes the answer
+    Given the platform refuses the same read and shapes the answer another way
+    When the SDK raises for that response
+    Then the raised error carries the same sentence
+
+  @unit
+  Scenario: A refused credential still reads as an authentication failure
+    Given the platform rejects the credential itself
+    When the SDK raises for that response
+    Then the raised error says authentication failed

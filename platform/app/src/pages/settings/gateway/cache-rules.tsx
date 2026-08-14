@@ -52,7 +52,7 @@ function CacheRulesPage() {
     { organizationId: organization?.id ?? "" },
     { enabled: !!organization?.id },
   );
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   const archiveMutation = api.gatewayCacheRules.archive.useMutation({
     onSuccess: async () => {

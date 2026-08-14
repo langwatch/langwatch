@@ -63,27 +63,30 @@
  * because hashing and verifying both read that same local pepper.
  */
 
-import {
-  PrismaClient,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "@prisma/client";
 import { hash as hashPassword } from "bcrypt";
 import { parse as parseDotenv } from "dotenv";
 import fs from "fs";
 import path from "path";
 import { ENTERPRISE_LICENSE_KEY } from "../ee/licensing/__tests__/fixtures/testLicenses";
 import {
+  PrismaClient,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "../src/generated/prisma/client";
+import {
   API_KEY_PREFIX,
   hashSecret,
   INGEST_KEY_PREFIX,
 } from "../src/server/api-key/api-key-token.utils";
 import { modelProviders } from "../src/server/modelProviders/registry";
+import { createPrismaPgAdapter } from "../src/server/prismaPgAdapter";
 import { CUSTOM_ROLE_KIND } from "../src/server/role/role-kind";
 import { encrypt } from "../src/utils/encryption";
 import { seedDemoPlatform } from "./seed-demo-platform";
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  adapter: createPrismaPgAdapter(process.env.DATABASE_URL ?? ""),
+});
 
 const ORG_ID = "local-dev-organization";
 const ORG_SLUG = "local-dev-org";
@@ -384,6 +387,7 @@ async function main() {
     await seedDemoPlatform({
       prisma,
       projectId: project.id,
+      organizationId: organization.id,
       userId: user.id,
     });
   }

@@ -1,3 +1,4 @@
+import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { api } from "~/utils/api";
 import { useIsReadOnlyTrace } from "../context/TraceViewerContext";
@@ -68,7 +69,7 @@ export function useConversationTurns(conversationId: string | null) {
       // open it, so read-only viewers skip conversation turns entirely.
       enabled: !!projectId && !!conversationId && !isReadOnly,
       staleTime: 30_000,
-      keepPreviousData: true,
+      placeholderData: keepPreviousData,
     },
   );
 }

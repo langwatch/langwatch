@@ -59,7 +59,7 @@ function listItemToHeader(item: TraceListItem): TraceHeader {
 export function useOpenTraceDrawer() {
   const { openDrawer } = useDrawer();
   const { project } = useOrganizationTeamProject();
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const queryClient = useQueryClient();
 
   return useCallback(

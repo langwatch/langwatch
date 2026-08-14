@@ -25,6 +25,20 @@ describe("evaluatorVerdict facet", () => {
       expect(expression).toContain("'error'");
     });
 
+    it("routes Status='skipped' to 'skipped' before consulting Passed (#6835)", () => {
+      // A skipped run is "nothing to evaluate", not an unknown verdict —
+      // burying it in 'unknown' next to score-only runs made it unfilterable.
+      const expression = (def as { expression?: string }).expression ?? "";
+      const skippedIdx = expression.indexOf("Status = 'skipped'");
+      const passedIdx = expression.indexOf("Passed = 1");
+      expect(skippedIdx).toBeGreaterThanOrEqual(0);
+      expect(passedIdx).toBeGreaterThan(skippedIdx);
+    });
+
+    it("offers 'skipped' in the query-language vocabulary", () => {
+      expect(FIELD_VALUES.evaluatorVerdict).toContain("skipped");
+    });
+
     it("keeps FIELD_VALUES in sync with the expression's output set", () => {
       const expression = (def as { expression?: string }).expression ?? "";
       for (const value of FIELD_VALUES.evaluatorVerdict ?? []) {
