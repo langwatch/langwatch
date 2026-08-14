@@ -133,8 +133,9 @@ Feature: One automation flow with a subject choice
 
   Rule: Advice that needs every facet renders where every facet is known
 
-    The action-conditional ceiling advice (automation-authoring-cap-advice
-    .feature) reads the condition estimate and the drafted action class at
+    The action-conditional ceiling advice, specified in
+    automation-authoring-cap-advice.feature, reads the condition estimate
+    and the drafted action class at
     once. The wizard separates those steps, so the advice renders at the
     first moment both are known: the review step at create, and the watch
     step when re-entered on edit, where the saved delivery already supplies
@@ -294,10 +295,11 @@ Feature: One automation flow with a subject choice
       And an automation without one in an unconnected project reads as needing Slack to be connected
 
     @integration
-    Scenario: New automations never store a token
+    Scenario: New automations rely on the project integration, not a token of their own
       Given the project has a Slack integration
       When the user creates an automation with Slack delivery
-      Then the saved automation stores no token of its own
+      Then the composer never asks for a bot token
+      And the delivery posts through the project's Slack integration
 
   Rule: A use-case template ships with its graph
 

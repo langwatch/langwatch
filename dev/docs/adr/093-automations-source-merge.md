@@ -32,7 +32,7 @@ An **automation** is one thing: it watches something, applies a rule, and delive
 
 There is no type card and no source card left to pick — not even a renamed one. The flow opens with the subject itself: **"What should this automation watch?" — a trace filter or a graph** — and the subject's configuration follows inline. Choosing the subject *is* choosing what was formerly the kind; the rule shape follows from it (a filter → per-trace conditions, Builder by default with Code as the toggle — decided, not open; a graph → series + operator/threshold/window). Asking "which source?" and then "which subject?" was two questions with one answer, so the first question is deleted rather than renamed. "Source" stops being a customer-facing concept entirely; it survives only as a derived wire field (§2).
 
-```
+```text
    CURRENT IA                              TARGET IA
    ──────────                              ─────────
    AUTOMATIONS                             AUTOMATIONS
@@ -92,7 +92,7 @@ Bound spec files that speak in alert nouns about wire and dispatch behaviour (`p
 
 ### 3. Data model: no migration
 
-```
+```text
    Trigger row (prisma)                     What changes
    ────────────────────                     ────────────
    triggerKind  AUTOMATION|ALERT|REPORT  ←  NOTHING. The enum is the storage
@@ -122,7 +122,7 @@ One dangling citation gets corrected on the way through: the schema comments at 
 
 Steps were chosen over accordion-trimming, and with the type card deleted (§1) the wizard is three steps. The sequence, and what each asks:
 
-```
+```text
    CREATE (linear, with a persistent step rail)
 
    ┌──────────────┐   ┌────────────┐   ┌──────────┐
@@ -208,7 +208,7 @@ Saving validates the token against Slack (`auth.test`) and stores the workspace 
 
 **Token resolution at dispatch** (and for the composer's channel discovery, so the picker lists the workspace delivery will actually hit):
 
-```
+```text
    Slack delivery needs a token
         │
         ▼
