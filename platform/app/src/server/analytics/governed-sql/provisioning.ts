@@ -243,6 +243,16 @@ export function qualified(
  * The key-map table: `KeyHash` to `TenantId`, one row per project — the hash
  * of `Project.governedSqlKey`, not of any credential a caller holds.
  *
+ * "One row per project" is the intended shape, not a constraint this table can
+ * hold. `ORDER BY KeyHash` is MergeTree's sort key and says nothing about
+ * uniqueness, and no code here writes the table. The invariant is therefore
+ * enforced where it is read — see {@link tenantPredicate}, which admits a
+ * tenant only when the hash resolves to exactly one, so a conflicting map
+ * denies access instead of granting it twice over. `ReplacingMergeTree` is not
+ * a substitute: without an explicit version column and `FINAL` at read time it
+ * only promises eventual dedup, and the policy would read the duplicates in
+ * the window before a merge.
+ *
  * Deliberately a table rather than a ClickHouse dictionary. A dictionary form
  * (`dictGetOrDefault(...)` inside the policy) requires granting `dictGet` on the
  * dictionary to the restricted identity, which turns that identity into an
@@ -346,7 +356,26 @@ export function governedGrantStatement({
 
 /**
  * The `USING` expression every governed row policy shares: the row's tenant
- * must be the one this request's key hash maps to.
+ * must be the one — and only the one — this request's key hash maps to.
+ *
+ * The `HAVING` is the load-bearing part, and it is here because the key map
+ * cannot enforce the invariant itself. `MergeTree ORDER BY KeyHash` sorts by
+ * that key, it does not make it unique, and nothing in this application writes
+ * the table: the rows arrive out of band. So a hash mapped to two tenants is
+ * representable, and a bare `IN` over the matching rows would admit both — one
+ * bad row would hand a caller another tenant's data.
+ *
+ * Aggregating without `GROUP BY` makes the matching rows a single group, so
+ * `HAVING uniqExact(...) = 1` decides the whole set at once and every ambiguous
+ * case fails closed:
+ *
+ * - no rows        — `uniqExact` is 0, the group is dropped, nothing is admitted
+ * - one tenant     — admitted, however many duplicate rows carry it
+ * - two or more    — the group is dropped, and *neither* tenant is admitted
+ *
+ * The third case is the point: a conflicting map revokes access rather than
+ * widening it. `any()` is safe under the `HAVING` because it only ever runs on
+ * a group already proven to hold exactly one distinct tenant.
  */
 function tenantPredicate({
   names,
@@ -357,8 +386,9 @@ function tenantPredicate({
 }): string {
   return (
     `${assertIdentifier(tenantColumn, "tenantColumn")} IN (` +
-    `SELECT ${KEY_MAP_COLUMNS.tenantId} FROM ${qualified(names, names.keyMapTable)} ` +
-    `WHERE ${KEY_MAP_COLUMNS.keyHash} = getSetting(${clickHouseLiteral(names.tenantSetting)}))`
+    `SELECT any(${KEY_MAP_COLUMNS.tenantId}) FROM ${qualified(names, names.keyMapTable)} ` +
+    `WHERE ${KEY_MAP_COLUMNS.keyHash} = getSetting(${clickHouseLiteral(names.tenantSetting)}) ` +
+    `HAVING uniqExact(${KEY_MAP_COLUMNS.tenantId}) = 1)`
   );
 }
 

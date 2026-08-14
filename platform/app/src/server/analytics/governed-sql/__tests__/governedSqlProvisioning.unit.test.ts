@@ -18,6 +18,8 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_GOVERNED_RESOURCE_LIMITS,
   type GovernedSqlNames,
+  governedKeyMapTableStatement,
+  governedRowPolicyStatement,
   governedSettingsProfileStatement,
 } from "../provisioning";
 
@@ -92,6 +94,68 @@ describe("given the governed settings profile statement", () => {
       expect(
         DEFAULT_GOVERNED_RESOURCE_LIMITS.maxConcurrentQueriesForUser,
       ).toBeGreaterThan(0);
+    });
+  });
+});
+
+/**
+ * The row policy is the tenant boundary, and its `USING` clause reads a table
+ * this application never writes and cannot constrain: `MergeTree ORDER BY
+ * KeyHash` sorts on the hash without making it unique. A key mapped to two
+ * tenants is therefore representable, and the only place that can refuse it is
+ * the predicate. These assertions pin the refusal, because a predicate that
+ * quietly went back to a bare `IN` would leave every integration suite green —
+ * none of them writes a conflicting row.
+ */
+describe("given the governed row policy", () => {
+  const GOVERNED_TABLE = {
+    table: "traces",
+    tenantColumn: "TenantId",
+    database: "governed_unit",
+  };
+
+  describe("when a key hash resolves to more than one tenant", () => {
+    it("admits no tenant at all, rather than every matching one", () => {
+      const statement = governedRowPolicyStatement({
+        names: NAMES,
+        governedTable: GOVERNED_TABLE,
+      });
+
+      // Without this the subquery yields both rows and `IN` admits both
+      // tenants, so one bad row in the key map hands a caller another
+      // tenant's data. With it the group is dropped and neither is admitted.
+      expect(
+        statement,
+        "a conflicting key map must revoke access, not widen it",
+      ).toContain("HAVING uniqExact(TenantId) = 1");
+    });
+
+    it("selects the tenant only under that single-tenant guard", () => {
+      const statement = governedRowPolicyStatement({
+        names: NAMES,
+        governedTable: GOVERNED_TABLE,
+      });
+
+      // `any()` is only sound because the HAVING has already proven the group
+      // holds exactly one distinct tenant. Asserting the order catches a
+      // rewrite that keeps the aggregate but drops the guard.
+      expect(statement.indexOf("any(TenantId)")).toBeGreaterThan(-1);
+      expect(
+        statement.indexOf("HAVING uniqExact(TenantId) = 1"),
+      ).toBeGreaterThan(statement.indexOf("any(TenantId)"));
+    });
+  });
+
+  describe("when the key map table is created", () => {
+    it("does not claim a uniqueness the engine will not enforce", () => {
+      const statement = governedKeyMapTableStatement({ names: NAMES });
+
+      // ReplacingMergeTree without an explicit version and FINAL only promises
+      // eventual dedup, and the policy would read duplicates in the window
+      // before a merge. If this ever becomes the engine, the predicate guard
+      // above is what must still be carrying the invariant.
+      expect(statement).toContain("ENGINE = MergeTree");
+      expect(statement).not.toContain("ReplacingMergeTree");
     });
   });
 });

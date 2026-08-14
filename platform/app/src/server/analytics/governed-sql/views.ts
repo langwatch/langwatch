@@ -517,8 +517,10 @@ export function governedSourceColumnGrantStatement({
  * The source tables the catalog reads, each with its tenant column, ready for
  * a row policy.
  *
- * Deduplicated by table: two views over one table share its policy, and
- * creating the same policy twice is not idempotent in a way worth relying on.
+ * Deduplicated by qualified name: two views over one table in one database
+ * share its policy, and creating the same policy twice is not idempotent in a
+ * way worth relying on. Two tables that share a name across databases are
+ * distinct sources and each keeps its own policy.
  */
 export function governedSourceTables({
   names,
@@ -531,7 +533,16 @@ export function governedSourceTables({
 }): GovernedTable[] {
   const byTable = new Map<string, GovernedTable>();
   for (const view of views) {
-    byTable.set(view.sourceTable, {
+    // A PostgreSQL-engine table lives in the governed database, beside the
+    // view over it, rather than in the application's.
+    const database = isPostgresResident(view) ? names.database : sourceDatabase;
+    // Keyed on the qualified name, not the bare table. Two catalog entries can
+    // share a `sourceTable` while resolving to different databases — one
+    // PostgreSQL-resident, one a fact table — and keying on the bare name
+    // collapses them to a single entry. The one that loses gets no row policy,
+    // and the row policy is the tenant boundary, so the physical table becomes
+    // readable across tenants by the restricted identity.
+    byTable.set(`${database}.${view.sourceTable}`, {
       table: view.sourceTable,
       // Every source names the owning project the same way — the fact tables
       // because that is their column, the PostgreSQL-engine tables because the
@@ -539,9 +550,7 @@ export function governedSourceTables({
       // catalog would have to grow a per-view tenant column if that ever
       // stopped being true; today asserting it here is what would catch it.
       tenantColumn: TENANT_COLUMN,
-      // A PostgreSQL-engine table lives in the governed database, beside the
-      // view over it, rather than in the application's.
-      database: isPostgresResident(view) ? names.database : sourceDatabase,
+      database,
     });
   }
   return [...byTable.values()];

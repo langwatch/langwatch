@@ -53,6 +53,47 @@ describe("given the PostgreSQL reader role statements", () => {
     });
   });
 
+  // These statements are meant to converge the role: what they emit is the
+  // whole of what it may read, not an addition to whatever it read before.
+  // Convergence is the part a test has to hold, because the failure is silent
+  // — the role keeps a grant nobody asked it to keep, and every statement here
+  // still looks correct in isolation.
+  describe("when a relation is no longer approved", () => {
+    it("revokes relation privileges, not only schema privileges", () => {
+      const statements = postgresReaderRoleStatements({
+        reader: readerRole({ approvedViews: ["governed_traces"] }),
+      });
+
+      // REVOKE ALL ON SCHEMA covers CREATE and USAGE on the schema itself.
+      // Table and view privileges live on the relations and outlive it, so a
+      // view dropped from approvedViews stays readable without this.
+      expect(
+        statements,
+        "schema-level revoke does not reach relation grants",
+      ).toContain(
+        `REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA "public" FROM "ChReader"`,
+      );
+    });
+
+    it("revokes before it grants, so the revoke cannot undo the new grants", () => {
+      const statements = postgresReaderRoleStatements({
+        reader: readerRole({ approvedViews: ["governed_traces"] }),
+      });
+      const revokeAt = statements.findIndex((statement) =>
+        statement.includes("REVOKE ALL PRIVILEGES ON ALL TABLES"),
+      );
+      const grantAt = statements.findIndex((statement) =>
+        statement.includes(`GRANT SELECT ON "public"."governed_traces"`),
+      );
+
+      expect(revokeAt).toBeGreaterThan(-1);
+      expect(grantAt).toBeGreaterThan(-1);
+      // Ordering is the whole point: run the other way round and the role ends
+      // the run able to read nothing at all.
+      expect(revokeAt).toBeLessThan(grantAt);
+    });
+  });
+
   // -1 is the case the guard exists for: PostgreSQL accepts it and reads it as
   // unlimited, so it is the one malformed value that would otherwise provision
   // cleanly and leave the budget uncapped.

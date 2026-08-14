@@ -287,7 +287,15 @@ export function postgresReaderRoleStatements({
       `CONNECTION LIMIT ${reader.connectionLimit}`,
     `ALTER ROLE ${role} SET default_transaction_read_only = on`,
     `ALTER ROLE ${role} SET statement_timeout = ${postgresLiteral(reader.statementTimeout)}`,
+    // Both revokes are needed, and they are not interchangeable. `ON SCHEMA`
+    // covers only CREATE and USAGE on the schema itself; the relation-level
+    // privileges live on the tables and views and survive it. Without the
+    // second statement a relation dropped from `approvedViews` keeps the
+    // SELECT it was granted on an earlier run, so the set below would be the
+    // views this identity may read *in addition to* whatever it already had,
+    // rather than the whole of what it may read.
     `REVOKE ALL ON SCHEMA ${schema} FROM ${role}`,
+    `REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA ${schema} FROM ${role}`,
     `GRANT USAGE ON SCHEMA ${schema} TO ${role}`,
     ...reader.approvedViews.map(
       (view) => `GRANT SELECT ON ${schema}.${postgresQuoted(view)} TO ${role}`,

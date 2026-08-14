@@ -84,7 +84,25 @@ export function validateAgainstVegaLiteSchema(
 ): VegaValidationError[] {
   const validate = getVegaLiteSchemaValidator();
   if (validate(spec)) return [];
-  return mostSpecificErrors(validate.errors ?? []).map(toValidationError);
+  const reported = mostSpecificErrors(validate.errors ?? []).map(
+    toValidationError,
+  );
+  // A refusal with no reported errors must not read as an acceptance. Ajv can
+  // return `false` with `errors` null or empty, and `mostSpecificErrors` takes
+  // `Math.max` over that empty pool — `-Infinity`, which nothing matches — so
+  // returning it directly would hand the caller zero errors for a spec the
+  // schema rejected. This runtime is fail-closed: say so generically instead.
+  if (reported.length === 0) {
+    return [
+      governedVegaError({
+        rule: "spec.schema-invalid",
+        path: JSON_POINTER_ROOT,
+        message:
+          "This chart specification does not match the Vega-Lite v6 schema.",
+      }),
+    ];
+  }
+  return reported;
 }
 
 /**
