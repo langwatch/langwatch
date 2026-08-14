@@ -1,6 +1,8 @@
 /**
  * Message Normalization & System Instruction Extraction
  */
+
+import { safeStringify } from "./_geminiContent";
 import { isMessageLike, isRecord, type MessageLike } from "./_guards";
 import { isReplyTextPart } from "./_parts";
 
@@ -76,20 +78,14 @@ const extractTextsFromParts = (parts: unknown[]): string[] => {
       } else if (p.type === "thinking" && typeof p.thinking === "string") {
         texts.push(p.thinking);
       } else if (p.type === "tool_use" && p.input != null) {
-        try {
-          texts.push(JSON.stringify(p.input));
-        } catch {
-          // ignore unstringifiable inputs
-        }
+        const s = safeStringify(p.input);
+        if (s !== null) texts.push(s);
       } else if (p.type === "tool_result" && Array.isArray(p.content)) {
         const inner = extractTextsFromParts(p.content);
         if (inner.length > 0) texts.push(inner.join("\n"));
       } else if (isRecord(p.toolUse) && p.toolUse.input != null) {
-        try {
-          texts.push(JSON.stringify(p.toolUse.input));
-        } catch {
-          // ignore unstringifiable inputs
-        }
+        const s = safeStringify(p.toolUse.input);
+        if (s !== null) texts.push(s);
       } else if (
         isRecord(p.toolResult) &&
         Array.isArray(p.toolResult.content)
@@ -101,11 +97,8 @@ const extractTextsFromParts = (parts: unknown[]): string[] => {
         const inner: string[] = [];
         for (const block of p.toolResult.content) {
           if (isRecord(block) && block.json != null) {
-            try {
-              inner.push(JSON.stringify(block.json));
-            } catch {
-              // ignore unstringifiable results
-            }
+            const s = safeStringify(block.json);
+            if (s !== null) inner.push(s);
           } else {
             inner.push(...extractTextsFromParts([block]));
           }
