@@ -215,6 +215,33 @@ describe("saving a workbench chart", () => {
     });
   });
 
+  describe("given the first Save fails outright", () => {
+    describe("when the member fixes the problem and saves again", () => {
+      // The in-flight guard has to release on the failing path too, or one
+      // refused save would leave Save dead for the rest of the session.
+      it("lets the second attempt through", async () => {
+        mocks.create.mutateAsync.mockRejectedValueOnce(new Error("nope"));
+
+        const { result, onError } = mountHook();
+
+        await act(async () => {
+          await result.current.save({ draft: DRAFT, name: "Traces per day" });
+        });
+        expect(onError).toHaveBeenCalledWith(
+          expect.anything(),
+          "Couldn't save the chart",
+        );
+
+        await act(async () => {
+          await result.current.save({ draft: DRAFT, name: "Traces per day" });
+        });
+
+        expect(mocks.create.mutateAsync).toHaveBeenCalledTimes(2);
+        expect(result.current.openedChartId).toBe("chart-1");
+      });
+    });
+  });
+
   describe("given the write succeeds but refreshing the list then fails", () => {
     describe("when the member saves", () => {
       /**
