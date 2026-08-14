@@ -27,13 +27,12 @@ export type ExternalKind =
   (typeof EXTERNAL_KINDS_BY_PROVIDER)[LinkProvider][number];
 
 /**
- * Kinds whose value IS the person's email address — the ones erasure swaps
- * for the org-scoped keyed-hash token (ADR-094 Decision 9). Deliberately only
- * the kinds literally named `email` for now: Microsoft's `upn` is email-shaped
- * and names the person, but the locked ADR names only "email-kind"; widening
- * this list is a spec decision, not an implementation detail.
+ * Kinds whose value names the person in email form — the ones erasure swaps
+ * for the org-scoped keyed-hash token (ADR-094 Decision 9). Microsoft's `upn`
+ * is included by captain decision (recorded as an amendment on Decision 9):
+ * it is email-shaped and names the person, so it must not survive erasure.
  */
-export const EMAIL_EXTERNAL_KINDS: readonly string[] = ["email"];
+export const EMAIL_EXTERNAL_KINDS: readonly string[] = ["email", "upn"];
 
 export const isEmailKind = (externalKind: string): boolean =>
   EMAIL_EXTERNAL_KINDS.includes(externalKind);
