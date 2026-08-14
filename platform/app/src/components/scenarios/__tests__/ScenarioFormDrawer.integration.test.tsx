@@ -117,6 +117,9 @@ const mocks = vi.hoisted(() => ({
   mockGetByIdHasError: false,
   mockGetByIdRefetch: vi.fn(),
   mockPromptsCatalogIsLoading: false,
+  mockProject: { id: "project-123", slug: "my-project" } as
+    | { id: string; slug: string }
+    | undefined,
 }));
 
 vi.mock("~/utils/api", () => ({
@@ -225,7 +228,7 @@ vi.mock("~/hooks/useDrawer", () => ({
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
-    project: { id: "project-123", slug: "my-project" },
+    project: mocks.mockProject,
     organization: { id: "org-123" },
   }),
 }));
@@ -289,6 +292,7 @@ describe("<ScenarioFormDrawer/>", () => {
     mocks.mockGetByIdIsLoading = false;
     mocks.mockGetByIdHasError = false;
     mocks.mockPromptsCatalogIsLoading = false;
+    mocks.mockProject = { id: "project-123", slug: "my-project" };
     mocks.mockCreateMutateAsync.mockResolvedValue({
       id: "new-scenario-id",
       name: "Refund Request Test",
@@ -935,6 +939,64 @@ describe("<ScenarioFormDrawer/>", () => {
       });
 
       expect(screen.queryByTestId("save-and-run-menu")).toBe(null);
+    });
+  });
+
+  /**
+   * specs/scenarios/scenario-editor-loading-state.feature
+   *
+   * The read is disabled until the project resolves, and a disabled query
+   * reports itself as not loading. Taken at its word, that window hands back
+   * the blank form the placeholder exists to prevent.
+   */
+  describe("when the project is not known yet", () => {
+    /** @scenario "The editor waits for the project too" */
+    it("shows the placeholder rather than an empty form", () => {
+      mocks.mockDrawerParams = { scenarioId: "scenario-123" };
+      mocks.mockProject = undefined;
+      mocks.mockGetByIdData = null;
+      mocks.mockGetByIdIsLoading = false;
+
+      render(<ScenarioFormDrawer open={true} scenarioId="scenario-123" />, {
+        wrapper: Wrapper,
+      });
+
+      expect(screen.getByTestId("scenario-form-skeleton")).toBeInTheDocument();
+      expect(screen.queryByPlaceholderText("e.g., Angry refund request")).toBe(
+        null,
+      );
+    });
+  });
+
+  /**
+   * specs/scenarios/scenario-editor-loading-state.feature
+   *
+   * A read that fails after one succeeded still holds the record it read, and
+   * the person may be part way through editing it. The error state is for
+   * having nothing to show, not for every failure.
+   */
+  describe("when a later read of a loaded scenario fails", () => {
+    /** @scenario "A failed background read keeps the scenario on screen" */
+    it("keeps the fields rather than replacing them with the error", () => {
+      mocks.mockDrawerParams = { scenarioId: "scenario-123" };
+      mocks.mockGetByIdData = {
+        id: "scenario-123",
+        name: "Refund Request Test",
+        situation: "User requests a refund",
+        criteria: ["Agent acknowledges the issue"],
+        labels: [],
+      };
+      mocks.mockGetByIdIsLoading = false;
+      mocks.mockGetByIdHasError = true;
+
+      render(<ScenarioFormDrawer open={true} scenarioId="scenario-123" />, {
+        wrapper: Wrapper,
+      });
+
+      expect(
+        screen.getByDisplayValue("Refund Request Test"),
+      ).toBeInTheDocument();
+      expect(screen.queryByTestId("scenario-read-error")).toBe(null);
     });
   });
 

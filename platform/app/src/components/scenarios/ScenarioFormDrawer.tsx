@@ -190,12 +190,22 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   // reads as "the scenario has no name and no criteria" rather than "not
   // loaded yet", and the person who just asked an agent to write it cannot
   // tell the difference.
-  const isHydrating = !!scenarioId && isScenarioLoading;
+  //
+  // The project is part of the wait. The read stays disabled until the project
+  // resolves, and a disabled query does not report itself as loading, so
+  // `isScenarioLoading` alone leaves that window uncovered and shows the blank
+  // form it exists to prevent.
+  const isHydrating = !!scenarioId && (!project || isScenarioLoading);
   // A read that fails ends the wait without producing a record, so the form
   // would come back with every field at its default. That is the blank form
   // the skeleton exists to prevent, and worse: the fields are editable, so
   // the person can fill in what looks like their scenario and save it.
-  const hasReadFailed = !!scenarioId && isScenarioReadFailed;
+  //
+  // Only when there is no record to show. A background refetch that fails
+  // keeps the record it read before, and the form the person is typing in
+  // stays as it is rather than being replaced by an error with their edits
+  // inside it.
+  const hasReadFailed = !!scenarioId && isScenarioReadFailed && !scenario;
   const createMutation = api.scenarios.create.useMutation({
     onSuccess: (data: Scenario) => {
       void utils.scenarios.getAll.invalidate({ projectId: project?.id ?? "" });
@@ -523,9 +533,12 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       }
     }, openParametersOnInvalid)();
   }, [handleSave, scenario, formInstance, onClose, openParametersOnInvalid]);
-  const setFormRef = useCallback((form: UseFormReturn<ScenarioFormData>) => {
-    setFormInstance(form);
-  }, []);
+  const setFormRef = useCallback(
+    (form: UseFormReturn<ScenarioFormData> | null) => {
+      setFormInstance(form);
+    },
+    [],
+  );
   const isSubmitting =
     createMutation.isPending || updateMutation.isPending || isRunning;
 
@@ -628,8 +641,10 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         </Drawer.Footer>
       </Drawer.Content>
 
-      {/* Parameter declarations: edited on the form, saved with the scenario */}
-      {formInstance && (
+      {/* Parameter declarations: edited on the form, saved with the scenario.
+          The form is gone while the scenario is being read and once the read
+          has failed, so the dialog goes with it. */}
+      {formInstance && !isHydrating && !hasReadFailed && (
         <ScenarioParametersDialog
           open={parametersDialogOpen}
           onOpenChange={setParametersDialogOpen}

@@ -98,3 +98,27 @@ Feature: The scenario editor says when it is still reading
       When the scenario has not been read yet
       And a save is attempted anyway
       Then no scenario is created
+
+    # The read cannot start before the project is known, and a read that has
+    # not started does not report itself as loading. Read as "loaded", it gives
+    # back the same blank form by a different route.
+    @integration
+    Scenario: The editor waits for the project too
+      Given the editor is opened on an existing scenario
+      When the project is not known yet
+      Then the editor shows a placeholder in place of the fields
+      And no empty form field is offered
+
+  # Once the scenario is on screen the person edits it, and the editor keeps
+  # reading it in the background. A background read that fails has a record to
+  # show and edits in the fields, so replacing them with an error takes work
+  # away that the person did.
+  Rule: A failed read only takes over when there is nothing to show
+
+    @integration
+    Scenario: A failed background read keeps the scenario on screen
+      Given the editor is opened on an existing scenario
+      When the scenario has been read
+      And a later read of it fails
+      Then the fields hold the scenario's values
+      And the editor does not say it could not load the scenario
