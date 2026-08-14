@@ -332,10 +332,10 @@ Feature: Saved governed SQL workbench charts — the persistence model and its w
     And the project's chart listing is unchanged
 
   @integration
-  Scenario: A stored definition this build cannot read is named, not returned as data
+  Scenario: A stored definition this build cannot read is refused, not returned as data
     Given a stored chart whose definition does not match the versioned schema
     When the integration reads it or lists the project's charts
-    Then the read is refused with error code saved_workbench_chart_definition_invalid
+    Then the read is refused as an internal error rather than named to the caller, because a definition this build cannot parse is this application's own fault and a platform failure's detail is not API copy
     And no raw stored payload is returned in its place
 
   @integration
@@ -460,8 +460,8 @@ Feature: Saved governed SQL workbench charts — the persistence model and its w
 #   (asserted as "a view-only key is refused", not as a literal scope string:
 #   `analytics:delete` is only ever held through `analytics:manage`, so naming
 #   the string would pin an implementation choice rather than the behaviour)
-# AC7 "an unreadable stored definition is named, not returned"
-#   → Scenario: A stored definition this build cannot read is named, not returned as data
+# AC7 "an unreadable stored definition is refused, not returned"
+#   → Scenario: A stored definition this build cannot read is refused, not returned as data
 # AC8 "the routes are published"
 #   → Scenario: Every chart endpoint is published in the API document
 #   (plus `pnpm check:openapi-route-coverage`, which fails on a handler with no

@@ -45,9 +45,9 @@ import { getProtectionsForProject } from "~/server/api/utils";
 import { validator as zValidator } from "~/server/api/validation";
 import { prisma } from "~/server/db";
 
-import { baseResponses } from "../../shared/base-responses";
+import { canonicalBaseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
-import { errorSchema } from "../../shared/schemas";
+import { apiErrorSchema } from "../../shared/schemas";
 import type { RouteResponse } from "../../shared/types";
 import { governedSqlProject } from "./routeGuards";
 
@@ -141,11 +141,15 @@ const CHART_TAGS = ["Analytics / Governed SQL"];
 /**
  * The not-found answer every resource operation can give — a missing id and
  * another project's chart alike, deliberately indistinguishable.
+ *
+ * The canonical envelope, like every other refusal this family publishes:
+ * {@link canonicalBaseResponses} covers 400/401/403/500, and a 404 is the one
+ * status only these operations can answer.
  */
 const chartNotFoundResponse: Record<404, RouteResponse> = {
   404: {
     description: "No chart with this id in this project",
-    content: { "application/json": { schema: resolver(errorSchema) } },
+    content: { "application/json": { schema: resolver(apiErrorSchema) } },
   },
 };
 
@@ -211,7 +215,7 @@ function registerList(secured: ReturnType<typeof createProjectApp>): void {
         "Lists every saved governed SQL chart in this project, each with the statement it runs, the parameter values it was saved with and the Vega-Lite specification that draws it. Charts built with the chart builder are a different kind and are not listed here.",
       tags: CHART_TAGS,
       responses: {
-        ...baseResponses,
+        ...canonicalBaseResponses,
         200: {
           description: "The project's saved workbench charts",
           content: {
@@ -242,7 +246,7 @@ function registerCreate(secured: ReturnType<typeof createProjectApp>): void {
         "Saves a governed SQL statement, its bound parameter values and an optional Vega-Lite specification as one chart. The statement is validated by the governed analytics SQL validator against this key's own permissions, and the specification by the visualization policy, before anything is written — a chart that could not be run or drawn is refused rather than stored.",
       tags: CHART_TAGS,
       responses: {
-        ...baseResponses,
+        ...canonicalBaseResponses,
         201: {
           description: "The chart was saved",
           content: { "application/json": { schema: resolver(chartSchema) } },
@@ -277,7 +281,7 @@ function registerRead(secured: ReturnType<typeof createProjectApp>): void {
         "Returns one saved governed SQL chart with its statement, parameter values and specification. A chart saved in another project is reported as not found.",
       tags: CHART_TAGS,
       responses: {
-        ...baseResponses,
+        ...canonicalBaseResponses,
         ...chartNotFoundResponse,
         200: {
           description: "The saved chart",
@@ -308,7 +312,7 @@ function registerUpdate(secured: ReturnType<typeof createProjectApp>): void {
         "Replaces a saved chart's name, its definition, or both. A definition offered here passes exactly the validators a save passes, resolved against this key's current permissions — so a chart cannot be edited into naming a column the caller may no longer read. A request carrying neither field is refused.",
       tags: CHART_TAGS,
       responses: {
-        ...baseResponses,
+        ...canonicalBaseResponses,
         ...chartNotFoundResponse,
         200: {
           description: "The updated chart",
@@ -348,7 +352,7 @@ function registerDelete(secured: ReturnType<typeof createProjectApp>): void {
         "Deletes one saved governed SQL chart. Answers 204 with no body; deleting a chart that is not in this project is reported as not found.",
       tags: CHART_TAGS,
       responses: {
-        ...baseResponses,
+        ...canonicalBaseResponses,
         ...chartNotFoundResponse,
         204: { description: "The chart was deleted" },
       },

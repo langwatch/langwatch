@@ -21,6 +21,13 @@
  *  - Two projects in two organizations throughout, both holding charts, so an
  *    isolation assertion has something to fail on.
  *
+ * The family publishes the canonical error envelope, so a refusal is read at
+ * `body.error.code` and its structured detail at `body.error.meta` — the same
+ * places the governed SQL REST suite reads them.
+ *
+ * @see ~/app/api/shared/canonical-error — the mapping every refusal here goes
+ *   through, including the 5xx redaction one case below turns on
+ *
  * @see specs/analytics/governed-sql-saved-charts.feature
  * @see ~/server/analytics/saved-workbench-charts — the service under test
  */
@@ -371,14 +378,17 @@ describe("given the saved workbench chart REST endpoints", () => {
         },
       });
 
-      expect(body.error).toBe("saved_workbench_chart_specification_refused");
-      // The refusal's `meta` reaches the wire flattened by this family's error
-      // handler; what matters is that the rule and the JSON path survive, so
-      // an author can repair the offending part rather than re-reading it all.
-      expect(Array.isArray(body.errors)).toBe(true);
-      expect(body.errors.length).toBeGreaterThan(0);
-      expect(body.errors[0].rule).toBeTruthy();
-      expect(body.errors[0].path).toBeTruthy();
+      expect(body.error.code).toBe(
+        "saved_workbench_chart_specification_refused",
+      );
+      // The refusal's `meta` reaches the wire under the envelope's own `meta`;
+      // what matters is that the rule and the JSON path survive, so an author
+      // can repair the offending part rather than re-reading it all.
+      const errors = body.error.meta.errors;
+      expect(Array.isArray(errors)).toBe(true);
+      expect(errors.length).toBeGreaterThan(0);
+      expect(errors[0].rule).toBeTruthy();
+      expect(errors[0].path).toBeTruthy();
 
       // The half that matters: a handler that wrote first and threw afterwards
       // passes every assertion above.
@@ -395,7 +405,9 @@ describe("given the saved workbench chart REST endpoints", () => {
         auth: asProject(openProject),
         body: { definition: { ...DEFINITION, vegaLiteSpec: NETWORK_SPEC } },
       });
-      expect(body.error).toBe("saved_workbench_chart_specification_refused");
+      expect(body.error.code).toBe(
+        "saved_workbench_chart_specification_refused",
+      );
 
       const after = await succeeds({
         path: chartPath(openProject, created.id),
@@ -425,8 +437,8 @@ describe("given the saved workbench chart REST endpoints", () => {
         body: { sql: GATED_SQL },
       });
 
-      expect(saving.error).toBe("governed_sql_not_permitted");
-      expect(saving.error).toBe(running.error);
+      expect(saving.error.code).toBe("governed_sql_not_permitted");
+      expect(saving.error.code).toBe(running.error.code);
       expect(await listedIds(gatedProject)).toEqual([]);
 
       // The control: the same statement, a key whose protections do not
@@ -450,7 +462,7 @@ describe("given the saved workbench chart REST endpoints", () => {
           definition: { ...DEFINITION, sql: "DROP TABLE analytics.traces" },
         },
       });
-      expect(write.error).toBe("governed_sql_not_permitted");
+      expect(write.error.code).toBe("governed_sql_not_permitted");
 
       const shapeless = await refused({
         path: chartsPath(openProject),
@@ -458,7 +470,7 @@ describe("given the saved workbench chart REST endpoints", () => {
         auth: asProject(openProject),
         body: { name: "Shapeless", definition: { sql: SQL } },
       });
-      expect(shapeless.error).toBe("validation_error");
+      expect(shapeless.error.code).toBe("validation_error");
 
       expect(await listedIds(openProject)).toEqual([]);
     });
@@ -493,7 +505,7 @@ describe("given the saved workbench chart REST endpoints", () => {
           definition: { ...DEFINITION, sql: paddedSql(400_000) },
         },
       });
-      expect(creating.error).toBe("validation_error");
+      expect(creating.error.code).toBe("validation_error");
 
       const editing = await refused({
         path: chartPath(openProject, permitted.id),
@@ -501,7 +513,7 @@ describe("given the saved workbench chart REST endpoints", () => {
         auth: asProject(openProject),
         body: { definition: { ...DEFINITION, sql: paddedSql(400_000) } },
       });
-      expect(editing.error).toBe("validation_error");
+      expect(editing.error.code).toBe("validation_error");
 
       // The half that matters: the control chart is the only thing here, and it
       // still holds the statement it was saved with.
@@ -560,7 +572,7 @@ describe("given the saved workbench chart REST endpoints", () => {
         }),
       ]);
 
-      expect(refusals.map((body) => body.error)).toEqual(
+      expect(refusals.map((body) => body.error.code)).toEqual(
         Array(5).fill("governed_sql_not_enabled"),
       );
       // Neither the write nor the delete happened while the surface was off.
@@ -618,7 +630,7 @@ describe("given the saved workbench chart REST endpoints", () => {
           call({ path: chartsPath(openProject), auth: asProject(openProject) }),
       );
       expect(response.status).toBe(403);
-      expect(((await response.json()) as Body).error).toBe(
+      expect(((await response.json()) as Body).error.code).toBe(
         "governed_sql_not_enabled",
       );
     });
@@ -640,7 +652,9 @@ describe("given the saved workbench chart REST endpoints", () => {
           auth: asProject(otherProject),
           ...(body === undefined ? {} : { body }),
         });
-        expect(refusal.error, method).toBe("saved_workbench_chart_not_found");
+        expect(refusal.error.code, method).toBe(
+          "saved_workbench_chart_not_found",
+        );
       }
 
       // An id that never existed answers identically, so the refusal above
@@ -649,7 +663,7 @@ describe("given the saved workbench chart REST endpoints", () => {
         path: chartPath(otherProject, `never-${nanoid()}`),
         auth: asProject(otherProject),
       });
-      expect(never.error).toBe("saved_workbench_chart_not_found");
+      expect(never.error.code).toBe("saved_workbench_chart_not_found");
 
       expect(await listedIds(otherProject)).toEqual([]);
 
@@ -675,7 +689,7 @@ describe("given the saved workbench chart REST endpoints", () => {
         path: chartsPath(otherProject),
         auth: asProject(openProject),
       });
-      expect(refusal.error).toBe("project_not_found");
+      expect(refusal.error.code).toBe("project_not_found");
     });
   });
 
@@ -712,7 +726,7 @@ describe("given the saved workbench chart REST endpoints", () => {
           auth: asViewOnly(openProject),
           ...(body === undefined ? {} : { body }),
         });
-        expect(refusal.error, method).toBe("api_key_permission_denied");
+        expect(refusal.error.code, method).toBe("api_key_permission_denied");
       }
 
       // Nothing the refused writes attempted actually happened.
@@ -726,8 +740,8 @@ describe("given the saved workbench chart REST endpoints", () => {
   });
 
   describe("when a stored definition does not match the versioned schema", () => {
-    /** @scenario "A stored definition this build cannot read is named, not returned as data" */
-    it("names the failure rather than returning the raw stored payload", async () => {
+    /** @scenario "A stored definition this build cannot read is refused, not returned as data" */
+    it("refuses as an internal error rather than returning the raw stored payload", async () => {
       const stored = await prisma.customGraph.create({
         data: {
           id: `chart-unreadable-${ns}`,
@@ -747,9 +761,14 @@ describe("given the saved workbench chart REST endpoints", () => {
         const response = await call({ path, auth: asProject(openProject) });
         const body = (await response.json()) as Body;
         expect(response.status, path).toBe(500);
-        expect(body.error, path).toBe(
-          "saved_workbench_chart_definition_invalid",
-        );
+        // `saved_workbench_chart_definition_invalid` is a 5xx `platform` fault,
+        // and the canonical envelope answers every 5xx as `internal_error` with
+        // a generic sentence on purpose — a platform failure's detail is not
+        // API copy. The named code stays server-side, correlated by the trace
+        // ids the envelope carries. Asserted rather than skipped because the
+        // alternative outcome this rules out is a 200 carrying the raw row.
+        expect(body.error.code, path).toBe("internal_error");
+        expect(body.error.type, path).toBe("internal_error");
         expect(
           JSON.stringify(body),
           "the unreadable payload reached the caller",
@@ -769,7 +788,7 @@ describe("given the saved workbench chart REST endpoints", () => {
         auth: asProject(openProject),
         body: {},
       });
-      expect(refusal.error).toBe("validation_error");
+      expect(refusal.error.code).toBe("validation_error");
 
       const after = await succeeds({
         path: chartPath(openProject, created.id),
@@ -815,7 +834,7 @@ describe("given the saved workbench chart REST endpoints", () => {
         method: "DELETE",
         auth: asProject(openProject),
       });
-      expect(again.error).toBe("saved_workbench_chart_not_found");
+      expect(again.error.code).toBe("saved_workbench_chart_not_found");
     });
   });
 
