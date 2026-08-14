@@ -47,6 +47,8 @@ import { prisma } from "~/server/db";
 
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
+import { errorSchema } from "../../shared/schemas";
+import type { RouteResponse } from "../../shared/types";
 import { governedSqlProject } from "./routeGuards";
 
 /** Request shape only — a length, not a meaning. Matches the tRPC surface. */
@@ -137,6 +139,17 @@ const chartListSchema = z.object({ data: z.array(chartSchema) });
 const CHART_TAGS = ["Analytics / Governed SQL"];
 
 /**
+ * The not-found answer every resource operation can give — a missing id and
+ * another project's chart alike, deliberately indistinguishable.
+ */
+const chartNotFoundResponse: Record<404, RouteResponse> = {
+  404: {
+    description: "No chart with this id in this project",
+    content: { "application/json": { schema: resolver(errorSchema) } },
+  },
+};
+
+/**
  * The chart as the API publishes it.
  *
  * Built field by field rather than spread: the service's chart also carries
@@ -154,7 +167,7 @@ function chartResource({
 }: {
   chart: SavedWorkbenchChart;
   project: Project;
-}) {
+}): z.infer<typeof chartSchema> {
   return {
     id: chart.id,
     name: chart.name,
@@ -265,6 +278,7 @@ function registerRead(secured: ReturnType<typeof createProjectApp>): void {
       tags: CHART_TAGS,
       responses: {
         ...baseResponses,
+        ...chartNotFoundResponse,
         200: {
           description: "The saved chart",
           content: { "application/json": { schema: resolver(chartSchema) } },
@@ -295,6 +309,7 @@ function registerUpdate(secured: ReturnType<typeof createProjectApp>): void {
       tags: CHART_TAGS,
       responses: {
         ...baseResponses,
+        ...chartNotFoundResponse,
         200: {
           description: "The updated chart",
           content: { "application/json": { schema: resolver(chartSchema) } },
@@ -334,6 +349,7 @@ function registerDelete(secured: ReturnType<typeof createProjectApp>): void {
       tags: CHART_TAGS,
       responses: {
         ...baseResponses,
+        ...chartNotFoundResponse,
         204: { description: "The chart was deleted" },
       },
     }),

@@ -273,7 +273,11 @@ describe("given the saved workbench chart REST endpoints", () => {
   }, 120_000);
 
   afterEach(async () => {
-    for (const project of [openProject, gatedProject, otherProject]) {
+    // `.filter(Boolean)` for the same reason as `afterAll` below: a setup
+    // failure must not be buried under teardown TypeErrors.
+    for (const project of [openProject, gatedProject, otherProject].filter(
+      Boolean,
+    )) {
       await prisma.customGraph.deleteMany({ where: { projectId: project.id } });
     }
   });

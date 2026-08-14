@@ -467,7 +467,7 @@ Feature: Saved governed SQL workbench charts — the persistence model and its w
 #   `describeRoute` — the scenario is what fails when the *document* loses them)
 # AC9 "no regression" → the existing governed SQL REST suite, unedited, which
 #   runs the extracted guards through the query and schema endpoints.
-# AC10 "every slice-4 scenario is actually bound" → `pnpm check-feature-parity`.
+# AC10 "every slice-4 scenario is actually bound" → `pnpm check:feature-parity`.
 #
 # Design decision 1 of the slice-4 plan — PATCH rather than PUT, and a PATCH
 # carrying neither field is a refusal rather than a silent no-op:
