@@ -141,6 +141,33 @@ describe("saved workbench charts (integration)", () => {
     });
   });
 
+  describe("given a chart already saved under a caller-supplied id", () => {
+    describe("when the member saves another chart with the same id", () => {
+      it("refuses the collision as its own handled error, not an unknown failure", async () => {
+        const id = `chart-${nanoid()}`;
+        await service.createChart({
+          projectId: project.id,
+          protections: FULLY_PERMITTED,
+          input: { id, name: "First", definition: DEFINITION },
+        });
+
+        await expect(
+          service.createChart({
+            projectId: project.id,
+            protections: FULLY_PERMITTED,
+            input: { id, name: "Second", definition: DEFINITION },
+          }),
+        ).rejects.toMatchObject({
+          code: "saved_workbench_chart_already_exists",
+        });
+
+        // The first save is untouched.
+        const kept = await service.getById({ id, projectId: project.id });
+        expect(kept.name).toBe("First");
+      });
+    });
+  });
+
   describe("given the project holds saved charts and a builder chart", () => {
     describe("when the member lists the saved workbench charts", () => {
       /** @scenario "A saved chart is listed among the project's workbench charts" */
@@ -341,6 +368,14 @@ describe("saved workbench charts (integration)", () => {
         });
         expect(updated.name).toBe("Traces per week");
         expect(updated.definition.vegaLiteSpec).toBeUndefined();
+
+        // Read the row back so the assertion covers the persisted JSON, not
+        // just the object the update call answered with.
+        const reread = await service.getById({
+          id: saved.id,
+          projectId: project.id,
+        });
+        expect(reread.definition.vegaLiteSpec).toBeUndefined();
 
         await service.deleteChart({ id: saved.id, projectId: project.id });
 

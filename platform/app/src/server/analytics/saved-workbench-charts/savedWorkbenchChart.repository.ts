@@ -109,7 +109,10 @@ export class SavedWorkbenchChartRepository implements SavedWorkbenchChartStore {
   async update(
     input: UpdateSavedWorkbenchChartInput,
   ): Promise<CustomGraph | null> {
-    const updated = await this.prisma.customGraph.updateMany({
+    // One statement: `UPDATE ... RETURNING` answers with the row it wrote, so
+    // there is no window in which another writer's delete could turn a
+    // successful update into a not-found read-back.
+    const updated = await this.prisma.customGraph.updateManyAndReturn({
       where: {
         id: input.id,
         projectId: input.projectId,
@@ -120,9 +123,7 @@ export class SavedWorkbenchChartRepository implements SavedWorkbenchChartStore {
         ...(input.definition === undefined ? {} : { graph: input.definition }),
       },
     });
-    if (updated.count === 0) return null;
-
-    return await this.findById({ id: input.id, projectId: input.projectId });
+    return updated[0] ?? null;
   }
 
   /** Deletes one saved workbench chart. Answers how many rows went. */

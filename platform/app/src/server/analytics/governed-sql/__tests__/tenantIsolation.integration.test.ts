@@ -102,7 +102,16 @@ describe("given the governed analytics setup applied to a ClickHouse 25.10 serve
     it("exposes the other tenant's rows once the row policy is detached, and hides them again once restored", async () => {
       const spans = harness.governedTables.find(
         (governedTable) => governedTable.table === "spans",
-      )!;
+      );
+      // Before the try, because the `finally` below reattaches the row policy
+      // using this same entry: a rename would otherwise throw inside the try
+      // and then throw again while restoring, masking the first failure and
+      // leaving the source table unpoliced for every case after this one.
+      if (!spans) {
+        throw new Error(
+          `governed-sql tenant-isolation suite: "spans" is not among the governed tables, so there is no row policy to detach`,
+        );
+      }
       await recordSeedControl({
         harness,
         table: "spans",

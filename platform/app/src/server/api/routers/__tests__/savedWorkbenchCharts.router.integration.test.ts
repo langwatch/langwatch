@@ -304,19 +304,29 @@ describe("the saved workbench chart router", () => {
         ).toEqual([saved.id]);
 
         // Each write, refused on its own permission rather than on the read one.
-        await expect(
-          reader.create({
-            projectId: PROJECT,
-            name: "Theirs",
-            definition: DEFINITION,
-          }),
-        ).rejects.toThrow();
-        await expect(
-          reader.update({ projectId: PROJECT, id: saved.id, name: "Renamed" }),
-        ).rejects.toThrow();
-        await expect(
-          reader.delete({ projectId: PROJECT, id: saved.id }),
-        ).rejects.toThrow();
+        expect(
+          await refusalOf(() =>
+            reader.create({
+              projectId: PROJECT,
+              name: "Theirs",
+              definition: DEFINITION,
+            }),
+          ),
+        ).toBe("project_permission_denied");
+        expect(
+          await refusalOf(() =>
+            reader.update({
+              projectId: PROJECT,
+              id: saved.id,
+              name: "Renamed",
+            }),
+          ),
+        ).toBe("project_permission_denied");
+        expect(
+          await refusalOf(() =>
+            reader.delete({ projectId: PROJECT, id: saved.id }),
+          ),
+        ).toBe("project_permission_denied");
 
         // Nothing the refused writes attempted actually happened.
         const after = await author.getById({

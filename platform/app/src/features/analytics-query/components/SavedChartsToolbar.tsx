@@ -32,7 +32,7 @@ export interface SavedChartsToolbarProps {
   readonly openedChartName: string | null;
   readonly isSaving: boolean;
   /** Whether there is anything worth saving — an empty statement is not. */
-  readonly savable: boolean;
+  readonly canSave: boolean;
   readonly onSave: (input: { name?: string }) => void;
   readonly onOpen: (chartId: string) => void;
   readonly onRename: (input: { id: string; name: string }) => void;
@@ -179,7 +179,7 @@ function OpenedChartMenu({
         open={confirmingDelete}
         onOpenChange={setConfirmingDelete}
         title="Delete chart"
-        message={`Delete "${chartName}"? This cannot be undone.`}
+        message={`Delete "${chartName ?? "this chart"}"? This cannot be undone.`}
         confirmLabel="Delete"
         tone="danger"
         onConfirm={() => {
@@ -196,7 +196,7 @@ export function SavedChartsToolbar({
   openedChartId,
   openedChartName,
   isSaving,
-  savable,
+  canSave,
   onSave,
   onOpen,
   onRename,
@@ -249,7 +249,7 @@ export function SavedChartsToolbar({
       <Button
         size="xs"
         variant="ghost"
-        disabled={!savable || isSaving}
+        disabled={!canSave || isSaving}
         onClick={handleSave}
         data-testid="save-chart"
       >

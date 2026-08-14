@@ -120,6 +120,12 @@ const registry = {
       "Ask an administrator to enable the SQL workbench for this project",
     ],
   },
+  saved_workbench_chart_already_exists: {
+    tips: [
+      "A saved chart with this id already exists in this project",
+      "Retry with a different id, or omit the id to have the server mint one",
+    ],
+  },
   saved_workbench_chart_not_found: {
     tips: [
       "Check the chart id — a chart saved in another project is not readable from this one",

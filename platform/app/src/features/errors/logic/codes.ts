@@ -216,6 +216,7 @@ export const APP_ERROR_CODES = [
   "rum_payload_too_large",
   "rum_rate_limited",
   "run_not_found",
+  "saved_workbench_chart_already_exists",
   "saved_workbench_chart_definition_invalid",
   "saved_workbench_chart_not_found",
   "saved_workbench_chart_specification_refused",

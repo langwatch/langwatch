@@ -425,7 +425,7 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
       expect(definition).toContain(postgres.approvedView);
 
       for (const secret of [
-        "governed-pg-reader-test-password",
+        postgres.readerPassword,
         postgres.readerRole,
         String(postgres.container.getPort()),
         "host.docker.internal",

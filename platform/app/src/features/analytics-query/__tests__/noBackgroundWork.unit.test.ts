@@ -52,6 +52,16 @@ const FORBIDDEN: readonly { token: string; because: string }[] = [
     because: "the workbench persists nothing between visits",
   },
   {
+    token: "indexedDB",
+    because: "the workbench persists nothing between visits",
+  },
+  {
+    token: "document.cookie",
+    because:
+      "the specification the member is editing is never written anywhere " +
+      "by the chart surface itself",
+  },
+  {
     token: "features/langy",
     because: "the workbench exposes no agent surface",
   },

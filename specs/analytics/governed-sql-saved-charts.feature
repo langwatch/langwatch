@@ -312,7 +312,8 @@ Feature: Saved governed SQL workbench charts — the persistence model and its w
 #   → Scenario: Being allowed to read a chart is not being allowed to change one
 # AC "each failure with a stable code and presentation-registry entry"
 #   → Scenario: A refusal from the write gate reaches the member with its code intact
-#   → Scenario: A refused save says what to repair, and leaves the work on screen
+#   (carried by that scenario alone: the client-side half was drafted and
+#   removed — see the note below)
 # AC "saving never re-runs the query" → carried for now by the workbench's own
 #   guard, `Scenario: The workbench ships no polling, browser-side persistence,
 #   export, or agent surface`, which slice 2 amended rather than deleted. The

@@ -49,6 +49,17 @@ function gatedProcedures(router: unknown): string[] {
 describe("the workbench feature gate", () => {
   describe("given the saved-chart router", () => {
     it("gates every procedure on it, reads included", () => {
+      // The exact list first: two derived-and-compared arrays could both be
+      // empty — a `_def` shape change would pass vacuously — and the names pin
+      // the `_def.procedures` reading this file depends on.
+      expect(gatedProcedures(savedWorkbenchChartsRouter)).toEqual([
+        "create",
+        "delete",
+        "getAll",
+        "getById",
+        "update",
+      ]);
+      // And the closure: a sixth procedure added without the gate fails here.
       expect(gatedProcedures(savedWorkbenchChartsRouter)).toEqual(
         Object.keys(chainsOf(savedWorkbenchChartsRouter)).sort(),
       );
