@@ -71,7 +71,12 @@ export const registerRedactionProject = (ns: string) => {
     });
   };
 
+  // Several fixtures deliver to a customer endpoint, a channel a project
+  // only has once it is turned on for them.
+  const previousFlagOverride = process.env.FEATURE_FLAG_FORCE_ENABLE;
+
   beforeAll(async () => {
+    process.env.FEATURE_FLAG_FORCE_ENABLE = "release_webhook_automations";
     organization = await prisma.organization.create({
       data: { name: "Triggers Redaction Org", slug: `--test-org-${ns}` },
     });
@@ -95,6 +100,11 @@ export const registerRedactionProject = (ns: string) => {
   });
 
   afterAll(async () => {
+    if (previousFlagOverride === undefined) {
+      delete process.env.FEATURE_FLAG_FORCE_ENABLE;
+    } else {
+      process.env.FEATURE_FLAG_FORCE_ENABLE = previousFlagOverride;
+    }
     if (project) {
       await prisma.trigger.deleteMany({ where: { projectId: projectId() } });
       await prisma.project.delete({ where: { id: project.id } });

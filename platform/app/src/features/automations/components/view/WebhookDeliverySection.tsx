@@ -119,6 +119,21 @@ function guidanceForStatus(status: number | null): string | undefined {
   return undefined;
 }
 
+/** What one attempt row shows, decided ahead of the JSX so the components
+ *  below stay presentational. */
+function attemptRowFacts(attempt: WebhookDelivery) {
+  const statusText =
+    attempt.responseStatus != null
+      ? `HTTP ${attempt.responseStatus}`
+      : (attempt.error ?? "No response");
+  const guidance =
+    attempt.outcome === "success"
+      ? undefined
+      : guidanceForStatus(attempt.responseStatus);
+  const hasDetail = Boolean(attempt.error ?? guidance ?? attempt.response);
+  return { statusText, guidance, hasDetail };
+}
+
 function DeliveryAttemptRow({
   attempt,
   index,
@@ -129,15 +144,7 @@ function DeliveryAttemptRow({
   total: number;
 }) {
   const [open, setOpen] = useState(false);
-  const statusText =
-    attempt.responseStatus != null
-      ? `HTTP ${attempt.responseStatus}`
-      : (attempt.error ?? "No response");
-  const guidance =
-    attempt.outcome === "success"
-      ? undefined
-      : guidanceForStatus(attempt.responseStatus);
-  const hasDetail = Boolean(attempt.error ?? guidance ?? attempt.response);
+  const { statusText, guidance, hasDetail } = attemptRowFacts(attempt);
 
   return (
     <Box
@@ -145,43 +152,61 @@ function DeliveryAttemptRow({
       borderColor="border"
       _last={{ borderBottomWidth: 0 }}
     >
-      <HStack
-        // A row with nothing to expand is plain content, not a control; the
-        // expandable ones announce their state.
-        as={hasDetail ? "button" : "div"}
-        aria-expanded={hasDetail ? open : undefined}
-        gap={2.5}
-        paddingX={3}
-        paddingY={2}
-        width="full"
-        textAlign="left"
-        cursor={hasDetail ? "pointer" : "default"}
-        onClick={() => hasDetail && setOpen((v) => !v)}
-      >
-        <Box
-          boxSize={2}
-          borderRadius="full"
-          flexShrink={0}
-          bg={OUTCOME_DOT[attempt.outcome]}
-        />
-        <Text textStyle="sm" flex="1" minWidth="0">
-          {total > 1 ? `Attempt ${index + 1} · ` : ""}
-          {statusText}
-        </Text>
-        <Text
-          textStyle="xs"
-          color="fg.muted"
-          flexShrink={0}
-          whiteSpace="nowrap"
-        >
-          {attempt.latencyMs != null ? `${attempt.latencyMs}ms · ` : ""}
-          {formatTimeAgo(new Date(attempt.firedAt).getTime())}
-        </Text>
-      </HStack>
+      <AttemptRowHeader
+        attempt={attempt}
+        label={`${total > 1 ? `Attempt ${index + 1} · ` : ""}${statusText}`}
+        hasDetail={hasDetail}
+        open={open}
+        onToggle={() => hasDetail && setOpen((v) => !v)}
+      />
       {open && hasDetail ? (
         <DeliveryAttemptDetail attempt={attempt} guidance={guidance} />
       ) : null}
     </Box>
+  );
+}
+
+function AttemptRowHeader({
+  attempt,
+  label,
+  hasDetail,
+  open,
+  onToggle,
+}: {
+  attempt: WebhookDelivery;
+  label: string;
+  hasDetail: boolean;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <HStack
+      // A row with nothing to expand is plain content, not a control; the
+      // expandable ones announce their state.
+      as={hasDetail ? "button" : "div"}
+      aria-expanded={hasDetail ? open : undefined}
+      gap={2.5}
+      paddingX={3}
+      paddingY={2}
+      width="full"
+      textAlign="left"
+      cursor={hasDetail ? "pointer" : "default"}
+      onClick={onToggle}
+    >
+      <Box
+        boxSize={2}
+        borderRadius="full"
+        flexShrink={0}
+        bg={OUTCOME_DOT[attempt.outcome]}
+      />
+      <Text textStyle="sm" flex="1" minWidth="0">
+        {label}
+      </Text>
+      <Text textStyle="xs" color="fg.muted" flexShrink={0} whiteSpace="nowrap">
+        {attempt.latencyMs != null ? `${attempt.latencyMs}ms · ` : ""}
+        {formatTimeAgo(new Date(attempt.firedAt).getTime())}
+      </Text>
+    </HStack>
   );
 }
 
