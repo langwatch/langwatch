@@ -265,6 +265,32 @@ function startOfUtcDay(ms: number): number {
   );
 }
 
+function pulledUsageFromRawOcsf(rawPayload: string): {
+  costUsd: number;
+  tokensInput: number;
+  tokensOutput: number;
+} {
+  try {
+    const raw = JSON.parse(rawPayload) as {
+      metadata?: {
+        extension?: {
+          cost_usd?: unknown;
+          tokens_input?: unknown;
+          tokens_output?: unknown;
+        };
+      };
+    };
+    const extension = raw.metadata?.extension;
+    return {
+      costUsd: Number(extension?.cost_usd ?? 0),
+      tokensInput: Number(extension?.tokens_input ?? 0),
+      tokensOutput: Number(extension?.tokens_output ?? 0),
+    };
+  } catch {
+    return { costUsd: 0, tokensInput: 0, tokensOutput: 0 };
+  }
+}
+
 function emptyDenseBuckets(
   windowStartMs: number,
   windowDays: number,
@@ -1119,7 +1145,7 @@ export class ActivityMonitorService {
     if (ch && govProjectId) {
       const sourceIds = sources.map((s) => s.id);
       const since = Date.now() - 24 * 60 * 60 * 1000;
-      const [traceCounts, logCounts] = await Promise.all([
+      const [traceCounts, logCounts, ocsfCounts] = await Promise.all([
         ch.query({
           query: `
             SELECT ts.Attributes[{sourceKey:String}] AS sourceId, toString(count()) AS c
@@ -1167,6 +1193,32 @@ export class ActivityMonitorService {
           },
           format: "JSONEachRow",
         }),
+        ch.query({
+          query: `
+            SELECT SourceId AS sourceId, toString(count()) AS c
+            FROM governance_ocsf_events
+            WHERE TenantId = {tenantId:String}
+              AND startsWith(TraceId, 'pull:')
+              AND EventTime >= fromUnixTimestamp64Milli({since:UInt64})
+              AND SourceId IN ({sourceIds:Array(String)})
+              AND (TenantId, EventId, LastUpdatedAt) IN (
+                SELECT TenantId, EventId, max(LastUpdatedAt)
+                FROM governance_ocsf_events
+                WHERE TenantId = {tenantId:String}
+                  AND startsWith(TraceId, 'pull:')
+                  AND EventTime >= fromUnixTimestamp64Milli({since:UInt64})
+                  AND SourceId IN ({sourceIds:Array(String)})
+                GROUP BY TenantId, EventId
+              )
+            GROUP BY sourceId
+          `,
+          query_params: {
+            tenantId: govProjectId,
+            since,
+            sourceIds,
+          },
+          format: "JSONEachRow",
+        }),
       ]);
       const traceRows = (await traceCounts.json()) as Array<{
         sourceId: string;
@@ -1176,7 +1228,11 @@ export class ActivityMonitorService {
         sourceId: string;
         c: string;
       }>;
-      for (const row of [...traceRows, ...logRows]) {
+      const ocsfRows = (await ocsfCounts.json()) as Array<{
+        sourceId: string;
+        c: string;
+      }>;
+      for (const row of [...traceRows, ...logRows, ...ocsfRows]) {
         eventsBySource.set(
           row.sourceId,
           (eventsBySource.get(row.sourceId) ?? 0) + Number(row.c),
@@ -1211,11 +1267,9 @@ export class ActivityMonitorService {
       ? new Date(input.beforeIso).getTime()
       : Date.now();
 
-    // Pull recent traces for the source. Webhook log_records are out of
-    // scope for this endpoint (the per-source detail page renders trace
-    // shape; the log shape gets its own viewer in 3b).
-    const result = await ch.query({
-      query: `
+    const [traceResult, ocsfResult] = await Promise.all([
+      ch.query({
+        query: `
         SELECT
           ts.TraceId AS eventId,
           ts.Attributes[{sourceTypeKey:String}] AS eventType,
@@ -1240,20 +1294,59 @@ export class ActivityMonitorService {
         ORDER BY ts.OccurredAt DESC, ts.TraceId DESC
         LIMIT {limit:UInt32}
       `,
-      query_params: {
-        tenantId: govProjectId,
-        beforeMs,
-        originKey: ATTR_ORIGIN_KIND,
-        originValue: ORIGIN_KIND_VALUE,
-        sourceKey: ATTR_INGESTION_SOURCE_ID,
-        sourceTypeKey: GOVERNANCE_ATTR.INGESTION_SOURCE_TYPE,
-        userKey: ATTR_USER_ID,
-        sourceId: input.sourceId,
-        limit,
-      },
-      format: "JSONEachRow",
-    });
-    const rows = (await result.json()) as Array<{
+        query_params: {
+          tenantId: govProjectId,
+          beforeMs,
+          originKey: ATTR_ORIGIN_KIND,
+          originValue: ORIGIN_KIND_VALUE,
+          sourceKey: ATTR_INGESTION_SOURCE_ID,
+          sourceTypeKey: GOVERNANCE_ATTR.INGESTION_SOURCE_TYPE,
+          userKey: ATTR_USER_ID,
+          sourceId: input.sourceId,
+          limit,
+        },
+        format: "JSONEachRow",
+      }),
+      ch.query({
+        query: `
+          SELECT
+            EventId AS eventId,
+            SourceType AS eventType,
+            ActorUserId AS actorUserId,
+            ActorEmail AS actorEmail,
+            ActorEnduserId AS actorEnduserId,
+            ActionName AS action,
+            TargetName AS target,
+            toString(toUnixTimestamp64Milli(EventTime)) AS occurredMs,
+            toString(toUnixTimestamp64Milli(CreatedAt)) AS createdMs,
+            RawOcsfJson AS rawPayload
+          FROM governance_ocsf_events
+          WHERE TenantId = {tenantId:String}
+            AND startsWith(TraceId, 'pull:')
+            AND SourceId = {sourceId:String}
+            AND EventTime < fromUnixTimestamp64Milli({beforeMs:UInt64})
+            AND (TenantId, EventId, LastUpdatedAt) IN (
+              SELECT TenantId, EventId, max(LastUpdatedAt)
+              FROM governance_ocsf_events
+              WHERE TenantId = {tenantId:String}
+                AND startsWith(TraceId, 'pull:')
+                AND SourceId = {sourceId:String}
+                AND EventTime < fromUnixTimestamp64Milli({beforeMs:UInt64})
+              GROUP BY TenantId, EventId
+            )
+          ORDER BY EventTime DESC, EventId DESC
+          LIMIT {limit:UInt32}
+        `,
+        query_params: {
+          tenantId: govProjectId,
+          sourceId: input.sourceId,
+          beforeMs,
+          limit,
+        },
+        format: "JSONEachRow",
+      }),
+    ]);
+    const traceRows = (await traceResult.json()) as Array<{
       eventId: string;
       eventType: string;
       actor: string;
@@ -1264,7 +1357,7 @@ export class ActivityMonitorService {
       occurredMs: string;
       createdMs: string;
     }>;
-    return rows.map((r) => ({
+    const pushedEvents = traceRows.map((r) => ({
       eventId: r.eventId,
       eventType: r.eventType ?? "",
       actor: r.actor ?? "",
@@ -1277,6 +1370,44 @@ export class ActivityMonitorService {
       ingestedAtIso: new Date(Number(r.createdMs)).toISOString(),
       rawPayload: "",
     }));
+    const ocsfRows = (await ocsfResult.json()) as Array<{
+      eventId: string;
+      eventType: string;
+      actorUserId: string;
+      actorEmail: string;
+      actorEnduserId: string;
+      action: string;
+      target: string;
+      occurredMs: string;
+      createdMs: string;
+      rawPayload: string;
+    }>;
+    const pulledEvents = ocsfRows.map((r) => ({
+      eventId: r.eventId,
+      eventType: r.eventType ?? "",
+      actor: r.actorEmail || r.actorUserId || r.actorEnduserId || "",
+      action: r.action ?? "",
+      target: r.target ?? "",
+      ...pulledUsageFromRawOcsf(r.rawPayload),
+      eventTimestampIso: new Date(Number(r.occurredMs)).toISOString(),
+      ingestedAtIso: new Date(Number(r.createdMs)).toISOString(),
+      rawPayload: r.rawPayload,
+    }));
+
+    const seen = new Set<string>();
+    return [...pushedEvents, ...pulledEvents]
+      .sort(
+        (a, b) =>
+          new Date(b.eventTimestampIso).getTime() -
+            new Date(a.eventTimestampIso).getTime() ||
+          b.eventId.localeCompare(a.eventId),
+      )
+      .filter((event) => {
+        if (seen.has(event.eventId)) return false;
+        seen.add(event.eventId);
+        return true;
+      })
+      .slice(0, limit);
   }
 
   async sourceHealthMetrics(input: {
@@ -1297,7 +1428,7 @@ export class ActivityMonitorService {
     const day = 24 * 60 * 60 * 1000;
     const since30d = now - 30 * day;
 
-    const [traceResult, logResult] = await Promise.all([
+    const [traceResult, logResult, ocsfResult] = await Promise.all([
       ch.query({
         query: `
           SELECT
@@ -1355,6 +1486,37 @@ export class ActivityMonitorService {
         },
         format: "JSONEachRow",
       }),
+      ch.query({
+        query: `
+          SELECT
+            countIf(EventTime >= fromUnixTimestamp64Milli({since24h:UInt64})) AS c24,
+            countIf(EventTime >= fromUnixTimestamp64Milli({since7d:UInt64})) AS c7,
+            count() AS c30,
+            toString(toUnixTimestamp64Milli(max(EventTime))) AS lastMs
+          FROM governance_ocsf_events
+          WHERE TenantId = {tenantId:String}
+            AND startsWith(TraceId, 'pull:')
+            AND SourceId = {sourceId:String}
+            AND EventTime >= fromUnixTimestamp64Milli({since30d:UInt64})
+            AND (TenantId, EventId, LastUpdatedAt) IN (
+              SELECT TenantId, EventId, max(LastUpdatedAt)
+              FROM governance_ocsf_events
+              WHERE TenantId = {tenantId:String}
+                AND startsWith(TraceId, 'pull:')
+                AND SourceId = {sourceId:String}
+                AND EventTime >= fromUnixTimestamp64Milli({since30d:UInt64})
+              GROUP BY TenantId, EventId
+            )
+        `,
+        query_params: {
+          tenantId: govProjectId,
+          since24h: now - day,
+          since7d: now - 7 * day,
+          since30d,
+          sourceId: input.sourceId,
+        },
+        format: "JSONEachRow",
+      }),
     ]);
     const traceRows = (await traceResult.json()) as Array<{
       c24: number | string;
@@ -1368,16 +1530,27 @@ export class ActivityMonitorService {
       c30: number | string;
       lastMs: string | null;
     }>;
+    const ocsfRows = (await ocsfResult.json()) as Array<{
+      c24: number | string;
+      c7: number | string;
+      c30: number | string;
+      lastMs: string | null;
+    }>;
     const t = traceRows[0];
     const l = logRows[0];
+    const o = ocsfRows[0];
 
-    const events24h = Number(t?.c24 ?? 0) + Number(l?.c24 ?? 0);
-    const events7d = Number(t?.c7 ?? 0) + Number(l?.c7 ?? 0);
-    const events30d = Number(t?.c30 ?? 0) + Number(l?.c30 ?? 0);
+    const events24h =
+      Number(t?.c24 ?? 0) + Number(l?.c24 ?? 0) + Number(o?.c24 ?? 0);
+    const events7d =
+      Number(t?.c7 ?? 0) + Number(l?.c7 ?? 0) + Number(o?.c7 ?? 0);
+    const events30d =
+      Number(t?.c30 ?? 0) + Number(l?.c30 ?? 0) + Number(o?.c30 ?? 0);
 
     const traceLastMs = t?.lastMs ? Number(t.lastMs) : 0;
     const logLastMs = l?.lastMs ? Number(l.lastMs) : 0;
-    const lastMs = Math.max(traceLastMs, logLastMs);
+    const ocsfLastMs = o?.lastMs ? Number(o.lastMs) : 0;
+    const lastMs = Math.max(traceLastMs, logLastMs, ocsfLastMs);
     const lastSuccessIso = lastMs > 0 ? new Date(lastMs).toISOString() : null;
 
     return { events24h, events7d, events30d, lastSuccessIso };
