@@ -8,6 +8,7 @@
 
 import { z } from "zod";
 import type { Span } from "../../tracer/types";
+import { runParameterValuesSchema } from "../parameters";
 
 // ============================================================================
 // Field Mapping Types
@@ -121,6 +122,13 @@ export const HttpAgentDataSchema = z.object({
   outputPath: z.string().optional(),
   /** Maps agent input field identifiers to scenario data sources or static values. */
   scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
+  /**
+   * The project's decrypted secrets, so `{{ secrets.NAME }}` resolves in the
+   * url, the header values and the auth fields, the places a credential
+   * belongs. Defaulted so a job queued before secrets reached http targets
+   * still parses.
+   */
+  secrets: z.record(z.string(), z.string()).default({}),
 });
 export type HttpAgentData = z.infer<typeof HttpAgentDataSchema>;
 
@@ -323,6 +331,13 @@ export const ChildProcessJobDataSchema = z
   .object({
     context: ExecutionContextSchema,
     scenario: ScenarioConfigSchema,
+    /**
+     * The values the run resolved for this scenario. The scenario's own text
+     * arrives already rendered against them; the target under test reads them
+     * as `params.NAME`. Defaulted so a job queued before parameters existed
+     * still parses.
+     */
+    parameters: runParameterValuesSchema.default({}),
     /** Pre-generated scenario run ID so the SDK uses the same aggregate ID. */
     scenarioRunId: z.string().optional(),
     adapterData: TargetAdapterDataSchema,
