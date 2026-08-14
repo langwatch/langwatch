@@ -48,9 +48,6 @@ function createMockPrisma() {
   const organizationUser = {
     findUnique: vi.fn(),
     findMany: vi.fn().mockResolvedValue([]),
-    // The membership lifecycle counts what is left after the change; a
-    // single-organization person has nothing, which is what escalates the
-    // account flag (ADR-094 Decision 4).
     count: vi.fn().mockResolvedValue(0),
     create: vi.fn(),
     delete: vi.fn().mockResolvedValue({}),
@@ -450,9 +447,11 @@ describe("ScimService", () => {
           userId: "user-1",
           organizationId: "org-1",
         });
-        (
-          prisma.organizationUser.count as ReturnType<typeof vi.fn>
-        ).mockResolvedValue(1);
+        // A membership of another organization survives this delete, so the
+        // account must not follow it (#6976).
+        (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({
+          orgMemberships: [{ organizationId: "org-2" }],
+        });
 
         await service.deleteUser({ id: "user-1", organizationId: "org-1" });
 
