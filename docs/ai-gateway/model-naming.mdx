@@ -126,6 +126,6 @@ The error surfaces the accepted names so an integrator can fix the request witho
 
 ## Why not just pick one convention?
 
-Most gateways in the ecosystem (litellm, OpenRouter, Portkey) use `provider/model`. Most SDK codebases use the bare name. Requiring either one would create friction for the other population.
+Gateways in the ecosystem (litellm, OpenRouter, Portkey) use `provider/model`. Provider SDK codebases use the bare name. Requiring either one would create friction for the other population.
 
-Accepting both, with a single O(1) resolution step, not a retry loop, lets you write whichever is natural for your code and the gateway figures it out at zero hot-path cost.
+Accepting both, with a single O(1) resolution step, not a retry loop, lets you write whichever is natural for your code.

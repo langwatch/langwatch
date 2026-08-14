@@ -1,6 +1,6 @@
 ---
 title: Routing policies
-description: Decouple the credential from the provider chain — admins publish routing policies once, virtual keys reference them by ID.
+description: Decouple the credential from the provider chain. Admins publish routing policies once, virtual keys reference them by ID.
 sidebarTitle: Routing policies
 ---
 
@@ -8,7 +8,7 @@ A **routing policy** answers: "when one of my organization's users
 wants to call a model, which providers can serve it, in what order,
 under what allowlist?"
 
-Until v1.x, this was embedded in every virtual key's config — every
+Until v1.x, this was embedded in every virtual key's config: every
 service VK had its own copy of "Anthropic primary, OpenAI fallback,
 allow these models." That worked for service VKs created by hand.
 It does not scale to a thousand personal VKs, where the answer is
@@ -87,7 +87,7 @@ Concretely: when a personal VK is auto-issued for a user (member of
 some team in their org), the gateway picks:
 
 1. Is there a `PROJECT`-scoped default for their personal project?
-   No — personal projects don't carry their own routing policies.
+   No. Personal projects don't carry their own routing policies.
 2. Is there a `TEAM`-scoped default for the user's team? Maybe.
 3. If not, fall back to the `ORG`-scoped default for their
    organization.
@@ -108,7 +108,7 @@ all models allowed. Each pattern supports `*` wildcards:
 ```
 
 Allowlists compose with the gateway's per-VK `models_allowed`
-config — a request must satisfy both to be allowed.
+config: a request must satisfy both to be allowed.
 
 ## Model-aware dispatch
 

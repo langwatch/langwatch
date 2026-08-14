@@ -95,7 +95,7 @@ Clicking a row in the list opens the detail page (`/gateway/virtual-keys/<vk_id>
 
 1. **Header**: name + action bar: **Audit history** (deep-links into `/settings/audit-log?targetKind=virtual_key&targetId=<vk_id>` with a pre-filled filter chip showing only this VK's events alongside any related platform actions), **Edit**, **Rotate**, **Revoke**. The Audit history deep-link is the fastest way to reconstruct "who changed this VK, when" during an incident.
 2. **Identity, Activity**: id, prefix, environment, status, description, and humanised **Last used** + **Created** (hover for exact timestamp). Revision number shown when non-zero, increments on every `gateway.virtual_key.updated` audit row.
-3. **Provider fallback chain**: ordered rows, each showing provider icon + readable name + ModelProvider id + position badge (`primary`, `fallback-1`, `fallback-2`, …). The list is computed from the bound routing policy (or the default policy if none is pinned). Clarifies at-a-glance which provider is in the driver's seat and what falls back when it errors.
+3. **Provider fallback chain**: ordered rows, each showing provider icon + readable name + ModelProvider id + position badge (`primary`, `fallback-1`, `fallback-2`, …). The list is computed from the bound routing policy (or the default policy if none is pinned). It shows which provider serves the request first and which ones take over when that one errors.
 4. **Configuration summary**: compact read-only view (no drawer needed) of the runtime config that's actually in effect:
    - **Tags**: colored subtle badges, the same strings shown on the list row.
    - **Cache mode**: badge (`respect`, `force`, `disable`) + TTL on force.
@@ -128,7 +128,7 @@ Disabling a VK stops it without destroying anything: requests on the key are rej
 - `POST /api/gateway/v1/virtual-keys/:id/disable` and `.../enable`, permission `virtualKeys:update`.
 - Each transition emits a webhook event (`gateway.virtual_key.disabled`, `gateway.virtual_key.enabled`) alongside `created` and `revoked`, so a provisioning backend can mirror key state without polling. See [Webhooks](/features/webhooks#family-gateway).
 
-Disable is the pause; revoke is the goodbye. If you find yourself scheduling a revoke "in case the customer comes back", you want disable.
+If you find yourself scheduling a revoke "in case the customer comes back", you want disable.
 
 ## Revocation
 
@@ -146,7 +146,7 @@ A VK belongs to exactly one **organisation** and carries one or more **scope row
 - **Budget cascade**: every applicable budget at any of the VK's scopes is checked. Hard-block at any scope blocks.
 - **Trace attribution**: the gateway tags spans with the most-specific scope match (PROJECT > TEAM > ORG).
 
-For the full semantics — including how multi-scope intersection works and which scope provides `langwatch.project_id` on a span — see [vk-scope-inheritance.feature](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/vk-scope-inheritance.feature) and [vk-config-bundle.feature](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/vk-config-bundle.feature).
+For the full semantics, including how multi-scope intersection works and which scope provides `langwatch.project_id` on a span, see [vk-scope-inheritance.feature](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/vk-scope-inheritance.feature) and [vk-config-bundle.feature](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/vk-config-bundle.feature).
 
 Trace attribution on every request:
 

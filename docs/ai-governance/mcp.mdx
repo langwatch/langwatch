@@ -18,7 +18,7 @@ Model Context Protocol (MCP) is the standard way for agents (Claude Code, Cursor
 - **Type-safe inputs**: the same Zod schemas the REST API and CLI consume are exposed via MCP `inputSchema`, so the agent gets validation feedback before the tool call leaves the client.
 - **Built-in RBAC + audit**: every successful tool call lands in the same audit log as a dashboard click, tagged with `surface="mcp"` for incident response.
 
-The MCP server is the most agent-native of the three governance surfaces. It's also the *highest-leverage* surface for self-hosted onboarding, drop the MCP server into Claude Code, point the agent at a fresh LangWatch deployment, and walk it through setting up the org via a chat conversation.
+The MCP server is the most agent-native of the three governance surfaces. For self-hosted onboarding you can drop the MCP server into Claude Code, point the agent at a fresh LangWatch deployment, and walk it through setting up the org via a chat conversation.
 
 ## Tool naming
 

@@ -7,19 +7,19 @@ description: Connect an API protected by OAuth2 client-credentials (Auth0 machin
 
 # Testing Agents Behind Authentication
 
-Many production agents sit behind an API that requires authentication — most commonly an **OAuth2 client-credentials** flow (Auth0 "machine-to-machine" is the canonical example). LangWatch's HTTP agent type carries a *static* credential (`bearer` / `api_key` / `basic`), which is not enough when a token has to be **exchanged** first.
+Many production agents sit behind an API that requires authentication, most commonly an **OAuth2 client-credentials** flow (Auth0 "machine-to-machine" is the canonical example). LangWatch's HTTP agent type carries a *static* credential (`bearer` / `api_key` / `basic`), which is not enough when a token has to be **exchanged** first.
 
-A **custom code agent** closes that gap: a few lines of Python that fetch the token, call your API with it, and keep the credentials in your project's encrypted secret store — never in the agent's stored source.
+A **custom code agent** closes that gap: a few lines of Python that fetch the token, call your API with it, and keep the credentials in your project's encrypted secret store, never in the agent's stored source.
 
 ## How it fits together
 
 1. **Project secrets** hold the client ID and client secret, encrypted at rest. They are exposed to your code agent's Python as the injected `secrets` namespace.
 2. **The code agent** exchanges the credentials for an access token and calls your protected API with it.
-3. **A scenario** drives the agent like a real user and judges the answers — the agent only passes if it actually got through the auth wall.
+3. **A scenario** drives the agent like a real user and judges the answers. The agent only passes if it got through the auth wall.
 
 ## 1. Store the credentials as project secrets
 
-In **Settings → Secrets**, create the credentials **and** the endpoint coordinates — keeping the endpoints in secrets too means the whole agent is configurable without touching its code or any API.
+In **Settings → Secrets**, create the credentials **and** the endpoint coordinates. Keeping the endpoints in secrets too means the whole agent is configurable without touching its code or any API.
 
 Create **`AUTH0_CLIENT_SECRET` through the Settings → Secrets UI**, not on a command line: a secret passed as a CLI argument lands in your shell history and the process listing, and can end up in CI logs. The non-sensitive coordinates are fine to create via the CLI:
 
@@ -78,23 +78,23 @@ class Code:
 Things the sandbox enforces, in the order people trip on them:
 
 - **Entry point**: `class Code` with `__call__` (no constructor arguments).
-- **`secrets` is injected** into the module globals — it is *not* the Python stdlib `secrets` module. Do **not** `import secrets`; that would shadow the injected namespace. `os.environ` is *not* populated in the sandbox.
+- **`secrets` is injected** into the module globals. It is *not* the Python stdlib `secrets` module. Do **not** `import secrets`; that would shadow the injected namespace. `os.environ` is *not* populated in the sandbox.
 - **Return every declared output key**, or the run fails with `missing_output`.
 - **Available packages**: `requests`, `httpx`, `pydantic`, `langwatch`.
-- **Budget**: the token fetch *plus* your API call must finish inside the runner's wall-clock limit (60s by default) — keep explicit timeouts on both requests.
-- **Failure behavior**: `raise_for_status()` puts the URL and status code in the error — never the request body — so a rejected credential fails loudly without exposing the secret.
+- **Budget**: the token fetch *plus* your API call must finish inside the runner's wall-clock limit (60s by default). Keep explicit timeouts on both requests.
+- **Failure behavior**: `raise_for_status()` puts the URL and status code in the error, never the request body, so a rejected credential fails loudly without exposing the secret.
 
 ## 3. Map the agent's input for scenarios
 
-Because everything else rides the secrets namespace, the agent has a **single input** — the conversation message — and needs exactly one mapping: `message` from the scenario's `input`. That mapping is creatable in the agent editor today.
+Because everything else rides the secrets namespace, the agent has a **single input**, the conversation message, and needs exactly one mapping: `message` from the scenario's `input`. That mapping is creatable in the agent editor today.
 
 <Note>
-  Keeping the endpoint coordinates in secrets is deliberate: the alternative — static `value` mappings on extra inputs — currently cannot be created from the editor UI, only via the agents API. UI support for static value mappings is tracked in [#6371](https://github.com/langwatch/langwatch/issues/6371).
+  Keeping the endpoint coordinates in secrets is deliberate: the alternative, static `value` mappings on extra inputs, currently cannot be created from the editor UI, only via the agents API. UI support for static value mappings is tracked in [#6371](https://github.com/langwatch/langwatch/issues/6371).
 </Note>
 
 ## 4. Run a scenario against it
 
-Create a scenario whose criteria can only pass if the agent really got through the auth wall — e.g. facts that only your protected API returns — bundle it with the agent in a [suite](/agent-simulations/getting-started), and run it. The simulation transcript shows the agent's answers; the run fails if the exchange breaks.
+Create a scenario whose criteria can only pass if the agent got through the auth wall, for example facts that only your protected API returns. Bundle it with the agent in a [suite](/agent-simulations/getting-started), and run it. The simulation transcript shows the agent's answers; the run fails if the exchange breaks.
 
 ```text
 [user]      where is my order #1042?
@@ -102,13 +102,13 @@ Create a scenario whose criteria can only pass if the agent really got through t
             and arrives Thursday before noon.
 ```
 
-That answer exists only behind the auth wall — which is the point: the scenario passing *is* the proof that authentication works.
+That answer exists only behind the auth wall, so the scenario passing is the proof that authentication works.
 
 ## Troubleshooting
 
 | Symptom | Likely cause |
 |---|---|
-| Agent answers are empty | The token exchange or API call raised — check the credentials and endpoint URLs. (Improved error surfacing is tracked in [#6340](https://github.com/langwatch/langwatch/issues/6340).) |
+| Agent answers are empty | The token exchange or API call raised. Check the credentials and endpoint URLs. (Improved error surfacing is tracked in [#6340](https://github.com/langwatch/langwatch/issues/6340).) |
 | `missing_output` error | The Python returned a dict without one of the agent's declared output keys. |
 | Credential works locally but not on the platform | The secret name in `secrets.NAME` doesn't match a stored project secret, or the value was stored in a different project. |
-| Timeout | Token fetch + downstream call exceeded the 60s runner budget — check both endpoints' latency. |
+| Timeout | Token fetch + downstream call exceeded the 60s runner budget. Check both endpoints' latency. |

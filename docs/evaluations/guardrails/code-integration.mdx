@@ -8,7 +8,7 @@ description: Add guardrails to your LLM application to block harmful content in 
   **Let your agent set this up.** [Copy the evaluations prompt](/skills/code-prompts#set-up-evaluations) into your coding agent to get started automatically.
 </Tip>
 
-This guide shows how to integrate guardrails into your application using the LangWatch SDK. Guardrails run evaluators synchronously and return results you can act on immediately.
+The LangWatch SDK runs guardrail evaluators synchronously and returns results you can act on immediately.
 
 ## Basic Usage
 
@@ -144,7 +144,7 @@ def chatbot(user_input):
 
 ### Combined Guardrails
 
-Use both for comprehensive protection:
+Use both to check the input and the output:
 
 ```python
 import langwatch
@@ -362,7 +362,7 @@ Always handle potential errors in guardrail execution:
 import langwatch
 
 @langwatch.trace()
-def robust_chatbot(user_input):
+def chatbot_with_error_handling(user_input):
     try:
         guardrail = langwatch.evaluation.evaluate(
             "azure/jailbreak",

@@ -273,7 +273,7 @@ Rolling twice inside a window discards the secret that was already rolling off, 
 
 ## Signing automation webhooks
 
-Endpoints are not the only thing LangWatch POSTs to you: an [automation trigger](/features/automations) can call a webhook when it fires. Those requests go out unsigned unless you give the trigger a signing secret, in the webhook action's **Signing secret** field.
+An [automation trigger](/features/automations) can also call a webhook when it fires. Those requests go out unsigned unless you give the trigger a signing secret, in the webhook action's **Signing secret** field.
 
 Set one and every fire from that trigger carries the same `X-LangWatch-Signature: t=...,v1=...` header, computed the same way, so the verifier above validates it without a single change. The trigger's own id header is `X-LangWatch-Event-Id` rather than `X-LangWatch-Delivery-Id`, and it groups the attempts of one fire.
 

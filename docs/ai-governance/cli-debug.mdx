@@ -26,7 +26,7 @@ langwatch login --device
 
 The same `~/.langwatch/config.json` the rest of the governance CLI uses persists the Bearer access token. Token TTL is 1h with a long-lived refresh token; the CLI rotates transparently. `langwatch logout` server-revokes both.
 
-The `ingest` and `governance` subcommands are always registered — `langwatch --help` lists them once the CLI is installed. Per-account governance entitlement is enforced server-side.
+The `ingest` and `governance` subcommands are always registered: `langwatch --help` lists them once the CLI is installed. Per-account governance entitlement is enforced server-side.
 
 ## `langwatch governance status`
 
@@ -154,7 +154,7 @@ Polls every 3s for new events newest-first, deduplicating by `eventId` so re-rep
 langwatch ingest tail JxQztBgN90QeX12-afJ0C --follow
 ```
 
-`Ctrl-C` exits cleanly. The follow loop is robust to transient errors, control-plane 5xx prints a yellow `warn` and retries on the next tick rather than killing the stream.
+`Ctrl-C` exits cleanly. The follow loop keeps running through transient errors: a control-plane 5xx prints a yellow `warn` and retries on the next tick rather than killing the stream.
 
 ### `--json`
 

@@ -5,11 +5,11 @@ sidebarTitle: Webhooks & Billing
 keywords: self-hosted webhooks, SSRF, egress, license, billing events, settlement window
 ---
 
-The [webhook endpoints platform](/features/webhooks) and the [billing events surface](/ai-gateway/billing-events) run unchanged on self-hosted deployments. This page covers what the operator controls: the license flag, the outbound egress policy, local receivers for development and internal networks, and billing settlement tuning.
+The [webhook endpoints platform](/features/webhooks) and the [billing events surface](/ai-gateway/billing-events) run unchanged on self-hosted deployments. The operator controls the license flag, the outbound egress policy, local receivers for development and internal networks, and billing settlement tuning.
 
 ## License
 
-Webhook endpoints and the billing pull APIs are gated by the `webhookEndpointsEnabled` flag on your enterprise license. Without it, the REST surfaces answer `403`, delivery does not register, and **Settings > Webhooks** shows the upgrade state. Adding the license to a running deployment lights the surfaces up without a migration, the same flow as every enterprise flag (see [Compliance](/self-hosting/compliance)).
+Webhook endpoints and the billing pull APIs are gated by the `webhookEndpointsEnabled` flag on your enterprise license. Without it, the REST surfaces answer `403`, delivery does not register, and **Settings > Webhooks** shows the upgrade state. Adding the license to a running deployment enables the surfaces without a migration, the same flow as every enterprise flag (see [Compliance](/self-hosting/compliance)).
 
 ## Outbound egress and SSRF policy
 

@@ -5,7 +5,7 @@ sidebarTitle: Billable events
 keywords: billable event, events, pricing, span, evaluation, experiment, simulation, metering, deduplication
 ---
 
-LangWatch Cloud bills on **ingested events per billing period**. This page is the complete list of what produces one, so you can predict a bill from your own workload rather than from a sample.
+LangWatch Cloud bills on **ingested events per billing period**. The list below is complete, so you can predict a bill from your own workload rather than from a sample.
 
 <Note>
 Self-hosted deployments are not metered and send no usage data to LangWatch. This page applies to LangWatch Cloud. See [Editions and licensing](/self-hosting/licensing).
@@ -25,11 +25,11 @@ These are the only events that increment your count. Everything else the platfor
 | A scenario simulation started | `lw.simulation_run.started` | One per run |
 | A simulation recorded a conversation snapshot | `lw.simulation_run.message_snapshot` | One per snapshot |
 
-Spans dominate the count for most customers. A single trace of an agent turn typically contains several spans, one per step.
+Spans dominate the count whenever your app sends traces. A single trace of an agent turn typically contains several spans, one per step.
 
 ### Reading an experiment's cost
 
-An experiment is not one event. A run over 100 dataset rows with 2 evaluators produces roughly `1 started + 100 target results + 200 evaluator results`, so around 301 events. This is worth knowing before a large sweep.
+An experiment counts one event per step, not one for the whole run. A run over 100 dataset rows with 2 evaluators produces roughly `1 started + 100 target results + 200 evaluator results`, so around 301 events. This is worth knowing before a large sweep.
 
 ### Reading a simulation's cost
 

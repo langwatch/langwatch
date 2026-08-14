@@ -4,7 +4,7 @@ description: Make your first request through the LangWatch AI Gateway in five mi
 sidebarTitle: Quickstart
 ---
 
-This walkthrough takes you from zero to a traced, budget-gated LLM response.
+The steps below create a virtual key, send a request through it, read the trace, and cap the spend with a budget.
 
 ## Are you a developer or an admin?
 
@@ -23,7 +23,7 @@ The fastest path depends on which side of the rollout you're on. **Pick one befo
   </Card>
 </CardGroup>
 
-The rest of this page covers the **service-virtual-key** flow used for non-personal traffic (server-to-server calls from your applications, evaluators, prompt playground, etc.). If that's what you're here for, read on.
+The rest of this page uses a **service virtual key**, the flow for non-personal traffic (server-to-server calls from your applications, evaluators, prompt playground, etc.).
 
 <Note>You'll need a LangWatch account, an **organisation admin** or **project admin** role, and at least one model provider (OpenAI, Anthropic, Azure OpenAI, Bedrock, Vertex, or Gemini) configured at **Settings → Model Providers**. If you haven't set one up yet, start there, the AI Gateway reuses those credentials.</Note>
 
@@ -164,7 +164,7 @@ See [Budgets](/ai-gateway/budgets) for full scoping details.
 
 - [Concepts](/ai-gateway/concepts): how VKs, budgets, guardrails, and fallback fit together.
 - [Fallback chains](/ai-gateway/providers/fallback-chains): survive provider outages with no code change.
-- [Caching passthrough](/ai-gateway/caching-passthrough): the load-bearing rule for keeping your 90% Anthropic cache discount.
+- [Caching passthrough](/ai-gateway/caching-passthrough): the rule that keeps your 90% Anthropic cache discount.
 - [CLI Integrations](/ai-gateway/cli/overview): ship the gateway to every developer's Claude Code, Codex, Cursor.
 - [Budgets](/ai-gateway/budgets): cap spend per organization, team, project, key, person, or end user.
 - [Billing and spend events](/ai-gateway/billing-events): the per-request record, for reconciliation and rebilling.

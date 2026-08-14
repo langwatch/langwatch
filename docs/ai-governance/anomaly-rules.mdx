@@ -10,8 +10,6 @@ sidebarTitle: Anomaly rules
 
 Anomaly rules are the "Detect" layer of the [governance control plane](/ai-governance/control-plane#tier-3--audit-log-ingest). The composer at `/settings/governance/anomaly-rules` accepts a rule definition and persists it; the [event-sourcing reactor](/ai-gateway/governance/activity-monitor-event-sourcing) evaluates each rule against incoming events and produces an `AnomalyAlert` row when a violation is detected.
 
-This page documents what the reactor actually evaluates today vs what's preview-only, so you don't author rules that look "active" in the list but never fire.
-
 ## Rule-type coverage
 
 The composer's rule-type dropdown surfaces every shape the schema can hold; the reactor only evaluates one of them today.
@@ -26,7 +24,7 @@ The composer's rule-type dropdown surfaces every shape the schema can hold; the 
 | `pii_leak` | ⏳ Preview | Outbound payload matches a PII regex set | (config schema TBD) |
 | `custom` | ⏳ Preview | User-defined CEL, SQL predicate | (config schema TBD) |
 
-**⏳ Preview** rules can be created and the row will show `active` in the list, but the reactor logs `debug` and skips them, no AnomalyAlert is produced. Until the reactor slice for each ships, treat them as "save the rule for the future, don't expect alerts."
+**⏳ Preview** rules can be created and the row shows `active` in the list, but the reactor logs `debug` and skips them, no AnomalyAlert is produced. Until the reactor slice for each ships, treat them as "save the rule for the future, don't expect alerts."
 
 If you need detection beyond `spend_spike` today, the recommended shape is one of:
 
@@ -67,7 +65,7 @@ Fields the reactor reads:
 | `ratioVsBaseline` | `2.0` | Multiplier, the reactor fires when current spend ≥ baseline × ratio. `2.0` means "double the spend of last week's same-window." |
 | `minBaselineUsd` | `1.0` | Floor, the reactor skips evaluation when the baseline window is below this value. Prevents trivial alerts on cold sources where last week's spend was ~$0.01 and a 2× rise is meaningless. |
 
-Sensible starting values for most orgs:
+Sensible starting values:
 
 | Goal | `windowSec` | `baselineOffsetSec` | `ratioVsBaseline` | `minBaselineUsd` |
 |------|---------------|------------------------|----------------------|---------------------|

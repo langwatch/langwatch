@@ -1,9 +1,9 @@
 ---
-title: Activity Monitor — event-sourcing architecture
+title: Activity Monitor event-sourcing architecture
 description: Why the receiver → event_log → projection reactor → anomaly reactor pipeline replaces the original direct-CH-write design, and how to extend it.
 ---
 
-# Activity Monitor — event-sourcing architecture
+# Activity Monitor event-sourcing architecture
 
 ## Why this exists
 
@@ -14,21 +14,20 @@ plan for anomaly detection (Option C v0) was a poller worker that
 periodically swept active `AnomalyRule` rows and SELECT-ed against
 the CH table.
 
-Per @rchaves's 2026-04-27 directive — *"event sourcing is the one
-true way"* — and @master_orchestrator's follow-up (rebase/learn from
-[PR #3351](https://github.com/langwatch/langwatch/pull/3351)) we
-redesigned the trigger architecture before the eval engine landed.
-The receiver now appends an `ActivityEventReceived` event to
-`event_log`, and a dedicated `activity-monitor-processing` pipeline
-takes over from there. Anomaly detection becomes a reactor that
-fires *as new events arrive*, not a worker that polls.
+We redesigned the trigger architecture before the eval engine landed,
+following the event-sourcing pattern from
+[PR #3351](https://github.com/langwatch/langwatch/pull/3351). The
+receiver appends an `ActivityEventReceived` event to `event_log`, and
+a dedicated `activity-monitor-processing` pipeline takes over from
+there. Anomaly detection is a reactor that fires as new events
+arrive, not a worker that polls.
 
 ## The pipeline
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
 │  /api/ingest/otel/:sourceId  /api/ingest/webhook/:sourceId      │
-│  (Hono routes — auth, validate sourceId, parse body)            │
+│  (Hono routes: auth, validate sourceId, parse body)             │
 └────────────────────────┬───────────────────────────────────────┘
                          │
                          ▼  RecordActivityEventCommand
@@ -65,25 +64,24 @@ fires *as new events arrive*, not a worker that polls.
 ```
 
 The shape mirrors `pipelines/trace-processing/` (PR #3351's
-alertTrigger reactor) — same `definePipeline().withFoldProjection().
-withMapProjection().withReactor()` builder, same
-`ReactorDefinition<EventShape, FoldState>` contract, same
+alertTrigger reactor): the same `definePipeline().withFoldProjection().
+withMapProjection().withReactor()` builder, the same
+`ReactorDefinition<EventShape, FoldState>` contract, the same
 `triggerActionDispatch.ts` shared helper.
 
 ## Why a dedicated pipeline (not bolted onto trace-processing)
 
-Per @master_orchestrator's call: gateway/activity events have
-different aggregate semantics from traces. A trace is a
-multi-span aggregate that folds into a `TraceSummaryData` over
-its lifetime. An activity event is a *single completed
-observation* of upstream platform behaviour — there's no
+Gateway and activity events have different aggregate semantics from
+traces. A trace is a multi-span aggregate that folds into a
+`TraceSummaryData` over its lifetime. An activity event is a *single
+completed observation* of upstream platform behaviour, with no
 multi-event aggregate to fold across; each event already has
-final cost/tokens/actor when it arrives.
+final cost, tokens, and actor when it arrives.
 
 Bolting them onto `trace-processing` would force one of:
 
 1. Activity events get represented as fake single-span traces
-   (lossy + confusing — trace_summaries would mix gateway-proxied
+   (lossy and confusing: trace_summaries would mix gateway-proxied
    traces and per-event activity rows under the same TenantId).
 2. trace_summaries grows a discriminator column and the fold
    projection becomes branchy.
@@ -101,29 +99,28 @@ aggregateId:    EventId  (one event = one aggregate, no fold across events)
 tenantId:       IngestionSource.id  (matches gateway_activity_events.TenantId)
 ```
 
-The fold projection (`anomalyWindow`) does not aggregate events
-*into* an aggregate — it aggregates *across* aggregates within a
-tenant, keyed by tenant + rolling window. That's a different shape
-from trace-processing's "fold spans into a trace summary" —
-in our case the fold is "tally per-tenant rolling spend / request
-count / per-actor breakdown for the past N minutes/hours". Same
-machinery, different aggregate semantics.
+The fold projection (`anomalyWindow`) aggregates *across* aggregates
+within a tenant, keyed by tenant and rolling window, rather than
+folding events *into* one aggregate. Trace-processing folds spans
+into a trace summary; this fold tallies per-tenant rolling spend,
+request count, and per-actor breakdown for the past N minutes or
+hours. Same machinery, different aggregate semantics.
 
 ## Slicing the redesign
 
-Per @master_orchestrator's C0/C1/C2/C3 sequence:
+The redesign ships as four slices, C0 through C3:
 
-### C0 — this doc + spec updates
+### C0: this doc and spec updates
 - This architecture doc.
 - `specs/ai-gateway/governance/anomaly-detection.feature` updated to
   drop poller language; reactor framing throughout.
 - `AnomalyAlert` Prisma model + migration `20260427020000_add_anomaly_alert/`
   doc-comment updated to reference the reactor as producer.
-- Existing receivers continue to write CH directly until C1 lands —
-  this slice is doc-only so the team can review the architecture
+- Existing receivers continue to write CH directly until C1 lands.
+  This slice is doc-only so the team can review the architecture
   before more code moves.
 
-### C1 — receiver → event_log → projection reactor
+### C1: receiver → event_log → projection reactor
 - New event schema: `ActivityEventReceived` with the OCSF-normalised
   ActivityEventRow shape.
 - New command: `RecordActivityEventCommand` wired into the
@@ -136,7 +133,7 @@ Per @master_orchestrator's C0/C1/C2/C3 sequence:
 - Dogfood: curl → 202 → row visible in CH (same as today, just via
   event-sourced path).
 
-### C2 — AnomalyAlert + anomaly reactor for one rule type
+### C2: AnomalyAlert and anomaly reactor for one rule type
 - Apply the AnomalyAlert migration that's already drafted but
   doesn't ship behaviour yet.
 - Add `anomalyWindow` fold projection (per-tenant rolling totals).
@@ -144,10 +141,10 @@ Per @master_orchestrator's C0/C1/C2/C3 sequence:
   (cleanest mapping to the existing CostUSD field).
 - Wire into `api.activityMonitor.recentAnomalies` (replaces current
   `[]` stub).
-- Dogfood: create rule in Alexis's UI → curl violating event →
-  alert appears on `/governance` within ~30s.
+- Dogfood: create a rule in the anomaly rules UI → curl a violating
+  event → alert appears on `/governance` within ~30s.
 
-### C3 — Dispatch destinations
+### C3: Dispatch destinations
 - Generic webhook + log-only first (matches PR #3351's
   triggerActionDispatch shape).
 - Slack / PagerDuty / SIEM / email follow as per-destination
@@ -155,14 +152,14 @@ Per @master_orchestrator's C0/C1/C2/C3 sequence:
 
 ## What we keep from the v0 receiver code
 
-- `IngestionSourceService` (CRUD + auth) — unchanged.
-- `gateway_activity_events` CH schema (migration `00019_*`) —
+- `IngestionSourceService` (CRUD and auth): unchanged.
+- `gateway_activity_events` CH schema (migration `00019_*`):
   unchanged. The map projection writes the same columns.
-- OTel + webhook normalisers (`normalizers/otel.ts` etc.) —
-  unchanged. They get called from the map projection now instead of
-  the receiver handler.
-- All receiver auth + sourceId-mismatch + 24h secret rotation grace —
-  unchanged.
+- OTel and webhook normalisers (`normalizers/otel.ts` etc.):
+  unchanged. The map projection calls them now instead of the
+  receiver handler.
+- All receiver auth, sourceId-mismatch, and 24h secret rotation
+  grace: unchanged.
 
 ## What we drop from the v0 receiver code
 
@@ -181,21 +178,21 @@ Per @master_orchestrator's C0/C1/C2/C3 sequence:
 | C2 | spend_spike scenario in anomaly-detection.feature | reactor test: violating fold state → AnomalyAlert.upsert called | UI rule + violating event → /governance shows alert |
 | C3 | dispatch scenarios in anomaly-detection.feature | reactor test: dispatch helper called with right shape | webhook receives canonical body |
 
-Each slice ships its own BDD + integration coverage before code
-lands; production architecture is reactor-only — `evaluateNow`
-appends a synthetic event and lets the reactor handle it (test
-harness, not parallel code path).
+Each slice ships its own BDD and integration coverage before code
+lands. The production architecture is reactor-only: `evaluateNow`
+appends a synthetic event and lets the reactor handle it (a test
+harness, not a parallel code path).
 
 ## Cross-references
 
-- [PR #3351 — feat: event-driven trace triggers via reactor](https://github.com/langwatch/langwatch/pull/3351)
+- [PR #3351: event-driven trace triggers via reactor](https://github.com/langwatch/langwatch/pull/3351)
   (the pattern this redesign learns from).
-- [`anomaly-detection.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/anomaly-detection.feature)
-  — user-facing contract, updated for event-sourcing.
-- [`anomaly-rules.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/anomaly-rules.feature)
-  — configuration entity (already shipped, unchanged).
-- [`activity-monitor.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/activity-monitor.feature)
-  — admin UI contract (already shipped; pipeline section adds in C1).
-- [`architecture.md`](./architecture.md) — top-level governance
-  architecture; this doc is the activity-monitor deep-dive linked
+- [`anomaly-detection.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/anomaly-detection.feature):
+  user-facing contract, updated for event-sourcing.
+- [`anomaly-rules.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/anomaly-rules.feature):
+  configuration entity (already shipped, unchanged).
+- [`activity-monitor.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/activity-monitor.feature):
+  admin UI contract (already shipped; pipeline section adds in C1).
+- [`architecture.md`](./architecture.md): top-level governance
+  architecture. This doc is the activity-monitor deep-dive linked
   from the "Activity Monitor (Tier C/D)" block.

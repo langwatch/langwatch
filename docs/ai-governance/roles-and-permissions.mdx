@@ -10,7 +10,7 @@ LangWatch RBAC has two layers, two surfaces, and one stitching mechanism:
 - **Two surfaces**: `/settings/roles` (the role catalog: pre-built + custom) and `/settings/role-bindings` (who is bound to what role at what scope).
 - **One stitching mechanism**: a `RoleBinding` row glues a *user* to a *role* at a *scope* (organization, team, project, or governance subscope).
 
-Most orgs never touch this page. The pre-built roles cover the common cases. You only land here when you need to delegate `aiTools:manage` without granting full `organization:manage`, or when an audit asks "who can read the audit log" and you want a screen instead of a Slack thread.
+The pre-built roles cover the common cases. You only land here when you need to delegate `aiTools:manage` without granting full `organization:manage`, or when an audit asks "who can read the audit log" and you want a screen instead of a Slack thread.
 
 <Info>**Pairs with:** [Members & invites](/ai-governance/members-and-invites) (assigning roles when inviting), [Audit log](/ai-governance/audit-log) (every role binding mutation records a row), and [AI Gateway → RBAC](/ai-gateway/rbac) (the gateway-side enforcement of permissions).</Info>
 
@@ -22,7 +22,7 @@ The three pre-built org roles. Each user in the org has exactly one.
 |---|---|---|
 | **ADMIN** | First user to sign in becomes admin | `organization:view`, `organization:manage`, `organization:delete`; the full governance surface (`governance:view`, `governance:manage`, `ingestionSources:*`, `anomalyRules:*`, `complianceExport:view`, `activityMonitor:view`); `aiTools:view` + `aiTools:manage`. |
 | **MEMBER** | Default for invitees | `organization:view`, `aiTools:view`. **No** governance permissions, **no** member-list reads, **no** audit log access by default. The team-role (below) is what gives them anything beyond `/me`. |
-| **EXTERNAL** | Lite-member shape, opt-in via the invite drawer | Same as MEMBER. EXTERNAL also has stricter team-level defaults: even when on a team they default to view-only on most resources. |
+| **EXTERNAL** | Lite-member shape, opt-in via the invite drawer | Same as MEMBER. EXTERNAL also has stricter team-level defaults: even when on a team they default to view-only, apart from annotations (see [Seats](#seats)). |
 
 The minimum-privilege default is intentional: an `ORGANIZATION` role binding for a MEMBER does **not** grant team-level access. Team-level permissions come from team-role bindings (next).
 
@@ -70,7 +70,7 @@ The four pre-built team roles. A user can have **different** team roles on diffe
 | Team role | What it grants by default |
 |---|---|
 | **ADMIN** | The full team-scoped permission set: `project:create/update`, `analytics:manage`, `traces:create`, `virtualKeys:create/update/rotate/manage`, `gatewayBudgets:view/manage`, `gatewayProviders:view/update/manage`, `routingPolicies:view/manage`, `gatewayGuardrails:view/attach/detach/manage`, `gatewayLogs:view`, `auditLog:view`, `gatewayUsage:view`, `gatewayCacheRules:*`. |
-| **MEMBER** | Same shape minus the `*:manage` permissions. Read + create + update on most resources; can't delete or reconfigure providers, policies. |
+| **MEMBER** | Same shape minus the `*:manage` permissions. Read, create and update on the same resources; can't delete or reconfigure providers, policies. |
 | **VIEWER** | View-only across the team. No create, update, delete on anything. The right shape for stakeholders who need read access to a team's traces but should never reconfigure anything. |
 | **CUSTOM** | Empty by default. Permissions come from the `CustomRolePermissions` JSON column on the `RoleBinding` row, see [Custom roles](#custom-roles) below. |
 
@@ -88,7 +88,7 @@ Every gate in the codebase is a string of the shape `<resource>:<verb>`. The ful
 
 ## What `organization:manage` gates today
 
-After this PR's RBAC defense-in-depth pass, the legacy `/settings/{audit-log, teams, members, roles, groups}` pages all require `organization:manage` (admins only). Underlying tRPC procedures match, `role.getAll`, `organization.getAllOrganizationMembers`, `organization.getOrganizationPendingInvites`, `team.getTeamsWithRoleBindings`, `organization.getMemberById`, `group.getById`, `group.listForMember`, `group.listAll`, `limits.checkAndSendUsageLimitNotification` are all gated to `organization:manage` server-side.
+The legacy `/settings/{audit-log, teams, members, roles, groups}` pages all require `organization:manage` (admins only). Underlying tRPC procedures match, `role.getAll`, `organization.getAllOrganizationMembers`, `organization.getOrganizationPendingInvites`, `team.getTeamsWithRoleBindings`, `organization.getMemberById`, `group.getById`, `group.listForMember`, `group.listAll`, `limits.checkAndSendUsageLimitNotification` are all gated to `organization:manage` server-side.
 
 Picker procedures (`team.getTeamsWithMembers`, `team.getTeamWithMembers`, `organization.getOrganizationWithMembersAndTheirTeams`) intentionally stay on `organization:view` so non-admin pickers (the AddAutomationDrawer, GroupBindingInputRow, project pickers, onboarding flows) continue working, but they redact other members' email addresses to `null` for non-admin callers and strip other users' [Personal Workspaces](/ai-governance/workspaces#personal-workspace-privacy) from the result entirely.
 

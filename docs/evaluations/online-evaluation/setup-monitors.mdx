@@ -13,9 +13,9 @@ description: Set up online evaluation monitors in LangWatch to score outputs ins
   allowFullScreen
 ></iframe>
 
-Once you ran all experiments, you are sure of the quality, and you get your LLM application live in production, this is not the end of the story, in fact it's just the beginning. To make sure that the quality is good and it's safe in production for your users, and to improve your application, you need to be constantly monitoring it with Online evaluation in production.
+After you run all your experiments and get your LLM application live in production, you need to keep monitoring it. Online evaluation checks that the quality is good and that the application is safe for your users in production, and gives you the data to improve it.
 
-Online evaluation can not only alert you when things go wrong and guardrail safety issues, but also help you generate insights and build your datasets automatically, so each time you have more and more valuable data for optimizing your AI application.
+Online evaluation alerts you when things go wrong, guards against safety issues, generates insights, and builds your datasets automatically, so you keep collecting data for optimizing your AI application.
 
 {/* In this guide, we'll explore in depth a few use cases for online evaluation, and how you can set them up in LangWatch:
 
@@ -33,11 +33,11 @@ Online evaluation can not only alert you when things go wrong and guardrail safe
 
 ## Real-Time Evaluations for Safety
 
-Just like all web applications need standard safety protections from for example DDOS attacks, it's now the default practice to add sane protections to LLM applications too, like PII detection to know when sensitive data is being exposed, or protection agains Prompt Injection, listed as the number 1 vulnerability for LLMs on the [OWASP Top 10](https://owasp.org/www-project-top-10-for-large-language-model-applications/).
+Just like all web applications need standard safety protections from for example DDOS attacks, it's now the default practice to add sane protections to LLM applications too, like PII detection to know when sensitive data is being exposed, or protection against Prompt Injection, listed as the number 1 vulnerability for LLMs on the [OWASP Top 10](https://owasp.org/www-project-top-10-for-large-language-model-applications/).
 
 ### Setting up a Prompt Injection detection monitor
 
-On LangWatch, it's very easy to set up a prompt injection detection, and making sure it works well with your data, so you can monitor any incidents and get alerted.
+On LangWatch, you set up prompt injection detection, check that it works with your data, and get alerted on any incidents.
 
 First, go to the [Online Evaluations page](https://app.langwatch.ai/@project/online-evaluations) and click New Online Evaluation:
 
@@ -83,13 +83,13 @@ Make sure the input from your dataset is correctly mapped to the input of the ev
 <img src="/images/real-time-evaluation/image 2.png" alt="" style={{ maxWidth: '400px' }} />
 </Frame>
 
-That's it! Go to the final step, let's name our evaluation simply "Prompt Injection", and you are ready to run a Trial Evaluation now:
+Go to the final step, name the evaluation "Prompt Injection", and you are ready to run a Trial Evaluation now:
 
 <Frame>
 <img src="/images/real-time-evaluation/image.psd(5).png" alt="" style={{ maxWidth: '400px' }} />
 </Frame>
 
-Our test is successful! You can see that the first row passes as expected, and the second fails as a Prompt Injection attempt was detected. If you want to try more examples, you can go back to the dataset and add more cases, but looks like we are good to go!
+The test is successful: the first row passes as expected, and the second fails because a Prompt Injection attempt was detected. To try more examples, go back to the dataset and add more cases.
 
 <Frame>
 <img src="/images/real-time-evaluation/image 3.png" alt="" style={{ maxWidth: '400px' }} />
@@ -101,7 +101,7 @@ Now click "Enable Monitoring":
 <img src="/images/real-time-evaluation/image.psd(6).png" alt="" style={{ maxWidth: '400px' }} />
 </Frame>
 
-That's it, we are now monitoring messages for any Jailbreak Attempts:
+LangWatch now monitors your messages for Jailbreak Attempts:
 
 <Frame>
 <img src="/images/real-time-evaluation/image 4.png" alt="" style={{ maxWidth: '400px' }} />

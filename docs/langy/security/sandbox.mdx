@@ -1,6 +1,6 @@
 ---
 title: How Langy is Isolated
-description: Langy runs each conversation as an isolated worker under a gVisor sandbox, with per-worker file and control-port walls and an L7 egress adapter; this page states exactly what each layer blocks and where the boundary is only cooperative today.
+description: Langy runs each conversation as an isolated worker under a gVisor sandbox, with per-worker file and control-port walls and an L7 egress adapter that is cooperative rather than mandatory today.
 sidebarTitle: Sandbox and isolation
 keywords:
   - ai agent sandbox
@@ -29,7 +29,7 @@ Langy is isolated at several layers, from the pod boundary down to the walls bet
 | Worker to external (optional, hard) | Cilium `toFQDNs` on the floor, or a per-worker network namespace (ADR-033 Fix B) | Cilium / netns (planned, see below) |
 | Control plane to agent | `LANGY_INTERNAL_SECRET` bearer token, constant-time compared; the agent Service is ClusterIP only and never exposed outside the cluster | Go |
 
-The manager process runs as root in the container, which is load-bearing: assigning a distinct UID per worker needs `CAP_SETUID`, `CAP_SETGID`, and `CAP_CHOWN`.
+The manager process runs as root in the container, because assigning a distinct UID per worker needs `CAP_SETUID`, `CAP_SETGID`, and `CAP_CHOWN`.
 
 To keep the blast radius small, the container drops all capabilities and adds back only five: `CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETUID`, and `SETGID`. It also sets `allowPrivilegeEscalation: false` and `readOnlyRootFilesystem: true`.
 

@@ -15,7 +15,7 @@ export OPENAI_API_BASE="https://gateway.langwatch.ai/v1"
 aider --model gpt-5-mini
 ```
 
-For Anthropic Claude models, Aider uses `litellm` under the hood, it will route `anthropic/claude-*` model names through its Anthropic handler, which uses `ANTHROPIC_BASE_URL`:
+For Anthropic Claude models, Aider uses `litellm` under the hood, and it routes `anthropic/claude-*` model names through its Anthropic handler, which uses `ANTHROPIC_BASE_URL`:
 
 ```bash
 export ANTHROPIC_API_KEY="vk-lw-01HZX..."
@@ -24,7 +24,7 @@ export ANTHROPIC_BASE_URL="https://gateway.langwatch.ai"
 aider --model anthropic/claude-sonnet-4-6
 ```
 
-This hits the gateway's `/v1/messages` endpoint, which is Anthropic-native and preserves `cache_control` blocks byte-for-byte (load-bearing for Aider's repo-map caching, see below).
+This hits the gateway's `/v1/messages` endpoint, which is Anthropic-native and preserves `cache_control` blocks byte-for-byte, which Aider's repo-map caching depends on (see below).
 
 ## Cache-aware repo maps
 

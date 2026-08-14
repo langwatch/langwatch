@@ -44,7 +44,7 @@ kubectl -n langwatch port-forward svc/langwatch-app 5560:5560
 ```
 
 <Warning>
-`autogen.enabled=true` generates random secrets on each install. This is fine for testing but not for production, secrets will change on reinstall and invalidate sessions. See [Production Deployment](#production-deployment) below.
+`autogen.enabled=true` generates random secrets on each install. This is fine for testing but not for production, secrets change on reinstall and invalidate sessions. See [Production Deployment](#production-deployment) below.
 </Warning>
 
 ## Low-Resources Deployment
@@ -89,7 +89,7 @@ kubectl -n langwatch create secret generic langwatch-app-secrets \
 
 If you run with `gateway.chartManaged: false` (no AI gateway proxy), skip the two `LW_GATEWAY_*` lines.
 
-For chart-managed ClickHouse (the default), create the credentials Secret too. With `autogen.enabled=false` the chart will not materialise this Secret itself. The deployment composes `CLICKHOUSE_URL` at runtime from the password key:
+For chart-managed ClickHouse (the default), create the credentials Secret too. With `autogen.enabled=false` the chart does not materialise this Secret itself. The deployment composes `CLICKHOUSE_URL` at runtime from the password key:
 
 ```bash
 kubectl create secret generic langwatch-clickhouse-creds \
@@ -173,7 +173,7 @@ clickhouse:
     size: 100Gi
   auth:
     # Operator-owned Secret (created above). With autogen.enabled=false the
-    # chart will not materialise a ClickHouse Secret; point at the one you
+    # chart does not materialise a ClickHouse Secret; point at the one you
     # created and the deployment composes CLICKHOUSE_URL at runtime from
     # its password key.
     existingSecret: langwatch-clickhouse-creds
@@ -304,7 +304,7 @@ helm install langwatch langwatch/langwatch \
 ```
 
 <Note>
-Replicated ClickHouse requires an odd number of replicas (3, 5, 7) for Keeper consensus. 3 replicas is recommended for most deployments.
+Replicated ClickHouse requires an odd number of replicas (3, 5, 7) for Keeper consensus. Use 3 replicas unless you have a specific reason for more.
 </Note>
 
 ## Overlay System

@@ -97,7 +97,7 @@ Overflow menu → **Remove from org**. The user loses every team membership, eve
 What the user controls about their own account lives at `/settings/authentication`, the same URL used by both the governance/Personal-Workspace shell and the legacy non-governance LLMOps shell. The page renders one of three shapes depending on how your org is configured:
 
 - **Email + password**: single Change Password row. The default shape for self-hosted Apache 2.0 deployments + dev orgs without an SSO enforced.
-- **SSO enforced**: *"You sign in via your company's SSO provider"* status row, no add-method affordance. The right shape for almost every enterprise deployment, since most orgs lock down to a single SSO provider.
+- **SSO enforced**: *"You sign in via your company's SSO provider"* status row, no add-method affordance. This is the shape for any org that enforces a single SSO provider.
 - **Auth0 + no enforced SSO (rare)**: linked OAuth providers list (Google, GitHub, Microsoft) with an optional Link-another button. Only relevant when the deployment is on Auth0 *and* the admin hasn't enforced one provider.
 
 The page is per-user. There's no admin gate, every member of the org can manage their own credentials here. Admins don't manage other users' sign-in methods from this page; user-account-management is by-design self-service.

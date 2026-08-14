@@ -4,7 +4,7 @@ description: A 30-minute admin walkthrough, publish a routing policy, configure 
 sidebarTitle: First 30 minutes (admin)
 ---
 
-You are an org admin standing in front of a fresh LangWatch deployment. By the end of this page you will have:
+You are an org admin on a fresh LangWatch deployment. By the end of this page you will have:
 
 - Published a default [Routing Policy](/ai-gateway/governance/routing-policies) so developers can sign in via `langwatch login`.
 - Configured an [Ingestion Source](/ai-governance/ingestion-sources/index) that lands telemetry from your gateway (or any OTLP-compatible upstream) in the unified trace store.
@@ -34,7 +34,7 @@ Publish at least one policy *before* opening CLI sign-in to your team:
 
 1. Navigate to **Settings → Routing Policies** (`/settings/routing-policies`).
 2. Click **+ New routing policy**.
-3. Pick a recommended starter shape, for most orgs, "Anthropic primary, OpenAI fallback, prompt caching on" works on day one.
+3. Pick a recommended starter shape: "Anthropic primary, OpenAI fallback, prompt caching on" works on day one.
 4. Tick **Mark as default** before saving.
 
 The same chain controls cost, latency, fallback, and prompt caching across every CLI your developers use later. The full reference (provider order, fallback semantics, model aliasing, `policy_rules.tools.deny`) lives in [Routing Policies](/ai-gateway/governance/routing-policies).
@@ -50,7 +50,7 @@ For a brand-new org, the cheapest first source is `otel_generic`, it's available
 3. The backend mints a `lw_is_<base64url>` ingest secret and shows it **once** in a one-time-reveal modal, copy it now. The list endpoint never returns it again.
 4. Paste the secret into the upstream platform's OTLP exporter as `Authorization: Bearer lw_is_<secret>`. The receiver endpoint is on the same host as the rest of LangWatch.
 
-The source flips to `active` on the first received event. The full per-platform setup (Cowork, Workato, S3, Copilot Studio, OpenAI/Anthropic compliance APIs) lives in [Ingestion Sources](/ai-governance/ingestion-sources/index): most are available on Enterprise plans.
+The source flips to `active` on the first received event. The full per-platform setup (Cowork, Workato, S3, Copilot Studio, OpenAI/Anthropic compliance APIs) lives in [Ingestion Sources](/ai-governance/ingestion-sources/index): these source types require an Enterprise plan.
 
 If no upstream is ready yet, skip this step. Your gateway itself is an implicit source: every Personal VK developer makes adds spans to the same trace store via the gateway's own pipeline.
 
@@ -77,7 +77,7 @@ A LangWatch org with one admin is not a particularly useful org. Invite a collea
 
 1. Navigate to **Settings → Members** (`/settings/members`).
 2. Click **+ Add members**.
-3. Type their email, pick a role (`Member` for most cases, `Admin` if they should help configure the org), and pick which teams they belong to.
+3. Type their email, pick a role (`Member` by default, `Admin` if they should help configure the org), and pick which teams they belong to.
 4. Click **Send invites**.
 
 The colleague receives an email with a one-click accept link. After they sign in via your company SSO they appear in the **Organization Members** list with their assigned role.
@@ -120,7 +120,7 @@ The deep reference for budget shape, fallback semantics, and the WARN response t
 
 ## Step 8: Write your first anomaly rule
 
-Budgets enforce *at* the limit. [Anomaly rules](/ai-governance/anomaly-rules) detect *before* it, the patterns that precede a breach (spend spike, geo-mismatch, off-hours usage). The reactor evaluates `spend_spike` rules live today; other rule types are preview-only (the [coverage table](/ai-governance/anomaly-rules#rule-type-coverage) is honest about which is which).
+Budgets enforce *at* the limit. [Anomaly rules](/ai-governance/anomaly-rules) detect *before* it, the patterns that precede a breach (spend spike, geo-mismatch, off-hours usage). The reactor evaluates `spend_spike` rules live today; other rule types are preview-only (the [coverage table](/ai-governance/anomaly-rules#rule-type-coverage) marks which is which).
 
 Write a starter `spend_spike` rule:
 
@@ -142,7 +142,7 @@ Write a starter `spend_spike` rule:
      ```
 4. Click **Create rule**.
 
-The reactor will start evaluating from the next ingest event. When today's 24h spend exceeds 2× last week's same-day baseline (and the baseline was at least \$1, to avoid noise on quiet days), the reactor writes an `AnomalyAlert` row visible in `/governance` and surfaces it in the [`activityMonitor.recentAnomalies`](/ai-governance/anomaly-rules) procedure.
+The reactor starts evaluating from the next ingest event. When today's 24h spend exceeds 2× last week's same-day baseline (and the baseline was at least \$1, to avoid noise on quiet days), the reactor writes an `AnomalyAlert` row visible in `/governance` and surfaces it in the [`activityMonitor.recentAnomalies`](/ai-governance/anomaly-rules) procedure.
 
 ## Where to next
 

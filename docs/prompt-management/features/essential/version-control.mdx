@@ -5,7 +5,7 @@ description: "Manage version control for prompts in LangWatch to run evaluations
 
 # Prompt Version Control
 
-LangWatch provides a robust version control system for managing your prompts. Each prompt can have multiple versions, allowing you to track changes, experiment with different approaches, and rollback when needed.
+LangWatch provides a version control system for managing your prompts. Each prompt can have multiple versions, allowing you to track changes, experiment with different approaches, and rollback when needed.
 
 ## Version Management
 
@@ -22,7 +22,7 @@ Prompts have two scope levels that affect version management and conflict resolu
 
 <Warning>
   **Scope Conflicts**: When updating an organization-scoped prompt, conflicts
-  may arise if other projects have made changes. The system will provide
+  may arise if other projects have made changes. The system provides
   conflict information to help resolve differences.
 </Warning>
 
@@ -118,7 +118,7 @@ curl --request GET \
 
 ## CRUD Operations
 
-The SDK provides comprehensive CRUD operations for managing prompts programmatically:
+The SDK provides CRUD operations for managing prompts programmatically:
 
 <Note>
 **Field Structure**: All examples show the essential fields. Additional optional fields like `temperature`, `maxTokens`, `responseFormat`, `inputs`, `outputs`, `demonstrations`, and `promptingTechnique` can also be set. See the [Data Model](/prompt-management/data-model) page for complete field documentation.
@@ -276,7 +276,7 @@ Remove entire prompts and all their versions:
 
 ## Advanced Prompt Capabilities
 
-Beyond basic prompt creation, LangWatch provides powerful features for optimizing and managing your AI interactions:
+Beyond basic prompt creation, LangWatch provides these features for optimizing and managing your AI interactions:
 
 ### Response Format Control
 - **Structured Output**: Use `responseFormat: { type: "json_schema" }` to get consistent, parseable responses
@@ -297,13 +297,13 @@ Beyond basic prompt creation, LangWatch provides powerful features for optimizin
 - **Model Selection**: Choose the best model for your specific use case
 
 <Tip>
-These advanced features are particularly powerful when combined with LangWatch's optimization studio,
+Combine these advanced features with LangWatch's optimization studio,
 where you can A/B test different configurations and measure their impact on performance metrics.
 </Tip>
 
 ### Optimization Studio Integration
 
-The optimization studio leverages these advanced prompt capabilities to help you:
+The optimization studio uses these advanced prompt capabilities to help you:
 
 - **A/B Testing**: Compare different prompt versions, models, and configurations
 - **Performance Metrics**: Measure response quality, latency, and cost across variations
@@ -326,7 +326,7 @@ Learn how to use advanced prompt features to improve your AI application perform
 </Frame>
 
 - **Version List**: See all versions with timestamps and commit messages
-- **Rollback**: Easily revert to previous versions
+- **Rollback**: Revert to previous versions
 {/* TODO: - **Diff View**: Compare changes between versions */}
 {/* TODO: - **Branching**: Create experimental versions without affecting production */}
 

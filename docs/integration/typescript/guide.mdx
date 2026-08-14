@@ -25,7 +25,7 @@ import LLMsTxtProtip from "/snippets/llms-txt-protip.mdx";
   </div>
 </div>
 
-Get started with LangWatch TypeScript SDK in under 5 minutes. This guide will walk you through setting up observability for your LLM applications, from basic tracing to advanced features.
+Get started with LangWatch TypeScript SDK in under 5 minutes. It adds observability to your LLM applications, from basic tracing to advanced features.
 
 <LLMsTxtProtip />
 
@@ -123,14 +123,14 @@ npx tsx app.ts
 Now visit your LangWatch dashboard - you should see your first trace! 🎉
 
 <Check>
-**What you'll see**: A trace named "greet-user" with input/output data, timing, and status.
+**What you'll see**: A trace named "ask-ai" with input/output data, timing, and status.
 </Check>
 
 ## What Just Happened?
 
 Let's break down what we just set up:
 
-- **Trace**: The entire `greetUser` function execution
+- **Trace**: The entire `askAI` function execution
 - **Span**: The individual operation within the trace
 - **Input/Output**: The data flowing through your function
 - **Timing**: How long each operation took
@@ -155,7 +155,7 @@ For consistent observability across your application, learn about [Semantic Conv
 
 ## Integrations
 
-LangWatch offers seamless integrations with many popular TypeScript libraries and frameworks. These integrations provide automatic instrumentation, capturing relevant data from your LLM applications with minimal setup.
+LangWatch offers integrations with many popular TypeScript libraries and frameworks. These integrations provide automatic instrumentation, capturing relevant data from your LLM applications with minimal setup.
 
 Below is a list of currently supported integrations. Click on each to learn more about specific setup instructions and available features:
 
@@ -318,8 +318,8 @@ const handle = setupObservability({
 ```
 
 **LangWatch never terminates your process.** Node runs every listener registered for a
-signal, so if your application has its own shutdown logic — draining a queue, finishing
-in-flight database writes, closing connections — LangWatch flushes its traces and then
+signal, so if your application has its own shutdown logic (draining a queue, finishing
+in-flight database writes, closing connections), LangWatch flushes its traces and then
 stands aside. Your handler decides when the process ends, and it is never cut off
 part-way through.
 
@@ -332,8 +332,8 @@ not installed.
 <Warning>
   Earlier SDK versions called `process.exit(0)` as soon as LangWatch's own flush
   finished, which ended the process out from under any other `SIGINT` / `SIGTERM`
-  listener. If your application relied on that to terminate — because it registers a
-  signal handler that never exits the process itself — either exit at the end of your own
+  listener. If your application relied on that to terminate (because it registers a
+  signal handler that never exits the process itself), either exit at the end of your own
   handler (recommended) or set `advanced.UNSAFE_exitProcessAfterAutoShutdown: true` to
   restore the old behaviour while you migrate.
 </Warning>

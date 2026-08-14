@@ -6,7 +6,7 @@ sidebarTitle: Track your Claude Code usage
 
 The Anthropic Console gives you a monthly total, but nothing about which prompt cost what, which model handled which turn, how many tokens came from the prompt cache vs fresh, or what the assistant actually said in long agentic runs. Without that, you can't debug your own agent.
 
-This guide wires Claude Code up so all of that lands on LangWatch, where you can browse:
+Wire Claude Code to LangWatch and all of that lands there, where you can browse:
 
 - Cost per session and per turn
 - Model used per turn, including subagents
@@ -156,15 +156,15 @@ Within ~30 seconds of your first turn:
 
 Use this when you have both work and personal repos on the same machine, want telemetry on for specific repos only, run plain `claude` (no wrapper), want the configuration auto-applied per repo at launch with no leak to personal repos.
 
-This is a **delivery method**, not a third billing path — it works under either Path 1 or Path 2's billing model. Instead of the `langwatch claude` wrapper injecting environment variables at spawn time, Claude Code reads them from `.claude/settings.json` in your project root at launch. The LangWatch-specific wiring connects to the **project** OTLP endpoint (`/api/otel/v1/traces`). For why the project endpoint is the correct home for Claude Code's own usage telemetry (versus the governance IngestionSource plane), see [Choosing the right OTel endpoint](/observability/trace-vs-activity-ingestion). For how Claude Code's `env` block works and its settings-precedence rules, see the [Claude Code settings reference](https://code.claude.com/docs/en/settings) — this section documents only the LangWatch wiring.
+This is a **delivery method**, not a third billing path. It works under either Path 1 or Path 2's billing model. Instead of the `langwatch claude` wrapper injecting environment variables at spawn time, Claude Code reads them from `.claude/settings.json` in your project root at launch. The LangWatch-specific wiring connects to the **project** OTLP endpoint (`/api/otel/v1/traces`). For why the project endpoint is the correct home for Claude Code's own usage telemetry (versus the governance IngestionSource plane), see [Choosing the right OTel endpoint](/observability/trace-vs-activity-ingestion). For how Claude Code's `env` block works and its settings-precedence rules, see the [Claude Code settings reference](https://code.claude.com/docs/en/settings). This section documents only the LangWatch wiring.
 
 <Info>A repo with no `.claude/settings.json` `env` block, run with plain `claude`, emits zero telemetry to LangWatch.</Info>
 
 ### Get your project key
 
-The key you need is a standard LangWatch project API key (`sk-lw-…`). Mint it at [app.langwatch.ai/authorize](https://app.langwatch.ai/authorize) — the same self-serve page that produces `LANGWATCH_API_KEY` in the quick-start guide.
+The key you need is a standard LangWatch project API key (`sk-lw-…`). Mint it at [app.langwatch.ai/authorize](https://app.langwatch.ai/authorize), the same self-serve page that produces `LANGWATCH_API_KEY` in the quick-start guide.
 
-Minting requires a live device session. If the mint returns 401, re-run `langwatch login --device` to refresh it. Once minted, **ingestion does not need a live session** — the key authenticates the OTLP endpoint standalone; your `claude` sessions keep sending traces even after the device session expires.
+Minting requires a live device session. If the mint returns 401, re-run `langwatch login --device` to refresh it. Once minted, **ingestion does not need a live session**. The key authenticates the OTLP endpoint standalone, so your `claude` sessions keep sending traces even after the device session expires.
 
 An `ik-lw-` write-only key (obtainable via the governance REST endpoint) also authenticates the project OTLP endpoint, but `sk-lw-` is the documented self-serve path.
 
@@ -200,9 +200,9 @@ The committed file decides the shape of the export. What that export carries is 
 
 The two export intervals set how often Claude Code flushes; the defaults are 5 seconds for logs and 60 seconds for metrics, which is long enough that a first check looks like a failure.
 
-For self-hosted (`npx @langwatch/server`), replace the endpoint with `http://localhost:5560/api/otel`. The SDK auto-appends `/v1/traces`, `/v1/logs`, `/v1/metrics` — never write the per-signal path yourself.
+For self-hosted (`npx @langwatch/server`), replace the endpoint with `http://localhost:5560/api/otel`. The SDK auto-appends `/v1/traces`, `/v1/logs`, `/v1/metrics`. Never write the per-signal path yourself.
 
-**`.claude/settings.local.json`** (gitignore this — add `.claude/settings.local.json` to `.gitignore`):
+**`.claude/settings.local.json`** (gitignore this: add `.claude/settings.local.json` to `.gitignore`):
 
 ```json
 {
@@ -218,7 +218,7 @@ For self-hosted (`npx @langwatch/server`), replace the endpoint with `http://loc
 }
 ```
 
-<Warning>**`OTEL_RESOURCE_ATTRIBUTES` is not merged across files — the higher-precedence file fully replaces it.** `settings.local.json` wins over `settings.json`, so if you set `OTEL_RESOURCE_ATTRIBUTES` in both, the local file's value completely replaces the committed one. Carry all three attributes (`project.repo`, `cost_center`, `enduser.id`) together in the local file, or `project.repo` is silently dropped from every span.</Warning>
+<Warning>**`OTEL_RESOURCE_ATTRIBUTES` is not merged across files. The higher-precedence file fully replaces it.** `settings.local.json` wins over `settings.json`, so if you set `OTEL_RESOURCE_ATTRIBUTES` in both, the local file's value completely replaces the committed one. Carry all three attributes (`project.repo`, `cost_center`, `enduser.id`) together in the local file, or `project.repo` is silently dropped from every span.</Warning>
 
 ### Verify
 
@@ -227,17 +227,17 @@ Run `claude` for at least one turn, then send a test trace or inspect the OTLP r
 1. The response body contains `"Trace received successfully."` (not just HTTP 200).
 2. `partialSuccess.rejectedSpans` equals `0` over a **non-empty** body (at least one span submitted).
 
-A bare HTTP 200 is not proof — an empty payload returns `{"message":"No traces to process"}` with 200, and a malformed span returns `rejectedSpans:1` with 200. Both are silent failures.
+A bare HTTP 200 is not proof. An empty payload returns `{"message":"No traces to process"}` with 200, and a malformed span returns `rejectedSpans:1` with 200. Both are silent failures.
 
 View confirmed traces in `/traces` and cost attribution in `/me`.
 
-`langwatch ingest list` will be **empty** for this path — that is expected. `ingest list` surfaces governance IngestionSources only (the `lw_is_` plane); project-plane traces never create an IngestionSource. Verify via `/traces` and `/me`, not `ingest list`.
+`langwatch ingest list` is **empty** for this path, which is expected. `ingest list` surfaces governance IngestionSources only (the `lw_is_` plane); project-plane traces never create an IngestionSource. Verify via `/traces` and `/me`, not `ingest list`.
 
 ### Gotchas
 
 **Claude Code reads `settings.json` `env` at launch.** A session already running when you add or change the `env` block emits nothing until you restart `claude`. If telemetry is missing after editing the file, exit and relaunch.
 
-**`.gitignore` covering all of `.claude/` silently swallows the committed `settings.json`.** Some repos ignore the entire `.claude/` directory for privacy. That prevents `git add` from staging `settings.json`, so teammates never inherit the telemetry flags — yet local telemetry still works for you (the file is present on disk), so you won't notice. Fix: either `git add -f .claude/settings.json` to force-track it, or — if you want the file tracked by default — fix the `.gitignore` itself. A bare `!.claude/settings.json` negation is a no-op here, because git won't descend into an excluded directory to re-include a file under it. You have to un-ignore the directory first, then re-ignore the secret files:
+**`.gitignore` covering all of `.claude/` silently swallows the committed `settings.json`.** Some repos ignore the entire `.claude/` directory for privacy. That prevents `git add` from staging `settings.json`, so teammates never inherit the telemetry flags, yet local telemetry still works for you (the file is present on disk), so you won't notice. Fix: either `git add -f .claude/settings.json` to force-track it, or, if you want the file tracked by default, fix the `.gitignore` itself. A bare `!.claude/settings.json` negation is a no-op here, because git won't descend into an excluded directory to re-include a file under it. You have to un-ignore the directory first, then re-ignore the secret files:
 
 ```gitignore
 .claude/
@@ -248,9 +248,9 @@ View confirmed traces in `/traces` and cost attribution in `/me`.
 
 After this, `git check-ignore .claude/settings.json` reports it is no longer ignored (so it commits), while `settings.local.json` stays ignored (so your token is safe).
 
-**Shared key vs key per repo.** One `sk-lw-` key can serve any number of repos — attribution rides on the `project.repo` resource attribute, not the key itself. However, revoking a shared key (app/dashboard only — no CLI revoke) kills telemetry for all repos using it. If you need isolated blast radius, mint a separate key per repo.
+**Shared key vs key per repo.** One `sk-lw-` key can serve any number of repos: attribution rides on the `project.repo` resource attribute, not the key itself. However, revoking a shared key (app/dashboard only, no CLI revoke) kills telemetry for all repos using it. If you need isolated blast radius, mint a separate key per repo.
 
-**Telemetry is scoped to the launch directory, not the git repository identity.** Claude Code resolves `.claude/settings.json` by walking up from the working directory at launch — so starting from a subdirectory still works via walk-up. A git worktree of the same repo is a separate directory tree; its gitignored `settings.local.json` does not carry over from the main worktree, so telemetry silently won't apply in the worktree unless you re-wire it there. `project.repo` is a hand-set label in `OTEL_RESOURCE_ATTRIBUTES` — it is not derived from the git remote or any git metadata.
+**Telemetry is scoped to the launch directory, not the git repository identity.** Claude Code resolves `.claude/settings.json` by walking up from the working directory at launch, so starting from a subdirectory still works via walk-up. A git worktree of the same repo is a separate directory tree; its gitignored `settings.local.json` does not carry over from the main worktree, so telemetry silently won't apply in the worktree unless you re-wire it there. `project.repo` is a hand-set label in `OTEL_RESOURCE_ATTRIBUTES`. It is not derived from the git remote or any git metadata.
 
 ## What you can do with this
 
@@ -289,7 +289,7 @@ Same pattern works for the other agent CLIs you might be running. The wrapper pi
 
 | Command | With Virtual Key | Without Virtual Key |
 |---|---|---|
-| `langwatch claude` | gateway via `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN` | OTLP via `CLAUDE_CODE_ENABLE_TELEMETRY` + `CLAUDE_CODE_ENHANCED_TELEMETRY_BETA` (spans, and with them the tool call tree and subagent attribution) + an ingestion key on `OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer sk-lw-…"` + the four `OTEL_LOG_*` unlock knobs (`USER_PROMPTS`, `TOOL_DETAILS`, `TOOL_CONTENT`, `RAW_API_BODIES`) so user prompt text, tool input and output content, and assistant response text all land on the wire, with bodies truncated at 60 KB and extended thinking redacted |
+| `langwatch claude` | gateway via `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN` | OTLP via `CLAUDE_CODE_ENABLE_TELEMETRY` + `CLAUDE_CODE_ENHANCED_TELEMETRY_BETA` (spans, and with them the tool call tree and subagent attribution) + an ingestion key on `OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer sk-lw-…"` + the four `OTEL_LOG_*` content knobs (`USER_PROMPTS`, `TOOL_DETAILS`, `TOOL_CONTENT`, `RAW_API_BODIES`) so user prompt text, tool input and output content, and assistant response text all land on the wire, with bodies truncated at 60 KB and extended thinking redacted |
 | `langwatch codex` | gateway via `OPENAI_BASE_URL` + `OPENAI_API_KEY` | OTLP via `[otel]` block in `~/.codex/config.toml` |
 | `langwatch gemini` | gateway via `GOOGLE_GEMINI_BASE_URL` + `GEMINI_API_KEY` | OTLP (gen_ai.* native) |
 | `langwatch opencode` | gateway via `OPENAI_*` + `ANTHROPIC_*` env pairs | OTLP (opencode 1.14 emits structural spans only; tokens / model / cost wait on upstream `gen_ai.*` adoption) |

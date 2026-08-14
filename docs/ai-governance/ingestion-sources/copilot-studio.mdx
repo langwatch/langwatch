@@ -8,15 +8,15 @@ sidebarTitle: Microsoft Copilot Studio
 
 `copilot_studio` polls the Microsoft Purview Audit API for Copilot Studio activity. Today the source can be created and the per-platform credentials are persisted, but the cron worker that calls Purview hasn't shipped, events do not flow yet.
 
-This page documents the configuration contract so admins can pre-stage Azure AD app registrations and trust policies; the matching adapter is on the [roadmap](/ai-governance/ingestion-sources/index#adapter-roadmap).
+The configuration contract below lets admins pre-stage Azure AD app registrations and trust policies; the matching adapter is on the [roadmap](/ai-governance/ingestion-sources/index#adapter-roadmap).
 
 ## Currently implemented
 
-- **CRUD:** the source can be created via the admin composer at `/settings/governance/ingestion-sources` and via `api.ingestionSources.create`. It will appear in `langwatch ingest list` with status `awaiting_first_event`.
+- **CRUD:** the source can be created via the admin composer at `/settings/governance/ingestion-sources` and via `api.ingestionSources.create`. It appears in `langwatch ingest list` with status `awaiting_first_event`.
 - **Receiver:** none. There is no `POST /api/ingest/copilot/:id` endpoint and the OTLP, webhook receivers reject `copilot_studio` sources with `400 wrong_endpoint`.
 - **Poller:** none.
 - **Normaliser:** none.
-- **Status flip:** the source will stay `awaiting_first_event` indefinitely until the poller ships.
+- **Status flip:** the source stays `awaiting_first_event` indefinitely until the poller ships.
 
 ## What the admin configures upstream
 
@@ -40,7 +40,7 @@ There is no LangWatch-side URL or bearer secret to paste back into Microsoft. Th
 
 ## What event shape we accept today
 
-None, no events flow until the poller ships. `langwatch ingest tail <sourceId>` will print:
+None, no events flow until the poller ships. `langwatch ingest tail <sourceId>` prints:
 
 ```text
 No events for this source yet. Once your upstream platform starts

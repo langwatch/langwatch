@@ -4,7 +4,7 @@ description: How the LangWatch AI Gateway protects secrets, isolates tenants, an
 sidebarTitle: Security & Trust
 ---
 
-The gateway sits on the hot path between your applications and upstream LLM providers. Everything below is what the gateway does NOT do, what it DOES do, and how each guarantee is enforced.
+The gateway sits on the hot path between your applications and upstream LLM providers.
 
 ## Threat model
 
@@ -122,7 +122,7 @@ Postgres:
 
 ClickHouse:
 
-- Trace/span data is per-organization, partitioned on `TenantId`. Queries from the UI always include a `TenantId` predicate enforced at middleware. Cross-tenant reads are prevented by the ClickHouse query layer, not just by convention.
+- Trace/span data is per-organization, partitioned on `TenantId`. Queries from the UI always include a `TenantId` predicate enforced at middleware. The ClickHouse query layer is what blocks a cross-tenant read, so a caller cannot opt out of it.
 
 ## Self-hosted deployments
 
