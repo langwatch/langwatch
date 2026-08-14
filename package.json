@@ -40,6 +40,7 @@
     "packages/clickhouse-client/",
     "packages/handled-error/",
     "packages/identity/",
+    "packages/identity-links/",
     "packages/identity-server/",
     "packages/langy/",
     "packages/observability/",
