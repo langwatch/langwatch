@@ -112,19 +112,17 @@ const TRACE_CAPABILITY: LensCapability = {
   defaultSort: { columnId: "time", direction: "desc" },
 };
 
-// The Sessions grouping (user-facing name; column/addon ids and the
-// persisted "by-conversation" mode key predate the rename and stay stable
-// so saved lens state keeps parsing). Rows come from the server-side
-// session rollup: trace count, cost, tokens, duration, context size and
-// the error and span counts sum ALL traces of the session in range, not
-// the fetched page (specs/traces-v2/sessions-lens.feature).
+// The Conversations grouping. Rows come from the server-side session
+// rollup: trace count, cost, tokens, duration, context size and the error
+// and span counts sum ALL traces of the conversation in range, not the
+// fetched page (specs/traces-v2/sessions-lens.feature).
 const CONVERSATION_CAPABILITY: LensCapability = {
   // Sections mirror the trace-grouping shape so the Columns dropdown
   // can render the same "Standard" section header on every grouping —
   // without this the dropdown falls back to "Other" for any column
   // missing a section, which reads as broken next to the dialog version.
   columns: [
-    { id: "conversation", label: "Session", section: "Standard" },
+    { id: "conversation", label: "Conversation", section: "Standard" },
     { id: "turns", label: "Traces", section: "Standard" },
     { id: "started", label: "Started", section: "Standard" },
     { id: "lastTurn", label: "Last Activity", section: "Standard" },
@@ -134,8 +132,8 @@ const CONVERSATION_CAPABILITY: LensCapability = {
     { id: "contextSize", label: "Context Size", section: "Standard" },
     { id: "modelCalls", label: "Model Calls", section: "Standard" },
     { id: "compactions", label: "Compactions", section: "Standard" },
-    // Opt-in: the lens is already wide, and only coding-agent sessions carry
-    // a repository or a pull request at all.
+    // Opt-in: the lens is already wide, and only coding-agent conversations
+    // carry a repository or a pull request at all.
     { id: "repository", label: "Repository", section: "Standard" },
     { id: "pullRequest", label: "Pull Request", section: "Standard" },
     { id: "model", label: "Model", section: "Standard" },
@@ -154,7 +152,7 @@ const CONVERSATION_CAPABILITY: LensCapability = {
     "service",
     "status",
   ],
-  addons: [{ id: "conversation-turns", label: "Session turns" }],
+  addons: [{ id: "conversation-turns", label: "Conversation turns" }],
   sortableColumnIds: [
     "started",
     "lastTurn",
@@ -193,8 +191,7 @@ export const LENS_CAPABILITIES: Record<GroupingMode, LensCapability> = {
 
 export const GROUPING_LABELS: Record<GroupingMode, string> = {
   flat: "Flat",
-  // Persisted mode key stays "by-conversation"; only the label says Session.
-  "by-conversation": "By Session",
+  "by-conversation": "By Conversation",
   "by-service": "By Service",
   "by-user": "By User",
   "by-model": "By Model",

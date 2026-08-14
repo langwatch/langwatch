@@ -31,6 +31,9 @@ type Orchestrator struct {
 	// container is the colima VM the langyagent worker runs on in its container
 	// tiers (see domain.LangyTier). May be nil in tests that never launch it.
 	container ContainerRuntime
+	// janitor sweeps leaked testcontainers off that same VM. Nil in tests that
+	// never reap.
+	janitor ContainerJanitor
 	// claude edits Claude Code's own settings, which only `haven setup` does.
 	// Nil everywhere else, including in tests that never install a feature.
 	claude ClaudeSettings
@@ -41,6 +44,12 @@ type Orchestrator struct {
 	// know that half has finished.
 	isGoverning atomic.Bool
 	governance  sync.WaitGroup
+
+	// procActivity is the process watch's cross-tick idle clock (ADR-095),
+	// touched only from the daemon's monitor loop. procTel ships the watch's
+	// observations to the local observability stack; nil means unobserved.
+	procActivity map[int]tsgoSeen
+	procTel      ProcTelemetry
 }
 
 // Deps is the injected object graph. A struct rather than a positional
@@ -59,6 +68,8 @@ type Deps struct {
 	Hyg       Hygiene
 	Sem       Semaphore
 	Container ContainerRuntime
+	Janitor   ContainerJanitor
+	ProcTel   ProcTelemetry
 	Claude    ClaudeSettings
 	Log       *zap.Logger
 }
@@ -68,7 +79,7 @@ func New(d Deps) *Orchestrator {
 	return &Orchestrator{
 		cfg: d.Cfg, proxy: d.Proxy, store: d.Store, sup: d.Sup, sys: d.Sys,
 		ch: d.CH, pg: d.PG, rds: d.RDS, obs: d.Obs, hyg: d.Hyg, sem: d.Sem,
-		container: d.Container, claude: d.Claude, log: d.Log,
+		container: d.Container, janitor: d.Janitor, procTel: d.ProcTel, claude: d.Claude, log: d.Log,
 	}
 }
 

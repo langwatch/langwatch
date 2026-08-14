@@ -102,6 +102,26 @@ const FeatureFlagsDrawer = lazyDefault({
   factory: () => import("./drawers/FeatureFlagsDrawer"),
   key: "FeatureFlagsDrawer",
 });
+const GroupDetailDrawer = lazyDefault({
+  factory: () => import("./ops/queues/groupDetail/GroupDetailDrawer"),
+  key: "GroupDetailDrawer",
+});
+const ProcessInstanceDrawer = lazyDefault({
+  factory: () => import("./ops/processes/instanceDrawer/ProcessInstanceDrawer"),
+  key: "ProcessInstanceDrawer",
+});
+const ProcessInstancesDrawer = lazyDefault({
+  factory: () => import("./ops/processes/ProcessInstancesDrawer"),
+  key: "ProcessInstancesDrawer",
+});
+const OpsBlobsDrawer = lazyDefault({
+  factory: () => import("./ops/blobs/OpsBlobsDrawer"),
+  key: "OpsBlobsDrawer",
+});
+const OpsReplayDrawer = lazyDefault({
+  factory: () => import("./ops/projections/OpsReplayDrawer"),
+  key: "OpsReplayDrawer",
+});
 const EditModelProviderDrawer = lazyDefault({
   factory: () => import("./EditModelProviderDrawer"),
   key: "EditModelProviderDrawer",
@@ -293,6 +313,11 @@ export const drawers = {
   featureFlags: FeatureFlagsDrawer,
   // Ops
   foundry: FoundryDrawer,
+  opsGroupDetail: GroupDetailDrawer,
+  opsProcessInstance: ProcessInstanceDrawer,
+  opsProcessInstances: ProcessInstancesDrawer,
+  opsBlobs: OpsBlobsDrawer,
+  opsReplay: OpsReplayDrawer,
   // Coding agents
   pullRequestDetail: PullRequestDetailDrawer,
 } satisfies Record<string, React.FC<any>>;

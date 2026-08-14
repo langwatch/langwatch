@@ -24,6 +24,10 @@ function makeRepo(): ScheduledJobRepository {
     deactivateForTarget: vi.fn(async () => undefined),
     findAllForProject: vi.fn(async () => []),
     listForOps: vi.fn(async () => []),
+    findByIdForOps: vi.fn(async () => null),
+    setActiveForOps: vi.fn(async () => true),
+    releaseSlotForOps: vi.fn(async () => true),
+    requestImmediateRunForOps: vi.fn(async () => true),
   };
 }
 

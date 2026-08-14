@@ -1,10 +1,10 @@
 import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useSharedTrace } from "../context/SharedTraceContext";
 import { isPreviewTraceId } from "../onboarding/data/samplePreviewTraces";
 import type { TraceListItem } from "../types/trace";
+import { useDrawerProjectId } from "./useDrawerProjectId";
 
 export interface ConversationTurn {
   traceId: string;
@@ -59,7 +59,7 @@ export function useConversationContext(
   conversationId: string | null | undefined,
   traceId: string | null | undefined,
 ): ConversationContextResult {
-  const { project } = useOrganizationTeamProject();
+  const projectId = useDrawerProjectId();
   const shared = useSharedTrace();
 
   // Conversation context for preview-mode traces is seeded
@@ -72,12 +72,11 @@ export function useConversationContext(
   // The read-only share page carries no conversation payload (thread sharing
   // is a follow-up), so it never fetches the surrounding conversation.
   const isPreview = !!traceId && isPreviewTraceId(traceId);
-  const fetchEnabled =
-    !!project?.id && !!conversationId && !isPreview && !shared;
+  const fetchEnabled = !!projectId && !!conversationId && !isPreview && !shared;
 
   const query = api.tracesV2.conversationContext.useQuery(
     {
-      projectId: project?.id ?? "",
+      projectId,
       conversationId: conversationId ?? "",
     },
     {
@@ -93,7 +92,7 @@ export function useConversationContext(
     if (shared) {
       return { ...NULL_RESULT, conversationId: conversationId ?? null };
     }
-    if (!project?.id || !conversationId) return NULL_RESULT;
+    if (!projectId || !conversationId) return NULL_RESULT;
     if (!query.data) {
       return {
         ...NULL_RESULT,
@@ -113,12 +112,5 @@ export function useConversationContext(
         idx >= 0 && idx < turns.length - 1 ? (turns[idx + 1] ?? null) : null,
       isLoading: false,
     };
-  }, [
-    project?.id,
-    query.data,
-    query.isLoading,
-    conversationId,
-    traceId,
-    shared,
-  ]);
+  }, [projectId, query.data, query.isLoading, conversationId, traceId, shared]);
 }

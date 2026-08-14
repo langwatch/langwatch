@@ -1,7 +1,7 @@
 import { useEffect } from "react";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useConversationContext } from "./useConversationContext";
+import { useDrawerProjectId } from "./useDrawerProjectId";
 
 /** How long to wait after a trace settles before warming siblings. */
 const PREFETCH_DELAY_MS = 600;
@@ -33,10 +33,9 @@ export function useConversationPrefetch(
   conversationId: string | null | undefined,
   currentTraceId: string | null | undefined,
 ): void {
-  const { project } = useOrganizationTeamProject();
+  const projectId = useDrawerProjectId();
   const { turns } = useConversationContext(conversationId, currentTraceId);
   const utils = api.useUtils();
-  const projectId = project?.id;
 
   useEffect(() => {
     if (!projectId || !currentTraceId || turns.length === 0) return;
