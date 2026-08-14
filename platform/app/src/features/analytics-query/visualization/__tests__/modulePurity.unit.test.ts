@@ -214,16 +214,14 @@ describe("the Vega-Lite validator and policy modules", () => {
         ];
 
         for (const source of caught) {
-          expect(
-            importsBrowserRuntime(source),
-            `should catch: ${source}`,
-          ).toBe(true);
+          expect(importsBrowserRuntime(source), `should catch: ${source}`).toBe(
+            true,
+          );
         }
         for (const source of admitted) {
-          expect(
-            importsBrowserRuntime(source),
-            `should admit: ${source}`,
-          ).toBe(false);
+          expect(importsBrowserRuntime(source), `should admit: ${source}`).toBe(
+            false,
+          );
         }
       });
     });
