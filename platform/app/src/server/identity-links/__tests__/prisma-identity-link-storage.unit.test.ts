@@ -203,7 +203,8 @@ describe("PrismaIdentityLinkStorage — erasure blanks who, never which rows (AD
     const where = prisma.providerIdentityLink.findMany.mock.calls[0]![0].where;
     expect(where.organizationId).toBe("org-a");
     expect(where.OR[2]).toEqual({
-      externalKind: { in: ["email"] },
+      // ADR-094 Decision 9 as amended (v7): upn counts as an email-kind id.
+      externalKind: { in: ["email", "upn"] },
       externalId: { in: ["alice@example.com"] },
     });
   });
