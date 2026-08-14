@@ -155,10 +155,7 @@ const getImportedModelCosts = () => {
           model.pricing,
         ),
         inputAudioCostPerToken: model.pricing.audioCostPerToken,
-        outputAudioCostPerToken: resolveAudioOutputRate(
-          modelId,
-          model.pricing,
-        ),
+        outputAudioCostPerToken: resolveAudioOutputRate(modelId, model.pricing),
         inputCostPerCharacter: model.pricing.inputCostPerCharacter,
         inputCostPerSecond: model.pricing.inputCostPerSecond,
       };

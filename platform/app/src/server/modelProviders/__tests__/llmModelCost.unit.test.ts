@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getStaticModelCosts, resolveCacheWrite1hRate } from "../llmModelCost";
+import { matchModelCostWithFallbacks } from "../../tracer/collector/cost";
+import {
+  getStaticModelCosts,
+  resolveAudioOutputRate,
+  resolveCacheWrite1hRate,
+} from "../llmModelCost";
 
 describe("getStaticModelCosts", () => {
   const costs = getStaticModelCosts();
@@ -274,5 +279,85 @@ describe("resolveCacheWrite1hRate", () => {
         resolveCacheWrite1hRate(ANTHROPIC, { inputCostPerToken: 0.000005 }),
       ).toBeUndefined();
     });
+  });
+});
+
+describe("audio token rates in the static registry", () => {
+  const costs = getStaticModelCosts();
+  const findByModel = (modelId: string) =>
+    costs.find((c) => c.model === modelId);
+  const match = (model: string) => matchModelCostWithFallbacks(model, costs);
+
+  it("maps the catalog's audioCostPerToken onto the input audio rate", () => {
+    expect(findByModel("openai/gpt-audio")?.inputAudioCostPerToken).toBe(
+      0.000032,
+    );
+  });
+
+  it("derives the output audio rate for an OpenAI audio model", () => {
+    expect(findByModel("openai/gpt-audio")?.outputAudioCostPerToken).toBe(
+      0.000064,
+    );
+  });
+
+  it("prefers a supplied output audio rate over the derived one", () => {
+    // gpt-realtime states $64 per million in the overlay, which is the same
+    // figure the derivation would produce, so assert the source instead.
+    expect(
+      resolveAudioOutputRate("openai/gpt-realtime", {
+        audioCostPerToken: 0.000032,
+        audioOutputCostPerToken: 0.00009,
+      }),
+    ).toBe(0.00009);
+  });
+
+  it("leaves models outside the OpenAI audio families without a derived rate", () => {
+    expect(
+      resolveAudioOutputRate("anthropic/claude-opus-5", {
+        audioCostPerToken: 0.000032,
+      }),
+    ).toBeUndefined();
+  });
+
+  it("derives nothing for a model with no audio input price", () => {
+    expect(resolveAudioOutputRate("openai/gpt-realtime", {})).toBeUndefined();
+  });
+
+  it("does not price gpt-realtime-mini at gpt-realtime's rate", () => {
+    const mini = match("openai/gpt-realtime-mini");
+    expect(mini?.model).toBe("openai/gpt-realtime-mini");
+    expect(mini?.inputAudioCostPerToken).toBe(0.00001);
+    expect(mini?.outputAudioCostPerToken).toBe(0.00002);
+  });
+
+  it("keeps gpt-realtime itself on the full rate", () => {
+    const full = match("openai/gpt-realtime");
+    expect(full?.model).toBe("openai/gpt-realtime");
+    expect(full?.inputAudioCostPerToken).toBe(0.000032);
+  });
+});
+
+describe("the ElevenLabs conversational entry", () => {
+  const costs = getStaticModelCosts();
+  const match = (model: string) => matchModelCostWithFallbacks(model, costs);
+
+  // The gateway confirms with the BARE resolved model id, because
+  // matchModelCostWithFallbacks strips the provider prefix, so both
+  // spellings have to reach the same entry.
+  it("resolves the bare id the gateway confirms with", () => {
+    expect(match("convai")?.model).toBe("elevenlabs/convai");
+  });
+
+  it("resolves the prefixed id too", () => {
+    expect(match("elevenlabs/convai")?.model).toBe("elevenlabs/convai");
+  });
+
+  it("is priced per second of conversation", () => {
+    expect(match("convai")?.inputCostPerSecond).toBeCloseTo(0.08 / 60, 15);
+  });
+
+  it("does not capture the transcription models", () => {
+    expect(match("scribe_v1")?.model).toBe("elevenlabs/scribe_v1");
+    expect(match("elevenlabs/scribe_v1")?.model).toBe("elevenlabs/scribe_v1");
   });
 });
