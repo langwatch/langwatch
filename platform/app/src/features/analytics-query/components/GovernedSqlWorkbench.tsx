@@ -319,33 +319,65 @@ export function GovernedSqlWorkbench({ projectId }: GovernedSqlWorkbenchProps) {
           parametersSendable={parametersSendable}
         />
 
-        <Box
-          background="bg.panel"
-          borderWidth="1px"
-          borderColor="border"
-          borderRadius="10px"
-          boxShadow="xs"
-          overflow="hidden"
-          flex="1"
-          minHeight={0}
-          display="flex"
-          flexDirection="column"
-        >
-          <GovernedSqlResultPane
-            state={query.state}
-            onRun={query.runQuery}
-            {...(insertExample ? { onInsertExample: insertExample } : {})}
-            renderChartArea={chartArea({
-              state: query.state,
-              registerSpecReader: wiring.registerSpecReader,
-              openedRevision: wiring.openedRevision,
-              editedSpecText: shownSpecText,
-              onEditedSpecTextChange: setEditedSpecText,
-            })}
-          />
-        </Box>
+        <ResultCard
+          query={query}
+          wiring={wiring}
+          shownSpecText={shownSpecText}
+          onEditedSpecTextChange={setEditedSpecText}
+          {...(insertExample ? { onInsertExample: insertExample } : {})}
+        />
       </Box>
     </HStack>
+  );
+}
+
+/**
+ * The result half of the split: the card chrome, and the pane inside it.
+ *
+ * Separate from the workbench because it is what takes every pixel the query
+ * card leaves — the flex chain from here down to the chart is load-bearing, and
+ * keeping it in one place is what stops a later edit from breaking the fill by
+ * dropping a `minHeight={0}` somewhere in the middle of a longer component.
+ */
+function ResultCard({
+  query,
+  wiring,
+  shownSpecText,
+  onEditedSpecTextChange,
+  onInsertExample,
+}: {
+  query: ReturnType<typeof useGovernedSqlQuery>;
+  wiring: ReturnType<typeof useSavedChartWiring>;
+  shownSpecText: string | null;
+  onEditedSpecTextChange: (text: string | null) => void;
+  onInsertExample?: () => void;
+}) {
+  return (
+    <Box
+      background="bg.panel"
+      borderWidth="1px"
+      borderColor="border"
+      borderRadius="10px"
+      boxShadow="xs"
+      overflow="hidden"
+      flex="1"
+      minHeight={0}
+      display="flex"
+      flexDirection="column"
+    >
+      <GovernedSqlResultPane
+        state={query.state}
+        onRun={query.runQuery}
+        {...(onInsertExample ? { onInsertExample } : {})}
+        renderChartArea={chartArea({
+          state: query.state,
+          registerSpecReader: wiring.registerSpecReader,
+          openedRevision: wiring.openedRevision,
+          editedSpecText: shownSpecText,
+          onEditedSpecTextChange,
+        })}
+      />
+    </Box>
   );
 }
 
