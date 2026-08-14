@@ -41,6 +41,27 @@ export type AttachedScope = Pick<
 export class ModelDefaultsRepository {
   constructor(private readonly prisma: ModelDefaultsPrisma) {}
 
+  /** Acquire a tx-scoped advisory lock over every default-models write
+   * in one organization.
+   *
+   * A scope lock alone only covers the scopes a write attaches. Claiming
+   * a scope also detaches, and sometimes deletes, whichever config held
+   * it, and that config may hold scopes this transaction never locked,
+   * so two writes could reach the same config rows through disjoint lock
+   * sets and take row locks in opposite orders. Every config a claim can
+   * touch is anchored to the same organization as the scope being
+   * claimed (ADR-021), so one lock per organization covers all of them.
+   *
+   * Taken FIRST by every write path, before any scope lock, which is
+   * what makes the order total and a lock cycle impossible. Writes are
+   * rare admin actions, so serialising them per organization costs
+   * nothing a user can perceive. */
+  async lockOrganization(organizationId: string): Promise<void> {
+    await this.prisma
+      .$executeRaw`-- @tenancy: advisory-lock helper, organizationId bounded
+SELECT pg_advisory_xact_lock(hashtextextended(${`mdc-org:${organizationId}`}, 0))`;
+  }
+
   /** Acquire a tx-scoped advisory lock keyed by the (scopeType, scopeId)
    * pair so the read-then-write upsert path in `setRoleAtScope` /
    * `setFeatureAtScope` serialises across concurrent callers without
@@ -115,14 +136,19 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`mdc:${scopeType}:${scopeId}`}, 
     return { id };
   }
 
-  /** Update a config row's JSON payload + authorId (no scope changes
-   * here — that path needs the multi-statement `$transaction` form
-   * which only the root PrismaClient exposes, see `updateConfigScopes`). */
+  /** Update a config row's JSON payload + authorId. Scope changes go
+   * through `updateConfigScopes`, which needs a caller-held transaction
+   * to stay atomic; this one is a single statement, so it needs none.
+   *
+   * `updateMany`, so a config a concurrent save already collected is a
+   * no-op rather than a P2025 the caller would surface as an unknown
+   * error. Callers check the row exists first, so this never hides a
+   * plain wrong id. */
   async updateConfigPayload(params: {
     id: string;
     data: { config?: Record<string, string>; authorId?: string | null };
   }): Promise<void> {
-    await this.prisma.modelDefaultConfig.update({
+    await this.prisma.modelDefaultConfig.updateMany({
       where: { id: params.id },
       data: params.data,
     });
@@ -162,7 +188,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`mdc:${scopeType}:${scopeId}`}, 
         );
       }
     }
-    await this.prisma.modelDefaultConfig.update({
+    await this.prisma.modelDefaultConfig.updateMany({
       where: { id: params.id },
       data: params.configPayload ?? {},
     });
@@ -204,28 +230,59 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`mdc:${scopeType}:${scopeId}`}, 
     });
   }
 
-  /** Delete the given scope-attachment rows. */
+  /** Delete the given scope-attachment rows. Ids are sorted so two
+   * writes over overlapping sets take their row locks in the same
+   * order. */
   async deleteAttachments(attachmentIds: string[]): Promise<void> {
     if (attachmentIds.length === 0) return;
     await this.prisma.modelDefaultConfigScope.deleteMany({
-      where: { id: { in: attachmentIds } },
+      where: { id: { in: [...attachmentIds].sort() } },
     });
   }
 
   /** Delete any of the given configs that no longer have a single scope
    * attachment: an unattached config can never be hit by the resolver,
-   * it just haunts the settings table. */
+   * it just haunts the settings table. Ids are sorted for the same
+   * reason as `deleteAttachments`. */
   async deleteConfigsWithoutScopes(configIds: string[]): Promise<void> {
     if (configIds.length === 0) return;
     await this.prisma.modelDefaultConfig.deleteMany({
-      where: { id: { in: configIds }, scopes: { none: {} } },
+      where: { id: { in: [...configIds].sort() }, scopes: { none: {} } },
     });
   }
 
   /** Delete a config row. ModelDefaultConfigScope rows cascade via the
-   * FK so callers don't have to clean them up explicitly. */
+   * FK so callers don't have to clean them up explicitly.
+   *
+   * `deleteMany`, not `delete`: a config the caller asked to remove can
+   * already be gone, because a concurrent save claimed its last scope
+   * and collected it. "Remove this config" is satisfied either way, and
+   * `delete` would raise P2025 for the caller to surface as an unknown
+   * error on a save that in fact succeeded. */
   async delete(configId: string): Promise<void> {
-    await this.prisma.modelDefaultConfig.delete({ where: { id: configId } });
+    await this.prisma.modelDefaultConfig.deleteMany({
+      where: { id: configId },
+    });
+  }
+
+  /** The organization a config is anchored to, or null when the config
+   * is already gone. */
+  async findOrganizationIdForConfig(configId: string): Promise<string | null> {
+    const row = await this.prisma.modelDefaultConfig.findUnique({
+      where: { id: configId },
+      select: { organizationId: true },
+    });
+    return row?.organizationId ?? null;
+  }
+
+  /** The single organization a set of scopes resolves to (ADR-021).
+   * Throws on an empty, unresolvable, or cross-organization set. */
+  async organizationIdForScopes(scopes: ScopeAttachment[]): Promise<string> {
+    return resolveSingleOrganizationForScopes(
+      this.prisma,
+      scopes,
+      "model default config",
+    );
   }
 
   /** Return every config currently attached at the given scope (newest

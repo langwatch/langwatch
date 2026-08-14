@@ -23,6 +23,10 @@ const HIERARCHY = {
   projects: [
     { id: "proj-web", teamId: "team-platform" },
     { id: "proj-lab", teamId: "team-research" },
+    // A project the viewer can see without seeing its team. The chain
+    // must skip the team tier rather than fall back to matching any
+    // team by type.
+    { id: "proj-orphan", teamId: null },
   ],
 };
 
@@ -96,7 +100,7 @@ describe("resolveAtScope", () => {
       expect(resolved?.scope).toBe("team");
     });
 
-    it("skips the team tier when the project's team is not in the hierarchy", () => {
+    it("skips the team tier when the project is not in the hierarchy", () => {
       const resolved = resolveAtScope({
         key: "FAST",
         configs: ALL,
@@ -106,6 +110,33 @@ describe("resolveAtScope", () => {
 
       expect(resolved?.model).toBe("openai/gpt-5-mini");
       expect(resolved?.scope).toBe("organization");
+    });
+
+    it("skips the team tier for a known project that carries no team", () => {
+      const resolved = resolveAtScope({
+        key: "FAST",
+        configs: ALL,
+        anchor: { type: "PROJECT", id: "proj-orphan" },
+        hierarchy: HIERARCHY,
+      });
+
+      // team-research's newer config must not be borrowed just because
+      // this project's own team is unknown.
+      expect(resolved?.model).toBe("openai/gpt-5-mini");
+      expect(resolved?.scope).toBe("organization");
+    });
+  });
+
+  describe("when the hierarchy carries no organization", () => {
+    it("stops at the tiers it can resolve instead of guessing one", () => {
+      const resolved = resolveAtScope({
+        key: "FAST",
+        configs: ALL,
+        anchor: { type: "PROJECT", id: "proj-web" },
+        hierarchy: { ...HIERARCHY, organization: null },
+      });
+
+      expect(resolved).toBeNull();
     });
   });
 

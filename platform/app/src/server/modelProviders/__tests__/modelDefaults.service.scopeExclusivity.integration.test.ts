@@ -12,7 +12,7 @@
  */
 
 import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { OrganizationUserRole } from "~/generated/prisma/client";
 
 import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
@@ -83,6 +83,14 @@ describe("given default-model configs with scope attachments (real DB)", () => {
         role: OrganizationUserRole.MEMBER,
       },
     });
+  });
+
+  // Each test states the whole world it needs. Without this the tests
+  // inherit whatever rows the previous ones left attached, and pass only
+  // because claiming happens to clear the leftovers first: adding a test
+  // above another would break it.
+  afterEach(async () => {
+    await prisma.modelDefaultConfig.deleteMany({ where: { organizationId } });
   });
 
   afterAll(async () => {
@@ -222,19 +230,34 @@ describe("given default-model configs with scope attachments (real DB)", () => {
 
   describe("when the caller cannot manage the target scope", () => {
     /** @scenario Saving into a scope the caller cannot manage is refused with a handled error */
-    it("raises model_default_scope_forbidden with a 403", async () => {
+    it("raises model_default_scope_forbidden with a 403 and writes nothing", async () => {
       const session = { user: { id: memberUserId } } as Session;
-      await expect(
-        assertCanWriteScope(
+      // The guard runs before the write, the way every save path
+      // (tRPC drawer save, REST create/update/delete) orders them. A
+      // refactor that dropped the guard would create the row here.
+      const save = async () => {
+        await assertCanWriteScope(
           { prisma, session },
           "ORGANIZATION",
           organizationId,
-        ),
-      ).rejects.toMatchObject({
+        );
+        await createConfig(ctx(), {
+          config: { DEFAULT: "openai/gpt-5.5" },
+          scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
+          authorId: null,
+        });
+      };
+
+      await expect(save()).rejects.toMatchObject({
         isHandled: true,
         code: "model_default_scope_forbidden",
         httpStatus: 403,
       });
+
+      expect(await attachmentsAt("ORGANIZATION", organizationId)).toEqual([]);
+      expect(
+        await prisma.modelDefaultConfig.count({ where: { organizationId } }),
+      ).toBe(0);
     });
   });
 });

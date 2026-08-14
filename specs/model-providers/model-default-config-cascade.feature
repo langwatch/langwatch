@@ -301,15 +301,20 @@ Feature: Model default config cascade
     Then the save fails with a handled "model_default_scope_forbidden" error carrying a 403
     And no ModelDefaultConfig row is created
 
-  @integration @unimplemented
+  @integration
   Scenario: Migration collapses pre-invariant duplicate configs per scope
     Given two configs attached to the same (ORGANIZATION, org-acme) scope
+    And a third config attached to org-acme and to a project no one else holds
+    And two more configs sharing one created-at on the same team scope
     When migration 20260814120000_collapse_duplicate_model_default_scopes runs
     Then only the newest config keeps the org-acme attachment
     And the older config is deleted when it has no other attachment
-    # Bound to the migration toolchain like the flat-rows migration
-    # above; the keep-newest rule matches the resolver tiebreak so
-    # resolution results do not change.
+    And the third config survives with only the project attachment
+    And the team scope keeps the config with the higher id
+    # The keep-newest rule matches the resolver tiebreak, so resolution
+    # results do not change. Bound by replaying the shipped statements
+    # against real Postgres, so editing the rule out of the migration
+    # fails the test.
 
   @integration @unimplemented
   Scenario: Saving a config attached to many scopes creates one config + N scope rows

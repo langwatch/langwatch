@@ -128,7 +128,7 @@ Feature: Role-based default models with per-scope overrides
   Scenario: At organization scope the inherit entry reads "Not configured"
     When I open the drawer for a new config scoped to the organization
     Then the Default selector's first entry reads "Not configured" with no model attached
-    And picking it leaves the DEFAULT key out of the saved JSON
+    And no entry claims a value flows down from a narrower scope
     # There is nothing above the organization to inherit from. The entry
     # still exists so an org-scope edit can clear a pinned key back to
     # absent; it just never claims a value flows down from somewhere.
@@ -148,8 +148,19 @@ Feature: Role-based default models with per-scope overrides
     When I save before the config list query has settled
     Then the save is disabled until the target config is loaded
     And the mutation carries that config's id, never a create
+    And it carries the values the target row was loaded with
     # Deriving the id from an unsettled query made a slow fetch silently
     # turn an edit into a create, one more duplicate row.
+
+  @integration
+  Scenario: Retargeting the open drawer to another row saves that row's values
+    Given the drawer is open on one config
+    When the row behind it points the drawer at a different config
+    Then the drawer reloads the new row's values
+    And saving writes the new row's values, never the first row's
+    # The drawer is not modal and it is rendered without a key, so the
+    # pencil behind it swaps the target on the same mount. Hydrating
+    # only once would carry the first row's models onto the second.
 
   @integration
   Scenario: Editing every key to Inherit tells the user the config was removed

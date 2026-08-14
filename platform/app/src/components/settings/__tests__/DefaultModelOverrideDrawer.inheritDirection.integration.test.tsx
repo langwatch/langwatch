@@ -138,12 +138,25 @@ function payloadWith(configs: unknown[]) {
   };
 }
 
-function renderDrawer(editingId?: string) {
-  return render(
+function drawerTree(editingId?: string) {
+  return (
     <ChakraProvider value={defaultSystem}>
       <DefaultModelOverrideDrawer editingId={editingId} />
-    </ChakraProvider>,
+    </ChakraProvider>
   );
+}
+
+function renderDrawer(editingId?: string) {
+  return render(drawerTree(editingId));
+}
+
+/** The config payload of the drawer's first save call. */
+function savedConfig(): Record<string, string> | undefined {
+  return (
+    mockSave.mock.calls[0]?.[0] as
+      | { config: Record<string, string> }
+      | undefined
+  )?.config;
 }
 
 describe("<DefaultModelOverrideDrawer/> inherit direction and save integrity", () => {
@@ -180,7 +193,7 @@ describe("<DefaultModelOverrideDrawer/> inherit direction and save integrity", (
 
   describe("when editing a project-scoped config that inherits from the organization", () => {
     /** @scenario The inherit entry names the wider scope the value comes from */
-    it("labels the inherit entry with the wider scope, never the project's own view", () => {
+    it("labels the inherit entry with the wider scope, never the project's own view", async () => {
       mockGetInheritedValues.mockReturnValue({
         data: {
           inherited: {
@@ -203,10 +216,16 @@ describe("<DefaultModelOverrideDrawer/> inherit direction and save integrity", (
       expect(
         screen.queryByText("Inherit (from project)"),
       ).not.toBeInTheDocument();
+
+      // The entry is a label over a value that flows down, not a value
+      // of its own: leaving it selected saves the key as absent.
+      fireEvent.click(screen.getByTestId("config-save"));
+      await vi.waitFor(() => expect(mockSave).toHaveBeenCalled());
+      expect(savedConfig()).not.toHaveProperty("DEFAULT");
     });
   });
 
-  describe("when editing the organization-scoped config", () => {
+  describe("when adding a config scoped to the organization", () => {
     /** @scenario At organization scope the inherit entry reads "Not configured" */
     it("offers a plain Not configured entry instead of a reverse-direction inherit", () => {
       // The server walk for a picked organization scope excludes the
@@ -220,7 +239,8 @@ describe("<DefaultModelOverrideDrawer/> inherit direction and save integrity", (
         isLoading: false,
       });
 
-      renderDrawer("cfg_org");
+      renderDrawer(undefined);
+      fireEvent.click(screen.getByTestId("pick-org-scope"));
 
       expect(screen.getAllByText("Not configured").length).toBeGreaterThan(0);
       expect(screen.queryByText(/Inherit \(from/)).not.toBeInTheDocument();
@@ -245,15 +265,19 @@ describe("<DefaultModelOverrideDrawer/> inherit direction and save integrity", (
         data: undefined,
         isLoading: true,
       });
-      renderDrawer("cfg_org");
+      // One mount throughout, so the unsettled-to-settled transition and
+      // the hydration latch it drives are the thing under test. Two
+      // separate mounts would each start from a clean latch and prove
+      // nothing about either.
+      const { rerender } = renderDrawer("cfg_org");
       expect(screen.getByTestId("config-save")).toBeDisabled();
-      cleanup();
 
       mockGetDefaultModels.mockReturnValue({
         data: payloadWith([ORG_CONFIG_ROW, PROJECT_CONFIG_ROW]),
         isLoading: false,
       });
-      renderDrawer("cfg_org");
+      rerender(drawerTree("cfg_org"));
+
       const save = screen.getByTestId("config-save");
       expect(save).not.toBeDisabled();
       fireEvent.click(save);
@@ -263,6 +287,27 @@ describe("<DefaultModelOverrideDrawer/> inherit direction and save integrity", (
           expect.objectContaining({ id: "cfg_org" }),
         );
       });
+      // Hydrated from the settled row, not left empty by the latch.
+      expect(savedConfig()).toEqual({ DEFAULT: "openai/gpt-5.5" });
+    });
+
+    /** @scenario Retargeting the open drawer to another row saves that row's values */
+    it("re-hydrates when the open drawer is pointed at a different row", async () => {
+      // The drawer is non-modal and CurrentDrawer renders it without a
+      // key, so the pencil behind it swaps `editingId` on the SAME
+      // mount. A latch that hydrated only once would keep the first
+      // row's values and write them onto the second row.
+      const { rerender } = renderDrawer("cfg_org");
+      rerender(drawerTree("cfg_proj"));
+
+      fireEvent.click(screen.getByTestId("config-save"));
+
+      await vi.waitFor(() => {
+        expect(mockSave).toHaveBeenCalledWith(
+          expect.objectContaining({ id: "cfg_proj" }),
+        );
+      });
+      expect(savedConfig()).toEqual({});
     });
   });
 

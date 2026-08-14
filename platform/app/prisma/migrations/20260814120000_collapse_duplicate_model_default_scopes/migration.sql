@@ -1,3 +1,11 @@
+-- IRREVERSIBLE: both statements delete rows, and there is no down step
+-- that could bring them back. The shadowed ModelDefaultConfigScope
+-- attachments and any ModelDefaultConfig left with no attachment are
+-- gone once this runs, their JSON payloads included. That is the point
+-- of the migration rather than a cost of it: every deleted row was
+-- already unreachable, shadowed at its scope by a newer config, so no
+-- resolution result changes.
+--
 -- One config per scope for default models.
 --
 -- The "+ Add config" save path used to insert a new ModelDefaultConfig
@@ -17,6 +25,11 @@
 --      tiebreak, so resolution results do not change.
 --   2. Delete configs left with zero attachments. They cannot be
 --      reached by the resolver and only clutter the settings table.
+--
+-- The id half of the tiebreak compares COLLATE "C". Ids are nanoids,
+-- whose alphabet includes "-" and "_", and a linguistic collation
+-- orders those differently from byte order, so without it two databases
+-- could keep different configs from the same rows.
 
 DELETE FROM "ModelDefaultConfigScope" s
 USING "ModelDefaultConfig" c
@@ -29,7 +42,10 @@ WHERE s."configId" = c."id"
       AND s2."scopeId" = s."scopeId"
       AND (
         c2."createdAt" > c."createdAt"
-        OR (c2."createdAt" = c."createdAt" AND c2."id" > c."id")
+        OR (
+          c2."createdAt" = c."createdAt"
+          AND c2."id" COLLATE "C" > c."id" COLLATE "C"
+        )
       )
   );
 

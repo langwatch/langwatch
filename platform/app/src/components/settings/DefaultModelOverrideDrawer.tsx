@@ -54,6 +54,11 @@ type ModelRoleKey = "DEFAULT" | "FAST" | "LANGY" | "EMBEDDINGS";
 
 const ROLES: ModelRoleKey[] = ["DEFAULT", "FAST", "LANGY", "EMBEDDINGS"];
 
+/** Stands in for "no row" in the hydration latch, which tracks which
+ *  target the drawer's state belongs to and cannot use a config id
+ *  for create mode. */
+const CREATE_TARGET = "__create__";
+
 const ROLE_LABEL: Record<ModelRoleKey, string> = {
   DEFAULT: "Default",
   FAST: "Fast",
@@ -166,15 +171,25 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
   });
   const [busy, setBusy] = useState(false);
 
-  // Hydrate edit state exactly once, when the target row first loads.
-  // The drawer unmounts on close, so one hydration per open is enough;
-  // keying on the `editing` object identity instead used to wipe
-  // in-progress edits whenever a background refetch replaced the query
-  // data. Create mode needs no hydration, its state starts empty.
-  const hydratedRef = useRef(false);
+  // Hydrate edit state once per target, and re-hydrate when the target
+  // changes. Both halves matter: keying on the `editing` object identity
+  // wiped in-progress edits whenever a background refetch replaced the
+  // query data, while a plain "hydrated once" latch goes the other way
+  // and keeps the previous target's values. The drawer is non-modal, so
+  // the pencil and "+ Add config" behind it can retarget it without ever
+  // unmounting, and stale values would then be saved onto another row.
+  const hydratedForRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!editing || hydratedRef.current) return;
-    hydratedRef.current = true;
+    if (!editingId) {
+      // Create mode has nothing to load, it starts empty.
+      if (hydratedForRef.current === CREATE_TARGET) return;
+      hydratedForRef.current = CREATE_TARGET;
+      setScopes([]);
+      setConfig({});
+      return;
+    }
+    if (!editing || hydratedForRef.current === editing.id) return;
+    hydratedForRef.current = editing.id;
     setScopes(
       editing.scopes.map((s) => ({
         scopeType: s.type as ScopeType,
@@ -182,7 +197,7 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
       })),
     );
     setConfig({ ...(editing.config as Record<string, string>) });
-  }, [editing]);
+  }, [editingId, editing]);
 
   const inheritedQuery = api.modelProvider.getInheritedValuesForScopes.useQuery(
     {
@@ -758,11 +773,20 @@ function ReplacedConfigsNote({
     [scopes, configs, editingId],
   );
   if (replacedNames.length === 0) return null;
-  const single = replacedNames.length === 1;
+  const isSingle = replacedNames.length === 1;
   return (
-    <Text fontSize="xs" color="fg.muted" data-testid="replaced-configs-note">
-      {replacedNames.join(", ")} already {single ? "has" : "have"} default
-      models. Saving replaces {single ? "that config" : "those configs"}.
+    // The note appears only after a scope is picked, and it is the one
+    // warning that saving overwrites another config. `role="status"`
+    // makes the insertion announced, so it reaches a screen reader user
+    // before they save rather than not at all.
+    <Text
+      fontSize="xs"
+      color="fg.muted"
+      role="status"
+      data-testid="replaced-configs-note"
+    >
+      {replacedNames.join(", ")} already {isSingle ? "has" : "have"} default
+      models. Saving replaces {isSingle ? "that config" : "those configs"}.
     </Text>
   );
 }
