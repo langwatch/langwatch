@@ -147,6 +147,26 @@ function withMinimumRow(conditions: Condition[]): Condition[] {
  * user in Code mode upstream; this component is only mounted for a structurable
  * query, and defends the invariant by ignoring an unparseable incoming value.
  */
+/**
+ * A completed row whose key can't round-trip is excluded from the emitted
+ * query, so on its own it would silently save a WIDER automation than the
+ * one on screen. Reporting it to the store lets the drawer's save gate hold
+ * Save until the row is fixed or removed; cleared on unmount so switching to
+ * Code mode (which owns raw text) never leaves Save stuck.
+ */
+function useInvalidRowSaveGate(conditions: Condition[]) {
+  const setConditionRowsInvalid = useAutomationStore(
+    (s) => s.setConditionRowsInvalid,
+  );
+  const hasInvalidRow = conditions.some(
+    (condition) => !attributeFieldRoundTrips(condition),
+  );
+  useEffect(() => {
+    setConditionRowsInvalid(hasInvalidRow);
+    return () => setConditionRowsInvalid(false);
+  }, [hasInvalidRow, setConditionRowsInvalid]);
+}
+
 export function ConditionBuilder({
   query,
   onChange,
@@ -171,21 +191,7 @@ export function ConditionBuilder({
     if (parsed) setConditions(withMinimumRow(parsed));
   }, [query]);
 
-  // A completed row whose key can't round-trip is excluded from the emitted
-  // query (below), so on its own it would silently save a WIDER automation
-  // than the one on screen. Reporting it to the store lets the drawer's save
-  // gate hold Save until the row is fixed or removed; cleared on unmount so
-  // switching to Code mode (which owns raw text) never leaves Save stuck.
-  const setConditionRowsInvalid = useAutomationStore(
-    (s) => s.setConditionRowsInvalid,
-  );
-  const hasInvalidRow = conditions.some(
-    (condition) => !attributeFieldRoundTrips(condition),
-  );
-  useEffect(() => {
-    setConditionRowsInvalid(hasInvalidRow);
-    return () => setConditionRowsInvalid(false);
-  }, [hasInvalidRow, setConditionRowsInvalid]);
+  useInvalidRowSaveGate(conditions);
 
   const commit = (next: Condition[]) => {
     setConditions(next);

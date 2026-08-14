@@ -131,37 +131,38 @@ export function SubjectSection({
  * a graph" is wrong advice for a project that already has one and merely
  * failed to load the list.
  *
- * `graphCount === null` is part of the failure test because react-query
- * leaves the last good list in place when a background refetch fails — a
- * stale list is still a working picker, so only a failure with nothing to
- * show replaces it. Loading is not emptiness either: deciding on an
+ * The failure face is gated on `data == null` because react-query's `error`
+ * state leaves the last good `data` in place on a background refetch failure
+ * — a stale list is still a working picker, so only a failure with nothing
+ * to show replaces it. Loading is not emptiness either: deciding on an
  * in-flight first fetch would flash a false rejection before the data that
- * clears it has arrived. A draft that already carries a graph — prefilled
- * from a dashboard chart card, or an existing alert opened for editing —
- * keeps the picker too: "go create a graph" would hide the selection the
- * author came to inspect, even when the graph itself has since been removed.
+ * clears it has arrived. And a draft that already carries a graph —
+ * prefilled from a dashboard chart card, or an existing alert opened for
+ * editing — keeps the picker too: "go create a graph" would hide the
+ * selection the author came to inspect, even when the graph itself has
+ * since been removed.
  */
 function graphSubjectView({
   isPrefilled,
   hasSelection,
   isLoading,
   isError,
-  graphCount,
+  data,
 }: {
   isPrefilled: boolean;
   hasSelection: boolean;
   isLoading: boolean;
   isError: boolean;
-  /** `null` when no list has loaded yet. */
-  graphCount: number | null;
+  /** `undefined`/`null` when no list has ever loaded. */
+  data: unknown[] | undefined | null;
 }): "failed" | "empty" | "picker" {
-  if (isPrefilled || hasSelection) return "picker";
-  if (isError) return graphCount === null ? "failed" : "picker";
-  if (isLoading) return "picker";
-  return graphCount === 0 ? "empty" : "picker";
+  if (isPrefilled) return "picker";
+  if (isError && data == null) return "failed";
+  if (hasSelection || isLoading || isError) return "picker";
+  return (data ?? []).length === 0 ? "empty" : "picker";
 }
 
-/** Alert subject: the custom graph + the series to watch. */
+/** Graph-watching subject: the custom graph + the series to watch. */
 function GraphSubject({ prefilledGraphId }: { prefilledGraphId?: string }) {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
@@ -182,16 +183,28 @@ function GraphSubject({ prefilledGraphId }: { prefilledGraphId?: string }) {
     [selectedGraphQuery.data?.graph],
   );
 
+  // Loading is not "no graph picked yet" — showing the error while the first
+  // fetch is still in flight would flash a false rejection before the data
+  // that would clear it has even arrived.
+  const isCustomGraphMissing =
+    draft.customGraphId === null && !graphs.isLoading;
+  const isSeriesMissing =
+    !!draft.customGraphId && draft.graphAlert.seriesName.length === 0;
   const view = graphSubjectView({
     isPrefilled,
     hasSelection: !!draft.customGraphId,
     isLoading: graphs.isLoading,
     isError: graphs.isError,
-    graphCount: graphs.data?.length ?? null,
+    data: graphs.data,
   });
 
   if (view === "failed") {
-    return <GraphsLoadFailed onRetry={() => void graphs.refetch()} />;
+    return (
+      <GraphsLoadFailed
+        error={graphs.error}
+        onRetry={() => void graphs.refetch()}
+      />
+    );
   }
 
   if (view === "empty") {
@@ -209,61 +222,56 @@ function GraphSubject({ prefilledGraphId }: { prefilledGraphId?: string }) {
 
   return (
     <VStack align="stretch" gap={4}>
-      <GraphPicker
-        graphs={graphs.data ?? []}
-        selectedId={draft.customGraphId}
+      <GraphPickerField
+        invalid={isCustomGraphMissing}
         locked={isPrefilled}
-        // Loading is not "no graph picked yet", so hold the rejection back
-        // until the list that would populate the picker has arrived.
-        invalid={draft.customGraphId === null && !graphs.isLoading}
-        onSelect={selectGraph}
+        options={graphs.data ?? []}
       />
-      <SeriesPicker
-        options={seriesOptions}
-        value={draft.graphAlert.seriesName}
-        graphPicked={!!draft.customGraphId}
-        onSelect={(seriesName) =>
-          dispatch({
-            type: "SET_GRAPH_ALERT",
-            value: { ...draft.graphAlert, seriesName },
-          })
-        }
+      <SeriesPickerField
+        invalid={isSeriesMissing}
+        seriesOptions={seriesOptions}
       />
     </VStack>
   );
 }
 
-/** The graph half of the alert subject: which custom graph to watch. */
-function GraphPicker({
-  graphs,
-  selectedId,
-  locked,
+/** The graph half of the subject. Reads and writes the draft directly, the
+ *  same way the parent does. */
+function GraphPickerField({
   invalid,
-  onSelect,
+  locked,
+  options,
 }: {
-  graphs: RouterOutputs["graphs"]["getAll"];
-  selectedId: string | null;
-  /** The drawer was opened from a specific chart card, so the graph is
-   *  already decided and the control is inert. */
-  locked: boolean;
   invalid: boolean;
-  onSelect: (customGraphId: string | null) => void;
+  /** True when the drawer was opened from a specific chart card. */
+  locked: boolean;
+  options: { id: string; name: string | null; trigger?: unknown }[];
 }) {
+  const draft = useDraft();
+  const dispatch = useAutomationStore((s) => s.dispatch);
   return (
-    // `disabled` on Field.Root stamps the native attribute through the field
-    // context, so the control is genuinely inert (keyboard + AT).
+    /* `disabled` on Field.Root stamps the native attribute through the
+       field context, so the control is genuinely inert (keyboard + AT). */
     <Field.Root invalid={invalid} disabled={locked}>
       <Field.Label>Custom graph</Field.Label>
       <NativeSelect.Root disabled={locked}>
         <NativeSelect.Field
-          value={selectedId ?? ""}
-          onChange={(e) => onSelect(e.target.value || null)}
+          value={draft.customGraphId ?? ""}
+          onChange={(e) => {
+            const id = e.target.value || null;
+            dispatch({ type: "SET_CUSTOM_GRAPH_ID", value: id });
+            // Reset the series — the previous key won't exist on the new graph.
+            dispatch({
+              type: "SET_GRAPH_ALERT",
+              value: { ...draft.graphAlert, seriesName: "" },
+            });
+          }}
         >
           <option value="">Select a graph…</option>
-          {graphs.map((graph) => (
-            <option key={graph.id} value={graph.id}>
-              {graph.name ?? graph.id}
-              {graph.trigger && graph.id !== selectedId
+          {options.map((g) => (
+            <option key={g.id} value={g.id}>
+              {g.name ?? g.id}
+              {g.trigger && g.id !== draft.customGraphId
                 ? " — already automated"
                 : ""}
             </option>
@@ -281,33 +289,34 @@ function GraphPicker({
   );
 }
 
-/** The series half of the alert subject: which line on the picked graph. */
-function SeriesPicker({
-  options,
-  value,
-  graphPicked,
-  onSelect,
+/** The series half: which line on the picked graph. */
+function SeriesPickerField({
+  invalid,
+  seriesOptions,
 }: {
-  options: ReturnType<typeof deriveSeriesOptionsFromGraph>;
-  value: string;
-  /** Nothing to choose between until a graph is picked. */
-  graphPicked: boolean;
-  onSelect: (seriesName: string) => void;
+  invalid: boolean;
+  seriesOptions: ReturnType<typeof deriveSeriesOptionsFromGraph>;
 }) {
-  const disabled = !graphPicked || options.length === 0;
-
+  const draft = useDraft();
+  const dispatch = useAutomationStore((s) => s.dispatch);
+  const disabled = !draft.customGraphId || seriesOptions.length === 0;
   return (
-    <Field.Root invalid={graphPicked && value.length === 0} disabled={disabled}>
+    <Field.Root invalid={invalid} disabled={disabled}>
       <Field.Label>Series</Field.Label>
       <NativeSelect.Root disabled={disabled}>
         <NativeSelect.Field
-          value={value}
-          onChange={(e) => onSelect(e.target.value)}
+          value={draft.graphAlert.seriesName}
+          onChange={(e) =>
+            dispatch({
+              type: "SET_GRAPH_ALERT",
+              value: { ...draft.graphAlert, seriesName: e.target.value },
+            })
+          }
         >
           <option value="">Select a series…</option>
-          {options.map((series) => (
-            <option key={series.key} value={series.key}>
-              {series.label}
+          {seriesOptions.map((s) => (
+            <option key={s.key} value={s.key}>
+              {s.label}
             </option>
           ))}
         </NativeSelect.Field>
