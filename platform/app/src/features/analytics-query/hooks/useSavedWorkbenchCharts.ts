@@ -265,12 +265,8 @@ function useOpenChart({
           id: chart.id,
           name: chart.name,
           sql: chart.definition.sql,
-          parameters: chart.definition.parameters as Readonly<
-            Record<string, GovernedSqlParameterValue>
-          >,
-          vegaLiteSpec: chart.definition.vegaLiteSpec as
-            | Record<string, unknown>
-            | undefined,
+          parameters: chart.definition.parameters,
+          vegaLiteSpec: chart.definition.vegaLiteSpec,
         });
       } catch (error) {
         onError(error, "Couldn't open the chart");
