@@ -5,7 +5,7 @@
  * Spec: specs/analytics/governed-sql-workbench.feature
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   describeGovernedSqlValue,
@@ -223,6 +223,32 @@ describe("a governed SQL result value", () => {
             { name: "day", type: "Date" },
           ]),
         ).toEqual([]);
+      });
+    });
+  });
+  describe("given a structured cell nobody expands", () => {
+    describe("when it is formatted", () => {
+      it("does not build the indented copy until it is read", () => {
+        const value = { nested: { a: [1, 2, 3] } };
+        const stringify = vi.spyOn(JSON, "stringify");
+
+        const cell = describeGovernedSqlValue(value);
+        if (cell.kind !== "structured") throw new Error("expected a structure");
+
+        // The compact form is what the grid shows; the indented one is not
+        // built yet, because nothing has opened this cell.
+        const afterFormat = stringify.mock.calls.length;
+
+        const pretty = cell.pretty;
+        expect(stringify.mock.calls.length).toBeGreaterThan(afterFormat);
+        expect(pretty).toContain("\n");
+
+        // Re-reading an open cell does not pay for it again.
+        const afterFirstRead = stringify.mock.calls.length;
+        void cell.pretty;
+        expect(stringify.mock.calls.length).toBe(afterFirstRead);
+
+        stringify.mockRestore();
       });
     });
   });

@@ -156,14 +156,29 @@ function scalarCell(text: string): GovernedSqlCell {
   return { kind: "scalar", display, copy: text, clipped };
 }
 
+/**
+ * The indented form is built on first read, not on construction.
+ *
+ * Every cell of every row passes through here, while `pretty` is read by one
+ * thing only: the expanded view, which opens a single cell at a time. Building
+ * it eagerly walked each structured value a second time for the whole result —
+ * ten thousand rows of a nested column meant ten thousand indented copies of
+ * documents that can each be kilobytes, none of which anyone looked at. The
+ * getter keeps the property a plain `string` to its readers, and memoises so a
+ * re-render of an open cell does not pay for it twice.
+ */
 function structuredCell(value: unknown): GovernedSqlCell {
   const compact = safeJson(value);
   const { display, clipped } = clip(compact);
+  let indented: string | undefined;
   return {
     kind: "structured",
     display,
     copy: compact,
-    pretty: safeJson(value, 2),
+    get pretty(): string {
+      indented ??= safeJson(value, 2);
+      return indented;
+    },
     clipped,
   };
 }
