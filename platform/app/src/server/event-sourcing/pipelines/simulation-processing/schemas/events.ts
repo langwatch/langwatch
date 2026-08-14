@@ -97,9 +97,13 @@ export const simulationRunFinishedEventDataSchema = z.object({
   durationMs: z.number().optional(),
   status: z.string().optional(),
   // Identity + traceIds are event-carried state (ECST) so downstream
-  // subscribers never read fold state. Optional so events written before
-  // 2026-08-06 still parse; FinishRunCommand backfills them from the run's
-  // prior events when the caller did not supply them.
+  // subscribers never read fold state.
+  //
+  // Optional because the CALLER need not supply them — FinishRunCommand
+  // backfills from the run's prior events when they are absent. Not for
+  // backwards compatibility: this schema pins `version` to a literal, so an
+  // event written under an older version fails that check before reaching
+  // these fields at all.
   scenarioId: z.string().optional(),
   batchRunId: z.string().optional(),
   scenarioSetId: z.string().optional(),
