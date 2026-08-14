@@ -61,17 +61,24 @@ function parseSpecText(text: string): Record<string, unknown> | undefined {
  * it is opened.
  */
 function specificationToSave({
-  read,
+  onScreen,
+  lastSeen,
   openedSpecText,
   chartIsOpen,
 }: {
-  read: SpecReader | null;
+  onScreen: Record<string, unknown> | undefined;
+  lastSeen: Record<string, unknown> | undefined;
   openedSpecText: string | undefined;
   chartIsOpen: boolean;
 }): Record<string, unknown> | undefined {
-  const onScreen = read?.();
   if (onScreen) return onScreen;
-  if (!chartIsOpen || openedSpecText === undefined) return undefined;
+  if (!chartIsOpen) return undefined;
+  // The reader exists only while chart mode is mounted. Falling straight back
+  // to `openedSpecText` here would reach past every edit already made to what
+  // the chart held when it was *opened* — so a Save taken after leaving chart
+  // mode would quietly undo an edit that a previous Save had already stored.
+  if (lastSeen) return lastSeen;
+  if (openedSpecText === undefined) return undefined;
   return parseSpecText(openedSpecText);
 }
 
@@ -91,6 +98,14 @@ export function useSavedChartWiring({
   >(undefined);
 
   const specReaderRef = useRef<SpecReader | null>(null);
+  /**
+   * The last specification the reader actually produced, which outlives the
+   * reader itself. Cleared whenever a chart is opened, so one chart's
+   * specification can never be carried into another's Save.
+   */
+  const lastSeenSpecRef = useRef<Record<string, unknown> | undefined>(
+    undefined,
+  );
   const registerSpecReader = useCallback((read: SpecReader | null) => {
     specReaderRef.current = read;
   }, []);
@@ -102,6 +117,7 @@ export function useSavedChartWiring({
     projectId,
     onOpened: useCallback(
       (opened) => {
+        lastSeenSpecRef.current = undefined;
         setSql(opened.sql);
         setParameters(opened.parameters);
         setOpenedParameters(opened.parameters);
@@ -126,8 +142,12 @@ export function useSavedChartWiring({
   // What Save writes: the draft the member is looking at, plus the
   // specification they are looking at with it.
   const currentDraft = useCallback(() => {
+    const onScreen = specReaderRef.current?.();
+    if (onScreen) lastSeenSpecRef.current = onScreen;
+
     const vegaLiteSpec = specificationToSave({
-      read: specReaderRef.current,
+      onScreen,
+      lastSeen: lastSeenSpecRef.current,
       openedSpecText,
       chartIsOpen: openedChartId !== null,
     });

@@ -186,6 +186,72 @@ describe("saving a chart that was opened but never charted", () => {
     });
   });
 
+  describe("given the chart mode unmounted after an edit was already saved", () => {
+    describe("when they save a second time", () => {
+      /** @scenario "Save stores what is on screen, and saves again into the same chart" */
+      it("keeps the edit rather than reverting to the opened copy", async () => {
+        const { result } = mountWiring();
+        await act(async () => {
+          await result.current.saved.open("chart-1");
+        });
+
+        const edited = { ...SPEC, mark: "line" };
+        act(() => result.current.registerSpecReader(() => edited));
+        await act(async () => {
+          await result.current.saved.save({
+            draft: result.current.currentDraft(),
+          });
+        });
+
+        // Leaving chart mode takes the reader with it. The edit is already
+        // stored, so a second Save must not reach back past it.
+        act(() => result.current.registerSpecReader(null));
+        await act(async () => {
+          await result.current.saved.save({
+            draft: result.current.currentDraft(),
+          });
+        });
+
+        expect(mocks.update.mutateAsync).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            definition: expect.objectContaining({ vegaLiteSpec: edited }),
+          }),
+        );
+      });
+
+      /** @scenario "Save stores what is on screen, and saves again into the same chart" */
+      it("does not carry that edit into a different chart", async () => {
+        const { result } = mountWiring();
+        await act(async () => {
+          await result.current.saved.open("chart-1");
+        });
+        const edited = { ...SPEC, mark: "line" };
+        act(() => result.current.registerSpecReader(() => edited));
+        act(() => {
+          result.current.currentDraft();
+        });
+
+        // A second chart is opened with no chart mode mounted. Its own stored
+        // specification is the only honest answer here.
+        act(() => result.current.registerSpecReader(null));
+        await act(async () => {
+          await result.current.saved.open("chart-1");
+        });
+        await act(async () => {
+          await result.current.saved.save({
+            draft: result.current.currentDraft(),
+          });
+        });
+
+        expect(mocks.update.mutateAsync).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            definition: expect.objectContaining({ vegaLiteSpec: SPEC }),
+          }),
+        );
+      });
+    });
+  });
+
   describe("given nothing is open", () => {
     describe("when they save a query they have only just written", () => {
       it("saves the query alone, inventing no specification", async () => {
