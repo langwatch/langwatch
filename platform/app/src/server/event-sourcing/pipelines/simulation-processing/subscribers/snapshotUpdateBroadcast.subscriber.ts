@@ -19,10 +19,14 @@ export interface SnapshotUpdateBroadcastSubscriberDeps {
  * plus status — the frontend refetches the run on receipt.
  *
  * Not fold-attached: `delay` absorbs fold-commit lag so the refetch almost
- * always sees settled state. The residual race (broadcast lands before the
- * fold writes, e.g. under queue backlog) is benign — the next event's
- * broadcast corrects it, and `finished` carries `status` in the payload
- * itself.
+ * always sees settled state. The residual race is a broadcast landing before
+ * the fold writes, e.g. under queue backlog.
+ *
+ * Mid-run that self-corrects, because another event follows and broadcasts
+ * again. On `finished` nothing follows — it is the last event — so the
+ * correction there is not a later broadcast but the payload: `finished`
+ * carries `status`, so a client that refetches early still learns the
+ * terminal state from the message rather than from what it read back.
  *
  * Broadcast failure is swallowed — it must not block the pipeline.
  */
