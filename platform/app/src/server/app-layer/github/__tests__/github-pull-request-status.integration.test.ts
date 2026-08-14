@@ -96,9 +96,15 @@ const SEEDED_PR_UPDATED_AT = new Date(Date.now() - 60 * 60 * 1000);
  * its source timestamp is at least as fresh as the stored one, so re-seeding
  * an older snapshot over a test that stored a newer one would be skipped and
  * leak that test's state into the next.
+ *
+ * The drop goes through `cleanupTestRows` rather than a raw `deleteMany`.
+ * `organizationId` is assigned in `beforeAll`, so it is undefined exactly when
+ * setup already failed, and Prisma drops an undefined filter rather than
+ * matching nothing: the raw form would sweep every row in the table, across
+ * every other suite and worktree sharing this database.
  */
 async function seedOpenSnapshot(): Promise<void> {
-  await prisma.githubPullRequest.deleteMany({ where: { organizationId } });
+  await cleanupTestRows(prisma, [["githubPullRequest", { organizationId }]]);
   await repository.upsertPullRequests({
     pullRequests: [
       {
