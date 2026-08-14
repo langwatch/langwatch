@@ -9,7 +9,7 @@
  * what the epoch IS.
  */
 import { createLogger } from "@langwatch/observability";
-import { connection, isBuildOrNoRedis } from "../redis";
+import { tryGetApp } from "../app-layer/app";
 
 const logger = createLogger("langwatch:authz:epoch");
 
@@ -32,7 +32,10 @@ export async function getAuthzEpoch({
 }: {
   organizationId: string;
 }): Promise<number | null> {
-  if (isBuildOrNoRedis || !connection) return null;
+  // Degrade by contract, like the fail-open rate limiters: no App (build,
+  // unit tests) or no Redis both mean "no epoch to compare against".
+  const connection = tryGetApp()?.redis;
+  if (!connection) return null;
   try {
     const raw = await connection.get(`${EPOCH_KEY_PREFIX}${organizationId}`);
     if (raw == null) return null;
@@ -54,7 +57,8 @@ export async function bumpAuthzEpoch({
 }: {
   organizationId: string;
 }): Promise<void> {
-  if (isBuildOrNoRedis || !connection) return;
+  const connection = tryGetApp()?.redis;
+  if (!connection) return;
   try {
     await connection.incr(`${EPOCH_KEY_PREFIX}${organizationId}`);
   } catch (error) {
