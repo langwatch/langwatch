@@ -45,6 +45,11 @@ const BUDGET_ID = `bdg-tts-${suffix}`;
 const SPEECH_CHARS = 4000;
 const SPEECH_COST_NANO_USD = 60_000_000;
 
+/** What ElevenLabs charges for a minute of scribe_v1, in nano-USD:
+ *  60 seconds at $0.0000611 per second. */
+const TRANSCRIPTION_MS = 60_000;
+const TRANSCRIPTION_COST_NANO_USD = 3_666_000;
+
 let chRepo: GatewayBudgetClickHouseRepository;
 let writeDebits: (payload: WriteGatewayDebitsPayload) => Promise<void>;
 
@@ -158,47 +163,55 @@ afterAll(async () => {
 }, 120_000);
 
 describe("given a speech request priced by the characters it synthesized", () => {
-  /** @scenario A character-priced call debits the budget it was admitted under */
-  it("moves the budget by the characters times the per-character rate", async () => {
-    const before = await spentNanoUsd();
+  describe("when one call is served", () => {
+    /** @scenario A character-priced call debits the budget it was admitted under */
+    it("moves the budget by the characters times the per-character rate", async () => {
+      const before = await spentNanoUsd();
 
-    await writeDebits(
-      servedRequest("openai/tts-1", {
-        ...EMPTY_SPEND_USAGE,
-        input_chars: SPEECH_CHARS,
-      }),
-    );
-
-    expect(await spentNanoUsd()).toBe(before + SPEECH_COST_NANO_USD);
-  });
-
-  /** @scenario A character-priced call debits the budget it was admitted under */
-  it("totals three of them exactly", async () => {
-    const before = await spentNanoUsd();
-
-    for (let i = 0; i < 3; i++) {
       await writeDebits(
         servedRequest("openai/tts-1", {
           ...EMPTY_SPEND_USAGE,
           input_chars: SPEECH_CHARS,
         }),
       );
-    }
 
-    expect(await spentNanoUsd()).toBe(before + 3 * SPEECH_COST_NANO_USD);
+      expect(await spentNanoUsd()).toBe(before + SPEECH_COST_NANO_USD);
+    });
   });
 
-  /** @scenario A character-priced call debits the budget it was admitted under */
-  it("moves the budget for a second-priced transcription too", async () => {
-    const before = await spentNanoUsd();
+  describe("when three of them are served", () => {
+    /** @scenario A character-priced call debits the budget it was admitted under */
+    it("totals them exactly", async () => {
+      const before = await spentNanoUsd();
 
-    await writeDebits(
-      servedRequest("elevenlabs/scribe_v1", {
-        ...EMPTY_SPEND_USAGE,
-        audio_ms: 60_000,
-      }),
-    );
+      for (let i = 0; i < 3; i++) {
+        await writeDebits(
+          servedRequest("openai/tts-1", {
+            ...EMPTY_SPEND_USAGE,
+            input_chars: SPEECH_CHARS,
+          }),
+        );
+      }
 
-    expect(await spentNanoUsd()).toBeGreaterThan(before);
+      expect(await spentNanoUsd()).toBe(before + 3 * SPEECH_COST_NANO_USD);
+    });
+  });
+});
+
+describe("given a transcription request priced by the seconds it transcribed", () => {
+  describe("when the duration reaches the spend record", () => {
+    /** @scenario A duration-priced transcription debits the budget it was admitted under */
+    it("moves the budget by the duration times the per-second rate", async () => {
+      const before = await spentNanoUsd();
+
+      await writeDebits(
+        servedRequest("elevenlabs/scribe_v1", {
+          ...EMPTY_SPEND_USAGE,
+          audio_ms: TRANSCRIPTION_MS,
+        }),
+      );
+
+      expect(await spentNanoUsd()).toBe(before + TRANSCRIPTION_COST_NANO_USD);
+    });
   });
 });

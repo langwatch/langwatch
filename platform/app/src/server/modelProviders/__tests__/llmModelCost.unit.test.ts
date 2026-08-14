@@ -288,52 +288,76 @@ describe("audio token rates in the static registry", () => {
     costs.find((c) => c.model === modelId);
   const match = (model: string) => matchModelCostWithFallbacks(model, costs);
 
-  it("maps the catalog's audioCostPerToken onto the input audio rate", () => {
-    expect(findByModel("openai/gpt-audio")?.inputAudioCostPerToken).toBe(
-      0.000032,
-    );
+  describe("given a model the catalog prices audio input for", () => {
+    describe("when the registry is built", () => {
+      it("maps the catalog's audioCostPerToken onto the input audio rate", () => {
+        expect(findByModel("openai/gpt-audio")?.inputAudioCostPerToken).toBe(
+          0.000032,
+        );
+      });
+
+      it("derives the output audio rate at twice the input rate", () => {
+        expect(findByModel("openai/gpt-audio")?.outputAudioCostPerToken).toBe(
+          0.000064,
+        );
+      });
+    });
   });
 
-  it("derives the output audio rate for an OpenAI audio model", () => {
-    expect(findByModel("openai/gpt-audio")?.outputAudioCostPerToken).toBe(
-      0.000064,
-    );
+  describe("given the catalog carries its own output audio price", () => {
+    describe("when the rate is resolved", () => {
+      it("uses the catalog price rather than deriving one", () => {
+        expect(
+          resolveAudioOutputRate("openai/gpt-realtime", {
+            audioCostPerToken: 0.000032,
+            audioOutputCostPerToken: 0.00009,
+          }),
+        ).toBe(0.00009);
+      });
+    });
   });
 
-  it("prefers a supplied output audio rate over the derived one", () => {
-    // gpt-realtime states $64 per million in the overlay, which is the same
-    // figure the derivation would produce, so assert the source instead.
-    expect(
-      resolveAudioOutputRate("openai/gpt-realtime", {
-        audioCostPerToken: 0.000032,
-        audioOutputCostPerToken: 0.00009,
-      }),
-    ).toBe(0.00009);
+  describe("given a model outside the OpenAI audio families", () => {
+    describe("when the rate is resolved", () => {
+      it("derives nothing", () => {
+        expect(
+          resolveAudioOutputRate("anthropic/claude-opus-5", {
+            audioCostPerToken: 0.000032,
+          }),
+        ).toBeUndefined();
+      });
+    });
   });
 
-  it("leaves models outside the OpenAI audio families without a derived rate", () => {
-    expect(
-      resolveAudioOutputRate("anthropic/claude-opus-5", {
-        audioCostPerToken: 0.000032,
-      }),
-    ).toBeUndefined();
+  describe("given an OpenAI audio model with no audio input price", () => {
+    describe("when the rate is resolved", () => {
+      it("derives nothing, because there is nothing to scale", () => {
+        expect(
+          resolveAudioOutputRate("openai/gpt-realtime", {}),
+        ).toBeUndefined();
+      });
+    });
   });
 
-  it("derives nothing for a model with no audio input price", () => {
-    expect(resolveAudioOutputRate("openai/gpt-realtime", {})).toBeUndefined();
-  });
+  describe("given both realtime models are in the catalog", () => {
+    describe("when the smaller one is matched", () => {
+      // The prefix-anchored regex would price mini at the full rate if the
+      // two entries did not land together.
+      it("does not price gpt-realtime-mini at gpt-realtime's rate", () => {
+        const mini = match("openai/gpt-realtime-mini");
+        expect(mini?.model).toBe("openai/gpt-realtime-mini");
+        expect(mini?.inputAudioCostPerToken).toBe(0.00001);
+        expect(mini?.outputAudioCostPerToken).toBe(0.00002);
+      });
+    });
 
-  it("does not price gpt-realtime-mini at gpt-realtime's rate", () => {
-    const mini = match("openai/gpt-realtime-mini");
-    expect(mini?.model).toBe("openai/gpt-realtime-mini");
-    expect(mini?.inputAudioCostPerToken).toBe(0.00001);
-    expect(mini?.outputAudioCostPerToken).toBe(0.00002);
-  });
-
-  it("keeps gpt-realtime itself on the full rate", () => {
-    const full = match("openai/gpt-realtime");
-    expect(full?.model).toBe("openai/gpt-realtime");
-    expect(full?.inputAudioCostPerToken).toBe(0.000032);
+    describe("when the full model is matched", () => {
+      it("keeps it on the full rate", () => {
+        const full = match("openai/gpt-realtime");
+        expect(full?.model).toBe("openai/gpt-realtime");
+        expect(full?.inputAudioCostPerToken).toBe(0.000032);
+      });
+    });
   });
 });
 
@@ -342,22 +366,35 @@ describe("the ElevenLabs conversational entry", () => {
   const match = (model: string) => matchModelCostWithFallbacks(model, costs);
 
   // The gateway confirms with the BARE resolved model id, because
-  // matchModelCostWithFallbacks strips the provider prefix, so both
-  // spellings have to reach the same entry.
-  it("resolves the bare id the gateway confirms with", () => {
-    expect(match("convai")?.model).toBe("elevenlabs/convai");
+  // matchModelCostWithFallbacks strips the provider prefix.
+  describe("given the bare model id the gateway confirms with", () => {
+    describe("when it is matched", () => {
+      it("resolves the conversational entry", () => {
+        expect(match("convai")?.model).toBe("elevenlabs/convai");
+      });
+
+      it("is priced per second of conversation", () => {
+        expect(match("convai")?.inputCostPerSecond).toBeCloseTo(0.08 / 60, 15);
+      });
+    });
   });
 
-  it("resolves the prefixed id too", () => {
-    expect(match("elevenlabs/convai")?.model).toBe("elevenlabs/convai");
+  describe("given the prefixed model id", () => {
+    describe("when it is matched", () => {
+      it("resolves the same entry", () => {
+        expect(match("elevenlabs/convai")?.model).toBe("elevenlabs/convai");
+      });
+    });
   });
 
-  it("is priced per second of conversation", () => {
-    expect(match("convai")?.inputCostPerSecond).toBeCloseTo(0.08 / 60, 15);
-  });
-
-  it("does not capture the transcription models", () => {
-    expect(match("scribe_v1")?.model).toBe("elevenlabs/scribe_v1");
-    expect(match("elevenlabs/scribe_v1")?.model).toBe("elevenlabs/scribe_v1");
+  describe("given a transcription model id", () => {
+    describe("when it is matched", () => {
+      it("is not captured by the conversational entry", () => {
+        expect(match("scribe_v1")?.model).toBe("elevenlabs/scribe_v1");
+        expect(match("elevenlabs/scribe_v1")?.model).toBe(
+          "elevenlabs/scribe_v1",
+        );
+      });
+    });
   });
 });

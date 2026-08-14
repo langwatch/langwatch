@@ -387,9 +387,13 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 	// calls that structurally never carry completion tokens or extracted
 	// output: TTS spans (binary audio response), duration-priced STT spans
 	// (scribe reports seconds, not tokens), and embeddings.
+	// completionTokens, not params.Usage.CompletionTokens: an audio-native
+	// model answers entirely in audio tokens, which are carried out of the
+	// completion total, so reading the raw field would drop a real answer as
+	// an empty probe.
 	isProbeShape := params.RequestType == domain.RequestTypeChat ||
 		params.RequestType == domain.RequestTypeMessages
-	if !isError && isProbeShape && params.Usage.CompletionTokens == 0 && params.Usage.CostMicroUSD == 0 && output == "" {
+	if !isError && isProbeShape && completionTokens == 0 && params.Usage.CostMicroUSD == 0 && output == "" {
 		span.SetAttributes(attrDrop.Bool(true))
 	}
 

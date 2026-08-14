@@ -73,59 +73,73 @@ const wireConfirmationBeforeAudio = {
 };
 
 describe("the spend quantity vocabulary", () => {
-  /** @scenario A quantity added to the vocabulary defaults on records written before it */
-  it("reads a confirmation recorded before the audio quantities existed", () => {
-    const parsed = confirmSpendWireSchema.parse(wireConfirmationBeforeAudio);
+  describe("given a confirmation recorded before the audio quantities existed", () => {
+    describe("when it is read back", () => {
+      /** @scenario A quantity added to the vocabulary defaults on records written before it */
+      it("defaults every quantity it never carried", () => {
+        const parsed = confirmSpendWireSchema.parse(
+          wireConfirmationBeforeAudio,
+        );
 
-    expect(parsed.usage).toEqual({
-      input_tokens: 869,
-      output_tokens: 207,
-      cache_read_input_tokens: 11,
-      cache_creation_input_tokens: 5,
-      cache_creation_1h_tokens: 0,
-      reasoning_tokens: 0,
-      input_audio_tokens: 0,
-      output_audio_tokens: 0,
-      input_chars: 0,
-      audio_ms: 0,
+        expect(parsed.usage).toEqual({
+          input_tokens: 869,
+          output_tokens: 207,
+          cache_read_input_tokens: 11,
+          cache_creation_input_tokens: 5,
+          cache_creation_1h_tokens: 0,
+          reasoning_tokens: 0,
+          input_audio_tokens: 0,
+          output_audio_tokens: 0,
+          input_chars: 0,
+          audio_ms: 0,
+        });
+      });
     });
   });
 
-  /** @scenario The confirm command carries every billable quantity, not only token classes */
-  it("keeps the quantities a current gateway sends", () => {
-    const parsed = confirmSpendWireSchema.parse({
-      ...wireConfirmationBeforeAudio,
-      usage: {
-        input_tokens: 200,
-        input_audio_tokens: 800,
-        output_tokens: 50,
-        output_audio_tokens: 250,
-        input_chars: 4000,
-        audio_ms: 1234,
-        cache_creation_1h_tokens: 17,
-      },
-    });
+  describe("given a confirmation a current gateway sent", () => {
+    describe("when it is read back", () => {
+      /** @scenario The confirm command carries every billable quantity, not only token classes */
+      it("keeps every quantity it carried", () => {
+        const parsed = confirmSpendWireSchema.parse({
+          ...wireConfirmationBeforeAudio,
+          usage: {
+            input_tokens: 200,
+            input_audio_tokens: 800,
+            output_tokens: 50,
+            output_audio_tokens: 250,
+            input_chars: 4000,
+            audio_ms: 1234,
+            cache_creation_1h_tokens: 17,
+          },
+        });
 
-    expect(parsed.usage).toMatchObject({
-      input_audio_tokens: 800,
-      output_audio_tokens: 250,
-      input_chars: 4000,
-      audio_ms: 1234,
-      cache_creation_1h_tokens: 17,
+        expect(parsed.usage).toMatchObject({
+          input_audio_tokens: 800,
+          output_audio_tokens: 250,
+          input_chars: 4000,
+          audio_ms: 1234,
+          cache_creation_1h_tokens: 17,
+        });
+      });
     });
   });
 
-  /** @scenario A quantity added to the vocabulary defaults on records written before it */
-  it("defaults every quantity on a failure that carried no usage at all", () => {
-    const parsed = failSpendWireSchema.parse({
-      gateway_request_id: "req_01J",
-      occurred_at: Date.UTC(2026, 6, 21, 9, 0, 0),
-      tenantId: "proj_1",
-      error: { type: "provider_timeout", http_status: 504 },
-    });
+  describe("given a failure that carried no usage at all", () => {
+    describe("when it is read back", () => {
+      /** @scenario A quantity added to the vocabulary defaults on records written before it */
+      it("defaults every quantity to zero", () => {
+        const parsed = failSpendWireSchema.parse({
+          gateway_request_id: "req_01J",
+          occurred_at: Date.UTC(2026, 6, 21, 9, 0, 0),
+          tenantId: "proj_1",
+          error: { type: "provider_timeout", http_status: 504 },
+        });
 
-    expect(parsed.usage.input_chars).toBe(0);
-    expect(parsed.usage.audio_ms).toBe(0);
-    expect(parsed.usage.input_audio_tokens).toBe(0);
+        expect(parsed.usage.input_chars).toBe(0);
+        expect(parsed.usage.audio_ms).toBe(0);
+        expect(parsed.usage.input_audio_tokens).toBe(0);
+      });
+    });
   });
 });

@@ -92,169 +92,189 @@ describe("gateway spend quantities through the fold store (real CH)", () => {
     await startTestContainers();
   });
 
-  it("round-trips a speech call's characters", async () => {
-    const gatewayRequestId = `req-chars-${nanoid(10)}`;
-    await repository().upsertFromFold([
-      {
-        tenantId: TENANT,
-        gatewayRequestId,
-        state: confirmedState({ input_chars: 4000 }, 60_000_000),
-      },
-    ]);
+  describe("given a speech call the fold committed", () => {
+    describe("when the store reads it back", () => {
+      it("round-trips its characters", async () => {
+        const gatewayRequestId = `req-chars-${nanoid(10)}`;
+        await repository().upsertFromFold([
+          {
+            tenantId: TENANT,
+            gatewayRequestId,
+            state: confirmedState({ input_chars: 4000 }, 60_000_000),
+          },
+        ]);
 
-    const read = await repository().readForFold({
-      tenantId: TENANT,
-      gatewayRequestId,
+        const read = await repository().readForFold({
+          tenantId: TENANT,
+          gatewayRequestId,
+        });
+
+        expect(read?.usage?.input_chars).toBe(4000);
+        expect(read?.costNanoUsd).toBe(60_000_000);
+      });
     });
-
-    expect(read?.usage?.input_chars).toBe(4000);
-    expect(read?.costNanoUsd).toBe(60_000_000);
   });
 
-  it("round-trips every quantity the vocabulary carries", async () => {
-    const gatewayRequestId = `req-all-${nanoid(10)}`;
-    await repository().upsertFromFold([
-      {
-        tenantId: TENANT,
-        gatewayRequestId,
-        state: confirmedState(
+  describe("given a call carrying every quantity", () => {
+    describe("when the store reads it back", () => {
+      it("round-trips all of them", async () => {
+        const gatewayRequestId = `req-all-${nanoid(10)}`;
+        await repository().upsertFromFold([
           {
-            input_tokens: 200,
-            output_tokens: 50,
+            tenantId: TENANT,
+            gatewayRequestId,
+            state: confirmedState(
+              {
+                input_tokens: 200,
+                output_tokens: 50,
+                input_audio_tokens: 800,
+                output_audio_tokens: 250,
+                cache_creation_1h_tokens: 17,
+                input_chars: 4000,
+                audio_ms: 1234,
+              },
+              43_200_000,
+            ),
+          },
+        ]);
+
+        const read = await repository().readForFold({
+          tenantId: TENANT,
+          gatewayRequestId,
+        });
+
+        expect(read?.usage).toMatchObject({
+          input_tokens: 200,
+          output_tokens: 50,
+          input_audio_tokens: 800,
+          output_audio_tokens: 250,
+          cache_creation_1h_tokens: 17,
+          input_chars: 4000,
+          audio_ms: 1234,
+        });
+      });
+    });
+  });
+
+  describe("given a row written before the quantity columns existed", () => {
+    describe("when the store reads it back", () => {
+      it("keeps its committed money instead of reporting a miss", async () => {
+        // A row the previous build wrote: the quantity columns are absent from
+        // the insert entirely, so ClickHouse serves their defaults. The version
+        // stamp is the CURRENT one, which is the whole point of not bumping it:
+        // the row decodes instead of reporting a store miss, and a miss would
+        // fold from init() and overwrite this committed state.
+        const gatewayRequestId = `req-old-${nanoid(10)}`;
+        await ch().insert({
+          table: "gateway_spend",
+          values: [
+            {
+              TenantId: TENANT,
+              GatewayRequestId: gatewayRequestId,
+              OrganizationId: `org-qty-${suffix}`,
+              VirtualKeyId: `vk_qty_${suffix}`,
+              PrincipalUserId: "",
+              EndUserId: "",
+              TraceId: "",
+              Model: "openai/gpt-4o",
+              ProviderKey: "pk-openai",
+              RequestType: "chat",
+              Status: "confirmed",
+              ErrorClass: "",
+              HttpStatus: 200,
+              NeedsReconciliation: 0,
+              SettleReason: "",
+              TokensInput: 869,
+              TokensOutput: 207,
+              TokensCacheRead: 0,
+              TokensCacheWrite: 0,
+              TokensReasoning: 0,
+              CostNanoUSD: 5_242_000,
+              RateVersion: "registry@2026-07-29",
+              Labels: [],
+              Metadata: "",
+              PodId: "pod-old",
+              PodSeq: 1,
+              DurationMS: 3878,
+              OccurredAt: new Date(OCCURRED_AT_MS),
+              Version: GATEWAY_SPEND_PROJECTION_VERSION_LATEST,
+              CreatedAt: OCCURRED_AT_MS,
+              LastEventOccurredAt: OCCURRED_AT_MS,
+              EventTimestamp: OCCURRED_AT_MS,
+            },
+          ],
+          format: "JSONEachRow",
+          clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
+        });
+
+        const read = await repository().readForFold({
+          tenantId: TENANT,
+          gatewayRequestId,
+        });
+
+        expect(read).not.toBeNull();
+        expect(read?.costNanoUsd).toBe(5_242_000);
+        expect(read?.usage).toMatchObject({
+          input_tokens: 869,
+          output_tokens: 207,
+          input_chars: 0,
+          audio_ms: 0,
+          input_audio_tokens: 0,
+        });
+      });
+    });
+  });
+
+  describe("given a confirmed call whose admission arrives late", () => {
+    describe("when the admission folds over the outcome", () => {
+      it("does not zero the quantities", async () => {
+        const gatewayRequestId = `req-late-${nanoid(10)}`;
+        const confirmed = confirmedState(
+          {
             input_audio_tokens: 800,
             output_audio_tokens: 250,
-            cache_creation_1h_tokens: 17,
-            input_chars: 4000,
-            audio_ms: 1234,
+            audio_ms: 60_000,
           },
           43_200_000,
-        ),
-      },
-    ]);
+        );
+        await repository().upsertFromFold([
+          { tenantId: TENANT, gatewayRequestId, state: confirmed },
+        ]);
 
-    const read = await repository().readForFold({
-      tenantId: TENANT,
-      gatewayRequestId,
-    });
+        // The admission arrives after the outcome. The fold loads this state
+        // from the store, fills the attribution and writes the whole row back,
+        // so anything readForFold cannot decode is lost on this write.
+        const loaded = await repository().readForFold({
+          tenantId: TENANT,
+          gatewayRequestId,
+        });
+        expect(loaded).not.toBeNull();
+        await repository().upsertFromFold([
+          {
+            tenantId: TENANT,
+            gatewayRequestId,
+            state: {
+              ...loaded!,
+              endUserId: "user_9",
+              traceId: "trace-1",
+              updatedAt: loaded!.updatedAt + 1,
+            },
+          },
+        ]);
 
-    expect(read?.usage).toMatchObject({
-      input_tokens: 200,
-      output_tokens: 50,
-      input_audio_tokens: 800,
-      output_audio_tokens: 250,
-      cache_creation_1h_tokens: 17,
-      input_chars: 4000,
-      audio_ms: 1234,
-    });
-  });
+        const after = await repository().readForFold({
+          tenantId: TENANT,
+          gatewayRequestId,
+        });
 
-  it("keeps the committed money on a row written before the columns existed", async () => {
-    // A row the previous build wrote: the quantity columns are absent from
-    // the insert entirely, so ClickHouse serves their defaults. The version
-    // stamp is the CURRENT one, which is the whole point of not bumping it:
-    // the row decodes instead of reporting a store miss, and a miss would
-    // fold from init() and overwrite this committed state.
-    const gatewayRequestId = `req-old-${nanoid(10)}`;
-    await ch().insert({
-      table: "gateway_spend",
-      values: [
-        {
-          TenantId: TENANT,
-          GatewayRequestId: gatewayRequestId,
-          OrganizationId: `org-qty-${suffix}`,
-          VirtualKeyId: `vk_qty_${suffix}`,
-          PrincipalUserId: "",
-          EndUserId: "",
-          TraceId: "",
-          Model: "openai/gpt-4o",
-          ProviderKey: "pk-openai",
-          RequestType: "chat",
-          Status: "confirmed",
-          ErrorClass: "",
-          HttpStatus: 200,
-          NeedsReconciliation: 0,
-          SettleReason: "",
-          TokensInput: 869,
-          TokensOutput: 207,
-          TokensCacheRead: 0,
-          TokensCacheWrite: 0,
-          TokensReasoning: 0,
-          CostNanoUSD: 5_242_000,
-          RateVersion: "registry@2026-07-29",
-          Labels: [],
-          Metadata: "",
-          PodId: "pod-old",
-          PodSeq: 1,
-          DurationMS: 3878,
-          OccurredAt: new Date(OCCURRED_AT_MS),
-          Version: GATEWAY_SPEND_PROJECTION_VERSION_LATEST,
-          CreatedAt: OCCURRED_AT_MS,
-          LastEventOccurredAt: OCCURRED_AT_MS,
-          EventTimestamp: OCCURRED_AT_MS,
-        },
-      ],
-      format: "JSONEachRow",
-      clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
-    });
-
-    const read = await repository().readForFold({
-      tenantId: TENANT,
-      gatewayRequestId,
-    });
-
-    expect(read).not.toBeNull();
-    expect(read?.costNanoUsd).toBe(5_242_000);
-    expect(read?.usage).toMatchObject({
-      input_tokens: 869,
-      output_tokens: 207,
-      input_chars: 0,
-      audio_ms: 0,
-      input_audio_tokens: 0,
-    });
-  });
-
-  it("does not zero the quantities when a late admission folds over the outcome", async () => {
-    const gatewayRequestId = `req-late-${nanoid(10)}`;
-    const confirmed = confirmedState(
-      { input_audio_tokens: 800, output_audio_tokens: 250, audio_ms: 60_000 },
-      43_200_000,
-    );
-    await repository().upsertFromFold([
-      { tenantId: TENANT, gatewayRequestId, state: confirmed },
-    ]);
-
-    // The admission arrives after the outcome. The fold loads this state
-    // from the store, fills the attribution and writes the whole row back,
-    // so anything readForFold cannot decode is lost on this write.
-    const loaded = await repository().readForFold({
-      tenantId: TENANT,
-      gatewayRequestId,
-    });
-    expect(loaded).not.toBeNull();
-    await repository().upsertFromFold([
-      {
-        tenantId: TENANT,
-        gatewayRequestId,
-        state: {
-          ...loaded!,
-          endUserId: "user_9",
-          traceId: "trace-1",
-          updatedAt: loaded!.updatedAt + 1,
-        },
-      },
-    ]);
-
-    const after = await repository().readForFold({
-      tenantId: TENANT,
-      gatewayRequestId,
-    });
-
-    expect(after?.endUserId).toBe("user_9");
-    expect(after?.costNanoUsd).toBe(43_200_000);
-    expect(after?.usage).toMatchObject({
-      input_audio_tokens: 800,
-      output_audio_tokens: 250,
-      audio_ms: 60_000,
+        expect(after?.endUserId).toBe("user_9");
+        expect(after?.costNanoUsd).toBe(43_200_000);
+        expect(after?.usage).toMatchObject({
+          input_audio_tokens: 800,
+          output_audio_tokens: 250,
+          audio_ms: 60_000,
+        });
+      });
     });
   });
 });

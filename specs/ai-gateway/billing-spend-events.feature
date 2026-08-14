@@ -124,6 +124,21 @@ Feature: Billing spend events, one durable record per gateway request
       And no cost field exists anywhere in it
 
     @unit
+    Scenario: The confirm command carries every billable quantity, not only token classes
+      Given a request a provider bills by characters, seconds, or audio tokens
+      When the gateway confirms it
+      Then the payload carries that quantity beside the token classes
+      And audio tokens are stated apart from the text totals they came out of
+      And a text-only request carries the same token counts it always did
+
+    @unit
+    Scenario: A quantity added to the vocabulary defaults on records written before it
+      Given a confirmation recorded before a quantity existed
+      When it is read back
+      Then the missing quantity reads as zero
+      And the record parses instead of failing
+
+    @unit
     Scenario: The failed payload keeps the full error taxonomy
       When a fail command is serialized
       Then the error class and http status ride verbatim
@@ -198,21 +213,6 @@ Feature: Billing spend events, one durable record per gateway request
       When a confirmed event folds
       Then the record states the integer nano-USD the event was appended with
       And the rate identity that produced that figure
-
-    @unit
-    Scenario: The confirm command carries every billable quantity, not only token classes
-      Given a request a provider bills by characters, seconds, or audio tokens
-      When the gateway confirms it
-      Then the payload carries that quantity beside the token classes
-      And audio tokens are stated apart from the text totals they came out of
-      And a text-only request carries the same token counts it always did
-
-    @unit
-    Scenario: A quantity added to the vocabulary defaults on records written before it
-      Given a confirmation recorded before a quantity existed
-      When it is read back
-      Then the missing quantity reads as zero
-      And the record parses instead of failing
 
     @unit
     Scenario: The price is fixed when the outcome is recorded and every surface repeats it

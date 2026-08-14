@@ -126,6 +126,13 @@ Feature: Gateway audio endpoints, OpenAI-compatible TTS and STT for OpenAI and E
     # call that cost real money debits nothing at all.
 
   @integration
+  Scenario: A duration-priced transcription debits the budget it was admitted under
+    Given a virtual key with a budget and a second-priced transcription model
+    When the client transcribes audio through the gateway
+    Then the audio duration reaches the spend record
+    And the budget moves by the duration times the model's per-second rate
+
+  @integration
   Scenario: Upstream provider errors pass through transparently
     When the provider rejects the request (e.g. an invalid voice, HTTP 400)
     Then the gateway forwards the provider's status code and error body

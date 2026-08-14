@@ -9,7 +9,9 @@
  * The run, end to end against a locally running stack:
  *
  *   1. Refuse to touch a non-local database, and refuse to run at all when
- *      gateway_spend lacks the quantity columns.
+ *      gateway_spend lacks the quantity columns. The column check happens
+ *      before anything is written, so a missing migration leaves no orphan
+ *      key or budget behind.
  *   2. Issue a dedicated virtual key with its own budget (WARN, high limit),
  *      so the delta is attributable to this run and nothing else.
  *   3. Three POST /v1/audio/speech calls at EXACTLY 4000 characters, plus
@@ -19,6 +21,9 @@
  *   5. Assert per-request characters and cost, the ledger's three success
  *      debits, the budget delta, and that the trace explorer and the budget
  *      state the same cost for the same request.
+ *
+ * The reads live in probeSpendReads.ts and the assertions in
+ * probeSpendReport.ts; this file is the orchestrator.
  *
  * Prerequisite: `scripts/dogfood/audio/seed-audio-vk.ts` has run for this
  * user, so the org carries an OpenAI provider key and a default policy that
@@ -36,23 +41,24 @@
 
 import { PersonalVirtualKeyService } from "@ee/governance/services/personalVirtualKey.service";
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
-import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
+import {
+  assertQuantityColumns,
+  type ProbeScope,
+  REQUIRED_COLUMNS,
+} from "./probeSpendReads";
+import {
+  assertOutcome,
+  type Call,
+  failureCount,
+  log,
+  printFailures,
+  SPEECH_CALLS,
+  SPEECH_CHARS,
+} from "./probeSpendReport";
 
 const SPEECH_MODEL = "openai/tts-1";
 const CONTROL_MODEL = "openai/gpt-4o";
-const SPEECH_CALLS = 3;
-const SPEECH_CHARS = 4000;
-/** 4000 characters at tts-1's $15 per million characters. */
-const EXPECTED_COST_NANO_USD = 60_000_000;
-const REQUIRED_COLUMNS = [
-  "CharsInput",
-  "AudioMS",
-  "TokensCacheWrite1h",
-  "TokensInputAudio",
-  "TokensOutputAudio",
-];
 const LOCAL_DB_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 
 interface Args {
@@ -78,6 +84,12 @@ function parseArgs(argv: string[]): Args {
     if (argv[i] === "--allow-remote-db") allowRemoteDb = true;
   }
   if (!email) throw new Error("--email is required");
+  // A non-numeric or missing value parses to NaN, and every deadline
+  // comparison against NaN is false, so the poll loop would run forever
+  // instead of failing.
+  if (!Number.isFinite(deadlineSeconds) || deadlineSeconds <= 0) {
+    throw new Error("--deadline must be a positive number of seconds");
+  }
   return {
     email,
     org,
@@ -109,41 +121,19 @@ function assertLocalDatabase(allowRemoteDb: boolean): void {
   }
 }
 
-function log(line: string): void {
-  process.stderr.write(`[probe-audio-spend] ${line}\n`);
-}
-
-async function clickhouse(projectId: string) {
-  const client = await getClickHouseClientForProject(projectId);
-  if (!client) throw new Error("no ClickHouse client available");
-  return client;
+interface Tenant {
+  userId: string;
+  organizationId: string;
+  projectId: string;
+  teamId: string;
 }
 
 /**
- * Abort before spending money if the migration has not landed: without the
- * columns the probe would measure the defect it is meant to disprove and
- * blame the code.
+ * The user's organization and personal workspace, read and ensured before
+ * anything billable exists. The workspace is idempotent; the key and the
+ * budget that follow are not, which is why the column check sits between.
  */
-async function assertQuantityColumns(projectId: string): Promise<void> {
-  const client = await clickhouse(projectId);
-  const result = await client.query({
-    query: "DESCRIBE TABLE gateway_spend",
-    format: "JSONEachRow",
-  });
-  const rows = (await result.json()) as Array<{ name: string }>;
-  const present = new Set(rows.map((r) => r.name));
-  const missing = REQUIRED_COLUMNS.filter((c) => !present.has(c));
-  if (missing.length > 0) {
-    throw new Error(
-      `gateway_spend is missing ${missing.join(", ")}. Apply migration ` +
-        "00078_gateway_spend_billable_quantities.sql before probing.",
-    );
-  }
-  log(`gateway_spend carries all ${REQUIRED_COLUMNS.length} quantity columns`);
-}
-
-/** The user's organization, refusing to guess when there are several. */
-async function resolveOrg(args: Args): Promise<{ userId: string; id: string }> {
+async function resolveTenant(args: Args): Promise<Tenant> {
   const user = await prisma.user.findFirst({ where: { email: args.email } });
   if (!user) throw new Error(`no user with email ${args.email}`);
   const orgs = await prisma.organization.findMany({
@@ -163,21 +153,8 @@ async function resolveOrg(args: Args): Promise<{ userId: string; id: string }> {
         .join(", ")}`,
     );
   }
-  return { userId: user.id, id: picked.id };
-}
-
-interface Probe {
-  vkSecret: string;
-  vkId: string;
-  budgetId: string;
-  projectId: string;
-}
-
-/** A virtual key and a budget of this run's own, so the delta is this run's. */
-async function provision(args: Args): Promise<Probe> {
-  const { userId, id: organizationId } = await resolveOrg(args);
   const providers = await prisma.modelProvider.count({
-    where: { organizationId, provider: "openai", enabled: true },
+    where: { organizationId: picked.id, provider: "openai", enabled: true },
   });
   if (providers === 0) {
     throw new Error(
@@ -185,27 +162,40 @@ async function provision(args: Args): Promise<Probe> {
         "scripts/dogfood/audio/seed-audio-vk.ts first",
     );
   }
-
   const workspace = await new PersonalWorkspaceService(prisma).ensure({
-    userId,
-    organizationId,
+    userId: user.id,
+    organizationId: picked.id,
     displayName: null,
     displayEmail: args.email,
   });
+  return {
+    userId: user.id,
+    organizationId: picked.id,
+    projectId: workspace.project.id,
+    teamId: workspace.team.id,
+  };
+}
+
+interface Probe extends ProbeScope {
+  vkSecret: string;
+}
+
+/** A virtual key and a budget of this run's own, so the delta is this run's. */
+async function provision(args: Args, tenant: Tenant): Promise<Probe> {
   const issued = await PersonalVirtualKeyService.create(prisma, {
     gatewayBaseUrl: args.gateway,
   }).issue({
-    userId,
-    organizationId,
-    personalProjectId: workspace.project.id,
-    personalTeamId: workspace.team.id,
+    userId: tenant.userId,
+    organizationId: tenant.organizationId,
+    personalProjectId: tenant.projectId,
+    personalTeamId: tenant.teamId,
     label: `audio-spend-probe-${Date.now()}`,
   });
 
   const budget = await prisma.gatewayBudget.create({
     data: {
       name: `audio-spend-probe-${Date.now()}`,
-      organizationId,
+      organizationId: tenant.organizationId,
       scopeType: "VIRTUAL_KEY",
       scopeId: issued.id,
       window: "MONTH",
@@ -213,25 +203,21 @@ async function provision(args: Args): Promise<Probe> {
       // WARN, not BLOCK: the probe measures what a call costs, and a cap
       // that refused one would measure the cap instead.
       onBreach: "WARN",
-      createdById: userId,
+      createdById: tenant.userId,
       resetsAt: new Date(Date.now() + 30 * 86_400_000),
     },
   });
 
-  log(`vk=${issued.id} budget=${budget.id} project=${workspace.project.id}`);
+  log(`vk=${issued.id} budget=${budget.id} project=${tenant.projectId}`);
   return {
     vkSecret: issued.secret,
     vkId: issued.id,
     budgetId: budget.id,
-    projectId: workspace.project.id,
+    projectId: tenant.projectId,
+    // Bounds every read to this run's window. Set after provisioning so the
+    // predicate is as tight as the first call allows.
+    startedAt: new Date(),
   };
-}
-
-interface Call {
-  label: string;
-  gatewayRequestId: string;
-  traceId: string;
-  httpStatus: number;
 }
 
 /**
@@ -324,254 +310,21 @@ async function runCalls(probe: Probe, gateway: string): Promise<Call[]> {
   return calls;
 }
 
-interface SpendRow {
-  GatewayRequestId: string;
-  TraceId: string;
-  Model: string;
-  Status: string;
-  CharsInput: string;
-  TokensInput: string;
-  TokensOutput: string;
-  CostNanoUSD: string;
-}
-
-async function readSpendRows(probe: Probe): Promise<SpendRow[]> {
-  const client = await clickhouse(probe.projectId);
-  const result = await client.query({
-    query: `
-      SELECT GatewayRequestId, TraceId, Model, Status,
-             toString(CharsInput) AS CharsInput,
-             toString(TokensInput) AS TokensInput,
-             toString(TokensOutput) AS TokensOutput,
-             toString(CostNanoUSD) AS CostNanoUSD
-      FROM gateway_spend FINAL
-      WHERE TenantId = {tenantId:String}
-        AND VirtualKeyId = {vkId:String}
-        AND Status IN ('confirmed', 'failed')
-    `,
-    query_params: { tenantId: probe.projectId, vkId: probe.vkId },
-    format: "JSONEachRow",
-  });
-  return (await result.json()) as SpendRow[];
-}
-
-async function readLedgerDebits(
-  probe: Probe,
-): Promise<Array<{ Status: string; AmountNanoUSD: string }>> {
-  const client = await clickhouse(probe.projectId);
-  const result = await client.query({
-    query: `
-      SELECT Status, toString(AmountNanoUSD) AS AmountNanoUSD
-      FROM gateway_budget_ledger_events FINAL
-      WHERE TenantId = {tenantId:String} AND BudgetId = {budgetId:String}
-    `,
-    query_params: { tenantId: probe.projectId, budgetId: probe.budgetId },
-    format: "JSONEachRow",
-  });
-  return (await result.json()) as Array<{
-    Status: string;
-    AmountNanoUSD: string;
-  }>;
-}
-
-async function readBudgetSpendNanoUsd(probe: Probe): Promise<number> {
-  const repo = new GatewayBudgetClickHouseRepository(clickhouse);
-  const budget = await prisma.gatewayBudget.findUniqueOrThrow({
-    where: { id: probe.budgetId },
-  });
-  const [spend] = await repo.getSpendForBudgetsAcrossTenants(
-    [probe.projectId],
-    [budget],
-  );
-  return spend?.spentNanoUsd ?? 0;
-}
-
-async function readTraceCostUsd(
-  probe: Probe,
-  traceId: string,
-): Promise<number | null> {
-  const client = await clickhouse(probe.projectId);
-  const result = await client.query({
-    query: `
-      SELECT toString(TotalCost) AS TotalCost
-      FROM trace_summaries FINAL
-      WHERE TenantId = {tenantId:String} AND TraceId = {traceId:String}
-      LIMIT 1
-    `,
-    query_params: { tenantId: probe.projectId, traceId },
-    format: "JSONEachRow",
-  });
-  const rows = (await result.json()) as Array<{ TotalCost: string | null }>;
-  const raw = rows[0]?.TotalCost;
-  return raw == null || raw === "\\N" ? null : Number(raw);
-}
-
-/** Poll until the predicate holds or the deadline passes. No fixed sleeps:
- *  the pipeline's latency is a range, not a constant. */
-async function until<T>(
-  what: string,
-  deadlineMs: number,
-  read: () => Promise<T>,
-  done: (value: T) => boolean,
-): Promise<T> {
-  const stopAt = Date.now() + deadlineMs;
-  let last = await read();
-  while (!done(last)) {
-    if (Date.now() > stopAt) {
-      throw new Error(
-        `timed out after ${deadlineMs}ms waiting for ${what}; last read: ` +
-          JSON.stringify(last),
-      );
-    }
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    last = await read();
-  }
-  log(`${what}: satisfied`);
-  return last;
-}
-
-const failures: string[] = [];
-
-function check(name: string, ok: boolean, detail: string): void {
-  if (!ok) failures.push(`${name}: ${detail}`);
-  process.stdout.write(`${ok ? "PASS" : "FAIL"}  ${name}  ${detail}\n`);
-}
-
-function printTable(rows: SpendRow[]): void {
-  const header = [
-    "REQUEST",
-    "MODEL",
-    "STATUS",
-    "CHARS",
-    "TOK IN",
-    "TOK OUT",
-    "COST nanoUSD",
-  ];
-  const body = rows.map((r) => [
-    r.GatewayRequestId.slice(-12),
-    r.Model,
-    r.Status,
-    r.CharsInput,
-    r.TokensInput,
-    r.TokensOutput,
-    r.CostNanoUSD,
-  ]);
-  const widths = header.map((h, i) =>
-    Math.max(h.length, ...body.map((row) => row[i]!.length)),
-  );
-  const line = (cells: string[]) =>
-    cells.map((c, i) => c.padEnd(widths[i]!)).join("  ");
-  process.stdout.write(`\n${line(header)}\n`);
-  process.stdout.write(`${widths.map((w) => "-".repeat(w)).join("  ")}\n`);
-  for (const row of body) process.stdout.write(`${line(row)}\n`);
-  process.stdout.write("\n");
-}
-
-async function assertOutcome(probe: Probe, calls: Call[], deadlineMs: number) {
-  const speechCalls = calls.filter((c) => c.label.startsWith("speech"));
-  const speechRequestIds = new Set(speechCalls.map((c) => c.gatewayRequestId));
-
-  const rows = await until(
-    "four priced spend rows",
-    deadlineMs,
-    () => readSpendRows(probe),
-    (r) => r.length >= calls.length,
-  );
-  printTable(rows);
-
-  const speechRows = rows.filter((r) =>
-    speechRequestIds.has(r.GatewayRequestId),
-  );
-  check(
-    "three speech rows recorded",
-    speechRows.length === SPEECH_CALLS,
-    `${speechRows.length} of ${SPEECH_CALLS}`,
-  );
-  for (const row of speechRows) {
-    check(
-      `characters reached the record (${row.GatewayRequestId.slice(-12)})`,
-      row.CharsInput === String(SPEECH_CHARS),
-      `CharsInput=${row.CharsInput}`,
-    );
-    check(
-      `speech call priced (${row.GatewayRequestId.slice(-12)})`,
-      row.CostNanoUSD === String(EXPECTED_COST_NANO_USD),
-      `CostNanoUSD=${row.CostNanoUSD}, want ${EXPECTED_COST_NANO_USD}`,
-    );
-  }
-
-  const controlRow = rows.find(
-    (r) => !speechRequestIds.has(r.GatewayRequestId),
-  );
-  const controlNano = Number(controlRow?.CostNanoUSD ?? 0);
-  check(
-    "control call still prices",
-    controlNano > 0,
-    `CostNanoUSD=${controlNano}`,
-  );
-
-  const debits = await until(
-    "the ledger's debits",
-    deadlineMs,
-    () => readLedgerDebits(probe),
-    (d) => d.length >= calls.length,
-  );
-  const successDebits = debits.filter((d) => d.Status === "success");
-  check(
-    "three speech debits landed as success",
-    successDebits.filter(
-      (d) => d.AmountNanoUSD === String(EXPECTED_COST_NANO_USD),
-    ).length === SPEECH_CALLS,
-    `${successDebits.length} success debits total`,
-  );
-
-  const expectedDelta = SPEECH_CALLS * EXPECTED_COST_NANO_USD + controlNano;
-  const spent = await until(
-    "the budget to reach the expected delta",
-    deadlineMs,
-    () => readBudgetSpendNanoUsd(probe),
-    (s) => Math.abs(s - expectedDelta) <= expectedDelta * 0.01,
-  );
-  check(
-    "budget moved by the calls' cost",
-    Math.abs(spent - expectedDelta) <= expectedDelta * 0.01,
-    `spent=${spent}, expected=${expectedDelta} (within 1%)`,
-  );
-
-  // The trace id comes off the response, not the spend row: the row's
-  // TraceId column is empty on these routes today, so joining through it
-  // would silently skip the check that the two cost paths now agree.
-  const firstSpeech = speechCalls[0];
-  const firstSpeechRow = rows.find(
-    (r) => r.GatewayRequestId === firstSpeech?.gatewayRequestId,
-  );
-  if (firstSpeech?.traceId && firstSpeechRow) {
-    const traceCost = await until(
-      "the trace explorer's cost for the speech call",
-      deadlineMs,
-      () => readTraceCostUsd(probe, firstSpeech.traceId),
-      (c) => c !== null,
-    );
-    const billedUsd = Number(firstSpeechRow.CostNanoUSD) / 1e9;
-    check(
-      "trace cost equals the billed cost",
-      Math.abs((traceCost ?? 0) - billedUsd) < 1e-9,
-      `trace=${traceCost}, billed=${billedUsd}`,
-    );
-  }
-}
-
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   assertLocalDatabase(args.allowRemoteDb);
-  const probe = await provision(args);
-  await assertQuantityColumns(probe.projectId);
+
+  // Order matters: nothing billable is created until the columns are there.
+  const tenant = await resolveTenant(args);
+  await assertQuantityColumns(tenant.projectId);
+  log(`gateway_spend carries all ${REQUIRED_COLUMNS.length} quantity columns`);
+
+  const probe = await provision(args, tenant);
   const calls = await runCalls(probe, args.gateway);
   await assertOutcome(probe, calls, args.deadlineMs);
 
-  if (failures.length > 0) {
-    process.stdout.write(`\n${failures.length} check(s) failed:\n`);
-    for (const f of failures) process.stdout.write(`  - ${f}\n`);
+  if (failureCount() > 0) {
+    printFailures();
     throw new Error("probe failed");
   }
   process.stdout.write("\nAll checks passed.\n");

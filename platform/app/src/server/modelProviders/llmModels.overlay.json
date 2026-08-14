@@ -239,7 +239,7 @@
 				"audioOutputCostPerToken": 6.4e-5
 			},
 			"contextLength": 32000,
-			"maxCompletionTokens": null,
+			"maxCompletionTokens": 4096,
 			"supportedParameters": [],
 			"defaultParameters": null,
 			"modality": "audio+text->audio+text",
@@ -262,7 +262,7 @@
 				"audioOutputCostPerToken": 2e-5
 			},
 			"contextLength": 32000,
-			"maxCompletionTokens": null,
+			"maxCompletionTokens": 4096,
 			"supportedParameters": [],
 			"defaultParameters": null,
 			"modality": "audio+text->audio+text",
