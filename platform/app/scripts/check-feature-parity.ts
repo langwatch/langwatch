@@ -307,7 +307,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/self-hosting/gateway-finds-its-control-plane.feature",
   "specs/ai-gateway/self-hosting/personal-keys-deployment.feature",
   "specs/ai-gateway/semantic-caching.feature",
-  "specs/ai-gateway/span-shape.feature",
   "specs/ai-gateway/trace-propagation.feature",
   "specs/ai-gateway/wrapper-e2e/claude.feature",
   "specs/ai-gateway/wrapper-e2e/codex.feature",

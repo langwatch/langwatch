@@ -232,7 +232,31 @@ Feature: Gateway span shape — mandatory attributes per completed request
     And the request is served rather than failing on the oversized tag list
 
   # ─────────────────────────────────────────────────────────────────────────
-  # §9. Out of scope (for now)
+  # §9. The model name the client sent
+  # ─────────────────────────────────────────────────────────────────────────
+  # gen_ai.request.model carries the model that was dispatched. A routing
+  # policy rewrites names before dispatch, so with model tiers the two are
+  # routinely different and the caller's own name is nowhere in the trace:
+  # a trace of a tier request says nothing about the tier, and repointing a
+  # tier changes what every past trace appears to have asked for.
+
+  @unit
+  Scenario: A rewritten model name reaches the customer span
+    Given a routing policy pointing the "complex" tier at a flagship model
+    When a client sends model "complex" and the request completes
+    Then the exported customer span carries the requested name "complex"
+    And it carries the dispatched model in its own attribute
+    And it does so on a failed request and on a stream as well as a plain answer
+
+  @unit
+  Scenario: A model name that was not rewritten stamps nothing
+    Given a client that names the model it is served
+    When the request completes through the gateway
+    Then the exported customer span carries no requested-name attribute
+    And either spelling of the dispatched model counts as naming it
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # §10. Out of scope (for now)
   # ─────────────────────────────────────────────────────────────────────────
 
   # - Vendor-specific embedding-token attributes — embeddings is a narrow

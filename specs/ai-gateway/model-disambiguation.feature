@@ -196,3 +196,29 @@ Feature: AI Gateway — model disambiguation when a VK has multiple providers
       And the key aliases "coding" to "openai/gpt-5-mini"
       When a request names model "coding"
       Then the request resolves to "gpt-5-mini" on provider "openai"
+
+  Rule: A model refusal says who can fix it, and names what was refused
+
+    Every model the gateway turns away is the caller's to fix: they can send
+    a different name, or ask an admin to widen the key. The wire body only
+    carries that attribution when the refusal states it, and two of the three
+    refusal paths did not, so the same refusal reached one caller annotated
+    and another not.
+
+    A key can allow a model under one provider and not another, so a refusal
+    that drops the provider half describes a rule the caller did not hit.
+
+    @unit
+    Scenario: Every model refusal names the caller as the fault
+      Given a virtual key allowing only "openai/gpt-5.6-sol"
+      When a request names a model the key does not allow
+      Then the request is refused as model not allowed
+      And the refusal states the caller can fix it
+      And it does so whether the name came from an alias, a provider prefix, or a bare model
+
+    @unit
+    Scenario: A refused provider-qualified model is named the way it was sent
+      Given a virtual key allowing only "openai/gpt-4"
+      When a request names model "anthropic/gpt-4"
+      Then the request is refused as model not allowed
+      And the refusal names "anthropic/gpt-4" rather than the model half alone
