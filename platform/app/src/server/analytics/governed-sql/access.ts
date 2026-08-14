@@ -41,10 +41,14 @@ export async function governedSqlEnabled({
     where: { id: projectId },
     select: { team: { select: { organizationId: true } } },
   });
+  const organizationId = project?.team?.organizationId;
 
   return featureFlagService.isEnabled(GOVERNED_SQL_FLAG, {
     distinctId: projectId,
     projectId,
-    organizationId: project?.team.organizationId,
+    // Omitted rather than passed as undefined when the project cannot be read:
+    // a rule matching on the organization should not be handed a value this
+    // function guessed at.
+    ...(organizationId ? { organizationId } : {}),
   });
 }
