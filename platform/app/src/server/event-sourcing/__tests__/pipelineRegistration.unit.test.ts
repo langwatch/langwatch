@@ -93,6 +93,19 @@ describe("PipelineRegistry.registerAll", () => {
       it("mounts the GitHub branch recheck and retention sweep", () => {
         expect(registeredPipelineNames()).toContain("github_maintenance");
       });
+
+      /**
+       * The usage-attribution offboarding backstop (ADR-094 Decision 4). Every
+       * offboarding path writes its closing rows transactionally, so this sweep
+       * normally finds nothing — which is exactly why a dropped registration
+       * would stay invisible until a cost report attributed somebody's spend to
+       * a person who left months ago.
+       */
+      it("mounts the orphan usage-attribution link sweep", () => {
+        expect(registeredPipelineNames()).toContain(
+          "identity_links_maintenance",
+        );
+      });
     });
   });
 });
