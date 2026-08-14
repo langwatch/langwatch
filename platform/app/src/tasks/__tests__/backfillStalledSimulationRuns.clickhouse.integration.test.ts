@@ -8,7 +8,7 @@ import {
 import {
   BACKFILL_STALE_THRESHOLD_MS,
   ClickHouseStalledRunFinder,
-} from "../backfillStalledSimulationRuns";
+} from "../../server/event-sourcing/pipelines/simulation-processing/repositories/stalledSimulationRuns.clickhouse.repository";
 
 const tenantId = `test-stalled-backfill-${nanoid()}`;
 const otherTenantId = `test-stalled-backfill-other-${nanoid()}`;

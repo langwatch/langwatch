@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { StalledHistoricalRun } from "../backfillStalledSimulationRuns";
+import type { StalledHistoricalRun } from "~/server/event-sourcing/pipelines/simulation-processing/repositories/stalledSimulationRuns.clickhouse.repository";
 import { backfillStalledRuns } from "../backfillStalledSimulationRuns";
 
 function makeRun(
