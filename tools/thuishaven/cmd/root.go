@@ -250,6 +250,7 @@ func observabilityEndpoints() domain.ObservabilityEndpoints {
 	e.GrafanaPort = envInt("LW_OBS_GRAFANA_PORT", e.GrafanaPort)
 	e.OTLPHTTPPort = envInt("LW_OBS_OTLP_HTTP_PORT", e.OTLPHTTPPort)
 	e.OTLPGRPCPort = envInt("LW_OBS_OTLP_GRPC_PORT", e.OTLPGRPCPort)
+	e.PyroscopePort = envInt("LW_OBS_PYROSCOPE_PORT", e.PyroscopePort)
 	return e
 }
 

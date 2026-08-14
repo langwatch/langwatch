@@ -13,6 +13,7 @@ import {
   redisInstrumentationConfig,
 } from "./instrumentation.redis";
 // Dependency-free by design — safe on the boot path, before the app graph.
+import { startProfiling } from "./server/profiling/startProfiling";
 import { registerTelemetryFlush } from "./server/shutdown/telemetry";
 
 const isEnvTrue = (value: string | undefined) => value === "true";
@@ -220,6 +221,31 @@ if (explicitEndpoint && isEnvTrue(process.env.OTEL_METRICS_ENABLED)) {
     name: "metrics",
     run: async () => {
       await meterProvider.forceFlush();
+    },
+  });
+}
+
+// Continuous profiling. Gated on its own endpoint rather than on the OTLP one:
+// profiles go to Pyroscope over Pyroscope's own protocol, not through the
+// collector, so the two can be configured — and fail — independently. In local
+// development haven writes PYROSCOPE_SERVER_ADDRESS into .env.portless whenever
+// the shared observability stack is up; in production it names the in-cluster
+// Pyroscope service.
+//
+// The identity is read from the OTel variables on purpose. A flame graph that
+// cannot be lined up with the trace beside it is a curiosity, and a second set
+// of name/environment variables would drift the first time someone renamed one.
+const profiler = startProfiling({
+  serverAddress: process.env.PYROSCOPE_SERVER_ADDRESS,
+  appName: process.env.OTEL_SERVICE_NAME ?? "langwatch-app",
+  environment: process.env.ENVIRONMENT,
+  resourceAttributes: process.env.OTEL_RESOURCE_ATTRIBUTES,
+});
+if (profiler) {
+  registerTelemetryFlush({
+    name: "profiling",
+    run: async () => {
+      await profiler.stop();
     },
   });
 }

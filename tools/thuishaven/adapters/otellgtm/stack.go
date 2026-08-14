@@ -9,6 +9,7 @@ package otellgtm
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -191,6 +192,7 @@ func (s *Stack) runArgs(configMounts []string) []string {
 		"-p", fmt.Sprintf("127.0.0.1:%d:4317", s.endpoints.OTLPGRPCPort),
 		"-p", fmt.Sprintf("127.0.0.1:%d:4318", s.endpoints.OTLPHTTPPort),
 		"-p", fmt.Sprintf("127.0.0.1:%d:3000", s.endpoints.GrafanaPort),
+		"-p", fmt.Sprintf("127.0.0.1:%d:4040", s.endpoints.PyroscopePort),
 
 		"--memory", fmt.Sprintf("%dm", l.MemoryMB),
 		// Equal to --memory: no swap, so the ceiling is a real ceiling instead of a
@@ -251,6 +253,9 @@ func (s *Stack) Health(ctx context.Context) (bool, string) {
 		return false, fmt.Sprintf("not answering on %s", s.endpoints.GrafanaURL())
 	}
 	detail := fmt.Sprintf("grafana %s · otlp %s", s.endpoints.GrafanaURL(), s.endpoints.OTLPHTTPURL())
+	if reason := s.profilingUnready(ctx); reason != "" {
+		detail += " · profiling DEGRADED: " + reason
+	}
 	switch image := s.runningImage(ctx); image {
 	case "":
 		// Answering, but not from a container haven knows about — someone is running
@@ -277,6 +282,49 @@ func (s *Stack) runningImage(ctx context.Context) string {
 		return ""
 	}
 	return strings.TrimSpace(string(out))
+}
+
+// profilingUnready returns why Pyroscope cannot answer queries, or "" when it
+// can. It exists because Pyroscope fails in a shape none of the other checks
+// catch: its embedded raft metastore can stop while the process keeps serving,
+// and in that state /ingest still answers 200 while every read times out. So a
+// developer sees profiles being accepted, no error anywhere, and an empty flame
+// graph — and the container has been up for days, which is exactly when nobody
+// suspects the stack.
+//
+// Grafana's own health endpoint says nothing about this (see the note on
+// waitHealthy), and neither does the port being open, which is why this probes
+// Pyroscope's readiness directly rather than inferring it.
+//
+// The fix when it reports is to replace the container — `haven observability up`
+// after a stop, or `docker rm -f` — since the metastore does not recover on its
+// own. That discards the local telemetry, which is a debugging window rather
+// than an archive, so the trade is cheap.
+func (s *Stack) profilingUnready(ctx context.Context) string {
+	if s.endpoints.PyroscopePort == 0 {
+		return ""
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.endpoints.PyroscopeURL()+"/ready", nil)
+	if err != nil {
+		return ""
+	}
+	client := &http.Client{Timeout: 2 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Sprintf("not answering on %s", s.endpoints.PyroscopeURL())
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode == http.StatusOK {
+		return ""
+	}
+	// The body carries the actual reason ("Metastore not ready: terminated after
+	// 50 retries"), which is the difference between "wait a moment, it just
+	// started" and "recreate the container".
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 200))
+	if reason := strings.TrimSpace(string(body)); reason != "" {
+		return reason
+	}
+	return fmt.Sprintf("/ready returned %d", resp.StatusCode)
 }
 
 func (s *Stack) ping(ctx context.Context) error {

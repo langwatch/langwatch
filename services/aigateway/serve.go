@@ -67,6 +67,7 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 	)
 	g.Add(
 		lifecycle.Closer("otel", deps.OTel.Shutdown),
+		lifecycle.Closer("profiling", deps.Profiler.Shutdown),
 		lifecycle.Closer("customer-trace-bridge", deps.TraceBridge.Shutdown),
 		lifecycle.Worker("auth", deps.Auth.Start, deps.Auth.Stop),
 		lifecycle.Worker("statusprobe", statusMon.Start, statusMon.Stop),
