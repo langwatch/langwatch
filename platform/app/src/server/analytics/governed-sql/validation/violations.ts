@@ -118,10 +118,18 @@ const MAX_ECHOED_IDENTIFIER = 80;
 const UNPRINTABLE =
   /[\u0000-\u0008\u000e-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069]/gu;
 
-/** Quotes a caller-supplied identifier back at them, bounded and single-line. */
+/**
+ * Quotes a caller-supplied identifier back at them, bounded and single-line.
+ *
+ * The bound counts code points, not UTF-16 units. `slice` would cut an astral
+ * character — an emoji, a CJK extension B ideograph — in half and send the
+ * leading surrogate on alone through `message` and `meta.violations`, which is
+ * the very output this bound exists to keep well-formed.
+ */
 export function echoIdentifier(raw: string): string {
   const flattened = raw.replace(UNPRINTABLE, "").replace(/\s+/gu, " ").trim();
-  return flattened.length > MAX_ECHOED_IDENTIFIER
-    ? `${flattened.slice(0, MAX_ECHOED_IDENTIFIER)}…`
+  const codePoints = Array.from(flattened);
+  return codePoints.length > MAX_ECHOED_IDENTIFIER
+    ? `${codePoints.slice(0, MAX_ECHOED_IDENTIFIER).join("")}…`
     : flattened;
 }

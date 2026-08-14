@@ -44,7 +44,7 @@ export interface FieldValidationOutcome {
 interface BranchScope {
   readonly datasetName: string | null;
   readonly available: ReadonlySet<string>;
-  readonly unverifiable: boolean;
+  readonly isUnverifiable: boolean;
   readonly repeatFields: Readonly<Record<string, readonly string[]>>;
 }
 
@@ -129,7 +129,7 @@ function startingScope({
       ? {
           datasetName: null,
           available: new Set(),
-          unverifiable: false,
+          isUnverifiable: false,
           repeatFields,
         }
       : { ...inherited, repeatFields };
@@ -139,7 +139,7 @@ function startingScope({
   return {
     datasetName: declaredDatasetName,
     available: new Set(columns.map((column) => column.name)),
-    unverifiable: false,
+    isUnverifiable: false,
     repeatFields,
   };
 }
@@ -178,9 +178,9 @@ function applyTransforms({
     current = {
       ...current,
       available: new Set([...current.available, ...effect.produces]),
-      unverifiable: current.unverifiable || effect.unverifiable,
+      isUnverifiable: current.isUnverifiable || effect.isUnverifiable,
     };
-    if (effect.unverifiable) {
+    if (effect.isUnverifiable) {
       warnings.push(unverifiableWarning(stepPath));
     }
   });
@@ -250,7 +250,7 @@ function reportMissingFields({
 }): void {
   for (const field of fields) {
     if (fieldIsKnown({ field, available: scope.available })) continue;
-    if (scope.unverifiable) {
+    if (scope.isUnverifiable) {
       warnings.push({
         code: "transform-fields-unverifiable",
         path,

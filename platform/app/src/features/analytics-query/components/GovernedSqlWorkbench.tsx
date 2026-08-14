@@ -206,7 +206,7 @@ function QueryCardHeader({
   onToggleSchema,
   actionLabel,
   runnable,
-  inFlight,
+  isInFlight,
   onRun,
   onCancel,
   savedCharts,
@@ -215,7 +215,7 @@ function QueryCardHeader({
   onToggleSchema: () => void;
   actionLabel: string;
   runnable: boolean;
-  inFlight: boolean;
+  isInFlight: boolean;
   onRun: () => void;
   onCancel: () => void;
   /** Save and Open. Supplied by the workbench, which owns the saved chart. */
@@ -251,7 +251,7 @@ function QueryCardHeader({
       <Kbd size="sm" aria-hidden="true">
         ⌘⏎
       </Kbd>
-      {inFlight ? (
+      {isInFlight ? (
         <>
           <Button size="sm" variant="outline" onClick={onCancel}>
             Cancel
@@ -577,9 +577,9 @@ function QueryCard({
           draft.sql.trim().length > 0 &&
           parametersSendable &&
           timeWindow.sendable &&
-          !query.state.inFlight
+          !query.state.isInFlight
         }
-        inFlight={query.state.inFlight}
+        isInFlight={query.state.isInFlight}
         // Always the draft, under either label. When the label reads
         // "Reload" the draft is byte-identical to what produced the visible
         // result, so this IS a reload — and unlike `reload()` it can never

@@ -100,7 +100,7 @@ export interface GovernedSqlRequestState {
    * when the transport delivers the response anyway.
    */
   readonly submissionId: number;
-  readonly inFlight: boolean;
+  readonly isInFlight: boolean;
   /**
    * The visible answer, carrying the snapshot it belongs to. Not necessarily
    * {@link submitted}'s answer — a submission can be abandoned before it
@@ -136,7 +136,7 @@ export function initialGovernedSqlRequestState(
     draft,
     submitted: null,
     submissionId: 0,
-    inFlight: false,
+    isInFlight: false,
     outcome: null,
   };
 }
@@ -240,12 +240,12 @@ function withSubmission(
   state: GovernedSqlRequestState,
   snapshot: GovernedSqlSnapshot,
 ): GovernedSqlRequestState {
-  if (state.inFlight) return state;
+  if (state.isInFlight) return state;
   return {
     ...state,
     submitted: snapshot,
     submissionId: state.submissionId + 1,
-    inFlight: true,
+    isInFlight: true,
   };
 }
 
@@ -263,9 +263,9 @@ function withAnswer(
   submissionId: number,
   answer: GovernedSqlAnswer,
 ): GovernedSqlRequestState {
-  if (!state.inFlight || submissionId !== state.submissionId) return state;
+  if (!state.isInFlight || submissionId !== state.submissionId) return state;
 
-  // Unreachable: only `withSubmission` sets `inFlight`, and it sets `submitted`
+  // Unreachable: only `withSubmission` sets `isInFlight`, and it sets `submitted`
   // in the same breath. Guarded rather than asserted, because the cost of being
   // wrong is an outcome with no snapshot, which reads as never stale.
   const snapshot = state.submitted;
@@ -273,7 +273,7 @@ function withAnswer(
 
   return {
     ...state,
-    inFlight: false,
+    isInFlight: false,
     outcome:
       answer.kind === "result"
         ? { kind: "result", result: answer.result, snapshot }
@@ -282,8 +282,8 @@ function withAnswer(
 }
 
 function abandoned(state: GovernedSqlRequestState): GovernedSqlRequestState {
-  if (!state.inFlight) return state;
-  return { ...state, inFlight: false, submissionId: state.submissionId + 1 };
+  if (!state.isInFlight) return state;
+  return { ...state, isInFlight: false, submissionId: state.submissionId + 1 };
 }
 
 /**

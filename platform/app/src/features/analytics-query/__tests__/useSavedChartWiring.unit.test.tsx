@@ -89,7 +89,7 @@ function fakeQuery(): UseGovernedSqlQuery {
         draft,
         submitted: null,
         submissionId: 0,
-        inFlight: false,
+        isInFlight: false,
         outcome: null,
       };
     },

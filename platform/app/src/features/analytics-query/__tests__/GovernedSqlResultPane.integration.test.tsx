@@ -37,7 +37,7 @@ function stateWith({
   draftSql = SUBMITTED_SQL,
   outcomeSql = SUBMITTED_SQL,
   submittedSql = SUBMITTED_SQL,
-  inFlight = false,
+  isInFlight = false,
 }: {
   answer: GovernedSqlAnswer | null;
   draftSql?: string;
@@ -48,14 +48,14 @@ function stateWith({
   outcomeSql?: string;
   /** The LAST submission, answered or not. */
   submittedSql?: string;
-  inFlight?: boolean;
+  isInFlight?: boolean;
 }): GovernedSqlRequestState {
   const snapshot = { sql: outcomeSql, parameters: {} };
   return {
     draft: { sql: draftSql, parameters: {} },
     submitted: { sql: submittedSql, parameters: {} },
     submissionId: 1,
-    inFlight,
+    isInFlight,
     outcome:
       answer === null
         ? null
@@ -624,7 +624,7 @@ describe("the governed SQL result pane", () => {
     describe("when the pane renders", () => {
       /** @scenario "The table has intentional loading, empty, error, stale, and truncated states" */
       it("says the query is running rather than showing an empty table", () => {
-        renderPane(stateWith({ answer: null, inFlight: true }));
+        renderPane(stateWith({ answer: null, isInFlight: true }));
 
         expect(screen.getByTestId("governed-sql-loading")).toHaveTextContent(
           "Validating, scoping to this project, and reading",

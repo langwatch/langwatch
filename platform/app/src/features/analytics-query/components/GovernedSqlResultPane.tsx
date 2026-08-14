@@ -411,7 +411,7 @@ export function GovernedSqlResultPane({
   if (state.outcome === null) {
     return (
       <NoOutcomePane
-        inFlight={state.inFlight}
+        isInFlight={state.isInFlight}
         onInsertExample={onInsertExample}
       />
     );
@@ -441,7 +441,7 @@ export function GovernedSqlResultPane({
         chip={chip}
         isStale={isStale}
         onRun={onRun}
-        inFlight={state.inFlight}
+        isInFlight={state.isInFlight}
       />
 
       {state.outcome.kind === "error" && failure && (
@@ -483,10 +483,10 @@ function readPaneModel(state: GovernedSqlRequestState) {
 
 /** Before any outcome exists: the first run in flight, or the untouched pane. */
 function NoOutcomePane({
-  inFlight,
+  isInFlight,
   onInsertExample,
 }: {
-  inFlight: boolean;
+  isInFlight: boolean;
   onInsertExample: (() => void) | undefined;
 }) {
   return (
@@ -497,7 +497,7 @@ function NoOutcomePane({
       gap={0}
       data-testid="governed-sql-result-pane"
     >
-      {inFlight ? (
+      {isInFlight ? (
         <RunningState />
       ) : (
         <EmptyState {...(onInsertExample ? { onInsertExample } : {})} />
@@ -511,13 +511,13 @@ function ResultHeader({
   chip,
   isStale,
   onRun,
-  inFlight,
+  isInFlight,
 }: {
   tabs: ReactNode | undefined;
   chip: ResultChip | undefined;
   isStale: boolean;
   onRun: () => void;
-  inFlight: boolean;
+  isInFlight: boolean;
 }) {
   return (
     <HStack
@@ -532,7 +532,7 @@ function ResultHeader({
       {chip && <ResultChipBadge chip={chip} />}
       {isStale && <StaleNotice onRun={onRun} />}
       <Box flex="1" />
-      {inFlight && (
+      {isInFlight && (
         <HStack gap={2} color="fg.muted" data-testid="governed-sql-loading">
           <Spinner size="xs" />
           <Text fontSize="12px">Running…</Text>

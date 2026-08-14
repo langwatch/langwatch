@@ -39,9 +39,22 @@ const GENERATED_VALIDATOR = "vegaLiteSchemaValidator.generated";
 
 const EXTENSIONS = [".ts", ".tsx", ".js"];
 
-/** Static `import`/`export … from` specifiers. Deliberately not `import()`. */
+/**
+ * Static `import`/`export … from` specifiers. Deliberately not `import()`.
+ *
+ * The clause between the keyword and `from` is bounded so one match cannot
+ * span two statements. Unbounded (`[\s\S]*?`) it could, and the cost was not
+ * a duplicate — it was a miss: `export type Foo = string;` followed by
+ * `import vegaEmbed from "vega-embed"` matched as a single `export type …`
+ * span, which `TYPE_ONLY` then discarded whole, taking the runtime import
+ * with it. The scan reported no Vega in the chunk while Vega was statically
+ * imported, which is the one direction this file must not fail in.
+ *
+ * So: no `;` inside the clause, and a newline only where the next line does
+ * not begin a new `import`/`export`. Multi-line brace lists still match.
+ */
 const STATIC_IMPORT =
-  /(?:^|\n)\s*(?:import|export)(?:[\s\S]*?)\sfrom\s+["']([^"']+)["']|(?:^|\n)\s*import\s+["']([^"']+)["']/g;
+  /(?:^|\n)\s*(?:import|export)(?:[^;\n]|\n(?!\s*(?:import|export)\b))*?\sfrom\s+["']([^"']+)["']|(?:^|\n)\s*import\s+["']([^"']+)["']/g;
 
 /** `import type` and `export type` are erased before a bundler sees them. */
 const TYPE_ONLY = /^\s*(?:import|export)\s+type\b/;
@@ -159,6 +172,41 @@ describe("where the Vega runtime can be reached from", () => {
         expect(readFileSync(LAZY_BOUNDARY, "utf8")).toContain(
           'import("./GovernedSqlChartMode")',
         );
+      });
+    });
+  });
+
+  /**
+   * The scan above is only as good as what it can see, and its own failure
+   * direction is silent: a specifier it never records is a leak it reports as
+   * clean. These read the reader.
+   */
+  describe("given a source whose imports follow a type-only statement", () => {
+    describe("when its specifiers are collected", () => {
+      it("records the runtime import that the type-only line precedes", () => {
+        expect(
+          specifiersOf(
+            'export type Foo = string;\nimport vegaEmbed from "vega-embed";\n',
+          ),
+        ).toEqual(["vega-embed"]);
+      });
+
+      it("records it even where no semicolon closes the type-only line", () => {
+        expect(
+          specifiersOf(
+            'export type Foo = string\nimport vegaEmbed from "vega-embed"\n',
+          ),
+        ).toEqual(["vega-embed"]);
+      });
+
+      it("still discards a type-only import, which no bundler emits", () => {
+        expect(specifiersOf('import type { X } from "vega";\n')).toEqual([]);
+      });
+
+      it("still reads a specifier across a multi-line brace list", () => {
+        expect(
+          specifiersOf('import {\n  a,\n  b,\n} from "vega-lite";\n'),
+        ).toEqual(["vega-lite"]);
       });
     });
   });

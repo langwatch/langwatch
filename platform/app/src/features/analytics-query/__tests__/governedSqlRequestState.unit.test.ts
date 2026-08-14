@@ -286,7 +286,7 @@ describe("the governed SQL request machine", () => {
         await settle();
 
         expect(controller.getState().outcome).toBeNull();
-        expect(controller.getState().inFlight).toBe(false);
+        expect(controller.getState().isInFlight).toBe(false);
       });
     });
 
@@ -302,11 +302,11 @@ describe("the governed SQL request machine", () => {
 
         controller.setSql("SELECT 2");
         controller.runQuery();
-        expect(controller.getState().inFlight).toBe(true);
+        expect(controller.getState().isInFlight).toBe(true);
 
         controller.cancel();
         expect(calls[1]!.signal.aborted).toBe(true);
-        expect(controller.getState().inFlight).toBe(false);
+        expect(controller.getState().isInFlight).toBe(false);
         expect(controller.getState().outcome).toBe(shown);
 
         // An answer the transport delivers anyway is a superseded submission's
@@ -324,7 +324,7 @@ describe("the governed SQL request machine", () => {
         const { calls, controller } = controllerWith({ sql: "SELECT 1" });
         controller.cancel();
         expect(calls).toHaveLength(0);
-        expect(controller.getState().inFlight).toBe(false);
+        expect(controller.getState().isInFlight).toBe(false);
       });
     });
 

@@ -126,7 +126,7 @@ export function createGovernedSqlRequestController({
   const send = (snapshot: GovernedSqlSnapshot): void => {
     // The reducer refuses a submission while one is in flight, and refusing
     // means returning the same state — so an unchanged state IS the guard.
-    // Reading it here rather than re-deriving `inFlight` keeps one rule.
+    // Reading it here rather than re-deriving `isInFlight` keeps one rule.
     if (!apply({ type: "submitted", snapshot })) return;
 
     const submissionId = state.submissionId;
@@ -179,7 +179,7 @@ export function createGovernedSqlRequestController({
     },
 
     cancel() {
-      if (!state.inFlight) return;
+      if (!state.isInFlight) return;
       pending?.abort();
       pending = null;
       apply({ type: "abandoned" });

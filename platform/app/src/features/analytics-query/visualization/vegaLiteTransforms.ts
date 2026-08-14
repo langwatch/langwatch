@@ -17,7 +17,7 @@ export interface TransformEffect {
   readonly consumes: readonly string[];
   readonly produces: readonly string[];
   /** True when the step's output columns are only knowable from the data. */
-  readonly unverifiable: boolean;
+  readonly isUnverifiable: boolean;
 }
 
 /**
@@ -35,58 +35,58 @@ export const TRANSFORM_ANALYZERS: Record<
   filter: (step) => ({
     consumes: predicateFields(step.filter),
     produces: [],
-    unverifiable: false,
+    isUnverifiable: false,
   }),
   calculate: (step) => ({
     consumes: [],
     produces: stringList(step.as),
-    unverifiable: false,
+    isUnverifiable: false,
   }),
   aggregate: (step) => ({
     consumes: [...opFields(step.aggregate), ...stringList(step.groupby)],
     produces: [...opOutputs(step.aggregate), ...stringList(step.groupby)],
-    unverifiable: false,
+    isUnverifiable: false,
   }),
   bin: (step) => ({
     consumes: stringList(step.field),
     produces: binOutputs(step),
-    unverifiable: false,
+    isUnverifiable: false,
   }),
   timeUnit: (step) => ({
     consumes: stringList(step.field),
     produces: stringList(step.as),
-    unverifiable: false,
+    isUnverifiable: false,
   }),
   stack: (step) => ({
     consumes: [...stringList(step.stack), ...stringList(step.groupby)],
     produces: stackOutputs(step),
-    unverifiable: false,
+    isUnverifiable: false,
   }),
   fold: (step) => ({
     consumes: stringList(step.fold),
     produces:
       stringList(step.as).length > 0 ? stringList(step.as) : ["key", "value"],
-    unverifiable: false,
+    isUnverifiable: false,
   }),
   flatten: (step) => ({
     consumes: stringList(step.flatten),
     produces: [...stringList(step.as), ...stringList(step.flatten)],
-    unverifiable: false,
+    isUnverifiable: false,
   }),
   lookup: (step) => ({
     consumes: stringList(step.lookup),
     produces: lookupOutputs(step),
-    unverifiable: false,
+    isUnverifiable: false,
   }),
   joinaggregate: (step) => ({
     consumes: [...opFields(step.joinaggregate), ...stringList(step.groupby)],
     produces: opOutputs(step.joinaggregate),
-    unverifiable: false,
+    isUnverifiable: false,
   }),
   window: (step) => ({
     consumes: [...opFields(step.window), ...stringList(step.groupby)],
     produces: opOutputs(step.window),
-    unverifiable: false,
+    isUnverifiable: false,
   }),
   pivot: (step) => ({
     consumes: [
@@ -95,7 +95,7 @@ export const TRANSFORM_ANALYZERS: Record<
       ...stringList(step.groupby),
     ],
     produces: stringList(step.groupby),
-    unverifiable: true,
+    isUnverifiable: true,
   }),
 };
 
@@ -113,7 +113,7 @@ export function analyzeTransform(
   for (const [name, analyze] of Object.entries(TRANSFORM_ANALYZERS)) {
     if (name in step) return analyze(step);
   }
-  return { consumes: [], produces: [], unverifiable: false };
+  return { consumes: [], produces: [], isUnverifiable: false };
 }
 
 function stringList(value: unknown): string[] {
