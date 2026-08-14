@@ -332,9 +332,11 @@ function parseWithFallback<T>(
       );
       return { ok: true, request };
     } catch (jsonErr) {
-      // The size is the one thing about the body that is ours to state: it says
-      // whether the sender truncated it or sent something else entirely, and a
-      // byte count cannot carry a byte of it.
+      // The size is context for the numbers printed beside it, not a verdict of
+      // its own: `index out of range: 57 + 1307648 > 2070` only means something
+      // against how much actually arrived, and a JSON position says little
+      // without the end it stopped short of. It is also the one fact about the
+      // body we can state without quoting a byte of it.
       return {
         ok: false,
         error: (
