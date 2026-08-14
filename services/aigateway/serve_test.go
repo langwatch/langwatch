@@ -159,6 +159,14 @@ func TestServe_WarnIfGracefulShutdownTooShort_ZeroHeartbeatResolvesToDefault(t *
 	require.Equal(t, config.DefaultNonStreamingHeartbeatInterval, entry.ContextMap()["heartbeat_interval"])
 }
 
+// unstartedServer builds the http.Server that addManagedServices wraps in
+// these ordering tests. It is only ever registered, never started, so its
+// timeouts never take effect; ReadHeaderTimeout is set because an
+// http.Server literal without one is a Slowloris finding.
+func unstartedServer() *http.Server {
+	return &http.Server{ReadHeaderTimeout: 10 * time.Second}
+}
+
 // Stop runs in reverse registration order, so the listener has to be
 // registered after the spend services to be drained before them. Getting
 // this backwards silently loses money: Spool.Append counts and discards
@@ -175,7 +183,7 @@ func TestServe_ManagedServices_DrainTheListenerBeforeTheSpendPipeline(t *testing
 	addManagedServices(g, &Deps{
 		SpendSpool:   spool,
 		SpendDrainer: spendemitter.NewDrainer(spendemitter.DrainerOptions{Spool: spool}),
-	}, nil, &http.Server{})
+	}, nil, unstartedServer())
 
 	started := g.ServiceNames()
 	require.Contains(t, started, "http")
@@ -205,7 +213,7 @@ func TestServe_ManagedServices_DrainTheListenerBeforeTheSpendPipeline(t *testing
 // @scenario "an absent spend pipeline still leaves the listener draining first"
 func TestServe_ManagedServices_ListenerDrainsFirstWithoutSpend(t *testing.T) {
 	g := lifecycle.New()
-	addManagedServices(g, &Deps{}, nil, &http.Server{})
+	addManagedServices(g, &Deps{}, nil, unstartedServer())
 
 	started := g.ServiceNames()
 	require.NotContains(t, started, "spend-spool")

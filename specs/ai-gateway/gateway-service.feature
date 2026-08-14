@@ -124,7 +124,7 @@ Feature: Gateway service — public HTTP surface and operational basics
       And AuthCache.HardGraceSeconds is 21600
       And AuthCache.ConfigTTLSeconds is 90
 
-  Rule: Graceful shutdown window is actually configurable, and checked against the heartbeat interval
+  Rule: Graceful shutdown window is actually configurable, and checked against the heartbeat interval and the longest legitimate stream
 
     # shutdown.preDrainWaitSeconds and shutdown.timeoutSeconds reach the
     # container as SERVER_DRAIN_DELAY_SECONDS / SERVER_GRACEFUL_SECONDS,
@@ -141,10 +141,21 @@ Feature: Gateway service — public HTTP surface and operational basics
     # falsely claim it isn't tested when it is, just not in a format the
     # checker recognizes.
     #
-    # The warning marks a deployment that has narrowed its graceful window,
-    # never one that took the defaults. Both the Go default and the chart's
-    # timeoutSeconds sit above the 45s heartbeat interval for exactly that
-    # reason: a warning every stock install emits is noise, not a signal.
+    # Two bounds are checked, because a request can be legitimately slow for
+    # two unrelated reasons. The heartbeat interval is the chosen boundary
+    # between a fast non-streaming response and a slow but legitimate one.
+    # The upstream provider timeout is the only thing that bounds a stream at
+    # all: the HTTP server sets ReadHeaderTimeout and neither a WriteTimeout
+    # nor an IdleTimeout, so a stream can legitimately run for the full
+    # 14 minutes, and a graceful window under that severs it on every rolling
+    # deploy, node drain and scale-down.
+    #
+    # A warning marks a deployment that narrowed its graceful window, never
+    # one that took the Go defaults, which clear both bounds by construction:
+    # a warning every stock install emits is noise, not a signal. The gateway
+    # chart is the deliberate exception. Its timeoutSeconds of 60 trips the
+    # stream bound, which is the correct signal for a 75s pod grace period;
+    # raising it is a pod sizing decision rather than a defaulting one.
 
     @unit @regression
     Scenario: stock defaults clear the graceful-vs-heartbeat check
@@ -152,6 +163,7 @@ Feature: Gateway service — public HTTP surface and operational basics
       And the effective non-streaming heartbeat interval is 45s (the stock default)
       When the gateway starts
       Then no graceful_shutdown_shorter_than_heartbeat_interval warning is emitted
+      And no graceful_shutdown_shorter_than_max_stream_duration warning is emitted
 
     @unit @regression
     Scenario: a graceful window narrowed below the heartbeat interval warns
@@ -188,6 +200,29 @@ Feature: Gateway service — public HTTP surface and operational basics
       Then the warning compares against the resolved 45s default, not literal zero
 
     @unit @regression
+    Scenario: a graceful window below the upstream stream ceiling warns
+      Given GracefulSeconds is set to 60, which is above the 45s heartbeat interval
+      When the gateway starts
+      Then no graceful_shutdown_shorter_than_heartbeat_interval warning is emitted
+      But a WARN log "graceful_shutdown_shorter_than_max_stream_duration" is emitted
+      And it reports the 60s graceful window and the upstream stream ceiling
+
+    @unit @regression
+    Scenario: a graceful window at or above the upstream stream ceiling stays quiet
+      Given GracefulSeconds equals the upstream provider request timeout
+      When the gateway starts
+      Then no graceful_shutdown_shorter_than_max_stream_duration warning is emitted
+      And a window above that ceiling stays quiet too
+
+    @unit @regression
+    Scenario: disabled heartbeating still checks the stream ceiling
+      Given the non-streaming heartbeat interval is negative (disabled)
+      And GracefulSeconds is very small
+      When the gateway starts
+      Then no graceful_shutdown_shorter_than_heartbeat_interval warning is emitted
+      But a graceful_shutdown_shorter_than_max_stream_duration warning is emitted
+
+    @unit @regression
     Scenario: SERVER_DRAIN_DELAY_SECONDS reaches Server.DrainDelaySeconds
       Given env SERVER_DRAIN_DELAY_SECONDS=7
       When the gateway loads its configuration
@@ -198,6 +233,35 @@ Feature: Gateway service — public HTTP surface and operational basics
       Given no shutdown environment variables are set
       When the gateway loads its configuration
       Then Server.GracefulSeconds exceeds the 45s non-streaming heartbeat interval
+
+  Rule: Shutdown drains the listener before the spend pipeline
+
+    # Stop runs in reverse registration order, so the listener is registered
+    # last in order to be stopped first. That ordering is load bearing rather
+    # than cosmetic: Spool.Append counts and discards every record handed to
+    # it after Close, so closing the spool before the listener has drained
+    # throws away the spend of every request that finishes during the drain.
+    # Such a request has already had its admitSpend shipped, which leaves an
+    # admitted spend that is never confirmed.
+    #
+    # Telemetry is registered first, so it is torn down last and the shutdown
+    # itself is still traced.
+    # Bindings: services/aigateway/serve_test.go
+
+    @unit @regression
+    Scenario: the listener drains before the spend spool and drainer
+      Given a gateway wired with a spend spool and a spend drainer
+      When the managed services are registered
+      Then the stop order drains the HTTP listener before the spend drainer
+      And the spend drainer stops before the spool it reads from closes
+      And telemetry is the last thing torn down
+
+    @unit @regression
+    Scenario: an absent spend pipeline still leaves the listener draining first
+      Given a gateway wired with neither a spend spool nor a spend drainer
+      When the managed services are registered
+      Then no spend services are registered
+      And the HTTP listener is registered last, so it is still stopped first
 
   Rule: Seconds-valued configuration is range-checked before it becomes a duration
 
