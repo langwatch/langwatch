@@ -176,10 +176,12 @@ describe("IdentityErasureService", () => {
       // gone it is a pseudonym whose key we no longer hold (Decision 9).
       expect(links["own-typed"]!.externalId).toBe("mem-1");
 
-      // She authored this one; only her name as the actor goes.
+      // She authored this one; only her name as the actor goes. It carries NO
+      // stamp: the row's subject is Bob, who was not erased, and a stamp here
+      // is what would move his spend into the attributed bucket.
       expect(links["authored-for-bob"]!.userId).toBe("bob");
       expect(links["authored-for-bob"]!.actorUserId).toBeNull();
-      expect(links["authored-for-bob"]!.erasedAt).toBe(ERASED_AT);
+      expect(links["authored-for-bob"]!.erasedAt).toBeNull();
 
       // Somebody else's row is untouched, including its erasure marker.
       expect(links["bobs-own"]!.userId).toBe("bob");
@@ -231,6 +233,135 @@ describe("IdentityErasureService", () => {
       expect(prisma.providerIdentityLink.rows.map((row) => row.id)).toEqual(
         idsBefore,
       );
+    });
+  });
+
+  describe("given somebody who AUTHORED rows but is the subject of none", () => {
+    /**
+     * The blast-radius test. An admin's link rows name OTHER people's logins —
+     * a colleague's email is the `externalId` on a row the admin merely typed.
+     * An earlier spelling collected email ids from `userId OR actorUserId`, so
+     * erasing an admin irreversibly hashed the login of every colleague they
+     * had ever linked. The token is one-way; there is no undoing it.
+     */
+    const seedAdminOnly = () =>
+      createFakePrisma({
+        users: [
+          { id: "admin", email: `admin@example.com`, deactivatedAt: null },
+        ],
+        organizationUsers: [
+          { userId: "admin", organizationId: "org-a", disabledAt: null },
+        ],
+        ingestionSources: [{ id: "conn-a", organizationId: "org-a" }],
+        providerIdentityLinks: [
+          link({
+            id: "bobs-email-login",
+            externalKind: "email",
+            externalId: "bob@example.com",
+            userId: "bob",
+            actorUserId: "admin",
+          }),
+          link({
+            id: "bobs-typed-login",
+            externalKind: "member_id",
+            externalId: "mem-bob",
+            userId: "bob",
+            actorUserId: "admin",
+          }),
+        ],
+        discoveredAgents: [
+          {
+            id: "agent-bob",
+            organizationId: "org-a",
+            providerConnectionId: "conn-a",
+            providerAgentKey: "env-1/bot-bob",
+            snapshot: { ownerEmail: "bob@example.com", ownerId: "mem-bob" },
+            erasedAt: null,
+          },
+        ],
+      });
+
+    it("touches no login id — the colleague's email survives intact", async () => {
+      const prisma = seedAdminOnly();
+
+      await serviceFor(prisma).erase({
+        organizationId: "org-a",
+        userId: "admin",
+        confirm: true,
+      });
+
+      const links = rowsOf(prisma, "providerIdentityLink");
+      expect(links["bobs-email-login"]!.externalId).toBe("bob@example.com");
+      expect(links["bobs-typed-login"]!.externalId).toBe("mem-bob");
+      // Bob still owns his own logins; only the admin's name as author goes.
+      expect(links["bobs-email-login"]!.userId).toBe("bob");
+      expect(links["bobs-email-login"]!.actorUserId).toBeNull();
+    });
+
+    it("leaves the colleague's ids in agent snapshots alone", async () => {
+      const prisma = seedAdminOnly();
+
+      await serviceFor(prisma).erase({
+        organizationId: "org-a",
+        userId: "admin",
+        confirm: true,
+      });
+
+      const agents = rowsOf(prisma, "discoveredAgent");
+      expect(agents["agent-bob"]!.snapshot).toEqual({
+        ownerEmail: "bob@example.com",
+        ownerId: "mem-bob",
+      });
+      expect(agents["agent-bob"]!.erasedAt).toBeNull();
+    });
+
+    it("reports zero email logins in the dry run, so the operator sees the truth", async () => {
+      const preview = await serviceFor(seedAdminOnly()).preview({
+        organizationId: "org-a",
+        userId: "admin",
+      });
+      expect(preview.emailLoginsTokenized).toBe(0);
+    });
+  });
+
+  describe("given the erased person authored a CLOSE row for another login", () => {
+    /**
+     * `resolveOwnerAt` reads `userId === null` plus `erasedAt` as
+     * "erased-person", which the report shows inside the ATTRIBUTED bucket. A
+     * close row already has `userId === null` before anyone is erased — so
+     * stamping it because an erasure walked past would flip somebody else's
+     * login from unattributed to attributed, moving money in a period that may
+     * already have been reported, to a person who never owned it.
+     */
+    it("blanks the author without stamping the row", async () => {
+      const prisma = createFakePrisma({
+        users: [{ id: "admin", email: "admin@example.com" }],
+        organizationUsers: [
+          { userId: "admin", organizationId: "org-a", disabledAt: null },
+        ],
+        ingestionSources: [{ id: "conn-a", organizationId: "org-a" }],
+        providerIdentityLinks: [
+          link({
+            id: "bobs-close-row",
+            externalId: "mem-bob",
+            userId: null,
+            actorUserId: "admin",
+          }),
+        ],
+      });
+
+      await serviceFor(prisma).erase({
+        organizationId: "org-a",
+        userId: "admin",
+        confirm: true,
+      });
+
+      const row = rowsOf(prisma, "providerIdentityLink")["bobs-close-row"]!;
+      expect(row.actorUserId).toBeNull();
+      expect(row.userId).toBeNull();
+      // The load-bearing assertion: no stamp, so the login still resolves
+      // "unlinked" and its spend stays unattributed.
+      expect(row.erasedAt).toBeNull();
     });
   });
 

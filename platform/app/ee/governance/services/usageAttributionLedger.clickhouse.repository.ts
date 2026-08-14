@@ -102,11 +102,25 @@ export class UsageAttributionLedgerClickHouseRepository
    * keyed (TenantId, SourceId, HourBucket, TraceId).
    *
    * BOTH sides are deduped to their latest version before anything is added
-   * up. `governance_ocsf_events` and `governance_kpis` are ReplacingMergeTrees
-   * whose duplicates only collapse at merge time, and the shipped KPI read
-   * skips that dedup deliberately for an anomaly evaluator that can tolerate
-   * it. A money report cannot: a replayed event would otherwise double both
-   * its own count and its spend.
+   * up, and on the KPI side that is not a precaution — it is required for the
+   * number to mean anything. The KPI reactor is LEVEL-TRIGGERED: it writes the
+   * trace's RUNNING TOTALS on a throttle window, so a trace that emits over
+   * several windows leaves several rows under the same key, each carrying a
+   * larger cumulative figure. Summing them undeduped does not double-count a
+   * replay, it sums a trace's cost against itself as many times as the trace
+   * was flushed. The shipped `findSpendTotals` skips this deliberately for an
+   * anomaly evaluator comparing two windows, where the distortion is on both
+   * sides; a money report has no such luxury.
+   *
+   * The KPI window bound is tight rather than generous, and that is load-
+   * bearing. Both reactors take their timestamp from the same
+   * `foldState.occurredAt`: the OCSF row's `EventTime` IS that value and the
+   * KPI row's `HourBucket` is `toStartOfHour` of it. So for any event this
+   * query admits — `EventTime >= from` — its KPI row satisfies
+   * `HourBucket >= toStartOfHour(from)`, and no in-window trace's spend can
+   * fall outside the bound. Changing that lower bound to `from` rather than
+   * `toStartOfHour(from)` would silently drop the spend of every trace in the
+   * first hour of the window.
    *
    * A (login, trace) group is attributed as ONE unit at its first event. A
    * trace is one piece of work, and splitting it across a link handover that
@@ -146,19 +160,27 @@ export class UsageAttributionLedgerClickHouseRepository
             )
         ),
         trace_spend AS (
-          SELECT TraceId, sum(SpendUsd) AS TraceSpendUsd
-          FROM ${KPIS_TABLE}
-          WHERE TenantId = {tenantId:String}
-            AND HourBucket >= toStartOfHour(fromUnixTimestamp64Milli({fromMs:UInt64}))
-            AND HourBucket < fromUnixTimestamp64Milli({toMs:UInt64})
-            AND (TenantId, SourceId, HourBucket, TraceId, LastEventOccurredAt) IN (
-              SELECT TenantId, SourceId, HourBucket, TraceId, max(LastEventOccurredAt)
-              FROM ${KPIS_TABLE}
-              WHERE TenantId = {tenantId:String}
-                AND HourBucket >= toStartOfHour(fromUnixTimestamp64Milli({fromMs:UInt64}))
-                AND HourBucket < fromUnixTimestamp64Milli({toMs:UInt64})
-              GROUP BY TenantId, SourceId, HourBucket, TraceId
-            )
+          SELECT TraceId, sum(KeySpendUsd) AS TraceSpendUsd
+          FROM (
+            -- argMax, NOT the IN-tuple dedup the sibling reads use. That
+            -- pattern only collapses duplicates when the version column
+            -- strictly increases per write, and this one does not:
+            -- LastEventOccurredAt is set from the trace's own
+            -- foldState.occurredAt, a fact about the DATA rather than a
+            -- clock. Re-deliver the same reactor event and both rows carry an
+            -- identical version, both satisfy the tuple, and a plain sum adds
+            -- the trace's cost to itself. argMax picks one row per key
+            -- whatever the versions do, and where they tie the rows are
+            -- identical copies, so either is the same answer.
+            SELECT
+              TraceId,
+              argMax(SpendUsd, LastEventOccurredAt) AS KeySpendUsd
+            FROM ${KPIS_TABLE}
+            WHERE TenantId = {tenantId:String}
+              AND HourBucket >= toStartOfHour(fromUnixTimestamp64Milli({fromMs:UInt64}))
+              AND HourBucket < fromUnixTimestamp64Milli({toMs:UInt64})
+            GROUP BY TenantId, SourceId, HourBucket, TraceId
+          )
           GROUP BY TraceId
         )
         SELECT
@@ -173,6 +195,14 @@ export class UsageAttributionLedgerClickHouseRepository
           -- The KPI value is per trace, so the LEFT JOIN repeats it on every
           -- event row: take it once. The payload value is per EVENT, so the
           -- events of one trace add up.
+          --
+          -- any() is right because a trace produces exactly ONE row in this
+          -- table, from either writer: the push reactor keys its row
+          -- EventId = TraceId, and the puller synthesizes pull:<eventId>,
+          -- unique per event. One trace is one group here, so the repeated KPI
+          -- value is taken exactly once. A third writer emitting several OCSF
+          -- rows per trace would break that, and would first have to decide
+          -- which of them the trace's cost belongs to.
           toString(any(k.TraceSpendUsd)) AS kpiSpendUsd,
           toString(sum(e.PayloadCostUsd)) AS payloadSpendUsd,
           -- Existence, not magnitude: a KPI row saying zero is an answer.
@@ -187,6 +217,13 @@ export class UsageAttributionLedgerClickHouseRepository
         toMs: input.to.getTime(),
       },
       format: "JSONEachRow",
+      // Pinned, not assumed. `hasKpiRow` reads the LEFT JOIN's unmatched
+      // default as the empty string; under `join_use_nulls = 1` it would be
+      // NULL, the marker would be neither "1" nor "0", and EVERY KPI-backed
+      // trace would fall through to the payload cost — which for a pushed
+      // trace is the number this design deliberately ignores. The repo pins
+      // this explicitly wherever it matters; so does this.
+      clickhouse_settings: { join_use_nulls: 0 },
     });
 
     const rows = (await result.json()) as Array<{

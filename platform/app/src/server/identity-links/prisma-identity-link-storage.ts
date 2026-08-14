@@ -191,10 +191,25 @@ function erasedRowData(row: ErasableRow, erasure: EraseIdentifiersInput) {
       ? emailTokenByExternalId.get(row.externalId)!
       : row.externalId;
 
+  // `erasedAt` marks a row whose OWN SUBJECT was forgotten — its `userId`
+  // blanked, or its email-shaped login id swapped for a token. A row touched
+  // only to blank `actorUserId` is still blanked, but carries no stamp.
+  //
+  // That distinction is not pedantry, it is the difference between a correct
+  // report and a wrong one. `resolveOwnerAt` reads `userId === null` plus a
+  // stamp as "erased-person", which the report shows as "former member
+  // (erased)" inside the ATTRIBUTED bucket. An unlink row that the erased
+  // person happened to author already has `userId === null`; stamping it would
+  // flip somebody else's login from unattributed to attributed and move money
+  // in a period that may already have been reported — to a person who was
+  // never there.
+  const subjectErased =
+    row.userId === userId || erasedExternalId !== row.externalId;
+
   return {
     userId: row.userId === userId ? null : row.userId,
     actorUserId: row.actorUserId === userId ? null : row.actorUserId,
     externalId: erasedExternalId,
-    erasedAt,
+    ...(subjectErased ? { erasedAt } : {}),
   };
 }

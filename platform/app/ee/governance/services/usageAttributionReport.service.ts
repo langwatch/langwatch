@@ -102,6 +102,9 @@ const refKey = (ref: LoginRef): string =>
 
 const emptyTotals = (): AttributionTotals => ({ events: 0, spendUsd: 0 });
 
+const minDate = (a: Date, b: Date): Date =>
+  a.getTime() <= b.getTime() ? a : b;
+
 /**
  * The usage-attribution report (ADR-094 Decisions 2 and 5).
  *
@@ -169,9 +172,14 @@ export class UsageAttributionReportService {
       from,
       to,
       rows: mergeRows(rows),
-      totals: totalsOf(rows),
+      // The ledger total is computed from the LEDGER, not from the bucketed
+      // rows. Deriving it from the buckets would make
+      // attributed + unattributed + unattributable = ledger true by
+      // construction — including when the bucketing had silently dropped a
+      // row, which is the exact failure the invariant exists to catch.
+      totals: totalsOf(rows, ledgerRows),
       freshness: this.freshnessFor(sources, ledgerRows),
-      changeNotice: await this.changeNoticeFor(organizationId),
+      changeNotice: await this.changeNoticeFor({ organizationId, to }),
     };
   }
 
@@ -439,9 +447,13 @@ export class UsageAttributionReportService {
    * that was appended BEFORE the export was already in the numbers. Only the
    * overlap rewrites history, and that is the one that has to announce itself.
    */
-  private async changeNoticeFor(
-    organizationId: string,
-  ): Promise<string | null> {
+  private async changeNoticeFor({
+    organizationId,
+    to,
+  }: {
+    organizationId: string;
+    to: Date;
+  }): Promise<string | null> {
     const lastExport = await this.prisma.attributionReportExport.findFirst({
       where: { organizationId },
       orderBy: { exportedAt: "desc" },
@@ -453,7 +465,11 @@ export class UsageAttributionReportService {
       where: {
         organizationId,
         recordedAt: { gt: lastExport.exportedAt },
-        effectiveFrom: { lt: lastExport.periodTo },
+        // Inside the exported period AND inside the window being read. A
+        // correction to last quarter is not news on a report of this quarter:
+        // the numbers in front of the reader did not move, and a notice that
+        // fires on every report is one nobody reads by the third time.
+        effectiveFrom: { lt: minDate(lastExport.periodTo, to) },
       },
     });
     return backdated > 0 ? BACKDATED_ATTRIBUTION_NOTICE : null;
@@ -796,7 +812,10 @@ const mergeRows = (
   return [...merged.values()];
 };
 
-const totalsOf = (rows: readonly AttributionReportRow[]) => {
+const totalsOf = (
+  rows: readonly AttributionReportRow[],
+  ledgerRows: readonly AttributionLedgerRow[],
+) => {
   const totals = {
     attributed: emptyTotals(),
     unattributed: emptyTotals(),
@@ -806,6 +825,8 @@ const totalsOf = (rows: readonly AttributionReportRow[]) => {
   for (const row of rows) {
     totals[row.bucket].events += row.events;
     totals[row.bucket].spendUsd += row.spendUsd;
+  }
+  for (const row of ledgerRows) {
     totals.ledger.events += row.events;
     totals.ledger.spendUsd += row.spendUsd;
   }

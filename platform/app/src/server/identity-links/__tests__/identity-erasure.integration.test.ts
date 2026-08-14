@@ -239,10 +239,15 @@ describe("IdentityErasureService against a real database", () => {
       expect(own.externalId).toBe(`mem-${ns}`);
       expect(own.actorUserId).toBe(colleagueUserId);
 
+      // Their name as the AUTHOR goes, and nothing else: the row's subject is
+      // the colleague, who was not erased. No stamp, because `resolveOwnerAt`
+      // reads a stamp beside a null userId as "erased-person" and shows it in
+      // the ATTRIBUTED bucket — stamping here would eventually move a third
+      // party's money to somebody who never owned that login.
       const authored = await linkByExternalId(`mem-colleague-${ns}`);
       expect(authored.userId).toBe(colleagueUserId);
       expect(authored.actorUserId).toBeNull();
-      expect(authored.erasedAt).toEqual(ERASED_AT);
+      expect(authored.erasedAt).toBeNull();
 
       const unrelated = await linkByExternalId(`mem-unrelated-${ns}`);
       expect(unrelated.userId).toBe(colleagueUserId);

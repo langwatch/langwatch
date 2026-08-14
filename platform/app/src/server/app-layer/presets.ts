@@ -4,9 +4,9 @@ import { createNoopEnterprisePipelineCommands } from "@ee/event-sourcing/pipelin
 import { resolveSourceNonBillable } from "@ee/governance/services/costAttributionPolicy.service";
 import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
-import { UsageAttributionLedgerClickHouseRepository } from "@ee/governance/services/usageAttributionLedger.clickhouse.repository";
 import { GovernanceTraceActivityClickHouseRepository } from "@ee/governance/services/governanceTraceActivity.clickhouse.repository";
 import { PersonalUsageClickHouseRepository } from "@ee/governance/services/personalUsage.clickhouse.repository";
+import { UsageAttributionLedgerClickHouseRepository } from "@ee/governance/services/usageAttributionLedger.clickhouse.repository";
 import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
 import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import { createLogger } from "@langwatch/observability";

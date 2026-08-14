@@ -127,56 +127,139 @@ export class IdentityErasureService {
 
     const erasedAt = this.now();
 
-    return await this.prisma.$transaction(async (tx) => {
-      // Re-planned inside the transaction rather than reusing the dry run's
-      // result: the counts an operator saw are a decision aid, never the
-      // instruction set. Anything appended in between must still be erased.
-      const plan = await this.plan({ tx, organizationId, userId });
+    return await this.prisma.$transaction(
+      async (tx) => {
+        // Re-planned inside the transaction rather than reusing the dry run's
+        // result: the counts an operator saw are a decision aid, never the
+        // instruction set. Anything appended in between must still be erased.
+        const plan = await this.plan({ tx, organizationId, userId });
 
-      const { linkRowsTouched } = await new PrismaIdentityLinkStorage(
-        tx as PrismaClient,
-      ).eraseIdentifiers({
-        organizationId,
-        userId,
-        emailTokenByExternalId: plan.emailTokens,
-        erasedAt,
-      });
-
-      // The anchor is a mutable pointer with no history, so it gets no
-      // `erasedAt` marker: blank-after-erasure and never-set are the same
-      // state and there is no timeline to audit (ADR-094 Decision 9).
-      // `updateMany` is scoped to this organization only — a person's
-      // membership of another organization is not this request's business.
-      // Scoped to rows that actually carry an anchor, so the count reports
-      // what was blanked rather than how many membership rows were visited —
-      // the operator is comparing it against the dry run.
-      const { count: directoryAnchors } = await tx.organizationUser.updateMany({
-        where: {
+        const { linkRowsTouched } = await new PrismaIdentityLinkStorage(
+          tx as PrismaClient,
+        ).eraseIdentifiers({
           organizationId,
           userId,
-          OR: [{ externalId: { not: null } }, { scimSource: { not: null } }],
-        },
-        data: { externalId: null, scimSource: null },
-      });
-
-      for (const rewrite of plan.agentRewrites) {
-        await tx.discoveredAgent.update({
-          where: { id: rewrite.id },
-          data: {
-            snapshot: rewrite.snapshot as Prisma.InputJsonValue,
-            erasedAt,
-          },
+          emailTokenByExternalId: plan.emailTokens,
+          erasedAt,
         });
-      }
 
-      return {
-        organizationId,
-        userId,
-        erasedAt,
-        linkRows: linkRowsTouched,
-        directoryAnchors,
-        agentSnapshots: plan.agentRewrites.length,
-      };
+        // The anchor is a mutable pointer with no history, so it gets no
+        // `erasedAt` marker: blank-after-erasure and never-set are the same
+        // state and there is no timeline to audit (ADR-094 Decision 9).
+        // `updateMany` is scoped to this organization only — a person's
+        // membership of another organization is not this request's business.
+        // Scoped to rows that actually carry an anchor, so the count reports
+        // what was blanked rather than how many membership rows were visited —
+        // the operator is comparing it against the dry run.
+        const { count: directoryAnchors } =
+          await tx.organizationUser.updateMany({
+            where: {
+              organizationId,
+              userId,
+              OR: [
+                { externalId: { not: null } },
+                { scimSource: { not: null } },
+              ],
+            },
+            data: { externalId: null, scimSource: null },
+          });
+
+        for (const rewrite of plan.agentRewrites) {
+          await tx.discoveredAgent.update({
+            where: { id: rewrite.id },
+            data: {
+              snapshot: rewrite.snapshot as Prisma.InputJsonValue,
+              erasedAt,
+            },
+          });
+        }
+
+        return {
+          organizationId,
+          userId,
+          erasedAt,
+          linkRows: linkRowsTouched,
+          directoryAnchors,
+          agentSnapshots: plan.agentRewrites.length,
+        };
+      },
+      {
+        // Well past Prisma's 5s interactive default. Erasure reads the
+        // organization's whole agent inventory and then writes a row at a
+        // time, all in one unit because a half-erased person is worse than an
+        // un-erased one. On a large organization the default would time out
+        // and roll back — recoverable, but it would look like the feature is
+        // broken at exactly the moment somebody is exercising a legal right.
+        timeout: 120_000,
+        maxWait: 30_000,
+      },
+    );
+  }
+
+  /**
+   * Everything this person is called, across our ids and the providers'.
+   *
+   * Drawn from SUBJECT rows and their own account only. A row the person
+   * merely authored as an admin names a colleague, and feeding those values in
+   * here is what would scrub a colleague out of the inventory alongside them.
+   */
+  private identifiersOf({
+    userId,
+    subjectRows,
+    emailTokens,
+    anchoredMemberships,
+    accountEmail,
+  }: {
+    userId: string;
+    subjectRows: ReadonlyArray<{ externalKind: string; externalId: string }>;
+    emailTokens: ReadonlyMap<string, string>;
+    anchoredMemberships: ReadonlyArray<{ externalId: string | null }>;
+    accountEmail: string | null;
+  }): PersonIdentifiers {
+    return {
+      userId,
+      emails: [
+        ...emailTokens.keys(),
+        ...(accountEmail ? [canonicalizeEmailLike(accountEmail)] : []),
+      ],
+      providerActorIds: [
+        ...new Set(
+          subjectRows
+            .filter((row) => !isEmailKind(row.externalKind))
+            .map((row) => row.externalId),
+        ),
+        ...anchoredMemberships
+          .map((membership) => membership.externalId)
+          .filter((externalId): externalId is string => externalId !== null),
+      ],
+    };
+  }
+
+  /**
+   * Which agent snapshots mention this person, and what they should say
+   * instead. Rows that mention nobody are not returned, so they are neither
+   * rewritten nor stamped.
+   */
+  private async agentRewritesFor({
+    tx,
+    organizationId,
+    identifiers,
+  }: {
+    tx: TransactionClient;
+    organizationId: string;
+    identifiers: PersonIdentifiers;
+  }): Promise<Array<{ id: string; snapshot: unknown }>> {
+    const agents = await tx.discoveredAgent.findMany({
+      where: { organizationId },
+      select: { id: true, snapshot: true },
+    });
+
+    return agents.flatMap((agent) => {
+      const { snapshot, changed } = eraseSnapshotPersonReferences(
+        agent.snapshot,
+        identifiers,
+      );
+      return changed ? [{ id: agent.id, snapshot }] : [];
     });
   }
 
@@ -194,17 +277,20 @@ export class IdentityErasureService {
     organizationId: string;
     userId: string;
   }) {
-    const linkRows = await tx.providerIdentityLink.findMany({
-      where: { organizationId, OR: [{ userId }, { actorUserId: userId }] },
+    // Rows where this person is the SUBJECT. Deliberately NOT the rows they
+    // merely authored as an admin: those carry somebody else's login id, and
+    // an earlier spelling of this query took `OR: [{userId}, {actorUserId}]`
+    // here — so erasing an admin tokenized the email of every colleague they
+    // had ever linked, irreversibly, and stamped `erasedAt` on those rows.
+    // Whose login a row names is decided by `userId`, never by who typed it.
+    const subjectRows = await tx.providerIdentityLink.findMany({
+      where: { organizationId, userId },
       select: { externalKind: true, externalId: true },
     });
 
-    // Only rows that NAME the person get tokenized: the emails come from the
-    // person's own links and their account, never from every email-kind row in
-    // the organization, or erasing one person would blank a colleague's login.
     const emailTokens = this.tokens.tokensFor({
       organizationId,
-      emails: linkRows
+      emails: subjectRows
         .filter((row) => isEmailKind(row.externalKind))
         .map((row) => row.externalId),
     });
@@ -214,32 +300,29 @@ export class IdentityErasureService {
       select: { externalId: true, scimSource: true },
     });
 
-    const account = await tx.user.findUnique({
-      where: { id: userId },
-      select: { email: true },
+    // The person's account address is only ours to scrub if they belong here.
+    // The backoffice route takes both ids from the request body, so without
+    // this an operator naming an organization and an unrelated person would
+    // scrub that person's address out of THIS organization's agent snapshots —
+    // an erasure of somebody who never appeared in it. A membership row is
+    // enough whether or not it is still active: erasure has to reach people
+    // who were offboarded long ago, which is most of them.
+    const belongsHere = await tx.organizationUser.count({
+      where: { organizationId, userId },
     });
+    const account = belongsHere
+      ? await tx.user.findUnique({
+          where: { id: userId },
+          select: { email: true },
+        })
+      : null;
 
-    const identifiers: PersonIdentifiers = {
+    const identifiers = this.identifiersOf({
       userId,
-      emails: [
-        ...emailTokens.keys(),
-        ...(account?.email ? [canonicalizeEmailLike(account.email)] : []),
-      ],
-      providerActorIds: [
-        ...new Set(
-          linkRows
-            .filter((row) => !isEmailKind(row.externalKind))
-            .map((row) => row.externalId),
-        ),
-        ...anchoredMemberships
-          .map((membership) => membership.externalId)
-          .filter((externalId): externalId is string => externalId !== null),
-      ],
-    };
-
-    const agents = await tx.discoveredAgent.findMany({
-      where: { organizationId },
-      select: { id: true, snapshot: true },
+      subjectRows,
+      emailTokens,
+      anchoredMemberships,
+      accountEmail: account?.email ?? null,
     });
 
     // Counted with the SAME predicate the storage erases by, which is wider
@@ -265,12 +348,10 @@ export class IdentityErasureService {
       },
     });
 
-    const agentRewrites = agents.flatMap((agent) => {
-      const { snapshot, changed } = eraseSnapshotPersonReferences(
-        agent.snapshot,
-        identifiers,
-      );
-      return changed ? [{ id: agent.id, snapshot }] : [];
+    const agentRewrites = await this.agentRewritesFor({
+      tx,
+      organizationId,
+      identifiers,
     });
 
     return {

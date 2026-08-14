@@ -17,9 +17,9 @@ import type { BillableEventsClickHouseRepository } from "../../../ee/billing/ser
 import type { WebhookService } from "../../../ee/billing/services/webhookService";
 import type { GovernanceKpisClickHouseRepository } from "../../../ee/governance/services/governanceKpis.clickhouse.repository";
 import type { GovernanceOcsfEventsClickHouseRepository } from "../../../ee/governance/services/governanceOcsfEvents.clickhouse.repository";
-import type { UsageAttributionLedgerClickHouseRepository } from "../../../ee/governance/services/usageAttributionLedger.clickhouse.repository";
 import type { GovernanceTraceActivityClickHouseRepository } from "../../../ee/governance/services/governanceTraceActivity.clickhouse.repository";
 import type { PersonalUsageClickHouseRepository } from "../../../ee/governance/services/personalUsage.clickhouse.repository";
+import type { UsageAttributionLedgerClickHouseRepository } from "../../../ee/governance/services/usageAttributionLedger.clickhouse.repository";
 import type { ClickHouseClientResolver } from "../clickhouse/clickhouseClient";
 import type { StorageMeterService } from "../data-retention/metering/storageMeter.service";
 import type { PinnedTraceService } from "../data-retention/pinning/pinnedTrace.service";

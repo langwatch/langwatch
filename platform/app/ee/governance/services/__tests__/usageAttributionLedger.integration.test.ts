@@ -257,6 +257,16 @@ beforeAll(async () => {
       spendUsd: 5,
       lastEventOccurredAt: new Date("2026-03-12T12:00:00Z"),
     }),
+    // A byte-identical re-delivery of the FIRST bucket's contribution. Its
+    // version is `LastEventOccurredAt`, which the reactor takes from the
+    // trace's own occurredAt — a fact about the data, not a clock — so a
+    // replay ties rather than advancing. The IN-tuple dedup admits both rows
+    // of a tie and sums them; only picking one per key survives this.
+    kpiRow({
+      traceId: `trace-push-${ns}`,
+      spendUsd: 5,
+      lastEventOccurredAt: new Date("2026-03-12T12:00:00Z"),
+    }),
     kpiRow({ traceId: `trace-zero-${ns}`, spendUsd: 0 }),
   ]);
 });
@@ -328,6 +338,18 @@ describe("UsageAttributionLedgerClickHouseRepository against real ClickHouse", (
     it("counts it once, at its latest version", async () => {
       const rows = byTrace(await findLedger());
       expect(rows[`pull:evt-1-${ns}`]!.events).toBe(1);
+    });
+
+    describe("and the replay's version TIES rather than advancing", () => {
+      // The version comes from the trace's own occurredAt, so a re-delivered
+      // reactor event writes an identical row with an identical version. A
+      // dedup that keeps "every row at the max version" keeps both of them.
+      it("still counts the trace's spend once", async () => {
+        const rows = byTrace(await findLedger());
+        // 5 (the first bucket, whichever of the two tied copies wins) + 4
+        // (the second bucket). Never 5 + 5 + 4.
+        expect(rows[`trace-push-${ns}`]!.spendUsd).toBeCloseTo(9, 6);
+      });
     });
   });
 

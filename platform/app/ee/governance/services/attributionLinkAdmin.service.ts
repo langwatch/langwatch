@@ -196,7 +196,46 @@ export class AttributionLinkAdminService {
       });
       if (suggestion) suggestions.set(suggestionKey(suggestion), suggestion);
     }
-    return [...suggestions.values()];
+
+    return await this.withoutAlreadyDecided({
+      organizationId,
+      suggestions: [...suggestions.values()],
+    });
+  }
+
+  /**
+   * Drop suggestions for logins that already have a history.
+   *
+   * A login an admin deliberately CLOSED resolves to `unlinked`, and the report
+   * shows it as unattributed — correctly, since nobody owns it. But the report
+   * and this surface would then disagree about what that means: resolution
+   * treats a close as an ANSWER (it beats the weaker email evidence), while a
+   * suggestion treats it as a GAP. Re-proposing it asks the admin to undo a
+   * decision they just made, every time they open the page, until they give in.
+   *
+   * Only logins with no rows at all are genuinely undecided. Correcting a
+   * closed login is still possible — through `createLink` directly, which is
+   * the deliberate act it should be.
+   */
+  private async withoutAlreadyDecided({
+    organizationId,
+    suggestions,
+  }: {
+    organizationId: string;
+    suggestions: readonly LinkSuggestion[];
+  }): Promise<LinkSuggestion[]> {
+    if (suggestions.length === 0) return [];
+
+    const storage = new PrismaIdentityLinkStorage(this.prisma);
+    const existing = await storage.listLinksForLogins(
+      organizationId,
+      suggestions.map((suggestion) => suggestion.login),
+    );
+    const decided = new Set(existing.map((row) => loginRefKey(row)));
+
+    return suggestions.filter(
+      (suggestion) => !decided.has(loginRefKey(suggestion.login)),
+    );
   }
 
   /** The one suggestion this ledger row supports, if any. */
@@ -427,4 +466,12 @@ const suggestionKey = (suggestion: LinkSuggestion): string =>
     suggestion.login.externalKind,
     suggestion.login.externalId,
     suggestion.userId,
+  ].join("\u0000");
+
+const loginRefKey = (login: LoginRef): string =>
+  [
+    login.provider,
+    login.providerConnectionId,
+    login.externalKind,
+    login.externalId,
   ].join("\u0000");
