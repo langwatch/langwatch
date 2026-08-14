@@ -32885,9 +32885,9 @@ A run parameter is a constant the whole run shares. It is the same field the [ex
 
 ## Declare the parameters on the scenario
 
-Open the scenario and add one row per parameter under **Parameters**. Each row is a name, an optional description, and an optional default value.
+Open the scenario and click **Parameters**, next to **Labels** at the bottom of the editor. The editor opens with one row per parameter: a name, an optional description, and an optional default value. The names you declare show up next to **Labels**, and clicking one opens the editor again.
 
-<img src="/images/simulations/scenario-parameters-form.png" alt="The scenario editor with a Parameters section declaring a fixture parameter with a description and a default value, referenced as params.fixture in the situation and criteria" width="100%" />
+<img src="/images/simulations/scenario-parameters-form.png" alt="The scenario editor with the parameters dialog open over it, declaring a fixture parameter with a description and a default value, referenced as params.fixture in the situation and criteria" width="100%" />
 
 - **Name** is what every template reads. It starts with a letter or an underscore and continues with letters, digits and underscores, up to 64 characters. A name outside that grammar is rejected when you save.
 - **Description** is shown beside the field when someone starts a run, so write it for whoever is about to type a value. Up to 500 characters.
