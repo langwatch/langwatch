@@ -19,9 +19,14 @@ export const TRANSIENT_NETWORK_CODES = new Set([
  * One ClickHouse server error, by both of the forms it can arrive in.
  *
  * `@clickhouse/client` sets `code` and `type` as properties; an error that
- * arrives as raw HTTP text carries neither, so the symbolic name has to be
- * matched in the message as well. Both are needed — matching only the message
- * would miss the driver's own errors, whose text it has already stripped.
+ * arrives as raw HTTP text carries neither, and is read from the `Code: <n>.`
+ * prefix the engine writes at the head of the body. Both are needed — reading
+ * only the message would miss the driver's own errors, whose text it has
+ * already stripped.
+ *
+ * The message is not searched for the symbolic name: it echoes the submitted
+ * query, so that would let a caller name a table after a variant and pick the
+ * error code it gets back.
  */
 interface ServerError {
   /** The numeric code, as a string — how the driver exposes it. */
@@ -83,12 +88,21 @@ export function translateClickHouseQueryError(
   const type = (error as { type?: string }).type;
   const code = String((error as { code?: unknown }).code ?? "");
   const message = error.message;
+  // The engine writes its numeric code at the head of the message. Reading it
+  // from there — anchored — rather than searching the whole message for the
+  // variant's name keeps classification out of the caller's hands: the message
+  // echoes the submitted query, so a table or alias named after a variant
+  // would otherwise choose which error the caller gets back.
+  //
+  // When the prefix is absent the fallback simply does not fire and the error
+  // degrades to "unknown", which is the documented safe outcome (ADR-045).
+  const messageCode = /^Code:\s*(\d+)/.exec(message)?.[1] ?? "";
   const raised = (...variants: ServerError[]): boolean =>
     variants.some(
       (variant) =>
         code === variant.code ||
         type === variant.name ||
-        message.includes(variant.name),
+        (messageCode !== "" && messageCode === variant.code),
     );
 
   if (raised(MEMORY_LIMIT_EXCEEDED)) {

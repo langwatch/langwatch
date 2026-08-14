@@ -172,4 +172,34 @@ describe("saving a workbench chart", () => {
       });
     });
   });
+
+  describe("given the write succeeds but refreshing the list then fails", () => {
+    describe("when the member saves", () => {
+      /**
+       * The chart is on the server by this point. Reporting the refresh failure
+       * as a failed save sends them back to press Save again — and because the
+       * hook now holds the new chart as the open one, the second press writes
+       * back rather than duplicating, but the copy they were shown was a lie
+       * either way.
+       */
+      it("does not tell them the save failed", async () => {
+        const { result, onError } = mountHook();
+        mocks.utils.analytics.savedWorkbenchCharts.getAll.invalidate.mockRejectedValue(
+          new Error("network"),
+        );
+
+        await act(async () => {
+          await result.current.save({ draft: DRAFT, name: "Traces per day" });
+        });
+
+        // The write itself happened and the chart is the open one.
+        expect(mocks.create.mutateAsync).toHaveBeenCalled();
+        expect(result.current.openedChartId).toBe("chart-1");
+
+        // Reported, but as a stale list — never as a lost save.
+        expect(onError).toHaveBeenCalledTimes(1);
+        expect(onError.mock.calls[0]?.[1]).not.toBe("Couldn't save the chart");
+      });
+    });
+  });
 });

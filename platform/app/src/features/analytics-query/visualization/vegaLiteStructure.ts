@@ -138,24 +138,37 @@ function pushDescendants({
   key: string;
   value: unknown;
 }): void {
-  if (isPlainObject(value)) {
-    stack.push({ path, node: value, parentKey: key });
-    return;
+  // Iterative rather than recursive: array nesting is caller-authored, so a
+  // spec nested deeply enough — `[[[[…]]]]` — would overflow the call stack
+  // and crash the screen instead of being refused. A worklist descends to any
+  // depth at heap cost.
+  //
+  // Items are pushed in reverse so popping yields index order, which is the
+  // order the previous recursive descent produced.
+  const pending: { path: string; value: unknown }[] = [{ path, value }];
+
+  while (pending.length > 0) {
+    const entry = pending.pop();
+    if (!entry) break;
+
+    if (isPlainObject(entry.value)) {
+      stack.push({ path: entry.path, node: entry.value, parentKey: key });
+      continue;
+    }
+    if (!Array.isArray(entry.value)) continue;
+
+    // Descend rather than only pushing plain objects: an object one array
+    // deeper — `[[{ embedOptions: … }]]` — was never reported, and every
+    // blanket rule that walks these nodes (URL properties, embed options,
+    // string resources, image marks) skipped it, so the refusal had a hole
+    // exactly where a spec would hide one.
+    for (let index = entry.value.length - 1; index >= 0; index -= 1) {
+      pending.push({
+        path: joinPointer(entry.path, index),
+        value: entry.value[index],
+      });
+    }
   }
-  if (!Array.isArray(value)) return;
-  // Recurse rather than only pushing plain objects: an object one array deeper
-  // — `[[{ embedOptions: … }]]` — was never reported, and every blanket rule
-  // that walks these nodes (URL properties, embed options, string resources,
-  // image marks) skipped it, so the refusal had a hole exactly where a spec
-  // would hide one.
-  value.forEach((item, index) => {
-    pushDescendants({
-      stack,
-      path: joinPointer(path, index),
-      key,
-      value: item,
-    });
-  });
 }
 
 /** Keys whose values are nested predicates. */

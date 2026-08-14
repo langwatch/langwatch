@@ -155,4 +155,41 @@ describe("translateClickHouseQueryError", () => {
       expect(translated).toBe(handled);
     });
   });
+
+  describe("given a message that echoes a query naming a variant", () => {
+    /**
+     * The engine echoes the submitted query back in the message, so anything
+     * read from the body has to come from the part the engine wrote itself.
+     * Searching the whole message for the symbolic name let a caller pick the
+     * error code by naming a table after it.
+     */
+    it.each([
+      [
+        "a table named after the memory variant",
+        "Code: 60. DB::Exception: Table analytics.MEMORY_LIMIT_EXCEEDED doesn't exist",
+      ],
+      [
+        "an alias named after the scan variant",
+        "Code: 60. DB::Exception: Unknown table expression TOO_MANY_ROWS",
+      ],
+    ])("does not classify by the echoed name: %s", (_case, text) => {
+      const raw = new Error(text);
+
+      // Untouched — code 60 is not one of the mapped variants, and the name in
+      // the echoed query does not get a vote.
+      expect(translateClickHouseQueryError(raw, 10)).toBe(raw);
+    });
+
+    it("still reads the engine's own code prefix when the driver sets no properties", () => {
+      // Raw HTTP text: no `code`/`type` properties, so the leading prefix the
+      // engine writes is the only thing left to read.
+      const raw = new Error(
+        "Code: 158. DB::Exception: Limit for rows to read exceeded",
+      );
+
+      expect(translateClickHouseQueryError(raw, 10)).toBeInstanceOf(
+        QueryScanLimitExceededError,
+      );
+    });
+  });
 });

@@ -224,11 +224,20 @@ function useSaveChart({
             setOpened,
           });
         }
-        await refreshList();
       } catch (error) {
         // Rethrowing would leave the workbench with an unhandled rejection and
         // nothing on screen; the caller turns this into registry copy.
         onError(error, "Couldn't save the chart");
+        return;
+      }
+
+      // Outside the write's catch on purpose: the chart is already saved by
+      // this point, and reporting a failed refresh as a failed save sends the
+      // member back to press Save again, creating a duplicate.
+      try {
+        await refreshList();
+      } catch (error) {
+        onError(error, "Saved, but the chart list didn't refresh");
       }
     },
     [
