@@ -401,7 +401,7 @@ function groupedColumnExpression(
 ): string {
   const grain = governedGrainColumns(view);
   if (grain.includes(column.name)) {
-    return columnExpression(column, sourceColumn);
+    return columnExpression({ column, source: sourceColumn });
   }
   if (!column.summed) {
     throw new Error(
@@ -409,7 +409,7 @@ function groupedColumnExpression(
         `the grain nor a summed measure, so it would take an arbitrary value from its group`,
     );
   }
-  return columnExpression(column, sourceColumn, { aggregated: true });
+  return columnExpression({ column, source: sourceColumn, isAggregated: true });
 }
 
 /**
@@ -461,7 +461,7 @@ export function governedViewStatement({
         ? sourceColumn(column.name)
         : grouped
           ? groupedColumnExpression(view, column)
-          : columnExpression(column, sourceColumn);
+          : columnExpression({ column, source: sourceColumn });
       return `  ${expression} AS ${quotedColumn(column.name)}`;
     })
     .join(",\n");

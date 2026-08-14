@@ -49,8 +49,9 @@ const MAP_KEY_ACCESS = /\[\s*'([^']+)'\s*\]/g;
 const SOURCE = (name: string) => `SRC.\`${name}\``;
 
 /** A column's SQL, with source references qualified the way the generator does. */
-const expressionOf = (column: Parameters<typeof columnExpression>[0]) =>
-  columnExpression(column, SOURCE);
+const expressionOf = (
+  column: Parameters<typeof columnExpression>[0]["column"],
+) => columnExpression({ column, source: SOURCE });
 
 /** Which content category a span-attribute key belongs to, if any. */
 function contentCategoryOf(key: string): ContentCategory | null {
@@ -436,22 +437,23 @@ describe("given the governed view catalog", () => {
    * someone made rather than a line that arrived with a copy-pasted entry.
    */
   describe("when the analytics projections are inspected", () => {
-    const ANALYTICS_DATASETS = [
-      "trace_metrics",
-      "trace_metrics_by_minute",
-      "model_usage_by_minute",
-      "evaluation_metrics",
-      "evaluation_metrics_by_minute",
-    ] as const;
+    // The property, not a name list: an analytics dataset is one that reads a
+    // fold projection or its rollup, so a sixth one added later is covered on
+    // arrival rather than left off an "expected" list.
+    const analyticsDatasets = GOVERNED_VIEW_CATALOG.filter((view) =>
+      /_analytics(_rollup)?$/.test(view.sourceTable),
+    );
 
     /** @scenario "The analytics-optimised datasets expose no captured content" */
     it("exposes no content-gated column on any of them", () => {
-      for (const name of ANALYTICS_DATASETS) {
-        const view = governedViewByName(name);
-        expect(view, `${name} is not in the catalog`).toBeDefined();
+      expect(
+        analyticsDatasets.length,
+        "no dataset reads an analytics projection — this case is inspecting nothing",
+      ).toBeGreaterThan(0);
+      for (const view of analyticsDatasets) {
         expect(
-          view!.columns.filter(isContentGated).map((column) => column.name),
-          `${name} exposes captured content`,
+          view.columns.filter(isContentGated).map((column) => column.name),
+          `${view.name} exposes captured content`,
         ).toEqual([]);
       }
     });

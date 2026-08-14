@@ -264,11 +264,12 @@ function fanoutForPair({
  *
  * Read from {@link governedGrainColumns} rather than from the source's sort
  * key, because the two are not always the same list and the difference is a
- * false alarm rather than a finding. `trace_metrics` is sorted
- * `(TenantId, OccurredAt, TraceId)` for range scans while still being one row
- * per trace, so a join on the `(TenantId, TraceId)` the schema endpoint
- * advertises would otherwise be reported as fanning out on `OccurredAt` — the
- * diagnostic contradicting the schema, on the join it told the caller to write.
+ * false alarm rather than a finding. `evaluation_metrics` is sorted
+ * `(TenantId, OccurredAt, EvaluationId)` for range scans and declares a grain
+ * of `(TenantId, EvaluationId)`, which its `in-tuple` dedup delivers, so a join
+ * on that grain would otherwise be reported as fanning out on `OccurredAt` —
+ * the diagnostic contradicting the schema, on the join it told the caller to
+ * write.
  */
 function unmatchedGrainColumns(
   view: GovernedViewDefinition,

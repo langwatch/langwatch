@@ -133,7 +133,9 @@ source tables that are **not** `ReplacingMergeTree`s: `trace_analytics_rollup`
 and `evaluation_analytics_rollup` are `AggregatingMergeTree`s, whose rows for one
 sort key are *summed* rather than one superseding the others.
 
-The decision above holds for them: `FINAL` is what those views use. Measured
+The decision above holds for them: `FINAL` is what those views use, except
+where the published grain is narrower than the source key — see the `GROUP BY`
+render below. Measured
 against 25.10.2.65 with merges stopped and a bucket written as two parts, `FINAL`
 over an `AggregatingMergeTree` returns one row per sort key with each
 `SimpleAggregateFunction(sum, …)` column summed across the parts. What changes is

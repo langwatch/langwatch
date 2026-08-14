@@ -392,11 +392,15 @@ export function governedGrainColumns(
  * {@link GovernedViewColumn.expression} for why every reference must go through
  * it.
  */
-export function columnExpression(
-  column: GovernedViewColumn,
-  source: (name: string) => string,
-  options?: { readonly aggregated?: boolean },
-): string {
+export function columnExpression({
+  column,
+  source,
+  isAggregated = false,
+}: {
+  readonly column: GovernedViewColumn;
+  readonly source: (name: string) => string;
+  readonly isAggregated?: boolean;
+}): string {
   if (column.expression) {
     // Refused rather than resolved in either direction: a summed measure's SQL
     // is derived from its own name and type precisely so that no second
@@ -435,7 +439,7 @@ export function columnExpression(
   // Under a `GROUP BY` render the merge has not run for the view — the group
   // is what performs it — so the measure is summed explicitly; elsewhere the
   // merged total is already in the column and only the cast is needed.
-  const merged = options?.aggregated ? `sum(${source(only)})` : source(only);
+  const merged = isAggregated ? `sum(${source(only)})` : source(only);
   return `to${column.type}(${merged})`;
 }
 
