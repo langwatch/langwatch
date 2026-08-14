@@ -385,6 +385,46 @@ describe("saving a workbench chart", () => {
     });
   });
 
+  describe("given identity fields outside the stored bounds", () => {
+    describe("when the member saves a chart with an over-long name", () => {
+      it("refuses it as invalid input and writes nothing", async () => {
+        const { store, service } = build();
+
+        const refusal = await refusalOf(() =>
+          service.createChart({
+            projectId: PROJECT_ID,
+            protections: FULLY_PERMITTED,
+            input: { name: "x".repeat(256), definition: definition() },
+          }),
+        );
+
+        expect(refusal.code).toBe("validation_error");
+        expect(store.rows.size).toBe(0);
+      });
+    });
+
+    describe("when the member saves a chart with an id no store should carry", () => {
+      it("refuses it as invalid input and writes nothing", async () => {
+        const { store, service } = build();
+
+        const refusal = await refusalOf(() =>
+          service.createChart({
+            projectId: PROJECT_ID,
+            protections: FULLY_PERMITTED,
+            input: {
+              id: "not/a/valid/id",
+              name: "Traces per day",
+              definition: definition(),
+            },
+          }),
+        );
+
+        expect(refusal.code).toBe("validation_error");
+        expect(store.rows.size).toBe(0);
+      });
+    });
+  });
+
   describe("given a definition both governors accept", () => {
     describe("when the member saves it", () => {
       it("stores the query, its parameters and its specification together", async () => {
@@ -399,7 +439,10 @@ describe("saving a workbench chart", () => {
         expect(saved.name).toBe("Traces per day");
         expect(saved.definition.sql).toBe(PERMITTED_SQL);
         expect(saved.definition.vegaLiteSpec).toEqual(VALID_SPEC);
-        expect(store.rows.get(saved.id)?.kind).toBe(WORKBENCH_SQL_CHART_KIND);
+        // The stored `kind` is deliberately not asserted here: the fake writes
+        // it, so the assertion would read back the fake's own constant. The
+        // integration suite proves it against the real database.
+        expect(store.rows.has(saved.id)).toBe(true);
       });
 
       it("saves a query with no specification as the same kind of record", async () => {

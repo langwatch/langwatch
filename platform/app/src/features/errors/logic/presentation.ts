@@ -273,6 +273,11 @@ const presentations = {
     describe: () =>
       "This project doesn't have the SQL workbench enabled yet. Ask your administrator to switch it on.",
   },
+  saved_workbench_chart_already_exists: {
+    title: "That chart id is already taken",
+    describe: () =>
+      "A saved chart with this id already exists in this project. Save again with a different id, or leave the id out to have one chosen for you.",
+  },
   saved_workbench_chart_not_found: {
     title: "That saved chart isn't here",
     describe: () =>
