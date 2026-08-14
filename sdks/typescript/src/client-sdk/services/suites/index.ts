@@ -6,4 +6,5 @@ export {
   type CreateSuiteBody,
   type UpdateSuiteBody,
   type SuiteRunResult,
+  type SuiteRunOptions,
 } from "./suites-api.service";

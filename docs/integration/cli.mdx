@@ -244,6 +244,25 @@ langwatch suite list
 langwatch suite run <suite-id>                # kicks off every scenario × target
 ```
 
+### Pass values into a run
+
+Every run command accepts a repeatable `--param key=value`. A parameter is a constant value that the whole run shares: a fixture id, a tenant, a plan, a region.
+
+```bash
+langwatch suite run <suite-id> --param account_tier=platinum --param region=eu-central
+langwatch scenario run <scenario-id> --target http:<agent-id> --param account_tier=platinum
+langwatch experiment run <experiment-slug> --param model=gpt-5-mini
+langwatch workflow run <workflow-id> --input '{"question":"where is my order?"}' --param region=eu-central
+```
+
+The value type follows the text you type. `true` and `false` are booleans. A value that parses as a number and prints back the same is a number. All other values stay text, so `007` and `1.50` stay text. When you repeat a name, the last value wins.
+
+Each command uses the values differently:
+
+- `suite run` and `scenario run` supply the parameters that the scenarios declare. A name that no scenario in the run declares is rejected before anything is scheduled. See [Scenario run parameters](/agent-simulations/scenario-parameters).
+- `experiment run` merges the values into every dataset row. See [Running experiments in CI/CD](/evaluations/experiments/ci-cd#choosing-what-to-evaluate).
+- `workflow run` sends the values as entry inputs. They are merged over `--input`, so a `--param` pair wins when both name the same key.
+
 ### Inspect simulation runs
 
 Every scenario execution produces a **simulation run** you can inspect after the fact, full conversation, judge verdict, reasoning, met/unmet criteria, cost, and duration.

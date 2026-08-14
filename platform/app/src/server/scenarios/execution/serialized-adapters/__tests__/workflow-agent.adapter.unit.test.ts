@@ -500,4 +500,65 @@ describe("SerializedWorkflowAgentAdapter", () => {
       expect(fetchOptions.signal).toBeInstanceOf(AbortSignal);
     });
   });
+
+  describe("given a run that resolved parameter values", () => {
+    function callWithParameters(
+      parameters: Record<string, string | number | boolean>,
+    ) {
+      const adapter = new SerializedWorkflowAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl,
+        projectApiKey: apiKey,
+        parameters,
+      });
+      return adapter.call(defaultInput);
+    }
+
+    function sentPayload() {
+      return JSON.parse(mockFetch.mock.calls[0]![1].body).payload;
+    }
+
+    /** @scenario "A workflow target receives params as entry inputs" */
+    it("sends each one as an entry input", async () => {
+      await callWithParameters({ region: "eu-central" });
+
+      expect(sentPayload().inputs[0]).toMatchObject({ region: "eu-central" });
+    });
+
+    /** @scenario "A workflow target receives params as entry inputs" */
+    it("sends an entry input as a string, whatever the value's type", async () => {
+      await callWithParameters({ seats: 12, trial: false });
+
+      expect(sentPayload().inputs[0]).toMatchObject({
+        seats: "12",
+        trial: "false",
+      });
+    });
+
+    it("keeps the mapped conversation input alongside them", async () => {
+      await callWithParameters({ region: "eu-central" });
+
+      expect(sentPayload().inputs[0].input).toBe("Hello");
+    });
+
+    it("leaves a declared input alone when a parameter shares its name", async () => {
+      // The workflow's own `input` carries the conversation turn. A parameter
+      // that replaced it would leave the target answering the wrong question,
+      // and the run would read as an agent that ignored the user.
+      await callWithParameters({ input: "not the conversation" });
+
+      expect(sentPayload().inputs[0].input).toBe("Hello");
+    });
+
+    /** @scenario "A code target reads params.NAME the same way it reads secrets.NAME" */
+    it("carries them on the workflow with their native types, beside its secrets", async () => {
+      await callWithParameters({ region: "eu-central", seats: 12 });
+
+      expect(sentPayload().workflow.params).toEqual({
+        region: "eu-central",
+        seats: 12,
+      });
+      expect(sentPayload().workflow.secrets).toEqual({});
+    });
+  });
 });

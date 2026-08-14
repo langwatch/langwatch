@@ -23,7 +23,8 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 - [Introduction to Agent Testing](https://langwatch.ai/docs/agent-simulations/introduction.md)
 - [Getting Started](https://langwatch.ai/docs/agent-simulations/getting-started.md)
-- [Testing Agents Behind Authentication](https://langwatch.ai/docs/agent-simulations/authenticated-agents.md): Connect an API protected by OAuth2 client-credentials (Auth0 machine-to-machine) to LangWatch simulations using a custom code agent and project secrets.
+- [Scenario Run Parameters](https://langwatch.ai/docs/agent-simulations/scenario-parameters.md): Run the same scenario with different parameters, to set different setup conditions or fixtures for your agent.
+- [Testing Agents Behind Authentication](https://langwatch.ai/docs/agent-simulations/authenticated-agents.md): Reference project secrets from an HTTP target, and connect an API protected by OAuth2 client-credentials (Auth0 machine-to-machine) to LangWatch simulations using a custom code agent.
 - [Voice Agent Testing](https://langwatch.ai/docs/agent-simulations/voice-agents.md)
 - [Red Teaming](https://langwatch.ai/docs/agent-simulations/red-teaming.md)
 
