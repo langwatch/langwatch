@@ -1,3 +1,15 @@
+-- The prompt list reads organization-scoped prompts with
+-- `WHERE "organizationId" = $1 AND "scope" = 'ORGANIZATION'`. The single-column
+-- index made the planner read every prompt of the organization and then drop
+-- the project-scoped ones. The composite serves the whole predicate, and it
+-- replaces the single-column index because it has the same leading column.
+--
+-- LOCKING NOTE: plain `DROP INDEX` and `CREATE INDEX` lock "LlmPromptConfig"
+-- for the length of the build, so prompt writes wait. The table is small and
+-- this runs during deploy, so the pause is short. The `CONCURRENTLY` forms
+-- would avoid the lock but cannot run inside a transaction, which the Prisma
+-- migration runner requires.
+
 -- DropIndex
 DROP INDEX "LlmPromptConfig_organizationId_idx";
 
