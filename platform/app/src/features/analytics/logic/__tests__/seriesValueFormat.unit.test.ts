@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import { resolveSeriesValueFormat } from "../seriesValueFormat";
 
 describe("resolveSeriesValueFormat", () => {
-  describe("given a series with asPercent", () => {
+  describe("given a percentage series", () => {
     /** @scenario "A percentage series formats its values as a percentage" */
     it("formats as a percentage regardless of the metric's own format", () => {
       expect(
         resolveSeriesValueFormat({
-          asPercent: true,
+          isPercent: true,
           aggregation: "avg",
           metricFormat: "0.00a",
         }),
@@ -17,7 +17,7 @@ describe("resolveSeriesValueFormat", () => {
     it("wins over a cardinality aggregation", () => {
       expect(
         resolveSeriesValueFormat({
-          asPercent: true,
+          isPercent: true,
           aggregation: "cardinality",
           metricFormat: "0.00a",
         }),
@@ -26,12 +26,12 @@ describe("resolveSeriesValueFormat", () => {
 
     it("formats as a percentage even with no known metric", () => {
       expect(
-        resolveSeriesValueFormat({ asPercent: true, aggregation: "avg" }),
+        resolveSeriesValueFormat({ isPercent: true, aggregation: "avg" }),
       ).toBe("0%");
     });
   });
 
-  describe("given a cardinality aggregation with no asPercent", () => {
+  describe("given a cardinality aggregation with no percent flag", () => {
     it("formats as an integer regardless of the metric's own format", () => {
       expect(
         resolveSeriesValueFormat({

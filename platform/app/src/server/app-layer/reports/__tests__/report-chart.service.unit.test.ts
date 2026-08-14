@@ -390,8 +390,9 @@ describe("loadReportCharts", () => {
   describe("given the period genuinely has no data", () => {
     /** @scenario "'Nothing to show' appears only when the period is genuinely empty" */
     it("marks a graph with no series configured empty, without a false positive", async () => {
-      // The empty-array edge in `series.every(...)`: with no series at all,
-      // the check must resolve "nothing to show", not vacuously "has data".
+      // With no series at all, `buildChart` resolves "nothing to show" on
+      // its early return, before ever querying — pinned by the getTimeseries
+      // assertion below.
       const deps = makeDeps({
         graphs: [
           makeGraph({

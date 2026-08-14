@@ -36,7 +36,7 @@ Feature: Scheduled report content and links
   Rule: A report's view link always resolves to the exact data it summarised
 
     @unit
-    Scenario: The report email links to its own dashboard
+    Scenario: The delivered report links to its own dashboard
       Given a report whose source is a specific dashboard
       When the report is dispatched
       Then the delivered message links to that dashboard, not the generic analytics page
@@ -47,8 +47,7 @@ Feature: Scheduled report content and links
     Scenario: 'Nothing to show' appears only when the period is genuinely empty
       Given a graph with no series configured
       When the report renders its charts
-      Then that panel is marked empty
-      And a panel with real data is never marked empty by the same check
+      Then that panel is marked empty without ever running a query
 
   Rule: A panel's own configuration can be left out; anything else retries the whole report
 
@@ -67,7 +66,7 @@ Feature: Scheduled report content and links
       Given a dashboard panel whose query fails with an unrelated, unknown error
       When the report renders its charts
       Then the report is not delivered
-      And the failure reaches the scheduler's retry path
+      And the renderer surfaces the failure instead of absorbing it
 
     @unit
     Scenario: A panel whose configuration cannot be evaluated is left out; the report still delivers

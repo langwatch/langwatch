@@ -141,6 +141,39 @@ describe("withGroupedPipeline", () => {
     });
   });
 
+  describe("given a grouped pie chart with one explicit pipeline and one series without", () => {
+    it("fills only the missing pipeline, keeping the author's", () => {
+      const input = makeInput({
+        graphType: "pie",
+        groupBy: "metadata.model",
+        series: [
+          {
+            metric: "metadata.trace_id",
+            aggregation: "cardinality",
+            name: "Traces",
+            pipeline: { field: "trace_id", aggregation: "avg" },
+          },
+          {
+            metric: "metadata.trace_id",
+            aggregation: "cardinality",
+            name: "Bare",
+          },
+        ] as CustomGraphInput["series"],
+      });
+
+      const result = withGroupedPipeline(input);
+
+      expect(result.series[0]!.pipeline).toEqual({
+        field: "trace_id",
+        aggregation: "avg",
+      });
+      expect(result.series[1]!.pipeline).toEqual({
+        field: "trace_id",
+        aggregation: "sum",
+      });
+    });
+  });
+
   describe("given a pie chart with no groupBy", () => {
     it("leaves the input untouched — there is nothing to group", () => {
       const input = makeInput({ graphType: "pie" });
