@@ -15,42 +15,42 @@ Feature: Bedrock Converse span I/O extraction
 
   @unit @canonicalisation
   Scenario: Converse typeless text block survives extraction
-    Given messages whose content is [{text: ...}] with no type field
+    Given a Bedrock trace whose user and assistant messages carry a text block with no type field
     When trace I/O is extracted
     Then the trace summary shows the real prompt and completion
 
   @unit @canonicalisation
   Scenario: Converse toolUse block survives extraction
-    Given a gen_ai.completion message whose content is [{toolUse: {name, input}}]
+    Given a Bedrock trace whose assistant message carries a tool use block with a name and input
     When trace I/O is extracted
     Then the output text contains the JSON of the tool call's input
 
   @unit @canonicalisation
   Scenario: Converse toolUse block without input leaks nothing
-    Given a gen_ai.completion message whose content is [{toolUse: {toolUseId, name}}]
+    Given a Bedrock trace whose assistant message carries a tool use block with a tool use id and name but no input
     When trace I/O is extracted
     Then the output text contains neither the tool use id nor the tool name
 
   @unit @canonicalisation
   Scenario: Converse toolResult block survives extraction
-    Given a gen_ai.prompt message whose content is [{toolResult: {content: [{text}]}}]
+    Given a Bedrock trace whose user message carries a tool result with a text block
     When trace I/O is extracted
     Then the input text is the tool result's inner text
 
   @unit @canonicalisation
   Scenario: Converse toolResult json block survives extraction
-    Given a gen_ai.prompt message whose content is [{toolResult: {content: [{json}]}}]
+    Given a Bedrock trace whose user message carries a tool result with a structured value
     When trace I/O is extracted
     Then the input text is the JSON of the tool result's structured content
 
   @unit @canonicalisation
   Scenario: Converse toolResult json:null block is preserved, not dropped
-    Given a gen_ai.prompt message whose content is [{toolResult: {content: [{json: null}]}}]
+    Given a Bedrock trace whose user message carries a tool result with a null structured value
     When trace I/O is extracted
     Then the input text is the literal string "null"
 
   @unit @canonicalisation
   Scenario: Converse toolResult block with empty content contributes nothing
-    Given a gen_ai.prompt message whose content is [{toolResult: {content: []}}]
+    Given a Bedrock trace whose user message carries a tool result with no content
     When trace I/O is extracted
     Then the input falls back to the span name
