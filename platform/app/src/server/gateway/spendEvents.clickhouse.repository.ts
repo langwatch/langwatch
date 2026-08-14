@@ -18,6 +18,10 @@
 import { createLogger } from "@langwatch/observability";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { GatewaySpendState } from "~/server/event-sourcing/pipelines/gateway-spend-processing/projections/gatewaySpend.foldProjection";
+import {
+  EMPTY_SPEND_USAGE,
+  type SpendUsage,
+} from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/commands";
 import { GATEWAY_SPEND_PROJECTION_VERSION_LATEST } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/constants";
 import type { SpendFilters } from "./spendFilters";
 import {
@@ -320,6 +324,70 @@ function mapSummaryRow({
   };
 }
 
+/** One quantity column per field of the vocabulary. A request with no
+ *  measured usage writes zeros, which is what the column defaults hold for
+ *  every row written before the quantity existed. */
+function usageColumns(usage: SpendUsage | null): Record<string, number> {
+  const quantities = usage ?? EMPTY_SPEND_USAGE;
+  return {
+    TokensInput: quantities.input_tokens,
+    TokensOutput: quantities.output_tokens,
+    TokensCacheRead: quantities.cache_read_input_tokens,
+    TokensCacheWrite: quantities.cache_creation_input_tokens,
+    TokensCacheWrite1h: quantities.cache_creation_1h_tokens,
+    TokensReasoning: quantities.reasoning_tokens,
+    TokensInputAudio: quantities.input_audio_tokens,
+    TokensOutputAudio: quantities.output_audio_tokens,
+    CharsInput: quantities.input_chars,
+    AudioMS: quantities.audio_ms,
+  };
+}
+
+/**
+ * The quantities a spend row carries, or null when it measured nothing.
+ *
+ * The quantity columns beyond the five token classes are read straight off
+ * the raw row rather than through {@link mapSpendEventRow}: the mapped row
+ * shapes the REST and UI surfaces, and widening it would change those
+ * response bodies. The fold needs them regardless, because a late admission
+ * folding over a confirmed request rewrites the whole row from this state,
+ * so a quantity that does not decode here is a quantity zeroed on the next
+ * write.
+ *
+ * Any measured quantity counts as usage, not the token classes alone: a
+ * character-priced call has zero tokens and 4000 characters, and reading it
+ * back as "no usage" would drop them.
+ */
+function foldUsage(
+  row: SpendEventRow,
+  raw: Record<string, unknown>,
+): SpendUsage | null {
+  const quantity = (column: string): number => Number(raw[column] ?? 0);
+  const measured = [
+    row.tokensInput,
+    row.tokensOutput,
+    quantity("CharsInput"),
+    quantity("AudioMS"),
+    quantity("TokensInputAudio"),
+    quantity("TokensOutputAudio"),
+    quantity("TokensCacheWrite1h"),
+  ];
+  const outcome = row.status === "confirmed" || row.status === "failed";
+  if (!outcome && !measured.some((value) => value > 0)) return null;
+  return {
+    input_tokens: row.tokensInput,
+    output_tokens: row.tokensOutput,
+    cache_read_input_tokens: row.tokensCacheRead,
+    cache_creation_input_tokens: row.tokensCacheWrite,
+    cache_creation_1h_tokens: quantity("TokensCacheWrite1h"),
+    reasoning_tokens: row.tokensReasoning,
+    input_audio_tokens: quantity("TokensInputAudio"),
+    output_audio_tokens: quantity("TokensOutputAudio"),
+    input_chars: quantity("CharsInput"),
+    audio_ms: quantity("AudioMS"),
+  };
+}
+
 export class GatewaySpendEventsRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
@@ -360,16 +428,7 @@ export class GatewaySpendEventsRepository {
       HttpStatus: state.httpStatus,
       NeedsReconciliation: state.needsReconciliation ? 1 : 0,
       SettleReason: state.settleReason,
-      TokensInput: state.usage?.input_tokens ?? 0,
-      TokensOutput: state.usage?.output_tokens ?? 0,
-      TokensCacheRead: state.usage?.cache_read_input_tokens ?? 0,
-      TokensCacheWrite: state.usage?.cache_creation_input_tokens ?? 0,
-      TokensCacheWrite1h: state.usage?.cache_creation_1h_tokens ?? 0,
-      TokensReasoning: state.usage?.reasoning_tokens ?? 0,
-      TokensInputAudio: state.usage?.input_audio_tokens ?? 0,
-      TokensOutputAudio: state.usage?.output_audio_tokens ?? 0,
-      CharsInput: state.usage?.input_chars ?? 0,
-      AudioMS: state.usage?.audio_ms ?? 0,
+      ...usageColumns(state.usage),
       CostNanoUSD: state.costNanoUsd,
       RateVersion: state.rateVersion,
       Labels: state.labels,
@@ -414,12 +473,6 @@ export class GatewaySpendEventsRepository {
     gatewayRequestId: string;
   }): Promise<GatewaySpendState | null> {
     const client = await this.resolveClient(tenantId);
-    // The quantity columns beyond the five token classes are read HERE and
-    // not through SPEND_ROW_COLUMNS: the shared list shapes the REST and UI
-    // surfaces, and widening it would change those response bodies. The fold
-    // needs them because a late admission folding over a confirmed request
-    // rewrites the row from this state, so a quantity that does not decode
-    // is a quantity zeroed on the next write.
     const result = await client.query({
       query: `
         SELECT ${SPEND_ROW_COLUMNS}, SettleReason, PodId, PodSeq,
@@ -441,20 +494,7 @@ export class GatewaySpendEventsRepository {
       return null;
     }
     const row = mapSpendEventRow(r);
-    const quantity = (column: string): number => Number(r[column] ?? 0);
-    // Any measured quantity means the row carries usage, not only the token
-    // classes: a character-priced call has zero tokens and 4000 characters,
-    // and reading it back as "no usage" would drop them on the next fold.
-    const hasUsage =
-      row.status === "confirmed" ||
-      row.status === "failed" ||
-      row.tokensInput > 0 ||
-      row.tokensOutput > 0 ||
-      quantity("CharsInput") > 0 ||
-      quantity("AudioMS") > 0 ||
-      quantity("TokensInputAudio") > 0 ||
-      quantity("TokensOutputAudio") > 0 ||
-      quantity("TokensCacheWrite1h") > 0;
+    const usage = foldUsage(row, r);
     return {
       status: row.status,
       organizationId: row.organizationId,
@@ -469,20 +509,7 @@ export class GatewaySpendEventsRepository {
       metadataJson: row.metadata,
       podId: String(r.PodId ?? ""),
       podSeq: Number(r.PodSeq ?? 0),
-      usage: hasUsage
-        ? {
-            input_tokens: row.tokensInput,
-            output_tokens: row.tokensOutput,
-            cache_read_input_tokens: row.tokensCacheRead,
-            cache_creation_input_tokens: row.tokensCacheWrite,
-            cache_creation_1h_tokens: quantity("TokensCacheWrite1h"),
-            reasoning_tokens: row.tokensReasoning,
-            input_audio_tokens: quantity("TokensInputAudio"),
-            output_audio_tokens: quantity("TokensOutputAudio"),
-            input_chars: quantity("CharsInput"),
-            audio_ms: quantity("AudioMS"),
-          }
-        : null,
+      usage,
       rateVersion: row.rateVersion,
       costNanoUsd: row.costNanoUsd,
       errorType: row.errorClass,

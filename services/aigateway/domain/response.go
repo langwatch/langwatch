@@ -52,10 +52,10 @@ type Usage struct {
 	// Audio token counts, for the realtime and audio-native models that
 	// bill audio far above text: OpenAI charges $32 per million audio input
 	// tokens against $4 for text input on gpt-realtime, so a flat prompt
-	// total prices an audio turn at an eighth of what it costs. Both counts
-	// are DISJOINT from PromptTokens and CompletionTokens, which
-	// SplitAudioTokens is what keeps true, so every consumer prices each
-	// bucket exactly once.
+	// total prices an audio turn at a fraction of what it costs. Both counts
+	// are DISJOINT from PromptTokens and CompletionTokens, which is what
+	// SplitAudioTokens keeps true, so every consumer prices each bucket
+	// exactly once.
 	InputAudioTokens  int
 	OutputAudioTokens int
 
@@ -86,7 +86,7 @@ type AudioTokenSplit struct {
 //
 // A pair that does not add up leaves the totals alone. A negative remainder
 // means the provider's own numbers disagree, and an unsplit total charges
-// the audio at the text rate, which is the behaviour every caller had
+// the audio at the text rate, which is the behavior every caller had
 // before this split existed.
 func (u Usage) SplitAudioTokens(split AudioTokenSplit) Usage {
 	u.InputAudioTokens, u.PromptTokens = resolveAudioSplit(

@@ -50,10 +50,10 @@ func (e *Emitter) ConfirmSpend(o pipeline.SpendOutcome) {
 		GatewayRequestID: o.GatewayRequestID,
 		OccurredAtUnixMs: o.OccurredAt.UTC().UnixMilli(),
 		ProjectID:        o.ProjectID,
-		Usage:           usageFromDomain(o.Usage),
-		Model:           o.Model,
-		ModelProviderID: o.ModelProviderID,
-		DurationMS:      o.Duration.Milliseconds(),
+		Usage:            usageFromDomain(o.Usage),
+		Model:            o.Model,
+		ModelProviderID:  o.ModelProviderID,
+		DurationMS:       o.Duration.Milliseconds(),
 	})
 }
 
