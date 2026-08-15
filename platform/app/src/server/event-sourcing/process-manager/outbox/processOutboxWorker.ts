@@ -60,7 +60,7 @@ export class ProcessOutboxWorker {
   private started = false;
   /** Drains the watchdog abandoned that have still not settled. */
   private abandonedDrains = 0;
-  private refusingToDrain = false;
+  private isRefusingToDrain = false;
 
   constructor(options: ProcessOutboxWorkerOptions) {
     this.dispatcher = options.dispatcher;
@@ -115,8 +115,8 @@ export class ProcessOutboxWorker {
   private triggerDrain(): void {
     if (!this.started) return;
     if (this.abandonedDrains >= MAX_ABANDONED_DRAINS) {
-      if (!this.refusingToDrain) {
-        this.refusingToDrain = true;
+      if (!this.isRefusingToDrain) {
+        this.isRefusingToDrain = true;
         this.logger.error(
           {
             processName: this.name,
@@ -171,7 +171,7 @@ export class ProcessOutboxWorker {
         // batch, so give its slot back and let polling recover on its own.
         this.abandonedDrains = Math.max(0, this.abandonedDrains - 1);
         if (this.abandonedDrains < MAX_ABANDONED_DRAINS) {
-          this.refusingToDrain = false;
+          this.isRefusingToDrain = false;
         }
         return;
       }
