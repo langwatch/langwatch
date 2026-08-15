@@ -3,7 +3,10 @@ import { TriggerAction, TriggerKind } from "~/generated/prisma/client";
 import type { TriggerSummary } from "~/server/app-layer/automations/repositories/trigger.repository";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { IntentContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
-import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
+import {
+  DispatchError,
+  isDispatchError,
+} from "~/server/event-sourcing/queues/dispatchError";
 import type { Trace } from "~/server/tracer/types";
 import {
   createLogOverflowHandler,
@@ -626,7 +629,105 @@ describe("trigger settlement intent handlers integration", () => {
       raw.addToDataset.mockImplementation(
         async ({ datasetRecords }: { datasetRecords: { id: string }[] }) => {
           if (datasetRecords[0]!.id.includes("trace-1")) {
-            throw new Error("database unavailable");
+            throw new DispatchError({
+              message: "database unavailable",
+              retryable: true,
+            });
+          }
+        },
+      );
+
+      const thrown = await createPersistMatchHandler(deps)(
+        { triggerId: "trigger-1", traceIds: ["trace-1", "trace-2"] },
+        context("process:trigger-1:persist:page-1"),
+      ).catch((error: unknown) => error);
+
+      // The classification, not the copy, is what the outbox acts on.
+      expect(isDispatchError(thrown)).toBe(true);
+      expect((thrown as DispatchError).retryable).toBe(true);
+
+      // The page-mate was not abandoned by the failure: it dispatched and
+      // claimed, so the outbox retry of the page re-runs only trace-1.
+      expect(triggers.claimSend).toHaveBeenCalledWith({
+        triggerId: "trigger-1",
+        traceId: "trace-2",
+        projectId: "project-1",
+      });
+    });
+
+    it("treats an unclassified failure as retryable and retries the page", async () => {
+      const { deps, raw } = makeDeps(datasetTrigger());
+      raw.addToDataset.mockImplementation(
+        async ({ datasetRecords }: { datasetRecords: { id: string }[] }) => {
+          if (datasetRecords[0]!.id.includes("trace-1")) {
+            throw new Error("connection reset");
+          }
+        },
+      );
+
+      const thrown = await createPersistMatchHandler(deps)(
+        { triggerId: "trigger-1", traceIds: ["trace-1", "trace-2"] },
+        context("process:trigger-1:persist:page-1"),
+      ).catch((error: unknown) => error);
+
+      expect(thrown).toBeInstanceOf(Error);
+      expect(isDispatchError(thrown)).toBe(false);
+    });
+
+    it("dispatches a repeated trace of a page only once", async () => {
+      const { deps, triggers, raw } = makeDeps(datasetTrigger());
+
+      await createPersistMatchHandler(deps)(
+        { triggerId: "trigger-1", traceIds: ["trace-1", "trace-1"] },
+        context("process:trigger-1:persist:page-1"),
+      );
+
+      expect(raw.addToDataset).toHaveBeenCalledTimes(1);
+      expect(triggers.claimSend).toHaveBeenCalledTimes(1);
+      expect(triggers.filterSendClaimed).toHaveBeenCalledWith({
+        triggerId: "trigger-1",
+        traceIds: ["trace-1"],
+        projectId: "project-1",
+      });
+    });
+
+    it("drops the page retry when a dispatched trace could not write its claim", async () => {
+      const { deps, triggers, raw } = makeDeps(datasetTrigger());
+      // trace-1 dispatches and then loses its claim write; trace-2 fails in a
+      // way that would normally retry the whole page.
+      triggers.claimSend.mockRejectedValue(new Error("claim write failed"));
+      raw.addToDataset.mockImplementation(
+        async ({ datasetRecords }: { datasetRecords: { id: string }[] }) => {
+          if (datasetRecords[0]!.id.includes("trace-2")) {
+            throw new DispatchError({
+              message: "database unavailable",
+              retryable: true,
+            });
+          }
+        },
+      );
+
+      // Retrying would re-dispatch trace-1, whose side effect already landed
+      // and which no claim can suppress. The page gives up its retry instead.
+      await expect(
+        createPersistMatchHandler(deps)(
+          { triggerId: "trigger-1", traceIds: ["trace-1", "trace-2"] },
+          context("process:trigger-1:persist:page-1"),
+        ),
+      ).resolves.toBeUndefined();
+
+      expect(raw.addToDataset).toHaveBeenCalledTimes(2);
+    });
+
+    it("still retries the page when every dispatched trace claimed", async () => {
+      const { deps, raw } = makeDeps(datasetTrigger());
+      raw.addToDataset.mockImplementation(
+        async ({ datasetRecords }: { datasetRecords: { id: string }[] }) => {
+          if (datasetRecords[0]!.id.includes("trace-1")) {
+            throw new DispatchError({
+              message: "database unavailable",
+              retryable: true,
+            });
           }
         },
       );
@@ -636,15 +737,7 @@ describe("trigger settlement intent handlers integration", () => {
           { triggerId: "trigger-1", traceIds: ["trace-1", "trace-2"] },
           context("process:trigger-1:persist:page-1"),
         ),
-      ).rejects.toThrow("database unavailable");
-
-      // The page-mate was not abandoned by the failure: it dispatched and
-      // claimed, so the outbox retry of the page re-runs only trace-1.
-      expect(triggers.claimSend).toHaveBeenCalledWith({
-        triggerId: "trigger-1",
-        traceId: "trace-2",
-        projectId: "project-1",
-      });
+      ).rejects.toBeInstanceOf(DispatchError);
     });
 
     /** @scenario "A daily-ceiling breach is reported once per page" */

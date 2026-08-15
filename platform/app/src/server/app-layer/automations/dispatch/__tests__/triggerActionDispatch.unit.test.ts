@@ -246,53 +246,57 @@ describe("dispatchTriggerAction trace loading", () => {
 
   const foldState = { traceId: "trace-1" } as TraceSummaryData;
 
-  describe("when the action is an annotation-queue write", () => {
-    it("performs no full-trace read", async () => {
-      const deps = makeDeps();
-      await dispatchTriggerAction({
-        deps,
-        trigger: summary(TriggerAction.ADD_TO_ANNOTATION_QUEUE),
-        traceId: "trace-1",
-        tenantId: "project-1",
-        foldState,
-      });
+  describe("given valid dispatch dependencies", () => {
+    describe("when the action is an annotation-queue write", () => {
+      it("performs no full-trace read", async () => {
+        const deps = makeDeps();
+        await dispatchTriggerAction({
+          deps,
+          trigger: summary(TriggerAction.ADD_TO_ANNOTATION_QUEUE),
+          traceId: "trace-1",
+          tenantId: "project-1",
+          foldState,
+        });
 
-      expect(deps.traceById).not.toHaveBeenCalled();
-      expect(deps.addToAnnotationQueue).toHaveBeenCalledTimes(1);
+        expect(deps.traceById).not.toHaveBeenCalled();
+        expect(deps.addToAnnotationQueue).toHaveBeenCalledTimes(1);
+      });
     });
-  });
 
-  describe("when the action is a dataset write", () => {
-    it("reads the full trace exactly once for the mapping", async () => {
-      const deps = makeDeps();
-      await dispatchTriggerAction({
-        deps,
-        trigger: summary(TriggerAction.ADD_TO_DATASET),
-        traceId: "trace-1",
-        tenantId: "project-1",
-        foldState,
+    describe("when the action is a dataset write", () => {
+      it("reads the full trace exactly once for the mapping", async () => {
+        const deps = makeDeps();
+        await dispatchTriggerAction({
+          deps,
+          trigger: summary(TriggerAction.ADD_TO_DATASET),
+          traceId: "trace-1",
+          tenantId: "project-1",
+          foldState,
+        });
+
+        expect(deps.traceById).toHaveBeenCalledTimes(1);
+        expect(deps.addToDataset).toHaveBeenCalledTimes(1);
       });
-
-      expect(deps.traceById).toHaveBeenCalledTimes(1);
-      expect(deps.addToDataset).toHaveBeenCalledTimes(1);
     });
-  });
 
-  describe("when the caller preloads the project row", () => {
-    it("does not resolve the project again", async () => {
-      const deps = makeDeps();
-      await dispatchTriggerAction({
-        deps,
-        trigger: summary(TriggerAction.ADD_TO_ANNOTATION_QUEUE),
-        traceId: "trace-1",
-        tenantId: "project-1",
-        foldState,
-        project: { id: "project-1", name: "P", slug: "p" } as NonNullable<
-          Awaited<ReturnType<TriggerActionDispatchDeps["projects"]["getById"]>>
-        >,
+    describe("when the caller preloads the project row", () => {
+      it("does not resolve the project again", async () => {
+        const deps = makeDeps();
+        await dispatchTriggerAction({
+          deps,
+          trigger: summary(TriggerAction.ADD_TO_ANNOTATION_QUEUE),
+          traceId: "trace-1",
+          tenantId: "project-1",
+          foldState,
+          project: { id: "project-1", name: "P", slug: "p" } as NonNullable<
+            Awaited<
+              ReturnType<TriggerActionDispatchDeps["projects"]["getById"]>
+            >
+          >,
+        });
+
+        expect(deps.projects.getById).not.toHaveBeenCalled();
       });
-
-      expect(deps.projects.getById).not.toHaveBeenCalled();
     });
   });
 });
