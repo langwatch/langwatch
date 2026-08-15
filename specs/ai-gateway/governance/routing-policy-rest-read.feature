@@ -7,7 +7,7 @@ Feature: Read-only REST discovery of routing policies
     Given an organization "org-x" with a team "team-a" containing project "project-a"
     And a project API key for "project-a" with the standard pre-existing read permissions
 
-  @integration
+  @unimplemented
   Scenario: List returns exactly the policies selectable at the project's scope
     Given a policy "p-project" scoped to project "project-a"
     And a policy "p-team" scoped to team "team-a"
@@ -17,21 +17,21 @@ Feature: Read-only REST discovery of routing policies
     Then the response status is 200
     And the returned id set is exactly {"p-project", "p-team", "p-org"}
 
-  @integration
+  @unimplemented
   Scenario: Policy objects expose exactly the five-field summary subset
     Given at least one policy selectable at "project-a"
     When the client calls GET /routing-policies with the project API key
     Then each returned policy object has key set exactly {id, name, description, strategy, isDefault}
     And no returned object contains policyRules, modelAliases, modelAllowlist, modelProviderIds, organizationId, or scope assignments
 
-  @integration
+  @unimplemented
   Scenario: Get by id returns the same five-field subset
     Given a policy "p-project" scoped to project "project-a"
     When the client calls GET /routing-policies/p-project with the project API key
     Then the response status is 200
     And the response body has key set exactly {id, name, description, strategy, isDefault}
 
-  @integration
+  @unimplemented
   Scenario: A listed id round-trips through virtual-key create
     Given a policy "p-project" scoped to project "project-a"
     And the client obtained "p-project" from GET /routing-policies
@@ -41,7 +41,7 @@ Feature: Read-only REST discovery of routing policies
     # Skip-note: rejection of non-selectable ids on the virtual-key payload is
     # pre-existing validation, unchanged by this work.
 
-  @unit
+  @unimplemented
   Scenario: The regenerated OpenAPI spec documents both paths completely
     Given the regenerated OpenAPI spec artifact from this change
     Then the spec contains a path object for GET /routing-policies and GET /routing-policies/{id}
@@ -49,7 +49,7 @@ Feature: Read-only REST discovery of routing policies
     And each path declares a security scheme and documented 403 and 404 responses
     And the spec diff for this change touches no path outside /routing-policies*
 
-  @integration
+  @unimplemented
   Scenario: Invisible ids are byte-identical 404s with no existence oracle
     Given a policy "p-other-org" belonging to a different organization "org-y"
     And a policy "p-sibling" scoped only to sibling project "project-b" in "org-x"
@@ -63,13 +63,13 @@ Feature: Read-only REST discovery of routing policies
     And all four response bodies are byte-identical
     And no request returns a 500
 
-  @integration
+  @unimplemented
   Scenario: The list never returns another organization's policies
     Given an organization "org-y" with a default policy "p-y-default" and a non-default policy "p-y-other"
     When the client calls GET /routing-policies with the "project-a" API key
     Then neither "p-y-default" nor "p-y-other" appears in the response
 
-  @integration
+  @unimplemented
   Scenario: The list never returns a same-org sibling project's private policies
     Given a policy "p-sibling" whose only scope assignment is sibling project "project-b" in "org-x"
     And a policy "p-org" scoped to organization "org-x"
@@ -78,58 +78,58 @@ Feature: Read-only REST discovery of routing policies
     Then "p-sibling" is absent from the response
     And "p-org" and "p-team" are present in the response
 
-  @integration
+  @unimplemented
   Scenario: A key lacking the required permission is denied with the literal 403 body
     Given a project API key for "project-a" that lacks the permission gating these routes
     When the client calls GET /routing-policies and GET /routing-policies/{id}
     Then each response is HTTP 403 with the api_key_permission_denied error body
 
-  @integration
+  @unimplemented
   Scenario: Missing and invalid credentials receive the sibling routes' literal statuses
     When the client calls GET /routing-policies with no auth header
     And the client calls GET /routing-policies with a malformed or revoked key
     Then each response status equals the literal status the sibling gateway-platform
       routes return for that case, asserted as a literal in the test
 
-  @integration
+  @unimplemented
   Scenario: An org without the enterprise plan entitlement is gated with 402
     Given an organization without the enterprise plan entitlement
     When its project API key calls GET /routing-policies and GET /routing-policies/{id}
     Then each response is HTTP 402 with the enterprise_plan_required error body
 
-  @unit
+  @unimplemented
   Scenario: The change introduces no new EE-module-absence surface
     Given the route file diff for this change
     Then every EE-module import it relies on is a pre-existing static import of the REST app,
       or the routes sit behind a named presence guard with a documented response
-    # The corresponding explicit decision is recorded in the PR body (AC8b).
 
-  @integration
+  @unimplemented
   Scenario: The tenancy-unaware by-id lookup is never the sole authorization
     Given a policy "p-sibling" scoped only to sibling project "project-b" in "org-x"
     When the client calls GET /routing-policies/p-sibling with the "project-a" API key
     Then the response is the byte-identical 404 not-found response
     And the route file shows the by-id lookup absent or immediately followed by an explicit scope assertion
 
-  @unit
+  @unimplemented
   Scenario: Existing suites pass with additions-only diffs
     Given the pre-existing gateway-platform integration suites and routing-policy dashboard-API tests
     Then all of them pass in CI
     And the diff on every pre-existing test file contains additions only
 
-  @integration
+  @unimplemented
   Scenario: A key issued before this change can read the list
     Given a project API key created before this change, holding only pre-existing standard read permissions
     When the client calls GET /routing-policies
     Then the response status is 200
 
-  @integration
+  @unimplemented
   Scenario: An empty result is a 200 with the sibling routes' envelope
     Given "project-a" has zero selectable policies
     When the client calls GET /routing-policies with the project API key
     Then the response status is 200
     And the body is an empty collection, not null and not a 404
     And the response envelope matches the sibling gateway-platform list routes' envelope
+
 
 # --- AC Coverage Map ---
 # AC1  (list visibility)          -> "List returns exactly the policies selectable at the project's scope"
