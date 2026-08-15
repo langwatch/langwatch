@@ -2,12 +2,16 @@ import {
   CADENCE_WINDOW_MS,
   NOTIFICATION_CADENCES,
 } from "@langwatch/automations/cadences";
-import { describe, expect, it } from "vitest";
-import { TriggerAction } from "~/generated/prisma/client";
+import { describe, expect, it, vi } from "vitest";
+import { TriggerAction, TriggerKind } from "~/generated/prisma/client";
+import type { TriggerSummary } from "~/server/app-layer/automations/repositories/trigger.repository";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import {
   computeScheduledFor,
+  dispatchTriggerAction,
   NOTIFY_TRIGGER_ACTIONS,
   PERSIST_TRIGGER_ACTIONS,
+  type TriggerActionDispatchDeps,
   triggerReadsEvaluations,
 } from "../triggerActionDispatch";
 
@@ -188,6 +192,107 @@ describe("computeScheduledFor", () => {
       });
       expect(early).toEqual(late);
       expect(early).toEqual(new Date("2026-05-29T12:05:00.000Z"));
+    });
+  });
+});
+
+describe("dispatchTriggerAction trace loading", () => {
+  function summary(action: TriggerAction): TriggerSummary {
+    return {
+      id: "trigger-1",
+      projectId: "project-1",
+      name: "Persist",
+      action,
+      triggerKind: TriggerKind.AUTOMATION,
+      actionParams:
+        action === TriggerAction.ADD_TO_DATASET
+          ? {
+              datasetId: "dataset-1",
+              datasetMapping: { mapping: {}, expansions: [] },
+            }
+          : { annotators: [], createdByUserId: "user-1" },
+      filters: {},
+      alertType: "WARNING",
+      message: "",
+      customGraphId: null,
+      notificationCadence: "immediate",
+      filterQuery: null,
+      traceDebounceMs: 0,
+      templates: {
+        slackTemplateType: null,
+        slackTemplate: null,
+        emailSubjectTemplate: null,
+        emailBodyTemplate: null,
+      },
+    };
+  }
+
+  function makeDeps() {
+    return {
+      triggers: { updateLastRunAt: vi.fn().mockResolvedValue(undefined) },
+      projects: {
+        getById: vi
+          .fn()
+          .mockResolvedValue({ id: "project-1", name: "P", slug: "p" }),
+      },
+      traceById: vi.fn().mockResolvedValue({
+        trace_id: "trace-1",
+        spans: [{ span_id: "span-1", trace_id: "trace-1" }],
+      }),
+      addToAnnotationQueue: vi.fn().mockResolvedValue(undefined),
+      addToDataset: vi.fn().mockResolvedValue(undefined),
+    } as unknown as TriggerActionDispatchDeps;
+  }
+
+  const foldState = { traceId: "trace-1" } as TraceSummaryData;
+
+  describe("when the action is an annotation-queue write", () => {
+    it("performs no full-trace read", async () => {
+      const deps = makeDeps();
+      await dispatchTriggerAction({
+        deps,
+        trigger: summary(TriggerAction.ADD_TO_ANNOTATION_QUEUE),
+        traceId: "trace-1",
+        tenantId: "project-1",
+        foldState,
+      });
+
+      expect(deps.traceById).not.toHaveBeenCalled();
+      expect(deps.addToAnnotationQueue).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when the action is a dataset write", () => {
+    it("reads the full trace exactly once for the mapping", async () => {
+      const deps = makeDeps();
+      await dispatchTriggerAction({
+        deps,
+        trigger: summary(TriggerAction.ADD_TO_DATASET),
+        traceId: "trace-1",
+        tenantId: "project-1",
+        foldState,
+      });
+
+      expect(deps.traceById).toHaveBeenCalledTimes(1);
+      expect(deps.addToDataset).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when the caller preloads the project row", () => {
+    it("does not resolve the project again", async () => {
+      const deps = makeDeps();
+      await dispatchTriggerAction({
+        deps,
+        trigger: summary(TriggerAction.ADD_TO_ANNOTATION_QUEUE),
+        traceId: "trace-1",
+        tenantId: "project-1",
+        foldState,
+        project: { id: "project-1", name: "P", slug: "p" } as NonNullable<
+          Awaited<ReturnType<TriggerActionDispatchDeps["projects"]["getById"]>>
+        >,
+      });
+
+      expect(deps.projects.getById).not.toHaveBeenCalled();
     });
   });
 });
