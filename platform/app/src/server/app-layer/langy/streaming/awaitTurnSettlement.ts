@@ -88,41 +88,50 @@ type ConversationTurnEvents = Awaited<
  * `AGENT_RESPONSE_FAILED` both collapse to the failed arm, so no consumer ever
  * re-derives "did it fail" from a string.
  */
+function settlementFromEvent(
+  event: ConversationTurnEvents["events"][number],
+  turnId: string,
+): TurnSettlement | null {
+  if (
+    event.type === LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED &&
+    event.data.turnId === turnId
+  ) {
+    if (event.data.outcome === "failed") {
+      return {
+        succeeded: false,
+        outcome: "failed",
+        text: null,
+        error: event.data.error ?? "Turn failed",
+      };
+    }
+    return {
+      succeeded: true,
+      outcome: event.data.outcome,
+      text: extractTextFromParts(event.data.parts),
+      error: null,
+    };
+  }
+  if (
+    event.type === LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONSE_FAILED &&
+    event.data.turnId === turnId
+  ) {
+    return {
+      succeeded: false,
+      outcome: "failed",
+      text: null,
+      error: event.data.error,
+    };
+  }
+  return null;
+}
+
 export function settlementFromEvents(
   events: ConversationTurnEvents["events"],
   turnId: string,
 ): TurnSettlement | null {
   for (const event of events) {
-    if (
-      event.type === LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED &&
-      event.data.turnId === turnId
-    ) {
-      if (event.data.outcome === "failed") {
-        return {
-          succeeded: false,
-          outcome: "failed",
-          text: null,
-          error: event.data.error ?? "Turn failed",
-        };
-      }
-      return {
-        succeeded: true,
-        outcome: event.data.outcome,
-        text: extractTextFromParts(event.data.parts),
-        error: null,
-      };
-    }
-    if (
-      event.type === LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONSE_FAILED &&
-      event.data.turnId === turnId
-    ) {
-      return {
-        succeeded: false,
-        outcome: "failed",
-        text: null,
-        error: event.data.error,
-      };
-    }
+    const settlement = settlementFromEvent(event, turnId);
+    if (settlement) return settlement;
   }
   return null;
 }
@@ -188,6 +197,95 @@ function neverSettles(): Promise<never> {
   });
 }
 
+function isTerminalFrame(entry: { type: string }): boolean {
+  return entry.type === "end" || entry.type === "error";
+}
+
+/**
+ * Resolves when the buffer delivers a terminal frame (or never — abort and
+ * buffer absence both leave it pending; the fold loop is the authority either
+ * way).
+ */
+async function watchBufferForTerminal(
+  buffer: ReturnType<typeof createLangyTokenBuffer>,
+  {
+    conversationId,
+    turnId,
+    signal,
+  }: { conversationId: string; turnId: string; signal: AbortSignal },
+): Promise<void> {
+  const { reads, lastId } = await buffer.readTail({ conversationId, turnId });
+  if (reads.some(({ entry }) => isTerminalFrame(entry))) return;
+  for await (const { entry } of buffer.follow({
+    conversationId,
+    turnId,
+    fromId: lastId,
+    signal,
+  })) {
+    if (isTerminalFrame(entry)) return;
+  }
+  // follow() ended without a terminal: aborted. Stay pending forever so the
+  // settlement race never mistakes an abort for a settlement signal.
+  await neverSettles();
+}
+
+/**
+ * Arm the buffer-side terminal watch when Redis is available. `terminalSeen`
+ * is null when there is no Redis to watch.
+ */
+function armBufferWatch({
+  conversationId,
+  turnId,
+  signal,
+}: {
+  conversationId: string;
+  turnId: string;
+  signal: AbortSignal;
+}): { terminalSeen: Promise<void> | null; releaseBuffer: () => void } {
+  const redis = tryGetApp()?.redis ?? null;
+  if (!redis) {
+    return {
+      terminalSeen: null,
+      releaseBuffer: () => {
+        // No buffered connection was opened, so nothing to release.
+      },
+    };
+  }
+  const blocking = (redis as { duplicate(): unknown }).duplicate();
+  const buffer = createLangyTokenBuffer({ redis, blockingRedis: blocking });
+  return {
+    terminalSeen: watchBufferForTerminal(buffer, {
+      conversationId,
+      turnId,
+      signal,
+    }).catch(() => neverSettles()),
+    releaseBuffer: () => {
+      (blocking as { disconnect(): void }).disconnect();
+    },
+  };
+}
+
+type PollWaitOutcome = "tick" | "terminal" | "abort";
+
+/**
+ * Wait out one poll interval, unblocking early on the buffer's terminal frame
+ * or on abort.
+ */
+async function waitForNextPoll(
+  terminalSeen: Promise<void> | null,
+  pollMs: number,
+  signal: AbortSignal,
+): Promise<PollWaitOutcome> {
+  const delay = abortableDelay(pollMs, signal).then(
+    (completed): PollWaitOutcome => (completed ? "tick" : "abort"),
+  );
+  if (terminalSeen === null) return delay;
+  return Promise.race([
+    terminalSeen.then((): PollWaitOutcome => "terminal"),
+    delay,
+  ]);
+}
+
 export async function awaitTurnSettlement({
   projectId,
   conversationId,
@@ -203,46 +301,8 @@ export async function awaitTurnSettlement({
   signal: AbortSignal;
   pollIntervalMs?: number;
 }): Promise<TurnSettlement | null> {
-  const redis = tryGetApp()?.redis ?? null;
-
-  let terminalSeen: Promise<void> | null = null;
-  let releaseBuffer = () => {
-    // No buffered connection to release until one is opened below.
-  };
-  if (redis) {
-    const blocking = (redis as { duplicate(): unknown }).duplicate();
-    const buffer = createLangyTokenBuffer({ redis, blockingRedis: blocking });
-    releaseBuffer = () => {
-      (blocking as { disconnect(): void }).disconnect();
-    };
-    // Resolves when the buffer delivers a terminal frame (or never — abort and
-    // buffer absence both leave it pending; the fold loop below is the
-    // authority either way).
-    terminalSeen = (async () => {
-      const { reads, lastId } = await buffer.readTail({
-        conversationId,
-        turnId,
-      });
-      if (
-        reads.some(
-          ({ entry }) => entry.type === "end" || entry.type === "error",
-        )
-      ) {
-        return;
-      }
-      for await (const { entry } of buffer.follow({
-        conversationId,
-        turnId,
-        fromId: lastId,
-        signal,
-      })) {
-        if (entry.type === "end" || entry.type === "error") return;
-      }
-      // follow() ended without a terminal: aborted. Stay pending forever so
-      // the race below never mistakes an abort for a settlement signal.
-      await neverSettles();
-    })().catch(() => neverSettles());
-  }
+  const armed = armBufferWatch({ conversationId, turnId, signal });
+  let terminalSeen = armed.terminalSeen;
 
   let pollMs = terminalSeen !== null ? BUFFERED_POLL_MS : pollIntervalMs;
   try {
@@ -256,25 +316,16 @@ export async function awaitTurnSettlement({
       });
       if (settlement) return settlement;
 
-      if (terminalSeen !== null) {
-        const raced = await Promise.race([
-          terminalSeen.then(() => "terminal" as const),
-          abortableDelay(pollMs, signal).then((completed) =>
-            completed ? ("tick" as const) : ("abort" as const),
-          ),
-        ]);
-        if (raced === "abort") return null;
-        if (raced === "terminal") {
-          // The turn IS settled; only the projection may lag. Confirm fast.
-          terminalSeen = null;
-          pollMs = CONFIRM_POLL_MS;
-        }
-      } else if (!(await abortableDelay(pollMs, signal))) {
-        return null;
+      const waited = await waitForNextPoll(terminalSeen, pollMs, signal);
+      if (waited === "abort") return null;
+      if (waited === "terminal") {
+        // The turn IS settled; only the projection may lag. Confirm fast.
+        terminalSeen = null;
+        pollMs = CONFIRM_POLL_MS;
       }
     }
     return null;
   } finally {
-    releaseBuffer();
+    armed.releaseBuffer();
   }
 }
