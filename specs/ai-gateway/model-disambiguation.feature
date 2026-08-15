@@ -105,10 +105,7 @@ Feature: AI Gateway — model disambiguation when a VK has multiple providers
   Scenario: Unknown provider prefix on VK returns 400 with clear envelope
     When I POST with body `{"model": "bedrock/claude-3-haiku", ...}` on "vk_multi" (no bedrock slot)
     Then the response status is 400
-    # body.error.code, not the body.type the @unimplemented scenarios above
-    # use: this is the only bound scenario in the file, so its assertions are
-    # checked against the envelope herr.WriteHTTP actually emits. Those
-    # scenarios' shape has never been validated against code.
+    # The provider-binding failure is exposed through the nested error envelope.
     And the response body.error.code is "model_provider_not_bound"
     And the response body.error.hint contains "bind a \"bedrock\" provider slot to this virtual key"
     # Without this hard-fail the request would dispatch with a mismatched

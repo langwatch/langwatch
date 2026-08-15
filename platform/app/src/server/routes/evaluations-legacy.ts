@@ -1280,9 +1280,12 @@ async function handleEvaluatorCall(
     // flips silently on reroute. Narrow enough (and low-impact enough) to
     // document rather than special-case.
     const mergedSettings = {
+      // Workflow and custom evaluator definitions have no `settings` to
+      // derive defaults from — getEvaluatorDefaultSettings returns {} for
+      // those instead of crashing.
       ...(!workflowEvaluatorDef
         ? getEvaluatorDefaultSettings(
-            evaluatorDefinition as any,
+            evaluatorDefinition,
             await resolveEvaluatorSettingsDefaults(project.id),
           )
         : {}),

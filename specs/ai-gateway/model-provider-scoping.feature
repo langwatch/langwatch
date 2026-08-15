@@ -60,12 +60,12 @@ Feature: Cross-scope ModelProvider reuse
 
   @integration
   Scenario: Safety-type providers are excluded from gateway dispatch chains
-    Given a ModelProvider "azure_safety" (registry type "safety") enabled at ORGANIZATION scope
-    When the gateway config for any VK in the org is materialised
-    Then "azure_safety" is NOT in the bundle's providers[] or fallback chain
-    # Safety providers hold evaluator credentials; the Go gateway has no
-    # dispatch adapter for them — including one makes fallback attempts
-    # fail with "unsupported provider: azure_safety".
+    Given an evaluator-only (safety) provider is enabled for the organization
+    When a virtual key in that organization sends a request through the gateway
+    Then the request is served by an available language model provider
+    And the evaluator-only provider is never attempted for dispatch
+    # Safety providers hold evaluator credentials and cannot serve chat
+    # traffic; attempting one would fail the request outright.
 
   Scenario: Mixed-scope visibility composes
     Given ModelProviders at 3 scopes: ORG "OpenAI-ent", TEAM "OpenAI-plat", PROJECT "OpenAI-prod-only"

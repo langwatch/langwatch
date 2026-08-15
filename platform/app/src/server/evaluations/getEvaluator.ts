@@ -24,13 +24,19 @@ export const getEvaluatorDefinitions = (evaluator: string) => {
  * nothing to say (e.g. server-side callers without project context).
  */
 export const getEvaluatorDefaultSettings = <T extends EvaluatorTypes>(
-  evaluator: EvaluatorDefinition<T> | undefined,
+  evaluator:
+    | EvaluatorDefinition<T>
+    | { name: string; requiredFields: string[] }
+    | undefined,
   resolved?: {
     defaultModel?: string | null;
     embeddingsModel?: string | null;
   },
 ) => {
-  if (!evaluator) return {};
+  // Custom (non-workflow) evaluator definitions built by
+  // getEvaluatorIncludingCustom carry no `settings` — treat them the same
+  // as an unknown evaluator rather than crashing on Object.entries.
+  if (!evaluator || !("settings" in evaluator)) return {};
   return Object.fromEntries(
     Object.entries(evaluator.settings).map(([key, setting]) => {
       if (key === "model") {
