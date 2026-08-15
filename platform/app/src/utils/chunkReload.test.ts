@@ -189,28 +189,30 @@ describe("warmChunk", () => {
     });
   });
 
-  describe("when another import fails while a warm-up is in flight", () => {
-    /** @scenario "A stale file for a waiting screen reloads during a warm-up" */
-    it("reloads the page for the import somebody is waiting for", async () => {
-      registerChunkReloadListener();
+  describe("given a warm-up is in flight", () => {
+    describe("when another import fails because the file is gone", () => {
+      /** @scenario "A stale file for a waiting screen reloads during a warm-up" */
+      it("reloads the page for the import somebody is waiting for", async () => {
+        registerChunkReloadListener();
 
-      let finishWarmup = () => {};
-      const warmup = warmChunk(
-        () =>
-          new Promise<void>((resolve) => {
-            finishWarmup = resolve;
-          }),
-      );
+        let finishWarmup = () => {};
+        const warmup = warmChunk(
+          () =>
+            new Promise<void>((resolve) => {
+              finishWarmup = resolve;
+            }),
+        );
 
-      // A drawer the person just opened asks for a stale file. This error is
-      // not the warm-up's, so recovery must still run.
-      window.dispatchEvent(preloadErrorEvent(staleChunkError()));
+        // A drawer the person just opened asks for a stale file. This error is
+        // not the warm-up's, so recovery must still run.
+        window.dispatchEvent(preloadErrorEvent(staleChunkError()));
 
-      finishWarmup();
-      await warmup;
-      await settleDeferredReload();
+        finishWarmup();
+        await warmup;
+        await settleDeferredReload();
 
-      expect(reloaded()).toBe(true);
+        expect(reloaded()).toBe(true);
+      });
     });
   });
 
