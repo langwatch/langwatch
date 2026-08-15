@@ -26,23 +26,45 @@ import { hostnameOf, resolveProxyForHost } from "../outboundProxy";
  *    building one per call accumulates pools and file descriptors. They are
  *    cached by proxy URL here, which is also what lets SES and SQS share
  *    one.
+ * 5. **Every request is bounded.** `@smithy/node-http-handler` reads 0 as "no
+ *    timeout", and 0 is its default. A caller that also turned the SDK's
+ *    retries off has nothing left to end a request a silent proxy or a
+ *    half-open socket never answers, so the timeouts are set here rather than
+ *    left to each client.
  */
 
 /**
- * A proxy agent owns a socket pool, so building one per client would
- * accumulate pools and file descriptors under a burst. They are keyed by
- * proxy URL and reused; the set of distinct URLs in a process is
- * effectively one.
+ * How long one AWS request may take. The connection budget is short because
+ * failing to connect is a fast, local answer; the request budget covers a
+ * queue or a mail send under load without letting one hang a delivery worker.
+ */
+const CONNECTION_TIMEOUT_MS = 5_000;
+const REQUEST_TIMEOUT_MS = 20_000;
+
+/**
+ * A handler owns a socket pool, so building one per client would accumulate
+ * pools and file descriptors under a burst. They are keyed by proxy URL and
+ * reused; the set of distinct URLs in a process is effectively one, and the
+ * empty key is the direct, unproxied handler.
  */
 const requestHandlers = new Map<string, NodeHttpHandler>();
 
-export function proxyRequestHandler(proxyUrl: string): NodeHttpHandler {
-  const cached = requestHandlers.get(proxyUrl);
+/** The direct path has no proxy URL to key on, and one shared pool is the
+ *  same arrangement the proxied path already has. */
+const DIRECT_HANDLER_KEY = "";
+
+export function awsRequestHandler(proxyUrl?: string | null): NodeHttpHandler {
+  const key = proxyUrl ?? DIRECT_HANDLER_KEY;
+  const cached = requestHandlers.get(key);
   if (cached) return cached;
 
-  const agent = new HttpsProxyAgent(proxyUrl);
-  const handler = new NodeHttpHandler({ httpAgent: agent, httpsAgent: agent });
-  requestHandlers.set(proxyUrl, handler);
+  const agent = proxyUrl ? new HttpsProxyAgent(proxyUrl) : undefined;
+  const handler = new NodeHttpHandler({
+    ...(agent ? { httpAgent: agent, httpsAgent: agent } : {}),
+    connectionTimeout: CONNECTION_TIMEOUT_MS,
+    requestTimeout: REQUEST_TIMEOUT_MS,
+  });
+  requestHandlers.set(key, handler);
   return handler;
 }
 
@@ -99,7 +121,9 @@ export interface AwsClientConfig {
     | AwsStaticCredentialIdentity
     | ReturnType<typeof fromTemporaryCredentials>;
   endpoint?: string;
-  requestHandler?: NodeHttpHandler;
+  /** Always set, so no client falls back to the SDK's own handler and its
+   *  unbounded timeouts. */
+  requestHandler: NodeHttpHandler;
   maxAttempts?: number;
 }
 
@@ -149,6 +173,13 @@ function resolveCredentials({
 >): AwsClientConfig["credentials"] {
   const staticIdentity = staticCredentialsOrUndefined(staticCredentials);
   if (!assumeRole) return staticIdentity;
+  // The STS call is a second request to a second host, and it gets the same
+  // treatment as the first: through the proxy if there is one, and bounded.
+  // Without this the AssumeRole leg was the one unbounded request left, and it
+  // runs before every delivery on a cold client.
+  const stsHost = present(region)
+    ? `sts.${region}.amazonaws.com`
+    : "sts.amazonaws.com";
   // The role is assumed WITH whatever the outer credentials are, so a static
   // pair here means "these keys may assume that role"; absent, the
   // deployment's own identity does the assuming.
@@ -162,7 +193,10 @@ function resolveCredentials({
       DurationSeconds:
         assumeRole.durationSeconds ?? DEFAULT_ASSUME_ROLE_DURATION_SECONDS,
     },
-    ...(present(region) ? { clientConfig: { region } } : {}),
+    clientConfig: {
+      ...(present(region) ? { region } : {}),
+      requestHandler: awsRequestHandler(resolveProxyForHost(stsHost)),
+    },
     ...(staticIdentity ? { masterCredentials: staticIdentity } : {}),
   });
 }
@@ -175,7 +209,11 @@ export function buildAwsClientConfig({
   assumeRole,
   disableSdkRetries = false,
 }: AwsClientConfigInput): AwsClientConfig {
-  const config: AwsClientConfig = {};
+  const config: AwsClientConfig = {
+    requestHandler: awsRequestHandler(
+      resolveProxyForHost(hostnameOf(targetHost)),
+    ),
+  };
 
   if (present(region)) config.region = region;
   if (present(endpoint)) config.endpoint = endpoint;
@@ -187,9 +225,6 @@ export function buildAwsClientConfig({
     assumeRole,
   });
   if (credentials) config.credentials = credentials;
-
-  const proxyUrl = resolveProxyForHost(hostnameOf(targetHost));
-  if (proxyUrl) config.requestHandler = proxyRequestHandler(proxyUrl);
 
   return config;
 }

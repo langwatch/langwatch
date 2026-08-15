@@ -1,8 +1,34 @@
-import { describe, expect, it } from "vitest";
+import { fromTemporaryCredentials } from "@aws-sdk/credential-providers";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   buildAwsClientConfig,
   staticCredentialsOrUndefined,
 } from "../awsClientConfig";
+
+// The assume-role branch builds a provider whose shape nothing else can read
+// back: `fromTemporaryCredentials` returns an opaque function. Mocking it is
+// the only way to assert on ExternalId, which is the confused-deputy control.
+vi.mock("@aws-sdk/credential-providers", () => ({
+  fromTemporaryCredentials: vi.fn(() => vi.fn()),
+}));
+
+/**
+ * A `NodeHttpHandler` resolves its options lazily, so the timeouts it was
+ * built with are only readable off the promise it holds.
+ */
+async function handlerTimeouts(handler: unknown): Promise<{
+  connectionTimeout?: number;
+  requestTimeout?: number;
+}> {
+  const resolved = (await Reflect.get(handler as object, "configProvider")) as {
+    connectionTimeout?: number;
+    requestTimeout?: number;
+  };
+  return {
+    connectionTimeout: resolved.connectionTimeout,
+    requestTimeout: resolved.requestTimeout,
+  };
+}
 
 /**
  * The invariant these tests exist for broke IRSA in production once: a
@@ -12,6 +38,10 @@ import {
  * keys.
  */
 describe("buildAwsClientConfig", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   describe("given an incomplete credential pair", () => {
     it("omits credentials entirely rather than sending empty strings", () => {
       for (const credentials of [
@@ -33,7 +63,9 @@ describe("buildAwsClientConfig", () => {
         expect("credentials" in config).toBe(false);
       }
     });
+  });
 
+  describe("given a complete credential pair", () => {
     it("passes a complete pair through, trimmed", () => {
       const config = buildAwsClientConfig({
         region: "eu-central-1",
@@ -96,7 +128,16 @@ describe("buildAwsClientConfig", () => {
   });
 
   describe("when a role is assumed", () => {
-    it("supplies a credential provider rather than a static pair", () => {
+    const paramsOfLastCall = () =>
+      vi.mocked(fromTemporaryCredentials).mock.calls[0]![0]!;
+
+    /**
+     * The ExternalId is what proves the AssumeRole request came from us rather
+     * than from anyone who learned the role's name, so it has to reach the
+     * provider. Asserting only that a function came back kept passing with the
+     * ExternalId deleted.
+     */
+    it("passes the role, the external id and the session through to the provider", () => {
       const config = buildAwsClientConfig({
         region: "eu-central-1",
         targetHost: "sqs.eu-central-1.amazonaws.com",
@@ -105,7 +146,101 @@ describe("buildAwsClientConfig", () => {
           externalId: "lw-abc",
         },
       });
+
       expect(typeof config.credentials).toBe("function");
+      expect(paramsOfLastCall().params).toEqual({
+        RoleArn: "arn:aws:iam::123456789012:role/langwatch",
+        RoleSessionName: "langwatch",
+        ExternalId: "lw-abc",
+        DurationSeconds: 900,
+      });
+    });
+
+    it("omits the external id rather than sending an empty one", () => {
+      buildAwsClientConfig({
+        region: "eu-central-1",
+        targetHost: "sqs.eu-central-1.amazonaws.com",
+        assumeRole: {
+          roleArn: "arn:aws:iam::123456789012:role/langwatch",
+          externalId: "   ",
+        },
+      });
+
+      expect("ExternalId" in paramsOfLastCall().params).toBe(false);
+    });
+
+    /**
+     * A static pair beside a role means "these keys may assume that role". It
+     * has to reach the provider as its master credentials, or the deployment's
+     * own identity does the assuming and the customer's keys are ignored.
+     */
+    it("hands the outer static pair to the provider as its master credentials", () => {
+      buildAwsClientConfig({
+        region: "eu-central-1",
+        targetHost: "sqs.eu-central-1.amazonaws.com",
+        staticCredentials: {
+          accessKeyId: "AKIA1",
+          secretAccessKey: "s3cr3t",
+        },
+        assumeRole: {
+          roleArn: "arn:aws:iam::123456789012:role/langwatch",
+        },
+      });
+
+      expect(paramsOfLastCall().masterCredentials).toEqual({
+        accessKeyId: "AKIA1",
+        secretAccessKey: "s3cr3t",
+      });
+    });
+
+    // The AssumeRole leg is a second request to a second host, and it runs
+    // before every delivery on a cold client. Unbounded, it is the one that
+    // hangs a delivery worker with nothing left to end it.
+    it("bounds the STS call the same way it bounds the service call", async () => {
+      buildAwsClientConfig({
+        region: "eu-central-1",
+        targetHost: "sqs.eu-central-1.amazonaws.com",
+        assumeRole: {
+          roleArn: "arn:aws:iam::123456789012:role/langwatch",
+        },
+      });
+
+      const stsHandler = paramsOfLastCall().clientConfig?.requestHandler;
+      expect(stsHandler).toBeDefined();
+      await expect(handlerTimeouts(stsHandler)).resolves.toEqual({
+        connectionTimeout: 5_000,
+        requestTimeout: 20_000,
+      });
+    });
+  });
+
+  describe("when no proxy applies", () => {
+    /**
+     * `@smithy/node-http-handler` reads 0 as "no timeout" and 0 is its
+     * default, so leaving the handler to the SDK is what let a request with no
+     * answer sit open for as long as the socket did.
+     */
+    it("still hands the client a bounded request handler", async () => {
+      const config = buildAwsClientConfig({
+        region: "eu-central-1",
+        targetHost: "sqs.eu-central-1.amazonaws.com",
+      });
+
+      await expect(handlerTimeouts(config.requestHandler)).resolves.toEqual({
+        connectionTimeout: 5_000,
+        requestTimeout: 20_000,
+      });
+    });
+
+    it("reuses the one handler rather than a socket pool per client", () => {
+      const first = buildAwsClientConfig({
+        targetHost: "sqs.eu-central-1.amazonaws.com",
+      });
+      const second = buildAwsClientConfig({
+        targetHost: "email.eu-central-1.amazonaws.com",
+      });
+
+      expect(first.requestHandler).toBe(second.requestHandler);
     });
   });
 });
