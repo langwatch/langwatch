@@ -45,7 +45,8 @@ func (o *Orchestrator) Status(asJSON bool, worktreeDir string) error {
 		ok, detail := o.rds.Health(ctx)
 		servers["redis"] = health{OK: ok, Detail: detail}
 	}
-	live, rss := o.stackFootprint()
+	stackRSS := o.StackRSSByLauncher()
+	live, rss := o.stackFootprint(stackRSS)
 	selection, haveSelection := o.store.ReadSelection(worktreeDir)
 	if !haveSelection && worktreeDir != "" {
 		selection = domain.DefaultSelection()
@@ -77,8 +78,8 @@ func (o *Orchestrator) Status(asJSON bool, worktreeDir string) error {
 	for _, s := range stacks {
 		ram := ""
 		if o.sys.ProcessAlive(s.LauncherPID) {
-			if groupRSS := o.sys.GroupRSS(s.LauncherPID); groupRSS > 0 {
-				ram = "  ~" + domain.HumanBytes(int64(groupRSS))
+			if treeRSS := stackRSS[s.LauncherPID]; treeRSS > 0 {
+				ram = "  ~" + domain.HumanBytes(int64(treeRSS))
 			}
 		}
 		fmt.Printf("%-18s %-6s %s  (%s)%s\n", s.Slug, o.liveness(s), s.Branch, s.WorktreeDir, ram)
@@ -119,13 +120,13 @@ func (o *Orchestrator) liveness(s domain.Stack) string {
 	return "stale"
 }
 
-// stackFootprint sums the live stacks' process-group RSS — the "what are my
+// stackFootprint sums the live stacks' whole-tree RSS — the "what are my
 // dev stacks actually costing this machine" number.
-func (o *Orchestrator) stackFootprint() (live int, rss uint64) {
+func (o *Orchestrator) stackFootprint(stackRSS map[int]uint64) (live int, rss uint64) {
 	for _, s := range o.store.Stacks() {
 		if o.sys.ProcessAlive(s.LauncherPID) {
 			live++
-			rss += o.sys.GroupRSS(s.LauncherPID)
+			rss += stackRSS[s.LauncherPID]
 		}
 	}
 	return live, rss

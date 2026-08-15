@@ -1,5 +1,9 @@
-import { type GatewayBudget, Prisma, type PrismaClient } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
+import {
+  type GatewayBudget,
+  Prisma,
+  type PrismaClient,
+} from "~/generated/prisma/client";
 
 import type {
   GatewayBudgetClickHouseRepository,
@@ -60,6 +64,12 @@ function mockPrismaWithBudgets(budgets: GatewayBudget[]): PrismaClient {
     },
     project: {
       findMany: async () => [{ id: "project_01" }],
+    },
+    // The resolver reads the key's own team scopes so a team-scoped key
+    // reaches its team's budget. These checks pass the team directly, so
+    // the key contributes nothing extra.
+    virtualKeyScope: {
+      findMany: async () => [],
     },
   } as unknown as PrismaClient;
 }
@@ -148,7 +158,13 @@ describe("GatewayBudgetService.check", () => {
       });
       const chRepoStub = {
         getSpendForBudgetsAcrossTenants: async () => [
-          { budgetId: "b_ch_sourced", spentUsd: "95.00" },
+          // Both units, as a real read returns them. The cast below means the
+          // compiler would not notice this drifting from the shape.
+          {
+            budgetId: "b_ch_sourced",
+            spentNanoUsd: 95_000_000_000,
+            spentUsd: "95",
+          },
         ],
       } as unknown as Parameters<typeof GatewayBudgetService.create>[1];
 
@@ -324,6 +340,7 @@ describe("GatewayBudgetService.getDetail", () => {
       },
       virtualKeyScope: {
         findFirst: vi.fn(async () => ({ scopeId: "project_01" })),
+        findMany: vi.fn(async () => []),
       },
       user: {
         findUnique: vi.fn(async () => scopeRow),

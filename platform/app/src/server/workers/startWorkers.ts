@@ -3,8 +3,8 @@ import { createLogger } from "@langwatch/observability";
 import type { IncomingMessage, RequestListener, ServerResponse } from "http";
 import http from "http";
 import { register } from "prom-client";
+import { assertRedisReady } from "~/server/app-layer/redis-readiness";
 import { getWorkerMetricsPort, isMetricsAuthorized } from "~/server/metrics";
-import { assertRedisReady } from "~/server/redis";
 
 const logger = createLogger("langwatch:workers");
 
@@ -36,7 +36,8 @@ type ShutdownHandles = Array<() => Promise<void> | void>;
 async function verifyDatabaseReady(): Promise<void> {
   const { prisma } = await import("~/server/db");
   try {
-    await prisma.$queryRaw`SELECT 1`;
+    await prisma.$queryRaw`-- @tenancy: connectivity probe, touches no rows
+SELECT 1`;
     logger.info("database connection verified");
   } catch (error) {
     logger.fatal({ error }, "database unreachable at boot");
@@ -48,14 +49,12 @@ async function verifyDatabaseReady(): Promise<void> {
 async function bootStorageStatsCollection(
   shutdownHandles: ShutdownHandles,
 ): Promise<void> {
-  const { getSharedClickHouseClient } = await import(
-    "~/server/clickhouse/clickhouseClient"
-  );
-  const { startStorageStatsCollection, stopStorageStatsCollection } =
-    await import("~/server/clickhouse/metrics");
-  const clickHouseClient = getSharedClickHouseClient();
-  if (clickHouseClient) {
-    startStorageStatsCollection(clickHouseClient);
+  const {
+    startStorageStatsCollectionFromSharedClient,
+    stopStorageStatsCollection,
+  } = await import("~/server/clickhouse/metrics");
+  const hasStarted = startStorageStatsCollectionFromSharedClient();
+  if (hasStarted) {
     shutdownHandles.push(() => stopStorageStatsCollection());
     logger.info("storage stats collection ready");
   }
@@ -83,7 +82,9 @@ async function bootScenarioProcessor(
     concurrency: SCENARIO_WORKER.CONCURRENCY,
   });
   getScenarioExecutionHandle()?.setPool(scenarioPool);
-  const scenarioProcessor = await startScenarioProcessor(scenarioPool);
+  const scenarioProcessor = await startScenarioProcessor({
+    pool: scenarioPool,
+  });
   if (scenarioProcessor) {
     shutdownHandles.push(() => scenarioProcessor.close());
   }
@@ -489,10 +490,10 @@ export async function startWorkers(
 
   try {
     // Ingestion pulls self-drive through durable process wakes and the
-    // transactional process outbox; there is no BullMQ worker to boot.
+    // transactional process outbox; there is no separate queue worker to boot.
     // Topic clustering self-drives (ADR-051): the process wake worker and
     // process outbox in the event-sourcing runtime own scheduling and
-    // execution; there is no BullMQ worker to boot.
+    // execution; there is no separate queue worker to boot.
     await bootStorageStatsCollection(shutdownHandles);
     await bootScenarioProcessor(shutdownHandles);
     // Langy turns self-drive: the process outbox dispatches to the Go manager,

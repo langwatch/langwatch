@@ -39,6 +39,8 @@ const assignTopicMock = vi.fn().mockResolvedValue(undefined);
 const recordTopicsMock = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("~/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: vi.fn(() => ({
     traces: { assignTopic: assignTopicMock },
     topicClustering: { recordTopics: recordTopicsMock },
@@ -47,10 +49,6 @@ vi.mock("~/server/app-layer/app", () => ({
 
 vi.mock("~/server/metrics", () => ({
   getPayloadSizeHistogram: vi.fn().mockReturnValue({ observe: vi.fn() }),
-}));
-
-vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: vi.fn(),
 }));
 
 vi.mock("fetch-h2", () => ({ fetch: vi.fn() }));

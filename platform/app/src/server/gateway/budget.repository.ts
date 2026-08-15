@@ -10,7 +10,11 @@
  * callers that need per-member buckets (GROUP) or the provider filter read
  * the resolver directly.
  */
-import type { GatewayBudget, Prisma, PrismaClient } from "@prisma/client";
+import type {
+  GatewayBudget,
+  Prisma,
+  PrismaClient,
+} from "~/generated/prisma/client";
 
 import {
   type ResolvedBudget,
@@ -33,7 +37,10 @@ export class GatewayBudgetRepository {
     scopes: ApplicableScopes,
     tx?: Prisma.TransactionClient,
   ): Promise<ResolvedBudget[]> {
-    return resolveApplicableBudgets(tx ?? this.prisma, scopes);
+    return resolveApplicableBudgets({
+      client: tx ?? this.prisma,
+      target: scopes,
+    });
   }
 
   async applicableForRequest(

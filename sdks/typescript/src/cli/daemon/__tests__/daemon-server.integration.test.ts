@@ -491,34 +491,62 @@ describe("daemon over a unix socket", () => {
 
     describe("when several commands are dispatched at once", () => {
       it("serves them concurrently, each with its own output and exit code", async () => {
+        // A TIMEOUT HERE MEANS THE DAEMON SERIALISED THESE. The five commands
+        // are held at a rendezvous, so a daemon serving one at a time never
+        // gets past the first: it waits on four peers that cannot arrive until
+        // it returns.
+        //
+        // Concurrency is the whole point of the daemon, since an agent fanning
+        // out must not be slower than five cold processes running in parallel,
+        // and a rendezvous is what tests that property directly. No command
+        // emits its output or its exit code until all five are inside the
+        // daemon at the same moment, so being served concurrently is what lets
+        // this test finish at all. Nothing is measured against the clock, so
+        // machine load cannot decide the outcome.
+        const fanOut = [1, 2, 3, 4, 5];
+        let releaseAll: (() => void) | undefined;
+        const allArrived = new Promise<void>((resolve) => {
+          releaseAll = resolve;
+        });
+        let arrived = 0;
+
         await startDaemon({
-          executor: scriptedExecutor((args) => ({
-            stdout: `out:${args[1]}\n`,
-            exitCode: Number(args[1]),
-            delayMs: 20,
-          })),
+          executor: (request): CommandExecution => {
+            const n = Number(request.args[1]);
+            let cancelled = false;
+            let settle: ((code: number) => void) | undefined;
+            const completed = new Promise<number>((resolve) => {
+              settle = resolve;
+            });
+
+            if (++arrived === fanOut.length) releaseAll?.();
+            void allArrived.then(() => {
+              if (cancelled) return;
+              request.sink("stdout", Buffer.from(`out:${n}\n`));
+              settle?.(n);
+            });
+
+            return {
+              completed,
+              // Whatever is still waiting at the barrier has to settle its
+              // caller when the daemon gives up on it, teardown included.
+              cancel: (code) => {
+                cancelled = true;
+                settle?.(code);
+              },
+            };
+          },
         });
 
-        const started = Date.now();
-        const results = await Promise.all([
-          exec(["cmd", "1"]),
-          exec(["cmd", "2"]),
-          exec(["cmd", "3"]),
-          exec(["cmd", "4"]),
-          exec(["cmd", "5"]),
-        ]);
-        const elapsed = Date.now() - started;
+        const results = await Promise.all(
+          fanOut.map((n) => exec(["cmd", String(n)])),
+        );
 
         results.forEach((result, index) => {
           const n = index + 1;
           expect(result.outcome).toEqual({ served: true, exitCode: n });
           expect(result.stdout).toBe(`out:${n}\n`);
         });
-
-        // Serialised, five 20ms commands would take >=100ms. Concurrency is the
-        // whole point: an agent fanning out must not be slower than five cold
-        // processes running in parallel.
-        expect(elapsed).toBeLessThan(100);
       });
     });
 

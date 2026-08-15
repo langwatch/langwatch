@@ -14,7 +14,7 @@ import type {
   ModelProvider,
   PrismaClient,
   VirtualKey,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 
 import { decrypt } from "../../utils/encryption";
 import {
@@ -22,19 +22,14 @@ import {
   resolveLangyMirrorTier,
 } from "../app-layer/langy/LangyCredentialService";
 import { modelProviders } from "../modelProviders/registry";
-import {
-  budgetPeriodFloorMs,
-  type GatewayBudgetClickHouseRepository,
-} from "./budget.clickhouse.repository";
+import type { GatewayBudgetClickHouseRepository } from "./budget.clickhouse.repository";
+import { budgetPeriodFloorMs, effectiveBudgetPeriod } from "./budgetPeriod";
 import {
   type ResolvedBudget,
   resolveApplicableBudgets,
 } from "./budgetResolution.service";
 import { GatewayCacheRuleService } from "./cacheRule.service";
-import {
-  eligibleModelProvidersForVk,
-  resolveTraceProject,
-} from "./scopeResolver";
+import { eligibleModelProvidersForVk, traceProjectFor } from "./scopeResolver";
 import { parseVirtualKeyConfig } from "./virtualKey.config";
 import type { VirtualKeyWithScopes } from "./virtualKey.repository";
 
@@ -219,7 +214,7 @@ export class GatewayConfigMaterialiser {
       this.prisma,
       vk,
     );
-    const traceProject = await resolveTraceProject(this.prisma, vk);
+    const traceProject = await traceProjectFor(this.prisma, vk.traceProjectId);
     const budgets = await this.applicableBudgets(vk, traceProject);
     const spendByBudgetId = await this.loadCurrentSpend(vk, budgets);
     const cacheRules = await this.applicableCacheRules(vk.organizationId);
@@ -411,12 +406,15 @@ export class GatewayConfigMaterialiser {
     vk: VirtualKey,
     traceProject: { id: string; teamId: string } | null,
   ): Promise<ResolvedBudget[]> {
-    return resolveApplicableBudgets(this.prisma, {
-      organizationId: vk.organizationId,
-      virtualKeyId: vk.id,
-      teamId: traceProject?.teamId ?? null,
-      projectId: traceProject?.id ?? null,
-      principalUserId: vk.principalUserId,
+    return resolveApplicableBudgets({
+      client: this.prisma,
+      target: {
+        organizationId: vk.organizationId,
+        virtualKeyId: vk.id,
+        teamId: traceProject?.teamId ?? null,
+        projectId: traceProject?.id ?? null,
+        principalUserId: vk.principalUserId,
+      },
     });
   }
 }
@@ -521,7 +519,42 @@ function resolvePolicySideOfBundle(
 // from the LiteLLM integration) to the Go gateway's per-provider
 // credential shape. See services/aigateway/internal/dispatch/account.go
 // #pcToBifrostKey for the consuming side.
-function buildCredentials(mp: ModelProvider): Record<string, unknown> {
+// Exported for tests: the per-provider credential shapes (which fields ride
+// with which provider, e.g. gemini's optional Agent Platform pair) are
+// contract, and this is the single place they are built.
+// One provider, two Google doors. A credential carrying a project and
+// location is an Agent Platform key: the Go gateway routes it to
+// aiplatform.googleapis.com at the path those two fields name, while a
+// bare key goes to the Gemini API. See
+// specs/model-providers/google-agent-platform.feature.
+function geminiCredentials(
+  pick: (k: string) => string,
+): Record<string, unknown> {
+  // Trimmed here as well as at the schema: rows stored before the schema
+  // trimmed could carry whitespace, and a whitespace-only "pair" must not
+  // pick the Agent Platform door.
+  const project = pick("GEMINI_PROJECT").trim();
+  const location = pick("GEMINI_LOCATION").trim();
+  return {
+    api_key: pick("GEMINI_API_KEY") || pick("GOOGLE_API_KEY"),
+    ...(project && location
+      ? {
+          project_id: project,
+          // `region`, not `location`: `buildProviderSlot` lifts a
+          // slot-level region by looking up exactly that key
+          // (`pickString(credentials, "region")`), the convention every
+          // other regional provider's credentials already follow. Naming
+          // it `location` here — Google's own term, kept as the
+          // customer-facing field name — would silently leave this
+          // credential without a slot-level region once something reads
+          // it.
+          region: location,
+        }
+      : {}),
+  };
+}
+
+export function buildCredentials(mp: ModelProvider): Record<string, unknown> {
   const provider = mp.provider;
   const customKeys = decryptCustomKeys(mp.customKeys);
   const pick = (k: string): string =>
@@ -572,25 +605,16 @@ function buildCredentials(mp: ModelProvider): Record<string, unknown> {
       return { api_key: pick("ANTHROPIC_API_KEY") };
     case "gemini":
     case "google_gemini":
-      return { api_key: pick("GEMINI_API_KEY") || pick("GOOGLE_API_KEY") };
-    // Agent Platform serves Gemini models from a path that names the project
-    // and location, so both travel with the key rather than being derived.
-    // Routing this type to an upstream is `mapProvider`'s job in the Go
-    // gateway (services/aigateway); until that lands the credential
-    // materialises but no traffic is dispatched. Validation does not go
-    // through here — see providerValidation.ts.
+      return geminiCredentials(pick);
+    // Fold-window compatibility: rows stored while Agent Platform was its
+    // own provider carry the retired field names. Same wire shape as a
+    // gemini credential naming the Agent Platform door; goes with the
+    // deprecated registry entry and is deleted after the migration runs.
     case "google_agent_platform":
       return {
         api_key: pick("GOOGLE_AGENT_PLATFORM_API_KEY"),
-        project_id: pick("GOOGLE_AGENT_PLATFORM_PROJECT"),
-        // `region`, not `location`: `buildProviderSlot` below lifts a
-        // slot-level region by looking up exactly that key
-        // (`pickString(credentials, "region")`), the convention every
-        // other regional provider's credentials already follow. Naming it
-        // `location` here — Google's own term, kept as the customer-facing
-        // env var name — would silently leave this provider without a
-        // slot-level region once something reads it.
-        region: pick("GOOGLE_AGENT_PLATFORM_LOCATION"),
+        project_id: pick("GOOGLE_AGENT_PLATFORM_PROJECT").trim(),
+        region: pick("GOOGLE_AGENT_PLATFORM_LOCATION").trim(),
       };
     case "openai":
       return { api_key: pick("OPENAI_API_KEY") };
@@ -748,7 +772,9 @@ function budgetToWire(
     window: b.window.toLowerCase(),
     limit_micro_usd: decimalToMicroUSD(b.limitUsd),
     spent_micro_usd: budgetSpentMicroUSD(b, spendByBudgetId),
-    resets_at: Math.floor(b.resetsAt.getTime() / 1000),
+    // The boundary this budget is actually heading for, not the stored
+    // column, which only moves at create and at an explicit reset.
+    resets_at: Math.floor(effectiveBudgetPeriod(b).resetsAt.getTime() / 1000),
     on_breach: b.onBreach === "BLOCK" ? "block" : "warn",
   };
 }

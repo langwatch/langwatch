@@ -4,7 +4,7 @@ import {
   type PrismaClient,
   type RoleBinding,
   RoleBindingScopeType,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { scopesTouchPersonalTeam } from "~/server/role-bindings/personal-team-scope";
 import type {
   CreateBindingInput,
@@ -260,7 +260,7 @@ export class PrismaGroupRepository implements GroupRepository {
   ): Promise<boolean> {
     // One definition of "this scope reaches a personal workspace", shared with
     // the role-binding paths.
-    return scopesTouchPersonalTeam(this.prisma, scopes);
+    return scopesTouchPersonalTeam({ client: this.prisma, scopes });
   }
 
   async validateScopeInOrganization({

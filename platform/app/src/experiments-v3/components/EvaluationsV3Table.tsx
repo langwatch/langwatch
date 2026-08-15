@@ -34,7 +34,7 @@ import type {
   Field,
   HttpComponentConfig,
 } from "~/optimization_studio/types/dsl";
-import type { TypedAgent } from "~/server/agents/agent.repository";
+import type { AgentWithFields } from "~/server/agents/agent-fields";
 import type { DatasetColumnType } from "~/server/datasets/types";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
 import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
@@ -50,6 +50,7 @@ import {
   useOpenTargetEditor,
 } from "../hooks/useOpenTargetEditor";
 import { useDatasetSelectionLoader } from "../hooks/useSavedDatasetLoader";
+import { useSyncWorkflowTargetFields } from "../hooks/useSyncWorkflowTargetFields";
 import type {
   ComparisonEvaluatorConfig,
   DatasetColumn,
@@ -209,7 +210,7 @@ export function EvaluationsV3Table({
   const drawerParams = useDrawerParams();
   const drawerParamsKey = JSON.stringify(drawerParams);
   const { project } = useOrganizationTeamProject();
-  const trpcUtils = api.useContext();
+  const trpcUtils = api.useUtils();
   // Forking an agent target (and its workflow, when workflow-type) on duplicate.
   // Source: same project — the workbench duplicates within the current project,
   // so `sourceProjectId === projectId` (see #5879). The cross-project replicate
@@ -231,6 +232,10 @@ export function EvaluationsV3Table({
 
   // Sync saved dataset changes to DB
   useDatasetSync();
+
+  // Re-read what each workflow agent target reads and produces from its
+  // workflow, which owns those fields and can change without the workbench.
+  useSyncWorkflowTargetFields();
 
   const {
     datasets,
@@ -434,7 +439,7 @@ export function EvaluationsV3Table({
 
   // Handler for when a saved agent is selected from the drawer
   const handleSelectSavedAgent = useCallback(
-    (savedAgent: TypedAgent) => {
+    (savedAgent: AgentWithFields) => {
       const config = savedAgent.config as Record<string, unknown>;
 
       // Check if this is an HTTP agent by looking at savedAgent.type or config structure
@@ -442,7 +447,7 @@ export function EvaluationsV3Table({
         savedAgent.type === "http" ||
         (config.url !== undefined && config.bodyTemplate !== undefined);
 
-      // Convert TypedAgent to TargetConfig format (agent type)
+      // Convert the saved agent to TargetConfig format (agent type)
       // For HTTP agents, extract inputs from bodyTemplate and store httpConfig
       // For code/workflow agents, use config.inputs directly
       let targetInputs: Field[];
@@ -467,6 +472,17 @@ export function EvaluationsV3Table({
         ];
       }
 
+      // A workflow agent keeps no inputs or outputs on its own config, its
+      // Studio graph does, and the API derives them from that graph. Once that
+      // derivation resolves it is the whole answer, empty lists included:
+      // falling back to the "one field called output" below is what used to
+      // hide every result but the first from the evaluator's variable picker.
+      // Every other kind keeps its fields on its own config, so an empty list
+      // there means nothing was saved and the fallbacks still apply.
+      const { inputFields, outputFields, fieldsResolved } = savedAgent;
+      const derivationIsFinal =
+        savedAgent.type === "workflow" && fieldsResolved;
+
       const targetConfig: TargetConfig = {
         id: `target_${Date.now()}`, // Generate unique ID for the workbench
         type: "agent", // This is a target of type "agent" (code/workflow/http)
@@ -474,10 +490,16 @@ export function EvaluationsV3Table({
           ? "http"
           : (savedAgent.type as TargetConfig["agentType"]),
         dbAgentId: savedAgent.id, // Reference to the database agent
-        inputs: targetInputs,
-        outputs: (config.outputs as TargetConfig["outputs"]) ?? [
-          { identifier: "output", type: "str" },
-        ],
+        inputs:
+          derivationIsFinal || inputFields.length > 0
+            ? inputFields
+            : targetInputs,
+        outputs:
+          derivationIsFinal || outputFields.length > 0
+            ? outputFields
+            : ((config.outputs as TargetConfig["outputs"]) ?? [
+                { identifier: "output", type: "str" },
+              ]),
         mappings: {},
         httpConfig, // Only set for HTTP agents
       };

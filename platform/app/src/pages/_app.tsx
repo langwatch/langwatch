@@ -729,6 +729,12 @@ const appConfig = defineConfig({
             borderRadius: "xl",
             transition: "all 0.2s ease-in-out",
             background: "bg.panel",
+            // Clip children to the rounded border. Square child paints —
+            // table row hover/selection/tints, header bands, code blocks —
+            // otherwise overlap the border's curve at the corners. Floating
+            // content (menus, tooltips, popovers) renders in portals, so
+            // clipping the card never cuts it off.
+            overflow: "hidden",
           },
         },
         variants: {
@@ -892,9 +898,16 @@ const appConfig = defineConfig({
       table: defineSlotRecipe({
         slots: ["root", "row", "cell", "columnHeader"],
         base: {
+          // Deliberately NO borderRadius and NO background on root. The table
+          // is border-collapse: collapse, where border-radius does not apply
+          // to internal elements, so a rounded root renders its square
+          // header/row/own paints as a clipped-corner artifact; and an opaque
+          // root background is a square slab that covers the containing
+          // card's rounded BORDER at the corners (cards don't clip their
+          // children). Tables inherit their surface; rounding and clipping
+          // belong to the container.
           root: {
-            borderRadius: "lg",
-            background: "bg.panel",
+            background: "transparent",
           },
           row: {
             _hover: {
@@ -914,7 +927,7 @@ const appConfig = defineConfig({
             // add grid variant following previous pattern
             grid: {
               root: {
-                background: "bg.panel",
+                background: "transparent",
               },
               columnHeader: {
                 border: "1px solid",
@@ -928,7 +941,19 @@ const appConfig = defineConfig({
             },
             line: {
               root: {
-                background: "bg.panel",
+                background: "transparent",
+                // The final row's cell border doubles up against the
+                // container's own bottom edge — drop it.
+                "& tbody tr:last-of-type td": { borderBottomWidth: "0" },
+              },
+              // Chakra's stock line variant paints every row bg="bg" (the PAGE
+              // background) — darker than the card surface in dark mode, so
+              // the whole body rendered as a mismatched slab. The override must
+              // use the same `bg` KEY the stock recipe uses: a `background`
+              // key merges alongside `bg` instead of replacing it, and the
+              // stock paint wins.
+              row: {
+                bg: "transparent",
               },
               columnHeader: {
                 borderColor: "border",
@@ -940,7 +965,7 @@ const appConfig = defineConfig({
             },
             outline: {
               root: {
-                background: "bg.panel",
+                background: "transparent",
               },
               header: {
                 background: "none",

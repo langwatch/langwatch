@@ -1,4 +1,4 @@
-import { DlpServiceClient } from "@google-cloud/dlp";
+import type { DlpServiceClient } from "@google-cloud/dlp";
 import type { google } from "@google-cloud/dlp/build/protos/protos";
 import { createLogger } from "@langwatch/observability";
 import { normalizePresidioMarkers } from "@langwatch/redaction";
@@ -53,13 +53,37 @@ function getCredentials(): { project_id: string } | undefined {
   return cachedCredentials ?? undefined;
 }
 
-// Lazy DLP client - created only when getDlpClient() is called
-let dlpClient: DlpServiceClient | undefined;
+// Lazy DLP client - created only when getDlpClient() is called. The
+// @google-cloud/dlp SDK (generated protos via google-gax/grpc) is one of the
+// largest single deps in the server graph, so its module is imported here on
+// first use rather than at boot — and only ever when a google_dlp check
+// actually runs with credentials configured (see dlpCheck's guards).
+//
+// The *promise* is what is cached, not the resolved client: the module import
+// is asynchronous, so caching only the settled value would let every check that
+// arrives while the first import is still in flight construct its own client.
+// Each of those holds a gRPC channel, and all but the last would be dropped
+// without ever being closed.
+let dlpClient: Promise<DlpServiceClient> | undefined;
 
-function getDlpClient(): DlpServiceClient {
-  if (!dlpClient) {
-    dlpClient = new DlpServiceClient({ credentials: getCredentials() });
-  }
+function getDlpClient(): Promise<DlpServiceClient> {
+  // Assigned before the first await so concurrent callers observe the in-flight
+  // promise rather than an unset client.
+  dlpClient ??= (async () => {
+    // Dynamic import (the sanctioned exception to the "no inline import()"
+    // rule — same as server.mts / trpc.ts) so the module loads here on first
+    // use, never at boot. Only reached after the guards below confirm DLP is
+    // enabled and credentialed, so it never loads for deployments that don't
+    // use DLP. `import()` rather than `require()` so vitest's module mock
+    // intercepts it (a raw require of this externalized dep would not).
+    const { DlpServiceClient } = await import("@google-cloud/dlp");
+    return new DlpServiceClient({ credentials: getCredentials() });
+  })().catch((error) => {
+    // A failed import or constructor must not poison every later check with the
+    // same rejected promise — drop it so the next call retries.
+    dlpClient = undefined;
+    throw error;
+  });
   return dlpClient;
 }
 
@@ -157,13 +181,19 @@ const dlpCheck = async (
   text: string,
   piiRedactionLevel: PIIRedactionLevel,
 ): Promise<google.privacy.dlp.v2.IFinding[]> => {
+  if (env.LANGWATCH_DISABLE_GOOGLE_DLP) {
+    throw new Error(
+      "Google DLP redaction requested but it is disabled via LANGWATCH_DISABLE_GOOGLE_DLP. Unset that variable to re-enable DLP, or lower the data-privacy PII level for this scope.",
+    );
+  }
   const credentials = getCredentials();
   if (!credentials) {
     throw new Error(
       "Google DLP redaction requested but GOOGLE_APPLICATION_CREDENTIALS is not configured. Configure the credentials or lower the data-privacy PII level for this scope.",
     );
   }
-  const [response] = await getDlpClient().inspectContent({
+  const client = await getDlpClient();
+  const [response] = await client.inspectContent({
     parent: `projects/${credentials.project_id}/locations/global`,
     inspectConfig: {
       infoTypes: (piiRedactionLevel === "ESSENTIAL"

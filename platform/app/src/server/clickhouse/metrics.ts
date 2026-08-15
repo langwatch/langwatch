@@ -1,6 +1,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
 import { Counter, Gauge, Histogram, register } from "prom-client";
+import { getSharedClickHouseClient } from "./clickhouseClient";
 
 const logger = createLogger("langwatch:clickhouse:metrics");
 
@@ -57,6 +58,15 @@ export const incrementClickHouseQueryCount = (
 // chosen for the expensive ones.
 export type WindowedReadOutcome =
   | "hit"
+  /**
+   * The hinted window came back empty and the caller forbade widening
+   * (`fallback: "none"`), so there is no widen outcome to record instead. Split
+   * out of `hit` because a read that resolves queued work retries on empty:
+   * counting it as a hit made a permanently-failing lookup read as a healthy
+   * one, which is how 22 blocked claim-check groups stayed invisible on this
+   * metric through 2026-08-05.
+   */
+  | "windowed_empty"
   | "widened_hit"
   | "widened_empty"
   | "unbounded_hit"
@@ -126,6 +136,107 @@ const clickhouseConnectionsActive = new Gauge({
 
 export const setClickHouseActiveConnections = (count: number) =>
   clickhouseConnectionsActive.set(count);
+
+// ============================================================================
+// Statement Concurrency Metrics
+// ============================================================================
+
+// How many statements a process is running and how many are waiting for a slot
+// (see ~/server/clickhouse/statementLimit.ts). These are the numbers nobody
+// could see during the 2026-07-31 overload: the server's own counters show
+// what it admitted, never what a client was holding back. Sized from the
+// limiter itself at scrape time rather than tracked by hand, so the gauges
+// cannot drift from the limiter they describe.
+type LimiterStatsProbe = () => { inFlight: number; queued: number };
+
+const limiterProbes = new Map<string, LimiterStatsProbe>();
+
+/**
+ * Registers a limiter under an instance label. Re-registering the same label
+ * replaces the probe, which is what a client rebuild (tests, a private instance
+ * re-resolved) should do - two probes for one label would double-count.
+ */
+export const registerClickHouseLimiter = (
+  instance: string,
+  probe: LimiterStatsProbe,
+): void => {
+  limiterProbes.set(instance, probe);
+};
+
+/** Drops a limiter's probe, e.g. when its client is closed. */
+export const unregisterClickHouseLimiter = (instance: string): void => {
+  limiterProbes.delete(instance);
+};
+
+register.removeSingleMetric("clickhouse_statements_in_flight");
+const clickhouseStatementsInFlight = new Gauge({
+  name: "clickhouse_statements_in_flight",
+  help: "ClickHouse statements this process currently has in flight",
+  labelNames: ["instance"] as const,
+  collect() {
+    // Reset first. `labels().set()` only ever writes, so a client that has
+    // been closed would keep publishing its final value for the life of the
+    // process - a gauge describing a limiter that no longer fronts anything.
+    this.reset();
+    for (const [instance, probe] of limiterProbes) {
+      this.labels(instance).set(probe().inFlight);
+    }
+  },
+});
+
+register.removeSingleMetric("clickhouse_statements_queued");
+const clickhouseStatementsQueued = new Gauge({
+  name: "clickhouse_statements_queued",
+  help: "ClickHouse statements waiting for a concurrency slot in this process",
+  labelNames: ["instance"] as const,
+  collect() {
+    this.reset();
+    for (const [instance, probe] of limiterProbes) {
+      this.labels(instance).set(probe().queued);
+    }
+  },
+});
+
+// The alerting signal. Anything above zero means a process refused its own
+// work rather than pile it onto an overloaded server - useful, but not
+// something to discover from a customer.
+register.removeSingleMetric("clickhouse_statements_shed_total");
+const clickhouseStatementsShed = new Counter({
+  name: "clickhouse_statements_shed_total",
+  help: "ClickHouse statements refused because the concurrency wait queue was full",
+  labelNames: ["instance", "operation"] as const,
+});
+
+export const incrementClickHouseStatementsShed = (
+  instance: string,
+  operation: string,
+) => clickhouseStatementsShed.labels(instance, operation).inc();
+
+// Time spent waiting for a slot, which is the latency the pool used to hide.
+// Buckets start below a millisecond because the uncontended case must be
+// visibly free, and end at a minute because a wait that long is the incident.
+register.removeSingleMetric("clickhouse_statement_wait_seconds");
+const clickhouseStatementWait = new Histogram({
+  name: "clickhouse_statement_wait_seconds",
+  help: "Time a ClickHouse statement waited for a concurrency slot",
+  labelNames: ["instance", "operation"] as const,
+  buckets: [0.0005, 0.005, 0.025, 0.1, 0.5, 1, 5, 15, 60],
+});
+
+export const observeClickHouseStatementWait = (
+  instance: string,
+  operation: string,
+  waitSeconds: number,
+) => clickhouseStatementWait.labels(instance, operation).observe(waitSeconds);
+
+// Exported for the boot-time report and for tests that assert the gauges exist
+// without scraping the whole registry.
+export const clickHouseConcurrencyMetrics = {
+  inFlight: clickhouseStatementsInFlight,
+  queued: clickhouseStatementsQueued,
+  shed: clickhouseStatementsShed,
+  wait: clickhouseStatementWait,
+};
 
 // ============================================================================
 // Query Wrapper with Metrics
@@ -266,10 +377,41 @@ const MONITORED_TABLES = [
   "stored_objects",
 ];
 
+/** Values of CLICKHOUSE_BACKUP_METRICS_ENABLED that turn backup collection off. */
+const BACKUP_METRICS_OFF_VALUES = new Set(["false", "0", "no", "off"]);
+
+/**
+ * Whether this deployment should collect backup-status gauges from
+ * system.backup_log.
+ *
+ * Collection is ON unless explicitly disabled. The gauges predate this flag and
+ * production alerts (clickhouse_backup_last_success_timestamp_seconds,
+ * clickhouse_backup_status_total, and the "Backup Reporting Absent" rule built on
+ * them) already depend on them, while the deployments that emit them do not set
+ * the variable. Defaulting to off silently disarms live backup monitoring on the
+ * next deploy, so an unset, or unparseable, value keeps the existing behaviour and
+ * only a deliberate opt-OUT stops collection.
+ *
+ * Opting out is for environments where backups genuinely do not exist (local dev
+ * under haven, CI, self-hosted installs without backups), where the table is
+ * missing and the query would fail on every 15s tick for nothing.
+ *
+ * See specs/ops/clickhouse-backup-metrics.feature.
+ */
+export function shouldCollectBackupMetrics(
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  const raw = env.CLICKHOUSE_BACKUP_METRICS_ENABLED;
+  if (typeof raw !== "string") return true;
+  const normalized = raw.trim().toLowerCase();
+  if (normalized === "") return true;
+  return !BACKUP_METRICS_OFF_VALUES.has(normalized);
+}
+
 /**
  * Collects ClickHouse backup status from system.backup_log into the backup gauges.
- * Extracted so collectStorageStats can gate it behind the explicit opt-in (see the
- * call site).
+ * Extracted so collectStorageStats can gate it behind the opt-out (see the call
+ * site).
  *
  * We deliberately query system.backup_log instead of system.backups: system.backups
  * is an in-memory table that gets wiped on CH restart, which happens on every app
@@ -396,12 +538,13 @@ export async function collectStorageStats(
     // Backup status only exists where backups are configured (the production
     // cluster, via clickhouse-serverless's backup cronjobs) — everywhere else this
     // query just fails on every 15s tick for nothing, and NODE_ENV can't tell
-    // "has backups" from "staging/self-hosted production build". So the deployment
-    // that has backups opts in explicitly (set on the worker alongside the backup
-    // cronjobs). Gating here (not at one call site) covers both the app under
+    // "has backups" from "staging/self-hosted production build". So the
+    // deployments WITHOUT backups opt out explicitly; unset stays on, because
+    // production already emits these gauges and alerts on them without setting
+    // anything. Gating here (not at one call site) covers both the app under
     // haven's in-process workers and the standalone worker.
     // See specs/ops/clickhouse-backup-metrics.feature.
-    if (process.env.CLICKHOUSE_BACKUP_METRICS_ENABLED === "true") {
+    if (shouldCollectBackupMetrics()) {
       await collectBackupStats(client);
     }
 
@@ -477,4 +620,19 @@ export function stopStorageStatsCollection(): void {
     clearInterval(storageStatsInterval);
     storageStatsInterval = null;
   }
+}
+
+/**
+ * Starts storage-stats collection off the shared (non-tenant) ClickHouse
+ * client, resolving it here instead of at the worker boot call site — this
+ * module is the one place allowed to reach for a client directly. Returns
+ * `false` without starting anything when ClickHouse isn't configured.
+ */
+export function startStorageStatsCollectionFromSharedClient(
+  intervalMs?: number,
+): boolean {
+  const client = getSharedClickHouseClient();
+  if (!client) return false;
+  startStorageStatsCollection(client, intervalMs);
+  return true;
 }

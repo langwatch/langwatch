@@ -7,6 +7,7 @@
  */
 
 import type { AgentAdapter } from "@langwatch/scenario";
+import type { RunParameterValues } from "../parameters";
 import {
   SerializedCodeAgentAdapter,
   SerializedHttpAgentAdapter,
@@ -24,8 +25,17 @@ import type {
 
 type AdapterFactory = (params: {
   data: TargetAdapterData;
-  modelParams: LiteLLMParams;
+  /** The prompt's own inference credentials. Only the prompt factory reads
+   *  this — workflow/code use `projectApiKey` instead, and http needs
+   *  neither (issue #6634). */
+  modelParams?: LiteLLMParams;
   nlpServiceUrl: string;
+  /** The LangWatch platform API key (project.apiKey). Only the workflow and
+   *  code factories read this — see their adapters' doc comments for why it
+   *  is the platform key, never an LLM credential. */
+  projectApiKey?: string;
+  /** The values the run resolved, which every target reads as `params.NAME`. */
+  parameters?: RunParameterValues;
 }) => AgentAdapter;
 
 /**
@@ -33,40 +43,65 @@ type AdapterFactory = (params: {
  * To add a new adapter type, simply register it here.
  */
 export const SERIALIZED_ADAPTER_FACTORIES: Record<string, AdapterFactory> = {
-  prompt: ({ data, modelParams, nlpServiceUrl }) =>
-    new SerializedPromptConfigAdapter(
-      data as PromptConfigData,
-      modelParams,
+  prompt: ({ data, modelParams, nlpServiceUrl, parameters }) => {
+    if (!modelParams) {
+      throw new Error("Prompt adapter requires modelParams");
+    }
+    return new SerializedPromptConfigAdapter({
+      config: data as PromptConfigData,
+      litellmParams: modelParams,
+      nlpServiceUrl: nlpServiceUrl,
+      parameters,
+    });
+  },
+  http: ({ data, parameters }) =>
+    new SerializedHttpAgentAdapter({
+      config: data as HttpAgentData,
+      parameters,
+    }),
+  code: ({ data, nlpServiceUrl, projectApiKey, parameters }) => {
+    if (!projectApiKey) {
+      throw new Error("Code adapter requires projectApiKey");
+    }
+    return new SerializedCodeAgentAdapter({
+      config: data as CodeAgentData,
       nlpServiceUrl,
-    ),
-  http: ({ data }) => new SerializedHttpAgentAdapter(data as HttpAgentData),
-  code: ({ data, modelParams, nlpServiceUrl }) =>
-    new SerializedCodeAgentAdapter(
-      data as CodeAgentData,
+      projectApiKey,
+      parameters,
+    });
+  },
+  workflow: ({ data, nlpServiceUrl, projectApiKey, parameters }) => {
+    if (!projectApiKey) {
+      throw new Error("Workflow adapter requires projectApiKey");
+    }
+    return new SerializedWorkflowAgentAdapter({
+      config: data as WorkflowAgentData,
       nlpServiceUrl,
-      modelParams.api_key,
-    ),
-  workflow: ({ data, modelParams, nlpServiceUrl }) =>
-    new SerializedWorkflowAgentAdapter(
-      data as WorkflowAgentData,
-      nlpServiceUrl,
-      modelParams.api_key,
-    ),
+      projectApiKey,
+      parameters,
+    });
+  },
 };
 
 /**
  * Creates an adapter from serialized data using the registry.
  *
- * @throws Error if adapter type is not registered
+ * @throws Error if adapter type is not registered, or if the resolved
+ *   factory is missing the credential it needs (modelParams for prompt,
+ *   projectApiKey for workflow/code).
  */
 export function createAdapter({
   adapterData,
   modelParams,
   nlpServiceUrl,
+  projectApiKey,
+  parameters,
 }: {
   adapterData: TargetAdapterData;
-  modelParams: LiteLLMParams;
+  modelParams?: LiteLLMParams;
   nlpServiceUrl: string;
+  projectApiKey?: string;
+  parameters?: RunParameterValues;
 }): AgentAdapter {
   const factory = SERIALIZED_ADAPTER_FACTORIES[adapterData.type];
 
@@ -74,5 +109,11 @@ export function createAdapter({
     throw new Error(`Unknown adapter type: ${adapterData.type}`);
   }
 
-  return factory({ data: adapterData, modelParams, nlpServiceUrl });
+  return factory({
+    data: adapterData,
+    modelParams,
+    nlpServiceUrl,
+    projectApiKey,
+    parameters,
+  });
 }

@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import {
   collectMediaRefs,
   MAX_TRACE_MEDIA_REFS,
+  mediaRefBelongsToSide,
   parseMediaRefs,
   serializeMediaRefs,
 } from "../media-refs";
@@ -37,13 +38,14 @@ describe("collectMediaRefs", () => {
       ];
 
       expect(collectMediaRefs(value)).toEqual([
-        { kind: "image", url: "/api/files/p1/i1" },
-        { kind: "audio", url: "/api/files/p1/a1" },
+        { kind: "image", url: "/api/files/p1/i1", role: "user" },
+        { kind: "audio", url: "/api/files/p1/a1", role: "user" },
         {
           kind: "file",
           url: "/api/files/p1/f1",
           filename: "report.pdf",
           mimeType: "application/pdf",
+          role: "user",
         },
       ]);
     });
@@ -76,6 +78,154 @@ describe("collectMediaRefs", () => {
       const refs = collectMediaRefs([{ role: "user", content: parts }]);
       expect(refs).toHaveLength(MAX_TRACE_MEDIA_REFS);
     });
+
+    it("stamps the role on every ref it keeps under the cap", () => {
+      const audioPart = (i: number) => ({
+        type: "input_audio",
+        input_audio: { url: `/api/files/p1/a${i}`, mimeType: "audio/wav" },
+      });
+      const refs = collectMediaRefs([
+        { role: "user", content: [audioPart(0), audioPart(1)] },
+        {
+          role: "assistant",
+          content: [audioPart(2), audioPart(3), audioPart(4)],
+        },
+      ]);
+
+      expect(refs).toHaveLength(MAX_TRACE_MEDIA_REFS);
+      expect(refs.map((ref) => ref.role)).toEqual([
+        "user",
+        "user",
+        "assistant",
+        "assistant",
+      ]);
+    });
+  });
+
+  describe("given a voice turn whose transcript holds both sides", () => {
+    /** @scenario "A media ref remembers the role of the message it came from" */
+    it("marks each recording with the role of its own message", () => {
+      const refs = collectMediaRefs([
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "ACME Freight dispatch, hello?" },
+            {
+              type: "input_audio",
+              input_audio: {
+                url: "/api/files/p1/spoken",
+                mimeType: "audio/wav",
+              },
+            },
+          ],
+        },
+        {
+          role: "assistant",
+          content: [
+            { type: "text", text: "Good afternoon, how can I help?" },
+            {
+              type: "input_audio",
+              input_audio: {
+                url: "/api/files/p1/reply",
+                mimeType: "audio/wav",
+              },
+            },
+          ],
+        },
+      ]);
+
+      expect(refs).toEqual([
+        { kind: "audio", url: "/api/files/p1/spoken", role: "user" },
+        { kind: "audio", url: "/api/files/p1/reply", role: "assistant" },
+      ]);
+    });
+
+    /** @scenario "A media ref remembers the role of the message it came from" */
+    it("keeps the role across a nested JSON-string hop", () => {
+      const typedRaw = {
+        type: "raw",
+        value: JSON.stringify([
+          {
+            role: "assistant",
+            content: JSON.stringify([
+              {
+                type: "input_audio",
+                input_audio: {
+                  url: "/api/files/p1/nested",
+                  mimeType: "audio/wav",
+                },
+              },
+            ]),
+          },
+        ]),
+      };
+
+      expect(collectMediaRefs(typedRaw)).toEqual([
+        { kind: "audio", url: "/api/files/p1/nested", role: "assistant" },
+      ]);
+    });
+
+    /** @scenario "A media ref remembers the role of the message it came from" */
+    it("records no role for a part outside a message or under an unknown role", () => {
+      const refs = collectMediaRefs([
+        {
+          role: "narrator",
+          content: [
+            { type: "image_url", image_url: { url: "/api/files/p1/odd" } },
+          ],
+        },
+        { type: "image_url", image_url: { url: "/api/files/p1/bare" } },
+      ]);
+
+      expect(refs).toEqual([
+        { kind: "image", url: "/api/files/p1/odd" },
+        { kind: "image", url: "/api/files/p1/bare" },
+      ]);
+    });
+  });
+});
+
+describe("mediaRefBelongsToSide", () => {
+  describe("given refs from both sides of a voice turn", () => {
+    it("keeps the caller's recording on input and the reply on output", () => {
+      const spoken = {
+        kind: "audio",
+        url: "/api/files/p1/a",
+        role: "user",
+      } as const;
+      const reply = {
+        kind: "audio",
+        url: "/api/files/p1/b",
+        role: "assistant",
+      } as const;
+
+      expect(mediaRefBelongsToSide(spoken, "input")).toBe(true);
+      expect(mediaRefBelongsToSide(spoken, "output")).toBe(false);
+      expect(mediaRefBelongsToSide(reply, "input")).toBe(false);
+      expect(mediaRefBelongsToSide(reply, "output")).toBe(true);
+    });
+  });
+
+  describe("given a ref with no role, as traces ingested earlier carry", () => {
+    it("keeps it on both sides so nothing stops rendering", () => {
+      const ref = { kind: "audio", url: "/api/files/p1/a" } as const;
+
+      expect(mediaRefBelongsToSide(ref, "input")).toBe(true);
+      expect(mediaRefBelongsToSide(ref, "output")).toBe(true);
+    });
+  });
+
+  describe("given media the caller sent that is not a plain user message", () => {
+    it("keeps a system or tool part on the input side", () => {
+      for (const role of ["system", "tool", "developer", "function"] as const) {
+        expect(
+          mediaRefBelongsToSide(
+            { kind: "image", url: "/api/files/p1/x", role },
+            "input",
+          ),
+        ).toBe(true);
+      }
+    });
   });
 });
 
@@ -92,7 +242,7 @@ describe("serializeMediaRefs and parseMediaRefs", () => {
     const serialized = serializeMediaRefs(value);
     expect(serialized).not.toBeNull();
     expect(parseMediaRefs(serialized)).toEqual([
-      { kind: "image", url: "/api/files/p1/i1" },
+      { kind: "image", url: "/api/files/p1/i1", role: "user" },
     ]);
   });
 
@@ -105,6 +255,26 @@ describe("serializeMediaRefs and parseMediaRefs", () => {
     expect(parseMediaRefs(`{"kind":"image"}`)).toEqual([]);
     expect(parseMediaRefs(`[{"kind":"nope","url":"/x"}]`)).toEqual([]);
     expect(parseMediaRefs(null)).toEqual([]);
+  });
+
+  it("round-trips the message role and drops one it does not recognize", () => {
+    const serialized = serializeMediaRefs([
+      {
+        role: "assistant",
+        content: [
+          { type: "image_url", image_url: { url: "/api/files/p1/i1" } },
+        ],
+      },
+    ]);
+    expect(parseMediaRefs(serialized)).toEqual([
+      { kind: "image", url: "/api/files/p1/i1", role: "assistant" },
+    ]);
+
+    expect(
+      parseMediaRefs(
+        `[{"kind":"image","url":"/api/files/p1/i1","role":"nope"}]`,
+      ),
+    ).toEqual([{ kind: "image", url: "/api/files/p1/i1" }]);
   });
 
   describe("given a crafted reserved attribute smuggling non-stored urls", () => {

@@ -288,7 +288,7 @@ export const NewWorkflowForm = ({
           <Button
             type="submit"
             colorPalette="blue"
-            loading={createWorkflowMutation.isLoading}
+            loading={createWorkflowMutation.isPending}
             onClick={() => {
               void handleSubmit(onSubmit)();
             }}

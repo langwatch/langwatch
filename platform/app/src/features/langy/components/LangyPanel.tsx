@@ -1958,7 +1958,7 @@ function LangyPanel({
   }, [isBusy]);
 
   const onGithubConnected = useCallback(() => {
-    void utils.langyGithub.getInstallStatus.invalidate({
+    void utils.github.getConnectionStatus.invalidate({
       organizationId: organizationId ?? "",
     });
     if (githubRedrivenRef.current) return;

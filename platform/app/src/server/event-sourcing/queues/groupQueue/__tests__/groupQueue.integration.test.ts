@@ -15,14 +15,28 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "../../../__tests__/integration/testContainers";
-import type { EventSourcedQueueDefinition } from "../../queue.types";
+import { ConfigurationError } from "../../../services/errorHandling";
+import type {
+  EventSourcedQueueDefinition,
+  JobDelivery,
+} from "../../queue.types";
 import { GroupQueueProcessor } from "../groupQueue";
+import { DEFAULT_BISECTION_SPLITS_PER_DISPATCH } from "../scripts";
 
 async function foreignSiblingsRestagedCount(
   queueName: string,
 ): Promise<number> {
   const metric = await register
     .getSingleMetric("gq_foreign_siblings_restaged_total")
+    ?.get();
+  return (
+    metric?.values.find((v) => v.labels.queue_name === queueName)?.value ?? 0
+  );
+}
+
+async function readyScoreImplausibleCount(queueName: string): Promise<number> {
+  const metric = await register
+    .getSingleMetric("gq_ready_score_implausible_total")
     ?.get();
   return (
     metric?.values.find((v) => v.labels.queue_name === queueName)?.value ?? 0
@@ -43,6 +57,17 @@ type TestPayload = {
   value: string;
 };
 
+/**
+ * Ready scores are validated against the staging clock now (`resolveReadyScore`),
+ * so a bare ordinal like `value * 1000` is rejected as "not a timestamp" and
+ * replaced with the staging time - which would silently turn every ordering
+ * assertion below into an assertion about arrival order. Anchor the ordinal to a
+ * real, recent timestamp instead: same relative order, and it exercises the
+ * shape a production score function actually returns.
+ */
+const SCORE_BASE_MS = Date.now() - 60 * 60 * 1000;
+const orderedScore = (n: number): number => SCORE_BASE_MS + n * 1000;
+
 function createQueueDefinition(
   overrides: Partial<EventSourcedQueueDefinition<TestPayload>> & {
     process: (payload: TestPayload) => Promise<void>;
@@ -53,6 +78,65 @@ function createQueueDefinition(
     groupKey: (p) => p.groupId,
     ...overrides,
   };
+}
+
+/**
+ * The batch sizes a bisection produces for one dispatch of `root` payloads,
+ * against a handler that accepts at most `maxWorkable` of them per call.
+ *
+ * The rules, which are the bisector's contract: a batch the handler refuses is
+ * split into its ceiling and floor halves, a batch it accepts is a leaf, and
+ * the walk is depth-first with the left half before the right. Deriving the
+ * expectation from those rules rather than writing one sequence out by hand is
+ * what makes a change to ANY of them fail here. Halving replaced by
+ * one-at-a-time retries, halves run concurrently, and a descent that stops
+ * before it fits all produce a different sequence.
+ */
+function bisectionDescent({
+  root,
+  maxWorkable,
+}: {
+  root: number;
+  maxWorkable: number;
+}): number[] {
+  if (root <= maxWorkable) return [root];
+  const left = Math.ceil(root / 2);
+  return [
+    root,
+    ...bisectionDescent({ root: left, maxWorkable }),
+    ...bisectionDescent({ root: root - left, maxWorkable }),
+  ];
+}
+
+/**
+ * Reads a recorded sequence of handler batch sizes as the dispatches it is made
+ * of: `roots` is the size each dispatch started from, and `expected` is the
+ * sequence those roots should have produced if every one of them bisected the
+ * way {@link bisectionDescent} says.
+ *
+ * Two values rather than one verdict, so the caller can keep the two failures
+ * apart. How many payloads a dispatch coalesced belongs to the dispatcher, and
+ * how a failing batch narrows belongs to the bisector; folding both into a
+ * single expected array is what makes a coalescing change read as a bisection
+ * bug.
+ */
+function readDispatchRoots({
+  sizes,
+  maxWorkable,
+}: {
+  sizes: number[];
+  maxWorkable: number;
+}): { roots: number[]; expected: number[] } {
+  const roots: number[] = [];
+  const expected: number[] = [];
+  // Each iteration takes the next unaccounted-for call as a new dispatch root
+  // and appends the whole descent it predicts, so `expected` always grows.
+  while (expected.length < sizes.length) {
+    const root = sizes[expected.length]!;
+    roots.push(root);
+    expected.push(...bisectionDescent({ root, maxWorkable }));
+  }
+  return { roots, expected };
 }
 
 describe.skipIf(!hasTestcontainers)(
@@ -95,6 +179,48 @@ describe.skipIf(!hasTestcontainers)(
       );
       queues.push(queue);
       return queue;
+    }
+
+    /**
+     * Stages a whole group through a producer-only processor, then starts the
+     * consumer that dispatches it. Every payload is therefore staged AND past
+     * due before a dispatcher exists to look at the group.
+     *
+     * Coalescing is what makes the order matter. `sendBatch` gives each payload
+     * its index in milliseconds (`score + delay + index`) so a batch keeps FIFO
+     * order even when the scores tie, and the coalescing drain takes only the
+     * siblings that are already due (`ZRANGEBYSCORE jobs -inf now`). A consumer
+     * that wakes inside that spread therefore coalesces a PREFIX of the group
+     * and leaves the rest to a second dispatch, so a test about what happens to
+     * ONE coalesced batch gets two smaller ones instead.
+     *
+     * Future-dating the scores does not fix that: it moves the window rather
+     * than closing it, since the group becomes dispatchable the moment its
+     * EARLIEST payload is due and the rest follow a millisecond apart. Staging
+     * before the consumer exists closes it, and `sendBatch` is one atomic Lua
+     * call so there is no half-staged group to catch either.
+     */
+    async function stageThenConsume({
+      processFn,
+      overrides,
+      payloads,
+    }: {
+      processFn: (payload: TestPayload) => Promise<void>;
+      overrides: Partial<EventSourcedQueueDefinition<TestPayload>>;
+      payloads: TestPayload[];
+    }): Promise<GroupQueueProcessor<TestPayload>> {
+      const name = `{test/gqmain/${crypto.randomUUID().slice(0, 8)}}`;
+      const producer = new GroupQueueProcessor<TestPayload>(
+        createQueueDefinition({ name, process: processFn, ...overrides }),
+        redis,
+        { consumerEnabled: false },
+      );
+      queues.push(producer);
+      await producer.sendBatch(payloads);
+
+      const consumer = createQueue(processFn, { ...overrides, name });
+      await consumer.waitUntilReady();
+      return consumer;
     }
 
     describe("send()", () => {
@@ -140,6 +266,87 @@ describe.skipIf(!hasTestcontainers)(
             // timeout and charging the delay to whichever test runs next.
             releaseFirst?.();
           }
+        });
+      });
+
+      describe("when a producer's score function returns a value that is not a timestamp", () => {
+        /**
+         * The end-to-end version of the 2026-07-31 / 2026-08-03 defect, and the
+         * one assertion the unit tests cannot make: that what is WRITTEN to
+         * Redis is the resolved score, and that the resolved score takes its
+         * place in the real dispatch order.
+         *
+         * A test that recomputes the expected score in the test body would keep
+         * passing if `send` stopped calling the guard altogether. This one reads
+         * the staged score back out of the group's own jobs zset.
+         */
+        /** @scenario "a job staged with an unusable score dispatches behind one that occurred earlier" */
+        it("stages it at the current time and dispatches it behind a genuinely older job", async () => {
+          const processedOrder: string[] = [];
+          let releaseBlocker: (() => void) | undefined;
+          const blockerHeld = new Promise<void>((resolve) => {
+            releaseBlocker = resolve;
+          });
+
+          const queueName = `{test/gqmain/${crypto.randomUUID().slice(0, 8)}}`;
+          const scores: Record<string, number> = {
+            blocker: SCORE_BASE_MS,
+            older: Date.now() - 60_000,
+            broken: 0,
+          };
+          const queue = createQueue(
+            async (p) => {
+              if (p.id === "blocker") await blockerHeld;
+              processedOrder.push(p.id);
+            },
+            { name: queueName, score: (p) => scores[p.id] ?? 0 },
+          );
+          await queue.waitUntilReady();
+
+          // The blocker is staged first and carries the lowest score, so it
+          // leads the group and holds it while the two jobs behind it stay
+          // staged long enough to read their scores back out of Redis.
+          await queue.send({ id: "blocker", groupId: "g", value: "b" });
+
+          const stagedAtLeast = Date.now();
+          await queue.send({ id: "broken", groupId: "g", value: "x" });
+          await queue.send({ id: "older", groupId: "g", value: "y" });
+
+          try {
+            const jobsKey = `${queueName}:gq:group:g:jobs`;
+            await vi.waitFor(
+              async () => {
+                expect(await redis.zcard(jobsKey)).toBeGreaterThanOrEqual(2);
+              },
+              { timeout: 5000, interval: 50 },
+            );
+
+            // The broken score reached Redis as a real timestamp, not as 0.
+            const staged = await redis.zrange(jobsKey, 0, -1, "WITHSCORES");
+            const brokenScore = Number(
+              staged[staged.findIndex((m) => m.includes("broken")) + 1],
+            );
+            expect(brokenScore).toBeGreaterThanOrEqual(stagedAtLeast);
+            expect(brokenScore).toBeLessThanOrEqual(Date.now() + 1000);
+          } finally {
+            releaseBlocker?.();
+          }
+
+          await vi.waitFor(
+            () => {
+              expect(processedOrder).toHaveLength(3);
+            },
+            { timeout: 30000, interval: 50 },
+          );
+
+          // Rescored to now, so it sorts BEHIND the job that really did occur a
+          // minute ago. Staged at 0 it would have led the group for ever.
+          expect(processedOrder).toEqual(["blocker", "older", "broken"]);
+
+          // Exactly one: the counter reports PRODUCERS, so only the supplied
+          // score the queue refused registers. The two accepted scores do not,
+          // and neither would a re-stage - see `restageScore`.
+          expect(await readyScoreImplausibleCount(queueName)).toBe(1);
         });
       });
 
@@ -662,7 +869,7 @@ describe.skipIf(!hasTestcontainers)(
                 batches.push(ps as TestPayload[]);
               },
               coalesceMaxBatch: () => 50,
-              score: (p) => Number(p.value) * 1000,
+              score: (p) => orderedScore(Number(p.value)),
             },
           );
           await queue.waitUntilReady();
@@ -698,7 +905,7 @@ describe.skipIf(!hasTestcontainers)(
               if (ps.length > largest.length) largest = ps as TestPayload[];
             },
             coalesceMaxBatch: () => 50,
-            score: (p) => Number(p.value) * 1000,
+            score: (p) => orderedScore(Number(p.value)),
           });
           await queue.waitUntilReady();
 
@@ -733,7 +940,7 @@ describe.skipIf(!hasTestcontainers)(
                 batches.push(ps as TestPayload[]);
               },
               coalesceMaxBatch: () => 3,
-              score: (p) => Number(p.value) * 1000,
+              score: (p) => orderedScore(Number(p.value)),
             },
           );
           await queue.waitUntilReady();
@@ -763,6 +970,430 @@ describe.skipIf(!hasTestcontainers)(
         });
       });
 
+      describe("when one payload in a coalesced batch is unprocessable", () => {
+        it("commits every payload ahead of it and narrows the failure to it alone", async () => {
+          // Payloads AFTER the offender deliberately do not commit here: the
+          // fold derives fields from arrival order, so applying j6 while j5 is
+          // unresolved would leave a silent gap. Bisection's job is to stop
+          // losing the payloads BEFORE the offender and to name it — not to
+          // step over it. Letting later work past requires deciding what to do
+          // about that gap, which is the side-lining decision (#6482).
+          const POISON = "j5";
+          const attempted: TestPayload[][] = [];
+          // An ARRAY, not a set: a set cannot tell "committed once" from
+          // "committed twice", and the second is the thing worth watching when
+          // a dispatch applies part of a batch before failing.
+          const committed: string[] = [];
+
+          await stageThenConsume({
+            processFn: async (p) => {
+              // Only reached when the queue dispatches a job with no siblings
+              // to coalesce. A split that narrows to one payload still goes
+              // through processBatch with a one-element batch, never here.
+              if (p.id === POISON) throw new Error("unprocessable payload");
+              committed.push(p.id);
+            },
+            overrides: {
+              processBatch: async (ps) => {
+                const batch = ps as TestPayload[];
+                attempted.push(batch);
+                // Fails for any batch containing the poison payload — including
+                // the batch of exactly one, which is what makes it attributable.
+                if (batch.some((p) => p.id === POISON)) {
+                  throw new Error("unprocessable payload");
+                }
+                for (const p of batch) committed.push(p.id);
+              },
+              coalesceMaxBatch: () => 50,
+              score: (p) => Number(p.value) * 1000,
+            },
+            payloads: Array.from({ length: 8 }, (_, i) => ({
+              id: `j${i}`,
+              groupId: "group-a",
+              value: String(orderedScore(i) / 1000),
+            })),
+          });
+
+          const HEALTHY_PREFIX = ["j0", "j1", "j2", "j3", "j4"] as const;
+
+          // j0..j4 commit despite sharing a batch with the offender. Without
+          // bisection the whole batch fails together and NONE of them apply —
+          // that is the regression this pins.
+          await vi.waitFor(
+            () => {
+              expect([...new Set(committed)].sort()).toEqual(HEALTHY_PREFIX);
+            },
+            { timeout: 30000, interval: 50 },
+          );
+          expect(committed).not.toContain(POISON);
+
+          // No payload is applied more often than its peers. The prefix always
+          // commits as a unit, so equal counts hold however many times the
+          // group is redelivered — while a payload applied one extra time (the
+          // failure a set-based assertion cannot see) breaks equality.
+          //
+          // Scope note: this pins that BISECTION does not re-run a payload it
+          // already committed within a dispatch. Redelivery across dispatches
+          // is at-least-once by design and is made safe by the fold store's
+          // applied-event-id set, which has its own suite
+          // (projections/foldCache/__tests__/foldRedeliveryIdempotency) — this
+          // handler is a mock with no such guard, so asserting it here would
+          // test the mock rather than the queue.
+          const counts = HEALTHY_PREFIX.map(
+            (id) => committed.filter((c) => c === id).length,
+          );
+          expect(new Set(counts).size).toBe(1);
+
+          // The split actually narrowed to the offender rather than retrying
+          // the batch whole: some attempt isolated it on its own.
+          const isolated = attempted.filter(
+            (b) => b.length === 1 && b[0]?.id === POISON,
+          );
+          expect(isolated.length).toBeGreaterThanOrEqual(1);
+        });
+
+        it("keeps each half in arrival order while splitting", async () => {
+          const POISON = "j6";
+          const attempted: TestPayload[][] = [];
+
+          await stageThenConsume({
+            processFn: async (p) => {
+              if (p.id === POISON) throw new Error("unprocessable payload");
+            },
+            overrides: {
+              processBatch: async (ps) => {
+                const batch = ps as TestPayload[];
+                attempted.push(batch);
+                if (batch.some((p) => p.id === POISON)) {
+                  throw new Error("unprocessable payload");
+                }
+              },
+              coalesceMaxBatch: () => 50,
+              score: (p) => Number(p.value) * 1000,
+            },
+            payloads: Array.from({ length: 8 }, (_, i) => ({
+              id: `j${i}`,
+              groupId: "group-a",
+              value: String(orderedScore(i) / 1000),
+            })),
+          });
+
+          await vi.waitFor(
+            () => {
+              expect(
+                attempted.some((b) => b.length === 1 && b[0]?.id === POISON),
+              ).toBe(true);
+            },
+            { timeout: 30000, interval: 50 },
+          );
+
+          // The ordering invariant: a fold derives fields from arrival order, so
+          // every sub-batch a split produces must still be ascending and
+          // contiguous — never a reshuffle or an interleave.
+          for (const batch of attempted) {
+            // Contiguity in the ORIGINAL arrival sequence: ids are j0..j7, so
+            // a sub-batch must be a run of consecutive indices — a reshuffle
+            // or an interleave breaks either the ordering or the step.
+            const indices = batch.map((p) => Number(p.id.slice(1)));
+            expect(indices).toEqual([...indices].sort((a, b) => a - b));
+            for (let i = 1; i < indices.length; i++) {
+              expect(indices[i]! - indices[i - 1]!).toBe(1);
+            }
+          }
+        });
+      });
+
+      describe("when a coalesced batch fails only because it is too large", () => {
+        it("halves it until it fits and commits every payload once", async () => {
+          const MAX_WORKABLE = 2;
+          const seen: string[] = [];
+
+          const sizes: number[] = [];
+          let inFlight = 0;
+          let maxConcurrent = 0;
+
+          await stageThenConsume({
+            processFn: async (p) => {
+              seen.push(p.id);
+            },
+            overrides: {
+              processBatch: async (ps) => {
+                const batch = ps as TestPayload[];
+                sizes.push(batch.length);
+                inFlight += 1;
+                maxConcurrent = Math.max(maxConcurrent, inFlight);
+                // Yield so a concurrent sibling call would overlap here and be
+                // caught by maxConcurrent, rather than being hidden by a
+                // handler that never awaits.
+                await new Promise((resolve) => setTimeout(resolve, 5));
+                inFlight -= 1;
+                // Models a size-driven downstream limit (a query that exceeds
+                // its memory budget): nothing is wrong with any individual
+                // payload, the batch is simply too big for one pass.
+                if (batch.length > MAX_WORKABLE) {
+                  throw new Error("batch exceeded the downstream budget");
+                }
+                for (const p of batch) seen.push(p.id);
+              },
+              coalesceMaxBatch: () => 50,
+              score: (p) => Number(p.value) * 1000,
+            },
+            payloads: Array.from({ length: 8 }, (_, i) => ({
+              id: `j${i}`,
+              groupId: "group-a",
+              value: String(orderedScore(i) / 1000),
+            })),
+          });
+
+          await vi.waitFor(
+            () => {
+              expect(new Set(seen).size).toBe(8);
+            },
+            { timeout: 30000, interval: 50 },
+          );
+
+          // Converged by construction rather than by a retry happening to
+          // re-assemble a smaller batch — and without re-applying a payload
+          // that already succeeded inside this dispatch.
+          expect(seen.length).toBe(8);
+
+          const { roots, expected } = readDispatchRoots({
+            sizes,
+            maxWorkable: MAX_WORKABLE,
+          });
+
+          // Every handler call is accounted for by a descent that halves,
+          // depth-first, until each leaf fits. What that rules out: a fallback
+          // to one-at-a-time retries, halves attempted out of order, and a
+          // descent that gives up above the size the handler accepts.
+          expect(sizes).toEqual(expected);
+
+          // ...and there was exactly one descent, over the whole group. The
+          // batch this test is about is the coalesced one, so a dispatch that
+          // only picked up part of the group has not exercised it.
+          expect(roots).toEqual([8]);
+
+          // Sequential, not merely ordered: no batch ever started while
+          // another was still running.
+          expect(maxConcurrent).toBe(1);
+        });
+      });
+
+      describe("when a coalesced batch fails non-retryably", () => {
+        it("fails fast without splitting", async () => {
+          const attempts: number[] = [];
+
+          await stageThenConsume({
+            processFn: async () => {},
+            overrides: {
+              processBatch: async (ps) => {
+                attempts.push(ps.length);
+                // CRITICAL category: `isRetryableJobError` is false for this,
+                // so the batch must not be split: it would fail identically at
+                // every size, and bisecting only multiplies work before the
+                // same verdict.
+                throw new ConfigurationError("test-handler", "not retryable");
+              },
+              coalesceMaxBatch: () => 50,
+              score: (p) => Number(p.value) * 1000,
+            },
+            payloads: Array.from({ length: 8 }, (_, i) => ({
+              id: `j${i}`,
+              groupId: "group-a",
+              value: String(orderedScore(i) / 1000),
+            })),
+          });
+
+          await vi.waitFor(
+            () => {
+              expect(attempts.length).toBeGreaterThan(0);
+            },
+            { timeout: 30000, interval: 50 },
+          );
+
+          // Give any split a chance to appear before asserting none did.
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          expect(attempts.every((n) => n === attempts[0])).toBe(true);
+          expect(Math.min(...attempts)).toBeGreaterThan(1);
+        });
+      });
+
+      describe("when the split budget is set to zero", () => {
+        it("never splits, restoring the pre-bisection behaviour", async () => {
+          // The kill switch: an operator can disable bisection through the
+          // environment rather than waiting on a deploy.
+          vi.stubEnv("LANGWATCH_GQ_BISECTION_SPLIT_BUDGET", "0");
+          const sizes: number[] = [];
+          const queue = createQueue(async () => {}, {
+            processBatch: async (ps) => {
+              sizes.push(ps.length);
+              throw new Error("retryable");
+            },
+            coalesceMaxBatch: () => 8,
+          });
+          await queue.waitUntilReady();
+
+          const entries = Array.from({ length: 4 }, (_, i) => ({
+            payload: { id: `j${i}`, groupId: "group-a", value: String(i) },
+            stagedJobId: `job-${i}`,
+          }));
+
+          await expect(
+            (
+              queue as unknown as {
+                processBatchBisecting: (args: {
+                  entries: typeof entries;
+                  attempt: number;
+                  routingLabels: Record<string, string>;
+                  span: never;
+                }) => Promise<void>;
+              }
+            ).processBatchBisecting({
+              entries,
+              attempt: 1,
+              routingLabels: {
+                queue_name: "q",
+                pipeline_name: "p",
+                job_type: "t",
+                job_name: "n",
+              },
+              span: { addEvent: () => {}, setAttribute: () => {} } as never,
+            }),
+          ).rejects.toThrow("retryable");
+
+          // One call, the whole batch, no descent.
+          expect(sizes).toEqual([4]);
+          vi.unstubAllEnvs();
+        });
+      });
+
+      describe("when the root of a bisected batch commits and then fails", () => {
+        // Driven through the bisector directly: this is about which delivery
+        // flags the descent emits, and staged dispatch adds timing noise that
+        // has nothing to do with the contract.
+        it("marks the sub-batches as continuations so their commits extend rather than replace", async () => {
+          const deliveries: (JobDelivery | undefined)[] = [];
+          let rootFailed = false;
+
+          const queue = createQueue(async () => {}, {
+            processBatch: async (ps, delivery) => {
+              deliveries.push(delivery);
+              // The post-store window: the handler COMMITS and only then
+              // throws (a reactor failing after the fold stored). The commit
+              // is the part that matters — a later sub-batch that replaces
+              // the applied set erases what this call recorded.
+              if (!rootFailed && ps.length > 1) {
+                rootFailed = true;
+                throw new Error("reactor failed after the fold was stored");
+              }
+            },
+            coalesceMaxBatch: () => 8,
+          });
+          await queue.waitUntilReady();
+
+          const entries = Array.from({ length: 4 }, (_, i) => ({
+            payload: { id: `j${i}`, groupId: "group-a", value: String(i) },
+            stagedJobId: `job-${i}`,
+          }));
+
+          await (
+            queue as unknown as {
+              processBatchBisecting: (args: {
+                entries: typeof entries;
+                attempt: number;
+                routingLabels: Record<string, string>;
+                span: never;
+              }) => Promise<void>;
+            }
+          ).processBatchBisecting({
+            entries,
+            attempt: 1,
+            routingLabels: {
+              queue_name: "q",
+              pipeline_name: "p",
+              job_type: "t",
+              job_name: "n",
+            },
+            span: { addEvent: () => {}, setAttribute: () => {} } as never,
+          });
+
+          // The root is a fresh delivery; every call the split produces after
+          // it must be a continuation, because the root already wrote.
+          expect(deliveries[0]?.isContinuation).toBeUndefined();
+          expect(deliveries.length).toBeGreaterThan(1);
+          expect(
+            deliveries.slice(1).every((d) => d?.isContinuation === true),
+          ).toBe(true);
+        });
+      });
+
+      describe("when a batch degrades toward singletons", () => {
+        // Driven through the bisector directly rather than via staged dispatch:
+        // how large a root the drain assembles varies with staging timing, and
+        // this contract — bounded work per locked attempt — must hold for any
+        // shape, so the test pins it on the worst one deterministically.
+        it("stops splitting at the budget and rethrows to the retry path", async () => {
+          const sizes: number[] = [];
+          const queue = createQueue(async () => {}, {
+            processBatch: async (ps) => {
+              sizes.push(ps.length);
+              // Only singletons fit: without a budget this walks the entire
+              // tree — 127 calls for 64 payloads — inside one locked attempt.
+              if (ps.length > 1) {
+                throw new Error("only singletons fit");
+              }
+            },
+            coalesceMaxBatch: () => 64,
+          });
+          await queue.waitUntilReady();
+
+          const entries = Array.from({ length: 64 }, (_, i) => ({
+            payload: { id: `j${i}`, groupId: "group-a", value: String(i) },
+            stagedJobId: `job-${i}`,
+          }));
+          const span = {
+            addEvent: () => {},
+            setAttribute: () => {},
+          } as never;
+
+          await expect(
+            (
+              queue as unknown as {
+                processBatchBisecting: (args: {
+                  entries: typeof entries;
+                  attempt: number;
+                  routingLabels: Record<string, string>;
+                  span: never;
+                }) => Promise<void>;
+              }
+            ).processBatchBisecting({
+              entries,
+              attempt: 1,
+              routingLabels: {
+                queue_name: "q",
+                pipeline_name: "p",
+                job_type: "t",
+                job_name: "n",
+              },
+              span,
+            }),
+          ).rejects.toThrow("only singletons fit");
+
+          // Splits are the calls that failed with more than one payload; the
+          // budget caps them at DEFAULT_BISECTION_SPLITS_PER_DISPATCH. Total calls
+          // stay far below the 127-call full walk that completing without a
+          // budget would require — and the throw above is the yield itself:
+          // the dispatch fails to the normal restage/backoff machinery instead
+          // of finishing the walk under the group lock.
+          const splits = sizes.filter((n) => n > 1).length;
+          expect(splits).toBeLessThanOrEqual(
+            DEFAULT_BISECTION_SPLITS_PER_DISPATCH + 1,
+          );
+          expect(sizes.length).toBeLessThan(80);
+          expect(sizes.length).toBeGreaterThan(5);
+        });
+      });
+
       describe("when coalescing is disabled (maxBatch 1)", () => {
         /** @scenario 'Coalescing is a no-op when disabled' */
         it("processes each event individually and never calls processBatch", async () => {
@@ -777,7 +1408,7 @@ describe.skipIf(!hasTestcontainers)(
                 batches.push(ps as TestPayload[]);
               },
               coalesceMaxBatch: () => 1,
-              score: (p) => Number(p.value) * 1000,
+              score: (p) => orderedScore(Number(p.value)),
             },
           );
           await queue.waitUntilReady();
@@ -818,7 +1449,7 @@ describe.skipIf(!hasTestcontainers)(
                 for (const p of ps) succeeded.push(p as TestPayload);
               },
               coalesceMaxBatch: () => 50,
-              score: (p) => Number(p.value) * 1000,
+              score: (p) => orderedScore(Number(p.value)),
             },
           );
           await queue.waitUntilReady();
@@ -867,7 +1498,7 @@ describe.skipIf(!hasTestcontainers)(
               },
               coalesceMaxBatch: () => 50,
               coalesceMaxBytes: () => 1500,
-              score: (p) => Number((p.id as string).slice(1)),
+              score: (p) => orderedScore(Number((p.id as string).slice(1))),
             },
           );
           await queue.waitUntilReady();
@@ -921,7 +1552,7 @@ describe.skipIf(!hasTestcontainers)(
               // Smaller than any single job's stored size, so every dispatch's
               // own initialBytes already exceeds the budget.
               coalesceMaxBytes: () => 50,
-              score: (p) => Number((p.id as string).slice(1)),
+              score: (p) => orderedScore(Number((p.id as string).slice(1))),
             },
           );
           await queue.waitUntilReady();
@@ -964,7 +1595,7 @@ describe.skipIf(!hasTestcontainers)(
                 batches.push(ps as TestPayload[]);
               },
               coalesceMaxBatch: () => 50,
-              score: (p) => Number((p.id as string).slice(1)),
+              score: (p) => orderedScore(Number((p.id as string).slice(1))),
             },
           );
           await queue.waitUntilReady();

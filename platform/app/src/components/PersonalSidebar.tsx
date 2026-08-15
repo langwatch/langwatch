@@ -4,11 +4,12 @@ import {
   ClipboardList,
   Database,
   Gauge,
+  GitPullRequest,
   ListTree,
   Settings as SettingsIcon,
   Sliders,
-  Smartphone,
   Sparkles,
+  SquareTerminal,
 } from "lucide-react";
 import React, { useMemo, useState } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -47,7 +48,8 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
 
   const isUsageActive = router.pathname === "/me";
   const isConfigureActive = router.pathname.startsWith("/me/configure");
-  const isDevicesActive = router.pathname.startsWith("/me/devices");
+  const isSessionsActive = router.pathname.startsWith("/me/sessions");
+  const isPullRequestsActive = router.pathname.startsWith("/me/pull-requests");
   const isOrgSettingsActive =
     router.pathname === "/settings" ||
     (router.pathname.startsWith("/settings") &&
@@ -141,6 +143,20 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
                 showLabel={showExpanded}
               />
             )}
+            <SideMenuLink
+              icon={SquareTerminal}
+              label="Sessions"
+              href="/me/sessions"
+              isActive={isSessionsActive}
+              showLabel={showExpanded}
+            />
+            <SideMenuLink
+              icon={GitPullRequest}
+              label="Pull Requests"
+              href="/me/pull-requests"
+              isActive={isPullRequestsActive}
+              showLabel={showExpanded}
+            />
             {personalProjectSlug && features?.evaluations && (
               <SideMenuLink
                 icon={ClipboardList}
@@ -177,13 +193,6 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
                 showLabel={showExpanded}
               />
             )}
-            <SideMenuLink
-              icon={Smartphone}
-              label="Devices"
-              href="/me/devices"
-              isActive={isDevicesActive}
-              showLabel={showExpanded}
-            />
             <SideMenuLink
               icon={Sliders}
               label="Configure"

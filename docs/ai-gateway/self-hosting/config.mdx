@@ -27,7 +27,8 @@ For the zero-downtime rotation procedure, see [Secret rotation](#secret-rotation
 | Var                              | Default       | Purpose                                                                            |
 |----------------------------------|---------------|------------------------------------------------------------------------------------|
 | `SERVER_ADDR`                    | `:5563`       | HTTP listen address for the public + probe surface.                                |
-| `SERVER_GRACEFUL_SECONDS`        | `5`           | Drain window after `SIGTERM`. `/readyz` flips to 503 immediately; in-flight requests get this many seconds to complete before the listener closes. |
+| `SERVER_GRACEFUL_SECONDS`        | `900`         | Graceful-stop window, which begins once `SERVER_DRAIN_DELAY_SECONDS` has elapsed. `/readyz` flips to 503 immediately; the listener then stops accepting, and in-flight work gets this many seconds to finish after it begins shutting down. The window covers request completion, response flushing, and draining the spend spool to the ingest endpoint. The default covers the 14-minute upstream provider timeout, which is the longest a streaming response can legitimately run, plus a minute of margin. It is a ceiling and not a sleep, so an idle gateway still exits immediately. Must be zero or positive: it is time spent waiting, so a negative value is refused at startup. The chart sets it from `shutdown.timeoutSeconds`. |
+| `SERVER_DRAIN_DELAY_SECONDS`     | `3`           | Pause between flipping `/readyz` to draining and closing the listener, so the load balancer stops routing here before the door shuts. Charged on top of `SERVER_GRACEFUL_SECONDS` rather than out of it, so size `terminationGracePeriodSeconds` above the sum of the two. Zero or positive, same as above. The chart sets it from `shutdown.preDrainWaitSeconds`. |
 | `SERVER_MAX_REQUEST_BODY_BYTES`  | `33554432` (32 MiB) | Hard cap on inbound request body size, enforced before auth. 32 MiB fits 1 M-context multimodal payloads with margin under a 512 Mi pod limit. Returns 413 immediately on declared `Content-Length` over the cap. |
 
 ## Control plane
@@ -38,12 +39,19 @@ For the zero-downtime rotation procedure, see [Secret rotation](#secret-rotation
 
 ## Auth cache (stale-while-error)
 
-The gateway is on the hot path of every LLM request, so a brief control-plane outage must not translate into mass authentication rejection. When a cached entry crosses its JWT exp AND the refresh fails for transport reasons (network/timeout/5xx/parse error), the entry's soft expiry is extended by `SOFT_BUMP` and the cached bundle continues to serve, up to a hard cap of `(JWT exp + HARD_GRACE)`. Auth-class rejections (401/403/404) evict immediately, no grace for known-bad credentials. Setting `HARD_GRACE=0` disables stale-while-error entirely (legacy hard-fail behaviour at JWT exp).
+The gateway is on the hot path of every LLM request, so a brief control-plane outage must not translate into mass authentication rejection. When a cached entry crosses its JWT exp AND the refresh fails for transport reasons (network/timeout/5xx/parse error), the entry's soft expiry is extended by `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS` and the cached bundle continues to serve, up to a hard cap of `(JWT exp + LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS)`. Auth-class rejections (401/403/404) evict immediately, no grace for known-bad credentials. Setting `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` to a negative value disables stale-while-error entirely (legacy hard-fail behaviour at JWT exp); `0` means unset and takes the default.
 
-| Var                                  | Default     | Purpose                                                                  |
-|--------------------------------------|-------------|--------------------------------------------------------------------------|
-| `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP`    | unset       | Per-failure soft-expiry extension during a control-plane outage.         |
-| `LW_GATEWAY_AUTH_CACHE_HARD_GRACE`   | unset       | Outage cap measured from JWT exp. `0s` disables stale-while-error.       |
+The names without the `LW_GATEWAY_AUTH_CACHE_` prefix, and the duration-string forms they replaced (`LW_GATEWAY_AUTH_CACHE_HARD_GRACE=6h`), are not read. The gateway refuses to start when it finds one still set, naming the variable to use instead, rather than booting on the default and leaving the old setting looking applied.
+
+All three are a plain count of seconds, not a duration string: `300`, not `5m`.
+
+| Var                                          | Default        | Purpose                                                                                      |
+|----------------------------------------------|----------------|----------------------------------------------------------------------------------------------|
+| `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS`    | `300` (5m)     | Per-failure soft-expiry extension during a control-plane outage.                             |
+| `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS`   | `21600` (6h)   | Outage cap measured from JWT exp. A negative value disables stale-while-error.                |
+| `LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS`   | `60`           | How stale a cached key's config (credentials, base URLs, routing) can get before a background revalidation. A negative value disables the refresh. |
+
+The config refresh is conditional whenever the gateway has a version token to offer: it sends back the token the control plane stamped on the config it holds, and a key nobody changed is confirmed with a 304 instead of materialized and sent again. A key that did change still answers 200 with the whole bundle, which is the point of the refresh, so the saving is on the keys nobody edited. Since most keys are not edited in any given interval, lowering the TTL mostly buys revision lookups rather than bundles. The exception is a config the gateway holds no token for, which is what a response that arrived without an `ETag` leaves behind: that one is refreshed unconditionally and costs a full bundle every interval, so a proxy that strips `ETag` gives the saving up entirely.
 
 See [Auth Cache Architecture](/ai-gateway/observability#auth-cache-architecture) for the design and the [Production runbook → Control-plane outage](/ai-gateway/cookbooks/production-runbook#recipe-8--control-plane-outage--stale-while-error) for the operator playbook.
 
@@ -127,4 +135,4 @@ Canonical names always win when both are set. The aliases are scheduled for remo
 
 ## Forward-compat values.yaml knobs (v1.1)
 
-Several knobs are exposed in `charts/gateway/values.yaml` but the v1 gateway code does not yet read them. Setting them today is a no-op, they are documented in `values.yaml` so operator runbooks built ahead of v1.1 don't need rewriting. See [Scaling, Future tunables](/ai-gateway/self-hosting/scaling#future-tunables-forward-compat-in-valuesyaml) for the full list (cache LRU sizing, Redis L2, Bifrost pool sizing, admin, pprof listener, guardrail timeouts, startup netcheck).
+Several knobs are exposed in `charts/gateway/values.yaml` but the v1 gateway code does not yet read them. Setting them today is a no-op, they are documented in `values.yaml` so operator runbooks built ahead of v1.1 don't need rewriting. See [Scaling, Future tunables](/ai-gateway/self-hosting/scaling#future-tunables-forward-compat-in-valuesyaml) for the full list (cache LRU sizing, Bifrost pool sizing, admin, pprof listener, guardrail timeouts, startup netcheck).

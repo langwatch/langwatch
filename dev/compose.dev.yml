@@ -44,7 +44,7 @@ x-common-env: &common-env
   COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
   NODE_ENV: development
   SKIP_TIKTOKEN: 'true'
-  # Customer-egress policy is sourced from langwatch/.env. Do not override it
+  # Customer-egress policy is sourced from platform/app/.env. Do not override it
   # here: local/self-hosted setups may intentionally use private HTTP endpoints.
   # NOTE: infrastructure URLs (DATABASE_URL, REDIS_URL, CLICKHOUSE_URL,
   # LANGWATCH_NLP_SERVICE, LANGEVALS_ENDPOINT) are NOT set here. The
@@ -296,7 +296,7 @@ services:
       - root_modules:/node_modules
       - app_modules:/platform/app/node_modules
       - goose_bin:/opt/goose-bin:ro
-    command: sh -c "export PATH=/opt/goose-bin:$$PATH && corepack enable && while true; do pnpm exec tsx --tsconfig tsconfig.workers.json src/workers.ts; sleep 1; done"
+    command: sh -c "export PATH=/opt/goose-bin:$$PATH && corepack enable && while true; do pnpm exec tsx src/workers.ts; sleep 1; done"
     environment:
       <<: *common-env
       # Override BASE_HOST for Docker networking - scenario child processes post events here
@@ -448,7 +448,7 @@ volumes:
   root_modules:
     name: ${VOLUME_PREFIX:-langwatch}-root-modules
   # mcp-server's install + build run in the `init` container against the
-  # `./mcp-server` bind mount. Without isolation the container install writes
+  # `./mcp/typescript` bind mount. Without isolation the container install writes
   # container-shaped pnpm symlinks into the host tree, which then dangle and
   # break a host-side build (#5144). It is a plain workspace member since
   # ADR-076 (its store rides in root_modules), but its own node_modules links

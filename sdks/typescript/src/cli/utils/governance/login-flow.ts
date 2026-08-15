@@ -21,6 +21,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import chalk from "chalk";
+import { normalizeEndpoint } from "../../../internal/endpoint";
 import { createSpinner } from "../spinner";
 import {
 	type CliBootstrapResponse,
@@ -42,7 +43,7 @@ import { formatLoginCeremony } from "./login-ceremony";
 import { refreshTelemetryWiringForLogin } from "./telemetry-refresh";
 
 export interface RunUnifiedLoginOptions {
-	/** Credential type to mint. Defaults to 'device_session' for back-compat. */
+	/** Credential type to request. Defaults to 'device_session' for back-compat. */
 	kind?: CredentialType;
 	/** Optional browser override (LANGWATCH_BROWSER also honoured). */
 	browser?: string;
@@ -78,7 +79,7 @@ export async function runUnifiedLoginFlow(
 	const dc = await startDeviceCode({ baseUrl }, { credentialType: kind });
 	const verifyURL =
 		dc.verification_uri_complete ??
-		`${dc.verification_uri.replace(/\/+$/, "")}?user_code=${encodeURIComponent(dc.user_code)}`;
+		`${normalizeEndpoint(dc.verification_uri)}?user_code=${encodeURIComponent(dc.user_code)}`;
 
 	console.log();
 	console.log(chalk.cyan(`Opening: ${verifyURL}`));
@@ -222,7 +223,7 @@ export async function runUnifiedLoginFlow(
 
 		// kind === 'api_key' — write to project-local .env (NO copy-paste)
 		spinner.succeed(
-			`API key generated for project ${chalk.bold(result.project.name)}`,
+			`Connected to project ${chalk.bold(result.project.name)}`,
 		);
 		// Seed the identity notice's credential-to-project-name cache while the
 		// server is telling us the name anyway, so the first api-key notice
@@ -322,7 +323,7 @@ function persistDeviceSession(
 		};
 	}
 	if (result.endpoint) {
-		cfg.control_plane_url = result.endpoint.replace(/\/+$/, "");
+		cfg.control_plane_url = normalizeEndpoint(result.endpoint);
 	}
 }
 

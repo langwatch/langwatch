@@ -1,5 +1,5 @@
-import type { ModelProvider } from "@prisma/client";
 import { z } from "zod";
+import type { ModelProvider } from "~/generated/prisma/client";
 import { codexTokenKeysSchema } from "./codexAccount.schema";
 import { CODEX_ALLOWED_FEATURE_KEYS } from "./codexRestrictions";
 import type { CustomModelEntry } from "./customModel.schema";
@@ -67,6 +67,19 @@ type ModelProviderDefinition = {
    * only. Absent = unrestricted. See allowedCodexFeatures.ts.
    */
   restrictedToFeatureKeys?: readonly string[];
+  /**
+   * The provider no longer accepts new rows. The Add menu hides it and
+   * `updateModelProvider` refuses to create one — hiding a tile is not
+   * enforcement, and the stored population has to be able to reach zero
+   * or this entry can never be deleted. Stored rows stay readable,
+   * editable, validatable and dispatchable, so no deployment is ever
+   * stranded mid-fold.
+   *
+   * `replacedBy` names the provider that absorbed it
+   * (google_agent_platform → gemini), which is what turns the refusal
+   * into something the caller can act on.
+   */
+  deprecated?: { replacedBy: string };
 };
 
 export type MaybeStoredModelProvider = Omit<
@@ -146,6 +159,15 @@ export type MaybeStoredModelProvider = Omit<
    */
   scopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
   scopeId?: string;
+  /**
+   * True when this row's credential cannot serve embedding models, so a
+   * picker must not offer them. Derived server-side (see
+   * `modelProviders/geminiDoor.ts`) because the answer can depend on the
+   * server's own env, which the frontend cannot read, and on the API key,
+   * which it must never receive. Only Gemini's Agent Platform door has
+   * this shape today.
+   */
+  embeddingsUnsupported?: boolean;
 };
 
 // ============================================================================
@@ -345,18 +367,58 @@ export const modelProviders = {
     type: "llm",
     apiKey: "GEMINI_API_KEY",
     endpointKey: undefined,
-    keysSchema: z.object({
-      GEMINI_API_KEY: z.string().min(1),
-    }),
+    // One provider, two Google doors. An AI Studio key answers on
+    // generativelanguage.googleapis.com; a key minted for Gemini Enterprise
+    // Agent Platform is refused there (API_KEY_SERVICE_BLOCKED) and answers
+    // on aiplatform.googleapis.com at a path naming the project and
+    // location. Same models, same wire shape, same auth header — verified
+    // live with one key of each kind. So the door is a property of the
+    // credential, not a provider of its own: project + location present
+    // means the Agent Platform door, absent means the Gemini API. See
+    // specs/model-providers/google-agent-platform.feature.
+    keysSchema: z
+      .object({
+        GEMINI_API_KEY: z.string().min(1),
+        // Trimmed at the schema so a whitespace-only value stores as ""
+        // and every layer (validation, materialiser, Go header parser)
+        // agrees on whether the pair is present — they all test emptiness.
+        GEMINI_PROJECT: z.string().trim().nullable().optional(),
+        // Both `global` and a region such as `us-central1` resolve; the
+        // Agent Platform path requires one either way, so it is asked for
+        // rather than guessed.
+        GEMINI_LOCATION: z.string().trim().nullable().optional(),
+      })
+      .superRefine((data, ctx) => {
+        // The Agent Platform path needs both or neither: a project without
+        // a location (or the reverse) cannot be probed or dispatched, and
+        // silently ignoring the lone field would validate a credential
+        // through a different door than traffic would later use. The issue
+        // lands on the EMPTY side of the pair so the form renders it under
+        // the field the customer has to fill — a pathless issue gets
+        // re-anchored under the first field (the API key), which reads as
+        // the wrong field complaining.
+        if (!!data.GEMINI_PROJECT !== !!data.GEMINI_LOCATION) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: data.GEMINI_PROJECT
+              ? ["GEMINI_LOCATION"]
+              : ["GEMINI_PROJECT"],
+            message:
+              "Fill in both the project and the location, or leave both empty for an AI Studio key.",
+          });
+        }
+      }),
+    optionalKeys: ["GEMINI_PROJECT", "GEMINI_LOCATION"],
     enabledSince: new Date("2023-01-01"),
   },
-  // Gemini models served by Gemini Enterprise Agent Platform rather than by
-  // AI Studio. Its own provider, not a mode of `gemini`, for the same reason
-  // `vertex_ai` is: different host, different auth header, and a path that
-  // names the project and location. A key minted for it is refused by
-  // generativelanguage.googleapis.com, which is what made this look like an
-  // invalid key rather than the wrong service. See
-  // specs/model-providers/google-agent-platform.feature.
+  // Compatibility for rows stored while Agent Platform was its own
+  // provider. Deprecated: hidden from the Add menu, but the rows stay
+  // visible, editable, validatable and dispatchable — without this entry,
+  // application pods running this version would treat them as an unknown
+  // provider and hide them. Converting them into `gemini` rows is a
+  // separate, per-deployment data migration; delete this entry (and its
+  // validation + materialiser branches) only in a release after that
+  // migration has run everywhere.
   google_agent_platform: {
     name: "Google Agent Platform",
     type: "llm",
@@ -365,11 +427,10 @@ export const modelProviders = {
     keysSchema: z.object({
       GOOGLE_AGENT_PLATFORM_API_KEY: z.string().min(1),
       GOOGLE_AGENT_PLATFORM_PROJECT: z.string().min(1),
-      // Both `global` and a region such as `us-central1` resolve; the path
-      // requires one either way, so it is asked for rather than guessed.
       GOOGLE_AGENT_PLATFORM_LOCATION: z.string().min(1),
     }),
     enabledSince: new Date("2026-07-29"),
+    deprecated: { replacedBy: "gemini" },
   },
   elevenlabs: {
     name: "ElevenLabs",
@@ -501,6 +562,25 @@ export const modelProviders = {
       "Azure Content Safety for content moderation, prompt injection, and jailbreak detection. Your subscription is billed directly by Microsoft.",
   },
 } satisfies Record<string, ModelProviderDefinition>;
+
+/**
+ * The deprecation on a provider, or undefined when it still accepts new
+ * rows.
+ *
+ * `modelProviders` is a literal typed by `satisfies`, so each entry keeps
+ * its own exact shape and `.deprecated` is only reachable on the entries
+ * that declare it — reading it off an arbitrary key needs a cast. One
+ * narrowing here beats a cast at every caller, and it is the single place
+ * that has to change when the flag grows a field.
+ */
+export const providerDeprecation = (
+  provider: string,
+): { replacedBy: string } | undefined =>
+  (
+    modelProviders[provider as keyof typeof modelProviders] as
+      | ModelProviderDefinition
+      | undefined
+  )?.deprecated;
 
 // ============================================================================
 // Parameter Constraints

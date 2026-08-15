@@ -1,6 +1,11 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef } from "react";
+import {
+  keepPreviousData,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import { useEffect, useMemo, useRef } from "react";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
+import { applyOverlayToSpanTreeNodes } from "~/server/traces/edit-overlay/applyTraceEditOverlayToViews";
 import { api } from "~/utils/api";
 import { LIVE_REFETCH_MS } from "../constants/freshness";
 import {
@@ -14,9 +19,15 @@ import {
   spanTreeQueryFn,
   spanTreeQueryKey,
 } from "./spanTreePagedQuery";
+import { useAppliedTraceEditPatch } from "./useTraceEditOverlay";
 import { useTraceQueryArgs } from "./useTraceQueryArgs";
 
-export function useSpanTree() {
+/**
+ * The span tree exactly as captured, before any correction. Read it when the
+ * captured trace is the point: the Original view, the hover-original marks and
+ * the difference view.
+ */
+export function useSpanTreeCanonical() {
   const shared = useSharedTrace();
   const { isLive, isReady, queryArgs } = useTraceQueryArgs();
   // SSE health decides the delta poll's CADENCE, not whether it runs at all.
@@ -45,8 +56,8 @@ export function useSpanTree() {
     // authenticated endpoint to walk it with.
     enabled: isReady && !shared,
     staleTime: 300_000,
-    cacheTime: 1_800_000,
-    keepPreviousData: true,
+    gcTime: 1_800_000,
+    placeholderData: keepPreviousData,
     refetchOnWindowFocus: true,
   });
 
@@ -56,11 +67,12 @@ export function useSpanTree() {
   // exists for. This is the single update path for both SSE states; only the
   // trigger differs (SSE event vs. interval, see `refetchInterval` below).
   //
-  // `keepPreviousData` means `data` can briefly be the PREVIOUS trace's tree
-  // right after a trace switch — its high-water mark would make the delta
-  // poll skip this trace's spans, so wait for current data.
-  const tree = treeQuery.isPreviousData ? undefined : treeQuery.data;
-  api.tracesV2.spanTreeDelta.useQuery(
+  // `placeholderData: keepPreviousData` means `data` can briefly be the
+  // PREVIOUS trace's tree right after a trace switch — its high-water mark
+  // would make the delta poll skip this trace's spans, so wait for current
+  // data.
+  const tree = treeQuery.isPlaceholderData ? undefined : treeQuery.data;
+  const deltaQuery = api.tracesV2.spanTreeDelta.useQuery(
     {
       ...queryArgs,
       sinceUpdatedAtMs: tree !== undefined ? spanTreeDeltaSinceMs(tree) : 0,
@@ -84,16 +96,25 @@ export function useSpanTree() {
       refetchInterval: sseConnected ? false : LIVE_REFETCH_MS,
       // Deltas are throwaway transport into the spanTree cache entry —
       // don't retain per-poll entries of their own.
-      cacheTime: 0,
-      onSuccess: (delta) => {
-        const queryKey = spanTreeQueryKey(queryArgs);
-        const existing = queryClient.getQueryData<SpanTreeNode[]>(queryKey);
-        if (!existing) return;
-        const merged = mergeSpanTreeDelta(existing, delta);
-        if (merged !== existing) queryClient.setQueryData(queryKey, merged);
-      },
+      gcTime: 0,
     },
   );
+
+  // Per-fetch merge of the delta into the assembled tree. Keyed on
+  // `dataUpdatedAt`, not on `data`: structural sharing keeps `data` identity
+  // stable when a poll returns the same spans, and re-merging an already
+  // merged delta is a no-op (`merged === existing`), so a spurious run cannot
+  // corrupt the tree.
+  const { data: delta, dataUpdatedAt: deltaUpdatedAt } = deltaQuery;
+  useEffect(() => {
+    if (!deltaUpdatedAt || delta === undefined) return;
+    const queryKey = spanTreeQueryKey(queryArgs);
+    const existing = queryClient.getQueryData<SpanTreeNode[]>(queryKey);
+    if (!existing) return;
+    const merged = mergeSpanTreeDelta(existing, delta);
+    if (merged !== existing) queryClient.setQueryData(queryKey, merged);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deltaUpdatedAt]);
 
   // One catch-up delta when SSE comes back. While it was down the interval
   // was doing the polling; once it reconnects the interval stops and updates
@@ -124,4 +145,61 @@ export function useSpanTree() {
     return asSharedQueryResult(shared.spanTree) as unknown as typeof treeQuery;
   }
   return treeQuery;
+}
+
+/**
+ * Both readings of the span tree from one read: the trace as captured, and the
+ * trace as the reader sees it. A caller that needs each of them (the drawer
+ * scaffold, whose header counts captured spans while its panes render corrected
+ * ones) takes them from here rather than instantiating the query twice, which
+ * would put a second observer on the live delta poll for the same data.
+ *
+ * The correction is applied to the query's result and never written back into
+ * the cache, so the delta poll's high-water mark keeps tracking what was
+ * actually ingested.
+ */
+export function useSpanTreeWithCaptured() {
+  const captured = useSpanTreeCanonical();
+  const patch = useAppliedTraceEditPatch();
+  const nodes = captured.data;
+
+  const data = useMemo(
+    () => (nodes ? applyOverlayToSpanTreeNodes({ nodes, patch }) : nodes),
+    [nodes, patch],
+  );
+
+  const corrected = useMemo(
+    () => (data === nodes ? captured : { ...captured, data }),
+    [captured, data, nodes],
+  );
+
+  // The same tree with the removed rows still on it, for the waterfall to show
+  // struck through. It is what the correction did, not what the trace now is,
+  // so it never stands in for `corrected`.
+  const displayData = useMemo(
+    () =>
+      nodes
+        ? applyOverlayToSpanTreeNodes({ nodes, patch, shouldKeepDeleted: true })
+        : nodes,
+    [nodes, patch],
+  );
+
+  const display = useMemo(
+    () =>
+      displayData === nodes ? captured : { ...captured, data: displayData },
+    [captured, displayData, nodes],
+  );
+
+  return useMemo(
+    () => ({ captured, corrected, display }),
+    [captured, corrected, display],
+  );
+}
+
+/**
+ * The span tree the reader sees: corrected when a correction applies, captured
+ * otherwise.
+ */
+export function useSpanTree() {
+  return useSpanTreeWithCaptured().corrected;
 }

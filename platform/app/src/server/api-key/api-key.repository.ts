@@ -1,5 +1,10 @@
-import type { ApiKey, Prisma, PrismaClient, RoleBinding } from "@prisma/client";
-import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
+import type {
+  ApiKey,
+  Prisma,
+  PrismaClient,
+  RoleBinding,
+} from "~/generated/prisma/client";
+import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import { HIDDEN_SYSTEM_KEY_NAMES } from "./reserved-names";
 
 export type ApiKeyWithBindings = ApiKey & {
@@ -145,6 +150,47 @@ export class ApiKeyRepository {
     return this.prisma.apiKey.findUnique({
       where: { id },
       include: { roleBindings: true },
+    });
+  }
+
+  /**
+   * One key inside an organization, bindings included.
+   *
+   * The tenancy predicate is in the query rather than a comparison on the
+   * result, so an id belonging to another organization returns nothing at
+   * all: there is no row to accidentally read a field off before the check.
+   */
+  async findByIdInOrg({
+    id,
+    organizationId,
+  }: {
+    id: string;
+    organizationId: string;
+  }): Promise<ApiKeyWithBindings | null> {
+    return this.prisma.apiKey.findFirst({
+      where: { id, organizationId },
+      include: { roleBindings: true },
+    });
+  }
+
+  /**
+   * The permission sets of custom roles, scoped to one organization.
+   *
+   * Scoped rather than looked up by id alone: a binding pointing at another
+   * organization's role must read as nothing here, the same way the permission
+   * resolver refuses to honor one.
+   */
+  async findCustomRolePermissionsInOrg({
+    ids,
+    organizationId,
+  }: {
+    ids: string[];
+    organizationId: string;
+  }): Promise<Array<{ id: string; permissions: Prisma.JsonValue }>> {
+    if (ids.length === 0) return [];
+    return this.prisma.customRole.findMany({
+      where: { id: { in: ids }, organizationId },
+      select: { id: true, permissions: true },
     });
   }
 
@@ -359,6 +405,24 @@ export class ApiKeyRepository {
         role: TeamUserRole.ADMIN,
       },
       select: { userId: true },
+    });
+  }
+
+  async findOrgAdminApiKeyBinding({
+    apiKeyId,
+    organizationId,
+  }: {
+    apiKeyId: string;
+    organizationId: string;
+  }): Promise<{ apiKeyId: string | null } | null> {
+    return this.prisma.roleBinding.findFirst({
+      where: {
+        apiKeyId,
+        organizationId,
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        role: TeamUserRole.ADMIN,
+      },
+      select: { apiKeyId: true },
     });
   }
 

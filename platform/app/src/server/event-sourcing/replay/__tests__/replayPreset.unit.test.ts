@@ -9,11 +9,9 @@ vi.mock("ioredis", () => ({
 }));
 
 vi.mock("../../../app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: vi.fn(),
-}));
-
-vi.mock("../../../clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: vi.fn(),
 }));
 
 vi.mock(
@@ -96,6 +94,7 @@ function stubApp(definitions: unknown[]) {
   mockedGetApp.mockReturnValue({
     eventSourcing: { definitions },
     retentionPolicyCache: {},
+    clickhouse: { enabled: true, resolveClient: vi.fn() },
   } as unknown as ReturnType<typeof getApp>);
 }
 

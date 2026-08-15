@@ -1,28 +1,23 @@
-import "dotenv/config";
-// Portless (haven) overlay, loaded last with override exactly like
-// server.mts: a standalone workers lane must resolve the same hostnames,
-// ports and connection URLs as the app it serves, or the two halves of one
-// stack quietly talk to different infrastructure.
-import dotenv from "dotenv";
-import { existsSync } from "fs";
-
-dotenv.config({
-  path: ".env.portless",
-  override: true,
-  quiet: process.env.NODE_ENV !== "development" || !existsSync(".env.portless"),
-});
+// Env files (.env + the .env.portless haven overlay) load as this import's
+// side effect, BEFORE instrumentation and the app graph below evaluate — a
+// standalone workers lane must resolve the same hostnames, ports and
+// connection URLs as the app it serves, or the two halves of one stack
+// quietly talk to different infrastructure. Must stay the first import: see
+// src/env-load.ts for why inline dotenv.config() calls cannot do this.
+import "./env-load";
 
 // OTel instrumentation MUST load before any module that creates spans —
 // without it the worker process has no registered tracer provider and every
-// BullMQOtel adapter / getLangWatchTracer span becomes a non-recording no-op.
-// dotenv stays first so instrumentation.node sees .env-provided config
-// (LANGWATCH_API_KEY, OTEL_EXPORTER_OTLP_ENDPOINT). Kept as the first import
-// so its side effects run before the worker modules below evaluate.
+// getLangWatchTracer span becomes a non-recording no-op.
+// env-load stays first so instrumentation.node sees .env-provided config
+// (LANGWATCH_API_KEY, OTEL_EXPORTER_OTLP_ENDPOINT).
 import "./instrumentation.node";
 // Registers the Grafana trace-link builder with @langwatch/handled-error.
 import "./server/handled-error-wiring";
 import { setEnvironment } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
+import { SHUTDOWN_BUDGET } from "./server/shutdown/budget";
+import { installShutdownHandlers } from "./server/shutdown/runGracefulShutdown";
 import { startWorkers, type WorkerHandle } from "./server/workers/startWorkers";
 
 setEnvironment(process.env.ENVIRONMENT ?? "local");
@@ -39,30 +34,35 @@ const logger = createLogger("langwatch:workers");
 
 logger.info("starting");
 
-let isShuttingDown = false;
 let workerHandle: WorkerHandle | undefined;
 
-async function gracefulShutdown(): Promise<void> {
-  if (isShuttingDown) return;
-  isShuttingDown = true;
-  try {
-    await workerHandle?.shutdown();
-  } catch (error) {
-    logger.error({ error }, "error shutting down workers");
-  }
-  // Close the App (ClickHouse / Redis / Prisma) last, after the workers above
-  // have stopped accepting and draining jobs.
-  try {
-    const { getApp } = await import("./server/app-layer/app");
-    await getApp().close();
-  } catch (error) {
-    logger.error({ error }, "error closing app during shutdown");
-  }
-  process.exit(0);
-}
-
-process.on("SIGINT", () => void gracefulShutdown());
-process.on("SIGTERM", () => void gracefulShutdown());
+installShutdownHandlers((signal) => ({
+  signal,
+  logger,
+  phases: [
+    { name: "workers", run: async () => await workerHandle?.shutdown() },
+    // The app phase carries the queue drain, so it gets the whole budget
+    // rather than the default per-phase ceiling; App.close bounds it from
+    // the inside.
+    // The App (ClickHouse / Redis / Prisma) closes last, after the workers
+    // above have stopped accepting jobs. App.close drains the queue consumer
+    // BEFORE dropping those connections — closing them alongside a running
+    // drain is what severed in-flight ClickHouse statements on every rollout.
+    // See specs/event-sourcing/worker-graceful-shutdown.feature.
+    {
+      name: "app",
+      // App.close bounds the drain itself at appCloseMs; this leaves room on
+      // top for the transports to close. Deliberately BELOW the runner's
+      // watchdog (processDeadlineMs) — set equal to it, this bound could never
+      // fire first and would be decoration.
+      timeoutMs: SHUTDOWN_BUDGET.appCloseMs + 5_000,
+      run: async () => {
+        const { getApp } = await import("./server/app-layer/app");
+        await getApp().close({ terminating: true });
+      },
+    },
+  ],
+}));
 
 void startWorkers({ shouldStartMetricsServer: true })
   .then((handle) => {

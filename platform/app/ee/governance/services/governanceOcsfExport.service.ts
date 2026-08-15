@@ -24,39 +24,13 @@
  *   - GovernanceOcsfEventsSyncReactor (the producer)
  *   - migration 00023_create_governance_ocsf_events.sql
  */
-import type { ClickHouseClient } from "@clickhouse/client";
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 
-import { getClickHouseClientForOrganization } from "~/server/clickhouse/clickhouseClient";
+import type {
+  GovernanceOcsfEventsClickHouseRepository,
+  GovernanceOcsfExportRow,
+} from "./governanceOcsfEvents.clickhouse.repository";
 import { PROJECT_KIND } from "./governanceProject.service";
-
-export interface GovernanceOcsfExportRow {
-  eventId: string;
-  /**
-   * Forward-compat marker stamped by
-   * `governanceOcsfEvents.clickhouse.repository.ts:OCSF_SCHEMA_VERSION`
-   * at write time. Pre-this-column rows materialize as "1.1.0" via
-   * the CH DEFAULT (migration 00028). SIEM consumers can filter or
-   * version-gate downstream parsing on this value.
-   */
-  ocsfSchemaVersion: string;
-  traceId: string;
-  sourceId: string;
-  sourceType: string;
-  classUid: number;
-  categoryUid: number;
-  activityId: number;
-  typeUid: number;
-  severityId: number;
-  eventTimeMs: number;
-  actorUserId: string;
-  actorEmail: string;
-  actorEnduserId: string;
-  actionName: string;
-  targetName: string;
-  anomalyAlertId: string;
-  rawOcsfJson: string;
-}
 
 export interface GovernanceOcsfExportPage {
   events: GovernanceOcsfExportRow[];
@@ -75,32 +49,34 @@ export interface GovernanceOcsfExportPage {
   nextCursorCompound: { eventTimeMs: number; eventId: string } | null;
 }
 
-interface CHRow {
-  EventId: string;
-  OcsfSchemaVersion: string;
-  TraceId: string;
-  SourceId: string;
-  SourceType: string;
-  ClassUid: number | string;
-  CategoryUid: number | string;
-  ActivityId: number | string;
-  TypeUid: number | string;
-  SeverityId: number | string;
-  EventTimeMs: string;
-  ActorUserId: string;
-  ActorEmail: string;
-  ActorEnduserId: string;
-  ActionName: string;
-  TargetName: string;
-  AnomalyAlertId: string;
-  RawOcsfJson: string;
-}
-
 export class GovernanceOcsfExportService {
-  constructor(private readonly prisma: PrismaClient) {}
+  private readonly prisma: PrismaClient;
+  /**
+   * The OCSF SIEM-export sink, from the App. `undefined` on a deployment
+   * without ClickHouse, in which case {@link list} throws the same class
+   * of error the direct client lookup always did — the export has no
+   * fallback store to read from.
+   */
+  private readonly ocsfRepository:
+    | GovernanceOcsfEventsClickHouseRepository
+    | undefined;
 
-  static create(prisma: PrismaClient): GovernanceOcsfExportService {
-    return new GovernanceOcsfExportService(prisma);
+  constructor({
+    prisma,
+    ocsfRepository,
+  }: {
+    prisma: PrismaClient;
+    ocsfRepository: GovernanceOcsfEventsClickHouseRepository | undefined;
+  }) {
+    this.prisma = prisma;
+    this.ocsfRepository = ocsfRepository;
+  }
+
+  static create(deps: {
+    prisma: PrismaClient;
+    ocsfRepository: GovernanceOcsfEventsClickHouseRepository | undefined;
+  }): GovernanceOcsfExportService {
+    return new GovernanceOcsfExportService(deps);
   }
 
   async list(input: {
@@ -119,75 +95,18 @@ export class GovernanceOcsfExportService {
       return { events: [], nextCursor: null, nextCursorCompound: null };
     }
 
-    const ch = await this.getClickhouse(input.organizationId);
-    if (!ch) {
-      return { events: [], nextCursor: null, nextCursorCompound: null };
+    if (!this.ocsfRepository) {
+      throw new Error(
+        "ClickHouse client is not available — check ClickHouse connection configuration",
+      );
     }
 
-    const result = await ch.query({
-      query: `
-        SELECT
-          EventId,
-          OcsfSchemaVersion,
-          TraceId,
-          SourceId,
-          SourceType,
-          ClassUid,
-          CategoryUid,
-          ActivityId,
-          TypeUid,
-          SeverityId,
-          toString(toUnixTimestamp64Milli(EventTime)) AS EventTimeMs,
-          ActorUserId,
-          ActorEmail,
-          ActorEnduserId,
-          ActionName,
-          TargetName,
-          AnomalyAlertId,
-          RawOcsfJson
-        FROM governance_ocsf_events
-        WHERE TenantId = {tenantId:String}
-          AND (EventTime, EventId) > (fromUnixTimestamp64Milli({sinceMs:UInt64}), {sinceEventId:String})
-          AND (TenantId, EventId, LastUpdatedAt) IN (
-            SELECT TenantId, EventId, max(LastUpdatedAt)
-            FROM governance_ocsf_events
-            WHERE TenantId = {tenantId:String}
-              AND (EventTime, EventId) > (fromUnixTimestamp64Milli({sinceMs:UInt64}), {sinceEventId:String})
-            GROUP BY TenantId, EventId
-          )
-        ORDER BY EventTime ASC, EventId ASC
-        LIMIT {limit:UInt32}
-      `,
-      query_params: {
-        tenantId: govProjectId,
-        sinceMs: input.sinceMs,
-        sinceEventId: input.sinceEventId ?? "",
-        limit: input.limit,
-      },
-      format: "JSONEachRow",
+    const events = await this.ocsfRepository.findAll({
+      tenantId: govProjectId,
+      sinceMs: input.sinceMs,
+      sinceEventId: input.sinceEventId ?? "",
+      limit: input.limit,
     });
-
-    const rows = (await result.json()) as CHRow[];
-    const events: GovernanceOcsfExportRow[] = rows.map((r) => ({
-      eventId: r.EventId,
-      ocsfSchemaVersion: r.OcsfSchemaVersion,
-      traceId: r.TraceId,
-      sourceId: r.SourceId,
-      sourceType: r.SourceType,
-      classUid: Number(r.ClassUid),
-      categoryUid: Number(r.CategoryUid),
-      activityId: Number(r.ActivityId),
-      typeUid: Number(r.TypeUid),
-      severityId: Number(r.SeverityId),
-      eventTimeMs: Number(r.EventTimeMs),
-      actorUserId: r.ActorUserId,
-      actorEmail: r.ActorEmail,
-      actorEnduserId: r.ActorEnduserId,
-      actionName: r.ActionName,
-      targetName: r.TargetName,
-      anomalyAlertId: r.AnomalyAlertId,
-      rawOcsfJson: r.RawOcsfJson,
-    }));
 
     const lastEvent = events[events.length - 1];
     return {
@@ -211,11 +130,5 @@ export class GovernanceOcsfExportService {
       select: { id: true },
     });
     return project?.id ?? null;
-  }
-
-  private async getClickhouse(
-    organizationId: string,
-  ): Promise<ClickHouseClient | null> {
-    return await getClickHouseClientForOrganization(organizationId);
   }
 }

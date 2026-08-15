@@ -14,15 +14,15 @@ import type {
   GatewayBudgetScopeType,
   GatewayBudgetWindow,
   PrismaClient,
-} from "@prisma/client";
-import { Prisma } from "@prisma/client";
+} from "~/generated/prisma/client";
+import { Prisma } from "~/generated/prisma/client";
 import { GatewayAuditAdapter } from "./auditLog.repository";
 import { serializeRowForAudit } from "./auditSerializer";
 import type {
   BudgetBucketBoundary,
   GatewayBudgetClickHouseRepository,
 } from "./budget.clickhouse.repository";
-import { budgetPeriodFloorMs } from "./budget.clickhouse.repository";
+import { budgetPeriodFloorMs } from "./budgetPeriod";
 import {
   attributedUserBucketScopeId,
   bucketScopeIdFor,
@@ -32,17 +32,26 @@ import {
 import {
   type BudgetScopeReach,
   resolveBudgetScopeReach,
+  resolveScopeReach,
+  type ScopeReach,
 } from "./budgetScopeReach";
-import { nextResetAt, shouldResetBudget } from "./budgetWindow";
+import {
+  isCyclicWindow,
+  nextBoundaryFor,
+  shouldResetBudget,
+} from "./budgetWindow";
 import { ChangeEventRepository } from "./changeEvent.repository";
 import {
+  GatewayBudgetCycleAnchorInvalidError,
   GatewayBudgetNotFoundError,
+  GatewayBudgetScopeUnreachableError,
   GatewayGroupBudgetUnsupportedError,
   GatewayScopeOrgMismatchError,
   translateExternalIdConflict,
   VirtualKeyNotFoundError,
 } from "./errors";
 import { identityPatchData, type ResourceMetadata } from "./resourceMetadata";
+import { usdToNanoUsd } from "./wireMoney";
 import { keysetAfter } from "./wirePagination";
 
 const logger = createLogger("langwatch:gateway:budget-service");
@@ -55,6 +64,14 @@ const logger = createLogger("langwatch:gateway:budget-service");
  * scope leaves both fields absent.
  */
 export type GatewayBudgetWithSeats = GatewayBudget & {
+  /**
+   * Current-period spend as the nano-USD integer the ledger holds, present
+   * whenever it was read from the ledger at all. `spentUsd` on the same row
+   * is this number rendered, so the two always agree; a consumer publishing
+   * an integer takes it from here rather than re-deriving it from decimals,
+   * which cannot recover digits the decimal never had.
+   */
+  spentNanoUsd?: number;
   /** Distinct end users with spend against this template this period. */
   endUsersSeen?: number;
   /** How many of those are at or over the per-person limit. */
@@ -68,6 +85,13 @@ export type BudgetListWithHealth = {
    * than render the untotalled figure as if it were real spend.
    */
   spendAvailable: boolean;
+  /**
+   * The instant the spend above was read at. A caller that renders the
+   * period beside the figure has to resolve it at this instant rather than
+   * at the wall clock: a boundary crossed in between would print the new
+   * period next to the previous period's spend.
+   */
+  readAt: Date;
   scopeReach: Map<string, BudgetScopeReach>;
 };
 
@@ -105,6 +129,19 @@ export type CreateBudgetInput = {
   externalId?: string | null;
   /** Customer-owned bookkeeping. Never read by the gateway. */
   metadata?: ResourceMetadata;
+  /**
+   * Phases a cyclic window off this instant instead of the calendar, so a
+   * MONTH budget anchored on the 17th at 09:00 UTC rolls every 17th at
+   * 09:00 UTC. Null (the default) keeps the calendar alignment every budget
+   * has today. Rejected on TOTAL and MANUAL, which do not cycle.
+   */
+  cycleAnchorAt?: Date | null;
+  /**
+   * Keeps a budget no active key can reach, instead of refusing it.
+   * Provisioning ahead of the keys that will use it is legitimate; the
+   * refusal is a guardrail, not a prohibition.
+   */
+  allowUnreachable?: boolean;
   actorUserId: string;
 };
 
@@ -327,9 +364,19 @@ export class GatewayBudgetService {
   private async applyClickHouseSpendWithHealth(
     budgets: GatewayBudget[],
     organizationId: string,
-  ): Promise<{ budgets: GatewayBudgetWithSeats[]; spendAvailable: boolean }> {
-    if (budgets.length === 0) return { budgets, spendAvailable: true };
-    if (!this.chRepo) return { budgets, spendAvailable: false };
+  ): Promise<{
+    budgets: GatewayBudgetWithSeats[];
+    spendAvailable: boolean;
+    readAt: Date;
+  }> {
+    // One instant for every read below, so the per-person breakdown cannot
+    // land in a later period than the totals it sits beside, and so the
+    // period a caller reports is the one the figure was summed in.
+    const now = new Date();
+    if (budgets.length === 0) {
+      return { budgets, spendAvailable: true, readAt: now };
+    }
+    if (!this.chRepo) return { budgets, spendAvailable: false, readAt: now };
 
     const projects = await this.prisma.project.findMany({
       where: { team: { organizationId }, archivedAt: null },
@@ -337,12 +384,11 @@ export class GatewayBudgetService {
     });
     // No project means nothing has ever been able to emit a ledger row, so
     // zero is the true total rather than a missing one.
-    if (projects.length === 0) return { budgets, spendAvailable: true };
+    if (projects.length === 0) {
+      return { budgets, spendAvailable: true, readAt: now };
+    }
 
     const tenantIds = projects.map((p) => p.id);
-    // One instant for every read below, so the per-person breakdown cannot
-    // land in a later period than the totals it sits beside.
-    const now = new Date();
     const boundariesByBudget = await this.bucketBoundaries(
       budgets,
       organizationId,
@@ -367,12 +413,13 @@ export class GatewayBudgetService {
         { organizationId, budgetCount: budgets.length, error },
         "failed to read gateway budget spend totals",
       );
-      return { budgets, spendAvailable: false };
+      return { budgets, spendAvailable: false, readAt: now };
     }
 
-    const spendByBudget = new Map(spends.map((s) => [s.budgetId, s.spentUsd]));
+    const spendByBudget = new Map(spends.map((s) => [s.budgetId, s]));
     return {
       spendAvailable: true,
+      readAt: now,
       budgets: budgets.map((b) => {
         const ch = spendByBudget.get(b.id);
         const seat = seats.get(b.id);
@@ -380,7 +427,11 @@ export class GatewayBudgetService {
           ? { ...b, endUsersSeen: seat.seen, endUsersOver: seat.over }
           : b;
         if (ch === undefined) return withSeats;
-        return { ...withSeats, spentUsd: new Prisma.Decimal(ch) };
+        return {
+          ...withSeats,
+          spentNanoUsd: ch.spentNanoUsd,
+          spentUsd: new Prisma.Decimal(ch.spentUsd),
+        };
       }),
     };
   }
@@ -437,10 +488,13 @@ export class GatewayBudgetService {
         boundaries: args.boundariesByBudget.get(budget.id) ?? [],
         now: args.now,
       });
-      const limitUsd = Number.parseFloat(budget.limitUsd.toString());
+      // Compared as integers, in the unit both sides are exact in. A seat
+      // one nano-USD under its cap is under it, and a float comparison at
+      // these magnitudes is what decides that wrongly.
+      const limitNanoUsd = usdToNanoUsd(budget.limitUsd);
       out.set(budget.id, {
         seen: buckets.length,
-        over: buckets.filter((b) => Number.parseFloat(b.spentUsd) >= limitUsd)
+        over: buckets.filter((b) => BigInt(b.spentNanoUsd) >= limitNanoUsd)
           .length,
       });
     }
@@ -513,7 +567,12 @@ export class GatewayBudgetService {
       include: { team: true },
     });
     if (!project) {
-      return { budgets: [], spendAvailable: true, scopeReach: new Map() };
+      return {
+        budgets: [],
+        spendAvailable: true,
+        readAt: new Date(),
+        scopeReach: new Map(),
+      };
     }
     const rows = await this.prisma.gatewayBudget.findMany({
       where: {
@@ -534,11 +593,17 @@ export class GatewayBudgetService {
     rows: GatewayBudget[],
     organizationId: string,
   ): Promise<BudgetListWithHealth> {
-    const [{ budgets, spendAvailable }, scopeReach] = await Promise.all([
-      this.applyClickHouseSpendWithHealth(rows, organizationId),
-      resolveBudgetScopeReach(this.prisma, organizationId, rows),
-    ]);
-    return { budgets, spendAvailable, scopeReach };
+    const [{ budgets, spendAvailable, readAt }, scopeReach] = await Promise.all(
+      [
+        this.applyClickHouseSpendWithHealth(rows, organizationId),
+        resolveBudgetScopeReach({
+          prisma: this.prisma,
+          organizationId,
+          budgets: rows,
+        }),
+      ],
+    );
+    return { budgets, spendAvailable, readAt, scopeReach };
   }
 
   /**
@@ -555,14 +620,22 @@ export class GatewayBudgetService {
   ): Promise<{
     budget: GatewayBudgetWithSeats;
     spendAvailable: boolean;
+    readAt: Date;
+    /** True when no active key can produce traffic this budget matches. */
+    unreachableByAnyKey: boolean;
   } | null> {
     const row = await this.prisma.gatewayBudget.findFirst({
       where: { id, organizationId, archivedAt: null },
     });
     if (!row) return null;
-    const { budgets, spendAvailable } =
-      await this.applyClickHouseSpendWithHealth([row], organizationId);
-    return { budget: budgets[0] ?? row, spendAvailable };
+    const { budgets, spendAvailable, readAt, scopeReach } =
+      await this.decorateWithHealth([row], organizationId);
+    return {
+      budget: budgets[0] ?? row,
+      spendAvailable,
+      readAt,
+      unreachableByAnyKey: scopeReach.get(row.id)?.reachable === false,
+    };
   }
 
   async get(
@@ -812,7 +885,87 @@ export class GatewayBudgetService {
     }
   }
 
+  /**
+   * The wire spelling of each reach-checked scope, so the refusal's
+   * `meta.scope_type` can only ever be one of the three the documentation
+   * lists.
+   */
+  private static readonly REACH_CHECKED_SCOPE_NAMES = {
+    TEAM: "team",
+    PROJECT: "project",
+    GROUP: "group",
+  } as const;
+
+  /**
+   * Whether any active key can produce traffic this scope matches.
+   *
+   * Read separately from the create guard rather than carried out of it,
+   * because the guard only runs for the three scopes it can refuse and a
+   * create response that omitted the field would not equal the row the very
+   * next read returns. Callers do compare those.
+   */
+  async scopeReach({
+    organizationId,
+    scope,
+  }: {
+    organizationId: string;
+    scope: Pick<GatewayBudget, "scopeType" | "scopeId">;
+  }): Promise<ScopeReach> {
+    return await resolveScopeReach({
+      prisma: this.prisma,
+      organizationId,
+      scope,
+    });
+  }
+
+  /**
+   * Refuse a budget that no active key could ever spend against.
+   *
+   * Only TEAM, PROJECT and GROUP are checked, because only those three are
+   * matched through the key rather than through something the creator picked
+   * here. An ORGANIZATION budget matches every key by construction, and
+   * VIRTUAL_KEY, PRINCIPAL and ATTRIBUTED_USER already refuse a target that
+   * does not exist in this organization.
+   *
+   * Create only: scope is immutable afterwards, so no update can turn a
+   * reachable budget into an unreachable one.
+   */
+  private async assertScopeIsReachable(
+    input: CreateBudgetInput,
+  ): Promise<void> {
+    if (input.allowUnreachable) return;
+    const kind = input.scope.kind;
+    if (kind !== "TEAM" && kind !== "PROJECT" && kind !== "GROUP") return;
+
+    const reach = await resolveScopeReach({
+      prisma: this.prisma,
+      organizationId: input.organizationId,
+      scope: {
+        scopeType: scopeKindToEnum(kind),
+        scopeId: scopeIdForScope(input.scope),
+      },
+    });
+    // An organization with no keys yet is being set up, and budget first, key
+    // second is the natural order there. Refusing would leave a fresh
+    // organization unable to configure anything at all.
+    if (reach.activeKeyCount === 0 || reach.reachable) return;
+
+    throw new GatewayBudgetScopeUnreachableError({
+      scopeType: GatewayBudgetService.REACH_CHECKED_SCOPE_NAMES[kind],
+      reachableProjectIds: reach.reachableProjectIds,
+    });
+  }
+
   async create(input: CreateBudgetInput): Promise<GatewayBudget> {
+    // An anchor only means something on a window that rolls. Checked before
+    // any lookup, since it needs nothing but the request.
+    const cycleAnchorAt = input.cycleAnchorAt ?? null;
+    if (cycleAnchorAt && !isCyclicWindow(input.window)) {
+      throw new GatewayBudgetCycleAnchorInvalidError(
+        input.window.toLowerCase(),
+      );
+    }
+
     // Cross-org guard for PRINCIPAL budgets: the named user must be a
     // member of the budget's organization. Without this check an admin
     // in org A could create a PRINCIPAL budget for any userId — the FK
@@ -966,7 +1119,11 @@ export class GatewayBudgetService {
       }
     }
 
-    const resetsAt = nextResetAt(input.window);
+    await this.assertScopeIsReachable(input);
+
+    const resetsAt = nextBoundaryFor({
+      budget: { window: input.window, cycleAnchorAt },
+    });
     const projectId = resolveProjectFromScope(input.scope);
 
     const created = await this.prisma
@@ -985,6 +1142,7 @@ export class GatewayBudgetService {
             providerKey: input.providerKey ?? null,
             externalId: input.externalId ?? null,
             ...identityPatchData({ metadata: input.metadata }),
+            cycleAnchorAt,
             resetsAt,
             currentPeriodStartedAt: new Date(),
             createdById: input.actorUserId,
@@ -1208,7 +1366,10 @@ export class GatewayBudgetService {
         data: {
           currentPeriodStartedAt: now,
           lastResetAt: now,
-          resetsAt: nextResetAt(existing.window, now),
+          // A reset forgives the spend so far; it does not re-phase the
+          // cycle, so an anchored budget reports the next boundary on its
+          // own schedule rather than one window from this instant.
+          resetsAt: nextBoundaryFor({ budget: existing, now }),
           // The current-period figure the bundle reads; the period just
           // restarted, so it is zero by definition. Ledger rows untouched.
           spentUsd: new Prisma.Decimal(0),
@@ -1258,12 +1419,15 @@ export class GatewayBudgetService {
     // Same resolver the bundle and the debits process use, so what
     // enforces here is exactly what the key was told applies to it.
     const resolved = (
-      await resolveApplicableBudgets(this.prisma, {
-        organizationId: input.organizationId,
-        teamId: input.teamId,
-        projectId: input.projectId,
-        virtualKeyId: input.virtualKeyId,
-        principalUserId: input.principalUserId,
+      await resolveApplicableBudgets({
+        client: this.prisma,
+        target: {
+          organizationId: input.organizationId,
+          teamId: input.teamId,
+          projectId: input.projectId,
+          virtualKeyId: input.virtualKeyId,
+          principalUserId: input.principalUserId,
+        },
       })
     ).filter((r) => budgetAppliesToProvider(r.budget, input.providerKey));
     const applicable = resolved.map((r) => r.budget);

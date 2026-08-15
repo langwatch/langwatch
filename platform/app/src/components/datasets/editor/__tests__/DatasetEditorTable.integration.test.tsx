@@ -7,7 +7,14 @@
  * cells, portal editor); only the tRPC transport is mocked.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -66,7 +73,7 @@ vi.mock("~/utils/api", () => ({
     licenseEnforcement: {
       checkLimit: { useQuery: () => ({ data: null, isLoading: false }) },
     },
-    useContext: () => ({}),
+    useUtils: () => ({}),
   },
 }));
 
@@ -477,7 +484,7 @@ describe("given the saved dataset's record count", () => {
   });
 });
 
-// ── Pagination (classic page N of M) ─────────────────────────────────
+// ── Pagination ───────────────────────────────────────────────────────
 
 describe("given a saved dataset larger than one page", () => {
   const TOTAL_PAGES = 3;
@@ -527,7 +534,7 @@ describe("given a saved dataset larger than one page", () => {
     renderPaged();
     await waitFor(() =>
       expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
-        "Page 1 of 3",
+        "showing 1–50",
       ),
     );
     // Total reflects the whole dataset, not just the loaded page.
@@ -549,7 +556,7 @@ describe("given a saved dataset larger than one page", () => {
     await user.click(screen.getByTestId("pagination-next"));
     await waitFor(() =>
       expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
-        "Page 2 of 3",
+        "showing 51–100",
       ),
     );
     // The editor requested page 2 from the server (windowed read, not a slice).
@@ -561,7 +568,7 @@ describe("given a saved dataset larger than one page", () => {
     await user.click(screen.getByTestId("pagination-prev"));
     await waitFor(() =>
       expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
-        "Page 1 of 3",
+        "showing 1–50",
       ),
     );
   });
@@ -570,7 +577,7 @@ describe("given a saved dataset larger than one page", () => {
     /** @scenario Move between pages */
     it("stays on the requested page instead of bouncing back to page 1", async () => {
       // react-query holds the previous page's result while the next page's key
-      // loads (keepPreviousData), flagging it `isPreviousData: true`. Simulate
+      // loads (keepPreviousData), flagging it `isPlaceholderData: true`. Simulate
       // that faithfully: page 2 is not yet "ready", so the hook returns page 1's
       // data marked as held — the page count must NOT momentarily reset and snap
       // navigation back to page 1, and the held data must not re-hydrate the
@@ -580,7 +587,7 @@ describe("given a saved dataset larger than one page", () => {
       const fresh = new Map<number, unknown>();
       const held = new Map<number, unknown>();
       let lastReady = 1;
-      const pageResult = (p: number, isPreviousData: boolean) => ({
+      const pageResult = (p: number, isPlaceholderData: boolean) => ({
         data: {
           id: "dataset_paged",
           name: "paged",
@@ -596,7 +603,7 @@ describe("given a saved dataset larger than one page", () => {
           ],
         },
         isLoading: false,
-        isPreviousData,
+        isPlaceholderData,
         refetch: vi.fn(),
       });
       getAllQuery.mockReset();
@@ -607,7 +614,7 @@ describe("given a saved dataset larger than one page", () => {
           if (!fresh.has(p)) fresh.set(p, pageResult(p, false));
           return fresh.get(p);
         }
-        // Previous page held while page p loads → flagged isPreviousData.
+        // Previous page held while page p loads → flagged isPlaceholderData.
         if (!held.has(lastReady))
           held.set(lastReady, pageResult(lastReady, true));
         return held.get(lastReady);
@@ -619,7 +626,7 @@ describe("given a saved dataset larger than one page", () => {
       });
       await waitFor(() =>
         expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
-          "Page 1 of 3",
+          "showing 1–50",
         ),
       );
 
@@ -628,7 +635,7 @@ describe("given a saved dataset larger than one page", () => {
       // and the last request must be for page 2.
       await waitFor(() =>
         expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
-          "Page 2 of 3",
+          "showing 51–100",
         ),
       );
       expect(
@@ -683,7 +690,7 @@ describe("given a saved dataset larger than one page", () => {
     await user.click(screen.getByTestId("pagination-next")); // page 3 (last)
     await waitFor(() =>
       expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
-        "Page 3 of 3",
+        "showing 101–150",
       ),
     );
     expect(screen.getByTestId("add-row")).toBeInTheDocument();
@@ -695,25 +702,26 @@ describe("given a saved dataset larger than one page", () => {
     renderPaged();
     await screen.findByTestId("pagination-indicator");
 
-    // The active size (default 50) is a no-op — disabled so it can't re-trigger
-    // the clear-selection / reset-to-page-1 / refetch path with no real change.
-    expect(screen.getByTestId("pagination-size-50")).toBeDisabled();
+    // The select reports the size currently in force.
+    expect(screen.getByTestId("pagination-page-size")).toHaveValue("50");
 
     // Move off page 1 first so the reset-to-page-1 is observable.
     await user.click(screen.getByTestId("pagination-next"));
     await waitFor(() =>
       expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
-        "Page 2 of 3",
+        "showing 51–100",
       ),
     );
 
     // Switch to 100 rows per page. The page count is derived from
     // count / pageSize, so 150 records collapse to 2 pages immediately, and the
     // server is re-read with the new limit from page 1.
-    await user.click(screen.getByTestId("pagination-size-100"));
+    fireEvent.change(screen.getByTestId("pagination-page-size"), {
+      target: { value: "100" },
+    });
     await waitFor(() =>
       expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
-        "Page 1 of 2",
+        "showing 1–100",
       ),
     );
     const lastCall = getAllQuery.mock.calls.at(-1)![0] as {
@@ -729,7 +737,7 @@ describe("given a saved dataset larger than one page", () => {
 // dataset's rows into another when the editor is pointed at a different
 // datasetId while the previous result is still being served.
 describe("given the editor is switched to a different dataset", () => {
-  const datasetAResult = (isPreviousData: boolean) => ({
+  const datasetAResult = (isPlaceholderData: boolean) => ({
     data: {
       id: "dataset_a",
       name: "A",
@@ -743,7 +751,7 @@ describe("given the editor is switched to a different dataset", () => {
     },
     isLoading: false,
     // react-query sets this while keepPreviousData serves the prior key's data.
-    isPreviousData,
+    isPlaceholderData,
     refetch: vi.fn(),
   });
 
@@ -766,7 +774,7 @@ describe("given the editor is switched to a different dataset", () => {
       await screen.findByText("alpha");
 
       // Point the editor at dataset B; keepPreviousData still serves A's rows
-      // (isPreviousData), so the grid keeps showing them until B settles.
+      // (isPlaceholderData), so the grid keeps showing them until B settles.
       getAllQuery.mockReturnValue(datasetAResult(true));
       rerender(<DatasetEditorTable datasetId="dataset_b" />);
 
@@ -817,7 +825,7 @@ describe("given rows are deleted from a paginated dataset", () => {
           ],
         },
         isLoading: false,
-        isPreviousData: false,
+        isPlaceholderData: false,
         refetch: refetchSpy,
       });
 
@@ -877,7 +885,7 @@ describe("given rows are deleted from a paginated dataset", () => {
           ],
         },
         isLoading: false,
-        isPreviousData: false,
+        isPlaceholderData: false,
         refetch: refetchSpy,
       });
 

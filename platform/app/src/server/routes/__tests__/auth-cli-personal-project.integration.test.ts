@@ -21,6 +21,7 @@
  * Spec: specs/ai-governance/cli-onboarding/me-credentials.feature
  * Spec: specs/ai-governance/cli-onboarding/login-unified.feature
  */
+import type { Redis } from "ioredis";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 const ids = vi.hoisted(() => {
@@ -49,12 +50,20 @@ vi.mock("~/server/api/rbac", async (importActual) => {
 import { hasProjectPermission } from "~/server/api/rbac";
 import { prisma } from "~/server/db";
 import {
+  getTestClickHouseClient,
+  getTestRedisConnection,
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { connection as redisConnection } from "~/server/redis";
+import {
+  clearClickHouseTestApp,
+  installClickHouseTestApp,
+} from "~/test-utils/clickhouseTestApp";
 import { app as meApp } from "../../../app/api/me/[[...route]]/app";
 import { app } from "../auth-cli";
+
+/** The container's connection, handed to the test App the CLI routes read. */
+let redisConnection: Redis | null = null;
 
 const suffix = ids.suffix;
 const USER_ID = ids.USER_ID;
@@ -270,6 +279,15 @@ let exchange: ExchangeSuccess;
 
 beforeAll(async () => {
   await startTestContainers();
+  redisConnection = getTestRedisConnection();
+  // The routes and workers under test take their ClickHouse repositories
+  // from the App rather than resolving a client, so the fixture has to
+  // provide one or they fail with "App not initialized".
+  installClickHouseTestApp({
+    resolveClient: async () => getTestClickHouseClient(),
+    // The CLI device flow writes its codes and tokens to Redis.
+    redis: redisConnection,
+  });
   await seedCallerOrg();
   await seedOtherMemberWorkspace();
 
@@ -279,6 +297,7 @@ beforeAll(async () => {
 }, 120_000);
 
 afterAll(async () => {
+  await clearClickHouseTestApp();
   // organizationId, not principalUserId-in-list: the tenancy guard
   // extension on VirtualKey only honours scalar tenancy predicates; the
   // in-list form is rejected and the catch would hide the leak.

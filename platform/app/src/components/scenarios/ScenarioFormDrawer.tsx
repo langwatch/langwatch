@@ -1,5 +1,6 @@
 import {
   Button,
+  chakra,
   Grid,
   GridItem,
   Heading,
@@ -7,14 +8,19 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { generate } from "@langwatch/ksuid";
-import type { Scenario } from "@prisma/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { type UseFormReturn, useWatch } from "react-hook-form";
+import {
+  type FieldErrors,
+  type UseFormReturn,
+  useFormState,
+  useWatch,
+} from "react-hook-form";
 import {
   applyHandledErrorToForm,
   FormServerError,
   showErrorToast,
 } from "~/features/errors";
+import type { Scenario } from "~/generated/prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
 import {
   clearFlowCallbacks,
@@ -28,6 +34,7 @@ import { useRunScenario } from "../../hooks/useRunScenario";
 import { useScenarioTarget } from "../../hooks/useScenarioTarget";
 import type { CustomComponentConfig } from "../../optimization_studio/types/dsl";
 import type { TypedAgent } from "../../server/agents/agent.repository";
+import { parseScenarioParameterDefinitions } from "../../server/scenarios/parameters";
 import { api } from "../../utils/api";
 import { KSUID_RESOURCES } from "../../utils/constants";
 import { AgentTypeSelectorDrawer } from "../agents/AgentTypeSelectorDrawer";
@@ -43,6 +50,7 @@ import {
   type ScenarioFormData,
   type ScenarioInitialData,
 } from "./ScenarioForm";
+import { ScenarioParametersDialog } from "./ScenarioParametersDialog";
 import { ScenarioRunModelDialog } from "./ScenarioRunModelDialog";
 import type { TargetValue } from "./TargetSelector";
 
@@ -100,7 +108,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     rawComplexProps && "initialFormData" in rawComplexProps
       ? (rawComplexProps as Partial<ScenarioInitialData>)
       : {};
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const [formInstance, setFormInstance] =
     useState<UseFormReturn<ScenarioFormData> | null>(null);
   const { runScenario, isRunning } = useRunScenario({
@@ -115,6 +123,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const [selectedTarget, setSelectedTarget] = useState<TargetValue>(null);
   const [promptDrawerOpen, setPromptDrawerOpen] = useState(false);
   const [agentTypeSelectorOpen, setAgentTypeSelectorOpen] = useState(false);
+  const [parametersDialogOpen, setParametersDialogOpen] = useState(false);
 
   // Run-model dialog: after a target is picked in Save and Run, the user
   // confirms which user-simulator and judge models to run with. null = follow
@@ -313,6 +322,17 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     },
     [project?.id, scenario, updateExisting, createScenario],
   );
+  /**
+   * Parameter rows are edited in their own dialog, and the message for a bad
+   * row shows on the row. When parameter validation rejects a submit, open the
+   * dialog again. The reader can then see which row is wrong.
+   */
+  const openParametersOnInvalid = useCallback(
+    (errors: FieldErrors<ScenarioFormData>) => {
+      if (errors.parameters) setParametersDialogOpen(true);
+    },
+    [],
+  );
   const handleSaveAndRun = useCallback(
     async (target: TargetValue) => {
       const form = formInstance;
@@ -377,14 +397,25 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       // scenario's stored choices (null = follow the project default) and open
       // it — the actual save + run happens on confirm.
       const valid = await form.trigger();
-      if (!valid) return;
+      if (!valid) {
+        openParametersOnInvalid(form.formState.errors);
+        return;
+      }
 
       setRunSimulatorModel(scenario?.simulatorModel ?? null);
       setRunJudgeModel(scenario?.judgeModel ?? null);
       setPendingRunTarget(target);
       setRunModelDialogOpen(true);
     },
-    [project?.id, project?.slug, formInstance, utils, openDrawer, scenario],
+    [
+      project?.id,
+      project?.slug,
+      formInstance,
+      utils,
+      openDrawer,
+      scenario,
+      openParametersOnInvalid,
+    ],
   );
 
   const confirmRunWithModels = useCallback(async () => {
@@ -461,8 +492,8 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       } catch {
         // Error already handled by mutation onError callback
       }
-    })();
-  }, [handleSave, scenario, formInstance, onClose]);
+    }, openParametersOnInvalid)();
+  }, [handleSave, scenario, formInstance, onClose, openParametersOnInvalid]);
   const setFormRef = useCallback((form: UseFormReturn<ScenarioFormData>) => {
     setFormInstance(form);
   }, []);
@@ -472,10 +503,18 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   // Use initial data from complexProps (new scenario from modal) or from DB (editing)
   const initialFormData =
     props.initialFormData ?? complexPropsData.initialFormData;
-  const defaultValues: Partial<ScenarioFormData> | undefined = useMemo(
-    () => scenario ?? initialFormData ?? undefined,
-    [scenario, initialFormData],
-  );
+  const defaultValues: Partial<ScenarioFormData> | undefined = useMemo(() => {
+    // A stored scenario carries its parameters as JSON, including the null a
+    // scenario that never declared any has, so they are read through the
+    // tolerant parser before the form sees them.
+    if (scenario) {
+      return {
+        ...scenario,
+        parameters: parseScenarioParameterDefinitions(scenario.parameters),
+      };
+    }
+    return initialFormData ?? undefined;
+  }, [scenario, initialFormData]);
 
   return (
     <Drawer.Root
@@ -514,7 +553,15 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         </Drawer.Body>
         {/* Bottom Bar */}
         <Drawer.Footer borderTopWidth="1px" justifyContent="space-between">
-          {formInstance && <FooterLabels form={formInstance} />}
+          {formInstance && (
+            <HStack gap={6} flex={1} overflow="hidden" flexWrap="wrap">
+              <FooterLabels form={formInstance} />
+              <FooterParameters
+                form={formInstance}
+                onOpen={() => setParametersDialogOpen(true)}
+              />
+            </HStack>
+          )}
           <HStack gap={2} flexShrink={0}>
             <Button variant="outline" size="sm" onClick={onClose}>
               Cancel
@@ -531,6 +578,15 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           </HStack>
         </Drawer.Footer>
       </Drawer.Content>
+
+      {/* Parameter declarations: edited on the form, saved with the scenario */}
+      {formInstance && (
+        <ScenarioParametersDialog
+          open={parametersDialogOpen}
+          onOpenChange={setParametersDialogOpen}
+          form={formInstance}
+        />
+      )}
 
       {/* Run-model dialog: choose user-simulator + judge models before running */}
       <ScenarioRunModelDialog
@@ -577,7 +633,7 @@ function FooterLabels({ form }: { form: UseFormReturn<ScenarioFormData> }) {
   const labels = useWatch({ control: form.control, name: "labels" });
 
   return (
-    <HStack gap={2} flex={1} overflow="hidden" flexWrap="wrap">
+    <HStack gap={2} overflow="hidden" flexWrap="wrap">
       <Text fontSize="xs" fontWeight="medium" color="fg.muted" flexShrink={0}>
         Labels
       </Text>
@@ -592,5 +648,84 @@ function FooterLabels({ form }: { form: UseFormReturn<ScenarioFormData> }) {
         onAdd={(label) => form.setValue("labels", [...labels, label])}
       />
     </HStack>
+  );
+}
+
+/**
+ * The declared parameter names, next to the labels, as the way into their
+ * editor. Names are not removed here: a name can be read as "params.NAME" by
+ * the situation, the criteria and the target, so removing one is a decision
+ * taken in the editor with the rest of the declaration in view.
+ */
+function FooterParameters({
+  form,
+  onOpen,
+}: {
+  form: UseFormReturn<ScenarioFormData>;
+  onOpen: () => void;
+}) {
+  const parameters = useWatch({ control: form.control, name: "parameters" });
+  const { errors } = useFormState({ control: form.control });
+  const invalid = !!errors.parameters;
+  const names = (parameters ?? [])
+    .map((definition) => definition.name)
+    .filter((name) => name.length > 0);
+
+  return (
+    <HStack
+      gap={2}
+      overflow="hidden"
+      flexWrap="wrap"
+      data-testid="scenario-parameters-footer"
+      data-invalid={invalid ? "true" : undefined}
+    >
+      <Text
+        fontSize="xs"
+        fontWeight="medium"
+        color={invalid ? "fg.error" : "fg.muted"}
+        flexShrink={0}
+      >
+        Parameters
+      </Text>
+      <HStack gap={1} flexWrap="wrap">
+        {names.map((name, index) => (
+          <ParameterChip key={`${name}-${index}`} name={name} onOpen={onOpen} />
+        ))}
+        <Button
+          type="button"
+          size="xs"
+          variant="outline"
+          borderRadius="full"
+          borderColor={invalid ? "fg.error" : "border"}
+          color={invalid ? "fg.error" : undefined}
+          onClick={onOpen}
+          data-testid="edit-scenario-parameters"
+        >
+          + add
+        </Button>
+      </HStack>
+    </HStack>
+  );
+}
+
+const ChipButton = chakra("button");
+
+function ParameterChip({ name, onOpen }: { name: string; onOpen: () => void }) {
+  return (
+    <ChipButton
+      type="button"
+      onClick={onOpen}
+      aria-label={`Edit parameter ${name}`}
+      data-testid={`scenario-parameter-chip-${name}`}
+      bg="bg.muted"
+      paddingX={2}
+      paddingY={0.5}
+      borderRadius="full"
+      fontSize="xs"
+      cursor="pointer"
+      _hover={{ bg: "bg.emphasized" }}
+    >
+      {name}
+    </ChipButton>
   );
 }

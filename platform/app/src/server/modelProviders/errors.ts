@@ -83,6 +83,46 @@ export class ModelProviderScopesRequiredError extends HandledError {
 }
 
 /**
+ * The call tried to create a row under a provider that no longer accepts
+ * them.
+ *
+ * A deprecated provider has been absorbed into another one; its stored rows
+ * stay fully usable so no deployment is stranded mid-fold, but the population
+ * has to be able to reach zero, or the compatibility entry can never be
+ * deleted. Hiding the tile handles the UI; this handles everyone else.
+ *
+ * Editing, disabling and deleting an existing row are all still allowed —
+ * only creation is closed, which is why the check keys on there being no
+ * existing row rather than on the provider alone.
+ *
+ * `replacement` rides in `meta` rather than in the sentence: which provider
+ * to use instead is a fact the client's presentation registry turns into
+ * words, and an API caller reads the slug directly.
+ */
+export class ModelProviderDeprecatedError extends HandledError {
+  declare readonly code: "model_provider_deprecated";
+
+  constructor({
+    provider,
+    replacement,
+  }: {
+    provider: string;
+    replacement?: string;
+  }) {
+    super(
+      "model_provider_deprecated",
+      "This model provider is no longer available to add.",
+      {
+        meta: { provider, ...(replacement ? { replacement } : {}) },
+        httpStatus: 400,
+        fault: "customer",
+      },
+    );
+    this.name = "ModelProviderDeprecatedError";
+  }
+}
+
+/**
  * The caller cannot manage one of the scopes a write would touch.
  *
  * A create / update / delete can affect several scope entries at once, and the
@@ -120,5 +160,104 @@ export class ModelProviderScopeForbiddenError extends HandledError {
       },
     );
     this.name = "ModelProviderScopeForbiddenError";
+  }
+}
+
+/**
+ * The caller cannot manage one of the scopes a default-models write would
+ * touch.
+ *
+ * Same shape and rationale as {@link ModelProviderScopeForbiddenError}, with
+ * its own code because the copy differs: this one is about the Default Models
+ * policies, not the provider credentials. Every default-models write path
+ * (tRPC drawer save, REST create/update/delete) routes through
+ * `assertCanWriteScope`, which raises this. A plain `Error` here used to
+ * surface as an unknown 500 and log a routine permission refusal as an
+ * incident.
+ */
+export class ModelDefaultScopeForbiddenError extends HandledError {
+  declare readonly code: "model_default_scope_forbidden";
+
+  constructor({
+    scopeType,
+    requiredPermission,
+  }: {
+    scopeType: string;
+    requiredPermission: string;
+  }) {
+    super(
+      "model_default_scope_forbidden",
+      "You don't have permission to manage default models here.",
+      {
+        meta: { scopeType, requiredPermission },
+        httpStatus: 403,
+        fault: "customer",
+      },
+    );
+    this.name = "ModelDefaultScopeForbiddenError";
+  }
+}
+
+/**
+ * Too many credential checks in too short a window.
+ *
+ * Every check is an outbound request from our servers carrying a customer's
+ * credential, and the control that triggers it sits one click away in
+ * settings. Without a ceiling the page is an egress amplifier: rows multiply
+ * across provider types, projects and scopes, so the budget is the
+ * organization's rather than the row's.
+ *
+ * `retryAfterSeconds` rides in `meta` so the client can say how long rather
+ * than inventing a number — the sentence here is the fallback for callers
+ * that render the message directly.
+ */
+export class ModelProviderTestRateLimitedError extends HandledError {
+  declare readonly code: "model_provider_test_rate_limited";
+
+  constructor({ retryAfterSeconds }: { retryAfterSeconds: number }) {
+    super(
+      "model_provider_test_rate_limited",
+      "Too many connection tests. Wait a moment and try again.",
+      {
+        meta: { retryAfterSeconds },
+        httpStatus: 429,
+        fault: "customer",
+      },
+    );
+    this.name = "ModelProviderTestRateLimitedError";
+  }
+}
+
+/**
+ * A write carried credentials, but none of the ones this provider declares,
+ * while the row on file holds some. Applying it would leave the provider with
+ * no credential at all.
+ *
+ * The merge keeps a stored value when the payload sends the masked
+ * placeholder for it. A key the payload never mentions has no such signal, so
+ * it is dropped, and a payload naming no credential at all drops every one of
+ * them. That is never what a caller means: clearing a credential is sending it
+ * empty, not leaving it out.
+ *
+ * Refusing rather than repairing, because the payload does not say what was
+ * intended and a guess would be silently wrong in the other direction. The
+ * check exists because the same silent loss has now arrived twice by different
+ * routes, and both times the provider's schema was loose enough to accept the
+ * short payload without complaint.
+ */
+export class ModelProviderCredentialsWouldBeDroppedError extends HandledError {
+  declare readonly code: "model_provider_credentials_would_be_dropped";
+
+  constructor({ provider }: { provider: string }) {
+    super(
+      "model_provider_credentials_would_be_dropped",
+      "This save would delete the credentials already stored for this provider. Send the credentials with it, or leave them out of the request entirely to keep them.",
+      {
+        meta: { provider },
+        httpStatus: 400,
+        fault: "customer",
+      },
+    );
+    this.name = "ModelProviderCredentialsWouldBeDroppedError";
   }
 }

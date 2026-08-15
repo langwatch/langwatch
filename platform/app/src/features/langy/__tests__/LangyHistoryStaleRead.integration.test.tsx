@@ -210,9 +210,8 @@ vi.mock("~/utils/api", async () => {
     return {
       data,
       isLoading: false,
-      isInitialLoading: false,
       isFetching: false,
-      isPreviousData: false,
+      isPlaceholderData: false,
       isFetched: true,
       isSuccess: enabled && !historyState.errored && !!data,
       isError: enabled && historyState.errored,
@@ -285,8 +284,8 @@ vi.mock("~/utils/api", async () => {
     virtualKeys: {
       list: { useQuery: () => ({ data: undefined, isLoading: false }) },
     },
-    langyGithub: {
-      getInstallStatus: {
+    github: {
+      getConnectionStatus: {
         useQuery: () => ({ data: undefined, isLoading: false, isError: true }),
       },
       disconnect: {

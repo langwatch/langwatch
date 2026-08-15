@@ -25,18 +25,20 @@ import {
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockState, mockOpenDrawer, mockDeleteProvider } = vi.hoisted(() => ({
-  mockState: {
-    project: undefined as { id: string; slug: string } | undefined,
-    permissions: { "project:manage": true, "project:create": true } as Record<
-      string,
-      boolean
-    >,
-    providers: [] as Array<Record<string, unknown>>,
-  },
-  mockOpenDrawer: vi.fn(),
-  mockDeleteProvider: vi.fn(),
-}));
+const { mockState, mockOpenDrawer, mockDeleteProvider, mockTestConnection } =
+  vi.hoisted(() => ({
+    mockState: {
+      project: undefined as { id: string; slug: string } | undefined,
+      permissions: { "project:manage": true, "project:create": true } as Record<
+        string,
+        boolean
+      >,
+      providers: [] as Array<Record<string, unknown>>,
+    },
+    mockOpenDrawer: vi.fn(),
+    mockDeleteProvider: vi.fn(),
+    mockTestConnection: vi.fn(),
+  }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
@@ -87,7 +89,7 @@ vi.mock("~/hooks/useDrawer", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       organization: { getAll: { invalidate: vi.fn() } },
       modelProvider: {
         getAllForProject: { invalidate: vi.fn() },
@@ -102,6 +104,15 @@ vi.mock("~/utils/api", () => ({
       delete: {
         useMutation: () => ({
           mutateAsync: mockDeleteProvider,
+          isPending: false,
+        }),
+      },
+      // The page's connection-test hook asks for this at render time, so
+      // leaving it out fails every test in the file on a TypeError rather
+      // than on anything they are about.
+      testConnection: {
+        useMutation: () => ({
+          mutateAsync: mockTestConnection,
           isPending: false,
         }),
       },
@@ -348,6 +359,55 @@ describe("given the Model Providers settings page", () => {
         expect(
           tooltipWith("Create a project first to edit or delete providers."),
         ).toBeNull();
+      });
+
+      // The row action and the verdict beneath it, driven from the page rather
+      // than from the hook. Everything under this heading was previously
+      // covered only at the hook, which left the wiring itself unbound: the
+      // menu item could stop calling the hook, or the verdict stop rendering,
+      // and nothing would have failed.
+
+      /** @scenario "Testing a saved provider uses the credential already stored" */
+      it("sends the row id when the connection test is picked", async () => {
+        mockTestConnection.mockResolvedValueOnce({ outcome: "verified" });
+        renderPage();
+
+        fireEvent.click(document.querySelector('[data-menu-item="test"]')!);
+
+        expect(mockTestConnection).toHaveBeenCalledWith(
+          expect.objectContaining({ modelProviderId: "mp-1" }),
+        );
+        // No endpoint travels with it — see the service for why the absence is
+        // the point.
+        expect(
+          Object.keys(mockTestConnection.mock.calls[0]![0] as object),
+        ).not.toContain("customBaseUrl");
+      });
+
+      /** @scenario "A working credential says so" */
+      it("shows the verdict on the row it belongs to", async () => {
+        mockTestConnection.mockResolvedValueOnce({ outcome: "verified" });
+        renderPage();
+
+        fireEvent.click(document.querySelector('[data-menu-item="test"]')!);
+
+        expect(await screen.findByText("Connection works")).toBeTruthy();
+      });
+
+      /** @scenario "A provider we cannot check says so instead of reporting success" */
+      it("never renders a provider it could not check as working", async () => {
+        mockTestConnection.mockResolvedValueOnce({
+          outcome: "unchecked",
+          reason: "provider_not_probeable",
+        });
+        renderPage();
+
+        fireEvent.click(document.querySelector('[data-menu-item="test"]')!);
+
+        expect(
+          await screen.findByText(/can't be tested automatically/),
+        ).toBeTruthy();
+        expect(screen.queryByText("Connection works")).toBeNull();
       });
 
       /** @scenario "Editing it" */

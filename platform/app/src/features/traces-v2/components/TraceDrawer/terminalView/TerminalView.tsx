@@ -4,6 +4,7 @@ import {
   memo,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -16,6 +17,7 @@ import {
 } from "../../../utils/formatters";
 import { findCacheRebuilds } from "../sessionView/tokenTimeline";
 import { toolResultBodyToString } from "../transcript";
+import { classifyPromptText } from "./injectedNotice";
 import {
   CLAUDE_MARK_GRADIENT,
   TERMINAL_FONT_STACK,
@@ -23,6 +25,7 @@ import {
 } from "./palette";
 import { SyntaxHighlightedCode } from "./SyntaxHighlightedCode";
 import type { SessionBanner } from "./sessionBanner";
+import type { TurnDivider } from "./sessionScrollback";
 import { TerminalDiff } from "./TerminalDiff";
 import { TerminalOutput } from "./TerminalOutput";
 import { TerminalPatch } from "./TerminalPatch";
@@ -33,6 +36,10 @@ import {
   toolPrimaryArg,
 } from "./terminalSession";
 import { parsePatchHunks, type TerminalToolSpan } from "./toolSpans";
+import {
+  CONVERSATION_TURN_CAP,
+  type ScrollbackStatus,
+} from "./useSessionScrollback";
 
 /** What actually ran, keyed by the tool span's OWN id (matches `entry.spanId`). */
 export type ToolSpanIndex = ReadonlyMap<string, TerminalToolSpan>;
@@ -72,6 +79,14 @@ const MARK_ROWS = [" ▐▛███▜▌", "▝▜█████▛▘", "  �
 
 /** How close to the true bottom counts as "at the bottom", in pixels. */
 const NEAR_BOTTOM_PX = 32;
+
+/**
+ * How close to the top a reader has to be for an upward gesture to mean "read
+ * further back". Generous, because the gesture is what triggers a load, not the
+ * position: a wheel flick that lands here has momentum the reader expects to
+ * carry them past the top.
+ */
+const LOAD_EARLIER_PX = 200;
 
 /**
  * Context-size bands for the "heatmap" note — a growing context costs more
@@ -171,6 +186,59 @@ function buildContextMarkers(
   return markers;
 }
 
+/**
+ * A turn can open on entries that render nothing (a `model_call` carries
+ * economics only), and a divider drawn at an index that never reaches the
+ * screen is a boundary the reader never sees. Each one moves down to the first
+ * entry that does render, exactly as {@link buildContextMarkers} does with its
+ * pending notes.
+ */
+function forwardDividersToVisible(
+  turnDividers: ReadonlyMap<number, TurnDivider> | undefined,
+  entries: TranscriptEntry[],
+  visibleIndices: readonly number[],
+): Map<number, TurnDivider> | null {
+  if (!turnDividers || turnDividers.size === 0) return null;
+
+  const visibleSet = new Set(visibleIndices);
+  const forwarded = new Map<number, TurnDivider>();
+  let pending: TurnDivider | null = null;
+
+  entries.forEach((_, fullIndex) => {
+    pending = turnDividers.get(fullIndex) ?? pending;
+    if (pending !== null && visibleSet.has(fullIndex)) {
+      forwarded.set(fullIndex, pending);
+      pending = null;
+    }
+  });
+
+  return forwarded;
+}
+
+/**
+ * Which beat is at the bottom of the viewport, read back off the DOM. Rows are
+ * laid out in order, so the last one whose top has not scrolled past the
+ * bottom edge is the one in view there, and that is the beat the bottom bar's
+ * running totals report.
+ */
+function trackedIndexAt({
+  rows,
+  visibleIndices,
+  viewportBottom,
+}: {
+  rows: ReadonlyMap<number, HTMLDivElement>;
+  visibleIndices: readonly number[];
+  viewportBottom: number;
+}): number {
+  let best = visibleIndices[0] ?? -1;
+  for (const fullIndex of visibleIndices) {
+    const node = rows.get(fullIndex);
+    if (!node || node.offsetTop > viewportBottom) break;
+    best = fullIndex;
+  }
+  return best;
+}
+
 interface TerminalViewProps {
   /** The whole session, in the order it happened — spans AND logs, agent-neutral. */
   entries: TranscriptEntry[];
@@ -185,6 +253,19 @@ interface TerminalViewProps {
   banner?: SessionBanner;
   /** The trace's name, shown in the bottom bar where Claude Code shows its input. */
   sessionName?: string | null;
+  /**
+   * A stable identity per entry, parallel to `entries`. Without it rows are
+   * keyed by position, which is only safe while nothing is ever prepended.
+   */
+  rowKeys?: string[];
+  /** Where one turn of the session ends and the next begins, by entry index. */
+  turnDividers?: ReadonlyMap<number, TurnDivider>;
+  /** The rest of the session, above the turn on screen. Absent: this turn is all there is. */
+  scrollback?: {
+    status: ScrollbackStatus;
+    earlierCount: number;
+    onLoadEarlier: () => void;
+  };
 }
 
 /**
@@ -209,6 +290,9 @@ export const TerminalView = memo(function TerminalView({
   toolSpans = NO_TOOL_SPANS,
   banner,
   sessionName,
+  rowKeys,
+  turnDividers,
+  scrollback,
 }: TerminalViewProps) {
   const timeline = useMemo(() => buildEntryTimeline(entries), [entries]);
 
@@ -226,6 +310,10 @@ export const TerminalView = memo(function TerminalView({
     () => buildContextMarkers(entries, visibleIndices),
     [entries, visibleIndices],
   );
+  const dividersAtVisibleIndex = useMemo(
+    () => forwardDividersToVisible(turnDividers, entries, visibleIndices),
+    [turnDividers, entries, visibleIndices],
+  );
 
   const screenRef = useRef<HTMLDivElement>(null);
   const rowRefs = useRef<Map<number, HTMLDivElement>>(new Map());
@@ -241,35 +329,91 @@ export const TerminalView = memo(function TerminalView({
   const [trackedFullIndex, setTrackedFullIndex] =
     useState(lastVisibleFullIndex);
 
-  // Re-derive which beat is "at the bottom of the viewport" from the DOM —
-  // rows are laid out in order, so the last one whose top hasn't scrolled
-  // past the viewport's bottom edge is the one currently in view there.
+  // What the screen measured last, so a prepend can be told apart from a
+  // resize and undone by exactly the height that arrived above the reader.
+  const prevFirstEntryRef = useRef<TranscriptEntry | undefined>(entries[0]);
+  const lastScrollHeightRef = useRef(0);
+  const lastScrollTopRef = useRef(0);
+  const prependedThisCommitRef = useRef(false);
+
+  const scrollbackStatus = scrollback?.status;
+  const onLoadEarlier = scrollback?.onLoadEarlier;
+  const requestEarlierTurn = useCallback(() => {
+    if (scrollbackStatus === "available") onLoadEarlier?.();
+  }, [scrollbackStatus, onLoadEarlier]);
+
   const syncToScroll = useCallback(() => {
     const el = screenRef.current;
     if (!el) return;
-    const viewportBottom = el.scrollTop + el.clientHeight;
+    const scrollTop = el.scrollTop;
+    const viewportBottom = scrollTop + el.clientHeight;
     setIsAtBottom(el.scrollHeight - viewportBottom <= NEAR_BOTTOM_PX);
 
-    let best = visibleIndices[0] ?? -1;
-    for (const fullIndex of visibleIndices) {
-      const node = rowRefs.current.get(fullIndex);
-      if (!node || node.offsetTop > viewportBottom) break;
-      best = fullIndex;
+    // The gesture, not the position, is what asks for more session. The tab
+    // opens at the top of its own turn, so anything that triggered on being
+    // near the top would walk the whole session back before the reader had
+    // read a line.
+    const movedUp = scrollTop < lastScrollTopRef.current - 1;
+    lastScrollTopRef.current = scrollTop;
+    lastScrollHeightRef.current = el.scrollHeight;
+    if (movedUp && scrollTop <= LOAD_EARLIER_PX) requestEarlierTurn();
+
+    setTrackedFullIndex(
+      trackedIndexAt({
+        rows: rowRefs.current,
+        visibleIndices,
+        viewportBottom,
+      }),
+    );
+  }, [visibleIndices, requestEarlierTurn]);
+
+  // A short turn never overflows, so it emits no scroll event to read a
+  // gesture from. The wheel says the same thing the scroll would have.
+  const onWheel = useCallback(
+    (event: React.WheelEvent<HTMLDivElement>) => {
+      const el = screenRef.current;
+      if (!el || event.deltaY >= 0) return;
+      if (el.scrollTop <= LOAD_EARLIER_PX) requestEarlierTurn();
+    },
+    [requestEarlierTurn],
+  );
+
+  // Earlier turns arrived ABOVE the reader: everything they were looking at
+  // just moved down by the height of what was inserted, so the screen moves
+  // with it and the row under their eyes stays under their eyes. Runs before
+  // the follow-the-tail effect below, which must not fire on this commit.
+  useLayoutEffect(() => {
+    const previousFirst = prevFirstEntryRef.current;
+    const nextFirst = entries[0];
+    const prepended =
+      previousFirst !== undefined &&
+      nextFirst !== previousFirst &&
+      entries.includes(previousFirst);
+    prependedThisCommitRef.current = prepended;
+    prevFirstEntryRef.current = nextFirst;
+
+    const el = screenRef.current;
+    if (!el) return;
+    if (prepended) {
+      el.scrollTop += el.scrollHeight - lastScrollHeightRef.current;
+      lastScrollTopRef.current = el.scrollTop;
     }
-    setTrackedFullIndex(best);
-  }, [visibleIndices]);
+    lastScrollHeightRef.current = el.scrollHeight;
+  }, [entries]);
 
   // New output arrives while the reader is caught up at the bottom: follow
   // it down, the way a real terminal does. Scrolled up reading history: stay
   // put — the point of the affordance below is that this is a choice, not
-  // something the screen fights you on.
+  // something the screen fights you on. History arriving at the TOP is never
+  // new output, however short the turn is and however close to the bottom the
+  // reader happens to be sitting.
   const prevEntryCountRef = useRef(entries.length);
   useEffect(() => {
     const hasGrown = entries.length > prevEntryCountRef.current;
     prevEntryCountRef.current = entries.length;
     const el = screenRef.current;
     if (!el) return;
-    if (hasGrown && isAtBottom) {
+    if (hasGrown && isAtBottom && !prependedThisCommitRef.current) {
       el.scrollTop = el.scrollHeight;
     }
     syncToScroll();
@@ -291,7 +435,12 @@ export const TerminalView = memo(function TerminalView({
     () => modelAt(entries, trackedFullIndex) ?? banner?.model ?? null,
     [entries, trackedFullIndex, banner?.model],
   );
-  const trackedStep = Math.max(0, visibleIndices.indexOf(trackedFullIndex)) + 1;
+  // An agent that reported usage but no content has entries and no beats to
+  // walk, which read as "step 1/0" while standing on nothing.
+  const trackedStep =
+    visibleIndices.length === 0
+      ? 0
+      : Math.max(0, visibleIndices.indexOf(trackedFullIndex)) + 1;
 
   if (entries.length === 0) {
     return (
@@ -318,6 +467,7 @@ export const TerminalView = memo(function TerminalView({
     >
       <Box
         ref={screenRef}
+        data-testid="terminal-screen"
         flex={1}
         minHeight={0}
         overflow="auto"
@@ -326,32 +476,48 @@ export const TerminalView = memo(function TerminalView({
         paddingX={3}
         paddingY={2}
         onScroll={syncToScroll}
+        onWheel={onWheel}
+        // Anchoring is the browser holding a row still by moving `scrollTop`
+        // itself, which would fight the prepend correction above and land the
+        // reader somewhere neither of them intended.
+        style={{ overflowAnchor: "none" }}
       >
         <VStack align="stretch" gap={2.5}>
-          <TerminalBanner banner={banner} />
+          <ScrollbackTop
+            banner={banner}
+            scrollback={scrollback}
+            loadedTurnCount={(turnDividers?.size ?? 0) + 1}
+          />
           {visibleIndices.length === 0 && entries.length > 0 && (
             <Text {...CELL} color={TERMINAL_TOKENS.faint}>
               This agent reported tokens and timing only: its telemetry carries
               no conversation content to replay. The totals below are real.
             </Text>
           )}
-          {visibleIndices.map((fullIndex) => (
-            <Fragment key={fullIndex}>
-              {contextMarkers.get(fullIndex)?.map((marker, i) => (
-                <ContextMarkerLine
-                  key={`${fullIndex}-marker-${i}`}
-                  marker={marker}
-                />
-              ))}
-              <Box
-                ref={(node: HTMLDivElement | null) =>
-                  setRowRef(fullIndex, node)
-                }
-              >
-                <EntryLine entry={entries[fullIndex]!} toolSpans={toolSpans} />
-              </Box>
-            </Fragment>
-          ))}
+          {visibleIndices.map((fullIndex) => {
+            const divider = dividersAtVisibleIndex?.get(fullIndex);
+            return (
+              <Fragment key={rowKeys?.[fullIndex] ?? fullIndex}>
+                {divider && <TurnDividerLine divider={divider} />}
+                {contextMarkers.get(fullIndex)?.map((marker, i) => (
+                  <ContextMarkerLine
+                    key={`${fullIndex}-marker-${i}`}
+                    marker={marker}
+                  />
+                ))}
+                <Box
+                  ref={(node: HTMLDivElement | null) =>
+                    setRowRef(fullIndex, node)
+                  }
+                >
+                  <EntryLine
+                    entry={entries[fullIndex]!}
+                    toolSpans={toolSpans}
+                  />
+                </Box>
+              </Fragment>
+            );
+          })}
         </VStack>
       </Box>
 
@@ -604,6 +770,176 @@ function TerminalBanner({ banner }: { banner?: SessionBanner }) {
   );
 }
 
+/**
+ * The top of the screen. The banner IS the session-start marker: it is what
+ * the agent printed when the session began, so it belongs above the FIRST
+ * turn and nowhere else. While earlier turns are still out there, the same
+ * slot carries the affordance that reaches them.
+ */
+function ScrollbackTop({
+  banner,
+  scrollback,
+  loadedTurnCount,
+}: {
+  banner?: SessionBanner;
+  scrollback?: TerminalViewProps["scrollback"];
+  /** How many turns of the session are on screen right now. */
+  loadedTurnCount: number;
+}) {
+  const status = scrollback?.status ?? "hidden";
+
+  if (status === "hidden" || status === "start") {
+    return (
+      <>
+        <TerminalBanner banner={banner} />
+        {/* Only worth saying once the reader has walked back far enough to
+            wonder whether there is more above them. */}
+        {status === "start" && loadedTurnCount > 1 && (
+          <RuleLine label="session start" />
+        )}
+      </>
+    );
+  }
+
+  if (status === "loading") {
+    return (
+      <ScrollbackLine
+        glyph="⋯"
+        color={TERMINAL_TOKENS.faint}
+        text="loading earlier turn"
+      />
+    );
+  }
+
+  if (status === "error") {
+    return (
+      <ScrollbackButton
+        glyph={GLYPH.note}
+        color={TERMINAL_TOKENS.red}
+        text="couldn't load the earlier turn, click to retry"
+        onClick={() => scrollback?.onLoadEarlier()}
+      />
+    );
+  }
+
+  if (status === "unavailable") {
+    return (
+      <ScrollbackLine
+        glyph={GLYPH.note}
+        color={TERMINAL_TOKENS.faint}
+        text={`earlier turns unavailable, this session is longer than the ${CONVERSATION_TURN_CAP} turns the view can walk`}
+      />
+    );
+  }
+
+  const count = scrollback?.earlierCount ?? 0;
+  return (
+    <ScrollbackButton
+      glyph="↑"
+      color={TERMINAL_TOKENS.faint}
+      text={`${count} earlier ${count === 1 ? "turn" : "turns"}, scroll to load`}
+      onClick={() => scrollback?.onLoadEarlier()}
+    />
+  );
+}
+
+/** A single faint row, the same shape the session's other notes use. */
+function ScrollbackLine({
+  glyph,
+  color,
+  text,
+}: {
+  glyph: string;
+  color: string;
+  text: string;
+}) {
+  return (
+    <HStack align="flex-start" gap={2}>
+      <Glyph char={glyph} color={color} />
+      <Text {...CELL} color={color} flex={1} minWidth={0}>
+        {text}
+      </Text>
+    </HStack>
+  );
+}
+
+/** The same row, when it is something the reader can act on. */
+function ScrollbackButton({
+  glyph,
+  color,
+  text,
+  onClick,
+}: {
+  glyph: string;
+  color: string;
+  text: string;
+  onClick: () => void;
+}) {
+  return (
+    <HStack asChild align="flex-start" gap={2} cursor="pointer" width="100%">
+      {/* A real button rather than a clickable row: it has to answer Enter
+          and Space too. Typed explicitly so a surrounding form cannot make
+          it a submit. */}
+      <button type="button" onClick={onClick}>
+        <Glyph char={glyph} color={color} />
+        <Text {...CELL} color={color} flex={1} minWidth={0} textAlign="start">
+          {text}
+        </Text>
+      </button>
+    </HStack>
+  );
+}
+
+/**
+ * The boundary between two turns of the session: a faint rule with its label
+ * inline, drawn with the rule glyph itself and clipped by overflow, the same
+ * idiom {@link AsciiBox} uses, rather than a CSS border standing in for one.
+ */
+function TurnDividerLine({ divider }: { divider: TurnDivider }) {
+  return (
+    <RuleLine
+      label={`turn ${divider.turnNumber}/${divider.turnCount} · ${clockTime(
+        divider.atMs,
+      )}`}
+    />
+  );
+}
+
+function RuleLine({ label }: { label: string }) {
+  const rule = "─".repeat(400);
+  return (
+    <HStack
+      gap={2}
+      align="center"
+      overflow="hidden"
+      color={TERMINAL_TOKENS.faint}
+    >
+      <Text {...CELL} flexShrink={0} aria-hidden>
+        ──
+      </Text>
+      <Text {...CELL} flexShrink={0}>
+        {label}
+      </Text>
+      <Text
+        {...CELL}
+        flex={1}
+        overflow="hidden"
+        whiteSpace="nowrap"
+        aria-hidden
+      >
+        {rule}
+      </Text>
+    </HStack>
+  );
+}
+
+/** Local wall-clock time, the way a terminal stamps its own output. */
+function clockTime(atMs: number): string {
+  const at = new Date(atMs);
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${pad(at.getHours())}:${pad(at.getMinutes())}:${pad(at.getSeconds())}`;
+}
+
 /** The startup mark, drawn from its precomputed per-row color segments. */
 function AgentMark({ mark }: { mark: MarkSpec }) {
   return (
@@ -660,7 +996,7 @@ function EntryLine({
     case "system_prompt":
       return <SystemContextLine text={entry.text} chars={entry.chars} />;
     case "user_prompt":
-      return <PromptLine text={entry.text} />;
+      return <UserMessage text={entry.text} />;
     case "assistant_message":
       return <AssistantLine text={entry.text} />;
     case "tool":
@@ -721,6 +1057,78 @@ function SystemContextLine({ text, chars }: { text: string; chars: number }) {
             minWidth={0}
           >
             {text}
+          </Text>
+        </HStack>
+      )}
+    </VStack>
+  );
+}
+
+/**
+ * The user's turn, which is not always the user. Agents inject blocks the human
+ * never typed into this same message (a monitor firing, a hook's reminder, a
+ * queued task notification), and behind the prompt caret those read as the
+ * reader's own words. Each one is drawn as a note about the session instead,
+ * and only what the human actually wrote keeps the caret.
+ */
+function UserMessage({ text }: { text: string | null }) {
+  const { notices, remainder } = classifyPromptText(text ?? "");
+  if (notices.length === 0) return <PromptLine text={text} />;
+  return (
+    <VStack align="stretch" gap={2}>
+      {notices.map((notice, index) => (
+        <NotificationLine
+          key={`${index}-${notice.label}`}
+          label={notice.label}
+          body={notice.body}
+        />
+      ))}
+      {remainder !== null && <PromptLine text={remainder} />}
+    </VStack>
+  );
+}
+
+/**
+ * One injected block, collapsed to its own line. Same family as
+ * {@link SystemContextLine}, because it is the same kind of thing: context the
+ * session carried that the reader may or may not want to open.
+ */
+function NotificationLine({ label, body }: { label: string; body: string }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <VStack align="stretch" gap={0.5}>
+      <HStack asChild align="flex-start" gap={2} cursor="pointer" width="100%">
+        {/* A real button, typed explicitly: inside a form, the default `type`
+            would be submit. */}
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+        >
+          <Glyph char={GLYPH.note} color={TERMINAL_TOKENS.faint} />
+          <Text
+            {...CELL}
+            color={TERMINAL_TOKENS.faint}
+            flex={1}
+            minWidth={0}
+            textAlign="start"
+          >
+            {label} {expanded ? "(click to collapse)" : "(click to expand)"}
+          </Text>
+        </button>
+      </HStack>
+      {expanded && (
+        <HStack align="flex-start" gap={2}>
+          <Glyph char={GLYPH.elbow} color={TERMINAL_TOKENS.faint} />
+          <Text
+            {...CELL}
+            whiteSpace="pre-wrap"
+            wordBreak="break-word"
+            color={TERMINAL_TOKENS.faint}
+            flex={1}
+            minWidth={0}
+          >
+            {body}
           </Text>
         </HStack>
       )}

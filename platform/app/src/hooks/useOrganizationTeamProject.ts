@@ -1,6 +1,6 @@
-import { OrganizationUserRole, type Project } from "@prisma/client";
 import { useEffect, useMemo } from "react";
 import { useLocalStorage } from "usehooks-ts";
+import { OrganizationUserRole, type Project } from "~/generated/prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
 import {
   EXTERNAL_MEMBER_PERMISSIONS,
@@ -250,7 +250,7 @@ export const useOrganizationTeamProject = (
   );
   const [localStorageProjectSlug, setLocalStorageProjectSlug] =
     useLocalStorage<string>("selectedProjectSlug", "");
-  const [, setLastVisitedHomeKind] = useLocalStorage<
+  const [lastVisitedHomeKind, setLastVisitedHomeKind] = useLocalStorage<
     "" | "project" | "personal"
   >("lastVisitedHomeKind", "");
 
@@ -453,7 +453,12 @@ export const useOrganizationTeamProject = (
     // slug: `project` also resolves from the persisted selectedProjectSlug on
     // non-project routes (e.g. /me), and marking "project" there would clobber
     // MyLayout's "personal" and wrongly bounce `/` back to the project.
-    if (project && typeof router.query.project === "string") {
+    // `projectSlugFromUrl` (not raw `router.query.project`) so reserved slugs
+    // like /messages or /datasets don't count as project visits either.
+    if (project && !!projectSlugFromUrl && lastVisitedHomeKind !== "project") {
+      // Guarded like the setters above: every unguarded write dispatches a
+      // storage event that setStates all mounted subscribers, which can cascade
+      // past React's nested-update limit during route transitions.
       setLastVisitedHomeKind("project");
     }
     // We want to update localstorage values only once, forward, doesn't matter if localstorage
@@ -493,18 +498,32 @@ export const useOrganizationTeamProject = (
       org.teams.filter((team) => team.projects.length > 0),
     );
 
+    // Onboarding is for people who belong to no organization. It is the page
+    // that creates one, so offering it to a member only ever produces a second
+    // organization nobody asked for, and `pages/index.tsx` already draws the
+    // line here.
+    if (organizations.data.length === 0) {
+      void router.push(`/onboarding/welcome${returnTo}`);
+      return;
+    }
+
     // ADR-038 v6: an intent-set org is onboarded, period. Governance orgs
     // deliberately have no project (users live on /me, data flows through
     // personal workspaces); an LLMOps org that postponed project creation
-    // recovers via /settings. Never bounce either into onboarding — the
-    // welcome screen would offer to create a duplicate org — or to another
-    // org's project.
+    // recovers via /settings. Never redirect either to another org's project.
     if (organization?.primaryIntent) {
       return;
     }
 
+    // A member with nothing to be redirected *to* stays put, and the home
+    // resolver in `pages/index.tsx` picks their destination. This used to bounce
+    // to onboarding, which is how a member invited into an organization with no
+    // shared project ended up at "let's kick off by creating your organization".
+    // Note `teamsWithProjectsOnAnyOrg` counts personal workspaces, so a member
+    // who has only their own workspace reaches here rather than the branch
+    // below, which is deliberate: a personal workspace is never a project-home
+    // target (ADR-038 v6).
     if (!organization || !teamsWithProjectsOnAnyOrg.length) {
-      void router.push(`/onboarding/welcome${returnTo}`);
       return;
     }
 

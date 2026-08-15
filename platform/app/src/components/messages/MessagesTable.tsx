@@ -85,7 +85,7 @@ export function MessagesTable({
   const openLiteMemberRestriction = useUpgradeModalStore(
     (s) => s.openLiteMemberRestriction,
   );
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
 
   const { filterParams, queryOpts } = useFilterParams();
   const [selectedTraceIds, setSelectedTraceIds] = useState<string[]>([]);
@@ -99,7 +99,8 @@ export function MessagesTable({
     setRelativePeriod,
   } = usePeriodSelector();
 
-  const navigationFooter = useNavigationFooter();
+  // Trace search pages by scrollId only — a non-zero pageOffset is rejected.
+  const navigationFooter = useNavigationFooter("cursor");
 
   const {
     isDialogOpen: isExportDialogOpen,
@@ -139,7 +140,6 @@ export function MessagesTable({
       endDate: liveEndDate,
       query: getSingleQueryParam(router.query.query),
       groupBy: "none",
-      pageOffset: navigationFooter.pageOffset,
       pageSize: navigationFooter.pageSize,
       sortBy: getSingleQueryParam(router.query.sortBy),
       sortDirection: getSingleQueryParam(router.query.orderBy),
@@ -172,7 +172,6 @@ export function MessagesTable({
   // so skeletons show during loading. SSE-driven liveEndDate changes don't go through here.
   const userQueryKey = JSON.stringify({
     filterParams,
-    pageOffset: navigationFooter.pageOffset,
     pageSize: navigationFooter.pageSize,
     sortBy: getSingleQueryParam(router.query.sortBy),
     sortDirection: getSingleQueryParam(router.query.orderBy),
@@ -998,9 +997,9 @@ export function MessagesTable({
               closable: true,
             },
             action: {
-              label: "View Queues",
+              label: "View queues",
               onClick: () => {
-                void router.push(`/${project?.slug}/annotations/`);
+                void router.push(`/${project?.slug}/annotations`);
               },
             },
           });
@@ -1388,7 +1387,7 @@ export function MessagesTable({
                         setAnnotators={setAnnotators}
                         queueDrawerOpen={queueDrawerOpen}
                         sendToQueue={sendToQueue}
-                        isLoading={queueItem.isLoading}
+                        isLoading={queueItem.isPending}
                       />
                     </Dialog.Body>
 

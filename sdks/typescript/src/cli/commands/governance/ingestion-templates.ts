@@ -6,10 +6,13 @@ import {
   cloneIngestionTemplateFromPlatform,
   createIngestionTemplate,
   getIngestionTemplate,
-  GovernanceCliError,
   updateIngestionTemplateOttlRules,
 } from "@/cli/utils/governance/cli-api";
 import { isLoggedIn, loadConfig } from "@/cli/utils/governance/config";
+import {
+  commandValidationError,
+  reportCommandError,
+} from "@/cli/utils/errorOutput";
 
 import type { IngestionTemplateRow } from "@/cli/utils/governance/cli-api";
 
@@ -36,9 +39,14 @@ function requireLogin() {
   return cfg;
 }
 
-function handleError(err: unknown): never {
-  const msg = err instanceof GovernanceCliError ? err.message : String(err);
-  process.stderr.write(`Error: ${msg}\n`);
+function handleError({
+  error,
+  json,
+}: {
+  error: unknown;
+  json?: boolean;
+}): never {
+  reportCommandError({ error, format: json ? "json" : undefined });
   process.exit(1);
 }
 
@@ -77,7 +85,7 @@ export async function adminListCommand(options: {
   try {
     rows = await adminListIngestionTemplates(cfg);
   } catch (err) {
-    handleError(err);
+    handleError({ error: err, json: options.json });
   }
   if (options.json) {
     console.log(JSON.stringify(rows, null, 2));
@@ -95,7 +103,7 @@ export async function getCommand(
   try {
     row = await getIngestionTemplate(cfg, id);
   } catch (err) {
-    handleError(err);
+    handleError({ error: err, json: options.json });
   }
   if (options.json) {
     console.log(JSON.stringify(row, null, 2));
@@ -120,9 +128,12 @@ export async function createCommand(options: {
       options.credentialSchema,
     )
   ) {
-    process.stderr.write(
-      `Error: --credential-schema must be one of: otlp_token, static_api_key, agent_id\n`,
-    );
+    reportCommandError({
+      error: commandValidationError(
+        "--credential-schema must be one of: otlp_token, static_api_key, agent_id",
+      ),
+      format: options.json ? "json" : undefined,
+    });
     process.exit(1);
   }
   let row: IngestionTemplateRow;
@@ -140,7 +151,7 @@ export async function createCommand(options: {
       ottl_rules: options.ottlRules,
     });
   } catch (err) {
-    handleError(err);
+    handleError({ error: err, json: options.json });
   }
   if (options.json) {
     console.log(JSON.stringify(row, null, 2));
@@ -159,7 +170,7 @@ export async function updateOttlRulesCommand(
   try {
     row = await updateIngestionTemplateOttlRules(cfg, id, options.ottlRules);
   } catch (err) {
-    handleError(err);
+    handleError({ error: err, json: options.json });
   }
   if (options.json) {
     console.log(JSON.stringify(row, null, 2));
@@ -176,7 +187,7 @@ export async function archiveCommand(
   try {
     await archiveIngestionTemplate(cfg, id);
   } catch (err) {
-    handleError(err);
+    handleError({ error: err, json: options.json });
   }
   if (options.json) {
     console.log(JSON.stringify({ ok: true }, null, 2));
@@ -194,7 +205,7 @@ export async function cloneFromPlatformCommand(
   try {
     row = await cloneIngestionTemplateFromPlatform(cfg, sourceTemplateId);
   } catch (err) {
-    handleError(err);
+    handleError({ error: err, json: options.json });
   }
   if (options.json) {
     console.log(JSON.stringify(row, null, 2));

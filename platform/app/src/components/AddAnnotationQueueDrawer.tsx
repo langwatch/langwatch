@@ -63,7 +63,7 @@ export const AddAnnotationQueueDrawer = ({
     }
   };
 
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
 
   const annotationScores = api.annotationScore.getAllActive.useQuery(
     {
@@ -169,8 +169,15 @@ export const AddAnnotationQueueDrawer = ({
       },
       {
         onSuccess: (data) => {
+          // Everything that lists queues or counts their work: the listing, the
+          // queue page itself, the participants picker, the sidebar entries and
+          // its badges. A queue nobody can see yet is a queue nobody can use.
           void queryClient.annotation.getOptimizedAnnotationQueues.invalidate();
           void queryClient.annotation.getQueueBySlugOrId.invalidate();
+          void queryClient.annotation.getQueues.invalidate();
+          void queryClient.annotation.getQueueItemsCounts.invalidate();
+          void queryClient.annotation.getPendingItemsCount.invalidate();
+          void queryClient.annotation.getAssignedItemsCount.invalidate();
           toaster.create({
             title: `Annotation Queue ${queueId ? "Updated" : "Created"}`,
             description: `Successfully ${queueId ? "updated" : "created"} ${
@@ -243,7 +250,7 @@ export const AddAnnotationQueueDrawer = ({
             </HStack>
             <HStack>
               <Text paddingTop={5} fontSize="2xl">
-                Create Annotation Queue
+                {queueId ? "Edit Annotation Queue" : "Create Annotation Queue"}
               </Text>
             </HStack>
           </Drawer.Header>
@@ -445,7 +452,7 @@ export const AddAnnotationQueueDrawer = ({
                     colorPalette="orange"
                     type="submit"
                     minWidth="fit-content"
-                    loading={createOrUpdateQueue.isLoading}
+                    loading={createOrUpdateQueue.isPending}
                   >
                     Save
                   </Button>

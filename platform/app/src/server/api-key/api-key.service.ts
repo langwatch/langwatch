@@ -1,7 +1,7 @@
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import type { ApiKey, PrismaClient } from "@prisma/client";
-import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
+import type { ApiKey, PrismaClient } from "~/generated/prisma/client";
+import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import type { Permission } from "~/server/api/rbac";
 import {
   MalformedCustomRolePermissionsError,
@@ -10,12 +10,12 @@ import {
 } from "~/server/rbac/custom-role-permissions";
 import {
   checkRoleBindingPermission,
+  resolveApiKeyPermission,
   resolveLegacyCeiling,
 } from "~/server/rbac/role-binding-resolver";
-import {
-  CUSTOM_ROLE_KIND,
-  RoleRepository,
-} from "~/server/role/repositories/role.repository";
+import { RoleRepository } from "~/server/role/repositories/role.repository";
+import { CUSTOM_ROLE_KIND } from "~/server/role/role-kind";
+import { assertPersonalTeamScopesOwnedBy } from "~/server/role-bindings/personal-team-scope";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
   ApiKeyRepository,
@@ -53,6 +53,32 @@ function isSystemManaged(apiKey: { name: string }): boolean {
   return HIDDEN_SYSTEM_KEY_NAMES.includes(apiKey.name);
 }
 
+/**
+ * Whether a member's own listing already shows them this key: their own keys,
+ * plus the organization's service keys.
+ *
+ * Deliberately in step with `findAllByUser`, which answers the same question
+ * for the list. A row a caller can see in the list and not by id is a hole in
+ * the CLI's list-then-read loop, not a security boundary. The company-wide
+ * ingestion keys are excluded here for the reason they are excluded there:
+ * their source, template and activity metadata is admin territory.
+ *
+ * A service credential (no user) is not a member and gets nothing from this:
+ * its listing is the org-wide one, which takes organization:manage.
+ *
+ * Revocation is not part of the question. The listing hides revoked keys so a
+ * member's list is not a graveyard; reading one back by an id already held is
+ * how you find out the key you are holding was revoked.
+ */
+function isListedForMember(
+  apiKey: { userId: string | null; ingestSourceType: string | null },
+  callerUserId: string | null,
+): boolean {
+  if (!callerUserId) return false;
+  if (apiKey.userId === callerUserId) return true;
+  return apiKey.userId === null && apiKey.ingestSourceType === null;
+}
+
 type RoleBindingBase = {
   scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
   scopeId: string;
@@ -66,6 +92,13 @@ type CreatorScope =
   | { type: "org"; id: string }
   | { type: "team"; id: string }
   | { type: "project"; id: string; teamId: string };
+
+/**
+ * A key with its bindings and the explicit permission set a `restricted` key
+ * carries on its private custom role, flattened onto the record so a reader
+ * does not have to know that indirection exists.
+ */
+export type ApiKeyDetail = ApiKeyWithBindings & { permissions: string[] };
 
 export class ApiKeyService {
   private readonly repo: ApiKeyRepository;
@@ -201,6 +234,18 @@ export class ApiKeyService {
       ];
     }
 
+    // A personal key has no such default, and zero bindings means zero access:
+    // `resolveApiKeyPermission` asks the key's own bindings first and denies
+    // when there are none. Minting it would hand somebody a token that is
+    // authorized for nothing anywhere, with nothing along the way saying so.
+    // The REST schema refuses this with a field path; this is the backstop for
+    // every other caller.
+    if (userId && effectiveBindings.length === 0) {
+      throw new ApiKeyScopeViolationError(
+        "A personal API key needs at least one role binding",
+      );
+    }
+
     // Ingestion-only keys (identified by ingestSourceType) carry the ik-lw-
     // prefix so they're distinguishable from full-access sk-lw- keys; same
     // scheme otherwise, so resolution is unaffected.
@@ -252,6 +297,15 @@ export class ApiKeyService {
       }
 
       if (effectiveBindings.length > 0) {
+        // A key may reach a personal workspace only as its owner's own
+        // credential, whose ceiling already caps it. A service key or a key
+        // owned by anyone else binding in would hand the private workspace to
+        // a second principal.
+        await assertPersonalTeamScopesOwnedBy({
+          client: tx,
+          scopes: effectiveBindings,
+          ownerUserId: userId ?? null,
+        });
         await txRepo.createRoleBindings({
           apiKeyId: created.id,
           organizationId,
@@ -287,7 +341,11 @@ export class ApiKeyService {
     bindings,
   }: {
     id: string;
-    callerUserId: string;
+    /**
+     * Null when the caller is a service credential. Ownership then never
+     * matches, so a null caller updates a key only through `callerIsAdmin`.
+     */
+    callerUserId: string | null;
     callerIsAdmin: boolean;
     organizationId: string;
     name?: string;
@@ -420,6 +478,13 @@ export class ApiKeyService {
       });
 
       if (effectiveBindings) {
+        // Same personal-workspace line as create(): replacement bindings may
+        // reach a personal workspace only when this key acts as its owner.
+        await assertPersonalTeamScopesOwnedBy({
+          client: tx,
+          scopes: effectiveBindings,
+          ownerUserId: existing.userId,
+        });
         await txRepo.replaceRoleBindings({
           apiKeyId: id,
           organizationId,
@@ -849,7 +914,11 @@ export class ApiKeyService {
     organizationId,
   }: {
     id: string;
-    callerUserId: string;
+    /**
+     * Null when the caller is a service credential. Ownership then never
+     * matches, so a null caller revokes a key only through `callerIsAdmin`.
+     */
+    callerUserId: string | null;
     callerIsAdmin: boolean;
     organizationId: string;
   }): Promise<ApiKey> {
@@ -910,10 +979,148 @@ export class ApiKeyService {
   }
 
   /**
+   * The service-credential counterpart of {@link isOrgAdmin}: whether the API
+   * key itself holds an ADMIN role binding at the organization scope. A
+   * credential can carry `organization:manage` through a custom role without
+   * being an organization admin, and admin-only decisions (minting unbound
+   * service keys, revoking someone else's key) must not accept that as
+   * adminness.
+   */
+  async isOrgAdminApiKey({
+    apiKeyId,
+    organizationId,
+  }: {
+    apiKeyId: string;
+    organizationId: string;
+  }): Promise<boolean> {
+    const binding = await this.repo.findOrgAdminApiKeyBinding({
+      apiKeyId,
+      organizationId,
+    });
+    return !!binding;
+  }
+
+  /**
+   * Whether the presented credential resolves the given permission at
+   * organization scope: the same primitive the route-level
+   * `requireOrgPermission` middleware applies, exposed for handlers that need
+   * a second, stricter permission on one branch of a route.
+   */
+  async hasOrgScopedPermission({
+    apiKeyId,
+    userId,
+    organizationId,
+    permission,
+  }: {
+    apiKeyId: string;
+    userId: string | null;
+    organizationId: string;
+    permission: Permission;
+  }): Promise<boolean> {
+    return resolveApiKeyPermission({
+      prisma: this.prisma,
+      apiKeyId,
+      userId,
+      organizationId,
+      scope: { type: "org", id: organizationId },
+      permission,
+    });
+  }
+
+  /**
    * Gets a single API key by ID (for display, not verification).
    */
   async getById({ id }: { id: string }): Promise<ApiKeyWithBindings | null> {
     return this.repo.findById({ id });
+  }
+
+  /**
+   * One key the caller already holds an id for, with its bindings and the
+   * explicit permission set behind a `restricted` mode.
+   *
+   * Every refusal is reported as not-found: an id from another organization,
+   * a key the product manages itself, and a key belonging to someone else all
+   * answer identically to an id that never existed. A 403 on the last of those
+   * would confirm the id names a real key, which is exactly what a caller
+   * probing for other people's keys is after.
+   *
+   * `callerCanReadAnyKey` is the org-administration branch: it lifts the
+   * ownership requirement, and nothing else.
+   */
+  async getByIdForCaller({
+    id,
+    organizationId,
+    callerUserId,
+    callerCanReadAnyKey,
+  }: {
+    id: string;
+    organizationId: string;
+    callerUserId: string | null;
+    callerCanReadAnyKey: boolean;
+  }): Promise<ApiKeyDetail> {
+    const apiKey = await this.repo.findByIdInOrg({ id, organizationId });
+    if (!apiKey) throw new ApiKeyNotFoundError(id);
+    if (isSystemManaged(apiKey)) throw new ApiKeyNotFoundError(id);
+    if (!callerCanReadAnyKey && !isListedForMember(apiKey, callerUserId)) {
+      throw new ApiKeyNotFoundError(id);
+    }
+
+    return {
+      ...apiKey,
+      permissions: await this.resolveKeyPermissions({ apiKey, organizationId }),
+    };
+  }
+
+  /**
+   * The permissions a key's CUSTOM bindings confer, deduplicated and sorted.
+   *
+   * A malformed role is skipped rather than thrown: this is a read, and one
+   * corrupted row must not make the key unreadable. The ceiling paths, where
+   * the same data drives a grant, keep failing closed instead.
+   */
+  private async resolveKeyPermissions({
+    apiKey,
+    organizationId,
+  }: {
+    apiKey: ApiKeyWithBindings;
+    organizationId: string;
+  }): Promise<string[]> {
+    const customRoleIds = [
+      ...new Set(
+        apiKey.roleBindings
+          .map((rb) => rb.customRoleId)
+          .filter((cid): cid is string => cid !== null),
+      ),
+    ];
+
+    const roles = await this.repo.findCustomRolePermissionsInOrg({
+      ids: customRoleIds,
+      organizationId,
+    });
+
+    const permissions = new Set<string>();
+    for (const role of roles) {
+      try {
+        for (const permission of parseCustomRolePermissions({
+          customRoleId: role.id,
+          permissions: role.permissions,
+        })) {
+          permissions.add(permission);
+        }
+      } catch (err) {
+        if (!(err instanceof MalformedCustomRolePermissionsError)) throw err;
+        // Both ids are opaque row identifiers, deliberately logged: naming the
+        // role and the key whose permission set lost it is the only way an
+        // operator can find the corrupted row. No secret, token or address is
+        // derivable from either, and the key's own secret never reaches here.
+        logger.warn(
+          { err, customRoleId: role.id, apiKeyId: apiKey.id },
+          "custom role has malformed permissions; omitted from the key's permission set",
+        );
+      }
+    }
+
+    return [...permissions].sort();
   }
 
   /**

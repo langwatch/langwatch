@@ -9,13 +9,11 @@
  * same membership rule as the keys table, so the page and the table agree
  * on which keys exist and what they spent.
  */
-import type { PrismaClient } from "@prisma/client";
-import { z } from "zod";
 
-import {
-  chRepoOrUndefined,
-  spendRepoOrUndefined,
-} from "~/server/gateway/clickhouseRepos";
+import { z } from "zod";
+import type { PrismaClient } from "~/generated/prisma/client";
+
+import { getApp } from "~/server/app-layer/app";
 import { VirtualKeyNotFoundError } from "~/server/gateway/errors";
 import { GatewayUsageService } from "~/server/gateway/usage.service";
 import {
@@ -30,8 +28,8 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 function usageService(prisma: PrismaClient) {
   return GatewayUsageService.create({
     prisma,
-    chRepo: chRepoOrUndefined(),
-    spendRepo: spendRepoOrUndefined(),
+    chRepo: getApp().gateway.budgets,
+    spendRepo: getApp().gateway.virtualKeySpend,
   });
 }
 

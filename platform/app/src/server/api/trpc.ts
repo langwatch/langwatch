@@ -16,15 +16,18 @@ import {
   SpanKind,
   SpanStatusCode,
 } from "@opentelemetry/api";
-import type { inferParser } from "@trpc/server";
-import {
-  initTRPC,
-  type ProcedureBuilder,
-  type ProcedureParams,
-  type Simplify,
-  TRPCError,
-} from "@trpc/server";
+import { initTRPC, TRPCError } from "@trpc/server";
 import { getHTTPStatusCodeFromError } from "@trpc/server/http";
+// The permission-builder below re-implements the typing of tRPC's own
+// `procedureBuilder.input`, which is only expressible in terms of these
+// internals (v10 exposed them via the `@trpc-internal/*` path aliases).
+import type {
+  inferParser,
+  Parser,
+  ProcedureBuilder,
+  Simplify,
+  UnsetMarker,
+} from "@trpc/server/unstable-core-do-not-import";
 
 // Local type replacing CreateNextContextOptions from @trpc/server/adapters/next
 // to avoid pulling in the real `next` types.
@@ -37,11 +40,9 @@ import { auditLog } from "@ee/audit-log/auditLog";
 import { HandledError, ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { getLogLevelFromStatusCode } from "@langwatch/observability/request";
-import type { OrganizationUserRole } from "@prisma/client";
-import type { Parser } from "@trpc-internal/parser";
-import type { UnsetMarker } from "@trpc-internal/utils";
 import superjson from "superjson";
 import { ZodError } from "zod";
+import type { OrganizationUserRole } from "~/generated/prisma/client";
 import type { Session } from "~/server/auth";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
@@ -835,6 +836,12 @@ function handledErrorToTRPCCode(error: HandledError): TRPCError["code"] {
   const map: Partial<Record<number, TRPCError["code"]>> = {
     400: "BAD_REQUEST",
     401: "UNAUTHORIZED",
+    // tRPC v10 has no PAYMENT_REQUIRED. FORBIDDEN is what the tRPC-side
+    // enterprise guard (`requireEnterprisePlan`) already answers for the same
+    // refusal, so a 402 handled error crossing this boundary reads the same
+    // as that guard rather than as a server fault. The domain status survives
+    // as `data.error.httpStatus`, and the client keys its copy off `code`.
+    402: "FORBIDDEN",
     403: "FORBIDDEN",
     404: "NOT_FOUND",
     409: "CONFLICT",
@@ -1080,38 +1087,86 @@ type OverwriteIfDefined<TType, TWith> = UnsetMarker extends TType
  * a permission check middleware to use, and that this permission check should be compatible with the
  * inputs required
  */
-interface PendingPermissionProcedureBuilder<TParams extends ProcedureParams> {
-  // Copy-paste from @trpc core internals procedureBuilder
+interface PendingPermissionProcedureBuilder<
+  TContext,
+  TMeta,
+  TContextOverrides,
+  TInputIn,
+  TInputOut,
+  TOutputIn,
+  TOutputOut,
+  TCaller extends boolean,
+> {
+  // Mirrors tRPC core's procedureBuilder.input typing (v11 generics)
   input: <$Parser extends Parser>(
     schema: $Parser,
-  ) => PendingPermissionProcedureBuilder<{
-    _config: TParams["_config"];
-    _meta: TParams["_meta"];
-    _ctx_out: TParams["_ctx_out"];
-    _input_in: OverwriteIfDefined<
-      TParams["_input_in"],
-      inferParser<$Parser>["in"]
-    >;
-    _input_out: OverwriteIfDefined<
-      TParams["_input_out"],
-      inferParser<$Parser>["out"]
-    >;
-
-    _output_in: TParams["_output_in"];
-    _output_out: TParams["_output_out"];
-  }>;
+  ) => PendingPermissionProcedureBuilder<
+    TContext,
+    TMeta,
+    TContextOverrides,
+    OverwriteIfDefined<TInputIn, inferParser<$Parser>["in"]>,
+    OverwriteIfDefined<TInputOut, inferParser<$Parser>["out"]>,
+    TOutputIn,
+    TOutputOut,
+    TCaller
+  >;
   use: (
-    middleware: PermissionMiddleware<TParams["_input_out"]>,
-  ) => ReturnType<ProcedureBuilder<TParams>["use"]>;
+    middleware: PermissionMiddleware<TInputOut>,
+  ) => ProcedureBuilder<
+    TContext,
+    TMeta,
+    TContextOverrides,
+    TInputIn,
+    TInputOut,
+    TOutputIn,
+    TOutputOut,
+    TCaller
+  >;
 }
 
-const permissionProcedureBuilder = <TParams extends ProcedureParams>(
-  procedure: ProcedureBuilder<TParams>,
-): PendingPermissionProcedureBuilder<TParams> => {
+const permissionProcedureBuilder = <
+  TContext,
+  TMeta,
+  TContextOverrides,
+  TInputIn,
+  TInputOut,
+  TOutputIn,
+  TOutputOut,
+  TCaller extends boolean,
+>(
+  procedure: ProcedureBuilder<
+    TContext,
+    TMeta,
+    TContextOverrides,
+    TInputIn,
+    TInputOut,
+    TOutputIn,
+    TOutputOut,
+    TCaller
+  >,
+): PendingPermissionProcedureBuilder<
+  TContext,
+  TMeta,
+  TContextOverrides,
+  TInputIn,
+  TInputOut,
+  TOutputIn,
+  TOutputOut,
+  TCaller
+> => {
   return {
-    input: (input) => {
+    input: ((input: Parser) => {
       return permissionProcedureBuilder(procedure.input(input as any));
-    },
+    }) as PendingPermissionProcedureBuilder<
+      TContext,
+      TMeta,
+      TContextOverrides,
+      TInputIn,
+      TInputOut,
+      TOutputIn,
+      TOutputOut,
+      TCaller
+    >["input"],
     use: (middleware) => {
       return procedure
         .use(tracerMiddleware as any)

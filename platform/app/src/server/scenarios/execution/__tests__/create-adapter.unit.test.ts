@@ -28,11 +28,13 @@ describe("createAdapter", () => {
         promptId: "prompt_123",
         systemPrompt: "You are helpful.",
         messages: [],
+        inputs: [],
       };
 
       const adapter = createAdapter({
         adapterData,
         modelParams: defaultModelParams,
+        projectApiKey: "lw-project-key",
         nlpServiceUrl,
       });
 
@@ -48,11 +50,13 @@ describe("createAdapter", () => {
         url: "https://api.example.com/chat",
         method: "POST",
         headers: [],
+        secrets: {},
       };
 
       const adapter = createAdapter({
         adapterData,
         modelParams: defaultModelParams,
+        projectApiKey: "lw-project-key",
         nlpServiceUrl,
       });
 
@@ -74,6 +78,7 @@ describe("createAdapter", () => {
       const adapter = createAdapter({
         adapterData,
         modelParams: defaultModelParams,
+        projectApiKey: "lw-project-key",
         nlpServiceUrl,
       });
 
@@ -91,6 +96,7 @@ describe("createAdapter", () => {
         createAdapter({
           adapterData,
           modelParams: defaultModelParams,
+          projectApiKey: "lw-project-key",
           nlpServiceUrl,
         }),
       ).toThrow("Unknown adapter type: unknown-type");

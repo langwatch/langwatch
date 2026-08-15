@@ -8,6 +8,8 @@ const mockReportEvaluation = vi.fn();
 const mockCheckLimit = vi.fn();
 
 vi.mock("~/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: vi.fn(() => ({
     usage: { checkLimit: mockCheckLimit },
     traces: { collection: { ingestNormalizedSpan: mockIngestNormalizedSpan } },
@@ -193,6 +195,36 @@ describe("POST /api/collector", () => {
     });
   });
 
+  describe("given a project over its plan limit", () => {
+    describe("when the payload is dispatched", () => {
+      it("rejects the batch with 402 and the plan-limit metadata", async () => {
+        mockCheckLimit.mockResolvedValue({
+          exceeded: true,
+          message: "monthly limit reached",
+          planName: "free",
+          count: 10,
+          maxMessagesPerMonth: 10,
+        });
+
+        const res = await postCollector({
+          trace_id: "trace-1",
+          spans: [makeSpan(1)],
+        });
+
+        expect(res.status).toBe(402);
+        const body = await res.json();
+        expect(body).toMatchObject({
+          error: "ERR_PLAN_LIMIT",
+          message: "monthly limit reached",
+          currentMonthMessagesCount: 10,
+          maxMessagesPerMonth: 10,
+          activePlanName: "free",
+        });
+        expect(mockIngestNormalizedSpan).not.toHaveBeenCalled();
+      });
+    });
+  });
+
   describe("given more than 200 spans", () => {
     describe("when the payload is dispatched", () => {
       it("returns 429 before ingesting anything", async () => {
@@ -271,6 +303,61 @@ describe("POST /api/collector", () => {
         const body = await res.json();
         expect(body.partialSuccess.rejectedSpans).toBe(1);
         expect(mockIngestNormalizedSpan).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given a body that is valid json but not an object", () => {
+    // `typeof null` is "object" and so is an array, so both walk past a bare
+    // typeof check and reach `"metadata" in body`, which throws on null. That
+    // turns a caller's mistake into a 500 in the platform's error stream, which
+    // is the same class of noise the warn-level change above removes.
+    describe("when the body is json null", () => {
+      it("answers 400 rather than throwing", async () => {
+        const res = await postCollector(null);
+
+        expect(res.status).toBe(400);
+        expect(await res.json()).toEqual({
+          message: "Invalid body, expecting json",
+        });
+        expect(mockIngestNormalizedSpan).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the body is a json array", () => {
+      it("answers 400", async () => {
+        const res = await postCollector([{ trace_id: "trace-1" }]);
+
+        expect(res.status).toBe(400);
+        expect(mockIngestNormalizedSpan).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given an evaluation reporting an error alongside a verdict", () => {
+    describe("when it is dispatched to the evaluations pipeline", () => {
+      it("dispatches with status error and no verdict (passed/score/label null)", async () => {
+        const res = await postCollector({
+          trace_id: "trace-1",
+          spans: [makeSpan(1)],
+          evaluations: [
+            {
+              name: "eval-a",
+              score: 0.1,
+              passed: false,
+              label: "bad",
+              error: { message: "provider timeout", stacktrace: [] },
+            },
+          ],
+        });
+
+        expect(res.status).toBe(200);
+        const call = mockReportEvaluation.mock.calls[0]![0];
+        expect(call.status).toBe("error");
+        expect(call.passed).toBeNull();
+        expect(call.score).toBeNull();
+        expect(call.label).toBeNull();
+        expect(call.error).toBe("provider timeout");
       });
     });
   });

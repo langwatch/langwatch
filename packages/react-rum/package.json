@@ -7,7 +7,8 @@
 	"packageManager": "pnpm@10.24.0",
 	"main": "src/index.ts",
 	"exports": {
-		".": "./src/index.ts"
+		".": "./src/index.ts",
+		"./constants": "./src/constants.ts"
 	},
 	"scripts": {
 		"typecheck": "tsc --noEmit",
@@ -36,7 +37,7 @@
 	},
 	"devDependencies": {
 		"@types/node": "^26.0.1",
-		"jsdom": "^29.1.1",
+		"jsdom": "^30.0.1",
 		"typescript": "^6.0.3",
 		"vitest": "^4.1.9"
 	}

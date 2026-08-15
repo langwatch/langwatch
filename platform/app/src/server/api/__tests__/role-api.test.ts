@@ -1,5 +1,5 @@
-import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import { RoleService } from "../../role";
 import {
   RoleDuplicateNameError,
@@ -13,10 +13,10 @@ import {
 const mockPrisma = {
   customRole: {
     findMany: vi.fn(),
+    findFirst: vi.fn(),
     findUnique: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
-    delete: vi.fn(),
   },
   team: {
     findFirst: vi.fn(),
@@ -27,11 +27,13 @@ const mockPrisma = {
     findFirst: vi.fn(),
     findUnique: vi.fn(),
     update: vi.fn(),
+    count: vi.fn().mockResolvedValue(0),
   },
   roleBinding: {
     findFirst: vi.fn(),
     deleteMany: vi.fn(),
     create: vi.fn(),
+    count: vi.fn().mockResolvedValue(0),
   },
   organizationUser: {
     findFirst: vi.fn(),
@@ -39,6 +41,14 @@ const mockPrisma = {
   $transaction: vi
     .fn()
     .mockImplementation((fn: (tx: any) => Promise<any>) => fn(mockPrisma)),
+  // `isRootPrismaClient` discriminates on `$connect` (Prisma 7 transaction
+  // clients carry `$transaction` too), so a root-client stand-in must have it.
+  $connect: vi.fn(),
+  // The delete carries its own in-use condition, so it is one raw statement
+  // rather than a read followed by `customRole.delete`. It answers the number
+  // of rows it removed, which is how the caller tells "deleted" from "somebody
+  // took a reference in between".
+  $executeRaw: vi.fn().mockResolvedValue(1),
 } as any;
 
 describe("RoleService Tests", () => {
@@ -137,9 +147,9 @@ describe("RoleService Tests", () => {
       await expect(roleService.getRoleById("nonexistent-role")).rejects.toThrow(
         RoleNotFoundError,
       );
-      await expect(roleService.getRoleById("nonexistent-role")).rejects.toThrow(
-        "Role not found",
-      );
+      await expect(
+        roleService.getRoleById("nonexistent-role"),
+      ).rejects.toMatchObject({ code: "custom_role_not_found" });
     });
   });
 
@@ -250,7 +260,7 @@ describe("RoleService Tests", () => {
         roleService.updateRole("nonexistent-role", {
           name: "Updated Role",
         }),
-      ).rejects.toThrow("Role not found");
+      ).rejects.toMatchObject({ code: "custom_role_not_found" });
     });
   });
 
@@ -267,21 +277,55 @@ describe("RoleService Tests", () => {
       };
 
       mockPrisma.customRole.findUnique.mockResolvedValue(mockRoleWithUsers);
+      mockPrisma.$executeRaw.mockResolvedValue(1);
 
       const result = await roleService.deleteRole("role-1");
 
       expect(result).toEqual({ success: true });
-      expect(mockPrisma.customRole.delete).toHaveBeenCalledWith({
-        where: { id: "role-1" },
+      expect(mockPrisma.$executeRaw).toHaveBeenCalled();
+    });
+
+    it("refuses when the row survived because something took a reference", async () => {
+      // Nothing deleted means the statement's own condition found a holder
+      // that the check above it did not, so the refusal has to name what holds
+      // the role now rather than report a success nobody performed.
+      mockPrisma.customRole.findUnique.mockResolvedValue({
+        id: "role-1",
+        name: "Data Analyst",
+        organizationId: "org-123",
+        kind: "custom",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        assignedUsers: [],
+      });
+      // Per-call values, not defaults: `clearAllMocks` between tests clears
+      // calls but keeps implementations, so a `mockResolvedValue` here would
+      // still be in force for every test after this one.
+      mockPrisma.$executeRaw.mockResolvedValueOnce(0);
+      // The role is re-read after the delete removed nothing: still there
+      // means a holder appeared, gone means somebody else deleted it.
+      mockPrisma.customRole.findFirst.mockResolvedValueOnce({
+        id: "role-1",
+        organizationId: "org-123",
+        kind: "custom",
+      });
+      // Counted twice: once by the check before the delete, which has to pass
+      // for the statement to run at all, and once after it removed nothing.
+      mockPrisma.roleBinding.count
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(1);
+
+      await expect(roleService.deleteRole("role-1")).rejects.toMatchObject({
+        code: "custom_role_in_use",
       });
     });
 
     it("throws NOT_FOUND when role does not exist", async () => {
       mockPrisma.customRole.findUnique.mockResolvedValue(null);
 
-      await expect(roleService.deleteRole("nonexistent-role")).rejects.toThrow(
-        "Role not found",
-      );
+      await expect(
+        roleService.deleteRole("nonexistent-role"),
+      ).rejects.toMatchObject({ code: "custom_role_not_found" });
     });
 
     it("throws PRECONDITION_FAILED when role is assigned to users", async () => {

@@ -68,7 +68,7 @@ export function useTraceNewCount(): TraceNewCountResult {
   //            and let them click it to commit.
   //   paused — do nothing; "no updates, no pill, no polling" per the
   //            store's contract.
-  const trpcUtils = api.useContext();
+  const trpcUtils = api.useUtils();
   const prevVisibleRef = useRef(isVisible);
   useEffect(() => {
     if (isVisible && !prevVisibleRef.current) {
@@ -134,42 +134,51 @@ export function useTraceNewCount(): TraceNewCountResult {
       // interval (backed off in onError) will try again shortly.
       retry: 1,
       refetchInterval: isVisible && !sseConnected ? intervalMs : false,
-      onSuccess: (data) => {
-        if (data.count === 0) {
-          consecutiveZerosRef.current += 1;
-          setIntervalMs((current) =>
-            nextBackoffInterval(consecutiveZerosRef.current, current),
-          );
-        } else {
-          consecutiveZerosRef.current = 0;
-          setIntervalMs(FAST_MS);
-        }
-        // Fire the aurora pulse only on the 0→N transition in live
-        // mode. Ask mode stays quiet (the floating pill is the
-        // operator's chosen signal). High-throughput projects no longer
-        // see the pulse loop every SSE event — it now correlates with
-        // an actual UI change (new rows are about to land).
-        const prev = prevCountRef.current;
-        prevCountRef.current = data.count;
-        if (
-          prev === 0 &&
-          data.count > 0 &&
-          useSseStatusStore.getState().liveUpdatesMode === "live"
-        ) {
-          // First success in a new query context (prev === null) is
-          // baseline only — never pulses.
-          pulseRefresh();
-        }
-      },
-      onError: () => {
-        // Ease off when the count query fails (typically ClickHouse
-        // "Too many simultaneous queries" under load) so the client does
-        // not amplify the storm with fast polling. Recovers to the fast
-        // cadence on the next successful poll or SSE fast-poll signal.
-        setIntervalMs(SLOW_MS);
-      },
     },
   );
+
+  // Per-fetch success handling. Keyed on `dataUpdatedAt`, NOT on `data`:
+  // structural sharing keeps `data` identity stable across polls returning
+  // the same count, and the zero-backoff must step on every poll.
+  const { data: countData, dataUpdatedAt, errorUpdatedAt } = query;
+  useEffect(() => {
+    if (!dataUpdatedAt || !countData) return;
+    if (countData.count === 0) {
+      consecutiveZerosRef.current += 1;
+      setIntervalMs((current) =>
+        nextBackoffInterval(consecutiveZerosRef.current, current),
+      );
+    } else {
+      consecutiveZerosRef.current = 0;
+      setIntervalMs(FAST_MS);
+    }
+    // Fire the aurora pulse only on the 0→N transition in live
+    // mode. Ask mode stays quiet (the floating pill is the
+    // operator's chosen signal). High-throughput projects no longer
+    // see the pulse loop every SSE event — it now correlates with
+    // an actual UI change (new rows are about to land).
+    const prev = prevCountRef.current;
+    prevCountRef.current = countData.count;
+    if (
+      prev === 0 &&
+      countData.count > 0 &&
+      useSseStatusStore.getState().liveUpdatesMode === "live"
+    ) {
+      // First success in a new query context (prev === null) is
+      // baseline only — never pulses.
+      pulseRefresh();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataUpdatedAt]);
+
+  useEffect(() => {
+    if (!errorUpdatedAt) return;
+    // Ease off when the count query fails (typically ClickHouse
+    // "Too many simultaneous queries" under load) so the client does
+    // not amplify the storm with fast polling. Recovers to the fast
+    // cadence on the next successful poll or SSE fast-poll signal.
+    setIntervalMs(SLOW_MS);
+  }, [errorUpdatedAt]);
 
   const acknowledge = useCallback(() => {
     setSince(Date.now());

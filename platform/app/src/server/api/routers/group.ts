@@ -1,11 +1,11 @@
 import { generate } from "@langwatch/ksuid";
+import { TRPCError } from "@trpc/server";
+import { z } from "zod";
 import {
   type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { TRPCError } from "@trpc/server";
-import { z } from "zod";
+} from "~/generated/prisma/client";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
 import { assertUsersInOrganization } from "~/server/organizations/assertUsersInOrganization";
 import { RoleService } from "~/server/role/role.service";
@@ -297,7 +297,10 @@ export const groupRouter = createTRPCRouter({
         });
 
         if (input.bindings?.length) {
-          await assertNoPersonalTeamScope(tx, input.bindings);
+          await assertNoPersonalTeamScope({
+            client: tx,
+            scopes: input.bindings,
+          });
           await tx.roleBinding.createMany({
             data: input.bindings.map((b) => ({
               id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
@@ -355,9 +358,10 @@ export const groupRouter = createTRPCRouter({
         scopeType: input.scopeType,
         scopeId: input.scopeId,
       });
-      await assertNoPersonalTeamScope(ctx.prisma, [
-        { scopeType: input.scopeType, scopeId: input.scopeId },
-      ]);
+      await assertNoPersonalTeamScope({
+        client: ctx.prisma,
+        scopes: [{ scopeType: input.scopeType, scopeId: input.scopeId }],
+      });
 
       if (input.role === TeamUserRole.CUSTOM && input.customRoleId) {
         const roleService = new RoleService(ctx.prisma);
@@ -404,7 +408,10 @@ export const groupRouter = createTRPCRouter({
           message: "Binding not found",
         });
       }
-      await assertNoPersonalTeamScope(ctx.prisma, [binding]);
+      await assertNoPersonalTeamScope({
+        client: ctx.prisma,
+        scopes: [binding],
+      });
       await ctx.prisma.roleBinding.delete({ where: { id: input.bindingId } });
       return { success: true };
     }),
@@ -523,14 +530,15 @@ export const groupRouter = createTRPCRouter({
     // userId and enumerate which groups that user belongs to (which
     // role bindings they inherit). That's admin-surface authorization
     // visibility. Sole TS caller is MemberDetailDialog under settings/.
+    //
+    // Deliberately not plan-gated, unlike the group management surfaces:
+    // permission resolution honours group bindings on every plan, and the
+    // member dialog reads this for every member of every organization, so
+    // gating the read either misreports a member's effective access or (as
+    // customers hit) turns every dialog open into a refused request. An
+    // organization that never had groups simply gets an empty list.
     .use(checkOrganizationPermission("organization:manage"))
     .query(async ({ ctx, input }) => {
-      await assertEnterprisePlan({
-        organizationId: input.organizationId,
-        user: ctx.session.user,
-        errorMessage: ENTERPRISE_FEATURE_ERRORS.SCIM,
-      });
-
       const groups = await ctx.prisma.group.findMany({
         where: {
           organizationId: input.organizationId,

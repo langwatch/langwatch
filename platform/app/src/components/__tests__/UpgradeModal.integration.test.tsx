@@ -180,7 +180,9 @@ describe("<UpgradeModal />", () => {
     it("shows the title, current/new seat counts, and the new recurring total", () => {
       previewProrationMock.mockReturnValue({
         data: {
-          formattedRecurringTotal: "$199.00 / mo",
+          amountDueCents: 4200,
+          formattedAmountDue: "$42.00",
+          formattedRecurringTotal: "$199.00",
           billingInterval: "month",
         },
         isLoading: false,
@@ -199,7 +201,55 @@ describe("<UpgradeModal />", () => {
       expect(screen.getAllByText("New billing amount").length).toBeGreaterThan(
         0,
       );
-      expect(screen.getAllByText("$199.00 / mo").length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/\$199\.00/).length).toBeGreaterThan(0);
+    });
+
+    /** @scenario Seats mode modal shows the amount charged immediately */
+    it("shows what is charged today, and labels the recurring total with its period", () => {
+      previewProrationMock.mockReturnValue({
+        data: {
+          amountDueCents: 32000,
+          formattedAmountDue: "€320",
+          formattedRecurringTotal: "€1,920",
+          billingInterval: "year",
+        },
+        isLoading: false,
+        isError: false,
+      });
+
+      renderWithProviders(
+        <UpgradeModal open={true} onClose={onClose} variant={baseVariant} />,
+      );
+
+      // Confirming charges the proration on the spot, so the dialog has to say
+      // so — an unlabelled annual total next to a "Confirm" button reads as if
+      // nothing is taken until the next invoice.
+      expect(screen.getAllByText("Due today").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("€320").length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/€1,920 per year/).length).toBeGreaterThan(0);
+    });
+
+    /** @scenario Seats mode modal presents a seat reduction as a credit */
+    it("calls a negative amount a credit rather than something due", () => {
+      previewProrationMock.mockReturnValue({
+        data: {
+          amountDueCents: -12000,
+          formattedAmountDue: "-€120",
+          formattedRecurringTotal: "€1,600",
+          billingInterval: "year",
+        },
+        isLoading: false,
+        isError: false,
+      });
+
+      renderWithProviders(
+        <UpgradeModal open={true} onClose={onClose} variant={baseVariant} />,
+      );
+
+      expect(
+        screen.getAllByText("Credit applied today").length,
+      ).toBeGreaterThan(0);
+      expect(screen.queryByText("Due today")).toBeNull();
     });
 
     /** @scenario Seats mode modal shows loading state while fetching preview */

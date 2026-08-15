@@ -1,5 +1,5 @@
-import type { PrismaClient } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { createInnerTRPCContext } from "../../trpc";
 import { annotationRouter, createOrUpdateQueueItems } from "../annotation";
 
@@ -146,6 +146,9 @@ describe("annotation queue references", () => {
       annotators: ["queue-queue-with-hyphens", "user-user-with-hyphens"],
       userId: "creator_1",
       prisma,
+      // Which ids resolve to a trace is ClickHouse's answer; this file is about
+      // which annotators the references are allowed to name.
+      findExistingTraceIds: async ({ traceIds }) => traceIds,
     });
 
     expect(queueItemUpsert).toHaveBeenCalledWith(

@@ -75,8 +75,9 @@ func TestObservabilityEnvMutesTheConsoleOnlyWhenAskedTo(t *testing.T) {
 }
 
 // The Grafana base URL is published only once the stack is up, so the app can turn
-// a trace/span id into a clickable deep link. Loopback, for the developer's own
-// browser on this machine.
+// a trace/span id into a clickable deep link. The proxied hostname wins when the
+// portless proxy carries the route; loopback is the fallback. Either way the link
+// is for the developer's own browser on this machine.
 func TestObservabilityEnvPublishesTheGrafanaLink(t *testing.T) {
 	st := Stack{Slug: "portless", ObservabilityOTLPPort: 4318}
 	if got := valueOf(st.OverlayEnv(), "GRAFANA_BASE_URL"); got != "" {
@@ -87,15 +88,21 @@ func TestObservabilityEnvPublishesTheGrafanaLink(t *testing.T) {
 	if got, want := valueOf(st.OverlayEnv(), "GRAFANA_BASE_URL"), "http://127.0.0.1:3000"; got != want {
 		t.Errorf("GRAFANA_BASE_URL = %q, want %q", got, want)
 	}
+
+	st.ObservabilityGrafanaURL = "https://observability.langwatch.localhost"
+	if got, want := valueOf(st.OverlayEnv(), "GRAFANA_BASE_URL"), "https://observability.langwatch.localhost"; got != want {
+		t.Errorf("with the proxied route up, GRAFANA_BASE_URL = %q, want %q", got, want)
+	}
 }
 
 func TestDefaultObservabilityLimitsStayWithinTheirBounds(t *testing.T) {
 	gib := uint64(1) << 30
 
-	// A small machine still gets enough to start the six-process bundle at all.
+	// A small machine still gets enough to start the six-process bundle at all
+	// — the floor covers the ~1.5 GiB idle plus profile ingest headroom.
 	small := DefaultObservabilityLimits(4*gib, 2)
-	if small.MemoryMB != 1536 {
-		t.Errorf("4 GiB machine: MemoryMB = %d, want the 1536 floor", small.MemoryMB)
+	if small.MemoryMB != 2048 {
+		t.Errorf("4 GiB machine: MemoryMB = %d, want the 2048 floor", small.MemoryMB)
 	}
 	if small.CPUs != 1 {
 		t.Errorf("2-core machine: CPUs = %v, want the floor of 1", small.CPUs)
@@ -103,17 +110,21 @@ func TestDefaultObservabilityLimitsStayWithinTheirBounds(t *testing.T) {
 
 	// A big one does not get to hand the stack an unbounded slice of it.
 	big := DefaultObservabilityLimits(128*gib, 32)
-	if big.MemoryMB != 2560 {
-		t.Errorf("128 GiB machine: MemoryMB = %d, want the 2560 ceiling", big.MemoryMB)
+	if big.MemoryMB != 4096 {
+		t.Errorf("128 GiB machine: MemoryMB = %d, want the 4096 ceiling", big.MemoryMB)
 	}
-	if big.CPUs != 2 {
-		t.Errorf("32-core machine: CPUs = %v, want the ceiling of 2", big.CPUs)
+	if big.CPUs != 3 {
+		t.Errorf("32-core machine: CPUs = %v, want the ceiling of 3", big.CPUs)
 	}
 
-	// An eighth of the machine in between.
+	// A sixth of the machine in between, with the CPU divisor between its
+	// floor and ceiling.
 	mid := DefaultObservabilityLimits(16*gib, 8)
-	if mid.MemoryMB != 2048 {
-		t.Errorf("16 GiB machine: MemoryMB = %d, want 2048 (an eighth)", mid.MemoryMB)
+	if want := 16 * 1024 / 6; mid.MemoryMB != want {
+		t.Errorf("16 GiB machine: MemoryMB = %d, want %d (a sixth)", mid.MemoryMB, want)
+	}
+	if want := float64(8) / 3; mid.CPUs != want {
+		t.Errorf("8-core machine: CPUs = %v, want %v (a third)", mid.CPUs, want)
 	}
 }
 
@@ -234,7 +245,7 @@ func TestDefaultColimaLimitsStayWithinTheirBounds(t *testing.T) {
 	}
 
 	big := DefaultColimaLimits(128*gib, 32)
-	if big.CPUs != 4 || big.MemoryGiB != 8 {
-		t.Errorf("128 GiB / 32-core: got %d cpus / %d GiB, want the 4 / 8 ceilings", big.CPUs, big.MemoryGiB)
+	if big.CPUs != 6 || big.MemoryGiB != 8 {
+		t.Errorf("128 GiB / 32-core: got %d cpus / %d GiB, want the 6 / 8 ceilings", big.CPUs, big.MemoryGiB)
 	}
 }

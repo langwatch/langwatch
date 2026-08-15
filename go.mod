@@ -1,6 +1,6 @@
 module github.com/langwatch/langwatch
 
-go 1.26.5
+go 1.26.6
 
 require (
 	github.com/0xdeafcafe/moron v1.0.1-0.20260714030656-2b32ef25bff8
@@ -24,7 +24,6 @@ require (
 	github.com/openai/openai-go v1.12.0
 	github.com/osteele/liquid v1.8.1
 	github.com/prometheus/client_golang v1.23.2
-	github.com/redis/go-redis/v9 v9.19.0
 	github.com/stretchr/testify v1.11.1
 	github.com/thessem/zap-prettyconsole v0.6.0
 	github.com/tidwall/gjson v1.18.0
@@ -159,7 +158,6 @@ require (
 	go.opentelemetry.io/collector/pdata/pprofile v0.151.0 // indirect
 	go.opentelemetry.io/otel/log v0.19.0 // indirect
 	go.starlark.net v0.0.0-20260102030733-3fee463870c9 // indirect
-	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	golang.org/x/arch v0.23.0 // indirect

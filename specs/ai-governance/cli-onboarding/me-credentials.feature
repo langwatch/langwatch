@@ -40,7 +40,7 @@ Feature: /me credentials just work - CLI credential resolution after device logi
   #
   # The cached key is a long-lived Project.apiKey, not a session-bound token,
   # so trusting it forever would let a stolen ~/.langwatch/config.json keep
-  # working after the device was revoked from /me/devices. The resolver trusts
+  # working after the device was revoked from the devices inventory. The resolver trusts
   # the cache only within a short window; past it, it re-confirms the session
   # is live before using the key, and drops the key when the session is gone.
   # ─────────────────────────────────────────────────────────────────────
@@ -63,7 +63,7 @@ Feature: /me credentials just work - CLI credential resolution after device logi
   @bdd @cli-onboarding @credentials @revocation @integration
   Scenario: device-session revocation severs CLI access and wipes the cached key
     Given a device login whose cached key's validation is past the window
-    When the device is revoked from /me/devices (its Redis tokens are dropped)
+    When the device is revoked from the devices inventory (its Redis tokens are dropped)
     And the next data command resolves credentials
     Then the session-authenticated revalidation fails with 401
     And the command reports the not-logged-in error

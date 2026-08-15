@@ -1,7 +1,7 @@
 {
   "name": "@langwatch/server",
-  "version": "3.9.0",
-  "description": "Run LangWatch locally with one command \u2014 `npx @langwatch/server`. Complete LangWatch stack: observability, evaluations, AI gateway, agent simulations.",
+  "version": "3.13.0",
+  "description": "Run LangWatch locally with one command — `npx @langwatch/server`. Complete LangWatch stack: observability, evaluations, AI gateway, agent simulations.",
   "license": "Apache-2.0",
   "homepage": "https://langwatch.ai",
   "repository": {
@@ -34,11 +34,13 @@
     "packages/server/dist/",
     "packages/api/",
     "packages/automations/",
+    "packages/clickhouse-client/",
     "packages/handled-error/",
     "packages/langy/",
     "packages/observability/",
     "packages/react-rum/",
     "packages/redaction/",
+    "packages/redis-client/",
     "packages/ssrf/",
     "platform/app/",
     "services/langevals/",
@@ -53,6 +55,7 @@
     "pnpm-workspace.yaml",
     "pnpm-lock.yaml",
     "packages/server/package.json",
+    "plugins/langwatch/package.json",
     "tests/agentic-e2e/package.json"
   ],
   "scripts": {

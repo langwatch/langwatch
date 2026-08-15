@@ -116,8 +116,9 @@ export interface ReplayConfig {
   mapProjections?: RegisteredMapProjection[];
   /**
    * Operational state projections to rebuild into their stores. Only
-   * the normal replay path supports these; `replayOptimized` rejects a config
-   * carrying them rather than silently skipping them.
+   * `ReplayService.replay` routes these (through the state lane); the
+   * fold/map engine rejects a config carrying them rather than silently
+   * skipping them.
    */
   stateProjections?: RegisteredStateProjection[];
   tenantIds: string[];
@@ -149,8 +150,8 @@ export interface DiscoveryResult {
 }
 
 /**
- * Shared dependencies the replay path implementations (fold / map / optimized)
- * receive from `ReplayService`.
+ * Shared dependencies the replay implementations (the fold/map engine and the
+ * state lane) receive from `ReplayService`.
  */
 export interface ReplayContext {
   redis: IORedis;

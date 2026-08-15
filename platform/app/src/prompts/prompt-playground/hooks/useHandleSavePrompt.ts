@@ -34,7 +34,7 @@ export function useHandleSavePrompt() {
     ({ updateTabData }) => ({ updateTabData }),
   );
   const tabId = useTabId();
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   // Get the latest version from DB for accurate "Update to vX" display
   const { nextVersion } = useLatestPromptVersion({ configId, currentVersion });

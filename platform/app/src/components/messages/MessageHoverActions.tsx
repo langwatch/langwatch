@@ -3,8 +3,10 @@ import { Bug, TextCursorInput } from "lucide-react";
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { Edit } from "react-feather";
+import { AnnotationPopover } from "~/features/traces-v2/components/TraceDrawer/conversationView/AnnotationPopover";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useTraceDetailsDrawer } from "~/hooks/useTraceDetailsDrawer";
+import { stringifyIfObject } from "~/utils/stringifyIfObject";
 import { useAnnotationCommentStore } from "../../hooks/useAnnotationCommentStore";
 import { useLiteMemberGuard } from "../../hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -37,7 +39,7 @@ export const useTranslationState = () => {
 
 type ActionButtonProps = {
   tooltipContent: string;
-  onClick: (e: React.MouseEvent) => void;
+  onClick: () => void;
   children: ReactNode;
 };
 
@@ -53,6 +55,17 @@ const ActionButton = ({
       positioning={{ placement: "top" }}
     >
       <Box
+        role="button"
+        aria-label={tooltipContent}
+        // A box that says it is a button has to behave like one: reachable by
+        // Tab, and fired by the keys a real button fires on.
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key !== "Enter" && e.key !== " ") return;
+          e.preventDefault();
+          e.stopPropagation();
+          onClick();
+        }}
         width="38px"
         height="38px"
         display="flex"
@@ -66,7 +79,7 @@ const ActionButton = ({
         backgroundColor="bg.panel"
         onClick={(e) => {
           e.stopPropagation();
-          onClick(e);
+          onClick();
         }}
         cursor="pointer"
       >
@@ -130,6 +143,7 @@ export const MessageHoverActions = ({
   };
 
   const { setCommentState } = useAnnotationCommentStore();
+  const [isSuggestingCorrection, setIsSuggestingCorrection] = useState(false);
 
   const { drawerOpen } = useDrawer();
   const { openTraceDetailsDrawer } = useTraceDetailsDrawer();
@@ -166,7 +180,7 @@ export const MessageHoverActions = ({
         tooltipContent="Translate message to English"
         onClick={translate}
       >
-        {translateAPI.isLoading ? (
+        {translateAPI.isPending ? (
           <Spinner size="sm" />
         ) : translationActive ? (
           <Image
@@ -194,18 +208,32 @@ export const MessageHoverActions = ({
 
       <ActionButton
         tooltipContent="Suggest"
-        onClick={() => {
-          setCommentState?.({
-            traceId: trace.trace_id,
-            action: "new",
-            annotationId: undefined,
-            expectedOutput: trace.output?.value,
-            expectedOutputAction: "new",
-          });
-        }}
+        onClick={() => setIsSuggestingCorrection(true)}
       >
         <TextCursorInput size={"20px"} />
       </ActionButton>
+
+      {/* Mounted only while it is open, and anchored to a hidden span beside
+          the action column, the same way the trace drawer anchors its own
+          correction popover. */}
+      {isSuggestingCorrection && (
+        <AnnotationPopover
+          traceId={trace.trace_id}
+          output={stringifyIfObject(trace.output?.value)}
+          mode="suggest"
+          open={isSuggestingCorrection}
+          onOpenChange={setIsSuggestingCorrection}
+          trigger={
+            <Box
+              as="span"
+              aria-hidden="true"
+              display="inline-block"
+              width="0"
+              height="0"
+            />
+          }
+        />
+      )}
     </VStack>
   );
 };

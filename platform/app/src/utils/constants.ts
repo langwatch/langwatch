@@ -69,4 +69,5 @@ export const KSUID_RESOURCES = {
   PROCESS_MANAGER_OUTBOX: "pmoutbox",
   WEBHOOK_ENDPOINT: "webhookendpoint",
   EXPORT: "export",
+  TRACE_EDIT_OVERLAY: "traceedit",
 } as const;

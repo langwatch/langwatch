@@ -43,6 +43,7 @@ import {
   ORIGIN_RESOLVED_EVENT_TYPE,
   RECORD_SPAN_COALESCE_MAX_BATCH,
   SPAN_RECEIVED_EVENT_TYPE,
+  TRACE_CORRELATION_COALESCE_MAX_BATCH,
 } from "./schemas/constants";
 import type { TraceProcessingEvent } from "./schemas/events";
 import type { NormalizedSpan } from "./schemas/spans";
@@ -61,6 +62,10 @@ export interface TraceProcessingPipelineDeps {
     TraceSummaryData
   >;
   customEvaluationSyncReactor: ReactorDefinition<
+    TraceProcessingEvent,
+    TraceSummaryData
+  >;
+  trackedEventSyncReactor: ReactorDefinition<
     TraceProcessingEvent,
     TraceSummaryData
   >;
@@ -172,6 +177,11 @@ export function createTraceProcessingPipeline(
       "traceSummary",
       "customEvaluationSync",
       deps.customEvaluationSyncReactor,
+    )
+    .withReactor(
+      "traceSummary",
+      "trackedEventSync",
+      deps.trackedEventSyncReactor,
     )
     .withReactor(
       "traceSummary",
@@ -323,10 +333,20 @@ export function createTraceProcessingPipeline(
       )
     : builder.withCommand("recordSpan", RecordSpanCommand, recordSpanOptions);
 
+  // ADR-066 pillar 2: both correlation commands funnel on the trace aggregate.
+  // See TRACE_CORRELATION_COALESCE_MAX_BATCH.
+  //
+  // A literal per registration, not one shared object: `recordSpanOptions`
+  // above is mutated after construction, so an options object here would invite
+  // the same treatment and silently apply one command's change to the other.
   return recordSpanBuilder
     .withCommand("assignTopic", AssignTopicCommand)
-    .withCommand("recordLogContribution", RecordLogContributionCommand)
-    .withCommand("recordMetricCorrelation", RecordMetricCorrelationCommand)
+    .withCommand("recordLogContribution", RecordLogContributionCommand, {
+      coalesceMaxBatch: TRACE_CORRELATION_COALESCE_MAX_BATCH,
+    })
+    .withCommand("recordMetricCorrelation", RecordMetricCorrelationCommand, {
+      coalesceMaxBatch: TRACE_CORRELATION_COALESCE_MAX_BATCH,
+    })
     .withCommand("resolveOrigin", ResolveOriginCommand)
     .withCommand("addAnnotation", AddAnnotationCommand)
     .withCommand("removeAnnotation", RemoveAnnotationCommand)

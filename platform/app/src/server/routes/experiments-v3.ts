@@ -11,15 +11,17 @@
  */
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import { ExperimentType } from "@prisma/client";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
-import type { z } from "zod";
+import { describeRoute } from "hono-openapi";
+import { resolver } from "hono-openapi/zod";
+import { z } from "zod";
 import {
   createInitialUIState,
   type EvaluationsV3State,
 } from "~/experiments-v3/types";
 import { persistedEvaluationsV3StateSchema } from "~/experiments-v3/types/persistence";
+import { ExperimentType } from "~/generated/prisma/client";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import type { Permission } from "~/server/api/rbac";
 import { hasProjectPermission } from "~/server/api/rbac";
@@ -58,8 +60,44 @@ import { trackServerEvent } from "~/server/posthog";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { fireExperimentRanNurturing } from "../../../ee/billing/nurturing/hooks/featureAdoption";
+import {
+  handledErrorEnvelopeSchema,
+  listRunsResponseSchema,
+  runResultsResponseSchema,
+  runStatusResponseSchema,
+  startRunResponseSchema,
+} from "./experiments-v3.schemas";
 
 const logger = createLogger("langwatch:experiments-v3");
+
+/**
+ * The errors these four routes answer with.
+ *
+ * Both come out flat, but by different routes. A 404 is a thrown
+ * `HandledError` (`ExperimentNotFoundError`, `RunNotFoundError`) that the
+ * boundary serialises, so it carries the code in `error` plus the error's
+ * `meta` spread alongside it. A 401 is hand-rolled in the handler, which
+ * forwards the handled denial payload when there is one and falls back to a
+ * bare `{ error }` when there is not — the same open shape covers both.
+ */
+const experimentErrorResponses = {
+  401: {
+    description: "Missing or invalid API key, or the key lacks the permission",
+    content: {
+      "application/json": {
+        schema: resolver(handledErrorEnvelopeSchema),
+      },
+    },
+  },
+  404: {
+    description: "No such experiment or run in this project",
+    content: {
+      "application/json": {
+        schema: resolver(handledErrorEnvelopeSchema),
+      },
+    },
+  },
+};
 
 const secured = createServiceApp({ basePath: "/api/experiments" });
 const sessionAuth = handlerManagedAuth({
@@ -173,9 +211,18 @@ const buildState = (
 
 // ── POST /execute ────────────────────────────────────────────────────
 
-secured
-  .access(sessionAuth)
-  .post("/execute", zValidator("json", executionRequestSchema), async (c) => {
+secured.access(sessionAuth).post(
+  "/execute",
+  // Kept out of the published document. The route authenticates with a
+  // browser session and streams workbench UI state, so an API-key caller
+  // has no way to reach it; publishing it would document an endpoint that
+  // answers 401 to everyone reading the reference. `zValidator` alone would
+  // have emitted an operation here — the body schema is enough metadata for
+  // the generator — so the exclusion has to be stated, not merely implied
+  // by leaving `describeRoute` off.
+  describeRoute({ hide: true }),
+  zValidator("json", executionRequestSchema),
+  async (c) => {
     const request = await c.req.json();
     const { projectId } = request;
 
@@ -309,7 +356,8 @@ secured
         });
       }
     });
-  });
+  },
+);
 
 // ── POST /abort ──────────────────────────────────────────────────────
 
@@ -380,313 +428,497 @@ secured.access(sessionAuth).post("/abort", async (c) => {
 
 // ── POST /:slug/run  (CI/CD execution) ──────────────────────────────
 
-secured.access(apiKeyAuthRun).post("/:slug/run", async (c) => {
-  const { slug } = c.req.param();
-
-  // Starting a run CREATES a run row against an experiment that already
-  // exists; it does not administer the evaluations family. Asking for
-  // `:manage` here refused every least-privilege key that legitimately holds
-  // the create — the Langy session key among them, which stops short of
-  // `:manage` precisely because `:manage` implies the delete. `:manage` still
-  // satisfies `:create` through `hasPermissionWithHierarchy`, so narrowing the
-  // grain takes access away from nobody.
-  const authResult = await authenticateRequest(c, "evaluations:create");
-  if ("error" in authResult) {
-    // `authResult.body` carries the handled payload (code, permission, tips)
-    // when the denial came from a handled error; `{ error }` is the fallback
-    // for the failures that have none.
-    return c.json(authResult.body ?? { error: authResult.error }, {
-      status: authResult.status,
-    });
-  }
-  const { project, markUsed } = authResult;
-
-  const experiment = await ExperimentService.create(prisma).findBySlugAndType({
-    projectId: project.id,
-    slug,
-    type: ExperimentType.EVALUATIONS_V3,
-  });
-
-  if (!experiment) {
-    throw new ExperimentNotFoundError(slug);
-  }
-
-  const parseResult = persistedEvaluationsV3StateSchema.safeParse(
-    experiment.workbenchState,
-  );
-  if (!parseResult.success) {
-    logger.error(
-      { slug, errors: parseResult.error.errors },
-      "Invalid workbenchState",
-    );
-    // The stored workbench state no longer matches its schema. The customer
-    // did not type this and cannot repair it from the API, so it is ours:
-    // `fault: "platform"` keeps it out of the customer-error noise.
-    throw new InvalidExperimentConfigurationError(slug);
-  }
-
-  const workbenchState = parseResult.data;
-  const dataset = workbenchState.datasets[0];
-  if (!dataset) {
-    return c.json({ error: "No dataset configured" }, { status: 400 });
-  }
-
-  // An empty body is allowed (a full run); malformed JSON must 400 rather than
-  // silently default to {} and start a full run on invalid input.
-  const bodyText = await c.req.text();
-  let rawBody: unknown = {};
-  if (bodyText.trim()) {
-    try {
-      rawBody = JSON.parse(bodyText);
-    } catch {
-      return c.json({ error: "Invalid JSON body" }, { status: 400 });
-    }
-  }
-  const inputsParse = runInputsBodySchema.safeParse(rawBody);
-  if (!inputsParse.success) {
-    return c.json(
-      {
-        error: inputsParse.error.errors[0]?.message ?? "Invalid request body",
+secured.access(apiKeyAuthRun).post(
+  "/:slug/run",
+  describeRoute({
+    summary: "Run an experiment",
+    description:
+      "Start a run of a saved experiment, addressed by slug. Returns a runId to poll straight away. Send `Accept: text/event-stream` instead to stream progress events until the run finishes.",
+    tags: ["Experiments"],
+    // Declared by hand rather than through zValidator: the handler reads the
+    // raw body so it can accept an empty one, and parses with
+    // `runInputsBodySchema` itself, so there is no validator schema for the
+    // generator to read. Every field is optional — sending no body at all runs
+    // the experiment's saved dataset as configured.
+    requestBody: {
+      required: false,
+      content: {
+        "application/json": {
+          schema: {
+            type: "object",
+            properties: {
+              data: {
+                type: "array",
+                items: { type: "object", additionalProperties: true },
+                description:
+                  "Rows to evaluate inline, instead of the experiment's saved dataset. Mutually exclusive with dataset_id.",
+              },
+              dataset_id: {
+                type: "string",
+                description:
+                  "A saved dataset to evaluate, instead of the one the experiment is configured with. Mutually exclusive with data.",
+              },
+              parameters: {
+                type: "object",
+                additionalProperties: {
+                  oneOf: [
+                    { type: "string" },
+                    { type: "number" },
+                    { type: "boolean" },
+                  ],
+                },
+                description:
+                  "Constant inputs applied to every row, overriding fields of the same name",
+              },
+              row_indices: {
+                type: "array",
+                items: { type: "integer", minimum: 0 },
+                description:
+                  "Run only these rows of the dataset, by zero-based index",
+              },
+            },
+            not: { required: ["data", "dataset_id"] },
+          },
+        },
       },
-      { status: 400 },
-    );
-  }
-  const runInputs = inputsParse.data;
-
-  const dataResult = await loadExecutionData(
-    project.id,
-    dataset,
-    workbenchState.targets,
-    workbenchState.evaluators,
-    {
-      data: runInputs.data,
-      datasetId: runInputs.dataset_id,
-      parameters: runInputs.parameters,
     },
-  );
+    responses: {
+      ...experimentErrorResponses,
+      400: {
+        description:
+          "The body was not valid JSON, failed input validation, or the experiment has no dataset configured",
+        content: {
+          // These three refusals are hand-rolled in the handler and carry a
+          // sentence in `error` rather than a stable code, so this documents
+          // the shape as sent. Converting them to HandledError is the right
+          // end state, but it turns `error` into a code slug and would break
+          // any CI script matching the current text — worth its own change.
+          "application/json": {
+            schema: resolver(z.object({ error: z.string() })),
+          },
+        },
+      },
+      200: {
+        description: "Run started",
+        content: {
+          "application/json": { schema: resolver(startRunResponseSchema) },
+          "text/event-stream": {
+            schema: {
+              type: "string",
+              description:
+                "Progress events, ending with a done event carrying the summary",
+            },
+          },
+        },
+      },
+    },
+  }),
+  async (c) => {
+    const { slug } = c.req.param();
 
-  if ("error" in dataResult) {
-    return c.json(
-      { error: dataResult.error },
-      { status: dataResult.status as 400 | 404 },
+    // Starting a run CREATES a run row against an experiment that already
+    // exists; it does not administer the evaluations family. Asking for
+    // `:manage` here refused every least-privilege key that legitimately holds
+    // the create — the Langy session key among them, which stops short of
+    // `:manage` precisely because `:manage` implies the delete. `:manage` still
+    // satisfies `:create` through `hasPermissionWithHierarchy`, so narrowing the
+    // grain takes access away from nobody.
+    const authResult = await authenticateRequest(c, "evaluations:create");
+    if ("error" in authResult) {
+      // `authResult.body` carries the handled payload (code, permission, tips)
+      // when the denial came from a handled error; `{ error }` is the fallback
+      // for the failures that have none.
+      return c.json(authResult.body ?? { error: authResult.error }, {
+        status: authResult.status,
+      });
+    }
+    const { project, markUsed } = authResult;
+
+    const experiment = await ExperimentService.create(prisma).findBySlugAndType(
+      {
+        projectId: project.id,
+        slug,
+        type: ExperimentType.EVALUATIONS_V3,
+      },
     );
-  }
 
-  const {
-    datasetRows,
-    datasetColumns,
-    loadedPrompts,
-    loadedAgents,
-    loadedEvaluators,
-    loadedWorkflows,
-  } = dataResult;
+    if (!experiment) {
+      throw new ExperimentNotFoundError(slug);
+    }
 
-  const state = buildState(workbenchState);
+    const parseResult = persistedEvaluationsV3StateSchema.safeParse(
+      experiment.workbenchState,
+    );
+    if (!parseResult.success) {
+      logger.error(
+        { slug, errors: parseResult.error.errors },
+        "Invalid workbenchState",
+      );
+      // The stored workbench state no longer matches its schema. The customer
+      // did not type this and cannot repair it from the API, so it is ours:
+      // `fault: "platform"` keeps it out of the customer-error noise.
+      throw new InvalidExperimentConfigurationError(slug);
+    }
 
-  const scope: ExecutionScope = runInputs.row_indices
-    ? { type: "rows", rowIndices: runInputs.row_indices }
-    : { type: "full" };
+    const workbenchState = parseResult.data;
+    const dataset = workbenchState.datasets[0];
+    if (!dataset) {
+      return c.json({ error: "No dataset configured" }, { status: 400 });
+    }
 
-  const acceptHeader = c.req.header("Accept") ?? "";
-  const isSSE = acceptHeader.includes("text/event-stream");
-
-  logger.info(
-    { projectId: project.id, slug, isSSE, rowCount: datasetRows.length },
-    "Starting CI/CD experiment execution",
-  );
-
-  markUsed();
-
-  if (isSSE) {
-    return streamSSE(c, async (stream) => {
+    // An empty body is allowed (a full run); malformed JSON must 400 rather than
+    // silently default to {} and start a full run on invalid input.
+    const bodyText = await c.req.text();
+    let rawBody: unknown = {};
+    if (bodyText.trim()) {
       try {
-        const orchestrator = runOrchestrator({
-          projectId: project.id,
-          experimentId: experiment.id,
-          scope,
-          state,
-          datasetRows,
-          datasetColumns,
-          loadedPrompts: loadedPrompts as Map<string, VersionedPrompt>,
-          loadedAgents: loadedAgents as Map<string, TypedAgent>,
-          loadedEvaluators,
-          loadedWorkflows,
-        });
+        rawBody = JSON.parse(bodyText);
+      } catch {
+        return c.json({ error: "Invalid JSON body" }, { status: 400 });
+      }
+    }
+    const inputsParse = runInputsBodySchema.safeParse(rawBody);
+    if (!inputsParse.success) {
+      return c.json(
+        {
+          error: inputsParse.error.errors[0]?.message ?? "Invalid request body",
+        },
+        { status: 400 },
+      );
+    }
+    const runInputs = inputsParse.data;
 
-        for await (const event of orchestrator) {
-          await stream.writeSSE({
-            data: JSON.stringify(event),
+    const dataResult = await loadExecutionData(
+      project.id,
+      dataset,
+      workbenchState.targets,
+      workbenchState.evaluators,
+      {
+        data: runInputs.data,
+        datasetId: runInputs.dataset_id,
+        parameters: runInputs.parameters,
+      },
+    );
+
+    if ("error" in dataResult) {
+      return c.json(
+        { error: dataResult.error },
+        { status: dataResult.status as 400 | 404 },
+      );
+    }
+
+    const {
+      datasetRows,
+      datasetColumns,
+      loadedPrompts,
+      loadedAgents,
+      loadedEvaluators,
+      loadedWorkflows,
+    } = dataResult;
+
+    const state = buildState(workbenchState);
+
+    const scope: ExecutionScope = runInputs.row_indices
+      ? { type: "rows", rowIndices: runInputs.row_indices }
+      : { type: "full" };
+
+    const acceptHeader = c.req.header("Accept") ?? "";
+    const isSSE = acceptHeader.includes("text/event-stream");
+
+    logger.info(
+      { projectId: project.id, slug, isSSE, rowCount: datasetRows.length },
+      "Starting CI/CD experiment execution",
+    );
+
+    markUsed();
+
+    if (isSSE) {
+      return streamSSE(c, async (stream) => {
+        try {
+          const orchestrator = runOrchestrator({
+            projectId: project.id,
+            experimentId: experiment.id,
+            scope,
+            state,
+            datasetRows,
+            datasetColumns,
+            loadedPrompts: loadedPrompts as Map<string, VersionedPrompt>,
+            loadedAgents: loadedAgents as Map<string, TypedAgent>,
+            loadedEvaluators,
+            loadedWorkflows,
           });
 
-          if (event.type === "done" || event.type === "stopped") {
-            break;
+          for await (const event of orchestrator) {
+            await stream.writeSSE({
+              data: JSON.stringify(event),
+            });
+
+            if (event.type === "done" || event.type === "stopped") {
+              break;
+            }
           }
+        } catch (error) {
+          logger.error(
+            { error, projectId: project.id, slug },
+            "Orchestrator error",
+          );
+          captureException(toError(error), {
+            extra: { projectId: project.id, slug },
+          });
+
+          // Through the same mapper the orchestrator uses: a handled error
+          // travels as its code plus `domainError` (so the client renders
+          // registry copy), and anything else becomes a fixed generic string.
+          // Writing `(error as Error).message` here put a Prisma string or a Go
+          // net error straight into the customer's cell — these two frames were
+          // the only producers the coded-error work didn't cover.
+          //
+          // No `rowIndex`: the orchestrator itself threw, so the whole run is
+          // gone and the mapper says so, rather than blaming one row.
+          await stream.writeSSE({
+            data: JSON.stringify(mapThrownErrorEvent({ error })),
+          });
         }
-      } catch (error) {
-        logger.error(
-          { error, projectId: project.id, slug },
-          "Orchestrator error",
-        );
-        captureException(toError(error), {
-          extra: { projectId: project.id, slug },
-        });
+      });
+    }
 
-        // Through the same mapper the orchestrator uses: a handled error
-        // travels as its code plus `domainError` (so the client renders
-        // registry copy), and anything else becomes a fixed generic string.
-        // Writing `(error as Error).message` here put a Prisma string or a Go
-        // net error straight into the customer's cell — these two frames were
-        // the only producers the coded-error work didn't cover.
-        //
-        // No `rowIndex`: the orchestrator itself threw, so the whole run is
-        // gone and the mapper says so, rather than blaming one row.
-        await stream.writeSSE({
-          data: JSON.stringify(mapThrownErrorEvent({ error })),
-        });
-      }
+    const { runId, runUrl, total } = await startPollingRun({
+      projectId: project.id,
+      projectSlug: project.slug,
+      experimentId: experiment.id,
+      experimentSlug: slug,
+      scope,
+      state,
+      datasetRows,
+      datasetColumns,
+      loadedPrompts: loadedPrompts as Map<string, VersionedPrompt>,
+      loadedAgents: loadedAgents as Map<string, TypedAgent>,
+      loadedEvaluators,
+      loadedWorkflows,
     });
-  }
 
-  const { runId, runUrl, total } = await startPollingRun({
-    projectId: project.id,
-    projectSlug: project.slug,
-    experimentId: experiment.id,
-    experimentSlug: slug,
-    scope,
-    state,
-    datasetRows,
-    datasetColumns,
-    loadedPrompts: loadedPrompts as Map<string, VersionedPrompt>,
-    loadedAgents: loadedAgents as Map<string, TypedAgent>,
-    loadedEvaluators,
-    loadedWorkflows,
-  });
-
-  return c.json({ runId, status: "running", total, runUrl });
-});
+    return c.json({ runId, status: "running", total, runUrl });
+  },
+);
 
 // ── GET /runs?experimentSlug=... (list runs for an experiment) ──────
 
-secured.access(apiKeyAuthRead).get("/runs", async (c) => {
-  const authResult = await authenticateRequest(c, "evaluations:view");
-  if ("error" in authResult) {
-    // `authResult.body` carries the handled payload (code, permission, tips)
-    // when the denial came from a handled error; `{ error }` is the fallback
-    // for the failures that have none.
-    return c.json(authResult.body ?? { error: authResult.error }, {
-      status: authResult.status,
-    });
-  }
-  const { project } = authResult;
-
-  const experimentSlug = c.req.query("experimentSlug");
-  if (!experimentSlug) {
-    return c.json(
+secured.access(apiKeyAuthRead).get(
+  "/runs",
+  describeRoute({
+    summary: "List runs of an experiment",
+    description:
+      "Runs recorded for one experiment, newest first. Page through them with `page` and `pageSize`.",
+    tags: ["Experiments"],
+    parameters: [
       {
-        error: "experimentSlug query parameter is required",
+        in: "query",
+        name: "experimentSlug",
+        required: true,
+        schema: { type: "string" },
+        description: "Slug of the experiment whose runs you want",
       },
-      { status: 400 },
-    );
-  }
-
-  const pageSizeRaw = c.req.query("pageSize");
-  const pageRaw = c.req.query("page");
-  const pageSize = (() => {
-    const parsed = pageSizeRaw ? parseInt(pageSizeRaw, 10) : 50;
-    if (!Number.isFinite(parsed) || parsed <= 0) return 50;
-    return Math.min(parsed, 200);
-  })();
-  const page = (() => {
-    const parsed = pageRaw ? parseInt(pageRaw, 10) : 1;
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
-  })();
-
-  const experimentRunService = ExperimentRunService.create(prisma);
-  const { experiment, runs, totalHits } =
-    await experimentRunService.listRunsForExperimentSlugPaginated({
-      projectId: project.id,
-      experimentSlug,
-      page,
-      pageSize,
-    });
-
-  if (!experiment) {
-    throw new ExperimentNotFoundError(experimentSlug);
-  }
-
-  const offset = (page - 1) * pageSize;
-  await authResult.markUsed?.();
-
-  return c.json({
-    experimentId: experiment.id,
-    experimentSlug: experiment.slug,
-    runs,
-    pagination: {
-      page,
-      pageSize,
-      totalHits,
-      hasMore: offset + runs.length < totalHits,
+      {
+        in: "query",
+        name: "page",
+        required: false,
+        schema: { type: "integer", default: 1 },
+        description: "1-based page number",
+      },
+      {
+        in: "query",
+        name: "pageSize",
+        required: false,
+        schema: { type: "integer", default: 50, maximum: 200 },
+        description: "Runs per page, capped at 200",
+      },
+    ],
+    responses: {
+      ...experimentErrorResponses,
+      400: {
+        description: "experimentSlug was not supplied",
+        content: {
+          "application/json": {
+            schema: resolver(z.object({ error: z.string() })),
+          },
+        },
+      },
+      200: {
+        description: "Runs for the experiment",
+        content: {
+          "application/json": { schema: resolver(listRunsResponseSchema) },
+        },
+      },
     },
-  });
-});
+  }),
+  async (c) => {
+    const authResult = await authenticateRequest(c, "evaluations:view");
+    if ("error" in authResult) {
+      // `authResult.body` carries the handled payload (code, permission, tips)
+      // when the denial came from a handled error; `{ error }` is the fallback
+      // for the failures that have none.
+      return c.json(authResult.body ?? { error: authResult.error }, {
+        status: authResult.status,
+      });
+    }
+    const { project } = authResult;
+
+    const experimentSlug = c.req.query("experimentSlug");
+    if (!experimentSlug) {
+      return c.json(
+        {
+          error: "experimentSlug query parameter is required",
+        },
+        { status: 400 },
+      );
+    }
+
+    const pageSizeRaw = c.req.query("pageSize");
+    const pageRaw = c.req.query("page");
+    const pageSize = (() => {
+      const parsed = pageSizeRaw ? parseInt(pageSizeRaw, 10) : 50;
+      if (!Number.isFinite(parsed) || parsed <= 0) return 50;
+      return Math.min(parsed, 200);
+    })();
+    const page = (() => {
+      const parsed = pageRaw ? parseInt(pageRaw, 10) : 1;
+      return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+    })();
+
+    const experimentRunService = ExperimentRunService.create(prisma);
+    const { experiment, runs, totalHits } =
+      await experimentRunService.listRunsForExperimentSlugPaginated({
+        projectId: project.id,
+        experimentSlug,
+        page,
+        pageSize,
+      });
+
+    if (!experiment) {
+      throw new ExperimentNotFoundError(experimentSlug);
+    }
+
+    const offset = (page - 1) * pageSize;
+    await authResult.markUsed?.();
+
+    return c.json({
+      experimentId: experiment.id,
+      experimentSlug: experiment.slug,
+      runs,
+      pagination: {
+        page,
+        pageSize,
+        totalHits,
+        hasMore: offset + runs.length < totalHits,
+      },
+    });
+  },
+);
 
 // ── GET /runs/:runId (poll run status) ───────────────────────────────
 
-secured.access(apiKeyAuthRead).get("/runs/:runId", async (c) => {
-  const { runId } = c.req.param();
+secured.access(apiKeyAuthRead).get(
+  "/runs/:runId",
+  describeRoute({
+    summary: "Poll a run",
+    description:
+      "Current state of one run. Returns progress while it is going and a summary once it finishes, so a CI job can poll this until `status` leaves `running`.",
+    tags: ["Experiments"],
+    responses: {
+      ...experimentErrorResponses,
+      200: {
+        description: "Run state",
+        content: {
+          "application/json": { schema: resolver(runStatusResponseSchema) },
+        },
+      },
+    },
+  }),
+  async (c) => {
+    const { runId } = c.req.param();
 
-  const authResult = await authenticateRequest(c, "evaluations:view");
-  if ("error" in authResult) {
-    // `authResult.body` carries the handled payload (code, permission, tips)
-    // when the denial came from a handled error; `{ error }` is the fallback
-    // for the failures that have none.
-    return c.json(authResult.body ?? { error: authResult.error }, {
-      status: authResult.status,
-    });
-  }
-  const { project, markUsed } = authResult;
+    const authResult = await authenticateRequest(c, "evaluations:view");
+    if ("error" in authResult) {
+      // `authResult.body` carries the handled payload (code, permission, tips)
+      // when the denial came from a handled error; `{ error }` is the fallback
+      // for the failures that have none.
+      return c.json(authResult.body ?? { error: authResult.error }, {
+        status: authResult.status,
+      });
+    }
+    const { project, markUsed } = authResult;
 
-  const runState = await runStateManager.getRunState(runId);
+    const runState = await runStateManager.getRunState(runId);
 
-  // All three not-found branches raise the SAME code. From outside they are one
-  // answer — this run is not yours to read — and telling a caller which of them
-  // it was would confirm that the id exists in another project.
-  if (!runState) {
-    throw new RunNotFoundError(runId);
-  }
-
-  if (runState.projectId !== project.id) {
-    throw new RunNotFoundError(runId);
-  }
-
-  // Same archive guard as /runs/:runId/results: a run whose owning
-  // experiment was archived must not keep serving status from the Redis
-  // cache for the rest of the 24h TTL. Without this, archive visibility
-  // silently depends on run age.
-  if (runState.experimentId) {
-    const stillLive = await ExperimentService.create(prisma).isActive({
-      projectId: project.id,
-      id: runState.experimentId,
-    });
-    if (!stillLive) {
+    // All three not-found branches raise the SAME code. From outside they are one
+    // answer — this run is not yours to read — and telling a caller which of them
+    // it was would confirm that the id exists in another project.
+    if (!runState) {
       throw new RunNotFoundError(runId);
     }
-  }
 
-  logger.debug({ runId, status: runState.status }, "Run status queried");
-  markUsed();
+    if (runState.projectId !== project.id) {
+      throw new RunNotFoundError(runId);
+    }
 
-  if (runState.status === "running" || runState.status === "pending") {
-    return c.json({
-      runId: runState.runId,
-      status: runState.status,
-      progress: runState.progress,
-      total: runState.total,
-      startedAt: runState.startedAt,
-    });
-  }
+    // Same archive guard as /runs/:runId/results: a run whose owning
+    // experiment was archived must not keep serving status from the Redis
+    // cache for the rest of the 24h TTL. Without this, archive visibility
+    // silently depends on run age.
+    if (runState.experimentId) {
+      const stillLive = await ExperimentService.create(prisma).isActive({
+        projectId: project.id,
+        id: runState.experimentId,
+      });
+      if (!stillLive) {
+        throw new RunNotFoundError(runId);
+      }
+    }
 
-  if (runState.status === "completed") {
+    logger.debug({ runId, status: runState.status }, "Run status queried");
+    markUsed();
+
+    if (runState.status === "running" || runState.status === "pending") {
+      return c.json({
+        runId: runState.runId,
+        status: runState.status,
+        progress: runState.progress,
+        total: runState.total,
+        startedAt: runState.startedAt,
+      });
+    }
+
+    if (runState.status === "completed") {
+      return c.json({
+        runId: runState.runId,
+        status: runState.status,
+        progress: runState.progress,
+        total: runState.total,
+        startedAt: runState.startedAt,
+        finishedAt: runState.finishedAt,
+        summary: runState.summary,
+      });
+    }
+
+    if (runState.status === "failed") {
+      return c.json({
+        runId: runState.runId,
+        status: runState.status,
+        progress: runState.progress,
+        total: runState.total,
+        startedAt: runState.startedAt,
+        finishedAt: runState.finishedAt,
+        // The code, never the thrown message — an API consumer gets the same
+        // contract the stream gives a browser: something stable to branch on,
+        // plus the handled payload when the failure had one, plus the trace id
+        // for the failures we could not name (ADR-045).
+        error: runState.error,
+        ...(runState.domainError ? { domainError: runState.domainError } : {}),
+        ...(runState.traceId ? { traceId: runState.traceId } : {}),
+      });
+    }
+
+    // stopped
     return c.json({
       runId: runState.runId,
       status: runState.status,
@@ -694,131 +926,130 @@ secured.access(apiKeyAuthRead).get("/runs/:runId", async (c) => {
       total: runState.total,
       startedAt: runState.startedAt,
       finishedAt: runState.finishedAt,
-      summary: runState.summary,
     });
-  }
-
-  if (runState.status === "failed") {
-    return c.json({
-      runId: runState.runId,
-      status: runState.status,
-      progress: runState.progress,
-      total: runState.total,
-      startedAt: runState.startedAt,
-      finishedAt: runState.finishedAt,
-      // The code, never the thrown message — an API consumer gets the same
-      // contract the stream gives a browser: something stable to branch on,
-      // plus the handled payload when the failure had one, plus the trace id
-      // for the failures we could not name (ADR-045).
-      error: runState.error,
-      ...(runState.domainError ? { domainError: runState.domainError } : {}),
-      ...(runState.traceId ? { traceId: runState.traceId } : {}),
-    });
-  }
-
-  // stopped
-  return c.json({
-    runId: runState.runId,
-    status: runState.status,
-    progress: runState.progress,
-    total: runState.total,
-    startedAt: runState.startedAt,
-    finishedAt: runState.finishedAt,
-  });
-});
+  },
+);
 
 // ── GET /runs/:runId/results (full per-row results from ClickHouse) ──
-secured.access(apiKeyAuthRead).get("/runs/:runId/results", async (c) => {
-  const { runId } = c.req.param();
+secured.access(apiKeyAuthRead).get(
+  "/runs/:runId/results",
+  describeRoute({
+    summary: "Read run results",
+    description:
+      "Every dataset row of a run with what the target predicted, plus one entry per evaluator per row. Runs older than the status cache need `experimentSlug` as well, since a run id is only unique within its experiment.",
+    tags: ["Experiments"],
+    parameters: [
+      {
+        in: "query",
+        name: "experimentSlug",
+        required: false,
+        schema: { type: "string" },
+        description:
+          "Owning experiment. Required once the run has aged out of the status cache.",
+      },
+    ],
+    responses: {
+      ...experimentErrorResponses,
+      200: {
+        description: "Rows and evaluations for the run",
+        content: {
+          "application/json": { schema: resolver(runResultsResponseSchema) },
+        },
+      },
+    },
+  }),
+  async (c) => {
+    const { runId } = c.req.param();
 
-  const authResult = await authenticateRequest(c, "evaluations:view");
-  if ("error" in authResult) {
-    // `authResult.body` carries the handled payload (code, permission, tips)
-    // when the denial came from a handled error; `{ error }` is the fallback
-    // for the failures that have none.
-    return c.json(authResult.body ?? { error: authResult.error }, {
-      status: authResult.status,
-    });
-  }
-  const { project, markUsed } = authResult;
+    const authResult = await authenticateRequest(c, "evaluations:view");
+    if ("error" in authResult) {
+      // `authResult.body` carries the handled payload (code, permission, tips)
+      // when the denial came from a handled error; `{ error }` is the fallback
+      // for the failures that have none.
+      return c.json(authResult.body ?? { error: authResult.error }, {
+        status: authResult.status,
+      });
+    }
+    const { project, markUsed } = authResult;
 
-  // Resolve the owning experiment. ClickHouse storage is keyed on
-  // (TenantId, ExperimentId, RunId) — runId alone is not unique across
-  // experiments (SDK callers can reuse a stable run_id) — so we must know
-  // the experimentId before we query results.
-  //
-  // Two sources, tried in order:
-  //   1. runStateManager (Redis, 24h TTL) — covers fresh runs.
-  //   2. experimentSlug query param → prisma lookup — covers older runs
-  //      whose run state has expired but whose ClickHouse rows remain.
-  //
-  // The previous "most recently updated experiment in the project"
-  // fallback was unsafe: it returned cryptic 404s whenever the user had
-  // edited any other experiment after the one that owned this run.
-  const runState = await runStateManager.getRunState(runId);
-  const slugFromState =
-    runState && runState.projectId === project.id
-      ? runState.experimentSlug
-      : undefined;
-  const experimentIdFromState =
-    runState && runState.projectId === project.id
-      ? runState.experimentId
-      : undefined;
+    // Resolve the owning experiment. ClickHouse storage is keyed on
+    // (TenantId, ExperimentId, RunId) — runId alone is not unique across
+    // experiments (SDK callers can reuse a stable run_id) — so we must know
+    // the experimentId before we query results.
+    //
+    // Two sources, tried in order:
+    //   1. runStateManager (Redis, 24h TTL) — covers fresh runs.
+    //   2. experimentSlug query param → prisma lookup — covers older runs
+    //      whose run state has expired but whose ClickHouse rows remain.
+    //
+    // The previous "most recently updated experiment in the project"
+    // fallback was unsafe: it returned cryptic 404s whenever the user had
+    // edited any other experiment after the one that owned this run.
+    const runState = await runStateManager.getRunState(runId);
+    const slugFromState =
+      runState && runState.projectId === project.id
+        ? runState.experimentSlug
+        : undefined;
+    const experimentIdFromState =
+      runState && runState.projectId === project.id
+        ? runState.experimentId
+        : undefined;
 
-  const experimentSlug = c.req.query("experimentSlug") ?? slugFromState;
-  let experimentId = experimentIdFromState;
-  const experiments = ExperimentService.create(prisma);
+    const experimentSlug = c.req.query("experimentSlug") ?? slugFromState;
+    let experimentId = experimentIdFromState;
+    const experiments = ExperimentService.create(prisma);
 
-  if (!experimentId && experimentSlug) {
-    const experiment = await experiments.findIdBySlug({
-      projectId: project.id,
-      slug: experimentSlug,
-    });
-    experimentId = experiment?.id;
-  } else if (experimentId) {
-    // Independent of how we resolved the id, refuse to return results once
-    // the owning experiment is archived. Without this check the Redis-state
-    // path (fresh runs, within 24h TTL) would keep serving ClickHouse rows
-    // after archive while the slug-based fallback already returns 404, so
-    // archive visibility would silently depend on run age.
-    const stillLive = await experiments.isActive({
-      projectId: project.id,
-      id: experimentId,
-    });
-    if (!stillLive) experimentId = undefined;
-  }
+    if (!experimentId && experimentSlug) {
+      const experiment = await experiments.findIdBySlug({
+        projectId: project.id,
+        slug: experimentSlug,
+      });
+      experimentId = experiment?.id;
+    } else if (experimentId) {
+      // Independent of how we resolved the id, refuse to return results once
+      // the owning experiment is archived. Without this check the Redis-state
+      // path (fresh runs, within 24h TTL) would keep serving ClickHouse rows
+      // after archive while the slug-based fallback already returns 404, so
+      // archive visibility would silently depend on run age.
+      const stillLive = await experiments.isActive({
+        projectId: project.id,
+        id: experimentId,
+      });
+      if (!stillLive) experimentId = undefined;
+    }
 
-  if (!experimentId) {
-    // The remediation that used to be spelled out here — pass ?experimentSlug
-    // for a run older than the status cache — is the registry's copy for this
-    // code now, so every surface says it the same way.
-    throw new RunNotFoundError(runId);
-  }
-
-  try {
-    const experimentRunService = ExperimentRunService.create(prisma);
-    const run = await experimentRunService.getRun({
-      projectId: project.id,
-      experimentId,
-      runId,
-    });
-
-    if (!run) {
+    if (!experimentId) {
+      // The remediation that used to be spelled out here — pass ?experimentSlug
+      // for a run older than the status cache — is the registry's copy for this
+      // code now, so every surface says it the same way.
       throw new RunNotFoundError(runId);
     }
 
-    markUsed();
-    return c.json(run);
-  } catch (error) {
-    // Only a genuine miss is a 404. This used to answer EVERY failure with
-    // "Run not found or results not yet available", so a ClickHouse outage
-    // told the caller their run did not exist — a wrong answer served with a
-    // status code that invites them to stop asking. Anything we cannot name
-    // goes up to the boundary, where it becomes a 500 and a trace id (ADR-045).
-    if (HandledError.isHandled(error)) throw error;
-    logger.error({ error, runId }, "Failed to fetch run results");
-    throw error;
-  }
-});
+    try {
+      const experimentRunService = ExperimentRunService.create(prisma);
+      const run = await experimentRunService.getRun({
+        projectId: project.id,
+        experimentId,
+        runId,
+      });
+
+      if (!run) {
+        throw new RunNotFoundError(runId);
+      }
+
+      markUsed();
+      return c.json(run);
+    } catch (error) {
+      // Only a genuine miss is a 404. This used to answer EVERY failure with
+      // "Run not found or results not yet available", so a ClickHouse outage
+      // told the caller their run did not exist — a wrong answer served with a
+      // status code that invites them to stop asking. Anything we cannot name
+      // goes up to the boundary, where it becomes a 500 and a trace id (ADR-045).
+      if (HandledError.isHandled(error)) throw error;
+      logger.error({ error, runId }, "Failed to fetch run results");
+      throw error;
+    }
+  },
+);
 
 export const app = secured.hono;

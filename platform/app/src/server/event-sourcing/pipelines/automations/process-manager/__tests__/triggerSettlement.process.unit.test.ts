@@ -1,5 +1,5 @@
-import { TriggerAction } from "@prisma/client";
 import { describe, expect, it } from "vitest";
+import { TriggerAction } from "~/generated/prisma/client";
 import { buildIntentFactories } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import { TRIGGER_MATCH_RECORDED_EVENT_TYPE } from "~/server/event-sourcing/pipelines/automations/schemas/constants";
 import type { TriggerMatchRecordedEventData } from "~/server/event-sourcing/pipelines/automations/schemas/events";
@@ -207,6 +207,7 @@ describe("trigger settlement process", () => {
         ]);
       });
 
+      /** @scenario "Pending matches are bounded without losing matches" */
       it("emits immediate dispatch intents for the flushed matches plus one log intent", () => {
         const pendingMatches = Object.fromEntries(
           Array.from({ length: MAX_PENDING_MATCHES }, (_, index) => [
@@ -251,7 +252,7 @@ describe("trigger settlement process", () => {
             },
           },
           {
-            messageKey: "overflow:5",
+            messageKey: "overflow:trigger-1:0",
             intentType: "logOverflow",
             payload: {
               triggerId: "trigger-1",
@@ -260,6 +261,74 @@ describe("trigger settlement process", () => {
             },
           },
         ]);
+      });
+
+      // The overflow entry is a log line, so it must cost about as much as a
+      // log line. Keyed on the cumulative flush counter it was unique on every
+      // single flush, so the outbox's own dedup could never collapse it and a
+      // storm wrote one durable row per overflowed match (119,665 rows in one
+      // project-day in production). Keyed on the trigger and the minute of
+      // event time, the same storm writes at most one row per trigger per
+      // minute — and because the key reads EVENT time rather than wall time,
+      // a redelivery of the same event produces a byte-identical key and
+      // dedups instead of adding a row.
+      it("keys the overflow entry per trigger per minute so a storm coalesces", () => {
+        const definition = automationProcessDefinition({
+          name: "triggerSettlement",
+        });
+        const evolve =
+          definition.config.handlers[TRIGGER_MATCH_RECORDED_EVENT_TYPE]!;
+        // The oldest entry is the one that flushes; persist-class keeps this
+        // fixture about the overflow key rather than digest batching.
+        const pendingEntry = (offset: number, index: number) =>
+          [
+            `trace-${offset}-${index}`,
+            {
+              settleDueAt: index,
+              dispatchDueAt: index === 0 ? 1_000 : index,
+              actionClass:
+                index === 0 ? ("persist" as const) : ("notify" as const),
+              settleWindowBucket: "30000-0",
+            },
+          ] as const;
+        const fullPending = (offset: number) =>
+          Object.fromEntries(
+            Array.from({ length: MAX_PENDING_MATCHES }, (_, index) =>
+              pendingEntry(offset, index),
+            ),
+          );
+        const overflowKeyAt = (at: number, triggerId: string) =>
+          evolve(
+            { pendingMatches: fullPending(at), overflowFlushed: 0 },
+            match({ traceId: `newest-${at}` }),
+            {
+              at,
+              now: at,
+              key: triggerId,
+              projectId: "project-1",
+              intents: buildIntentFactories(definition.config.intents),
+            },
+          ).intents?.find((intent) => intent.intentType === "logOverflow")
+            ?.messageKey;
+
+        const minuteStart = 3 * 60_000;
+        expect(overflowKeyAt(minuteStart, "trigger-1")).toBe(
+          "overflow:trigger-1:3",
+        );
+        // Anywhere else inside the same minute collapses onto that same row.
+        expect(overflowKeyAt(minuteStart + 59_999, "trigger-1")).toBe(
+          "overflow:trigger-1:3",
+        );
+        // The next minute gets its own row, so the storm stays visible.
+        expect(overflowKeyAt(minuteStart + 60_000, "trigger-1")).toBe(
+          "overflow:trigger-1:4",
+        );
+        // A different trigger in the same minute is never coalesced into
+        // another trigger's row — the outbox uniqueness carries no processKey,
+        // so the trigger has to be in the key itself.
+        expect(overflowKeyAt(minuteStart, "trigger-2")).toBe(
+          "overflow:trigger-2:3",
+        );
       });
     });
   });

@@ -4,7 +4,7 @@ import {
   type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import {
   bindingScopeCanGrant,
   EXTERNAL_MEMBER_PERMISSIONS,
@@ -13,6 +13,7 @@ import {
   type Permission,
   teamRoleHasPermission,
 } from "../api/rbac";
+import { CUSTOM_ROLE_KIND } from "../role/role-kind";
 import {
   MalformedCustomRolePermissionsError,
   parseCustomRolePermissions,
@@ -231,6 +232,33 @@ async function collectBindingsForApiKey({
 // ============================================================================
 
 /**
+ * The `customRole` predicate that keeps an API key's private permission role
+ * with the key it was minted for.
+ *
+ * A user or a group may never carry one at all. An API key may carry one, but
+ * only its own: a binding from key A to key B's system role would otherwise
+ * hand B's permissions to A, since the resolver reads whatever role the
+ * binding names. "Its own" is the same exclusivity
+ * `RoleRepository.isExclusiveToApiKey` uses when deciding a system role is
+ * safe to rewrite: every binding on the role belongs to this key, and no
+ * legacy assignment holds it.
+ */
+function systemRoleGuard(principal: Principal) {
+  if (principal.type !== "apiKey") {
+    return { kind: { not: CUSTOM_ROLE_KIND.SYSTEM_API_KEY } };
+  }
+  return {
+    OR: [
+      { kind: { not: CUSTOM_ROLE_KIND.SYSTEM_API_KEY } },
+      {
+        roleBindings: { every: { apiKeyId: principal.id } },
+        assignedUsers: { none: {} },
+      },
+    ],
+  };
+}
+
+/**
  * Checks whether a principal has a specific permission at a given scope.
  *
  * All matching bindings across ancestor scopes are evaluated and their
@@ -272,10 +300,21 @@ export async function checkRoleBindingPermission({
     // checkPermissionFromBindings() in rbac.ts.
     if (!bindingScopeCanGrant(binding.scopeType, permission)) continue;
 
-    // Custom role — look up its permissions
+    // Custom role: look up its permissions. Defense in depth on two axes:
+    // the lookup is scoped to the organization being checked, so a poisoned
+    // binding pointing at another organization's role grants nothing of that
+    // role even if a write path let it through; and an API key's private
+    // permission role (kind system_api_key) backs only that key's own
+    // bindings, never a user's, a group's, or another key's. Either mismatch
+    // resolves exactly like a missing role: the built-in CUSTOM baseline
+    // below, which cannot carry the foreign role's permissions.
     if (binding.role === TeamUserRole.CUSTOM && binding.customRoleId) {
-      const customRole = await prisma.customRole.findUnique({
-        where: { id: binding.customRoleId },
+      const customRole = await prisma.customRole.findFirst({
+        where: {
+          id: binding.customRoleId,
+          organizationId,
+          ...systemRoleGuard(resolvedPrincipal),
+        },
         select: { permissions: true },
       });
       // Use the shared parser so shape validation is consistent with the

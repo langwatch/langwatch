@@ -6,6 +6,18 @@ on:
       - main
   workflow_dispatch:
 
+# This one is not hypothetical: 12 of the last 60 runs were still in flight
+# when the next merge to main started another. release-please reads the commits
+# since the last release and then creates-or-updates a release PR per package,
+# so two overlapping runs compute their plan from the same history and race on
+# the same PRs — the observable results are a duplicate release PR, or one run
+# reverting the other's version bump.
+concurrency:
+  group: release-please-sdks-${{ github.ref }}
+  # Queue, never cancel. A cancelled run can land between "PR created" and
+  # "labels and body written", leaving a release PR that nothing will finish.
+  cancel-in-progress: false
+
 permissions:
   contents: write
   pull-requests: write

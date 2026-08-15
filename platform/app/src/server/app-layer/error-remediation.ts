@@ -75,10 +75,22 @@ const registry = {
   time_range_too_wide: {
     tips: ["Query in smaller windows and paginate through the results"],
   },
+  page_too_deep: {
+    tips: [
+      "Narrow the time range or filters so the page falls inside the window",
+      "Walk forward page by page, which has no depth limit",
+    ],
+  },
   clickhouse_unavailable: {
     tips: [
       "This is a temporary platform issue — retry in a few seconds",
       "If it persists, check the LangWatch status page or contact support",
+    ],
+  },
+  clickhouse_overloaded: {
+    tips: [
+      "Too many queries were running at once — retry in a few seconds",
+      "Narrow the time range or add filters so the query costs less to run",
     ],
   },
 
@@ -117,6 +129,74 @@ const registry = {
       "This name is reserved for keys LangWatch manages on your behalf — pick a different name",
     ],
     docsPath: "/api-reference/api-keys/create-api-key",
+  },
+
+  // ---- management API (organization, members, roles, role bindings) ----
+  enterprise_plan_required: {
+    tips: [
+      "This part of the API is available on the Enterprise plan; meta.feature names which capability was refused",
+      "Talk to your account team or visit the pricing page to upgrade the organization's plan",
+    ],
+    docsPath: "/pricing",
+  },
+  insufficient_permissions: {
+    tips: [
+      "The credential lacks the permission named in meta.required_permission",
+      "Ask an organization admin to grant that permission, or use an API key whose bindings include it",
+    ],
+    docsPath: "/platform/rbac",
+  },
+  role_binding_already_exists: {
+    tips: [
+      "An identical binding (same principal, role, and scope) already exists; treat this as already done",
+      "List the role bindings to find the existing one if you need its id",
+    ],
+    docsPath: "/platform/rbac",
+  },
+  custom_role_in_use: {
+    tips: [
+      "Remove or reassign the role's assignments and bindings first; meta carries how many are holding it",
+    ],
+    docsPath: "/platform/rbac",
+  },
+  custom_role_name_taken: {
+    tips: [
+      "Role names are unique per organization; pick a different name, or update the existing role instead",
+    ],
+    docsPath: "/platform/rbac",
+  },
+  organization_slug_taken: {
+    tips: [
+      "Organization slugs are unique across the instance; pick a different slug, or omit it to derive one from the name",
+    ],
+  },
+  duplicate_invite: {
+    tips: [
+      "A pending invite for this email already exists; revoke it first, or treat this as already done",
+    ],
+  },
+  scim_token_not_found: {
+    tips: [
+      "Check the token id; the token may already be revoked",
+      "List the organization's SCIM tokens to find the right id",
+    ],
+    docsPath: "/platform/scim",
+  },
+
+  // ---- personal workspace reads ----
+  // Both are hit almost entirely by agents and CLIs, which have no UI to fall
+  // back on, so the tips have to name the key to swap in rather than restate
+  // the refusal.
+  personal_project_key_required: {
+    tips: [
+      "Send the API key from your own personal workspace; a shared or team workspace key names no single owner to report for",
+      "Every personal workspace carries its own API key on its settings page",
+    ],
+  },
+  personal_usage_key_mismatch: {
+    tips: [
+      "Send a key scoped to your own personal workspace; being allowed to view a workspace is not the same as it being yours",
+    ],
   },
 
   // ---- evaluations ----
@@ -243,6 +323,39 @@ const registry = {
   langy_github_not_connected: {
     tips: [
       "Install the LangWatch GitHub App (Settings → Integrations) to let the agent open pull requests",
+    ],
+  },
+  langy_api_credential_missing: {
+    tips: [
+      "Send the project API key as X-Auth-Token, Authorization: Bearer <token>, or Authorization: Basic base64(projectId:token)",
+    ],
+    docsPath: "/api-reference/api-keys/overview",
+  },
+  langy_api_credential_invalid: {
+    tips: [
+      "The token did not resolve to a project — check it was copied whole and has not been revoked",
+    ],
+    docsPath: "/api-reference/api-keys/overview",
+  },
+  langy_api_key_unowned: {
+    tips: [
+      "This key has no owning user, so there is no one for the turn to act as — mint a personal API key and use that instead",
+    ],
+    docsPath: "/api-reference/api-keys/create-api-key",
+  },
+  langy_api_key_no_langy_access: {
+    tips: [
+      "The user who owns this key cannot use Langy in this project — ask a workspace admin to grant Langy access, then retry",
+    ],
+  },
+  langy_api_actor_missing: {
+    tips: [
+      "The user who owns this key no longer exists — mint a new key under a current user",
+    ],
+  },
+  langy_api_request_invalid: {
+    tips: [
+      "Read the `issues` array in `meta` — it names the field that failed and why",
     ],
   },
   langy_github_repo_not_accessible: {

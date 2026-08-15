@@ -1,5 +1,5 @@
-import type { Prisma } from "@prisma/client";
 import { HIDDEN_SYSTEM_KEY_NAMES } from "~/server/api-key/reserved-names";
+import type { GuardMiddleware, GuardParams } from "./dbGuardMiddleware";
 
 /**
  * Organization-tenancy guard: the org-level mirror of guardProjectId.
@@ -34,10 +34,7 @@ type OrgScopedModelConfig = {
    * alike. Bounds that genuinely resolve a single row for any action (a parent
    * FK, a globally-unique secret) simply ignore the argument.
    */
-  extraBound?: (args: {
-    clause: unknown;
-    action: Prisma.MiddlewareParams["action"];
-  }) => boolean;
+  extraBound?: (args: { clause: unknown; action: string }) => boolean;
 };
 
 /**
@@ -112,6 +109,52 @@ const isSystemManagedKeySweep = (clause: unknown): boolean => {
     where.revokedAt === null &&
     isElapsedExpiryBound(where.expiresAt)
   );
+};
+
+/**
+ * The shape of the branch-recheck sweep: a branch that resolved to no pull
+ * request (`notFoundAt: { not: null }`), whose backoff has elapsed
+ * (`recheckAfter: { lte: <now> }`), and that a reader has asked about recently
+ * (`lastRequestedAt: { gt: <cutoff> }`). Exactly those three clauses and
+ * nothing else.
+ *
+ * Each one is load-bearing, and the literal matching is deliberate for the same
+ * reason it is on the ApiKey sweep:
+ *
+ *   - `notFoundAt: { not: null }` is "branches with no pull request". Without
+ *     it the hatch reaches every mapped branch in every organization, which is
+ *     the set that carries the pull-request names worth reading.
+ *   - `recheckAfter: { lte: <now> }` is "…whose backoff has elapsed". Without
+ *     it the hatch reaches branches the sweep is deliberately not asking about.
+ *   - `lastRequestedAt: { gt: <cutoff> }` is "…that anyone still cares about".
+ *     Without it the sweep walks branches abandoned months ago, which is both
+ *     the wrong behavior and a much wider read.
+ *
+ * A sweep that legitimately changes shape must change this predicate with it.
+ */
+const isBranchRecheckSweep = (clause: unknown): boolean => {
+  if (!clause || typeof clause !== "object") return false;
+  const where = clause as Record<string, unknown>;
+  return (
+    Object.keys(where).length === 3 &&
+    isNotNullBound(where.notFoundAt) &&
+    isDateComparison(where.recheckAfter, "lte") &&
+    isDateComparison(where.lastRequestedAt, "gt")
+  );
+};
+
+/** Matches exactly `{ not: null }`, nothing looser. */
+const isNotNullBound = (value: unknown): boolean => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const bound = value as Record<string, unknown>;
+  return Object.keys(bound).length === 1 && bound.not === null;
+};
+
+/** Matches exactly `{ <operator>: <Date> }`, nothing looser. */
+const isDateComparison = (value: unknown, operator: "lte" | "gt"): boolean => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const bound = value as Record<string, unknown>;
+  return Object.keys(bound).length === 1 && bound[operator] instanceof Date;
 };
 
 const isNonEmptyStringList = (value: any): boolean =>
@@ -231,13 +274,33 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
       );
     },
   },
-  // GitHub App installation mapped to a LangWatch org (Langy bot-authored PRs).
-  // Bound by organizationId (admin reads) or the globally-unique installationId
-  // (webhook + mint paths). Issue #4747; spec
-  // specs/langy/langy-github-install.feature.
-  LangyGithubInstallation: {
+  // The organization's GitHub connection. Bound by organizationId (admin reads)
+  // or the globally-unique installationId (webhook + mint paths). Spec:
+  // specs/integrations/github-connection.feature.
+  GithubInstallation: {
     extraBound: ({ clause }) =>
       typeof clauseField(clause, "installationId") === "string",
+  },
+  // Pull requests discovered through that connection, and the per-branch
+  // bookkeeping behind the lookup. Both are reached by organizationId, or by
+  // the compound unique key that starts with it: a query that names a
+  // repository without naming the organization would span every tenant that
+  // has a repository by that name.
+  GithubPullRequest: {},
+  GithubBranchPullRequestCheck: {
+    // The branch-recheck sweep is the one read in this feature that cannot
+    // name an organization, for the same structural reason the expired-key
+    // sweep above cannot: it runs on a timer with no request context, and its
+    // whole job is to find the due branches wherever they are.
+    //
+    // Granted on the sweep's TERMS, not its name: the full predicate (see
+    // isBranchRecheckSweep) and `findMany`, the single action
+    // `findRecheckDue` performs. Action-gating is what stops the same shape
+    // being replayed as an `updateMany` that rewrites every organization's
+    // bookkeeping, or a `deleteMany` that erases it. The rows it reaches are
+    // bookkeeping only: a repository name, a branch name and timestamps.
+    extraBound: ({ clause, action }) =>
+      action === "findMany" && isBranchRecheckSweep(clause),
   },
 };
 
@@ -261,8 +324,11 @@ export const ORG_TENANCY_EXEMPT: readonly string[] = [
   "ModelProvider",
   "ModelDefaultConfig",
   // Webhook platform: enforced by guardProjectId's SCOPED_MODELS (org id,
-  // row id, or endpoint FK required on every query; creates must carry the
-  // org); the delivery sweep and retention prune use the raw-SQL opt-out.
+  // row id, endpoint FK, or project FK required on every query; creates must
+  // carry one channel's complete tenancy pair); the delivery sweep and
+  // retention prune use the raw-SQL opt-out. The delivery log is shared with
+  // the automations channel, whose rows are project-scoped and carry no
+  // organizationId at all, so a mandatory-organizationId guard cannot apply.
   "WebhookEndpoint",
   "WebhookEndpointDelivery",
   // organizationId is NULLABLE here (NULL = platform-published default), so a
@@ -349,11 +415,7 @@ const validateRecursive = (
   return false;
 };
 
-const _guardOrganizationId = ({
-  params,
-}: {
-  params: Prisma.MiddlewareParams;
-}) => {
+const _guardOrganizationId = ({ params }: { params: GuardParams }) => {
   const model = params.model;
   if (!model || !ORG_SCOPED_MODELS[model]) return;
 
@@ -412,7 +474,7 @@ const _guardOrganizationId = ({
   }
 };
 
-export const guardOrganizationId: Prisma.Middleware = async (params, next) => {
+export const guardOrganizationId: GuardMiddleware = async (params, next) => {
   _guardOrganizationId({ params });
   return next(params);
 };

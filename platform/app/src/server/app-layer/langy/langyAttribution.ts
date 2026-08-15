@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 
 /**
  * ProjectSecret / VirtualKey / ApiKey audit fields require a non-null user.

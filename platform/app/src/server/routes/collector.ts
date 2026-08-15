@@ -1,6 +1,5 @@
 import crypto from "node:crypto";
-import { createLogger } from "@langwatch/observability";
-import { bodyLimit } from "hono/body-limit";
+import { createLogger, validationMeta } from "@langwatch/observability";
 import type { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
@@ -17,6 +16,8 @@ import {
 import { TokenResolver } from "../api-key/token-resolver";
 import { getApp } from "../app-layer/app";
 import { SPAN_MAX_PAST_MS } from "../app-layer/traces/trace-request-collection.service";
+import { PlanLimitExceededError } from "../app-layer/usage/errors";
+import type { UsageLimitResult } from "../app-layer/usage/usage.service";
 import { prisma } from "../db";
 import { evaluationNameAutoslug } from "../tracer/collector/evaluationNameAutoslug";
 import { maybeAddIdsToContextList } from "../tracer/collector/rag";
@@ -35,6 +36,7 @@ import {
   spanValidatorSchema,
 } from "../tracer/types";
 import { CollectorSpanUtils } from "../traces/collectorSpan.utils";
+import { bodyLimit } from "./_lib/body-limit";
 
 const logger = createLogger("langwatch.collector");
 const tokenResolver = TokenResolver.create(prisma);
@@ -73,9 +75,13 @@ secured
         );
       }
 
+      // warn, not error: a malformed body is the caller's mistake and we answer
+      // it with a 400. These three sites return rather than throw, so they never
+      // reach the boundary that would classify them as customer fault, and at
+      // error level they were about a fifth of this service's error stream.
       const contentType = c.req.header("content-type");
       if (!contentType?.includes("application/json")) {
-        logger.error("collector request body is not json");
+        logger.warn("collector request body is not json");
 
         return c.json({ message: "Invalid body, expecting json" }, 400);
       }
@@ -84,12 +90,16 @@ secured
       try {
         body = await c.req.json();
       } catch {
-        logger.error("collector request body is not valid json");
+        logger.warn("collector request body is not valid json");
         return c.json({ message: "Invalid body, expecting json" }, 400);
       }
 
-      if (typeof body !== "object") {
-        logger.error("collector request body is not json");
+      // `typeof null` is "object" and an array is one too, so both walk past a
+      // bare typeof check and reach `"metadata" in body` below — which throws on
+      // null. That is the same customer mistake as the two guards above, so it
+      // belongs on the same 400 rather than in the error stream as a 500.
+      if (body === null || Array.isArray(body) || typeof body !== "object") {
+        logger.warn("collector request body is not a json object");
         return c.json({ message: "Invalid body, expecting json" }, 400);
       }
 
@@ -139,43 +149,15 @@ secured
         "collector request being processed",
       );
 
+      // The lookup is wrapped in try/catch on its own — on failure we log and
+      // let the request through (same behaviour as before). The thrown limit
+      // error below lives outside that try block so it is never mistaken for
+      // a lookup failure.
+      let limitResult: UsageLimitResult;
       try {
-        const limitResult = await getApp().usage.checkLimit({
+        limitResult = await getApp().usage.checkLimit({
           teamId: project.teamId,
         });
-
-        if (limitResult.exceeded) {
-          try {
-            const activePlan = await getApp().planProvider.getActivePlan({
-              organizationId: project.team.organizationId,
-            });
-            await getApp().usageLimits.notifyPlanLimitReached({
-              organizationId: project.team.organizationId,
-              planName: activePlan.name ?? "free",
-            });
-          } catch (error) {
-            logger.error(
-              { error, projectId: project.id },
-              "Error sending plan limit notification",
-            );
-          }
-          logger.info(
-            {
-              projectId: project.id,
-              currentMonthMessagesCount: limitResult.count,
-              activePlanName: limitResult.planName,
-              maxMessagesPerMonth: limitResult.maxMessagesPerMonth,
-            },
-            "Project has reached plan limit",
-          );
-
-          return c.json(
-            {
-              message: `ERR_PLAN_LIMIT: ${limitResult.message}`,
-            },
-            429,
-          );
-        }
       } catch (error) {
         logger.error(
           { error, projectId: project.id },
@@ -183,6 +165,42 @@ secured
         );
         captureException(new Error("Error checking trace limit"), {
           extra: { projectId: project.id, error },
+        });
+        limitResult = { exceeded: false };
+      }
+
+      if (limitResult.exceeded) {
+        try {
+          const activePlan = await getApp().planProvider.getActivePlan({
+            organizationId: project.team.organizationId,
+          });
+          await getApp().usageLimits.notifyPlanLimitReached({
+            organizationId: project.team.organizationId,
+            planName: activePlan.name ?? "free",
+          });
+        } catch (error) {
+          logger.error(
+            { error, projectId: project.id },
+            "Error sending plan limit notification",
+          );
+        }
+        logger.info(
+          {
+            projectId: project.id,
+            currentMonthMessagesCount: limitResult.count,
+            activePlanName: limitResult.planName,
+            maxMessagesPerMonth: limitResult.maxMessagesPerMonth,
+          },
+          "Project has reached plan limit",
+        );
+
+        // 402, not 429: OTel SDKs and most HTTP clients retry a 429, and a
+        // plan limit is terminal for that payload, so a retryable status
+        // turns one rejection into an unbounded loop.
+        throw new PlanLimitExceededError(limitResult.message, {
+          currentMonthMessagesCount: limitResult.count,
+          maxMessagesPerMonth: limitResult.maxMessagesPerMonth,
+          activePlanName: limitResult.planName,
         });
       }
 
@@ -266,14 +284,20 @@ secured
       try {
         params = collectorRESTParamsValidatorSchema.parse(body);
       } catch (error) {
+        const validation = validationMeta(error);
+
         captureException(new Error("ZodError on parsing body"), {
-          extra: { projectId: project.id, body, zodError: error },
+          extra: { projectId: project.id, ...validation },
         });
 
         const validationError = fromZodError(error as ZodError);
 
-        logger.error(
-          { error, body, validationError },
+        // Shape, never the body. The rendered `validationError.message` quotes
+        // the offending values, so it answers the sender and stays out of the
+        // log; `validation` is the schema's own vocabulary and is what tells us
+        // whether the rule, rather than the payload, is the thing that is wrong.
+        logger.warn(
+          { projectId: project.id, ...validation },
           "invalid trace received",
         );
 
@@ -290,10 +314,12 @@ secured
         params;
 
       if (body.spans && !Array.isArray(body.spans)) {
-        logger.error(
+        // The type, not the value: whatever arrived in place of the array is
+        // still the sender's content, and the type is the whole diagnosis.
+        logger.warn(
           {
             projectId: project.id,
-            spans: body.spans,
+            receivedType: typeof body.spans,
             traceId: nullableTraceId,
           },
           "invalid spans field, expecting array",
@@ -360,20 +386,17 @@ secured
         }
       } catch (error) {
         const validationError = fromZodError(error as ZodError);
+        const validation = validationMeta(error);
+
         captureException(new Error("ZodError on parsing metadata"), {
-          extra: {
-            projectId: project.id,
-            metadata: params.metadata,
-            zodError: error,
-          },
+          extra: { projectId: project.id, ...validation },
         });
 
-        logger.error(
-          {
-            projectId: project.id,
-            metadata: params.metadata,
-            zodError: error,
-          },
+        // Metadata is customer-authored key/value content, so the values stay
+        // out. The rejected KEY names do not: a key refused across many
+        // projects is how we learn our reserved-metadata list is too narrow.
+        logger.warn(
+          { projectId: project.id, ...validation },
           "invalid metadata received",
         );
 
@@ -501,14 +524,16 @@ secured
         try {
           spans[index] = spanValidatorSchema.parse(span);
         } catch (error) {
+          const validation = validationMeta(error);
+
           captureException(new Error("ZodError on parsing spans"), {
-            extra: { projectId: project.id, span, zodError: error },
+            extra: { projectId: project.id, index, ...validation },
           });
 
           const validationError = fromZodError(error as ZodError);
 
-          logger.error(
-            { error, span, projectId: project.id, index, validationError },
+          logger.warn(
+            { projectId: project.id, index, ...validation },
             "invalid span received",
           );
 
@@ -642,7 +667,7 @@ secured
       }
 
       // Total ingestion failure: every dispatched span failed (e.g. Redis /
-      // group-queue outage). With the BullMQ fallback stack gone, a 200 here
+      // group-queue outage). There is no fallback stack, so a 200 here
       // would tell the SDK the trace landed and it would never retry —
       // permanent trace loss. Return 500 so clients retry; the dedup gate
       // releases failed spans via tryReleaseOnFailure, so a retry is safe.
@@ -685,6 +710,12 @@ secured
               evaluationNameAutoslug(evaluation.name);
             const status =
               evaluation.status ?? (evaluation.error ? "error" : "processed");
+            // A verdict is only real when the evaluator ran to completion —
+            // an errored/skipped run's stray passed/score/label must not
+            // reach analytics or triggers as a real result (#6833). Same
+            // gate as the shared verdictGate helpers applied at the
+            // executeEvaluation command boundary.
+            const hasVerdict = status === "processed";
 
             await app.evaluations.reportEvaluation({
               tenantId: project.id,
@@ -695,9 +726,9 @@ secured
               traceId,
               isGuardrail: evaluation.is_guardrail ?? undefined,
               status,
-              score: evaluation.score ?? null,
-              passed: evaluation.passed ?? null,
-              label: evaluation.label ?? null,
+              score: hasVerdict ? (evaluation.score ?? null) : null,
+              passed: hasVerdict ? (evaluation.passed ?? null) : null,
+              label: hasVerdict ? (evaluation.label ?? null) : null,
               details: evaluation.details ?? null,
               error: evaluation.error?.message ?? null,
               occurredAt,

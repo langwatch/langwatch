@@ -24,13 +24,13 @@
  */
 
 import { generate } from "@langwatch/ksuid";
+import { nanoid } from "nanoid";
 import {
   Prisma,
   type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
+} from "~/generated/prisma/client";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
 type TxClient = Prisma.TransactionClient;
@@ -122,6 +122,14 @@ export class PersonalWorkspaceService {
         return { ...existing, created: false };
       }
 
+      const reactivated = await this.reactivateInTx(tx, {
+        userId,
+        organizationId,
+      });
+      if (reactivated) {
+        return { ...reactivated, created: false };
+      }
+
       // Use the user's display name if available, otherwise their local
       // email part (jane@acme.com → "jane"), otherwise a fallback. Slug
       // gets a nanoid suffix to avoid global slug collisions across orgs.
@@ -201,6 +209,84 @@ export class PersonalWorkspaceService {
         created: true,
       };
     });
+  }
+
+  /**
+   * Brings back the workspace a removed membership archived, if there is one.
+   *
+   * The slot is one personal team per (organization, owner) and the partial
+   * unique index enforcing it covers archived rows, while every lookup filters
+   * `archivedAt: null`. So an archived workspace is invisible and yet still holds
+   * the slot: creating a replacement raises P2002 and there is no way back.
+   * Reactivating is the only correct answer, and it is also the kinder one,
+   * because the person gets their own history back rather than an empty room.
+   *
+   * Runs inside `tryCreate`'s transaction, between the live lookup and the
+   * create, so the ordering is: use it, revive it, or make it.
+   *
+   * The owner's ADMIN binding is recreated rather than assumed: removing the
+   * membership deleted every role binding they had in the organization, this one
+   * included, so a revived workspace without it would be one they cannot open.
+   */
+  private async reactivateInTx(
+    tx: TxClient,
+    { userId, organizationId }: { userId: string; organizationId: string },
+  ): Promise<Omit<PersonalWorkspace, "created"> | null> {
+    const archived = await tx.team.findFirst({
+      where: {
+        organizationId,
+        ownerUserId: userId,
+        isPersonal: true,
+        archivedAt: { not: null },
+      },
+      select: {
+        id: true,
+        projects: {
+          where: { isPersonal: true },
+          select: { id: true },
+          take: 1,
+        },
+      },
+    });
+
+    // A team without its project is the broken shape `ensure()` cannot resolve,
+    // and reviving half of it would only hide that. Leave it to raise P2002 on
+    // the create below, which is loud and recoverable by hand, rather than hand
+    // back a workspace with nowhere to put anything.
+    if (!archived || archived.projects.length === 0) return null;
+
+    await tx.team.update({
+      where: { id: archived.id },
+      data: { archivedAt: null },
+    });
+    await tx.project.updateMany({
+      where: { teamId: archived.id, isPersonal: true },
+      data: { archivedAt: null },
+    });
+
+    const existingBinding = await tx.roleBinding.findFirst({
+      where: {
+        organizationId,
+        userId,
+        scopeType: RoleBindingScopeType.TEAM,
+        scopeId: archived.id,
+      },
+      select: { id: true },
+    });
+    if (!existingBinding) {
+      await tx.roleBinding.create({
+        data: {
+          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+          organizationId,
+          userId,
+          role: TeamUserRole.ADMIN,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: archived.id,
+        },
+      });
+    }
+
+    return await this.findInTx(tx, { userId, organizationId });
   }
 
   /**

@@ -26,7 +26,7 @@ Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. L
 
 If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
-If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team. No login needed, secrets and personal data are redacted locally, and it directly shapes what gets fixed. `npx langwatch report --help` explains the options.
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`, so preview with `--dry-run` when the session touched sensitive data. `npx langwatch report --help` explains the options.
 
 **Projects and API keys: target a real project, not a personal one.**
 
@@ -102,7 +102,7 @@ Examples: an LLM-judge evaluator flagging stale-data answers, a monitor on refus
 
 ### Settle open questions with experiments
 
-When two approaches compete (two prompts, two models, two retrieval settings), run an experiment instead of arguing: build a dataset from real traces (`datasets` skill), then `langwatch experiment run` both variants and compare. Numbers close debates.
+When two approaches compete (two prompts, two models, two retrieval settings), run an experiment instead of arguing: build a dataset from real traces (`datasets` skill), then run it once per variant with `langwatch experiment run <slug> --param model=<variant>` and compare. A `--param name=value` pair is a constant value merged into every dataset row, so one experiment covers both variants. Numbers close debates.
 
 LangWatch's free plan has limits on prompts, scenarios, evaluators, experiments, and datasets. When you hit a limit, the API returns `"Free plan limit of N reached..."` with an upgrade link.
 

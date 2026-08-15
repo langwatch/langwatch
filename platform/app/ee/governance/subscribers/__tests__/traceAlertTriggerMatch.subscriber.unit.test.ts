@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { TriggerAction, TriggerKind } from "@prisma/client";
+import { register } from "prom-client";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { TriggerAction, TriggerKind } from "~/generated/prisma/client";
 import type { TriggerSummary } from "~/server/app-layer/automations/repositories/trigger.repository";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TriggerContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
@@ -10,6 +11,9 @@ import { settleWindowBucket } from "~/server/event-sourcing/pipelines/automation
 import { SPAN_RECEIVED_EVENT_TYPE } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
 import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 import { createTraceAlertTriggerMatchHandler } from "../traceAlertTriggerMatch.subscriber";
+
+// Registers the counter the fan-out assertions below read back.
+import "~/server/metrics";
 
 function traceState(
   overrides: Partial<TraceSummaryData> = {},
@@ -216,6 +220,73 @@ describe("trace alert trigger match subscriber", () => {
 
       expect(triggers.getActiveTraceTriggersForProject).not.toHaveBeenCalled();
       expect(recordTriggerMatch.send).not.toHaveBeenCalled();
+    });
+  });
+
+  // Match recording is the fan-out step: one record per active trigger per
+  // trace, before any filter runs. That volume is our pipeline's shape, not
+  // the customer's configuration, so it is measured and never limited.
+  describe("given several active automations on one trace", () => {
+    async function matchRecordCount(): Promise<number> {
+      const metric = await register
+        .getSingleMetric("automation_match_records_total")!
+        .get();
+      return metric.values[0]?.value ?? 0;
+    }
+
+    /** @scenario "Match-record volume is measured for the team, not capped" */
+    it("counts every record it wrote on a team metric", async () => {
+      const triggers = {
+        getActiveTraceTriggersForProject: vi
+          .fn()
+          .mockResolvedValue([
+            trigger({ id: "trigger-1" }),
+            trigger({ id: "trigger-2" }),
+            trigger({ id: "trigger-3" }),
+          ]),
+      };
+      const recordTriggerMatch = { send: vi.fn().mockResolvedValue(undefined) };
+      const before = await matchRecordCount();
+
+      await createTraceAlertTriggerMatchHandler({
+        triggers: triggers as never,
+        recordTriggerMatch,
+      })(event(), context(traceState()));
+
+      expect(recordTriggerMatch.send).toHaveBeenCalledTimes(3);
+      expect((await matchRecordCount()) - before).toBe(3);
+    });
+
+    /** @scenario "Recording a match consumes nothing" */
+    it("reaches for no dependency beyond the triggers and the command port", async () => {
+      // The claim is about the dependency SURFACE, so the assertion has to be
+      // about the surface. A call count on `send` cannot fail for the reason
+      // this test exists: it would stay green if a cap were consulted. Watching
+      // every property the handler reads can fail, and does the moment someone
+      // wires a limit into this path.
+      const reads = new Set<string>();
+      const deps = {
+        triggers: {
+          getActiveTraceTriggersForProject: vi
+            .fn()
+            .mockResolvedValue([trigger({ id: "trigger-1" })]),
+        },
+        recordTriggerMatch: { send: vi.fn().mockResolvedValue(undefined) },
+      };
+      const watched = new Proxy(deps, {
+        get(target, key) {
+          if (typeof key === "string") reads.add(key);
+          return target[key as keyof typeof deps];
+        },
+      });
+
+      await createTraceAlertTriggerMatchHandler(watched as never)(
+        event(),
+        context(traceState()),
+      );
+
+      expect([...reads].sort()).toEqual(["recordTriggerMatch", "triggers"]);
+      expect(deps.recordTriggerMatch.send).toHaveBeenCalledTimes(1);
     });
   });
 });

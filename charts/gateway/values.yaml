@@ -115,11 +115,6 @@ secrets:
   # disable (strict single-key mode; production steady state).
   jwtSecretPreviousKey: ""
 
-# Redis for the L2 auth cache (optional but recommended for multi-replica).
-redis:
-  url: ""                # e.g. redis://redis.langwatch.svc:6379/0
-  existingSecretName: "" # optional; referenced as GATEWAY_REDIS_URL if set
-
 cache:
   lruSize: 50000
   refreshInterval: 60s
@@ -232,27 +227,43 @@ containerSecurityContext:
 
 # Graceful drain timing. On SIGTERM the pod flips /readyz to 503 so
 # the LB / Service endpoint controller stops routing new traffic, waits
-# preDrainWait for that removal to propagate, then calls server.Shutdown
-# which blocks up to `timeout` for in-flight handlers to finish. Operators
-# watch `gateway_in_flight_requests` to see drain progress.
+# preDrainWaitSeconds for that removal to propagate, then calls
+# server.Shutdown, which blocks up to `timeoutSeconds` for in-flight
+# handlers to finish (pkg/lifecycle.Group.Run, see configmap.yaml for how
+# these two reach the container as SERVER_DRAIN_DELAY_SECONDS /
+# SERVER_GRACEFUL_SECONDS).
 #
-# terminationGracePeriodSeconds (pod spec) MUST exceed preDrainWait +
-# timeout + a few seconds of slack, or the kubelet force-kills the pod
-# mid-drain.
+# Plain integer seconds, not duration strings ("5s"/"60s"): the Go side
+# (pkg/config.Server.DrainDelaySeconds / GracefulSeconds) is a plain int,
+# parsed as a raw number, with no unit suffix to strip.
+#
+# timeoutSeconds sits above the gateway's 45s non-streaming heartbeat
+# interval, which is the boundary between a request that is merely slow and
+# one that is stuck. Below it, every request the heartbeat exists to keep
+# alive is one a rolling deploy cuts off, and the gateway says so at boot
+# with a graceful_shutdown_shorter_than_heartbeat_interval warning.
+#
+# terminationGracePeriodSeconds (pod spec) MUST exceed preDrainWaitSeconds +
+# timeoutSeconds + a few seconds of slack, or the kubelet force-kills the
+# pod mid-drain.
 shutdown:
-  preDrainWait: 5s
-  timeout: 15s
-# terminationGracePeriodSeconds is computed from preDrainWait + timeout
-# + 5s slack. Operators with slow LB propagation can override this
-# directly AND bump preDrainWait accordingly.
-terminationGracePeriodSeconds: 30
+  preDrainWaitSeconds: 5
+  timeoutSeconds: 60
+# terminationGracePeriodSeconds is the kubelet's SIGKILL clock. 75 is a plain
+# default that happens to cover the drain settings above (5 + 60 + 10s slack),
+# not a value derived from them: raising preDrainWaitSeconds or timeoutSeconds
+# means raising this as well. The chart refuses to render when it falls short,
+# rather than installing a release the kubelet kills mid-drain. Operators with
+# slow load-balancer propagation can raise it further, along with
+# preDrainWaitSeconds.
+terminationGracePeriodSeconds: 75
 
 # Edge protection. Caps request body size so a misconfigured (or
 # hostile) caller can't OOM the pod with a multi-GB body. 10 MiB fits
 # ~3 MiB prompts plus base64 images with room to spare, and sits well
 # below the 512Mi memory limit. Set to 0 to disable (not recommended).
 security:
-  maxRequestBodyBytes: 10485760  # 10 MiB
+  maxRequestBodyBytes: 33554432  # 32 MiB
 
   # Application-layer SSRF admission for tenant-supplied provider endpoints.
   # Keep false for local/self-hosted installs that intentionally reach HTTP,
@@ -348,14 +359,6 @@ networkPolicy:
     - podSelector:
         matchLabels:
           app.kubernetes.io/name: langwatch-app
-
-  # Redis for L2 auth cache. Matches the default deployment pattern;
-  # if you run Redis elsewhere (managed service, another namespace)
-  # override with ipBlock or a namespace selector.
-  egressToRedis:
-    - podSelector:
-        matchLabels:
-          app.kubernetes.io/name: redis
 
   # OTLP collector — leave empty to disable the NetworkPolicy rule
   # when spans export out-of-cluster or per-project endpoints vary.

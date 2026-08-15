@@ -20,6 +20,13 @@ can live at exactly one scope pass `singleSelect`.
 | `TEAM`        | Every project in a team                       | `ModelProviderScopeType` enum      |
 | `PROJECT`     | One project                                   | `ModelProviderScopeType` enum      |
 | `DEPARTMENT`  | Every member of a department (a people group) | picker/badge only, no enum row     |
+| `GROUP`       | Every member of a group                       | badge only, `GatewayBudgetScopeType`|
+| `PRINCIPAL`   | One person                                    | badge only, `GatewayBudgetScopeType`|
+| `VIRTUAL_KEY` | One virtual key                               | badge only, `GatewayBudgetScopeType`|
+
+`GROUP` / `PRINCIPAL` / `VIRTUAL_KEY` are read-side only: gateway budgets
+target them, and `ProviderScopeChips` renders them, but `ScopeChipPicker` never
+offers them (budgets pick their target through their own drawer).
 
 `ORGANIZATION` / `TEAM` / `PROJECT` are the **resource triad** that maps 1:1 to
 the Prisma `ModelProviderScopeType` enum and persists to scoped-resource tables
@@ -94,8 +101,13 @@ const [scopes, setScopes] = useState<ScopeChipPickerEntry[]>([]);
 
 Each kind has a fixed icon + colour so chips read the same everywhere:
 `ORGANIZATION` Building2 / blue, `TEAM` Users / purple, `PROJECT` Folder,
-`DEPARTMENT` Boxes / cyan ("Department: <name>"). Pass `name` so the chip shows
-a label instead of the bare id.
+`DEPARTMENT` Boxes / cyan ("Department: <name>"), `GROUP` UsersRound / cyan,
+`PRINCIPAL` User / teal, `VIRTUAL_KEY` KeyRound / orange. Pass `name` so the
+chip shows a label instead of the bare id.
+
+Two optional fields keep the chip to one line: `detail` appends identifiers and
+counts to the tooltip (a slug, a key prefix, "4 members") instead of a second
+visible line, and `href` turns the chip into a link to the thing it names.
 
 ## Adding a new cut
 

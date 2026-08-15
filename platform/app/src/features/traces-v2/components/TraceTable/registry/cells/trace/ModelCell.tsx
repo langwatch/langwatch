@@ -9,11 +9,11 @@ import {
 } from "@chakra-ui/react";
 import { CircleHelp } from "lucide-react";
 import type React from "react";
-import { useFilterStore } from "~/features/traces-v2/stores/filterStore";
 import {
   modelProviderIcons,
   ProviderIconGlyph,
-} from "~/server/modelProviders/iconsMap";
+} from "~/components/modelProviders/iconsMap";
+import { useFilterStore } from "~/features/traces-v2/stores/filterStore";
 import type { TraceListItem } from "../../../../../types/trace";
 import { MonoCell } from "../../../MonoCell";
 import type { CellDef } from "../../types";

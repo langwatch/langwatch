@@ -1,3 +1,4 @@
+import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
 import type { TraceMediaRef } from "~/shared/traces/media-refs";
 
 export type TraceStatus = "ok" | "error" | "warning";
@@ -8,16 +9,20 @@ export type TraceStatus = "ok" | "error" | "warning";
  */
 export interface EvalSummary {
   name: string;
-  score: number | boolean;
+  /** `null` when the evaluator produced neither a score nor a verdict —
+   *  never substitute a fabricated 0, it renders as a real "0.00". */
+  score: number | boolean | null;
   scoreType: "numeric" | "boolean" | "categorical";
   /**
    * - `pass` / `fail` / `warning` — the evaluator ran and produced a verdict.
+   * - `processed` — the evaluator ran to completion but produced no pass/fail
+   *   verdict (score-only or verdict-less runs). Neutral: not a pass.
    * - `skipped` — the evaluator wasn't run (e.g. provider not configured,
    *   preconditions not met). The score is meaningless; don't show it.
    * - `error` — the evaluator crashed / errored out. Distinct from a "fail"
    *   verdict — the evaluator never produced a real score.
    */
-  status: "pass" | "warning" | "fail" | "skipped" | "error";
+  status: "pass" | "warning" | "fail" | "processed" | "skipped" | "error";
 }
 
 /**
@@ -34,14 +39,38 @@ export interface TraceEvalResult {
 }
 
 /**
- * Lightweight event reference attached to a trace list item.
- * Hoisted from spans during the fold projection.
+ * One event name a trace recorded, with how often it fired. Rows show one
+ * badge per name, not per event: an agent turn that retries a tool 237 times
+ * has 237 `tool.output` events and one thing worth saying about them.
  */
-export interface TraceListEvent {
-  spanId: string;
-  timestamp: number;
+export interface TraceListEventGroup {
   name: string;
+  count: number;
+  /** Epoch ms of the earliest event under this name — the badge order. */
+  firstTimestamp: number;
 }
+
+/**
+ * A trace's events as the list renders them. Read from `stored_spans` by
+ * `tracesV2.listEvents` once per visible page, not carried on the trace
+ * summary — the fold stopped hoisting events so that folding stays O(1) per
+ * span (migration 00025).
+ */
+export interface TraceListEvents {
+  /** Ordered by first occurrence; shorter than `distinctCount` when trimmed. */
+  groups: TraceListEventGroup[];
+  /** Every event the trace recorded, including names beyond the trim. */
+  totalCount: number;
+  /** Distinct names the trace recorded, including those beyond the trim. */
+  distinctCount: number;
+}
+
+/** A trace with no events, and the shape a row carries before they load. */
+export const NO_TRACE_EVENTS: TraceListEvents = {
+  groups: [],
+  totalCount: 0,
+  distinctCount: 0,
+};
 
 /**
  * Shape of a trace as rendered in the trace table.
@@ -122,5 +151,37 @@ export interface TraceListItem {
   traceName?: string;
   rootSpanType?: string | null;
   evaluations: TraceEvalResult[];
-  events: TraceListEvent[];
+  events: TraceListEvents;
+  /**
+   * True while the page's events read is still in flight. The Events column
+   * shows a placeholder rather than its empty marker, which would otherwise
+   * claim the trace recorded nothing.
+   */
+  eventsLoading?: boolean;
+  /**
+   * True when the page's events read failed. The column says so instead of
+   * showing its empty marker, which would report a trace that has events as
+   * having none.
+   */
+  eventsUnavailable?: boolean;
+  /**
+   * What reviewers left on the trace: their comments, ratings, scores and
+   * suggested outputs. Annotations live in their own store rather than on the
+   * trace summary, so the list reads them separately and lays them over the
+   * row (`useTraceListAnnotations`). Undefined until the Annotations column
+   * asks for them.
+   */
+  annotations?: AnnotationByTrace[];
+  /**
+   * True while the page's annotations read is still in flight. The column
+   * holds the space rather than showing its empty marker, which would claim
+   * nobody has reviewed the trace.
+   */
+  annotationsLoading?: boolean;
+  /**
+   * True when the page's annotations could not be read, whether the read
+   * failed or the reader may not see them. The column says so instead of
+   * reporting a reviewed trace as unreviewed.
+   */
+  annotationsUnavailable?: boolean;
 }

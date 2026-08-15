@@ -1,5 +1,5 @@
-import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import {
   Actions,
   canCreate,

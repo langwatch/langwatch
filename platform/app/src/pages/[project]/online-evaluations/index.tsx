@@ -248,7 +248,7 @@ function OnlineEvaluationsPage() {
         message={`Are you sure you want to delete "${monitorToDelete?.name ?? ""}"?`}
         confirmLabel="Delete"
         tone="danger"
-        loading={deleteMonitor.isLoading}
+        loading={deleteMonitor.isPending}
         onConfirm={() => {
           if (!monitorToDelete) return;
           deleteMonitor.mutate(

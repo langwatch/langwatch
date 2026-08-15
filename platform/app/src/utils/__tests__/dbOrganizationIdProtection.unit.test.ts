@@ -1,8 +1,9 @@
-import type { PrismaClient } from "@prisma/client";
-import { Prisma } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 
 import { reapExpiredLangySessionApiKeys } from "~/server/app-layer/langy/langyApiKey";
+import { parsePrismaDatamodel } from "~/test-utils/prismaDatamodel";
+import type { GuardParams } from "../dbGuardMiddleware";
 import {
   guardOrganizationId,
   ORG_SCOPED_MODEL_NAMES,
@@ -16,22 +17,9 @@ import {
  * partition test keeps the regime classification honest as the schema grows.
  */
 
-async function runGuard(
-  params: Partial<Prisma.MiddlewareParams> & {
-    model: string;
-    action: Prisma.MiddlewareParams["action"];
-    args: Prisma.MiddlewareParams["args"];
-  },
-): Promise<unknown> {
+async function runGuard(params: GuardParams): Promise<unknown> {
   const next = vi.fn(async () => "ok");
-  return guardOrganizationId(
-    {
-      dataPath: [],
-      runInTransaction: false,
-      ...params,
-    } as Prisma.MiddlewareParams,
-    next,
-  );
+  return guardOrganizationId(params, next);
 }
 
 describe("guardOrganizationId — original three models preserved", () => {
@@ -301,6 +289,120 @@ describe("guardOrganizationId — audited real query shapes pass", () => {
   });
 });
 
+describe("guardOrganizationId — the GitHub connection's tables", () => {
+  describe("when looking a pull request up by repository alone", () => {
+    it("THROWS — a repository name is not unique across organizations", async () => {
+      await expect(
+        runGuard({
+          model: "GithubPullRequest",
+          action: "findMany",
+          args: {
+            where: {
+              repositoryHost: "github.com",
+              repositoryFullName: "acme/service-x",
+              headBranch: "feature/thing",
+            },
+          },
+        }),
+      ).rejects.toThrow();
+    });
+  });
+
+  describe("when the same lookup names the organization", () => {
+    it("does NOT throw — the query is bounded to one tenant", async () => {
+      await expect(
+        runGuard({
+          model: "GithubPullRequest",
+          action: "findMany",
+          args: {
+            where: {
+              organizationId: "org-1",
+              repositoryHost: "github.com",
+              repositoryFullName: "acme/service-x",
+              headBranch: "feature/thing",
+            },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("when sweeping branch checks due for a recheck", () => {
+    it("THROWS without an organization, resolves with one", async () => {
+      await expect(
+        runGuard({
+          model: "GithubBranchPullRequestCheck",
+          action: "findMany",
+          args: { where: { notFoundAt: { not: null } } },
+        }),
+      ).rejects.toThrow();
+
+      await expect(
+        runGuard({
+          model: "GithubBranchPullRequestCheck",
+          action: "findMany",
+          args: {
+            where: { organizationId: "org-1", notFoundAt: { not: null } },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("when the background sweep reads every organization's due branches", () => {
+    const sweepWhere = () => ({
+      notFoundAt: { not: null },
+      recheckAfter: { lte: new Date() },
+      lastRequestedAt: { gt: new Date(Date.now() - 7 * 86_400_000) },
+    });
+
+    it("does NOT throw, the sweep's own shape is the bound", async () => {
+      await expect(
+        runGuard({
+          model: "GithubBranchPullRequestCheck",
+          action: "findMany",
+          args: { where: sweepWhere() },
+        }),
+      ).resolves.toBe("ok");
+    });
+
+    it("THROWS when the same shape is replayed as a write", async () => {
+      for (const action of ["updateMany", "deleteMany"] as const) {
+        await expect(
+          runGuard({
+            model: "GithubBranchPullRequestCheck",
+            action,
+            args: { where: sweepWhere() },
+          }),
+        ).rejects.toThrow();
+      }
+    });
+
+    it("THROWS when the activity clause is dropped, widening the read", async () => {
+      const { lastRequestedAt: _dropped, ...narrower } = sweepWhere();
+      await expect(
+        runGuard({
+          model: "GithubBranchPullRequestCheck",
+          action: "findMany",
+          args: { where: narrower },
+        }),
+      ).rejects.toThrow();
+    });
+  });
+
+  describe("when reading the connection by its GitHub installation id", () => {
+    it("does NOT throw — an installation id names exactly one organization", async () => {
+      await expect(
+        runGuard({
+          model: "GithubInstallation",
+          action: "findUnique",
+          args: { where: { installationId: "555" } },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+});
+
 describe("guardOrganizationId — unguarded models are ignored", () => {
   describe("when querying a model not in the org-scoped regime", () => {
     it("does NOT throw — Project is governed by guardProjectId, not here", async () => {
@@ -323,10 +425,8 @@ describe("guardOrganizationId — unguarded models are ignored", () => {
  * tenancy decision instead of a silent leak.
  */
 describe("organization-tenancy regime partition", () => {
-  const orgBearingModels = Prisma.dmmf.datamodel.models
-    .filter((model) =>
-      model.fields.some((field) => field.name === "organizationId"),
-    )
+  const orgBearingModels = parsePrismaDatamodel()
+    .filter((model) => model.fields.includes("organizationId"))
     .map((model) => model.name);
 
   it("covers every org-bearing model with exactly one regime", () => {
@@ -383,13 +483,7 @@ describe("guardOrganizationId — platform-owned API-key sweeps", () => {
         updateMany: async (args: unknown) => {
           calls.push(args);
           return guardOrganizationId(
-            {
-              model: "ApiKey",
-              action: "updateMany",
-              args,
-              dataPath: [],
-              runInTransaction: false,
-            } as Prisma.MiddlewareParams,
+            { model: "ApiKey", action: "updateMany", args },
             async () => ({ count: rowsAffected }),
           );
         },

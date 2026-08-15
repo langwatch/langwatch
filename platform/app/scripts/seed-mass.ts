@@ -23,13 +23,15 @@
  * HAVEN_SEED_MONTHS tunes the window (default 3). Deterministic and
  * idempotent: same window → same ids → re-running upserts the same story.
  */
-import { PrismaClient } from "@prisma/client";
+
 import { DEMO_PLATFORM_IDS } from "../prisma/demo-platform-ids";
 import { seedDemoPlatform } from "../prisma/seed-demo-platform";
+import { PrismaClient } from "../src/generated/prisma/client";
 import { resetApp } from "../src/server/app-layer/app";
 import { initializeDefaultApp } from "../src/server/app-layer/presets";
 import { getClickHouseClientForProject } from "../src/server/clickhouse/clickhouseClient";
 import { DEFAULT_PII_REDACTION_LEVEL } from "../src/server/event-sourcing/pipelines/trace-processing/schemas/commands";
+import { createPrismaPgAdapter } from "../src/server/prismaPgAdapter";
 import { getSuiteSetId } from "../src/server/suites/suite-set-id";
 import {
   type CustomMetadata,
@@ -347,10 +349,21 @@ async function waitForProjections({
   return counts;
 }
 
+/** The demo platform content, bound to the static local-dev identity. */
+const seedDemoContent = (prisma: PrismaClient) =>
+  seedDemoPlatform({
+    prisma,
+    projectId: PROJECT_ID,
+    organizationId: ORG_ID,
+    userId: USER_ID,
+  });
+
 async function main(): Promise<void> {
-  const prisma = new PrismaClient();
+  const prisma = new PrismaClient({
+    adapter: createPrismaPgAdapter(process.env.DATABASE_URL ?? ""),
+  });
   try {
-    await seedDemoPlatform({ prisma, projectId: PROJECT_ID, userId: USER_ID });
+    await seedDemoContent(prisma);
     const now = Date.now();
     const timeline = buildMassTimeline({ months: MONTHS, now });
     const metrics = buildMassMetrics({ months: MONTHS, now });

@@ -11,7 +11,10 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
+
+	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
@@ -922,112 +925,291 @@ func PlayDisclosure(number int) string {
 // migrations, seed, then the supervised service set until ctx is cancelled.
 // It never cleans up - the owning `haven play` process (or `haven clean`)
 // owns the teardown, so a hard death here can never skip it.
-func (o *Orchestrator) PlayLaunch(ctx context.Context, number int, checkout, lwDir string) error {
-	slug := PlaySlug(number)
-	database := domain.DatabaseForSlug(slug)
-	fmt.Print(PlayDisclosure(number))
+//
+// preset ("" = the plain identity seed) picks a variant from the same registry
+// `haven db seed` reads, so a sandbox can open on data instead of the
+// onboarding screen. A preset that loads data through the collector is ingested
+// once the sandbox is serving, alongside the supervised set.
+func (o *Orchestrator) PlayLaunch(ctx context.Context, pl PlaySandbox) error {
+	pre, err := resolveSeedPreset(pl.Preset)
+	if err != nil {
+		return err
+	}
+	pl.pre = pre
+	pl.slug = PlaySlug(pl.Number)
+	pl.database = domain.DatabaseForSlug(pl.slug)
+	fmt.Print(PlayDisclosure(pl.Number))
+	if pl.Preset != "" {
+		fmt.Printf("  Seeding it with the %q preset: %s.\n", pl.Preset, pre.summary)
+	}
 
+	if pl.dockerHost, err = o.ensurePlayRuntime(ctx); err != nil {
+		return err
+	}
+	free, err := o.sys.FreePorts(len(domain.PerWorktreeServices) + 5)
+	if err != nil {
+		return err
+	}
+	ports := newPlayPorts(free)
+	if err := o.startPlayDatabases(ctx, pl, ports); err != nil {
+		return err
+	}
+	st, err := o.registerPlayStack(pl, ports)
+	if err != nil {
+		return err
+	}
+	if err := o.preparePlaySandbox(ctx, pl, st); err != nil {
+		return err
+	}
+
+	// A preset's data goes through the real collector and event-sourcing
+	// commands, so it can only land once the sandbox is serving — and Supervise
+	// below runs until teardown. Hence a lane of its own beside the services,
+	// which waits for the app itself rather than guessing at a delay.
+	var ingesting sync.WaitGroup
+	if len(pre.ingest) > 0 {
+		ingesting.Add(1)
+		go func() {
+			defer ingesting.Done()
+			o.ingestPlaySeed(ctx, st, pl)
+		}()
+	}
+	opts := PlanOptions{Selection: playSelection(), RepoRoot: pl.Checkout}
+	o.sup.Supervise(ctx, o.planChildren(st, opts, pl.LwDir, ""))
+	// Both stop on the same canceled context, but the seeder writes to the
+	// databases teardown is about to delete — so hand back only once it has
+	// actually stopped, rather than racing a `docker volume rm` against it.
+	ingesting.Wait()
+	return nil
+}
+
+// PlaySandbox is one sandbox launch: which PR, where its code lives, and what
+// it was asked to seed. The steps below take it whole rather than passing the
+// same values down in different orders; the unexported fields are what
+// PlayLaunch derives from the rest on the way in.
+type PlaySandbox struct {
+	Number   int
+	Checkout string // the PR's own tree, under the haven home's play area
+	LwDir    string // the app directory inside that tree
+	// Preset names a variant from the seed registry `haven db seed` reads; empty
+	// is the plain identity seed.
+	Preset string
+
+	slug       string
+	database   string
+	pre        seedPreset
+	dockerHost string
+}
+
+// playSelection is the service set a sandbox runs: lean, and never langy — an
+// unreviewed branch has no business driving an agent runtime.
+func playSelection() domain.Selection { return domain.Selection{Gateway: true, NLP: true} }
+
+// playPorts is one sandbox's port allocation, named rather than indexed: the
+// slice arithmetic that assigned these was the kind of thing that goes wrong
+// silently when a service is added.
+type playPorts struct {
+	services      []int // one per domain.PerWorktreeServices, in order
+	api           int
+	workerMetrics int
+	postgres      int
+	clickHouse    int
+	redis         int
+}
+
+func newPlayPorts(free []int) playPorts {
+	n := len(domain.PerWorktreeServices)
+	return playPorts{
+		services: free[:n], api: free[n], workerMetrics: free[n+1],
+		postgres: free[n+2], clickHouse: free[n+3], redis: free[n+4],
+	}
+}
+
+// ensurePlayRuntime brings up what a sandbox needs before it can exist: the
+// proxy that serves its hostnames and the container runtime that holds its
+// dedicated databases. It returns the DOCKER_HOST addressing that runtime.
+func (o *Orchestrator) ensurePlayRuntime(ctx context.Context) (string, error) {
 	if !o.proxy.Installed() {
 		fmt.Println("portless is not installed: installing it (one time)…")
 		if err := o.proxy.Install(); err != nil {
-			return fmt.Errorf("could not install portless automatically (%w)", err)
+			return "", fmt.Errorf("could not install portless automatically (%w)", err)
 		}
 	}
 	if err := o.proxy.EnsureReady(); err != nil {
-		return fmt.Errorf("could not start the portless proxy: %w", err)
+		return "", fmt.Errorf("could not start the portless proxy: %w", err)
 	}
 	if o.container == nil {
-		return fmt.Errorf("haven play needs the container runtime (colima) for its dedicated databases")
+		return "", fmt.Errorf("haven play needs the container runtime (colima) for its dedicated databases")
 	}
 	dockerHost, err := o.container.Ensure(ctx)
 	if err != nil {
-		return fmt.Errorf("colima (%s): %w", o.container.Profile(), err)
+		return "", fmt.Errorf("colima (%s): %w", o.container.Profile(), err)
 	}
+	return dockerHost, nil
+}
 
-	nSvc := len(domain.PerWorktreeServices)
-	ports, err := o.sys.FreePorts(nSvc + 5)
-	if err != nil {
-		return err
+// startPlayDatabases starts the sandbox's dedicated engines. They come first:
+// the overlay needs their ports and the migrations need the databases. Each
+// engine is its own lane so its output reads distinctly.
+func (o *Orchestrator) startPlayDatabases(ctx context.Context, pl PlaySandbox, ports playPorts) error {
+	dockerEnv := []string{"DOCKER_HOST=" + pl.dockerHost}
+	fmt.Printf("  play: starting dedicated postgres/clickhouse/redis (volumes %s…)\n", PlayVolumeName(pl.Number, "postgres"))
+	engines := []struct {
+		lane  string
+		shell string
+	}{
+		{"play-postgres", playPostgresShell(pl.Number, ports.postgres, pl.database)},
+		{"play-clickhouse", playClickHouseShell(pl.Number, ports.clickHouse, pl.database)},
+		{"play-redis", playRedisShell(pl.Number, ports.redis)},
 	}
-	pgPort, chPort, redisPort := ports[nSvc+2], ports[nSvc+3], ports[nSvc+4]
+	for _, engine := range engines {
+		if err := o.sup.RunOnce(ctx, engine.lane, pl.Checkout, engine.shell, dockerEnv); err != nil {
+			return fmt.Errorf("%s: %w", engine.lane, err)
+		}
+	}
+	return nil
+}
 
-	// Dedicated infra first: the overlay needs the ports, migrations need the
-	// databases. Each engine is its own lane so its output reads distinctly.
-	dockerEnv := []string{"DOCKER_HOST=" + dockerHost}
-	fmt.Printf("  play: starting dedicated postgres/clickhouse/redis (volumes %s…)\n", PlayVolumeName(number, "postgres"))
-	if err := o.sup.RunOnce(ctx, "play-postgres", checkout, playPostgresShell(number, pgPort, database), dockerEnv); err != nil {
-		return fmt.Errorf("play postgres: %w", err)
-	}
-	if err := o.sup.RunOnce(ctx, "play-clickhouse", checkout, playClickHouseShell(number, chPort, database), dockerEnv); err != nil {
-		return fmt.Errorf("play clickhouse: %w", err)
-	}
-	if err := o.sup.RunOnce(ctx, "play-redis", checkout, playRedisShell(number, redisPort), dockerEnv); err != nil {
-		return fmt.Errorf("play redis: %w", err)
-	}
-
+// registerPlayStack builds the sandbox's stack record, routes its hostnames,
+// and publishes it — the overlay its own processes read and the registry every
+// other haven command (status, logs, clean, teardown) discovers it through.
+func (o *Orchestrator) registerPlayStack(pl PlaySandbox, ports playPorts) (domain.Stack, error) {
 	scheme, pport := o.proxy.Endpoint()
-	sel := domain.Selection{Gateway: true, NLP: true} // lean default; langy never runs in a sandbox
 	st := domain.Stack{
-		Slug: slug, WorktreeDir: checkout, Branch: PlayBranch(number),
+		Slug: pl.slug, WorktreeDir: pl.Checkout, Branch: PlayBranch(pl.Number),
 		LauncherPID: o.sys.Getpid(),
 		// The sandbox's Redis is dedicated, so index 0 is always free.
 		RedisDB:            0,
-		APIPort:            ports[nSvc],
-		WorkerMetricsPort:  ports[nSvc+1],
+		APIPort:            ports.api,
+		WorkerMetricsPort:  ports.workerMetrics,
 		LocalAPIKey:        o.cfg.LocalAPIKey,
-		ClickHouseHTTPPort: chPort, ClickHouseDatabase: database,
-		PostgresPort: pgPort, PostgresDatabase: database,
-		RedisPort: redisPort,
+		ClickHouseHTTPPort: ports.clickHouse, ClickHouseDatabase: pl.database,
+		PostgresPort: ports.postgres, PostgresDatabase: pl.database,
+		RedisPort: ports.redis,
+		// Sandboxes run unreviewed branches, so this is the last place that
+		// should be shipping trace text to Google on someone's real credentials.
+		DisableGoogleDLP: o.cfg.ShouldDisableGoogleDLP,
 	}
 	for i, r := range domain.PerWorktreeServices {
 		svc := domain.Service{
-			Name: r.Name, Role: r.Role, Port: ports[i],
-			Hostname: o.cfg.Naming.Hostname(r.Name, slug),
-			URL:      o.cfg.Naming.URL(r.Name, slug, scheme, pport),
+			Name: r.Name, Role: r.Role, Port: ports.services[i],
+			Hostname: o.cfg.Naming.Hostname(r.Name, pl.slug),
+			URL:      o.cfg.Naming.URL(r.Name, pl.slug, scheme, pport),
 		}
 		// The sandbox is hermetic: a service it does not run (langy) gets no
 		// baseline fallback - its port is simply absent.
-		if !runsLocally(r.Name, PlanOptions{Selection: sel}) {
+		if !runsLocally(r.Name, PlanOptions{Selection: playSelection()}) {
 			svc.Port = 0
 		}
 		st.Services = append(st.Services, svc)
-		if svc.Port != 0 {
-			if err := o.proxy.Register(svc.Name, slug, svc.Port); err != nil {
-				return fmt.Errorf("registering %s.%s: %w", svc.Name, slug, err)
-			}
+		if svc.Port == 0 {
+			continue
+		}
+		if err := o.proxy.Register(svc.Name, pl.slug, svc.Port); err != nil {
+			return st, fmt.Errorf("registering %s.%s: %w", svc.Name, pl.slug, err)
 		}
 	}
-	if err := o.proxy.Register(domain.ClickHouseService, slug, chPort); err != nil {
+	if err := o.proxy.Register(domain.ClickHouseService, pl.slug, ports.clickHouse); err != nil {
 		o.log.Warn("play clickhouse alias registration failed")
 	}
 	st.UpdatedAt = o.sys.Now()
-	if err := o.store.WriteOverlay(lwDir, st); err != nil {
-		return err
+	if err := o.store.WriteOverlay(pl.LwDir, st); err != nil {
+		return st, err
 	}
 	if err := o.store.SaveStack(st); err != nil {
-		return err
+		return st, err
 	}
 	o.printStack(st)
+	return st, nil
+}
 
+// preparePlaySandbox gets the checkout ready to run: dependencies, codegen,
+// migrations, seed. Codegen and the seed warn and continue — a sandbox that
+// serves a PR with stale generated files or an unseeded database is still worth
+// looking at — while a failed migration is fatal, because everything after it
+// would be running against a schema nobody has.
+func (o *Orchestrator) preparePlaySandbox(ctx context.Context, pl PlaySandbox, st domain.Stack) error {
 	// A sandbox exists to run somebody else's PR, so its package scripts are
 	// never trusted — install without lifecycle scripts unconditionally rather
 	// than re-deriving fork status inside this detached child. Nothing is lost:
 	// the repo's postinstall is codegen, and the very next step runs it
 	// explicitly through start:prepare:files.
-	if err := o.ensureDeps(ctx, checkout, false); err != nil {
+	if err := o.ensureDeps(ctx, pl.Checkout, false); err != nil {
 		return err
 	}
 	env := append(st.OverlayEnv(), "DOTENV_CONFIG_QUIET=true")
-	if err := o.sup.RunOnce(ctx, "codegen", lwDir, "pnpm -s run start:prepare:files", env); err != nil {
-		o.log.Warn("play codegen failed (continuing)")
+	if err := o.sup.RunOnce(ctx, "codegen", pl.LwDir, "pnpm -s run start:prepare:files", env); err != nil {
+		o.log.Warn("play codegen failed (continuing)", zap.Error(err))
 	}
-	if err := o.sup.RunOnce(ctx, "prepare", lwDir, "pnpm -s run start:prepare:db", env); err != nil {
+	if err := o.sup.RunOnce(ctx, "prepare", pl.LwDir, "pnpm -s run start:prepare:db", env); err != nil {
 		return fmt.Errorf("play migrations failed: %w", err)
 	}
-	if err := o.sup.RunOnce(ctx, "seed", lwDir, seedShell("pnpm -s run prisma:seed", env), env); err != nil {
-		o.log.Warn("play seed failed (continuing)")
+	// The preset's switches belong to the seed alone — codegen and migrations
+	// are the same run whatever data was asked for.
+	seedEnv := append(append([]string{}, env...), pl.pre.env...)
+	if err := o.sup.RunOnce(ctx, "seed", pl.LwDir, seedShell("pnpm -s run prisma:seed", seedEnv), seedEnv); err != nil {
+		o.log.Warn("play seed failed (continuing)", zap.Error(err))
 	}
-	opts := PlanOptions{Selection: sel, RepoRoot: checkout}
-	o.sup.Supervise(ctx, o.planChildren(st, opts, lwDir, ""))
 	return nil
+}
+
+// ingestPlaySeed loads a preset's sample data into a sandbox that is starting:
+// wait for its own app to answer, then run the preset's ingest scripts in order.
+//
+// Every failure is a warning, never a stop. The sandbox exists to run the PR;
+// its sample data is a convenience, and a PR that broke the collector is
+// precisely a PR someone wants to look at running. The retry line names this
+// sandbox's stack explicitly because the play checkout's directory is not its
+// slug — `haven db seed` run in there would resolve to a different stack.
+func (o *Orchestrator) ingestPlaySeed(ctx context.Context, st domain.Stack, pl PlaySandbox) {
+	appPort := playAppPort(st)
+	if appPort == 0 {
+		o.log.Warn("play seed ingest skipped: the sandbox has no app port")
+		return
+	}
+	if !o.sup.WaitReady(ctx, "seed", fmt.Sprintf("http://127.0.0.1:%d/api/health", appPort)) {
+		return // the sandbox is being torn down; nothing to say about it
+	}
+	env := append(append([]string{}, st.OverlayEnv()...),
+		fmt.Sprintf("HAVEN_SEED_ENDPOINT=http://127.0.0.1:%d", appPort),
+		"HAVEN_SEED_LANGWATCH_API_KEY="+o.cfg.LocalAPIKey,
+		"DOTENV_CONFIG_QUIET=true",
+	)
+	env = devNodeEnv(env)
+	for _, script := range pl.pre.ingest {
+		if err := o.sup.RunOnce(ctx, script, pl.LwDir, "pnpm run "+script, env); err != nil {
+			if ctx.Err() != nil {
+				return
+			}
+			o.log.Warn("play seed ingest failed (the sandbox keeps running)",
+				zap.String("step", script), zap.Error(err))
+			fmt.Print(PlaySeedFailure(st.Slug, pl.Preset, script))
+			return
+		}
+	}
+	fmt.Printf("haven: sandbox seeded (%s)\n", pl.Preset)
+}
+
+// PlaySeedFailure is what a sandbox says when its sample data did not land: the
+// step that failed, that the sandbox is unaffected, and the one command that
+// retries it. That command carries the slug explicitly — the play checkout's
+// directory name is pr-<n> while its stack is play-<n>, so a bare `haven db
+// seed` run in there would seed a different stack entirely.
+func PlaySeedFailure(slug, preset, script string) string {
+	return fmt.Sprintf(
+		"haven: seeding %q failed at %s — the sandbox is still running.\n"+
+			"  Retry it with: LANGWATCH_SLUG=%s haven db seed %s\n",
+		preset, script, slug, preset)
+}
+
+// playAppPort is the sandbox's own app port — the loopback endpoint its seed
+// ingest sends to. A sandbox always runs its own app, so a zero here means the
+// stack was built wrong rather than that the service lives elsewhere.
+func playAppPort(st domain.Stack) int {
+	for _, svc := range st.Services {
+		if svc.Name == "app" {
+			return svc.Port
+		}
+	}
+	return 0
 }

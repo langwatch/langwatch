@@ -9,6 +9,12 @@ on:
       - "charts/langyagent/**"
       - "charts/lib/**"
       - ".github/workflows/langwatch-chart.yml"
+      # The shutdown budget is the one place where a code constant and a
+      # chart value must agree: the pod's terminationGracePeriodSeconds is
+      # sized from the same numbers budget.ts derives. Without this path a
+      # change to those constants never runs the workers-shutdown job, and
+      # the chart would keep asserting a margin the code no longer uses.
+      - "platform/app/src/server/shutdown/**"
       # This job is the only thing in CI that builds the app image and runs a
       # stack against it — publish-docker-app fires on `release: published`, so
       # on a pull request nothing else touches the Dockerfile at all. Without
@@ -32,6 +38,12 @@ on:
       - "charts/langyagent/**"
       - "charts/lib/**"
       - ".github/workflows/langwatch-chart.yml"
+      # The shutdown budget is the one place where a code constant and a
+      # chart value must agree: the pod's terminationGracePeriodSeconds is
+      # sized from the same numbers budget.ts derives. Without this path a
+      # change to those constants never runs the workers-shutdown job, and
+      # the chart would keep asserting a margin the code no longer uses.
+      - "platform/app/src/server/shutdown/**"
       # This job is the only thing in CI that builds the app image and runs a
       # stack against it — publish-docker-app fires on `release: published`, so
       # on a pull request nothing else touches the Dockerfile at all. Without
@@ -46,6 +58,15 @@ on:
       - "pnpm-workspace.yaml"
       - "pnpm-lock.yaml"
       - "package.json"
+
+# The e2e jobs here are the most expensive in the repo — `e2e: infra` runs to
+# 697s and `e2e: overlays` to 348s — and without a group every push to a chart
+# PR left its predecessors running to completion alongside it. Same rule as
+# langwatch-app-ci: supersede on a PR branch, never on main, because every
+# commit that lands on main has to keep its own validation.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   lint-template:
@@ -85,7 +106,7 @@ jobs:
           - name: scalable-prod
             flags: "-f examples/values-scalable-prod.yaml"
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
         with:
           version: v3.12.0
@@ -102,7 +123,7 @@ jobs:
       run:
         working-directory: charts/langwatch
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
         with:
           version: v3.12.0
@@ -114,6 +135,120 @@ jobs:
       # the CPU allowance, and a memory ceiling that count can live within.
       - name: "assert rendered worker count and memory ceiling"
         run: ./tests/langevals-sizing.sh
+
+  restricted-rbac:
+    name: "restricted rbac"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: charts/langwatch
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # No helm, on purpose. Every `lookup` in the matrix above renders against
+      # no cluster and so returns empty, which is exactly what a lookup the
+      # installer is FORBIDDEN to make does not do — that one aborts the render.
+      # The templates have to be read to see it.
+      - name: "assert no template needs cluster-scoped read access"
+        run: ./tests/restricted-rbac.sh
+
+  email-gateway:
+    name: "email gateway"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: charts/langwatch
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
+        with:
+          version: v3.12.0
+      - run: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+      - run: helm repo add langwatch https://langwatch.github.io/langwatch
+      - run: helm dependency build .
+      # The overlays above never enable email, so nothing there would notice a
+      # gateway that reaches only one Deployment. This renders both and compares
+      # them, and checks that an unconfigurable provider stops the render.
+      - name: "assert rendered email configuration"
+        run: ./tests/email-gateway.sh
+
+  sso-providers:
+    name: "sso providers"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: charts/langwatch
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
+        with:
+          version: v3.12.0
+      - run: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+      - run: helm repo add langwatch https://langwatch.github.io/langwatch
+      - run: helm dependency build .
+      # A provider can be documented in the README and validated in the helpers
+      # while the Deployment never emits its variables, which looks exactly like
+      # the provider not being supported. Only rendering the container shows it.
+      - name: "assert rendered SSO provider configuration"
+        run: ./tests/sso-providers.sh
+
+  workers-shutdown:
+    name: "workers shutdown"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: charts/langwatch
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
+        with:
+          version: v3.12.0
+      - run: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+      - run: helm repo add langwatch https://langwatch.github.io/langwatch
+      - run: helm dependency build .
+      # Workers drain in-flight queue jobs and their ClickHouse writes on
+      # SIGTERM. Too short a grace period turns that drain into a SIGKILL,
+      # which severs in-flight statements — invisible in the template source,
+      # visible only in the rendered value.
+      - name: "assert workers get long enough to drain"
+        run: ./tests/workers-shutdown.sh
+
+  # The render matrix above proves the chart PARSES; these vitest suites
+  # assert on what it EMITS (env selection per provider, identity guards,
+  # migration postures, validation failures). They normally run inside the
+  # app CI's integration shards, but that workflow deliberately does not
+  # trigger on charts/** — so without this job a chart-only edit could break
+  # every behavioral guarantee while CI stays green.
+  behavioral:
+    name: "behavioral (rendered-output assertions)"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: platform/app
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
+        with:
+          version: v3.12.0
+      - run: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+      - run: helm repo add langwatch https://langwatch.github.io/langwatch
+      - uses: ./.github/actions/setup-pnpm-node
+        with:
+          install: "@langwatch/web..."
+      - name: Generate required files
+        run: pnpm start:prepare:files
+      # The integration config's globalSetup runs ClickHouse migrations via
+      # goose before any test file executes, helm-backed or not.
+      - name: Install Goose migration tool
+        working-directory: .
+        run: bash .github/scripts/install-goose.sh
+      - name: Run helm behavioral suites
+        env:
+          # Turns a silent helm-unavailable skip into a hard failure — this
+          # job exists precisely so these suites cannot quietly not run.
+          REQUIRE_HELM_TESTS: "1"
+        run: |
+          pnpm test:unit run src/server/stored-objects/__tests__/helm-and-docs-shape.unit.test.ts
+          pnpm test:integration run src/server/stored-objects/__tests__/helm-azure-identity.integration.test.ts
 
   e2e:
     name: "e2e: ${{ matrix.name }}"
@@ -135,7 +270,7 @@ jobs:
       run:
         working-directory: charts/langwatch
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
         with:
           version: v3.12.0

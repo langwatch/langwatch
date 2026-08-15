@@ -13,7 +13,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { HandledErrorAlert } from "~/features/errors";
+import { HandledErrorAlert, readHandledError } from "~/features/errors";
 import { signIn, useSession } from "~/utils/auth-client";
 import { useSearchParams } from "~/utils/compat/next-navigation";
 import { HorizontalFormControl } from "../../components/HorizontalFormControl";
@@ -22,7 +22,10 @@ import { Link } from "../../components/ui/link";
 import { toaster } from "../../components/ui/toaster";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { api } from "../../utils/api";
-import { authFailureMessage } from "./authFailureMessage";
+import {
+  authFailureMessage,
+  isCredentialRejection,
+} from "./authFailureMessage";
 
 /**
  * Wording for a sign-in failure this screen can't name. The account has
@@ -31,6 +34,14 @@ import { authFailureMessage } from "./authFailureMessage";
  */
 const SIGN_UP_FALLBACK =
   "Your account was created — sign in with your new details.";
+
+/**
+ * The same wording for the other direction: the address already had an account
+ * and the sign-in this screen ran on the customer's behalf failed for a reason
+ * it can't name. Saying the account "was created" there would be a lie.
+ */
+const RECOVERY_FALLBACK =
+  "That email already has an account. Sign in with it instead.";
 
 export default function SignUp() {
   const { data: session } = useSession();
@@ -64,6 +75,11 @@ export default function SignUp() {
 function SignUpForm() {
   const query = useSearchParams();
   const callbackUrl = query?.get("callbackUrl") ?? undefined;
+  // Where this screen sends someone who turns out to already have an account.
+  // Keeps the callback so an invite they were following survives the detour.
+  const signInHref = `/auth/signin${
+    callbackUrl ? `?callbackUrl=${encodeURIComponent(callbackUrl)}` : ""
+  }`;
 
   const schema = z
     .object({
@@ -88,17 +104,34 @@ function SignUpForm() {
   const register = api.user.register.useMutation();
   const [signInLoading, setSignInLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [showRecoveryLinks, setShowRecoveryLinks] = useState(false);
 
   const onSubmit = async (values: z.infer<typeof schema>) => {
     setSubmitError(null);
+    setShowRecoveryLinks(false);
 
+    // Whether this submit created the account, or found one already there.
+    // The two legs below read differently depending on the answer, because a
+    // sign-in failure means "your new account is waiting for you" in the first
+    // case and "this is not your account's password" in the second.
+    let accountWasJustCreated = true;
     try {
       await register.mutateAsync(values);
-    } catch {
-      // `register.error` renders in the alert below, through the code registry,
-      // carrying the reason the server actually gave ("that email is already
-      // registered"). A toast here would only cover that with a vaguer line.
-      return;
+    } catch (error) {
+      // An address that already has an account is not a wall, it is almost
+      // always the customer's own: sign-up writes the account and its password
+      // in one call and exchanges them for a session in another, so a failure
+      // in the second leaves an account nobody ever mentions and every retry
+      // lands here. It is also where someone who was a member before and got
+      // invited back arrives, because an invite asks them to create an account
+      // they already have. Carry on into the sign-in leg with the credentials
+      // they just typed rather than dead-ending them on their own account.
+      if (readHandledError(error)?.code !== "email_already_registered") {
+        // Every other refusal renders in the alert below, through the code
+        // registry. A toast here would only cover it with a vaguer line.
+        return;
+      }
+      accountWasJustCreated = false;
     }
 
     // The account exists from here on, so this leg fails on its own terms —
@@ -118,12 +151,30 @@ function SignUpForm() {
       });
 
       if (response?.error ?? (response?.status && response.status >= 400)) {
-        message = authFailureMessage({
-          code: response.code,
-          message: response.error,
-          status: response.status,
-          fallback: SIGN_UP_FALLBACK,
-        });
+        // Recovering an existing account and the password was not its
+        // password: the honest answer is the one the server already gave,
+        // that address has an account, plus the two ways into it. Leave
+        // `submitError` unset so the registry copy for
+        // `email_already_registered` renders instead of being masked by a
+        // sign-in sentence that would read as though the account were new.
+        if (
+          !accountWasJustCreated &&
+          isCredentialRejection({
+            code: response.code,
+            message: response.error,
+          })
+        ) {
+          setShowRecoveryLinks(true);
+        } else {
+          message = authFailureMessage({
+            code: response.code,
+            message: response.error,
+            status: response.status,
+            fallback: accountWasJustCreated
+              ? SIGN_UP_FALLBACK
+              : RECOVERY_FALLBACK,
+          });
+        }
       }
     } catch (error) {
       // A thrown exception is not the auth layer answering — it is the fetch
@@ -134,7 +185,9 @@ function SignUpForm() {
       // so nothing here is shown: the caught error goes to the console for
       // whoever is debugging, and the customer reads the fallback.
       console.error("sign-in after sign-up threw", error);
-      message = authFailureMessage({ fallback: SIGN_UP_FALLBACK });
+      message = authFailureMessage({
+        fallback: accountWasJustCreated ? SIGN_UP_FALLBACK : RECOVERY_FALLBACK,
+      });
     } finally {
       setSignInLoading(false);
     }
@@ -223,22 +276,31 @@ function SignUpForm() {
                   fallbackTitle="Couldn't create your account"
                 />
               ) : null}
+              {/* Shown only once the sign-in this screen ran on the customer's
+                  behalf came back with the wrong password for an account that
+                  does exist. The copy above names the situation; these are the
+                  two ways out of it. The sign-in link carries the callback so
+                  the invite they were following survives the detour; the reset
+                  flow returns through the emailed link instead. */}
+              {showRecoveryLinks ? (
+                <HStack width="full" gap={4}>
+                  <Link href={signInHref} textDecoration="underline">
+                    Sign in
+                  </Link>
+                  <Link href="/auth/forgot-password" textDecoration="underline">
+                    Reset your password
+                  </Link>
+                </HStack>
+              ) : null}
               <HStack width="full" paddingTop={4}>
-                <Link
-                  href={`/auth/signin${
-                    callbackUrl
-                      ? `?callbackUrl=${encodeURIComponent(callbackUrl)}`
-                      : ""
-                  }`}
-                  textDecoration="underline"
-                >
+                <Link href={signInHref} textDecoration="underline">
                   Already have an account?
                 </Link>
                 <Spacer />
                 <Button
                   colorPalette="orange"
                   type="submit"
-                  loading={register.isLoading || signInLoading}
+                  loading={register.isPending || signInLoading}
                 >
                   Sign up
                 </Button>

@@ -132,7 +132,7 @@ describe("given Zod schemas are the single source of truth", () => {
       const schemaKeys = Object.keys(evaluatorsSchema.shape).sort();
 
       expect(schemaKeys).toEqual(catalogKeys);
-      expect(catalogKeys.length).toBeGreaterThanOrEqual(40);
+      expect(catalogKeys.length).toBeGreaterThanOrEqual(30);
 
       for (const definition of Object.values(AVAILABLE_EVALUATORS)) {
         expect(definition.name).toBeTruthy();

@@ -10,11 +10,11 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { Dataset } from "@prisma/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { Edit2 } from "react-feather";
 import { useDebouncedCallback } from "use-debounce";
+import type { Dataset } from "~/generated/prisma/client";
 import type { Trace } from "~/server/tracer/types";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type {
@@ -78,11 +78,13 @@ export function DatasetMappingPreview({
     return Array.from(new Set(ids));
   }, [traces]);
 
-  // Fetch all traces with matching thread_ids when thread mapping is enabled
+  // Fetch all traces with matching thread_ids when thread mapping is enabled.
+  // Corrections apply here too, so thread mode maps the corrected traces.
   const threadTraces = api.traces.getTracesWithSpansByThreadIds.useQuery(
     {
       projectId: project?.id ?? "",
       threadIds: threadIds,
+      withEditOverlay: true,
     },
     {
       enabled: !!project && isThreadMapping && threadIds.length > 0,
@@ -98,7 +100,7 @@ export function DatasetMappingPreview({
     return traces;
   }, [isThreadMapping, threadTraces.data, traces]);
 
-  const trpc = api.useContext();
+  const trpc = api.useUtils();
   const updateStoredMapping_ = api.dataset.updateMapping.useMutation();
   const updateStoredMapping = useCallback(
     (mappingState: MappingState) => {
@@ -173,12 +175,19 @@ export function DatasetMappingPreview({
   }, [selectedDataset.mapping]);
 
   return (
-    <Field.Root width="full" paddingY={4}>
+    // Each heading gets a field of its own, holding nothing but its words. A
+    // field describes one control and hands that control its id, so one wrapped
+    // around this whole panel gave the same id to every expansion switch and
+    // every preview checkbox under it, and a click on one went wherever the id
+    // resolved first.
+    <Box width="full" paddingY={4}>
       <HStack width="full" gap="64px" align="start">
         <VStack align="start" maxWidth="50%" gap={4}>
-          <HStack width="full" align="center" justify="space-between">
-            <Field.Label margin={0}>Mapping</Field.Label>
-          </HStack>
+          <Field.Root width="full">
+            <HStack width="full" align="center" justify="space-between">
+              <Field.Label margin={0}>Mapping</Field.Label>
+            </HStack>
+          </Field.Root>
           <HStack
             bg="gray.100"
             _dark={{ bg: "gray.800" }}
@@ -252,11 +261,13 @@ export function DatasetMappingPreview({
               </HStack>
             </Box>
           </HStack>
-          <Field.HelperText margin={0} fontSize="13px" marginBottom={2}>
-            {isThreadMapping
-              ? "Groups traces by thread and maps to dataset columns"
-              : "Maps each trace individually to dataset columns"}
-          </Field.HelperText>
+          <Field.Root width="full">
+            <Field.HelperText margin={0} fontSize="13px" marginBottom={2}>
+              {isThreadMapping
+                ? "Groups traces by thread and maps to dataset columns"
+                : "Maps each trace individually to dataset columns"}
+            </Field.HelperText>
+          </Field.Root>
 
           {isThreadMapping ? (
             <ThreadMapping
@@ -273,6 +284,7 @@ export function DatasetMappingPreview({
                 (selectedDataset.mapping as MappingState | undefined)
               }
               traces={tracesToUse}
+              shouldApplyCorrections
               targetFields={columnTypes.map(({ name }) => name)}
               setDatasetEntries={onRowDataChange}
               setTraceMapping={(newMappingState) => {
@@ -284,14 +296,16 @@ export function DatasetMappingPreview({
         </VStack>
         <VStack align="start" width="full" height="full">
           <HStack width="full" align="end">
-            <VStack align="start">
-              <Field.Label margin={0}>Preview</Field.Label>
-              <Field.HelperText margin={0} fontSize="13px">
-                {paragraph
-                  ? paragraph
-                  : "Those are the rows that are going to be added, double click a cell to edit it"}
-              </Field.HelperText>
-            </VStack>
+            <Field.Root width="auto">
+              <VStack align="start">
+                <Field.Label margin={0}>Preview</Field.Label>
+                <Field.HelperText margin={0} fontSize="13px">
+                  {paragraph
+                    ? paragraph
+                    : "Those are the rows that are going to be added, double click a cell to edit it"}
+                </Field.HelperText>
+              </VStack>
+            </Field.Root>
             <Spacer />
             <Button
               size="sm"
@@ -348,6 +362,6 @@ export function DatasetMappingPreview({
           </Box>
         </VStack>
       </HStack>
-    </Field.Root>
+    </Box>
   );
 }

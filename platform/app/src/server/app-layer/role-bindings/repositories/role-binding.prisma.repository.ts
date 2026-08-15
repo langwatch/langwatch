@@ -1,5 +1,8 @@
-import { type PrismaClient, RoleBindingScopeType } from "@prisma/client";
-import { TRPCError } from "@trpc/server";
+import {
+  type PrismaClient,
+  RoleBindingScopeType,
+} from "~/generated/prisma/client";
+import { ScopeNotInOrganizationError } from "~/server/role-bindings/errors";
 import type {
   RoleBindingForSynthesis,
   RoleBindingRepository,
@@ -111,10 +114,7 @@ export class PrismaRoleBindingRepository implements RoleBindingRepository {
   }): Promise<void> {
     if (scopeType === RoleBindingScopeType.ORGANIZATION) {
       if (scopeId !== organizationId) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Invalid org scope",
-        });
+        throw new ScopeNotInOrganizationError(scopeType);
       }
       return;
     }
@@ -124,10 +124,7 @@ export class PrismaRoleBindingRepository implements RoleBindingRepository {
         where: { id: scopeId, organizationId },
       });
       if (!team) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Team not found in this org",
-        });
+        throw new ScopeNotInOrganizationError(scopeType);
       }
       return;
     }
@@ -138,10 +135,7 @@ export class PrismaRoleBindingRepository implements RoleBindingRepository {
         include: { team: { select: { organizationId: true } } },
       });
       if (!project || project.team.organizationId !== organizationId) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Project not found in this org",
-        });
+        throw new ScopeNotInOrganizationError(scopeType);
       }
     }
   }

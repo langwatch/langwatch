@@ -59,6 +59,27 @@ export { SimulationRunsApiService, SimulationRunsApiError } from "./services/sim
 export { TracesApiService, TracesApiError } from "./services/traces/traces-api.service";
 export { MonitorsApiService, MonitorsApiError } from "./services/monitors";
 export { SecretsApiService, SecretsApiError } from "./services/secrets";
+export { VirtualKeysApiService, VirtualKeysApiError } from "./services/virtual-keys/virtual-keys-api.service";
+export { GatewayBudgetsApiService, GatewayBudgetsApiError } from "./services/gateway-budgets/gateway-budgets-api.service";
+export { SpendEventsApiService, SpendEventsApiError } from "./services/spend-events/spend-events-api.service";
+export { WebhooksApiService, WebhooksApiError } from "./services/webhooks/webhooks-api.service";
+export { TeamsApiService, TeamsApiError } from "./services/teams/teams-api.service";
+export type {
+  Team,
+  TeamPagination,
+  TeamMember,
+  ListTeamsResponse,
+  ArchivedTeam,
+} from "./services/teams/teams-api.service";
+export { ProjectsApiService, ProjectsApiError } from "./services/projects/projects-api.service";
+export type {
+  Project,
+  PaginatedProjects,
+  ProjectWithServiceKey,
+  ArchivedProject,
+  CreateProjectInput,
+  UpdateProjectInput,
+} from "./services/projects/projects-api.service";
 import { LocalPromptsService } from "./services/prompts/local-prompts.service";
 import { ExperimentsFacade } from "./services/experiments";
 import { DatasetsFacade } from "./services/datasets";
@@ -77,6 +98,12 @@ import { GraphsApiService } from "./services/graphs";
 import { SimulationRunsApiService } from "./services/simulation-runs";
 import { MonitorsApiService } from "./services/monitors";
 import { SecretsApiService } from "./services/secrets";
+import { VirtualKeysApiService } from "./services/virtual-keys/virtual-keys-api.service";
+import { GatewayBudgetsApiService } from "./services/gateway-budgets/gateway-budgets-api.service";
+import { SpendEventsApiService } from "./services/spend-events/spend-events-api.service";
+import { WebhooksApiService } from "./services/webhooks/webhooks-api.service";
+import { TeamsApiService } from "./services/teams/teams-api.service";
+import { ProjectsApiService } from "./services/projects/projects-api.service";
 import { type InternalConfig } from "./types";
 import { createLangWatchApiClient, type LangwatchApiClient } from "../internal/api/client";
 import { type Logger, NoOpLogger } from "../logger";
@@ -147,6 +174,13 @@ export class LangWatch {
   readonly simulationRuns: SimulationRunsApiService;
   readonly monitors: MonitorsApiService;
   readonly secrets: SecretsApiService;
+  readonly virtualKeys: VirtualKeysApiService;
+  readonly gatewayBudgets: GatewayBudgetsApiService;
+  readonly spendEvents: SpendEventsApiService;
+  readonly webhooks: WebhooksApiService;
+
+  #teams?: TeamsApiService;
+  #projects?: ProjectsApiService;
 
   constructor(options: LangWatchConstructorOptions = {}) {
     const apiKey = options.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
@@ -199,10 +233,49 @@ export class LangWatch {
     this.simulationRuns = new SimulationRunsApiService(this.config);
     this.monitors = new MonitorsApiService({ apiKey, endpoint });
     this.secrets = new SecretsApiService({ apiKey, endpoint });
+    this.virtualKeys = new VirtualKeysApiService({ apiKey, endpoint });
+    this.gatewayBudgets = new GatewayBudgetsApiService({ apiKey, endpoint });
+    this.spendEvents = new SpendEventsApiService({ apiKey, endpoint });
+    this.webhooks = new WebhooksApiService({ apiKey, endpoint });
   }
 
   get apiClient(): LangwatchApiClient {
     return this.config.langwatchApiClient;
+  }
+
+  /**
+   * Teams, which group projects and the members who can reach them. These
+   * routes want an organization API key.
+   *
+   * Built on first use rather than in the constructor: the management
+   * families resolve their credential when constructed and refuse an empty
+   * one, so building this eagerly would make `new LangWatch()` throw for
+   * every caller that never touches a team.
+   */
+  get teams(): TeamsApiService {
+    this.#teams ??= new TeamsApiService(this.#managementConfig());
+    return this.#teams;
+  }
+
+  /**
+   * Projects, including provisioning one with its own service API key. These
+   * routes want an organization API key.
+   */
+  get projects(): ProjectsApiService {
+    this.#projects ??= new ProjectsApiService(this.#managementConfig());
+    return this.#projects;
+  }
+
+  /**
+   * What the management families are constructed with. An empty key is left
+   * off entirely so they resolve the ambient credential instead of
+   * authenticating with a blank bearer token.
+   */
+  #managementConfig(): { apiKey?: string; endpoint: string } {
+    return {
+      ...(this.config.apiKey ? { apiKey: this.config.apiKey } : {}),
+      endpoint: this.config.endpoint,
+    };
   }
 
   #createInternalConfig({

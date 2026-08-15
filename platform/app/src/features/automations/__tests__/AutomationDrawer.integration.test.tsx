@@ -126,6 +126,9 @@ vi.mock("~/utils/api", () => ({
         useMutation: () => ({ mutate: mockUpsertMutate, isLoading: false }),
       },
       getTriggers: { invalidate: mockInvalidate },
+      // Read by the trace-subject preview to warn when a condition would
+      // outrun the plan's daily action ceiling.
+      getDailyCap: { useQuery: () => ({ data: undefined }) },
     },
     graphs: {
       getAll: { useQuery: () => ({ data: [], isLoading: false }) },
@@ -142,7 +145,7 @@ vi.mock("~/utils/api", () => ({
         useQuery: () => ({ data: undefined, isFetching: false, error: null }),
       },
     },
-    useContext: () => ({
+    useUtils: () => ({
       automation: { getTriggers: { invalidate: mockInvalidate } },
       graphs: {
         getAll: { invalidate: mockGraphsGetAllInvalidate },

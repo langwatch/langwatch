@@ -1,7 +1,7 @@
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import { Prisma, type PrismaClient } from "@prisma/client";
 import { z } from "zod";
+import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer";
 import type { Session } from "~/server/auth";
 import { parseVirtualKeyConfig } from "~/server/gateway/virtualKey.config";
@@ -64,9 +64,6 @@ export type LangyMirrorTier = "content" | "structural" | "skip";
  * key live only on the Go manager and cannot name a project id from the TS side,
  * so the self-check compares the turn's `projectId` against an explicit
  * `LANGY_MIRROR_PROJECT_ID` (the mirror project's own id).
- *
- * SHIP-GATE: content-by-default is gated on a customer-facing-terms (DPA)
- * review before it is enabled in production — see ADR-061 §3 and the PR body.
  */
 export function resolveLangyMirrorTier(
   { projectId }: { projectId: string },
@@ -404,7 +401,7 @@ export class LangyCredentialService {
     let githubRepoScopeKey: string | undefined;
     if (LANGY_GITHUB_ENABLED) {
       try {
-        const minted = await getApp().langy.githubInstallations.mintTurnToken({
+        const minted = await getApp().github.installations.mintTurnToken({
           organizationId: project.organizationId,
           ...(repositoryFullName ? { repositoryFullName } : {}),
         });

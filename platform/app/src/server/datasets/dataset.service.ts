@@ -1,13 +1,13 @@
 import type { Readable } from "node:stream";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
+import { nanoid } from "nanoid";
 import type {
   Dataset,
   DatasetRecord,
   Prisma,
   PrismaClient,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
+} from "~/generated/prisma/client";
 import { tryToMapPreviousColumnsToNewColumns } from "~/optimization_studio/utils/datasetUtils";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { slugify } from "~/utils/slugify";

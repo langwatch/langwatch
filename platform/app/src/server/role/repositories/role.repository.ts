@@ -5,13 +5,10 @@ import {
   type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
+import { isRootPrismaClient } from "~/server/db";
 import { KSUID_RESOURCES } from "~/utils/constants";
-
-export const CUSTOM_ROLE_KIND = {
-  CUSTOM: "custom",
-  SYSTEM_API_KEY: "system_api_key",
-} as const;
+import { CUSTOM_ROLE_KIND } from "../role-kind";
 
 export type RolePrismaDelegate = PrismaClient | Prisma.TransactionClient;
 
@@ -78,11 +75,123 @@ export class RoleRepository {
     });
   }
 
+  /**
+   * The permission lists of these user-created roles, for callers that have to
+   * inspect what a role grants before a binding to it is written.
+   */
+  async findAssignablePermissionsByIds(
+    roleIds: string[],
+    organizationId: string,
+  ) {
+    return this.prisma.customRole.findMany({
+      where: {
+        id: { in: roleIds },
+        organizationId,
+        kind: CUSTOM_ROLE_KIND.CUSTOM,
+      },
+      select: { id: true, permissions: true },
+    });
+  }
+
   async findByIdWithUsers(roleId: string) {
     return this.prisma.customRole.findUnique({
       where: { id: roleId },
       include: { assignedUsers: true },
     });
+  }
+
+  /**
+   * A user-created role by id, only when it belongs to the organization.
+   * The org-scoped service paths use this so a foreign role id reads as
+   * not found rather than leaking another organization's role.
+   */
+  async findCustomByIdInOrg({
+    roleId,
+    organizationId,
+  }: {
+    roleId: string;
+    organizationId: string;
+  }) {
+    return this.prisma.customRole.findFirst({
+      where: { id: roleId, organizationId, kind: CUSTOM_ROLE_KIND.CUSTOM },
+    });
+  }
+
+  async findByIdWithUsersInOrg({
+    roleId,
+    organizationId,
+  }: {
+    roleId: string;
+    organizationId: string;
+  }) {
+    return this.prisma.customRole.findFirst({
+      where: { id: roleId, organizationId },
+      include: { assignedUsers: true },
+    });
+  }
+
+  /**
+   * The role bindings in this organization that reference this role.
+   *
+   * Organization-scoped because the tenancy middleware requires it of every
+   * `RoleBinding` query. `deleteIfUnused` asks a wider question in raw SQL, so
+   * a count of zero here does not mean the delete will go through; see
+   * `RoleService.deleteRoleRow`, which settles that by re-reading the role.
+   */
+  async countRoleBindings({
+    roleId,
+    organizationId,
+  }: {
+    roleId: string;
+    organizationId: string;
+  }): Promise<number> {
+    return this.prisma.roleBinding.count({
+      where: { customRoleId: roleId, organizationId },
+    });
+  }
+
+  /** The legacy `TeamUser.assignedRoleId` holders of a role. */
+  async countAssignedUsers(roleId: string): Promise<number> {
+    return this.prisma.teamUser.count({ where: { assignedRoleId: roleId } });
+  }
+
+  /**
+   * Deletes the role only if nothing references it, and reports whether it
+   * went.
+   *
+   * The condition rides on the delete rather than sitting in a separate read
+   * before it: a binding written in between would otherwise be silently
+   * unhooked from the role that grants it, because the relation is emulated in
+   * the client (`relationMode = "prisma"`), so deleting the parent nulls the
+   * reference instead of refusing. One statement leaves nothing to interleave
+   * with, and a delete that finds a holder leaves the role standing for the
+   * caller to refuse over.
+   *
+   * The role row is scoped to the organization; the reference checks are not.
+   * There are no database foreign keys here, so a binding in another
+   * organization can point at this role, and an organization-scoped check
+   * would delete the role out from under it and leave a dangling reference
+   * that silently resolves to the built-in permission bag.
+   */
+  async deleteIfUnused({
+    roleId,
+    organizationId,
+  }: {
+    roleId: string;
+    organizationId: string;
+  }): Promise<boolean> {
+    const deleted = await this.prisma.$executeRaw`
+      DELETE FROM "CustomRole"
+      WHERE "id" = ${roleId}
+        AND "organizationId" = ${organizationId}
+        AND NOT EXISTS (
+          SELECT 1 FROM "RoleBinding" WHERE "customRoleId" = ${roleId}
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM "TeamUser" WHERE "assignedRoleId" = ${roleId}
+        )
+    `;
+    return deleted > 0;
   }
 
   async findByNameAndOrganization(name: string, organizationId: string) {
@@ -116,12 +225,6 @@ export class RoleRepository {
         description: params.description,
         permissions: params.permissions as Prisma.InputJsonValue | undefined,
       },
-    });
-  }
-
-  async delete(roleId: string) {
-    await this.prisma.customRole.delete({
-      where: { id: roleId },
     });
   }
 
@@ -245,12 +348,12 @@ export class RoleRepository {
   }
 
   private requireFullClient(): PrismaClient {
-    if (!("$transaction" in this.prisma)) {
+    if (!isRootPrismaClient(this.prisma)) {
       throw new Error(
         "assignToUser/removeFromUser require PrismaClient, not a TransactionClient",
       );
     }
-    return this.prisma as PrismaClient;
+    return this.prisma;
   }
 
   async assignToUser(userId: string, teamId: string, customRoleId: string) {

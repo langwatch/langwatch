@@ -87,7 +87,7 @@ export const goErrorCodes = {
    *
    * @source services/aigateway/domain/errors.go
    */
-  codex_session_expired: { service: "aigateway" },
+  codex_session_expired: { service: "aigateway", httpStatus: 401 },
   /**
    * ConfigInvalid — is the herr code for configuration validation failures.
    *
@@ -230,6 +230,13 @@ export const goErrorCodes = {
    */
   max_workers_reached: { service: "langyagent", httpStatus: 503 },
   /**
+   * ErrMissingModel — is a request-shape error with its own stable identity so
+   * clients and rejection metrics do not have to infer it from prose.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  missing_model: { service: "aigateway", httpStatus: 400 },
+  /**
    * ErrModelNotAllowed
    *
    * @source services/aigateway/domain/errors.go
@@ -316,6 +323,11 @@ export const goErrorCodes = {
    * ErrSSRFBlocked — signals an HTTP block tried to reach a destination
    * disallowed by the SSRF policy (loopback, private, link-local, metadata).
    *
+   * Also produced as a workflow NodeError type, so this one entry is the copy
+   * for both the HTTP failure and the node error event. Its node sites are
+   * among the @source files below.
+   *
+   * @source services/nlpgo/app/engine/engine.go
    * @source services/nlpgo/domain/errors.go
    */
   ssrf_blocked: { service: "nlpgo", httpStatus: 400 },

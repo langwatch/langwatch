@@ -23,13 +23,13 @@ import {
   useDrawer,
 } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { evaluatorDisplayName } from "~/server/evaluations/evaluatorDisplayNames";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
 } from "~/server/evaluations/evaluators";
 import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
 import { api } from "~/utils/api";
-import { evaluatorTempNameMap } from "../checks/EvaluatorSelection";
 import { ConfirmDialog } from "../gateway/ConfirmDialog";
 import { Menu } from "../ui/menu";
 import { EvaluatorApiUsageDialog } from "./EvaluatorApiUsageDialog";
@@ -66,7 +66,7 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
   const { project } = useOrganizationTeamProject();
   const { closeDrawer, openDrawer } = useDrawer();
   const complexProps = getComplexProps();
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   // Get flow callbacks for this drawer (set by parent drawer like OnlineEvaluationDrawer)
   const flowCallbacks = getFlowCallbacks("evaluatorList");
@@ -240,7 +240,7 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
         }"?`}
         confirmLabel="Delete"
         tone="danger"
-        loading={deleteMutation.isLoading}
+        loading={deleteMutation.isPending}
         onConfirm={() => {
           if (!evaluatorToDelete) return;
           deleteMutation.mutate(
@@ -314,9 +314,7 @@ const getEvaluatorDisplayName = (evaluatorType: string): string => {
     AVAILABLE_EVALUATORS[evaluatorType as EvaluatorTypes];
   if (!evaluatorDefinition) return evaluatorType;
 
-  return (
-    evaluatorTempNameMap[evaluatorDefinition.name] ?? evaluatorDefinition.name
-  );
+  return evaluatorDisplayName(evaluatorDefinition.name);
 };
 
 function EvaluatorCard({

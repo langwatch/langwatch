@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { createLogger } from "@langwatch/observability";
-import type { GatewayBudget, PrismaClient, VirtualKey } from "@prisma/client";
+import type {
+  GatewayBudget,
+  PrismaClient,
+  VirtualKey,
+} from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
 import type {
   BudgetCrossingKind,
@@ -10,12 +14,14 @@ import type {
   VkLifecycleAction,
 } from "~/server/event-sourcing/pipelines/governance-events/schemas/commands";
 import { GOVERNANCE_EVENTS_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/governance-events/schemas/constants";
+import type {
+  BudgetSpendTarget,
+  GatewayBudgetClickHouseRepository,
+} from "~/server/gateway/budget.clickhouse.repository";
 import {
-  type BudgetSpendTarget,
   budgetPeriodFloorMs,
   currentPeriodStart,
-  type GatewayBudgetClickHouseRepository,
-} from "~/server/gateway/budget.clickhouse.repository";
+} from "~/server/gateway/budgetPeriod";
 import { SoftWarnPercent } from "./governanceSignals.constants";
 
 const logger = createLogger("langwatch:governance:signals");

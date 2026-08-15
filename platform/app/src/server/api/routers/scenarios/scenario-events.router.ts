@@ -39,7 +39,7 @@ const dateRangeFields = {
  *
  * Returns data from ClickHouse. Pending items are visible immediately
  * because SuiteRunService dispatches simulation startRun commands at
- * scheduling time (before BullMQ jobs begin processing).
+ * scheduling time (before queued jobs begin processing).
  *
  * Real-time updates are delivered via SSE (onSimulationUpdate subscription).
  */
@@ -175,7 +175,7 @@ export const scenarioEventsRouter = createTRPCRouter({
       return { lastUpdatedAt };
     }),
 
-  // Get all run data for a scenario set (paginated, no BullMQ merge)
+  // Get all run data for a scenario set (paginated, no queued-job merge)
   getScenarioSetRunData: protectedProcedure
     .input(
       projectSchema
@@ -437,9 +437,7 @@ export const scenarioEventsRouter = createTRPCRouter({
       // this generator suspended, its emitter listener attached, and its tab
       // registered forever.
       const signal =
-        opts.ctx.signal ??
-        // @ts-expect-error - tRPC v10 does not type `signal` on procedure opts
-        (opts.signal as AbortSignal | undefined);
+        opts.ctx.signal ?? (opts.signal as AbortSignal | undefined);
 
       try {
         for await (const eventArgs of on(emitter, "simulation_updated", {

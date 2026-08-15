@@ -3,8 +3,9 @@
  * passthrough to the repository, virtual-key display-name resolution, the
  * ClickHouse-disabled degrade, and RBAC denial.
  */
-import type { PrismaClient } from "@prisma/client";
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 import type { SpendEventRow } from "~/server/gateway/spendEvents.clickhouse.repository";
 import { createInnerTRPCContext } from "../../trpc";
 import { gatewaySpendEventsRouter } from "../gatewaySpendEvents";
@@ -31,17 +32,23 @@ vi.mock("../../rbac", async (importOriginal) => {
   };
 });
 
-const clickHouseEnabled = vi.hoisted(() => ({ current: true }));
-vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  isClickHouseEnabled: () => clickHouseEnabled.current,
-  getClickHouseClientForProject: vi.fn().mockResolvedValue({}),
-}));
-
 const readSpendEventsPage = vi.hoisted(() => vi.fn());
-vi.mock("~/server/gateway/spendEvents.clickhouse.repository", () => ({
-  GatewaySpendEventsRepository: class {
-    readSpendEventsPage = readSpendEventsPage;
-  },
+
+// The router takes the spend-events repository from the App, so standing
+// in for the store means standing in for `getApp()`. `current` toggles
+// between the repository and undefined to stand in for a deployment
+// without ClickHouse.
+const spendEventsRepository = vi.hoisted(() => ({
+  current: undefined as
+    | { readSpendEventsPage: typeof readSpendEventsPage }
+    | undefined,
+}));
+vi.mock("~/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
+  getApp: () => ({
+    gateway: { spendEvents: spendEventsRepository.current },
+  }),
 }));
 
 const SPEND_ROW: SpendEventRow = {
@@ -109,7 +116,7 @@ describe("gatewaySpendEventsRouter", () => {
     vi.clearAllMocks();
     seenPermissions.length = 0;
     denied.clear();
-    clickHouseEnabled.current = true;
+    spendEventsRepository.current = { readSpendEventsPage };
     readSpendEventsPage.mockResolvedValue({
       rows: [SPEND_ROW],
       nextCursor: null,
@@ -121,10 +128,15 @@ describe("gatewaySpendEventsRouter", () => {
     const caller = buildCaller();
     await caller.list({
       ...BASE_INPUT,
-      virtualKeyId: "vk_1",
-      endUserId: "enduser-9",
-      model: "gpt-5",
-      status: "error",
+      filters: {
+        virtualKeyIds: ["vk_1"],
+        endUserIds: ["enduser-9"],
+        models: ["gpt-5"],
+        providerKeys: ["pk-openai"],
+        labels: ["billable"],
+        metadata: [{ key: "customer_tier", values: ["gold"] }],
+        status: "error",
+      },
       cursor: { occurredAtMs: 123, gatewayRequestId: "req_0" },
       limit: 25,
     });
@@ -133,9 +145,12 @@ describe("gatewaySpendEventsRouter", () => {
       fromMs: BASE_INPUT.fromMs,
       toMs: BASE_INPUT.toMs,
       filters: {
-        virtualKeyId: "vk_1",
-        endUserId: "enduser-9",
-        model: "gpt-5",
+        virtualKeyIds: ["vk_1"],
+        endUserIds: ["enduser-9"],
+        models: ["gpt-5"],
+        providerKeys: ["pk-openai"],
+        labels: ["billable"],
+        metadata: [{ key: "customer_tier", values: ["gold"] }],
         status: "error",
       },
       cursor: { occurredAtMs: 123, gatewayRequestId: "req_0" },
@@ -155,7 +170,7 @@ describe("gatewaySpendEventsRouter", () => {
 
   /** @scenario The ledger degrades to an empty page without ClickHouse */
   it("degrades to an empty page when ClickHouse is disabled", async () => {
-    clickHouseEnabled.current = false;
+    spendEventsRepository.current = undefined;
     const caller = buildCaller();
     const result = await caller.list(BASE_INPUT);
     expect(result).toMatchObject({

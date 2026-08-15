@@ -17,17 +17,8 @@ const enterpriseScimProcedure = protectedProcedure
 
 export const scimTokenRouter = createTRPCRouter({
   list: enterpriseScimProcedure.query(async ({ ctx, input }) => {
-    const tokens = await ctx.prisma.scimToken.findMany({
-      where: { organizationId: input.organizationId },
-      select: {
-        id: true,
-        description: true,
-        createdAt: true,
-        lastUsedAt: true,
-      },
-      orderBy: { createdAt: "desc" },
-    });
-    return tokens;
+    const tokenService = ScimTokenService.create(ctx.prisma);
+    return tokenService.list({ organizationId: input.organizationId });
   }),
 
   generate: enterpriseScimProcedure
@@ -51,12 +42,10 @@ export const scimTokenRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await ctx.prisma.scimToken.delete({
-        where: {
-          id: input.tokenId,
-          organizationId: input.organizationId,
-        },
+      const tokenService = ScimTokenService.create(ctx.prisma);
+      return tokenService.revoke({
+        organizationId: input.organizationId,
+        tokenId: input.tokenId,
       });
-      return { success: true };
     }),
 });

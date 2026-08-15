@@ -67,6 +67,7 @@ Errors (like successes) always carry:
 
 - `X-LangWatch-Gateway-Request-Id: req_<hex>`, use this when filing support tickets. It is the same id that appears as `gateway_request_id` on spend events and webhook envelopes, so it joins a failing call to its billing records.
 - `X-LangWatch-Provider`, present when the error originated from an upstream provider (absent for gateway-internal errors).
+- `X-LangWatch-Handled-Error`, the top-level `error.code`, present on every LangWatch-authored error. A forwarded provider error is not LangWatch-authored, so this header is absent (or stripped, if the provider's own response happened to set it) on those responses — use it to tell the two apart rather than guessing from the body shape.
 
 ## Type enum
 
@@ -88,10 +89,32 @@ Errors (like successes) always carry:
 | `provider_error` | `502` | An upstream provider returned a non-recoverable error and fallback (if any) was exhausted. |
 | `circuit_open` | `503` | Repeated upstream 5xx/timeout/network failures opened the credential's circuit breaker, so the gateway declined to dial the provider for this request. Retryable; the breaker probes the upstream again after its cooldown. Answered 4xx (rate limits, quota, bad requests) never open the breaker. |
 | `upstream_timeout` | `504` | An upstream provider exceeded `timeout_ms` and fallback (if any) was exhausted. |
-| `bad_request` | `400` | Validation error on the incoming payload (e.g. missing `model`). |
+| `bad_request` | `400` | Validation error on the incoming payload. |
+| `missing_model` | `400` | The request names no model. `message` and `meta.request_type` say where that endpoint expects one. |
 | `unsupported_parameter` | `400` | The parameter policy refused a request parameter for the target lane: either the request depends on it functionally and the lane cannot honor it, or `drop_tuning_params` is `false` and the lane has no mapping for it. The message names the parameter, the lane, and why. See [Parameter mapping](/ai-gateway/parameter-mapping). |
-| `payload_too_large` | `413` | Request body exceeded `GATEWAY_MAX_REQUEST_BODY_BYTES` (default 10 MiB). Rejected at the edge, before auth, resolve-key, or any upstream dispatch, so a 1 GB drive-by scan never pressures the pod memory limit. Declared `Content-Length` above the cap returns 413 immediately without draining the socket; chunked unknown-length bodies trip a `*http.MaxBytesError` at the cap. |
-| `internal_error` | `500` | Unclassified gateway error. `X-LangWatch-Request-Id` is how we trace it. |
+| `payload_too_large` | `413` | Request body exceeded `SERVER_MAX_REQUEST_BODY_BYTES` (default 32 MiB). Rejected at the edge, before auth, resolve-key, or any upstream dispatch, so a 1 GB drive-by scan never pressures the pod memory limit. Declared `Content-Length` above the cap returns 413 immediately without draining the socket; chunked unknown-length bodies trip a `*http.MaxBytesError` at the cap. |
+| `internal_error` | `500` | Unclassified gateway error. `X-LangWatch-Gateway-Request-Id` is how we trace it. |
+
+## Control-plane codes
+
+The management and webhook APIs answer with the same envelope, and their `type` is the status class. Branch on `code`:
+
+| `code` | HTTP | When |
+|---|---|---|
+| `validation_error` | `400` | The body or query failed validation. `meta.field_errors` names the offending fields. |
+| `invalid_cursor` | `400` | A paging `cursor` this API did not issue. Restart the walk rather than guessing. |
+| `trace_project_required` | `400` | An organization- or team-scoped virtual key was created without a project for its traces and spend to land in, in an organization with no governance project either. |
+| `gateway_trace_project_ambiguous` | `400` | A virtual key was created without saying which project its traces and spend land in, and the organization has projects to choose from. Send `trace_project_id`, or scope the key to exactly one project. |
+| `gateway_trace_project_unknown` | `400` | The `trace_project_id` a virtual key named is not a project of this organization, so its traces could not land there. The id is not echoed back. |
+| `gateway_budget_scope_unreachable` | `400` | A `team`, `project` or `group` budget was created that no active key can produce traffic for, so as things stand it cannot spend or block, and it stays that way until some key reaches it. `meta.reachable_project_ids` names where the traffic goes, capped at the first 10 with `meta.reachable_project_count` giving the real total, so a longer list is never mistaken for the whole set. Send `allow_unreachable` to keep it as written. |
+| `gateway_spend_group_by_unstable` | `400` | A spend rollup was grouped by `model` or `provider`, or into time buckets, over a window recent enough that outcomes can still arrive. Until a request settles, the model and provider recorded against it are the ones that were asked for, and they are replaced by the ones that actually served it, so a page walk over such a group counts some requests twice and misses others. `meta.group_by` names the dimensions that move and `meta.settles_at` is when the requested window becomes safe. Reconcile closed periods, or send `allow_unstable` when an approximate shape is enough. |
+| `gateway_budget_cycle_anchor_invalid` | `400` | A `cycle_anchor_at` was sent on a `total` or `manual` budget. Those windows do not cycle. |
+| `group_budget_requires_clickhouse` | `400` | A `group` or `attributed_user` budget needs the ClickHouse spend ledger to tell members apart. |
+| `webhook_endpoint_invalid` | `400` | A webhook endpoint's URL broke the [receiver URL policy](/features/webhooks#what-a-receiver-url-must-look-like). The `message` names the rule. |
+| `external_id_conflict` | `409` | The `external_id` you supplied already belongs to another resource of this type in the organization. |
+| `idempotency_error` | `409` | An `Idempotency-Key` was reused with a different body, or while its first request is still running. See [retrying a create safely](/ai-gateway/api/management#retrying-a-create-safely). |
+| `webhook_endpoint_not_found` | `404` | No webhook endpoint with that id is visible to this credential. |
+| `spend_source_unavailable` | `412` | The deployment has no ClickHouse spend source, so a spend figure would be indistinguishable from zero spend. |
 
 ## Budget-warning headers (not errors)
 
@@ -112,7 +135,7 @@ When a virtual key carries an active [attributed-user budget template](/ai-gatew
 ```http
 HTTP/1.1 401 Unauthorized
 Content-Type: application/json
-X-LangWatch-Request-Id: grq_01HZX9K3MNM...
+X-LangWatch-Gateway-Request-Id: req_c2bf5df0b8449f1d1838c4b98dd850
 
 {
   "error": {
@@ -128,7 +151,7 @@ X-LangWatch-Request-Id: grq_01HZX9K3MNM...
 ```http
 HTTP/1.1 402 Payment Required
 Content-Type: application/json
-X-LangWatch-Request-Id: grq_01HZX9K3MNN...
+X-LangWatch-Gateway-Request-Id: req_1f0a7c3d5e8b2946af10c7d3e5b829
 
 {
   "error": {
@@ -152,7 +175,7 @@ X-LangWatch-Request-Id: grq_01HZX9K3MNN...
 ```http
 HTTP/1.1 403 Forbidden
 Content-Type: application/json
-X-LangWatch-Request-Id: grq_01HZX9K3MNO...
+X-LangWatch-Gateway-Request-Id: req_9d24b8e07f1a3c65d8b2e40f7a1c93
 
 {
   "error": {
@@ -169,7 +192,7 @@ X-LangWatch-Request-Id: grq_01HZX9K3MNO...
 ```http
 HTTP/1.1 504 Gateway Timeout
 Content-Type: application/json
-X-LangWatch-Request-Id: grq_01HZX9K3MNP...
+X-LangWatch-Gateway-Request-Id: req_4e71a9c2b60d85f3179ec4b208da6f
 X-LangWatch-Provider: anthropic
 X-LangWatch-Fallback-Count: 2
 
@@ -192,7 +215,7 @@ data: {"error":{"type":"provider_error","code":"upstream_mid_stream_failure","me
 
 ```
 
-Clients that receive chunks and then an `error` frame should treat the response as incomplete (partial) and `X-LangWatch-Request-Id` still identifies the session in traces.
+Clients that receive chunks and then an `error` frame should treat the response as incomplete (partial) and `X-LangWatch-Gateway-Request-Id` still identifies the session in traces.
 
 ### Mid-stream `code` values
 

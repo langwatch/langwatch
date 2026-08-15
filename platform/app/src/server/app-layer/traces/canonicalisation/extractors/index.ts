@@ -1,6 +1,7 @@
 export * from "./_constants";
 export { ClaudeCodeExtractor } from "./claudeCode";
 export { CodexExtractor } from "./codex";
+export { CopilotExtractor } from "./copilot";
 export { FallbackExtractor } from "./fallback";
 export { GenAIExtractor } from "./genAi";
 export { HaystackExtractor } from "./haystack";

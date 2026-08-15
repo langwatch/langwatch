@@ -1,4 +1,4 @@
-import type { JsonValue } from "@prisma/client/runtime/library";
+import type { JsonValue } from "@prisma/client/runtime/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";

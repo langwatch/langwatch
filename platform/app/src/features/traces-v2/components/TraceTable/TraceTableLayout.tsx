@@ -2,7 +2,7 @@ import { Box, Flex } from "@chakra-ui/react";
 import { motion } from "motion/react";
 import type React from "react";
 import { useCallback, useEffect, useRef } from "react";
-import type { TraceListCursor } from "../../stores/filterStore";
+import type { PageCursor } from "../../stores/filterStore";
 import { useRefreshUIStore } from "../../stores/refreshUIStore";
 import { RefreshProgressBar } from "../TracesPage/RefreshProgressBar";
 import { ColumnEducationDialog } from "./ColumnEducationDialog";
@@ -15,8 +15,10 @@ import {
 
 interface TraceTableLayoutProps {
   totalHits: number;
-  nextCursor?: TraceListCursor | null;
+  nextCursor?: PageCursor | null;
   visibleCount?: number;
+  /** What one row is, for the totals copy: "traces" (default) or "conversations". */
+  itemNoun?: string;
   children: React.ReactNode;
   /**
    * When true, hide the pagination chrome (totals are unknown until
@@ -31,16 +33,20 @@ interface TraceTableLayoutProps {
    * states without remounting per-row aurora animations.
    */
   isEmpty?: boolean;
+  /** Page-size cap of the active lens's data source; see Pagination. */
+  maxPageSize?: number;
 }
 
 export const TraceTableLayout: React.FC<TraceTableLayoutProps> = ({
   totalHits,
   nextCursor = null,
   visibleCount = 0,
+  itemNoun = "traces",
   children,
   isLoading = false,
   isTransitioning = false,
   isEmpty = false,
+  maxPageSize,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const ownedElRef = useRef<HTMLDivElement | null>(null);
@@ -101,8 +107,10 @@ export const TraceTableLayout: React.FC<TraceTableLayoutProps> = ({
         totalHits={totalHits}
         nextCursor={nextCursor}
         visibleCount={visibleCount}
+        itemNoun={itemNoun}
         isLoading={isLoading}
         isTransitioning={isTransitioning}
+        maxPageSize={maxPageSize}
       />
     </Flex>
   );

@@ -1,8 +1,7 @@
-import IORedis from "ioredis";
+import { RedisConnectionService } from "@langwatch/redis-client";
 import { getApp } from "../../app-layer/app";
 import { EvaluationRunClickHouseRepository } from "../../app-layer/evaluations/repositories/evaluation-run.clickhouse.repository";
 import { TraceSummaryClickHouseRepository } from "../../app-layer/traces/repositories/trace-summary.clickhouse.repository";
-import { getClickHouseClientForProject } from "../../clickhouse/clickhouseClient";
 import { EvaluationRunStore } from "../pipelines/evaluation-processing/projections/evaluationRun.store";
 import { createExperimentRunStateFoldStore } from "../pipelines/experiment-run-processing/projections/experimentRunState.store";
 import { ExperimentRunStateRepositoryClickHouse } from "../pipelines/experiment-run-processing/repositories/experimentRunState.clickhouse.repository";
@@ -42,6 +41,7 @@ const MAP_TARGET_TABLE: Record<string, string> = {
   metricDataPointStorage: "metric_data_points",
   metricSeriesCatalog: "metric_series",
   metricTimeRollup: "metric_time_rollups",
+  codingAgentSessionEvents: "coding_agent_session_events",
 };
 
 /** Pipelines with no fold store whose map projections still replay. */
@@ -49,8 +49,9 @@ const STORELESS_REPLAYABLE = new Set(["metric_processing", "log_processing"]);
 
 /**
  * Create a replay runtime using the app's tenant-aware ClickHouse resolver.
- * Every CH query routes through getClickHouseClientForProject, which
- * resolves project → org → private CH instance (or shared fallback).
+ * Every CH query routes through `getApp().clickhouse.resolveClient` — the
+ * same resolver every other repository is built from — which resolves
+ * project → org → private CH instance (or shared fallback).
  *
  * Iterates the live pipeline definitions from the EventSourcing runtime and
  * re-creates each fold projection with a raw CH store (no Redis cache).
@@ -58,14 +59,23 @@ const STORELESS_REPLAYABLE = new Set(["metric_processing", "log_processing"]);
 export function createReplayRuntime(config: {
   redisUrl: string;
 }): ReplayRuntime {
-  const redis = new IORedis(config.redisUrl, { maxRetriesPerRequest: null });
+  // Replay runs its own connection rather than the App's on purpose: a full
+  // rebuild should not share a socket with live traffic. It is still built by
+  // the client package, so a `rediss://` target gets TLS and the dev database
+  // index applies — building it by hand here silently dropped both (ADR-093).
+  //
+  // Standalone specifically: ReplayService runs multi-key operations that a
+  // Redis Cluster rejects with CROSSSLOT.
+  const redis = new RedisConnectionService().connectStandalone({
+    url: config.redisUrl,
+  });
+  if (!redis) {
+    throw new Error(
+      "Replay requires a Redis URL — none was resolved from the supplied config.",
+    );
+  }
 
-  const clientResolver = async (tenantId: string) => {
-    const client = await getClickHouseClientForProject(tenantId);
-    if (!client)
-      throw new Error(`No ClickHouse client available for tenant ${tenantId}`);
-    return client;
-  };
+  const clientResolver = getApp().clickhouse.resolveClient;
 
   // Raw CH stores (no Redis cache) — keyed by pipeline name
   const storeByPipeline = new Map<string, FoldProjectionStore<any>>([

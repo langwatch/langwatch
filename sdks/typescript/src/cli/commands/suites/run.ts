@@ -8,17 +8,25 @@ import { resolveOutputFormat } from "../../utils/errorOutput";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
-export const runSuiteCommand = async (
-  id: string,
-  options: { wait?: boolean; format?: string },
-): Promise<void> => {
+import { fetchBatchRuns, tallyBatchRuns } from "../../utils/batchRunProgress";
+import { parseRunParameterFlags } from "../../utils/keyValueFlags";
+
+export const runSuiteCommand = async ({
+  id,
+  options,
+}: {
+  id: string;
+  options: { wait?: boolean; format?: string; param?: string[] };
+}): Promise<void> => {
   await resolveCredentials();
+
+  const parameters = parseRunParameterFlags({ pairs: options.param });
 
   const service = new SuitesApiService();
   const spinner = createSpinner(`Scheduling suite run "${id}"...`).start();
 
   try {
-    const result = await service.run(id);
+    const result = await service.run(id, { parameters });
 
     spinner.succeed(
       `Suite run scheduled: ${result.jobCount} job${result.jobCount !== 1 ? "s" : ""} (batch: ${result.batchRunId})`,
@@ -109,31 +117,22 @@ export const runSuiteCommand = async (
       await new Promise((resolve) => setTimeout(resolve, 3000));
 
       try {
-        // Poll the scenario events endpoint for batch status
-        const statusResponse = await fetch(
-          `${endpoint}/api/scenario-events?batchRunId=${encodeURIComponent(result.batchRunId)}`,
-          {
-            method: "GET",
+        const progress = tallyBatchRuns(
+          await fetchBatchRuns({
+            endpoint,
+            batchRunId: result.batchRunId,
             headers: buildAuthHeaders({ apiKey }),
-          },
+          }),
         );
 
-        if (!statusResponse.ok) {
-          throw new Error(`status endpoint answered ${statusResponse.status}`);
-        }
-
-        const statusData = await statusResponse.json() as {
-          totalCount?: number;
-          completedCount?: number;
-          passedCount?: number;
-          failedCount?: number;
-          status?: string;
-        };
-
-        const total = statusData.totalCount ?? result.jobCount;
-        const completedCount = statusData.completedCount ?? 0;
-        const passed = statusData.passedCount ?? 0;
-        const failed = statusData.failedCount ?? 0;
+        // The suite knows how many runs it dispatched; the endpoint only knows
+        // how many exist so far. Take whichever is larger, or a batch whose
+        // runs have not all been created yet reads as finished on the first
+        // poll.
+        const total = Math.max(progress.total, result.jobCount);
+        const completedCount = progress.completed;
+        const passed = progress.passed;
+        const failed = progress.failed;
 
         const newStatus = `${completedCount}/${total} completed (${passed} passed, ${failed} failed)`;
         if (newStatus !== lastStatus) {

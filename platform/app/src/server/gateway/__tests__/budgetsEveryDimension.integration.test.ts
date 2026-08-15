@@ -16,7 +16,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-
+import { holdClickHouseSchemaLockForFile } from "~/server/clickhouse/__tests__/holdSchemaLock";
 import { prisma } from "~/server/db";
 import {
   getTestClickHouseClient,
@@ -75,6 +75,11 @@ async function seedProviders() {
   }
 }
 
+// Held for the whole file. The rollup this suite writes to and reads back is
+// database-wide, so a neighbouring suite rebuilding it drops the materialised
+// view out from under these fixtures.
+holdClickHouseSchemaLockForFile();
+
 describe("budgets on every dimension (real PG + real CH)", () => {
   beforeAll(async () => {
     await startTestContainers();
@@ -131,6 +136,9 @@ describe("budgets on every dimension (real PG + real CH)", () => {
         displayPrefix: "vk-lw-per",
         principalUserId: USER_ID,
         createdById: USER_ID,
+        // The destination is stored on the key rather than taken from its
+        // scope, so a row written straight to PG has to carry it.
+        traceProjectId: PROJECT_ID,
         scopes: { create: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }] },
       },
     });
@@ -142,6 +150,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
         hashedSecret: `hash-shared-${suffix}`,
         displayPrefix: "vk-lw-shr",
         createdById: USER_ID,
+        traceProjectId: PROJECT_ID,
         scopes: { create: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }] },
       },
     });
@@ -254,12 +263,15 @@ describe("budgets on every dimension (real PG + real CH)", () => {
   describe("given a GROUP budget on a group with members", () => {
     /** @scenario "A group budget gives each member their own allowance" */
     it("resolves a GROUP budget into that member's own bucket", async () => {
-      const resolved = await resolveApplicableBudgets(prisma, {
-        organizationId: ORG_ID,
-        teamId: TEAM_ID,
-        projectId: PROJECT_ID,
-        virtualKeyId: VK_PERSONAL_ID,
-        principalUserId: USER_ID,
+      const resolved = await resolveApplicableBudgets({
+        client: prisma,
+        target: {
+          organizationId: ORG_ID,
+          teamId: TEAM_ID,
+          projectId: PROJECT_ID,
+          virtualKeyId: VK_PERSONAL_ID,
+          principalUserId: USER_ID,
+        },
       });
       const group = resolved.find((r) => r.budget.id === BUDGET_GROUP_ID);
       expect(group).toBeDefined();
@@ -270,12 +282,15 @@ describe("budgets on every dimension (real PG + real CH)", () => {
 
     /** @scenario "A group budget does not apply to a key with no person behind it" */
     it("skips GROUP budgets for a key with no principal", async () => {
-      const resolved = await resolveApplicableBudgets(prisma, {
-        organizationId: ORG_ID,
-        teamId: TEAM_ID,
-        projectId: PROJECT_ID,
-        virtualKeyId: VK_SHARED_ID,
-        principalUserId: null,
+      const resolved = await resolveApplicableBudgets({
+        client: prisma,
+        target: {
+          organizationId: ORG_ID,
+          teamId: TEAM_ID,
+          projectId: PROJECT_ID,
+          virtualKeyId: VK_SHARED_ID,
+          principalUserId: null,
+        },
       });
       expect(resolved.map((r) => r.budget.id)).not.toContain(BUDGET_GROUP_ID);
     });
@@ -285,20 +300,26 @@ describe("budgets on every dimension (real PG + real CH)", () => {
       await prisma.groupMembership.create({
         data: { userId: OTHER_USER_ID, groupId: GROUP_ID },
       });
-      const joined = await resolveApplicableBudgets(prisma, {
-        organizationId: ORG_ID,
-        virtualKeyId: VK_SHARED_ID,
-        principalUserId: OTHER_USER_ID,
+      const joined = await resolveApplicableBudgets({
+        client: prisma,
+        target: {
+          organizationId: ORG_ID,
+          virtualKeyId: VK_SHARED_ID,
+          principalUserId: OTHER_USER_ID,
+        },
       });
       expect(joined.map((r) => r.budget.id)).toContain(BUDGET_GROUP_ID);
 
       await prisma.groupMembership.delete({
         where: { userId_groupId: { userId: OTHER_USER_ID, groupId: GROUP_ID } },
       });
-      const left = await resolveApplicableBudgets(prisma, {
-        organizationId: ORG_ID,
-        virtualKeyId: VK_SHARED_ID,
-        principalUserId: OTHER_USER_ID,
+      const left = await resolveApplicableBudgets({
+        client: prisma,
+        target: {
+          organizationId: ORG_ID,
+          virtualKeyId: VK_SHARED_ID,
+          principalUserId: OTHER_USER_ID,
+        },
       });
       expect(left.map((r) => r.budget.id)).not.toContain(BUDGET_GROUP_ID);
     });
@@ -354,10 +375,13 @@ describe("budgets on every dimension (real PG + real CH)", () => {
 
       // The created budget rides the per-member cascade like any other
       // group budget.
-      const resolved = await resolveApplicableBudgets(prisma, {
-        organizationId: ORG_ID,
-        virtualKeyId: VK_PERSONAL_ID,
-        principalUserId: USER_ID,
+      const resolved = await resolveApplicableBudgets({
+        client: prisma,
+        target: {
+          organizationId: ORG_ID,
+          virtualKeyId: VK_PERSONAL_ID,
+          principalUserId: USER_ID,
+        },
       });
       const bucket = resolved.find((r) => r.budget.id === row.id);
       expect(bucket).toBeDefined();
@@ -426,11 +450,14 @@ describe("budgets on every dimension (real PG + real CH)", () => {
         async () => ch as ClickHouseClient,
       );
 
-      const resolved = await resolveApplicableBudgets(prisma, {
-        organizationId: ORG_ID,
-        teamId: TEAM_ID,
-        projectId: PROJECT_ID,
-        virtualKeyId: VK_SHARED_ID,
+      const resolved = await resolveApplicableBudgets({
+        client: prisma,
+        target: {
+          organizationId: ORG_ID,
+          teamId: TEAM_ID,
+          projectId: PROJECT_ID,
+          virtualKeyId: VK_SHARED_ID,
+        },
       });
       const filtered = resolved.find(
         (r) => r.budget.id === BUDGET_PROJECT_OPENAI_ID,
@@ -453,7 +480,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
           virtualKeyId: VK_SHARED_ID,
           providerKey: MP_ANTHROPIC_ID,
           gatewayRequestId: requestId,
-          amountUsd: "0.2500",
+          amountNanoUsd: 250_000_000,
           tokensInput: 10,
           tokensOutput: 5,
           tokensCacheRead: 0,
@@ -538,7 +565,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
 
       // Two members spend against the same GROUP budget row, each in their
       // own bucket.
-      const debit = (member: string, amountUsd: string) => ({
+      const debit = (member: string, amountNanoUsd: number) => ({
         tenantId: PROJECT_ID,
         budgetId: BUDGET_GROUP_ID,
         scope: "GROUP" as const,
@@ -547,7 +574,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
         virtualKeyId: VK_PERSONAL_ID,
         providerKey: null,
         gatewayRequestId: `req-${suffix}-grp-${member}`,
-        amountUsd,
+        amountNanoUsd,
         tokensInput: 10,
         tokensOutput: 5,
         tokensCacheRead: 0,
@@ -558,8 +585,8 @@ describe("budgets on every dimension (real PG + real CH)", () => {
       });
       // One insert per request: the repository enforces one
       // gateway_request_id per debit burst.
-      await chRepo.insertDebit([debit(USER_ID, "10.0000")]);
-      await chRepo.insertDebit([debit(OTHER_USER_ID, "30.0000")]);
+      await chRepo.insertDebit([debit(USER_ID, 10_000_000_000)]);
+      await chRepo.insertDebit([debit(OTHER_USER_ID, 30_000_000_000)]);
 
       const repo = new VirtualKeyRepository(prisma);
       const vk = await repo.findById(VK_PERSONAL_ID, ORG_ID);
@@ -615,7 +642,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
           virtualKeyId: VK_PERSONAL_ID,
           providerKey: MP_OPENAI_ID,
           gatewayRequestId: `req-${suffix}-grp-openai`,
-          amountUsd: "2.0000",
+          amountNanoUsd: 2_000_000_000,
           tokensInput: 10,
           tokensOutput: 5,
           tokensCacheRead: 0,
@@ -826,13 +853,85 @@ describe("budgets on every dimension (real PG + real CH)", () => {
         },
       });
       expect(budget!.archivedAt).not.toBeNull();
-      const resolved = await resolveApplicableBudgets(prisma, {
-        organizationId: ORG_ID,
-        virtualKeyId: virtualKey.id,
-        projectId: PROJECT_ID,
-        teamId: TEAM_ID,
+      const resolved = await resolveApplicableBudgets({
+        client: prisma,
+        target: {
+          organizationId: ORG_ID,
+          virtualKeyId: virtualKey.id,
+          projectId: PROJECT_ID,
+          teamId: TEAM_ID,
+        },
       });
       expect(resolved.map((r) => r.budget.id)).not.toContain(budget!.id);
+    });
+  });
+
+  describe("given a team budget and a key scoped to that team", () => {
+    /** @scenario "A team budget reaches a team-scoped key's traffic" */
+    it("resolves the team budget even when the key's traces land on another team", async () => {
+      const ownerTeamId = `team-nxn-owner-${suffix}`;
+      const ownerBudgetId = `budget-nxn-owner-${suffix}`;
+      const ownerKeyId = `vk_nxn_owner_${suffix}`;
+      // Cleanup runs whatever happens: this leaves an ACTIVE key behind, and
+      // every later reachability assertion reads the organization's active
+      // keys, so one failure here would cascade into unrelated ones.
+      try {
+        await prisma.team.create({
+          data: {
+            id: ownerTeamId,
+            name: `Owner ${suffix}`,
+            slug: `owner-${suffix}`,
+            organizationId: ORG_ID,
+          },
+        });
+        await prisma.gatewayBudget.create({
+          data: {
+            id: ownerBudgetId,
+            name: `Owner team cap ${suffix}`,
+            organizationId: ORG_ID,
+            scopeType: "TEAM",
+            scopeId: ownerTeamId,
+            window: "MONTH",
+            limitUsd: "25.00",
+            onBreach: "BLOCK",
+            createdById: USER_ID,
+            resetsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          },
+        });
+        await prisma.virtualKey.create({
+          data: {
+            id: ownerKeyId,
+            organizationId: ORG_ID,
+            name: `owner-key-${suffix}`,
+            hashedSecret: `hash-owner-${suffix}`,
+            displayPrefix: "vk-lw-own",
+            createdById: USER_ID,
+            scopes: { create: [{ scopeType: "TEAM", scopeId: ownerTeamId }] },
+          },
+        });
+
+        // teamId is the team the key's traces land in, which for a shared
+        // key is usually the governance team, never the team that owns the
+        // key. Passing a different team here is the whole point: the budget
+        // must still resolve, from the key's own scope.
+        const resolved = await resolveApplicableBudgets({
+          client: prisma,
+          target: {
+            organizationId: ORG_ID,
+            virtualKeyId: ownerKeyId,
+            teamId: TEAM_ID,
+            projectId: PROJECT_ID,
+          },
+        });
+        expect(resolved.map((r) => r.budget.id)).toContain(ownerBudgetId);
+      } finally {
+        await prisma.virtualKeyScope.deleteMany({
+          where: { virtualKeyId: ownerKeyId },
+        });
+        await prisma.virtualKey.deleteMany({ where: { id: ownerKeyId } });
+        await prisma.gatewayBudget.deleteMany({ where: { id: ownerBudgetId } });
+        await prisma.team.deleteMany({ where: { id: ownerTeamId } });
+      }
     });
   });
 

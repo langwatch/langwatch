@@ -5,6 +5,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -18,14 +19,17 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/claudesettings"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/clickhousedocker"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/colima"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/dashboard"
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/dockerjanitor"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/fileregistry"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/hygiene"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/otellgtm"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/portlessproxy"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/postgresbrew"
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/procmetrics"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/procsupervisor"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/redisbrew"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/semaphore"
@@ -33,6 +37,24 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/app"
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
+
+// tsgoLimits resolves the tsgo governor's knobs (ADR-095) from the machine
+// with env overrides; a knob set to 0 disables its rule, and
+// HAVEN_TSGO_RUN_MAX_RSS_MB=0 disables the governor entirely.
+func tsgoLimits(ram uint64) domain.TsgoLimits {
+	l := domain.DefaultTsgoLimits(ram)
+	if mb := envInt("HAVEN_TSGO_RUN_MAX_RSS_MB", -1); mb >= 0 {
+		l.RunMaxRSS = int64(mb) << 20
+	}
+	if mb := envInt("HAVEN_TSGO_LSP_MAX_RSS_MB", -1); mb >= 0 {
+		l.LSPMaxRSS = int64(mb) << 20
+	}
+	if mb := envInt("HAVEN_TSGO_TOTAL_BUDGET_MB", -1); mb >= 0 {
+		l.TotalBudget = int64(mb) << 20
+	}
+	l.LSPIdleTTL = envDuration("HAVEN_TSGO_LSP_IDLE_TTL", l.LSPIdleTTL)
+	return l
+}
 
 // Root parses the global flags, wires the object graph, and dispatches. The three
 // steps are separate so none of them grows the others: meta commands answer
@@ -43,8 +65,8 @@ func Root(ctx context.Context, logger *zap.Logger, version string, args []string
 	args, hasAgentFlag = stripFlag(args, "--agent")
 	isAgent := hasAgentFlag || resolveAgent()
 
-	if handled := runMetaCommand(args, version); handled {
-		return nil
+	if handled, err := runMetaCommand(args, version); handled {
+		return err
 	}
 
 	d := wire(logger, isAgent)
@@ -67,19 +89,30 @@ func Root(ctx context.Context, logger *zap.Logger, version string, args []string
 
 // runMetaCommand answers the subcommands that need no wiring at all, so `haven
 // help` works in a directory where git or the adapters would fail.
-func runMetaCommand(args []string, version string) bool {
+func runMetaCommand(args []string, version string) (handled bool, err error) {
 	if len(args) == 0 {
-		return false
+		return false, nil
 	}
 	switch args[0] {
 	case "help", "-h", "--help":
-		fmt.Print(helpText)
-		return true
+		// `haven help <topic>` drills in; bare help stays short enough to read.
+		topic := ""
+		if len(args) > 1 {
+			topic = args[1]
+		}
+		body, ok := helpTopic(topic)
+		if !ok {
+			// An unknown topic is a failed request, not help. Returning it as an
+			// error puts the list on stderr and the failure in the exit code.
+			return true, errors.New(strings.TrimSpace(body))
+		}
+		fmt.Print(body)
+		return true, nil
 	case "version", "-v", "--version":
 		fmt.Println(version)
-		return true
+		return true, nil
 	}
-	return false
+	return false, nil
 }
 
 // deps is the wired object graph a command runs against.
@@ -144,15 +177,38 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		obsConsoleLevel = ""
 	}
 
+	// Resolved through the operator's own .env, not the full dotenv layering: the
+	// overlay haven writes is loaded last with override:true, so a knob read only
+	// from the shell would let haven's default beat a platform/app/.env line that
+	// says otherwise — and the opt-in would silently not work.
+	//
+	// It must exclude .env.portless specifically, because this is the one knob
+	// haven itself writes there (domain.Stack.OverlayEnv). Reading the merged
+	// layers means that from the second `haven up` onward haven is reading back
+	// its own output: it sees the "true" it wrote last time, concludes the
+	// operator asked for it, and rewrites it — so a `.env` opt-in can never win
+	// no matter how many times you set it. An overlay is output, not input.
+	disableDLP, disableDLPSet := operatorEnvLookup("LANGWATCH_DISABLE_GOOGLE_DLP")
+
 	cfg := app.Config{
-		Naming:                   naming,
-		Home:                     havenHome(),
-		IdleTTL:                  envDuration("HAVEN_IDLE_TTL", 4*time.Hour),
-		DBIdleTTL:                envDuration("HAVEN_DB_TTL", 14*24*time.Hour),
-		HeartbeatEvery:           30 * time.Second,
-		DaemonArgv:               selfArgv(trustedRepoRoot(), "daemon"),
-		IsAgent:                  isAgent,
-		ShouldManageClickHouse:   devEnv("LANGWATCH_HAVEN_CH") != "0",
+		Naming:  naming,
+		Home:    havenHome(),
+		IdleTTL: envDuration("HAVEN_IDLE_TTL", 4*time.Hour),
+		// Four days spans a long weekend away from a worktree; a fortnight (the
+		// old default) meant a dozen dead stacks' databases sat on the shared
+		// ClickHouse's small memory cap before the first prune ever fired.
+		DBIdleTTL:               envDuration("HAVEN_DB_TTL", 4*24*time.Hour),
+		TestContainerTTL:        envDuration("HAVEN_TESTCONTAINER_TTL", domain.DefaultTestContainerTTL),
+		RunningTestContainerTTL: envDuration("HAVEN_TESTCONTAINER_RUNNING_TTL", domain.DefaultRunningTestContainerTTL),
+		Tsgo:                    tsgoLimits(ram),
+		HeartbeatEvery:          30 * time.Second,
+		DaemonArgv:              selfArgv(trustedRepoRoot(), "daemon"),
+		IsAgent:                 isAgent,
+		ShouldManageClickHouse:  devEnv("LANGWATCH_HAVEN_CH") != "0",
+		// Opt-in on purpose: "no stack registered" does not mean nobody is
+		// querying — the documented native test mode (LANGWATCH_TEST_CLICKHOUSE_URL)
+		// and `haven db url clickhouse` both reach this server with no stack up,
+		// and a default-on stop would yank it out from under them.
 		ShouldStopClickHouseIdle: devEnv("LANGWATCH_HAVEN_CH_STOP_IDLE") == "1",
 		ShouldManagePostgres:     devEnv("LANGWATCH_HAVEN_PG") != "0",
 		ShouldManageRedis:        devEnv("LANGWATCH_HAVEN_REDIS") != "0",
@@ -162,15 +218,26 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		LocalAPIKey:               envOr("LANGWATCH_LOCAL_API_KEY", domain.DefaultLocalAPIKey),
 		RepoRoot:                  worktree,
 		ObservabilityConsoleLevel: obsConsoleLevel,
+		ShouldDisableGoogleDLP:    shouldDisableGoogleDLP(disableDLP, disableDLPSet),
 	}
 
+	orch := app.New(app.Deps{
+		Cfg: cfg, Proxy: proxy, Store: store, Sup: sup, Sys: sys,
+		CH: ch, PG: pg, RDS: rds, Obs: obs, Hyg: hyg, Sem: sem,
+		Container: rt, Janitor: dockerjanitor.New(rt),
+		ProcTel: procmetrics.New(observabilityEndpoints().OTLPHTTPPort),
+		Claude:  claudesettings.New(), Log: logger,
+	})
 	return deps{
-		orch: app.New(cfg, proxy, store, sup, sys, ch, pg, rds, obs, hyg, sem, rt, logger),
-		dash: dashboard.New(store.Stacks, sharedURL, dashboard.Probes{
-			PortInUse:    sys.PortInUse,
-			ProcessAlive: sys.ProcessAlive,
-			GroupRSS:     sys.GroupRSS,
-			TotalMemory:  sys.TotalMemory,
+		orch: orch,
+		dash: dashboard.New(dashboard.Config{
+			Stacks:    store.Stacks,
+			SharedURL: sharedURL,
+			Probes: dashboard.Probes{
+				PortInUse:    sys.PortInUse,
+				ProcessAlive: sys.ProcessAlive,
+			},
+			Extras: func() dashboard.Extras { return dashboardExtras(orch.HubView(worktree, worktree)) },
 		}),
 		params:   app.UpParams{WorktreeDir: worktree, LwDir: lwDir, Branch: gitBranch(worktree), ExplicitSlug: os.Getenv("LANGWATCH_SLUG"), IsBaseline: os.Getenv("HAVEN_BASELINE") == "1", IsLinkedWorktree: gitIsLinkedWorktree(worktree), UntrustedCheckout: os.Getenv("HAVEN_UNTRUSTED_CHECKOUT") == "1"},
 		opts:     optionsFromEnv(worktree),
@@ -616,6 +683,16 @@ func stdoutIsTTY() bool {
 	return err == nil && fi.Mode()&os.ModeCharDevice != 0
 }
 
+// stdinIsTTY reports whether there is a human at the other end of stdin.
+//
+// Separate from stdoutIsTTY because the two travel apart: a terminal keeps
+// stdout while stdin comes from a pipe that never closes, and anything that
+// reads a line then waits forever with its prompt already on screen.
+func stdinIsTTY() bool {
+	fi, err := os.Stdin.Stat()
+	return err == nil && fi.Mode()&os.ModeCharDevice != 0
+}
+
 // upRunsAttached decides how `haven up` presents itself. A human terminal gets
 // the background stack plus the attached log view on top, so quitting the view
 // detaches and leaves the stack running.
@@ -703,6 +780,21 @@ func dotenvLookup(key string) (string, bool) {
 	return resolveKnob(key, os.LookupEnv, dotenvKnobs)
 }
 
+// shouldDisableGoogleDLP decides whether haven forces
+// LANGWATCH_DISABLE_GOOGLE_DLP=true into every stack's overlay.
+//
+// Google DLP is off by default locally: no local workflow should ship trace text
+// to Google, and the app then skips loading the @google-cloud/dlp SDK entirely.
+// A value the operator did set is read exactly the way the app reads it — the
+// repo's boolean rule is a case-insensitive "true", everything else false (see
+// env-create.mjs) — so "false", "FALSE" and "0" mean the same thing on both
+// sides of the boundary. Only an absent or "true" value makes haven force the
+// override; anything else leaves .env to govern, which is how you opt back in to
+// exercising DLP locally against real credentials.
+func shouldDisableGoogleDLP(value string, isSet bool) bool {
+	return !isSet || strings.EqualFold(value, "true")
+}
+
 // resolveKnob is the precedence itself, kept pure so it can be tested without a
 // checkout on disk. dotenv is a thunk so the file is never read when the
 // process environment already answers.
@@ -728,9 +820,38 @@ func dotenvKnobs() map[string]string {
 	return dotenvVars
 }
 
+// operatorEnvLookup is dotenvLookup restricted to files a human wrote: the
+// process environment and platform/app/.env, never the .env.portless overlay haven
+// generates. Use it for any knob haven also *writes*, so that reading a
+// preference cannot pick up haven's own last answer instead of the operator's.
+func operatorEnvLookup(key string) (string, bool) {
+	return resolveKnob(key, os.LookupEnv, operatorEnvKnobs)
+}
+
+// operatorEnvKnobs loads only platform/app/.env — deliberately not the overlay.
+func operatorEnvKnobs() map[string]string {
+	operatorEnvOnce.Do(func() {
+		cwd, _ := os.Getwd()
+		operatorEnvVars = operatorEnvIn(filepath.Join(gitTopLevel(cwd), "platform", "app"))
+	})
+	return operatorEnvVars
+}
+
+// operatorEnvIn reads the operator-authored .env in lwDir and nothing else.
+// Split out from operatorEnvKnobs so the "and nothing else" half is reachable
+// from a test: pointed at a directory holding both files, it must still not see
+// .env.portless.
+func operatorEnvIn(lwDir string) map[string]string {
+	env := map[string]string{}
+	domain.ReadEnvFile(filepath.Join(lwDir, ".env"), env)
+	return env
+}
+
 var (
-	dotenvOnce sync.Once
-	dotenvVars map[string]string
+	dotenvOnce      sync.Once
+	dotenvVars      map[string]string
+	operatorEnvOnce sync.Once
+	operatorEnvVars map[string]string
 )
 
 // envTruthy reports whether an env var is set to a common "on" value. Accepts the

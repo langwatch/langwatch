@@ -9,8 +9,8 @@
  * BDD structure: given/when nested describes, action-based it() names.
  */
 
-import type { PrismaClient } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { createInnerTRPCContext } from "../../trpc";
 import { annotationRouter } from "../annotation";
 

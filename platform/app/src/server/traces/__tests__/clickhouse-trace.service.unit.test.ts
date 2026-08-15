@@ -52,7 +52,6 @@ describe("ClickHouseTraceService", () => {
     startDate: Date.now() - 86400000,
     endDate: Date.now(),
     pageSize: 2,
-    pageOffset: 0,
   } as GetAllTracesForProjectInput;
 
   // A minimal trace summary row from ClickHouse
@@ -975,6 +974,20 @@ describe("ClickHouseTraceService", () => {
         expect(traces).toHaveLength(1);
         expect(traces[0]!.spans).toHaveLength(1);
         expect(traces[0]!.spans[0]!.span_id).toBe("span-1");
+
+        // The span read is the heavy one: uncapped, a trace whose summaries
+        // carry no usable OccurredAt scans every partition and gets stopped by
+        // the server's OvercommitTracker, which picks its victim across the
+        // whole cluster, so one bad read degrades unrelated queries.
+        //
+        // Pinning the cap to this specific call is the point. A cap that is
+        // merely present somewhere, or that drifts onto the summary query,
+        // reads as protection while protecting nothing.
+        const spanQuery = mockClickHouseQuery.mock.calls[4]?.[0];
+        expect(spanQuery.query).toContain("FROM stored_spans");
+        expect(spanQuery.clickhouse_settings).toHaveProperty(
+          "max_memory_usage",
+        );
       });
     });
   });

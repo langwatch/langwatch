@@ -19,6 +19,7 @@ import {
 } from "@/cli/utils/governance/session-api";
 import { resolveControlPlaneEndpoint } from "@/cli/utils/governance/resolveEndpoint";
 import { DEFAULT_ENDPOINT } from "@/internal/constants";
+import { normalizeEndpoint } from "@/internal/endpoint";
 
 /**
  * Always-on agent-hint banner shown above the interactive prompts on
@@ -204,13 +205,14 @@ export const loginCommand = async (
     // later) see the right control-plane URL. The 4-source resolver
     // (flag > env > config > default) honors this value via the
     // persisted-config layer for any flow that doesn't explicitly take
-    // a flag. The env var has the same precedence as the flag for the
-    // login flow itself so users running `LANGWATCH_ENDPOINT=... langwatch
-    // login` skip the cloud/self-hosted picker.
+    // a flag. Only the flag skips the cloud/self-hosted picker; persisting
+    // the env var here is what makes that endpoint the picker's first and
+    // default choice, so `LANGWATCH_ENDPOINT=... langwatch login` is one
+    // Enter rather than a re-typed URL.
     const endpointFromEnv = process.env.LANGWATCH_ENDPOINT?.trim();
     const presetEndpoint = options?.endpoint ?? endpointFromEnv;
     if (presetEndpoint) {
-      const trimmed = presetEndpoint.replace(/\/+$/, "");
+      const trimmed = normalizeEndpoint(presetEndpoint);
       const cfg = loadConfig();
       cfg.control_plane_url = trimmed;
       saveConfig(cfg);
@@ -403,7 +405,7 @@ export const loginCommand = async (
           console.log(chalk.yellow("Login cancelled"));
           process.exit(0);
         }
-        cfg.control_plane_url = (url.url as string).replace(/\/+$/, "");
+        cfg.control_plane_url = normalizeEndpoint(url.url as string);
         saveConfig(cfg);
       }
     }
@@ -441,11 +443,10 @@ export const loginCommand = async (
       await runDeviceFlowLogin({ browser: options?.browser });
     }
     if (mode.mode === "api-key" || mode.mode === "both") {
-      // No-paste convergence (sergey f9fcc3927 + alexis bfef4ebab):
-      // /authorize page shows a project-picker + 'Generate API key'
-      // button; the freshly-minted key flows back to the CLI over the
-      // same RFC 8628 poll endpoint as the device-session flow. No
-      // copy-paste of the credential ever.
+      // The browser page shows a project picker; approving sends that
+      // project's existing API key back to the CLI over the same RFC 8628
+      // poll endpoint as the device-session flow. No copy-paste of the
+      // credential ever.
       await runUnifiedLoginFlow({
         kind: "project_api_key",
         browser: options?.browser,

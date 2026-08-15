@@ -157,6 +157,7 @@ class SuitesFacade:
         suite_id: str,
         *,
         params: Optional[Dict[str, Any]] = None,
+        parameters: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
         Trigger a suite run.
@@ -166,12 +167,18 @@ class SuitesFacade:
 
         Args:
             suite_id: The suite ID to run.
-            params: Optional run parameters (e.g., repeatCount overrides).
+            params: Optional request body fields (e.g., an idempotencyKey).
+            parameters: Optional constants applied to every scenario in the run
+                (e.g. ``{"account_tier": "gold"}``). A value given here
+                overrides the scenario's own default for that name, and wins
+                over a ``parameters`` key inside ``params``.
 
         Returns:
             Dictionary containing the run result with batch run ID.
         """
-        body = params or {}
+        body = dict(params or {})
+        if parameters is not None:
+            body["parameters"] = parameters
         response = self._http().post(
             f"/api/suites/{_quote(suite_id)}/run", json=body
         )

@@ -51,6 +51,13 @@ type Stack struct {
 	// responses, the Langy "view trace" link, and anywhere else a developer wants to
 	// jump straight to the failing trace.
 	ObservabilityGrafanaPort int `json:"observabilityGrafanaPort,omitempty"`
+	// ObservabilityGrafanaURL is the proxied browser address of the same Grafana
+	// (observability.langwatch.localhost) while the portless proxy is up, and ""
+	// when it is not. When set, OverlayEnv prefers it over the loopback port for
+	// GRAFANA_BASE_URL: the links it feeds are followed by a browser, and the
+	// stable hostname survives a Grafana port change and reads like every other
+	// haven surface.
+	ObservabilityGrafanaURL string `json:"observabilityGrafanaUrl,omitempty"`
 	// ObservabilityConsoleLevel, when set, is injected as LOG_CONSOLE_LEVEL while the
 	// stack is up — muting the console to this floor (default "warn") because the
 	// full info/debug stream is in Grafana. Empty is the opt-out: the console is left
@@ -59,6 +66,14 @@ type Stack struct {
 	// LocalAPIKey is the stable, deterministic local dev API key haven seeds and
 	// injects, so every worktree (and every agent) authenticates with the same key.
 	LocalAPIKey string `json:"localApiKey"`
+	// DisableGoogleDLP injects LANGWATCH_DISABLE_GOOGLE_DLP=true, turning the Google
+	// DLP PII check off. True by default for haven stacks: local dev never wants to
+	// ship trace text to Google, and switching the check off also keeps the
+	// @google-cloud/dlp SDK (grpc + generated protos, one of the heaviest
+	// dependencies we have) out of the process entirely. False is how you opt back
+	// in to running DLP: nothing is emitted, so .env governs the check — for the
+	// rare case of exercising DLP locally against real credentials.
+	DisableGoogleDLP bool `json:"disableGoogleDlp,omitempty"`
 	// IsBaseline marks this stack as the shared default other worktrees fall back to
 	// for services they do not run themselves (see Service.IsFallback).
 	IsBaseline bool `json:"baseline,omitempty"`

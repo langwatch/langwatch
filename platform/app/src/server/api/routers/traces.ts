@@ -23,6 +23,13 @@ export { getAllForProjectInput };
 
 const logger = createLogger("langwatch:traces:sse-subscription");
 
+/**
+ * Opt-in for reviewer corrections. Default false so every existing consumer
+ * (evaluations, exports, automations, the REST surface) keeps reading exactly
+ * what was ingested; only the add-to-dataset flow asks for the corrected trace.
+ */
+const withEditOverlayInput = z.boolean().default(false);
+
 export const tracesRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
     .input(getAllForProjectInput)
@@ -39,7 +46,13 @@ export const tracesRouter = createTRPCRouter({
     }),
 
   getById: protectedProcedure
-    .input(z.object({ projectId: z.string(), traceId: z.string() }))
+    .input(
+      z.object({
+        projectId: z.string(),
+        traceId: z.string(),
+        withEditOverlay: withEditOverlayInput,
+      }),
+    )
     .use(checkProjectPermission("traces:view"))
     .query(async ({ ctx, input }) => {
       const protections = await getUserProtectionsForProject(ctx, {
@@ -54,7 +67,7 @@ export const tracesRouter = createTRPCRouter({
         input.projectId,
         input.traceId,
         protections,
-        { full: true },
+        { full: true, withEditOverlay: input.withEditOverlay },
       );
 
       if (!trace) {
@@ -216,7 +229,13 @@ export const tracesRouter = createTRPCRouter({
     }),
 
   getTracesWithSpans: protectedProcedure
-    .input(z.object({ projectId: z.string(), traceIds: z.array(z.string()) }))
+    .input(
+      z.object({
+        projectId: z.string(),
+        traceIds: z.array(z.string()),
+        withEditOverlay: withEditOverlayInput,
+      }),
+    )
     .use(checkProjectPermission("traces:view"))
     .query(async ({ input, ctx }) => {
       const { projectId, traceIds } = input;
@@ -233,12 +252,18 @@ export const tracesRouter = createTRPCRouter({
         traceIds,
         protections,
         undefined,
-        { full: true },
+        { full: true, withEditOverlay: input.withEditOverlay },
       );
     }),
 
   getFormattedSpansDigest: protectedProcedure
-    .input(z.object({ projectId: z.string(), traceIds: z.array(z.string()) }))
+    .input(
+      z.object({
+        projectId: z.string(),
+        traceIds: z.array(z.string()),
+        withEditOverlay: withEditOverlayInput,
+      }),
+    )
     .use(checkProjectPermission("traces:view"))
     .query(async ({ input, ctx }) => {
       const { projectId, traceIds } = input;
@@ -246,11 +271,21 @@ export const tracesRouter = createTRPCRouter({
         projectId,
       });
 
+      // The digest is one more reading of the same spans the other columns are
+      // mapped from, so the correction is read the same way. Read without it,
+      // the one column that quotes the whole trace would spell out the very
+      // spans the reviewer deleted.
+      //
+      // It stays on previews all the same: this runs over a whole page of
+      // traces at once, and resolving every offloaded value on all of them is
+      // what #4991 kept off the grid. Applying a correction needs none of it.
       const traceService = TraceService.create(ctx.prisma);
       const traces = await traceService.getTracesWithSpans(
         projectId,
         traceIds,
         protections,
+        undefined,
+        { withEditOverlay: input.withEditOverlay },
       );
 
       return Object.fromEntries(
@@ -264,7 +299,13 @@ export const tracesRouter = createTRPCRouter({
     }),
 
   getTracesWithSpansByThreadIds: protectedProcedure
-    .input(z.object({ projectId: z.string(), threadIds: z.array(z.string()) }))
+    .input(
+      z.object({
+        projectId: z.string(),
+        threadIds: z.array(z.string()),
+        withEditOverlay: withEditOverlayInput,
+      }),
+    )
     .use(checkProjectPermission("traces:view"))
     .query(async ({ input, ctx }) => {
       const { projectId, threadIds } = input;
@@ -281,7 +322,7 @@ export const tracesRouter = createTRPCRouter({
         projectId,
         threadIds,
         protections,
-        { full: true },
+        { full: true, withEditOverlay: input.withEditOverlay },
       );
     }),
 
@@ -464,7 +505,6 @@ export const tracesRouter = createTRPCRouter({
       return traceService.getAllTracesForProject(
         {
           ...input,
-          pageOffset: input.pageOffset ?? 0,
           pageSize: input.pageSize ?? 10_000,
         },
         protections,
@@ -488,7 +528,6 @@ export const tracesRouter = createTRPCRouter({
 
       try {
         for await (const eventArgs of on(emitter, "trace_updated", {
-          // @ts-expect-error - signal is not typed
           signal: opts.signal,
         })) {
           logger.debug(

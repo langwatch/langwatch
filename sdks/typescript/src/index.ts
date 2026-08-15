@@ -57,6 +57,10 @@ export {
   type TargetMetadata,
   type TargetInfo,
   type EvaluationResult as ExperimentEvaluationResult,
+  type ComparisonMetric,
+  type ComparisonOptions,
+  type ComparisonStatus,
+  type ComparisonVerdict,
   type ExperimentInitOptions,
   type LogOptions,
   type EvaluateOptions as ExperimentEvaluateOptions,
@@ -70,6 +74,7 @@ export {
   ExperimentInitError,
   ExperimentApiError,
   TargetMetadataConflictError,
+  ComparisonError,
   EvaluatorError,
 } from "./client-sdk/services/experiments";
 
@@ -124,6 +129,18 @@ export {
   EvaluationsApiError,
 } from "./client-sdk/services/evaluations";
 
+/**
+ * The per-call options every mutating call on the gateway and webhook
+ * surfaces accepts, including the idempotency key that makes a create safe to
+ * retry after a timeout.
+ */
+export {
+  IDEMPOTENCY_KEY_HEADER,
+  IDEMPOTENT_REPLAY_HEADER,
+  type MutationOptions,
+  type IdempotentCreateOptions,
+} from "./client-sdk/services/_shared/mutation-options";
+
 // AI Gateway management API exports (virtual keys + budgets)
 export {
   VirtualKeysApiService,
@@ -145,18 +162,41 @@ export {
   type WebhookEndpointSummary,
   type WebhookEndpointWithSecret,
   type WebhookDeliveryRecord,
+  type WebhookDeliveryPage,
   type WebhookTestResult,
   type WebhookEndpointHealth,
   type WebhookEventType,
   type EmittedEvent,
+  type EmittedEventsPage,
+  type CreateWebhookEndpointInput,
+  type UpdateWebhookEndpointInput,
 } from "./client-sdk/services/webhooks/webhooks-api.service";
+/**
+ * Receiving webhooks, which needs no API client at all: a receiver holds a
+ * signing secret and the raw request, and has to decide whether to trust it.
+ */
+export {
+  verifyWebhookSignature,
+  WebhookSignatureVerificationError,
+  WEBHOOK_SIGNATURE_HEADER,
+  WEBHOOK_SIGNATURE_DEFAULT_TOLERANCE_SECONDS,
+  WEBHOOK_DELIVERY_ID_HEADER,
+  WEBHOOK_EVENT_ID_HEADER,
+  type WebhookSignatureFailureCode,
+  type VerifyWebhookSignatureOptions,
+} from "./client-sdk/services/webhooks/verify-signature";
 export {
   SpendEventsApiService,
   SpendEventsApiError,
   type SpendEvent,
   type SpendEventsPage,
   type SpendSummaryRow,
-  type SpendSummariesResponse,
+  type SpendSummariesPage,
+  type SpendEventStatus,
+  type SpendSummaryStatus,
+  type SpendGroupBy,
+  type SpendFilterOptions,
+  type SpendSummariesOptions,
   type SpendReplayResult,
   type EndUserSpend,
   type EndUserCap,
@@ -165,7 +205,7 @@ export {
   GatewayBudgetsApiService,
   GatewayBudgetsApiError,
   type GatewayBudget,
-  type GatewayBudgetList,
+  type GatewayBudgetPage,
   type BudgetScopeKind,
   type BudgetWindow,
   type BudgetOnBreach,
@@ -173,6 +213,32 @@ export {
   type CreateGatewayBudgetInput,
   type UpdateGatewayBudgetInput,
 } from "./client-sdk/services/gateway-budgets/gateway-budgets-api.service";
+
+/**
+ * Provisioning teams and projects, the two things an integration has to
+ * create before anything else exists to write to. Both families want an
+ * organization API key; creating a project also mints that project's own
+ * service API key, served once in the create response.
+ */
+export {
+  TeamsApiService,
+  TeamsApiError,
+  type Team,
+  type TeamPagination,
+  type TeamMember,
+  type ListTeamsResponse,
+  type ArchivedTeam,
+} from "./client-sdk/services/teams/teams-api.service";
+export {
+  ProjectsApiService,
+  ProjectsApiError,
+  type Project,
+  type PaginatedProjects,
+  type ProjectWithServiceKey,
+  type ArchivedProject,
+  type CreateProjectInput,
+  type UpdateProjectInput,
+} from "./client-sdk/services/projects/projects-api.service";
 
 export const logger = {
   ConsoleLogger,
