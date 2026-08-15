@@ -34,6 +34,7 @@ import {
 import { getApp } from "~/server/app-layer";
 import { GithubNotConnectedError } from "~/server/app-layer/github/errors";
 import { MAX_STATUS_REFS } from "~/server/app-layer/github/github-pull-request-status.service";
+import { getGithubAppConfig } from "~/server/app-layer/github/githubAppConfig";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -80,9 +81,18 @@ function uninstallUrl(installation: {
   return `https://github.com/settings/installations/${installation.installationId}`;
 }
 
-// Where an install starts. Built here so no client needs to know the App slug,
-// or that the flow begins with a REST redirect at all.
-function installUrl(organizationId: string): string {
+/**
+ * Where an install starts, or null on an instance that cannot start one. Built
+ * here so no client needs to know the App slug, or that the flow begins with a
+ * REST redirect at all.
+ *
+ * Null takes the same reading of "configured" the install route itself takes,
+ * which includes the App slug the deep link is built from. Reading it any other
+ * way hands the customer a button whose only possible outcome is the route's
+ * 503.
+ */
+function installUrl(organizationId: string): string | null {
+  if (!getGithubAppConfig().configured) return null;
   return `/api/github/install?organizationId=${encodeURIComponent(organizationId)}`;
 }
 
@@ -97,7 +107,12 @@ export const githubRouter = createTRPCRouter({
         input.organizationId,
       );
       return {
-        configured: service.configured,
+        // The same reading `installUrl` takes, which includes the App slug the
+        // deep link needs. Reporting token readiness here instead said GitHub
+        // was available on an instance with no slug, while both install
+        // actions were disabled, which is the state this contradiction
+        // produced on the settings page.
+        configured: getGithubAppConfig().configured,
         connected: installations.length > 0,
         installations: installations.map((i) => ({
           installationId: i.installationId,

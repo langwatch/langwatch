@@ -29,6 +29,21 @@ const {
   permissionsAsked: [] as string[],
 }));
 
+// The install link is built from the App's own configuration, so the suite
+// controls whether this instance can start an installation at all.
+const { appConfig } = vi.hoisted(() => ({
+  appConfig: {
+    appId: "app-123",
+    privateKey: "dummy-pem",
+    webhookSecret: "whsecret",
+    appSlug: "langwatch-langy",
+    configured: true,
+  },
+}));
+vi.mock("~/server/app-layer/github/githubAppConfig", () => ({
+  getGithubAppConfig: () => appConfig,
+}));
+
 vi.mock("~/server/api/rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("~/server/api/rbac")>();
   return {
@@ -105,6 +120,21 @@ describe("githubRouter access gates", () => {
     getAllForOrganization.mockResolvedValue([]);
     listRepositoriesForOrganization.mockResolvedValue([]);
     hasOrgPermission.mockReturnValue(true);
+    appConfig.configured = true;
+  });
+
+  describe("when the instance cannot start an installation", () => {
+    /** @scenario "An instance that cannot start an installation offers no install link" */
+    it("hands back no install link", async () => {
+      appConfig.configured = false;
+      isOrganizationMember.mockResolvedValue(true);
+
+      const result = await caller().getConnectionStatus({
+        organizationId: "org-1",
+      });
+
+      expect(result.installUrl).toBeNull();
+    });
   });
 
   describe("when a member without management permission reads the status", () => {

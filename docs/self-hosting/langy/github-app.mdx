@@ -48,7 +48,9 @@ Set the repository permissions to exactly these, nothing more. Tighter scope mea
 | Pull requests | Read & write |
 | Metadata | Read |
 
-Subscribe to no events beyond the installation lifecycle, which GitHub sends automatically (`installation`, `installation_repositories`).
+Under **Subscribe to events**, select **Pull request**. GitHub sends the installation lifecycle events (`installation`, `installation_repositories`) on its own. Subscribe to nothing else.
+
+The `pull_request` event links a pull request to its coding-agent sessions as soon as GitHub announces it. Without the event, linkage still works, but it waits for the periodic sweep, which can take up to a day for a branch that has been asked about a few times already.
 
 Click **Create GitHub App**. On the resulting page:
 
@@ -98,6 +100,8 @@ In a session, ask Langy something like "open a PR on `<a repo the app is install
     Langy clones the repo into the per-session worker home, branches, commits, pushes, and posts the PR URL, rendered as a PR card. The PR is authored by the app, with the requester credited as co-author.
   </Step>
 </Steps>
+
+To check the `pull_request` subscription, open a pull request on a repository the app is installed on, from a branch a coding-agent session ran on. GitHub records the delivery under **Advanced > Recent Deliveries** on the app registration, and the pull request appears on the LangWatch Pull Requests page without waiting for the sweep.
 
 If anything goes wrong, the audit log (`langy.github.install`, `langy.github.disconnect`) and Sentry capture the failure paths.
 
