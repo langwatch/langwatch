@@ -1,12 +1,12 @@
 ---
 title: LangWatch CLI
 sidebarTitle: LangWatch CLI
-description: The `langwatch` CLI is a single tool that gives you and your coding assistant full access to LangWatch from the terminal. Instrument code, version prompts, run scenarios, inspect traces, query analytics, and more.
+description: The `langwatch` CLI is a single tool that drives LangWatch from the terminal, for you and for your coding assistant. Instrument code, version prompts, run scenarios, inspect traces, query analytics, and more.
 ---
 
 import AgentReportNotice from "/snippets/agent-report-notice.mdx";
 
-Everything in the LangWatch app is available from the CLI, it's designed to be driven by a coding assistant.
+The CLI is designed to be driven by a coding assistant, and it reaches everything in the LangWatch app except cache rules, which you manage over [REST](/ai-gateway/api/management#cache-rules) or in the dashboard.
 
 Every subcommand supports `--help`, and every command accepts the output-contract flags (`-o json`, `--json <fields>`, `--jq <expr>`; see [Agent usage](#agent-usage)). Run `langwatch --help` to see the full command tree.
 

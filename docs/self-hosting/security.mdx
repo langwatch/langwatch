@@ -3,7 +3,7 @@ title: Security
 description: "Security model, encryption, secrets management, and hardening for LangWatch"
 ---
 
-Self-hosted LangWatch authenticates users, encrypts stored credentials, isolates tenants at the query layer, and runs every pod hardened by default.
+Self-hosted LangWatch authenticates users, encrypts stored credentials, isolates tenants at the query layer, and hardens every pod it authors by default. Three bundled components cannot meet [strict admission control](#strict-admission-control) and must be disabled or replaced there.
 
 ## Authentication & Authorization
 
