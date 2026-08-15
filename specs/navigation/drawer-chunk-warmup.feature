@@ -17,6 +17,15 @@ Feature: A screen fetches a drawer's code before the person opens it
       When the browser becomes idle
       Then the scenario editor's code is fetched
 
+    # A screen warms every drawer it opens, not only the one its rows open. The
+    # runs page opens a run's detail from the rows and the run plan editor from
+    # the sidebar, and both wait on the same kind of download.
+    @integration
+    Scenario: The runs page warms the drawers its rows and sidebar open
+      Given the runs page is on screen
+      When the browser becomes idle
+      Then the code of the run detail and the run plan editor is fetched
+
     # Fetching the code is not the whole of it. A drawer keeps its own record of
     # whether it is ready, so a drawer whose code is in memory still reports
     # itself as not ready on the first render and shows the spinner for a
