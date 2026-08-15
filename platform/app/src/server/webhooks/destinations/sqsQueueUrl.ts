@@ -17,9 +17,15 @@
  * - `sqs-fips.<region>.amazonaws.com`, the FIPS endpoints, which a regulated
  *   customer is required to use and which the plain pattern would have
  *   refused as "not an Amazon SQS queue URL";
- * - `https://<region>.queue.amazonaws.com/<account>/<queue>` and the
- *   region-less `https://queue.amazonaws.com/...`, the legacy forms that
- *   older consoles and SDKs still hand out.
+ * - `https://<region>.queue.amazonaws.com/<account>/<queue>`, the legacy
+ *   regional form that older consoles and SDKs still hand out.
+ *
+ * The region-less legacy form, `https://queue.amazonaws.com/<account>/<queue>`,
+ * is refused. The region is read off the URL precisely so it cannot disagree
+ * with the queue, and that URL carries no region to read: accepting it would
+ * mean guessing `us-east-1` and writing a customer's events to whatever queue
+ * of that name lives there. Re-copy the queue URL from the SQS console, which
+ * gives the current form.
  *
  * Queue names are up to 80 characters of alphanumerics, hyphens and
  * underscores; a FIFO queue adds the `.fifo` suffix, which is matched here so

@@ -128,6 +128,30 @@ describe("sqsWebhookDestination", () => {
         "wh_1:abc123",
       );
       expect(attributes["X-LangWatch-Delivery-Attempt"]!.StringValue).toBe("3");
+      // A consumer that routes test fires away from its ingest path reads this
+      // attribute, so its absence on an ordinary delivery is the contract too.
+      expect(Object.keys(attributes)).not.toContain("X-LangWatch-Test-Fire");
+    });
+
+    /** @scenario Signature, delivery id and attempt ride as message attributes */
+    it("marks a test fire under its own header name", async () => {
+      const { sent, client } = fakeQueue();
+      const destination = sqsWebhookDestination(
+        {
+          queueUrl: QUEUE_URL,
+          accessKeyId: "AKIA1",
+          secretAccessKey: "s3cr3t",
+        },
+        { createClient: () => client as never },
+      );
+
+      await destination.send(request({ isTestFire: true }));
+
+      const attributes = sent[0]!.MessageAttributes as Record<
+        string,
+        { StringValue: string }
+      >;
+      expect(attributes["X-LangWatch-Test-Fire"]!.StringValue).toBe("true");
     });
 
     /** @scenario A queue delivery is recorded with no response status */
@@ -431,6 +455,15 @@ describe("queue URL admission", () => {
       region: "eu-central-1",
       accountId: "381491922238",
     });
+  });
+
+  // The region is read off the URL so it cannot disagree with the queue, and
+  // this spelling has no region in it. Accepting it would mean guessing
+  // us-east-1 and writing to whatever queue of that name lives there.
+  it("refuses the region-less legacy spelling", () => {
+    expect(
+      inspectSqsQueueUrl("https://queue.amazonaws.com/381491922238/events"),
+    ).toEqual({ ok: false, problem: "shape" });
   });
 });
 

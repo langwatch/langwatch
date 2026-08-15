@@ -39,8 +39,13 @@ import type {
  */
 
 /**
- * A single SQS message tops out at 256 KiB, counting the body AND the
- * attributes (names, types and values all count).
+ * How large one delivery may be, counting the body AND the attributes (names,
+ * types and values all count).
+ *
+ * This is OUR cap, not the queue's: Amazon SQS accepts a message up to 1 MiB.
+ * A batch is one message, so the cap is what bounds how much a consumer must
+ * hold in memory for a single receive, and lowering an endpoint's maximum
+ * batch size is the way past it.
  */
 export const SQS_MAX_MESSAGE_BYTES = 262_144;
 
@@ -49,10 +54,10 @@ const ATTEMPT_ATTRIBUTE = "X-LangWatch-Delivery-Attempt";
 const TEST_FIRE_ATTRIBUTE = "X-LangWatch-Test-Fire";
 
 /**
- * What one message weighs against the 256 KiB limit: the body plus every
- * attribute's name, type and value, all as UTF-8 bytes. Measured before the
- * send, because a message over the limit is refused by the API and there is
- * nothing about the next attempt that would make the same bytes fit.
+ * What one message weighs against {@link SQS_MAX_MESSAGE_BYTES}: the body plus
+ * every attribute's name, type and value, all as UTF-8 bytes. Measured before
+ * the send, because there is nothing about the next attempt that would make
+ * the same bytes fit.
  */
 export function sqsMessageBytes({
   body,
@@ -307,7 +312,7 @@ function oversizeRefusal({
     body: "",
     dispatchId: batchId,
     error:
-      `Batch is ${bytes} bytes, over the ${SQS_MAX_MESSAGE_BYTES}-byte Amazon SQS message limit. ` +
+      `Batch is ${bytes} bytes, over the ${SQS_MAX_MESSAGE_BYTES}-byte limit for one delivery. ` +
       "Lower the endpoint's maximum batch size so each delivery carries fewer events.",
   };
 }

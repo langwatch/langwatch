@@ -374,7 +374,7 @@ On LangWatch Cloud, ask support for the principal to trust; it is a property of 
 
 - **Standard queues only.** A `.fifo` queue is refused at save time. Delivery is at-least-once and consumers deduplicate on the envelope `id`, which is what a standard queue asks of them; ordering was never part of the contract, and a FIFO queue would add a throughput ceiling for a guarantee nothing here needs.
 - **A canonical Amazon SQS queue URL**, `https://sqs.<region>.amazonaws.com/<account id>/<queue name>`. The region and the owning account are read from it, so they can never disagree with the queue. Anything else is refused.
-- **One batch is one message, and we cap it at 256 KiB** including the attributes, which is the size a standard queue accepts without extended-payload storage. A batch over the cap fails terminally and says so; lower `max_batch_size` so each delivery carries fewer events.
+- **One batch is one message, and LangWatch caps it at 256 KiB** including the attributes. Amazon SQS itself accepts up to 1 MiB; the lower cap is ours, and it keeps one slow consumer from having to hold a megabyte in memory per message. A batch over the cap fails terminally and says so; lower `max_batch_size` so each delivery carries fewer events.
 
 **Deduplicate on the envelope `id`.** A standard queue is at-least-once and can redeliver a message on its own, and it has no queue-level deduplication of its own to lean on. `X-LangWatch-Delivery-Id` names the batch delivery, not an event, so deduplicating on it would drop every envelope in the batch but one. The `id` inside each envelope is the idempotency key.
 

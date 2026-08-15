@@ -48,7 +48,7 @@ With the flag set, an endpoint may name a queue and supply no credentials, and d
 Leave this unset on any deployment serving more than one organization. With it on, anyone who can create a webhook endpoint can name **any queue this deployment's role is allowed to write to**, including another tenant's, and the platform will happily write to it. It is safe only on a single-tenant install whose queues are its own, and in local development.
 </Warning>
 
-The queue URL never passes through the SSRF fence above, because the AWS SDK dials it rather than the platform. It is pinned instead to the canonical Amazon SQS shape, and the region and owning account are read from the URL so they cannot be configured into disagreeing with the queue.
+The queue URL never passes through the SSRF fence above because the AWS SDK dials it rather than the platform. It is pinned instead to the canonical Amazon SQS shape, and the region and owning account are read from the URL so they cannot be configured into disagreeing with the queue.
 
 ## Authentication model
 
