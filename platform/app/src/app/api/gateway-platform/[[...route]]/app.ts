@@ -2526,10 +2526,9 @@ secured
       // answers the SAME 404 so no 404 can leak existence across scopes.
       const visible = policy.scopes.some(
         (s) =>
-          s.scopeType === RoutingPolicyScopeType.ORGANIZATION ||
-          s.scopeType === RoutingPolicyScopeType.TEAM
-            ? s.scopeType === RoutingPolicyScopeType.TEAM && s.scopeId === project.teamId
-            : s.scopeType === RoutingPolicyScopeType.PROJECT && s.scopeId === project.id,
+          (s.scopeType === RoutingPolicyScopeType.ORGANIZATION && s.scopeId === organizationId) ||
+          (s.scopeType === RoutingPolicyScopeType.TEAM && s.scopeId === project.teamId) ||
+          (s.scopeType === RoutingPolicyScopeType.PROJECT && s.scopeId === project.id),
       );
        if (!visible) {
         return errorResponse(c, {
