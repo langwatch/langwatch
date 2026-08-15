@@ -196,6 +196,39 @@ function verdictFromStatus(httpStatus: number): "retryable" | "terminal" {
   return httpStatus >= 500 || httpStatus === 429 ? "retryable" : "terminal";
 }
 
+/**
+ * Failures that say "the identity we are using is not accepted right now".
+ *
+ * These are the ones a customer repairs on their side, by fixing the role's
+ * trust policy or the key's permissions, and the repair is invisible to us.
+ * The cached client holds a credential provider that has already resolved, so
+ * without dropping it the repair does not take effect until the process
+ * restarts. Hand testing hit exactly that: a trust policy corrected while the
+ * app was running kept answering AccessDenied, and the same role assumed
+ * cleanly from the AWS CLI with the same key and external id at the same time.
+ */
+const STALE_CREDENTIAL_ERROR_NAMES = new Set([
+  "AccessDenied",
+  "AccessDeniedException",
+  "AuthorizationError",
+  "InvalidClientTokenId",
+  "UnrecognizedClientException",
+  "SignatureDoesNotMatch",
+  "InvalidSecurity",
+  "ExpiredToken",
+  "ExpiredTokenException",
+  "CredentialsProviderError",
+]);
+
+/** Whether this failure means the cached client's identity is worth rebuilding. */
+export function isStaleCredentialFailure(error: unknown): boolean {
+  const { name, code } = failureShape(error);
+  return (
+    STALE_CREDENTIAL_ERROR_NAMES.has(name) ||
+    STALE_CREDENTIAL_ERROR_NAMES.has(code)
+  );
+}
+
 export function classifySqsFailure(error: unknown): {
   verdict: "retryable" | "terminal";
   reason: string;
@@ -311,6 +344,12 @@ async function putOnQueue({
     };
   } catch (error) {
     const { verdict, reason } = classifySqsFailure(error);
+    if (isStaleCredentialFailure(error)) {
+      // The customer fixes this on their side, and we never hear about it, so
+      // the next attempt has to ask for credentials again rather than reuse a
+      // provider that already resolved against the old permissions.
+      dropSqsClient(queueUrl);
+    }
     const detail = error instanceof Error ? error.message : String(error ?? "");
     return {
       verdict,
@@ -377,6 +416,9 @@ export function sqsWebhookDestination(
  */
 const clients = new Map<string, SQSClient>();
 
+/** Cannot appear in a queue URL or in any credential field. */
+const KEY_SEPARATOR = "\u0000";
+
 /** Distinct per queue AND per credential, so a rotation is a different key. */
 function clientCacheKey(config: SqsDestinationConfig): string {
   return [
@@ -389,7 +431,7 @@ function clientCacheKey(config: SqsDestinationConfig): string {
     config.secretAccessKey
       ? createHash("sha256").update(config.secretAccessKey).digest("hex")
       : "",
-  ].join("\u0000");
+  ].join(KEY_SEPARATOR);
 }
 
 export function sqsClientFor(config: SqsDestinationConfig): SQSClient {
@@ -424,6 +466,22 @@ export function sqsClientFor(config: SqsDestinationConfig): SQSClient {
   );
   clients.set(key, client);
   return client;
+}
+
+/**
+ * Drop every cached client for one queue, whatever credentials they hold.
+ *
+ * The queue alone is the key here, rather than the full credential key, because
+ * the caller is reacting to a rejection and does not know which of the cached
+ * identities for that queue is the stale one. There is normally exactly one.
+ */
+export function dropSqsClient(queueUrl: string): void {
+  for (const [key, client] of clients) {
+    if (key.split(KEY_SEPARATOR)[0] === queueUrl) {
+      client.destroy();
+      clients.delete(key);
+    }
+  }
 }
 
 /** Drop every cached client. For tests, and for a process winding down. */

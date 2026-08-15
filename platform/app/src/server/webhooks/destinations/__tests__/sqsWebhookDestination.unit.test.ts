@@ -315,6 +315,66 @@ describe("sqsWebhookDestination", () => {
       expect(result.error).toContain("QueueDoesNotExist");
     });
   });
+
+  describe("when the identity we send with is refused", () => {
+    /**
+     * The customer repairs this on their side, by correcting the role's trust
+     * policy or the key's permissions, and we never hear about it. A cached
+     * client holds a credential provider that has already resolved, so keeping
+     * it makes the repair take effect only at the next process restart. Hand
+     * testing hit exactly that: a corrected trust policy kept answering
+     * AccessDenied while the AWS CLI assumed the same role with the same key
+     * and external id at the same moment.
+     */
+    /** @scenario A repaired credential takes effect without a restart */
+    it("drops the cached client so the next delivery asks for credentials again", async () => {
+      resetSqsClientCache();
+      const config = {
+        queueUrl: QUEUE_URL,
+        roleArn: "arn:aws:iam::381491922238:role/langwatch-webhook-producer",
+        externalId: "lw-abc",
+      };
+      const first = sqsClientFor(config);
+      expect(sqsClientFor(config)).toBe(first);
+
+      const { client } = fakeQueue({
+        rejectWith: Object.assign(new Error("not authorized to AssumeRole"), {
+          name: "AccessDenied",
+        }),
+      });
+      await sqsWebhookDestination(config, {
+        createClient: () => client as never,
+      }).send(request());
+
+      expect(sqsClientFor(config)).not.toBe(first);
+      resetSqsClientCache();
+    });
+
+    /** @scenario A repaired credential takes effect without a restart */
+    it("keeps the cached client when the failure says nothing about the identity", async () => {
+      resetSqsClientCache();
+      const config = {
+        queueUrl: QUEUE_URL,
+        accessKeyId: "AKIA1",
+        secretAccessKey: "s3cr3t",
+      };
+      const first = sqsClientFor(config);
+
+      const { client } = fakeQueue({
+        rejectWith: Object.assign(new Error("slow down"), {
+          name: "ThrottlingException",
+        }),
+      });
+      await sqsWebhookDestination(config, {
+        createClient: () => client as never,
+      }).send(request());
+
+      // Rebuilding on a throttle would re-assume the role on every delivery,
+      // which is the cost the cache exists to avoid.
+      expect(sqsClientFor(config)).toBe(first);
+      resetSqsClientCache();
+    });
+  });
 });
 
 describe("queue URL admission", () => {

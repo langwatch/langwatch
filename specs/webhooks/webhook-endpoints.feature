@@ -211,6 +211,16 @@ Feature: Webhook endpoints, signed outbound event delivery
       And throttling, a server error and a network failure are retryable
       And an expired credential is retryable
 
+    # A customer repairs a refused identity in their own account, and LangWatch
+    # is never told. If the repair only takes effect when the process restarts,
+    # the customer sees a queue that stays broken after they fixed it.
+    @unit
+    Scenario: A repaired credential takes effect without a restart
+      Given a queue that refuses the identity the delivery was sent with
+      When the customer corrects the permission on their side
+      Then the next delivery asks for the credential again
+      And a failure that says nothing about the identity reuses the connection
+
     @integration
     Scenario: Saving an endpoint names the field its destination kind is missing
       When an endpoint of a kind is saved without the field that kind requires
