@@ -111,6 +111,16 @@ export interface GovernedSqlExecutor {
   execute(
     request: GovernedSqlExecutionRequest,
   ): Promise<GovernedSqlExecutionResult>;
+  /**
+   * Releases whatever transport this executor holds.
+   *
+   * Optional because most implementations of this seam are test doubles that
+   * hold nothing. The real one owns a connection pool, and a process that
+   * replaces its service — which the endpoint suites do several times per
+   * file — would otherwise leave the previous pool's sockets open against the
+   * same server for the lifetime of the process.
+   */
+  close?(): Promise<void>;
 }
 
 /** How to reach the governed schema as the restricted identity. */
@@ -248,6 +258,10 @@ export function createGovernedSqlExecutor(
         // is exactly the kind of text this API must not relay.
         throw translateClickHouseQueryError(error, Date.now() - startedAt);
       }
+    },
+
+    async close() {
+      await client.close();
     },
   };
 }

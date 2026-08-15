@@ -14,7 +14,7 @@
  * @see specs/analytics/governed-sql-api.feature
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { Protections } from "../../../traces/protections";
 import { GOVERNED_VIEW_CATALOG } from "../catalog/governedViews";
@@ -24,7 +24,11 @@ import {
   type GovernedSqlExecutionResult,
   type GovernedSqlExecutor,
 } from "../executor";
-import { GovernedSqlService } from "../governedSql.service";
+import {
+  closeGovernedSqlService,
+  GovernedSqlService,
+  setGovernedSqlService,
+} from "../governedSql.service";
 import {
   GATED_DATASET,
   GATED_DATASET_QUALIFIED_NAME,
@@ -764,6 +768,49 @@ describe("given the result ceilings", () => {
 
       expect(capped.rows).toEqual(rows);
       expect(capped.truncated).toBe(false);
+    });
+  });
+});
+
+describe("handing back the transport when the service is replaced", () => {
+  describe("given a service whose executor holds a connection pool", () => {
+    describe("when the process-wide service is cleared", () => {
+      it("closes the executor rather than abandoning its sockets", async () => {
+        const close = vi.fn(async () => {});
+        setGovernedSqlService(
+          new GovernedSqlService({
+            executor: { execute: vi.fn(), close },
+            database: "analytics",
+          }),
+        );
+
+        await closeGovernedSqlService();
+
+        expect(close).toHaveBeenCalledTimes(1);
+      });
+
+      it("clears the cache, so the next read builds a fresh service", async () => {
+        const first = new GovernedSqlService({
+          executor: { execute: vi.fn(), close: vi.fn(async () => {}) },
+          database: "analytics",
+        });
+        setGovernedSqlService(first);
+
+        await closeGovernedSqlService();
+        // Nothing to close the second time: the cache is empty, not stale.
+        await expect(closeGovernedSqlService()).resolves.toBeUndefined();
+      });
+
+      it("tolerates an executor seam that holds nothing to close", async () => {
+        setGovernedSqlService(
+          new GovernedSqlService({
+            executor: { execute: vi.fn() },
+            database: "analytics",
+          }),
+        );
+
+        await expect(closeGovernedSqlService()).resolves.toBeUndefined();
+      });
     });
   });
 });

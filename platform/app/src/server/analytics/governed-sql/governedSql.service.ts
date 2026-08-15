@@ -201,6 +201,16 @@ export class GovernedSqlService {
   private readonly limits: GovernedSqlResultLimits;
   private readonly now: () => Date;
 
+  /**
+   * Releases the transport the executor holds, where it holds one.
+   *
+   * The service does not own the executor's construction, but it is the only
+   * thing that reaches it, so it is the only place that can hand it back.
+   */
+  async close(): Promise<void> {
+    await this.deps.executor?.close?.();
+  }
+
   constructor(private readonly deps: GovernedSqlServiceDependencies) {
     this.views = deps.views ?? GOVERNED_VIEW_CATALOG;
     this.limits = deps.limits ?? DEFAULT_GOVERNED_SQL_RESULT_LIMITS;
@@ -495,4 +505,20 @@ export function setGovernedSqlService(
   service: GovernedSqlService | null,
 ): void {
   cached = service;
+}
+
+/**
+ * Clears the process-wide service, releasing the transport it holds first.
+ *
+ * Separate from {@link setGovernedSqlService}, and awaitable, because closing a
+ * connection pool is asynchronous and that setter is not. Making the setter
+ * async would change every call site; having it start a close it cannot await
+ * would leave an unobserved promise in a teardown path, which is the one place
+ * a rejection has nowhere to go. So the suites that swap the service several
+ * times per file call this between swaps and get the sockets back.
+ */
+export async function closeGovernedSqlService(): Promise<void> {
+  const previous = cached;
+  cached = null;
+  await previous?.close();
 }

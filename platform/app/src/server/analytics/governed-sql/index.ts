@@ -44,6 +44,7 @@ export type {
   ValidatedGovernedSql,
 } from "./governedSql.service";
 export {
+  closeGovernedSqlService,
   createGovernedSqlService,
   DEFAULT_GOVERNED_DATABASE,
   GovernedSqlService,
