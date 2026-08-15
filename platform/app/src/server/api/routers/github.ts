@@ -35,6 +35,7 @@ import { getApp } from "~/server/app-layer";
 import { GithubNotConnectedError } from "~/server/app-layer/github/errors";
 import { MAX_STATUS_REFS } from "~/server/app-layer/github/github-pull-request-status.service";
 import { getGithubAppConfig } from "~/server/app-layer/github/githubAppConfig";
+import { getGithubWebBase } from "~/server/app-layer/github/githubHost";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -68,17 +69,18 @@ const enforceOrganizationMembership: PermissionMiddleware<{
   return next();
 };
 
-// GitHub can only be uninstalled by a human on github.com. Deep-link to the
-// right settings page for the account type.
+// GitHub can only be uninstalled by a human on GitHub itself. Deep-link to the
+// right account settings page on the host this instance is bound to.
 function uninstallUrl(installation: {
   accountLogin: string;
   accountType: string;
   installationId: string;
 }): string {
+  const webBase = getGithubWebBase();
   if (installation.accountType === "Organization") {
-    return `https://github.com/organizations/${installation.accountLogin}/settings/installations/${installation.installationId}`;
+    return `${webBase}/organizations/${installation.accountLogin}/settings/installations/${installation.installationId}`;
   }
-  return `https://github.com/settings/installations/${installation.installationId}`;
+  return `${webBase}/settings/installations/${installation.installationId}`;
 }
 
 /**

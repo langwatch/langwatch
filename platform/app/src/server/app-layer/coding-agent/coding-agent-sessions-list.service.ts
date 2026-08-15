@@ -1,6 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 
 import type { CodingAgentSessionRow } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
+import { normalizeGithubHost } from "../github/githubHost";
 import type {
   GithubPullRequestLookup,
   PullRequestBranchKey,
@@ -217,7 +218,7 @@ function branchDrivesOf(rows: CodingAgentSessionRow[]): BranchDrive[] {
   const drives: BranchDrive[] = [];
   for (const row of rows) {
     if (!row.repositoryOwner || !row.repositoryName) continue;
-    const repositoryHost = (row.repositoryHost || "github.com").toLowerCase();
+    const repositoryHost = normalizeGithubHost(row.repositoryHost ?? "");
     const repositoryFullName =
       `${row.repositoryOwner}/${row.repositoryName}`.toLowerCase();
     for (const headBranch of branchesOf(row)) {

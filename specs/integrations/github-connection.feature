@@ -55,14 +55,61 @@ Rule: Connection state is visible to members, managed by organization managers
     Then I see that the GitHub integration is unavailable on this instance
     And I am not offered an Install button
 
-  # The install link is a deep link into github.com built from the App slug, so
-  # an instance holding an id and a key but no slug mints tokens perfectly well
-  # and still has nowhere to send someone who clicks Connect.
+  # The install link is a deep link into the GitHub host built from the App
+  # slug, so an instance holding an id and a key but no slug mints tokens
+  # perfectly well and still has nowhere to send someone who clicks Connect.
   @unit
   Scenario: An instance that cannot start an installation offers no install link
     Given the instance is missing part of what starting an installation needs
     When I read the connection status
     Then no install link comes back
+
+Rule: The instance binds to exactly one GitHub host
+
+  # GitHub Enterprise Server serves the REST API under /api/v3 and the App
+  # pages under /github-apps/, so naming the host is not enough on its own.
+  # Both bases come from the host in one place, and an instance that names no
+  # host behaves exactly as it did before the setting existed.
+  @unit
+  Scenario: An instance that names no host talks to github.com
+    Given the instance names no GitHub host
+    When the connection resolves the host it talks to
+    Then the host is github.com
+    And the API base is the public GitHub API
+    And the install link is the github.com app page
+
+  @unit
+  Scenario: An instance that names an Enterprise Server host talks to that host
+    Given the instance names a GitHub Enterprise Server host
+    When the connection resolves the host it talks to
+    Then the API base is that host under /api/v3
+    And the install link is that host's own app page
+
+  @unit
+  Scenario: The uninstall link points at the configured host
+    Given the instance names a GitHub Enterprise Server host
+    And the "acme" organization has an installation on "acme/service-x"
+    When I read where the installation is uninstalled
+    Then the link points at that host
+
+  @unit
+  Scenario: A repository on the configured host is mapped
+    Given the instance names a GitHub Enterprise Server host
+    When a session reports a repository on that host
+    Then the branch is mapped through the connection
+
+  @unit
+  Scenario: A repository on github.com is not mapped by an Enterprise Server instance
+    Given the instance names a GitHub Enterprise Server host
+    When a session reports a repository on github.com
+    Then no mapping is requested
+
+  @unit
+  Scenario: A pull request announced over the webhook is recorded under the configured host
+    Given the instance names a GitHub Enterprise Server host
+    And the "acme" organization has an installation on "acme/service-x"
+    When GitHub announces a pull request on a branch
+    Then the stored pull request carries that host
 
 Rule: The installation flow verifies who is installing what
 

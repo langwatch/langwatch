@@ -1124,7 +1124,7 @@ export function initializeDefaultApp(options?: {
     "recheckDueBranches",
   );
   const pruneStaleBranchLinkage = new Deferred<
-    () => Promise<{ branchChecks: number; pullRequests: number }>
+    () => Promise<{ branchChecks: number }>
   >("pruneStaleBranchLinkage");
 
   const registry = new PipelineRegistry({

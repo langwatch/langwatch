@@ -100,7 +100,16 @@ export interface UpsertGithubBranchCheckInput {
   notFoundAt: Date | null;
   recheckAfter: Date | null;
   attempts: number;
-  lastRequestedAt: Date;
+  /**
+   * When demand for this branch was last recorded, or null to keep whatever is
+   * stored.
+   *
+   * The sweep passes null. It selects branches by this column, so writing it
+   * from inside the sweep renews the signal the sweep reads and no branch ever
+   * leaves it: an unmapped branch would be asked about once a day for as long
+   * as the connection existed.
+   */
+  lastRequestedAt: Date | null;
 }
 
 export interface GithubPullRequestsRepository {
@@ -202,12 +211,20 @@ export interface GithubPullRequestsRepository {
     freshMappingMs: number;
     /** How long the claim holds if the lookup never records an answer. */
     leaseMs: number;
+    /**
+     * Whether this claim is demand for the branch, and so refreshes
+     * `lastRequestedAt`. The sweep passes false: the branch is on its due list
+     * because of demand already recorded, and renewing it here would keep the
+     * branch on that list for good.
+     */
+    recordsDemand: boolean;
   }): Promise<boolean>;
 
   /**
-   * Record that a reader asked about this branch, whether or not we called
-   * GitHub — but only for a row whose `lastRequestedAt` is at or before
-   * `staleBefore`, so a page that reloads every few seconds writes once.
+   * Record demand for a branch whose lookup another caller is already holding,
+   * so losing the claim still keeps the branch inside the sweep's activity
+   * window, but only for a row whose `lastRequestedAt` is at or before
+   * `staleBefore`, so a burst of folds on one branch writes once.
    */
   touchBranchCheckRequestedAt(params: {
     organizationId: string;
@@ -259,20 +276,25 @@ export interface GithubPullRequestsRepository {
   }): Promise<GithubBranchCheckRow[]>;
 
   /**
-   * Delete the rows past the activity horizon, and the pull requests they were
-   * the only reason to keep.
+   * Delete the branch bookkeeping past the activity horizon.
+   *
+   * Bookkeeping ONLY. The pull requests a branch resolved to are kept for good:
+   * they are a record of work that was done, they are bounded by the number of
+   * pull requests the organization actually opened, and the Pull Requests page
+   * is mostly a place to look back at merged work. Deleting them with the
+   * bookkeeping emptied that page of every pull request whose branch had been
+   * quiet for a week.
    *
    * Bounded by the SAME horizon the sweep uses, deliberately rather than by a
-   * retention knob of its own: a branch nobody has asked about in a week has
+   * retention knob of its own: a branch with no session demand for a week has
    * already dropped out of the sweep, so the feature has already stopped
    * maintaining it. Keeping the row after that is keeping a row that is never
-   * read and never refreshed, at one row per agent branch per repository — the
-   * shape that turns into millions a year.
+   * read and never refreshed, at one row per agent branch per repository, which
+   * is the shape that turns into millions a year.
    *
    * Self-healing, which is what makes the horizon safe to be this short. A
-   * reader asking again re-maps the branch from GitHub and repopulates both
-   * tables; a page that is looked at keeps bumping `lastRequestedAt` and never
-   * reaches the horizon at all.
+   * session folding on the branch again re-maps it from GitHub and writes the
+   * bookkeeping back.
    *
    * Cross-tenant by nature, like the sweep it follows: system-owned
    * maintenance, so it takes the raw-SQL opt-out the platform's other retention
@@ -280,7 +302,6 @@ export interface GithubPullRequestsRepository {
    */
   deleteStaleBefore(params: { before: Date }): Promise<{
     branchChecks: number;
-    pullRequests: number;
   }>;
 }
 
@@ -310,10 +331,7 @@ export class NullGithubPullRequestsRepository
   async findRecheckDue(): Promise<GithubBranchCheckRow[]> {
     return [];
   }
-  async deleteStaleBefore(): Promise<{
-    branchChecks: number;
-    pullRequests: number;
-  }> {
-    return { branchChecks: 0, pullRequests: 0 };
+  async deleteStaleBefore(): Promise<{ branchChecks: number }> {
+    return { branchChecks: 0 };
   }
 }

@@ -38,8 +38,8 @@ function contextFor(state: CodingAgentSessionState) {
 }
 
 describe("pullRequestMapping reactor", () => {
-  describe("given a session whose repository host is not github.com", () => {
-    /** @scenario "A repository on a non-GitHub host never triggers a GitHub call" */
+  describe("given a session whose repository host is not the instance's GitHub host", () => {
+    /** @scenario "A repository on a host this instance cannot answer for never triggers a GitHub call" */
     it("requests no mapping", async () => {
       const requestBranchMapping = vi.fn().mockResolvedValue(undefined);
       const reactor = createPullRequestMappingReactor({

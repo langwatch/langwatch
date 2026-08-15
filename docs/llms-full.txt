@@ -57582,14 +57582,15 @@ The mirror lane copies each turn's trace into a LangWatch project you designate,
 
 ## GitHub
 
-Set these on the control plane to enable bot-authored pull requests. If `GITHUB_LANGY_PRIVATE_KEY` is unset, the GitHub feature is silently off. See [Register the Langy GitHub App](/self-hosting/langy/github-app) for the registration walkthrough.
+Set these on the control plane to enable bot-authored pull requests and coding-agent pull request linkage. If `GITHUB_LANGY_PRIVATE_KEY` is unset, the GitHub feature is silently off. See [Register the GitHub App](/self-hosting/langy/github-app) for the registration walkthrough.
 
 | Variable | Description | Required | Default |
 |---|---|---|---|
 | `GITHUB_LANGY_APP_ID` | GitHub App id (JWT `iss`). | For GitHub | unset (feature off) |
 | `GITHUB_LANGY_PRIVATE_KEY` | App RSA private key PEM (mints install tokens). The only credential; control-plane only. Escape newlines as `\n` in a single-line value. | For GitHub | unset (feature off) |
-| `GITHUB_LANGY_WEBHOOK_SECRET` | Verifies the `X-Hub-Signature-256` on inbound webhooks. | For GitHub | unset |
-| `GITHUB_LANGY_APP_SLUG` | App slug for the install deep-link (`github.com/apps/<slug>`). | For GitHub | unset |
+| `GITHUB_LANGY_WEBHOOK_SECRET` | Verifies the `X-Hub-Signature-256` on inbound webhooks. Optional: without it the instance still connects, mints tokens and opens pull requests, but it reconciles late. Linkage then waits for the outbound recheck, and an uninstall clears only when a live read gets a 404. See [Restricted networks](/self-hosting/langy/github-app#restricted-networks). | No | unset |
+| `GITHUB_LANGY_APP_SLUG` | App slug for the install deep-link. | For GitHub | unset |
+| `GITHUB_LANGY_HOST` | The GitHub host this instance connects to. Set it to a GitHub Enterprise Server hostname (no scheme, no path) to bind the instance to that server. One instance connects to one host. | No | `github.com` |
 | `CREDENTIALS_SECRET` | Signs the GitHub install state round-trip and encrypts provider keys at rest. Already required in production, so nothing new is needed for GitHub. | Yes (prod) | none |
 
 <Warning>
@@ -57601,20 +57602,24 @@ Set these on the control plane to enable bot-authored pull requests. If `GITHUB_
 # FILE: ./self-hosting/langy/github-app.mdx
 
 ---
-title: Register the Langy GitHub App
-description: Deployment-time guide for the GitHub App that lets Langy open bot-authored pull requests, covering registration, permissions, the GITHUB_LANGY env vars, install, verify, and disconnect.
+title: Register the GitHub App
+description: Deployment-time guide for the GitHub App the organization connects, covering registration, permissions, the GITHUB_LANGY env vars, GitHub Enterprise Server, restricted networks, install, verify, and disconnect.
 sidebarTitle: GitHub App
 keywords:
   - langy github app
   - github_langy_app_id
+  - github enterprise server
   - bot-authored pull requests
 ---
 
-Langy opens pull requests through a GitHub App you register and install. PRs are authored by the app and credit the requesting user via a `Co-authored-by` trailer and a `Requested by @<login> via LangWatch` note in the body.
+One GitHub App serves the whole organization connection, and two features use it:
+
+- **Langy pull requests.** Langy opens pull requests through the App. They are authored by the App and credit the requesting user with a `Co-authored-by` trailer and a `Requested by @<login> via LangWatch` note in the body.
+- **Coding-agent pull request linkage.** LangWatch matches each coding-agent session to the pull request its branch became, so the Pull Requests page can report what each pull request cost in assistant usage. This part only reads.
 
 There is no per-user OAuth and no long-lived stored token: the app private key is the only credential, it lives only in the control-plane env, and installation tokens are minted on demand, cached in Redis a hair under their 1 hour lifetime, and never written to the database.
 
-To set it up: register a GitHub App, put its id, private key, webhook secret, and slug into the deployment env, and have org admins install it on the repos Langy may touch from **Settings > Integrations**.
+To set it up: register a GitHub App, put its id, private key, webhook secret, and slug into the deployment env, and have org admins install it on the repos LangWatch may touch from **Settings > Integrations**.
 
 <Info>
 **Also check:** [What Langy can do in your GitHub](/langy/security/github-access), [Setup](/self-hosting/langy/setup), [Environment variables](/self-hosting/langy/environment-variables).
@@ -57634,13 +57639,17 @@ Fill in these fields:
 |---|---|
 | App name | `LangWatch Langy` (or per environment, e.g. `LangWatch Langy (dev)`) |
 | Homepage URL | `https://app.langwatch.ai` (or your control-plane URL) |
-| Setup URL | `<BASE_URL>/api/github-langy/setup` |
+| Setup URL | `<BASE_URL>/api/github/setup` |
 | Redirect on update | ON (so re-configuring an install returns to the Setup URL) |
 | Request user authorization (OAuth) during installation | OFF. Langy is bot-authored, no user OAuth. |
-| Webhook > Active | ON |
-| Webhook URL | `<BASE_URL>/api/github-langy/webhook` |
+| Webhook > Active | ON (optional, see [Restricted networks](#restricted-networks)) |
+| Webhook URL | `<BASE_URL>/api/github/webhook` |
 | Webhook secret | Generate one (`openssl rand -hex 32`). You set it as `GITHUB_LANGY_WEBHOOK_SECRET`. |
 | Where can this GitHub App be installed? | Any account (recommended) or only this org |
+
+<Note>
+`/api/github-langy/setup` and `/api/github-langy/webhook` are the earlier paths. They stay mounted on the same handlers, so an App already registered with them keeps working. Use the paths above for a new registration.
+</Note>
 
 Set the repository permissions to exactly these, nothing more. Tighter scope means a smaller blast radius.
 
@@ -57657,12 +57666,12 @@ The `pull_request` event links a pull request to its coding-agent sessions as so
 Click **Create GitHub App**. On the resulting page:
 
 - copy the **App ID**
-- note the **app slug** (in the app's URL: `github.com/apps/<slug>`)
+- note the **app slug** (the last segment of the app's own URL)
 - **Generate a private key** and download the `.pem`
 
 ## Plumb the secrets
 
-Add these to the control-plane env (`.env`, `values.yaml`, or your secret manager). All are optional in the schema (`platform/app/src/env-create.mjs`); when the private key is unset the feature is silently off, the connect card reports the integration as unavailable, and no token can be minted.
+Add these to the control-plane env (`.env` or your secret manager). All are optional in the schema (`platform/app/src/env-create.mjs`); when the private key is unset the feature is silently off, the connect card reports the integration as unavailable, and no token can be minted.
 
 ```bash title=".env"
 GITHUB_LANGY_APP_ID="<App ID from registration>"
@@ -57671,6 +57680,8 @@ GITHUB_LANGY_WEBHOOK_SECRET="<the webhook secret you generated>"
 # The private key PEM. In a single-line env value, escape newlines as \n;
 # the token service normalises them back.
 GITHUB_LANGY_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----"
+# Only for GitHub Enterprise Server. Unset means github.com.
+# GITHUB_LANGY_HOST="github.acme-corp.internal"
 ```
 
 <Warning>
@@ -57680,6 +57691,57 @@ GITHUB_LANGY_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRI
 There is no client id or secret; the bot-authored flow uses no user OAuth. `CREDENTIALS_SECRET` (already required for any production install) signs the install round-trip's state, so nothing new is needed there.
 
 For the full env-var reference, see [Environment variables](/self-hosting/langy/environment-variables#github).
+
+### Helm
+
+The chart has no `GITHUB_LANGY_*` keys of its own. Set the variables with `app.extraEnvs` or `app.extraEnvFrom`.
+
+`GITHUB_LANGY_PRIVATE_KEY` is a multi-line PEM, so put all four values in a Secret you manage and reference it with `app.extraEnvFrom`. That keeps the PEM out of your values file and lets you rotate it without a chart change.
+
+```yaml title="values.yaml"
+app:
+  extraEnvFrom:
+    - secretRef:
+        name: langwatch-github-app
+  extraEnvs:
+    # Only for GitHub Enterprise Server.
+    - name: GITHUB_LANGY_HOST
+      value: github.acme-corp.internal
+```
+
+Set the same values on `workers` when you run the workers as their own deployment. The periodic branch recheck runs there, and without the private key it cannot mint a token.
+
+## GitHub Enterprise Server
+
+One LangWatch instance connects to exactly one GitHub. To use GitHub Enterprise Server instead of github.com:
+
+1. Register the App on the Enterprise Server instance, at `https://<HOSTNAME>/settings/apps/new` under your organization or site admin settings. An App registered on github.com cannot be installed on an Enterprise Server, so this is a separate registration with its own id, key and slug.
+2. Set `GITHUB_LANGY_HOST` to the Enterprise Server hostname, for example `github.acme-corp.internal`. Give the hostname only, with no scheme and no path.
+3. Set the other four `GITHUB_LANGY_*` variables from the new registration.
+
+LangWatch then derives every address from that host: the REST API at `https://<HOSTNAME>/api/v3`, the install link at `https://<HOSTNAME>/github-apps/<slug>/installations/new`, and the uninstall link in settings. Egress from the control plane goes to the Enterprise Server host instead of `api.github.com`.
+
+Sessions are matched by the host their git remote reports, so an instance bound to an Enterprise Server links sessions on that host and leaves github.com sessions unlinked.
+
+<Note>
+`GITHUB_LANGY_HOST` covers the control plane: the connection, token minting, and coding-agent pull request linkage. Langy's own pull requests still go to github.com, because the worker clones with the `gh` command line, which reads its own host setting. Enterprise Server support for Langy pull requests is separate work.
+</Note>
+
+## Restricted networks
+
+GitHub must be able to reach `<BASE_URL>/api/github/webhook` to deliver webhooks. Many self-hosted instances sit behind a VPN or a private network, where that is not true.
+
+**The webhook is optional.** An instance with no inbound path connects and works. Connecting is a browser redirect through `/api/github/setup`, so only the admin's own browser has to reach the instance, not GitHub. You can leave **Webhook > Active** off, or leave it on and accept the failed deliveries.
+
+What changes without webhooks:
+
+| Behavior | With webhooks | Without webhooks |
+|---|---|---|
+| A pull request appears on the Pull Requests page | Within seconds of it being opened | On the next outbound recheck: about 15 to 25 minutes while sessions keep running on the branch, up to 24 hours for a branch that went quiet before its pull request was opened |
+| Uninstall and suspend | Reconciled at once | Reconciled late. The next live read gets a 404 from GitHub and removes the stale record |
+| Repository selection changes | Reconciled at once | Refreshed on the next live resolve |
+
+Everything else is outbound only and is not affected: minting installation tokens, Langy opening pull requests, the post-connect backfill, and the live pull request status the page reads.
 
 ## Install the app
 
@@ -57717,7 +57779,7 @@ Go to **Settings > Integrations > Disconnect**, which opens GitHub's uninstall p
 - **Nothing at rest.** No token or refresh token is stored control-plane side. The app private key is the only credential; it never leaves the control plane and never goes near a worker. Tokens are minted per turn, cached in Redis a hair under their 1h lifetime, and self-expire.
 - **Least privilege at mint time.** Tokens are minted with only `contents:write` and `pull_requests:write`, scoped to the installation's repositories (or a single repository when the turn targets one).
 - **Sticky worker tokens.** A worker spawned with token T keeps T until the idle reaper kills it. Removing the installation cuts off new turns immediately; a live worker may hold a token for up to the idle TTL (within 10 min) or until it self-expires (within 1h).
-- **Egress.** The control plane reaches `api.github.com` to mint installation tokens and read installation metadata. Workers need `github.com`, `api.github.com`, and `codeload.github.com` to clone and push, which requires outbound egress to be enabled. See [Networking and egress](/self-hosting/langy/networking-and-egress).
+- **Egress.** The control plane reaches `api.github.com` to mint installation tokens and read installation metadata, or `<GITHUB_LANGY_HOST>` when one is set. Workers need `github.com`, `api.github.com`, and `codeload.github.com` to clone and push, which requires outbound egress to be enabled. See [Networking and egress](/self-hosting/langy/networking-and-egress).
 
 ---
 
@@ -57758,9 +57820,17 @@ That is why per-worker egress control lives at L7, in a per-worker CONNECT proxy
 | In-cluster LangWatch AI Gateway | All LLM traffic (traced, budgeted, policed) | Always, in-cluster |
 | In-cluster LangWatch app | The `langwatch` CLI (per-session key) | Always, in-cluster |
 | `github.com`, `api.github.com`, `codeload.github.com` | Clone and push for pull requests | Only when egress is on |
-| `api.github.com` (from the control plane, not the worker) | Mint 1-hour installation tokens | Control plane |
+| `api.github.com` (from the control plane, not the worker) | Mint 1-hour installation tokens, read installation metadata, and list pull requests for a branch | Control plane |
 
 Private ranges (RFC 1918), CGNAT (`100.64.0.0/10`), and the cloud metadata service are blocked at L3/L4 regardless of the egress toggle, which is the SSRF and IMDS protection.
+
+With `GITHUB_LANGY_HOST` set to a GitHub Enterprise Server hostname, the control plane reaches that host instead of `api.github.com`. Workers keep using the github.com names, because they clone with the `gh` command line. See [GitHub Enterprise Server](/self-hosting/langy/github-app#github-enterprise-server).
+
+## Inbound
+
+Everything above is outbound. The one inbound path GitHub uses is the webhook, delivered to `<BASE_URL>/api/github/webhook`.
+
+It is optional. An instance GitHub cannot reach still connects and works, and reconciles late instead. For what changes, see [Restricted networks](/self-hosting/langy/github-app#restricted-networks).
 
 ## Enable outbound egress
 

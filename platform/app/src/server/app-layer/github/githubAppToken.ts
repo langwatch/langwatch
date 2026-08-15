@@ -18,10 +18,10 @@ import { createHash, randomBytes } from "crypto";
 import jwt from "jsonwebtoken";
 
 import { GithubRepositoryNotAccessibleError } from "./errors";
+import { getGithubApiBase } from "./githubHost";
 
 const logger = createLogger("langwatch:github:app-token");
 
-const GITHUB_API = "https://api.github.com";
 const HTTP_TIMEOUT_MS = 10_000;
 
 // App JWT lifetime. GitHub caps it at 10 minutes; use 9 with a -30s backdated
@@ -312,7 +312,7 @@ export class GithubAppTokenService {
     installationId: string,
   ): Promise<GithubInstallationDetails> {
     const res = await this.githubFetch(
-      `${GITHUB_API}/app/installations/${encodeURIComponent(installationId)}`,
+      `${getGithubApiBase()}/app/installations/${encodeURIComponent(installationId)}`,
       { headers: { Authorization: `Bearer ${this.signAppJwt()}` } },
     );
     if (!res.ok) {
@@ -459,7 +459,7 @@ export class GithubAppTokenService {
     page: number;
   }): Promise<{ id: number; full_name: string }[]> {
     const res = await this.githubFetch(
-      `${GITHUB_API}/installation/repositories?per_page=100&page=${page}`,
+      `${getGithubApiBase()}/installation/repositories?per_page=100&page=${page}`,
       { headers: { Authorization: `Bearer ${token}` } },
     );
     if (!res.ok) {
@@ -557,7 +557,7 @@ export class GithubAppTokenService {
       >,
     });
     const res = await this.githubFetch(
-      `${GITHUB_API}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}${path}`,
+      `${getGithubApiBase()}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}${path}`,
       { headers: { Authorization: `Bearer ${minted.token}` } },
     );
     if (!res.ok) {
@@ -588,7 +588,7 @@ export class GithubAppTokenService {
       payload.repository_ids = args.repositoryIds.map((id) => Number(id));
     }
     const res = await this.githubFetch(
-      `${GITHUB_API}/app/installations/${encodeURIComponent(
+      `${getGithubApiBase()}/app/installations/${encodeURIComponent(
         args.installationId,
       )}/access_tokens`,
       {

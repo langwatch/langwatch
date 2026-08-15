@@ -377,11 +377,8 @@ export interface PipelineRegistryDeps {
   github?: {
     /** One recheck pass; returns how many branches were re-asked about. */
     recheckDueBranches: () => Promise<number>;
-    /** One retention pass over the two linkage tables. */
-    pruneStaleBranchLinkage: () => Promise<{
-      branchChecks: number;
-      pullRequests: number;
-    }>;
+    /** One retention pass over the branch bookkeeping. */
+    pruneStaleBranchLinkage: () => Promise<{ branchChecks: number }>;
   };
 }
 

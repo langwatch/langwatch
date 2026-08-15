@@ -86,19 +86,9 @@ Rule: Branches map to their pull requests through the organization connection
     When the tick fires
     Then one sweep runs and the others stand down
 
-  # Nothing removed a branch's bookkeeping or its pull requests, ever, at one
-  # row per agent branch per repository.
   @unit
-  Scenario: Linkage rows nobody asks about stop accumulating
-    Given a branch outside the sweep's activity window
-    When the retention prune runs
-    Then its bookkeeping is removed
-    And the pull requests it was the only reason to keep are removed
-    And a reader asking again re-maps the branch from GitHub
-
-  @unit
-  Scenario: A repository on a non-GitHub host never triggers a GitHub call
-    Given a session whose repository host is not github.com
+  Scenario: A repository on a host this instance cannot answer for never triggers a GitHub call
+    Given a session whose repository host is not the instance's GitHub host
     When the mapping trigger evaluates the session
     Then no mapping is requested
 
@@ -107,6 +97,49 @@ Rule: Branches map to their pull requests through the organization connection
     Given sessions with repo and branch folded before any GitHub connection existed
     When the organization connects GitHub
     Then the recent branches are mapped without waiting for new sessions
+
+Rule: Demand is what a session asks for, and only demand keeps a branch in the sweep
+
+  # The column the sweep selects on was also written by the sweep itself, so a
+  # branch that never gets a pull request renewed its own place in the sweep and
+  # was asked about every day for as long as the connection existed.
+  @integration
+  Scenario: The sweep does not renew the demand it selects on
+    Given a branch with no pull request that the sweep asks GitHub about
+    When the sweep records the empty answer
+    Then the branch's last demand time is unchanged
+
+  @integration
+  Scenario: A session folding on a branch records demand for it
+    Given a branch with no pull request
+    When a session folds on that branch and the mapping runs
+    Then the branch's last demand time moves to the time of the fold
+
+  @integration
+  Scenario: A branch with no session demand for a week leaves the sweep
+    Given a branch whose last session demand is older than the activity window
+    When the periodic recheck selects branches
+    Then that branch is not selected
+
+Rule: Bookkeeping is pruned, and the pull requests it found are kept
+
+  # One bookkeeping row per agent branch per repository, and nothing removed
+  # them, so the table grew for as long as the connection existed.
+  @integration
+  Scenario: Bookkeeping for a branch outside the activity window is removed
+    Given a branch outside the sweep's activity window
+    When the retention prune runs
+    Then its bookkeeping is removed
+    And a session folding on that branch again re-maps it from GitHub
+
+  # A pull request is a record of work that was done. Removing it when the
+  # branch went quiet took merged work off the Pull Requests page, which is the
+  # work people most want to look back at.
+  @integration
+  Scenario: A linked pull request stays after its branch goes quiet
+    Given a branch outside the sweep's activity window whose pull request is linked
+    When the retention prune runs
+    Then the pull request is still stored for the organization
 
 Rule: A pull request links itself the moment GitHub announces it
 
