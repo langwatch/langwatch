@@ -71,6 +71,12 @@ Feature: Automation dispatch on the process-manager substrate
     And a retry of a page re-runs only the traces not yet claimed
 
   @unit
+  Scenario: A later settlement round is never swallowed by a completed page
+    Given a page dispatched for a settle round
+    When the same trace matches again in a later settle window
+    Then the later round produces a distinct page message
+
+  @unit
   Scenario: An old single-trace persist intent still dispatches after the paging change
     Given a pending persist intent written before the paging change
     When the intent dispatches

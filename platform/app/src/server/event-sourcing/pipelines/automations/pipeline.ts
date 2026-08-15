@@ -13,6 +13,7 @@ import {
   digestBatchKey,
   drainDue,
   INITIAL_SETTLEMENT_STATE,
+  pagePersistMatches,
   type SettlementState,
   settleBoundary,
 } from "./process-manager/triggerSettlement.process";
@@ -82,6 +83,12 @@ export function createAutomationsPipeline(deps: AutomationsPipelineDeps) {
         )
         .on(TRIGGER_MATCH_RECORDED_EVENT_TYPE, (state, data, ctx) => {
           const { state: nextState, flushed } = addPending(state, data, ctx.at);
+          const flushedPersist = flushed.filter(
+            ({ match }) => match.actionClass === "persist",
+          );
+          const flushedNotify = flushed.filter(
+            ({ match }) => match.actionClass !== "persist",
+          );
           return {
             state: nextState,
             // Cap hit: the oldest matches dispatch NOW instead of being
@@ -89,20 +96,26 @@ export function createAutomationsPipeline(deps: AutomationsPipelineDeps) {
             intents:
               flushed.length > 0
                 ? [
-                    ...flushed.map(({ traceId, match }) =>
-                      match.actionClass === "persist"
-                        ? ctx.intents.persistMatch(
-                            `persist:${traceId}:${match.settleWindowBucket}`,
-                            { triggerId: ctx.key, traceId },
-                          )
-                        : ctx.intents.notifyDigest(
-                            `digest:${match.dispatchDueAt}:${digestBatchKey([traceId])}`,
-                            {
-                              triggerId: ctx.key,
-                              traceIds: [traceId],
-                              boundary: match.dispatchDueAt,
-                            },
-                          ),
+                    ...pagePersistMatches(
+                      flushedPersist.map(({ traceId, match }) => ({
+                        traceId,
+                        settleWindowBucket: match.settleWindowBucket,
+                      })),
+                    ).map((page) =>
+                      ctx.intents.persistMatch(`persist:${page.pageKey}`, {
+                        triggerId: ctx.key,
+                        traceIds: page.traceIds,
+                      }),
+                    ),
+                    ...flushedNotify.map(({ traceId, match }) =>
+                      ctx.intents.notifyDigest(
+                        `digest:${match.dispatchDueAt}:${digestBatchKey([traceId])}`,
+                        {
+                          triggerId: ctx.key,
+                          traceIds: [traceId],
+                          boundary: match.dispatchDueAt,
+                        },
+                      ),
                     ),
                     // The message key is what the outbox dedups on, so it
                     // decides how many DURABLE ROWS a log line costs. Keyed on
@@ -146,20 +159,20 @@ export function createAutomationsPipeline(deps: AutomationsPipelineDeps) {
                   },
                 ),
               ),
-              ...due.settledMatches.map((match) =>
-                ctx.intents.persistMatch(
-                  `persist:${match.traceId}:${match.settleWindowBucket}`,
-                  {
-                    triggerId: ctx.key,
-                    traceId: match.traceId,
-                  },
-                ),
+              ...due.persistPages.map((page) =>
+                ctx.intents.persistMatch(`persist:${page.pageKey}`, {
+                  triggerId: ctx.key,
+                  traceIds: page.traceIds,
+                }),
               ),
             ],
             nextWakeAt: due.nextBoundary,
           };
         })
-        .outbox({ maxAttempts: 8, leaseDurationMs: 120_000 }),
+        // The lease covers a full page of degraded per-trace confirms with
+        // room to spare (see PERSIST_PAGE_MAX); the dispatcher releases any
+        // batch tail that would run past it.
+        .outbox({ maxAttempts: 8, leaseDurationMs: 300_000 }),
     )
     .withProcessManager("graphAlertSweep", (pm) =>
       pm

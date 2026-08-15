@@ -6,8 +6,11 @@ import type { TriggerMatchRecordedEventData } from "~/server/event-sourcing/pipe
 import { automationProcessDefinition } from "../../__tests__/pipelineTestHarness";
 import {
   addPending,
+  digestBatchKey,
   drainDue,
   MAX_PENDING_MATCHES,
+  PERSIST_PAGE_MAX,
+  pagePersistMatches,
   type SettlementState,
   settleBoundary,
 } from "../triggerSettlement.process";
@@ -67,7 +70,8 @@ describe("trigger settlement process", () => {
         ]);
       });
 
-      it("emits persist matches independently", () => {
+      /** @scenario "Settled persist matches dispatch in bounded pages" */
+      it("pages the settled persist matches deterministically", () => {
         const state: SettlementState = {
           pendingMatches: {
             "trace-a": {
@@ -86,10 +90,36 @@ describe("trigger settlement process", () => {
           overflowFlushed: 0,
         };
 
-        expect(drainDue(state, 1_000).settledMatches).toEqual([
-          { traceId: "trace-a", settleWindowBucket: "30000-0" },
-          { traceId: "trace-b", settleWindowBucket: "30000-0" },
+        expect(drainDue(state, 1_000).persistPages).toEqual([
+          {
+            traceIds: ["trace-a", "trace-b"],
+            pageKey: digestBatchKey(["trace-a@30000-0", "trace-b@30000-0"]),
+          },
         ]);
+        // Identical state drains to byte-identical keys: what a revision
+        // conflict re-runs and an event redelivery replay must produce.
+        expect(drainDue(state, 1_000).persistPages).toEqual(
+          drainDue(state, 1_000).persistPages,
+        );
+      });
+
+      it("splits more settled matches than the page bound into multiple pages", () => {
+        const matches = Array.from(
+          { length: PERSIST_PAGE_MAX + 3 },
+          (_, index) => ({
+            traceId: `trace-${String(index).padStart(3, "0")}`,
+            settleWindowBucket: "30000-0",
+          }),
+        );
+
+        const pages = pagePersistMatches(matches);
+
+        expect(pages).toHaveLength(2);
+        expect(pages[0]!.traceIds).toHaveLength(PERSIST_PAGE_MAX);
+        expect(pages[1]!.traceIds).toHaveLength(3);
+        expect(pages[0]!.pageKey).not.toBe(pages[1]!.pageKey);
+        // Insertion order does not leak into the keys.
+        expect(pagePersistMatches([...matches].reverse())).toEqual(pages);
       });
 
       it("keeps the next future boundary durable", () => {
@@ -118,6 +148,7 @@ describe("trigger settlement process", () => {
 
   describe("given a persist match completed its settle round", () => {
     describe("when later activity arrives in a new settle window", () => {
+      /** @scenario "A later settlement round is never swallowed by a completed page" */
       it("creates a fresh persist intent for the later round", () => {
         const definition = automationProcessDefinition({
           name: "triggerSettlement",
@@ -158,11 +189,14 @@ describe("trigger settlement process", () => {
           now: 61_001,
         });
 
+        // The settle-window bucket is inside the page hash, so the second
+        // round's page cannot collide with the completed first round's
+        // outbox row and be swallowed by the dedup.
         expect(firstWake.intents?.map((intent) => intent.messageKey)).toEqual([
-          "persist:trace-1:30000-0",
+          `persist:${digestBatchKey(["trace-1@30000-0"])}`,
         ]);
         expect(secondWake.intents?.map((intent) => intent.messageKey)).toEqual([
-          "persist:trace-1:30000-1",
+          `persist:${digestBatchKey(["trace-1@30000-1"])}`,
         ]);
       });
     });
@@ -244,11 +278,11 @@ describe("trigger settlement process", () => {
         // running flush count. Nothing is discarded.
         expect(evolution.intents).toEqual([
           {
-            messageKey: "persist:trace-0:30000-0",
+            messageKey: `persist:${digestBatchKey(["trace-0@30000-0"])}`,
             intentType: "persistMatch",
             payload: {
               triggerId: "trigger-1",
-              traceId: "trace-0",
+              traceIds: ["trace-0"],
             },
           },
           {
