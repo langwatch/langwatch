@@ -108,7 +108,7 @@ type ErrorPayload struct {
 // reasoning-token count today.
 func usageFromDomain(u domain.Usage, reasoning int) UsagePayload {
 	return UsagePayload{
-		InputTokens:         u.PromptTokens,
+		InputTokens:         u.PromptTokens - u.CacheReadTokens - u.CacheCreationTokens,
 		OutputTokens:        u.CompletionTokens,
 		CacheReadTokens:     u.CacheReadTokens,
 		CacheCreationTokens: u.CacheCreationTokens,
