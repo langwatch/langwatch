@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { KEY_CHECK, MASKED_KEY_PLACEHOLDER } from "../../../../utils/constants";
+import { MASKED_KEY_PLACEHOLDER } from "../../../../utils/constants";
+import { isSecretCredentialField } from "../../../../utils/modelProviderHelpers";
 import type { CustomModelEntry } from "../../../modelProviders/customModel.schema";
 import { customModelUpdateInputSchema } from "../../../modelProviders/customModel.schema";
 import type { MaybeStoredModelProvider } from "../../../modelProviders/registry";
@@ -21,7 +22,7 @@ function maskKeys(
   return Object.fromEntries(
     Object.entries(customKeys).map(([key, value]) => [
       key,
-      KEY_CHECK.some((k) => key.includes(k)) ? MASKED_KEY_PLACEHOLDER : value,
+      isSecretCredentialField(key) ? MASKED_KEY_PLACEHOLDER : value,
     ]),
   );
 }

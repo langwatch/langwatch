@@ -322,10 +322,12 @@ export class ModelProviderService {
    * Gets model providers with API keys masked for frontend display.
    *
    * Business rules:
-   * - Only masks customKeys fields matching KEY_CHECK patterns (API keys)
+   * - Every customKeys field is masked unless `PUBLIC_CREDENTIAL_FIELDS`
+   *   names it, so a provider that adds a credential is covered by default
    * - Extra-header values are always masked — they routinely carry auth
    *   secrets for azure/custom providers
-   * - URLs and other values remain visible
+   * - Endpoints, API versions, regions and cloud project or location pairs
+   *   remain visible, because the settings form has to render them back
    *
    * Masking runs even when `includeKeys` is false: customKeys are already
    * nulled by that flag, but extraHeaders are returned regardless, so
