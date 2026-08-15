@@ -149,6 +149,26 @@ const MEMBER_ACCESS = /\.\s*[A-Za-z_$][A-Za-z0-9_$]*/g;
 
 const IDENTIFIER = /[A-Za-z_$][A-Za-z0-9_$]*/g;
 
+/**
+ * Decimal and exponent numeric literals, which Vega supports.
+ *
+ * These are removed before the identifier scan because scientific notation
+ * carries letters: left in place, `1e6` reads as the identifier `e6` and a
+ * comparison Vega evaluates without complaint comes back refused.
+ *
+ * Hex is deliberately absent. Vega's expression language has no hex literal, so
+ * `0x1f` is not a number the evaluator understands, and stripping it would turn
+ * a form Vega rejects into one this screen waves through. Matching only the
+ * leading `0` leaves `x1f` behind for the scan to report, which is the answer
+ * that matches what Vega does.
+ *
+ * The leading boundary is what keeps `value1` whole — without it the trailing
+ * digit is eaten and the identifier is reported under a name that never
+ * appeared in the expression.
+ */
+const NUMERIC_LITERAL =
+  /(?<![A-Za-z0-9_$])(?:\d+(?:\.\d+)?|\.\d+)(?:[eE][+-]?\d+)?/g;
+
 /** Every character an expression may contain once its string literals are gone. */
 const DISALLOWED_CHARACTER = /[^A-Za-z0-9_$.,()[\]{}+\-*/%<>=!?:&|^~\s]/g;
 
@@ -191,7 +211,9 @@ export function screenVegaExpression(
     forbiddenConstructs.push("assignment or arrow function");
   }
 
-  const withoutMembers = withoutStrings.replace(MEMBER_ACCESS, "");
+  const withoutMembers = withoutStrings
+    .replace(NUMERIC_LITERAL, "0")
+    .replace(MEMBER_ACCESS, "");
   const forbiddenIdentifiers = [
     ...new Set(withoutMembers.match(IDENTIFIER) ?? []),
   ].filter((name) => !ALLOWED_IDENTIFIER_SET.has(name));

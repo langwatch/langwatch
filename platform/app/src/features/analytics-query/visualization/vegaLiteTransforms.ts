@@ -138,10 +138,22 @@ function opOutputs(value: unknown): string[] {
   );
 }
 
+/**
+ * What an explicit `as` names.
+ *
+ * Two names name both outputs and nothing is appended. One name names only the
+ * start, and Vega-Lite derives the end as `<name>_end`. Appending to a two-name
+ * tuple would publish fields the step never writes, which the field-existence
+ * check would then accept.
+ */
+function namedTransformOutputs(named: string[]): string[] {
+  const [only] = named;
+  return named.length === 1 && only ? [only, `${only}_end`] : named;
+}
+
 function binOutputs(step: Record<string, unknown>): string[] {
   const named = stringList(step.as);
-  if (named.length > 0)
-    return [...named, ...named.map((name) => `${name}_end`)];
+  if (named.length > 0) return namedTransformOutputs(named);
   return stringList(step.field).flatMap((field) => [
     `bin_${field}`,
     `bin_${field}_end`,
@@ -150,8 +162,7 @@ function binOutputs(step: Record<string, unknown>): string[] {
 
 function stackOutputs(step: Record<string, unknown>): string[] {
   const named = stringList(step.as);
-  if (named.length > 0)
-    return [...named, ...named.map((name) => `${name}_end`)];
+  if (named.length > 0) return namedTransformOutputs(named);
   return stringList(step.stack).flatMap((field) => [
     `${field}_start`,
     `${field}_end`,
