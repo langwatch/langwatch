@@ -1946,7 +1946,12 @@ model LlmPromptConfig {
 
   @@unique([handle], map: "LlmPromptConfig_handle_key")
   @@index([projectId])
-  @@index([organizationId], map: "LlmPromptConfig_organizationId_idx")
+  // Listing queries filter on (organizationId, scope) together. On a plain
+  // organizationId index one large organization matches almost every row and
+  // the planner falls back to scanning the table; scope in the index keeps
+  // the lookup selective. The composite also serves organizationId-only
+  // filters as its prefix, so a separate single-column index is not needed.
+  @@index([organizationId, scope])
   @@index([copiedFromPromptId])
 }
 

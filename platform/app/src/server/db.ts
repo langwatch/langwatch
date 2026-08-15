@@ -4,6 +4,7 @@ import type { GuardNext, GuardParams } from "../utils/dbGuardMiddleware";
 import { guardEnMasse } from "../utils/dbMassDeleteProtection";
 import { guardProjectId } from "../utils/dbMultiTenancyProtection";
 import { guardOrganizationId } from "../utils/dbOrganizationIdProtection";
+import { withQueryTiming } from "./dbSlowQueryWarning";
 import { createPrismaPgAdapter } from "./prismaPgAdapter";
 
 const globalForPrisma = globalThis as unknown as {
@@ -15,6 +16,10 @@ const globalForPrisma = globalThis as unknown as {
  * (enMasse → projectId → organizationId), then executes the query with
  * whatever args the guards left behind (guardEnMasse rewrites the safe-word
  * where clauses).
+ *
+ * Every model operation and every raw entry point funnels through here, which
+ * is why the slow-query timing wraps it: this is the one place that sees them
+ * all.
  */
 const withGuards = (
   params: GuardParams,
@@ -22,7 +27,7 @@ const withGuards = (
 ): Promise<unknown> => {
   const run: GuardNext = (p) =>
     guardProjectId(p, (q) => guardOrganizationId(q, (r) => execute(r.args)));
-  return guardEnMasse(params, run);
+  return withQueryTiming({ params, run: () => guardEnMasse(params, run) });
 };
 
 const createGuardedPrismaClient = (): PrismaClient => {

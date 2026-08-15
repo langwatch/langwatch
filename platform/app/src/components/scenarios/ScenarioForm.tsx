@@ -34,7 +34,7 @@ export interface ScenarioInitialData {
 
 type ScenarioFormProps = {
   defaultValues?: Partial<ScenarioFormData>;
-  formRef?: (form: UseFormReturn<ScenarioFormData>) => void;
+  formRef?: (form: UseFormReturn<ScenarioFormData> | null) => void;
 };
 
 /**
@@ -62,9 +62,12 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
     formState: { errors },
   } = form;
 
-  // Expose form to parent
+  // Expose form to parent, and take it back on unmount. Whoever holds the
+  // reference renders against it, so a reference that outlives this form
+  // points them at a form nobody is typing in.
   useEffect(() => {
     formRef?.(form);
+    return () => formRef?.(null);
   }, [form, formRef]);
 
   useResetOnDefaultsChange({ reset, defaultValues });
