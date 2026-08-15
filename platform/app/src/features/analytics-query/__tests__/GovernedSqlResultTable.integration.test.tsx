@@ -290,9 +290,13 @@ describe("the governed SQL result table", () => {
           }),
         );
 
-        expect(
-          await screen.findByTestId("governed-sql-value-full"),
-        ).toHaveTextContent("line three");
+        const full = await screen.findByTestId("governed-sql-value-full");
+
+        // Every line, not just the last one: the preview already showed a
+        // version of the value with the breaks taken out, so a test that only
+        // looks for "line three" would pass on a value missing its first two.
+        expect(full).toBeVisible();
+        expect(full.textContent).toBe(multiline);
       });
     });
   });
