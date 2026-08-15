@@ -405,4 +405,30 @@ afterAll(async () => {
     const body = await response.json();
     expect(body.error).toHaveProperty("code", "routing_policy_not_found");
   });
+
+  it("allows fetching an ORGANIZATION-scoped policy", async () => {
+    const policyId = `pol-org-scoped-${nanoid(8)}`;
+    await prisma.routingPolicy.create({
+      data: {
+        id: policyId,
+        organizationId: ORG_ID,
+        name: "Org Policy",
+        strategy: "priority",
+        isDefault: false,
+        createdById: "user",
+        updatedById: "user",
+        scopes: {
+          create: [{ scopeType: RoutingPolicyScopeType.ORGANIZATION, scopeId: ORG_ID }],
+        },
+      },
+    });
+
+    const res = await app.request(`/api/gateway/v1/routing-policies/${policyId}`, {
+      method: "GET",
+      headers: apiKeyAuth(projectApiKey),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.id).toBe(policyId);
+  });
 });
