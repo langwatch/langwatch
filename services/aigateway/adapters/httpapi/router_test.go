@@ -74,8 +74,8 @@ func (m *mockBudget) Precheck(ctx context.Context, bundle *domain.Bundle) (domai
 
 // --- Helpers ---
 
-func testBundle(extra ...domain.Credential) *domain.Bundle {
-	bundle := &domain.Bundle{
+func testBundle() *domain.Bundle {
+	return &domain.Bundle{
 		VirtualKeyID: "vk-test",
 		ProjectID:    "proj-test",
 		TeamID:       "team-test",
@@ -86,9 +86,6 @@ func testBundle(extra ...domain.Credential) *domain.Bundle {
 			Fallback: domain.FallbackConfig{MaxAttempts: 1},
 		},
 	}
-	bundle.Credentials = append(bundle.Credentials, extra...)
-	bundle.Config.Fallback.MaxAttempts = len(bundle.Credentials)
-	return bundle
 }
 
 func successResponse() *domain.Response {

@@ -1,8 +1,10 @@
 package app
 
 import (
+	"context"
 	"testing"
 
+	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -19,10 +21,10 @@ func TestEligibleCredentials(t *testing.T) {
 	}
 
 	tests := []struct {
-		name            string
-		resolved        *domain.ResolvedModel
-		wantIDs         []string
-		wantUnreachable domain.ProviderID
+		name     string
+		resolved *domain.ResolvedModel
+		wantIDs  []string
+		wantErr  herr.Code
 	}{
 		{
 			name:     "explicit anthropic provider keeps both anthropic creds in order",
@@ -70,13 +72,9 @@ func TestEligibleCredentials(t *testing.T) {
 			wantIDs:  []string{"anthropic_1", "openai_1", "gemini_1", "anthropic_2"},
 		},
 		{
-			// A provider the request named and the key cannot reach is refused.
-			// Dispatching it to whatever is left sent an Anthropic model to
-			// Gemini and answered with Gemini's own model-not-found.
-			name:            "a named provider the key cannot reach is refused, not rerouted",
-			resolved:        &domain.ResolvedModel{ProviderID: domain.ProviderBedrock, ModelID: "bedrock-only"},
-			wantIDs:         nil,
-			wantUnreachable: domain.ProviderBedrock,
+			name:     "explicit provider with no matching cred hard-fails as not bound",
+			resolved: &domain.ResolvedModel{ProviderID: domain.ProviderBedrock, ModelID: "bedrock-only"},
+			wantErr:  domain.ErrProviderNotBound,
 		},
 		{
 			name:     "nil resolved leaves chain untouched",
@@ -92,9 +90,15 @@ func TestEligibleCredentials(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got, unreachable := eligibleCredentials(mkCreds(), tc.resolved)
-			if unreachable != tc.wantUnreachable {
-				t.Errorf("unreachable: got %q want %q", unreachable, tc.wantUnreachable)
+			got, err := eligibleCredentials(context.Background(), mkCreds(), tc.resolved)
+			if tc.wantErr != "" {
+				if !herr.IsCode(err, tc.wantErr) {
+					t.Fatalf("got err %v, want code %s", err, tc.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
 			}
 			gotIDs := make([]string, len(got))
 			for i, c := range got {
@@ -108,7 +112,10 @@ func TestEligibleCredentials(t *testing.T) {
 }
 
 func TestEligibleCredentialsEmptyChain(t *testing.T) {
-	got, _ := eligibleCredentials(nil, &domain.ResolvedModel{ModelID: "gpt-4o"})
+	got, err := eligibleCredentials(context.Background(), nil, &domain.ResolvedModel{ModelID: "gpt-4o"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if got != nil {
 		t.Errorf("expected nil slice, got %v", got)
 	}
@@ -122,7 +129,10 @@ func TestEligibleCredentialsPreservesPriority(t *testing.T) {
 		{ID: "openai_first", ProviderID: domain.ProviderOpenAI},
 		{ID: "secondary_anthropic", ProviderID: domain.ProviderAnthropic},
 	}
-	got, _ := eligibleCredentials(creds, &domain.ResolvedModel{ProviderID: domain.ProviderAnthropic})
+	got, err := eligibleCredentials(context.Background(), creds, &domain.ResolvedModel{ProviderID: domain.ProviderAnthropic})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if len(got) != 2 {
 		t.Fatalf("got %d creds, want 2", len(got))
 	}
@@ -143,26 +153,36 @@ func equalSlices(a, b []string) bool {
 	return true
 }
 
-// The inference is a guess from a short prefix table, so a model name it
-// cannot match to any credential the key holds keeps the whole chain rather
-// than refusing a request the key could have served. The table-driven cases
-// above all run against a chain that HOLDS every provider they name, so none
-// of them reaches this branch.
-func TestEligibleCredentialsInferredProviderTheKeyCannotReach(t *testing.T) {
+func TestEligibleCredentialsImplicitNoMatchKeepsSafetyNet(t *testing.T) {
+	// A bare model name (no provider prefix) whose inferred provider has
+	// no credential must NOT hard-fail: without a prefix on the model
+	// string, each attempt dispatches with the credential's own provider
+	// and surfaces that provider's real error.
 	creds := []domain.Credential{
 		{ID: "openai_1", ProviderID: domain.ProviderOpenAI},
-		{ID: "gemini_1", ProviderID: domain.ProviderGemini},
 	}
+	got, err := eligibleCredentials(context.Background(), creds, &domain.ResolvedModel{ProviderID: "", ModelID: "gemini-2.5-pro"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(got) != 1 || got[0].ID != "openai_1" {
+		t.Errorf("safety net not applied: got %v", got)
+	}
+}
 
-	got, unreachable := eligibleCredentials(creds, &domain.ResolvedModel{
-		ProviderID: "",
-		ModelID:    "claude-3-5-sonnet",
+func TestEligibleCredentialsEmptyChainDefersToNoProviderConfigured(t *testing.T) {
+	// A VK with zero credentials is a different customer problem than a
+	// VK missing one provider: the org has configured nothing at all, so
+	// "bind a bedrock slot" is the wrong advice. This helper stays silent
+	// and lets candidateChain raise no_provider_configured, which names
+	// the actual next step. Both are 400s, so the status contract holds.
+	got, err := eligibleCredentials(context.Background(), nil, &domain.ResolvedModel{
+		ProviderID: domain.ProviderBedrock, ModelID: "anthropic.claude-3-5-sonnet",
 	})
-
-	if unreachable != "" {
-		t.Errorf("an inferred provider must not refuse, got %q", unreachable)
+	if err != nil {
+		t.Fatalf("empty chain must not hard-fail here: %v", err)
 	}
-	if len(got) != len(creds) {
-		t.Errorf("got %d creds, want the untouched chain of %d", len(got), len(creds))
+	if len(got) != 0 {
+		t.Errorf("expected empty chain to pass through, got %v", got)
 	}
 }

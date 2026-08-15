@@ -1,8 +1,11 @@
 package app
 
 import (
+	"context"
+	"fmt"
 	"strings"
 
+	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -22,33 +25,38 @@ import (
 // Filtering rules:
 //
 //  1. Resolved.ProviderID set (explicit prefix or alias-resolved): keep
-//     only credentials whose ProviderID matches. Nothing matching is
-//     reported through `unreachable` rather than dispatched elsewhere:
-//     the caller, or the policy alias they hit, named this provider, and
-//     serving the request from another vendor answers a question nobody
-//     asked. It also reads as a governance hole on a key whose whole
-//     purpose is to bound which providers it can reach.
+//     only credentials whose ProviderID matches.
 //  2. Resolved.ProviderID empty (implicit model name): infer the
-//     provider from the model name prefix and keep matching creds. If no
-//     provider knows the prefix, or the inference matches nothing the key
-//     holds, leave the chain untouched. The inference is a guess from a
-//     short prefix table, and a guess must not refuse a request the key
-//     could have served.
-func eligibleCredentials(
-	creds []domain.Credential,
-	resolved *domain.ResolvedModel,
-) (kept []domain.Credential, unreachable domain.ProviderID) {
+//     provider from the model name prefix and keep matching creds. If
+//     no provider knows the prefix, leave the chain untouched (fall
+//     back to existing behavior).
+//
+// Safety net (implicit names only): if inferring a provider from a bare
+// model name empties the chain, return the original creds — a bare model
+// name carries no provider prefix, so each attempt dispatches with the
+// credential's own provider and fails with that provider's real error.
+//
+// Explicitly-named providers (a "provider/model" prefix or an alias) get
+// the opposite treatment: an empty filter is a hard fail with
+// ErrProviderNotBound. Dispatching anyway would forward the prefixed
+// model string with a mismatched credential, and Bifrost's model-prefix
+// provider override then reads that credential through the wrong
+// provider's key-config shape — surfacing as opaque errors like
+// "deployments not set" (Azure), "no keys found that support model"
+// (Gemini), or raw HTML error pages (Vertex) instead of telling the
+// caller the provider isn't configured.
+func eligibleCredentials(ctx context.Context, creds []domain.Credential, resolved *domain.ResolvedModel) ([]domain.Credential, error) {
 	if len(creds) == 0 || resolved == nil {
-		return creds, ""
+		return creds, nil
 	}
 
-	named := resolved.ProviderID
-	target := named
+	target := resolved.ProviderID
+	explicit := target != ""
 	if target == "" {
 		target = inferProviderFromModel(resolved.ModelID)
 	}
 	if target == "" {
-		return creds, ""
+		return creds, nil
 	}
 
 	out := make([]domain.Credential, 0, len(creds))
@@ -58,12 +66,15 @@ func eligibleCredentials(
 		}
 	}
 	if len(out) == 0 {
-		if named != "" {
-			return nil, named
+		if explicit {
+			return nil, herr.New(ctx, domain.ErrProviderNotBound, herr.M{
+				"message": fmt.Sprintf("no %q provider is configured for this key", target),
+				"hint":    fmt.Sprintf("bind a %q provider slot to this virtual key, or drop the %q model prefix", target, target),
+			})
 		}
-		return creds, ""
+		return creds, nil
 	}
-	return out, ""
+	return out, nil
 }
 
 // inferProviderFromModel maps a bare model name to the provider that

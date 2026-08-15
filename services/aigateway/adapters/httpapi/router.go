@@ -1214,6 +1214,7 @@ func registerErrorStatuses() {
 	herr.RegisterStatus(domain.ErrGuardrailUpstreamUnavailable, http.StatusServiceUnavailable)
 	herr.RegisterStatus(domain.ErrPolicyViolation, http.StatusForbidden)
 	herr.RegisterStatus(domain.ErrModelNotAllowed, http.StatusBadRequest)
+	herr.RegisterStatus(domain.ErrProviderNotBound, http.StatusBadRequest)
 	herr.RegisterStatus(domain.ErrProviderError, http.StatusBadGateway)
 	herr.RegisterStatus(domain.ErrProviderTimeout, http.StatusGatewayTimeout)
 	herr.RegisterStatus(domain.ErrBadRequest, http.StatusBadRequest)

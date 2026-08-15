@@ -1,4 +1,5 @@
 import { modelProviderRegistry } from "~/features/onboarding/regions/model-providers/registry";
+import { isDispatchableProvider } from "~/server/modelProviders/registry";
 
 /**
  * A scope a VirtualKey is reachable from: the org/team/project triad the
@@ -103,14 +104,22 @@ export function buildScopeHierarchy(
 
 /**
  * A provider is only offered to a key when the gateway would actually
- * dispatch to it: `enabled: true, disabledAt: null`, the same predicate
- * `scopeResolver.eligibleModelProvidersForVk` runs against Postgres.
- * Fails closed — a row that arrives without the flag is not advertised,
- * because listing a credential an admin has withdrawn overstates the
- * key's reach and is a governance problem, not a cosmetic one.
+ * dispatch to it: `enabled: true, disabledAt: null` AND registry-dispatchable
+ * (shared `isDispatchableProvider` — the predicate
+ * `scopeResolver.eligibleModelProvidersForVk` also applies), so the picker
+ * never advertises a provider the dispatch chain would drop.
+ * The enabled/disabledAt dimension fails closed — a row that arrives without
+ * the flag is not advertised, because listing a credential an admin has
+ * withdrawn overstates the key's reach and is a governance problem, not a
+ * cosmetic one. The registry dimension's failure direction is stated on
+ * `isDispatchableProvider` itself.
  */
 function isRoutable(provider: OrgModelProvider): boolean {
-  return provider.enabled === true && !provider.disabledAt;
+  return (
+    provider.enabled === true &&
+    !provider.disabledAt &&
+    isDispatchableProvider(provider.provider)
+  );
 }
 
 /**

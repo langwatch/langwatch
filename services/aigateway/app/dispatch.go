@@ -135,12 +135,9 @@ func translateWalkError(ctx context.Context, err error) error {
 //     iterated; with several simultaneous exclusions any of them is an
 //     accurate answer to "why was nothing dispatchable").
 func (a *App) candidateChain(ctx context.Context, call *pipeline.Call) ([]domain.Credential, error) {
-	creds, unreachable := eligibleCredentials(
-		call.Bundle.Credentials,
-		call.Request.Resolved,
-	)
-	if unreachable != "" {
-		return nil, errProviderUnreachable(ctx, unreachable, call.Request.Resolved)
+	creds, err := eligibleCredentials(ctx, call.Bundle.Credentials, call.Request.Resolved)
+	if err != nil {
+		return nil, err
 	}
 	if len(creds) == 0 {
 		return nil, errNoProviderConfigured(ctx)
@@ -283,25 +280,6 @@ func (a *App) dispatchProvider(call *pipeline.Call, creds []domain.Credential, e
 func errNoProviderConfigured(ctx context.Context) error {
 	return herr.New(ctx, domain.ErrNoProviderConfigured, herr.M{
 		"message": "no model provider configured for this organization — add a provider API key in Settings → Model Providers",
-	})
-}
-
-// errProviderUnreachable answers a request that named a provider this key has
-// no credential for. Separate copy from errNoProviderConfigured: the
-// organization does have providers, so "add a provider API key" is the wrong
-// thing to tell someone whose real choice is to name a different model.
-func errProviderUnreachable(
-	ctx context.Context,
-	provider domain.ProviderID,
-	resolved *domain.ResolvedModel,
-) error {
-	message := "this key cannot reach any " + string(provider) + " provider"
-	if resolved != nil && resolved.ModelID != "" {
-		message += `, so it cannot serve "` + resolved.ModelID + `"`
-	}
-	return herr.New(ctx, domain.ErrNoProviderConfigured, herr.M{
-		"message": message,
-		"fault":   "customer",
 	})
 }
 

@@ -15,7 +15,9 @@
  *   3. `langy:create` ceiling         → else 403
  *   4. key owns an actor + has Langy  → else 403
  *   5. actor row still exists         → else 403
- *   6. shared `startConversationTurn` → 202
+ *   6. shared `startConversationTurn` → 202 — or, with `Prefer: wait=<seconds>`
+ *      (RFC 7240), a 200 carrying the assistant's reply once the turn settles
+ *      on the durable fold, degrading to the same 202 when the wait expires.
  *
  * The flag is checked AFTER authentication as a deliberate choice, NOT because
  * it is impossible to check earlier. Rollback is staged per project, so the
@@ -97,6 +99,7 @@ import {
 import type { LangyChatMessageInput } from "~/server/app-layer/langy/langy-turn.service";
 import { resolveLangyActorSession } from "~/server/app-layer/langy/langyApiKeyActorSession";
 import { resolveLangyKeyIdentity } from "~/server/app-layer/langy/langyApiKeyIdentity";
+import { awaitTurnSettlement } from "~/server/app-layer/langy/streaming/awaitTurnSettlement";
 import { prisma } from "~/server/db";
 import { featureFlagService } from "~/server/featureFlag";
 import { bodyLimit } from "./_lib/body-limit";
@@ -130,11 +133,25 @@ const secured = createServiceApp({
   errorEnvelope: "canonical",
 });
 
-/** One user turn on the wire. Parts stay opaque; the app layer bounds them. */
-const messageSchema = z.object({
-  role: z.enum(["user", "assistant", "system"]),
-  parts: z.array(z.record(z.string(), z.unknown())).default([]),
-});
+/**
+ * One user turn on the wire. Parts stay opaque; the app layer bounds them.
+ *
+ * `content` is the plain-text shorthand a generic HTTP client (a script, a
+ * scenario HTTP agent's body template) can produce without restructuring its
+ * own message shape; it normalizes to a single text part. When both are sent,
+ * `parts` wins — it is the richer form.
+ */
+const messageSchema = z
+  .object({
+    role: z.enum(["user", "assistant", "system"]),
+    parts: z.array(z.record(z.string(), z.unknown())).optional(),
+    content: z.string().optional(),
+  })
+  .transform(({ role, parts, content }) => ({
+    role,
+    parts:
+      parts ?? (content === undefined ? [] : [{ type: "text", text: content }]),
+  }));
 
 const turnBodySchema = z.object({
   messages: z.array(messageSchema).min(1),
@@ -225,6 +242,25 @@ async function authorizeTurn(c: Context) {
 }
 
 /**
+ * `Prefer: wait=<seconds>` (RFC 7240) opts a caller into synchronous delivery:
+ * the request is held until the turn settles and the assistant's reply comes
+ * back in the body. The ceiling exists because this connection crosses an
+ * ingress with its own idle timeout; a caller asking for more simply gets the
+ * ceiling (RFC 7240 §3: a preference is not a contract), and on expiry the
+ * response degrades to the exact 202 the async path returns.
+ */
+const MAX_WAIT_SECONDS = 120;
+
+function requestedWaitSeconds(c: Context): number | null {
+  const prefer = c.req.header("prefer");
+  if (!prefer) return null;
+  // RFC 7240 §2: the value may be a token or a quoted-string (`wait="30"`).
+  const match = /(?:^|[,;\s])wait="?(\d{1,4})"?/i.exec(prefer);
+  if (!match?.[1]) return null;
+  return Math.min(Number(match[1]), MAX_WAIT_SECONDS);
+}
+
+/**
  * Start or continue a turn.
  *
  * Nothing is caught. A domain `HandledError` already carries the status, code
@@ -260,6 +296,48 @@ async function startTurn({
     turnContext: {},
   });
   auth.markUsed();
+
+  // `Prefer: wait=<seconds>` holds the connection until the turn settles and
+  // returns the assistant's reply in the body — the synchronous mode a plain
+  // HTTP client (or a scenario HTTP agent) needs, since this surface has no
+  // public poll or stream endpoint yet. On timeout the response degrades to
+  // the 202 below, indistinguishable from never having asked.
+  const waitSeconds = requestedWaitSeconds(c);
+  if (waitSeconds && waitSeconds > 0) {
+    // Client disconnect and the wait deadline are one signal: an abandoned
+    // hold stops consuming fold reads (and its blocking Redis read) at once.
+    const settlement = await awaitTurnSettlement({
+      projectId: auth.projectId,
+      conversationId: result.conversationId,
+      turnId: result.turnId,
+      userId: auth.session.user.id,
+      signal: AbortSignal.any([
+        c.req.raw.signal,
+        AbortSignal.timeout(waitSeconds * 1000),
+      ]),
+    });
+    if (settlement) {
+      // RFC 7240 §3: echo the applied value — it is how a caller asking for
+      // more than MAX_WAIT_SECONDS learns what they actually got.
+      c.header("Preference-Applied", `wait=${waitSeconds}`);
+      // 200 even when the turn itself failed: the REQUEST succeeded — it was
+      // authorized, accepted and settled — and `status`/`error` carry the
+      // turn's own outcome. Failure here is a domain result, not a transport
+      // refusal.
+      return c.json(
+        {
+          ...result,
+          status: settlement.outcome,
+          error: settlement.error,
+          reply: settlement.succeeded
+            ? { role: "assistant" as const, text: settlement.text }
+            : null,
+        },
+        200,
+      );
+    }
+  }
+
   // 202, not 200: the turn is accepted and dispatched, and the assistant's
   // answer does not exist yet. The caller polls or streams for it.
   return c.json(result, 202);

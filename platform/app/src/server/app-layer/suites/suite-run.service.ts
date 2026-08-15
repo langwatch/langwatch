@@ -4,6 +4,7 @@ import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseCli
 import type { QueueRunCommandData } from "~/server/event-sourcing/pipelines/simulation-processing/schemas/commands";
 import type { SuiteRunStateData } from "~/server/event-sourcing/pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
 import type { StartSuiteRunCommandData } from "~/server/event-sourcing/pipelines/suite-run-processing/schemas/commands";
+import type { RunParameterValues } from "~/server/scenarios/parameters";
 import { generateBatchRunId } from "~/server/scenarios/scenario.ids";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -42,6 +43,17 @@ export type SuiteRunTarget = {
   type: "http" | "prompt" | "code" | "workflow";
   referenceId: string;
 };
+
+/**
+ * The `parameters` entry for a queued run's metadata, or nothing at all when
+ * the run resolved none. A run without parameters records the metadata it
+ * always did rather than an empty object nothing reads.
+ */
+function withParameters(
+  parameters: RunParameterValues | undefined,
+): { parameters: RunParameterValues } | Record<string, never> {
+  return parameters && Object.keys(parameters).length > 0 ? { parameters } : {};
+}
 
 export class SuiteRunService {
   constructor(
@@ -88,6 +100,13 @@ export class SuiteRunService {
     skippedArchived: SuiteRunResult["skippedArchived"];
     idempotencyKey: string;
     batchRunId?: string;
+    /**
+     * The values each scenario resolved for this run, keyed by scenario id.
+     * Recorded on the queued event so the run reads back with the values it
+     * actually ran against, and so the executor gets them without a second
+     * resolution pass reaching a different answer.
+     */
+    parametersByScenarioId?: Map<string, RunParameterValues>;
   }): Promise<SuiteRunResult> {
     const {
       suiteId,
@@ -98,6 +117,7 @@ export class SuiteRunService {
       repeatCount,
       skippedArchived,
       idempotencyKey,
+      parametersByScenarioId,
     } = params;
 
     const batchRunId = params.batchRunId ?? generateBatchRunId();
@@ -164,6 +184,7 @@ export class SuiteRunService {
           name: scenarioNameMap.get(item.scenarioId),
           metadata: {
             langwatch: { targetReferenceId: item.target.referenceId },
+            ...withParameters(parametersByScenarioId?.get(item.scenarioId)),
           },
           target: {
             type: item.target.type,

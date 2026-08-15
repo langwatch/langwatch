@@ -308,7 +308,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/guardrails.feature",
   "specs/ai-gateway/health-checks.feature",
   "specs/ai-gateway/license-gate-governance.feature",
-  "specs/ai-gateway/model-provider-scoping.feature",
   "specs/ai-gateway/payload-capture.feature",
   "specs/ai-gateway/prometheus-metrics.feature",
   "specs/ai-gateway/rate-limits.feature",

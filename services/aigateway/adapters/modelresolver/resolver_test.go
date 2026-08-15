@@ -48,6 +48,15 @@ func TestResolve_ExplicitFormat_NormalizedProviders(t *testing.T) {
 		{"google_vertex", "google_vertex/m", domain.ProviderVertex, "m"},
 		{"aws_bedrock", "aws_bedrock/m", domain.ProviderBedrock, "m"},
 		{"google_gemini", "google_gemini/m", domain.ProviderGemini, "m"},
+		// LiteLLM's spelling, and the one most SDKs emit. The credential
+		// side has always normalized it; this side had not, so a caller
+		// with a working Vertex credential resolved to a provider that
+		// matched none of their credentials.
+		{"vertex_ai", "vertex_ai/gemini-2.5-flash", domain.ProviderVertex, "gemini-2.5-flash"},
+		{"azure", "azure/m", domain.ProviderAzure, "m"},
+		{"bedrock", "bedrock/m", domain.ProviderBedrock, "m"},
+		{"vertex", "vertex/m", domain.ProviderVertex, "m"},
+		{"openai_codex", "openai_codex/m", domain.ProviderOpenAICodex, "m"},
 	}
 
 	r := New()
