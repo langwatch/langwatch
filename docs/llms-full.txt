@@ -7940,7 +7940,7 @@ Copilot Studio, Cowork, Workato, …) fits.
 
 ---
 title: "Personal IDE keys: your AI tools, governed by your company"
-description: Install LangWatch, run `langwatch login`, and use Claude Code / Cursor / Codex with org-attributed spend, a personal monthly budget, and zero per-tool config.
+description: Install LangWatch, run `langwatch login`, and use Claude Code / Cursor / Codex with org-attributed spend, a personal budget, and no per-tool configuration.
 sidebarTitle: Personal keys
 ---
 
@@ -7960,7 +7960,7 @@ Your IT or platform team gives you Claude Code, Cursor, Codex, and
 Gemini CLI, and asks for four things in return:
 
 - **Per-user spend attribution** so finance can stop staring at unnamed Anthropic invoices
-- **A personal monthly budget** so a runaway recursive prompt at 3 AM Saturday doesn't burn $10k overnight
+- **A personal budget** for the period your admin configures (monthly or weekly) so a runaway recursive prompt at 3 AM Saturday doesn't burn $10k overnight
 - **Audit trail** for SOC 2 / ISO 27001 / HIPAA / EU AI Act
 - **Zero-config provider setup**: your IT team wired up Anthropic + OpenAI + Gemini at the org level, and you inherit them
 
@@ -7977,8 +7977,8 @@ governed by your company's policy.
 - A personal dashboard at <code>https://app.langwatch.ai/me</code>
   showing your spending, requests, most-used models, and recent
   activity
-- Budget enforcement at the gateway: if you go over your monthly
-  cap, the request fails fast with an actionable error
+- Budget enforcement at the gateway: if you go over that cap, the
+  request fails fast with an actionable error
 
 ## Setup
 
@@ -39164,7 +39164,7 @@ LangWatch provides a library of evaluation metrics out of the box.
 
   ### Python
 
-Use `evaluation.run()` with pre-built evaluators:
+Use `evaluation.evaluate()` with pre-built evaluators:
 
 ```python
 for index, row in evaluation.loop(df.iterrows()):
@@ -40143,7 +40143,7 @@ By default Comparison shuffles candidate order deterministically (seeded per row
 2. The judge picks the single best candidate, or a tie if none is clearly better and ties are allowed.
 3. The verdict is mapped back to the winning candidate's real identifier before it's shown to you, never the shuffled slot position.
 
-One comparison covers every variant at once, however many there are, instead of a round of one-against-one matchups. The judge is asked twice per row, the second time with the candidate order reversed, and a row whose two answers disagree is recorded with no winner rather than as a tie: an answer that flips when the order flips has not separated the candidates.
+One comparison covers every variant at once, however many there are, instead of a round of one-against-one matchups. With `swap_and_reconcile` on (the default), the judge is asked twice per row, the second time with the candidate order reversed, and a row whose two answers disagree is recorded with no winner rather than as a tie: an answer that flips when the order flips has not separated the candidates.
 
 The verdict names the winning candidate's own identifier (for a prompt variant, its prompt handle) rather than a generic slot label. The details include the judge's reasoning so you can inspect why a row went the way it did.
 

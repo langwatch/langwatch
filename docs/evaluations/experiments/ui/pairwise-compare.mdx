@@ -64,7 +64,7 @@ By default Comparison shuffles candidate order deterministically (seeded per row
 2. The judge picks the single best candidate, or a tie if none is clearly better and ties are allowed.
 3. The verdict is mapped back to the winning candidate's real identifier before it's shown to you, never the shuffled slot position.
 
-One comparison covers every variant at once, however many there are, instead of a round of one-against-one matchups. The judge is asked twice per row, the second time with the candidate order reversed, and a row whose two answers disagree is recorded with no winner rather than as a tie: an answer that flips when the order flips has not separated the candidates.
+One comparison covers every variant at once, however many there are, instead of a round of one-against-one matchups. With `swap_and_reconcile` on (the default), the judge is asked twice per row, the second time with the candidate order reversed, and a row whose two answers disagree is recorded with no winner rather than as a tie: an answer that flips when the order flips has not separated the candidates.
 
 The verdict names the winning candidate's own identifier (for a prompt variant, its prompt handle) rather than a generic slot label. The details include the judge's reasoning so you can inspect why a row went the way it did.
 
