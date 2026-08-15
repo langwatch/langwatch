@@ -24,9 +24,9 @@ import {
   matchModelCostWithFallbacks,
 } from "~/server/tracer/collector/cost";
 import { getStaticModelCosts } from "../llmModelCost";
-import { llmModels, overlayOverriddenModelIds } from "../loadModelCatalog";
 import * as overlayRaw from "../llmModels.overlay.json";
 import type { LLMModelEntry } from "../llmModels.types";
+import { llmModels, overlayOverriddenModelIds } from "../loadModelCatalog";
 
 const overlayModels = (
   overlayRaw as unknown as { models: Record<string, LLMModelEntry> }
@@ -142,7 +142,9 @@ describe("catalog price coverage", () => {
           const entry = llmModels.models[id];
           return !entry || pricedUnits(entry).size === 0;
         });
-        expect(stillUnpriced.sort()).toEqual(Object.keys(KNOWN_UNPRICED).sort());
+        expect(stillUnpriced.sort()).toEqual(
+          Object.keys(KNOWN_UNPRICED).sort(),
+        );
       });
     });
 
@@ -164,7 +166,9 @@ describe("catalog price coverage", () => {
             ...ONE_OF_EVERYTHING,
           });
           if (!cost || cost <= 0) {
-            zeroRated.push(`${id} (matched ${matched.model}, rated ${cost ?? 0})`);
+            zeroRated.push(
+              `${id} (matched ${matched.model}, rated ${cost ?? 0})`,
+            );
           }
         }
 
