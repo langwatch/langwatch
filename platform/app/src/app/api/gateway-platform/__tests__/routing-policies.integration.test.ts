@@ -10,6 +10,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { RoutingPolicyScopeType } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 import { app } from "../[[...route]]/app";
+import { createTestApp } from "~/server/app-layer/presets";
+import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
+import { ENTERPRISE_TEST_PLAN } from "~/test-utils/managementApiOrg";
 
 const jsonHeaders = { "Content-Type": "application/json" };
 
@@ -42,6 +46,16 @@ let projectApiKey: string;
 let foreignProjectApiKey: string;
 
 beforeAll(async () => {
+  // Routing policies are Enterprise-gated on every route, and this suite is about
+  // the family's behavior, not the gate, so the fixture organization is
+  // entitled. The gate's own coverage lives in the enterprise-gate tests.
+  await resetApp();
+  globalForApp.__langwatch_app = createTestApp({
+    planProvider: PlanProviderService.create({
+      getActivePlan: async () => ENTERPRISE_TEST_PLAN,
+    }),
+  });
+
   // Setup organizations and teams
   await prisma.organization.create({
     data: {
@@ -360,7 +374,8 @@ afterAll(async () => {
 
     expect(response.status).toBe(404);
     const body = await response.json();
-    expect(body).toHaveProperty("code", "routing_policy_not_found");
+    console.log("DEBUG: Response body:", JSON.stringify(body, null, 2));
+    expect(body.error).toHaveProperty("code", "routing_policy_not_found");
   });
 
   it("returns 404 for a sibling project's private policy", async () => {
@@ -374,7 +389,7 @@ afterAll(async () => {
 
     expect(response.status).toBe(404);
     const body = await response.json();
-    expect(body).toHaveProperty("code", "routing_policy_not_found");
+    expect(body.error).toHaveProperty("code", "routing_policy_not_found");
   });
 
   it("returns 404 for a non-existent policy id", async () => {
@@ -388,6 +403,6 @@ afterAll(async () => {
 
     expect(response.status).toBe(404);
     const body = await response.json();
-    expect(body).toHaveProperty("code", "routing_policy_not_found");
+    expect(body.error).toHaveProperty("code", "routing_policy_not_found");
   });
 });

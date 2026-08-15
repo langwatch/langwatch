@@ -37,6 +37,7 @@ import {
 } from "~/server/api/idempotency";
 import { RoutingPolicyService } from "@ee/governance/services/routingPolicy.service";
 import { requireEnterprisePlanRest } from "~/app/api/middleware/enterprise-gate";
+import { type Organization } from "~/generated/prisma/client";
 import { apiKeyPermission, createProjectApp } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { getApp } from "~/server/app-layer/app";
@@ -2375,6 +2376,37 @@ function machineActorForProject(projectId: string): string {
 const enterpriseGate = requireEnterprisePlanRest("ROUTING_POLICIES");
 
 /**
+ * Middleware that fetches the organization from the resolved token and puts it on the context.
+ * This is needed for the enterprise gate to work with project-scoped apps.
+ */
+async function addOrganizationToContext(c: any, next: () => Promise<void>) {
+  const resolvedToken = c.get("resolvedToken") as any;
+  if (!resolvedToken) {
+    throw new Error("No resolved token found on context");
+  }
+  
+  let organizationId: string;
+  if (resolvedToken.type === "legacyProjectKey") {
+    organizationId = resolvedToken.project.team.organizationId;
+  } else if (resolvedToken.type === "apiKey") {
+    organizationId = resolvedToken.organizationId;
+  } else {
+    throw new Error("Unsupported token type: " + resolvedToken.type);
+  }
+  
+  const organization = await prisma.organization.findUnique({
+    where: { id: organizationId },
+  });
+  
+  if (!organization) {
+    throw new Error("Organization not found");
+  }
+  
+  c.set("organization", organization);
+  await next();
+}
+
+/**
  * Map a full RoutingPolicy row onto the five-field REST summary.
  * Strips scopes, modelProviderIds, modelAliases, modelAllowlist,
  * policyRules, organizationId, createdAt/updatedAt — nothing but
@@ -2400,6 +2432,7 @@ secured
   .access(apiKeyPermission("routingPolicies:view"))
   .get(
     "/routing-policies",
+    addOrganizationToContext,
     enterpriseGate,
     describeRoute({
       summary: "List routing policies",
@@ -2446,6 +2479,7 @@ secured
   .access(apiKeyPermission("routingPolicies:view"))
   .get(
     "/routing-policies/:id",
+    addOrganizationToContext,
     enterpriseGate,
     describeRoute({
       summary: "Get routing policy",
@@ -2476,16 +2510,16 @@ secured
       const organizationId = await orgIdForProject(project.id);
       const service = new RoutingPolicyService(prisma);
       const policy = await service.findById(id);
-      if (!policy || policy.organizationId !== organizationId) {
-        // Collapse "not found" + "found-but-wrong-org" into the same 404:
-        // findById carries no tenancy filter, so a foreign org's id must
-        // NOT leak existence here.
-        return errorResponse(c, {
-          status: 404,
-          code: "routing_policy_not_found",
-          message: `routing policy ${id} not found`,
-        });
-      }
+     if (!policy || policy.organizationId !== organizationId) {
+      // Collapse "not found" + "found-but-wrong-org" into the same 404:
+      // findById carries no tenancy filter, so a foreign org's id must
+      // NOT leak existence here.
+      return errorResponse(c, {
+        status: 404,
+        code: "routing_policy_not_found",
+        message: `routing policy ${id} not found`,
+      });
+    }
       // Explicit scope authorization: a policy in this org is only visible
       // if selectable from the project's cascade (PROJECT, the project's
       // TEAM, or the ORG). A sibling-project or a sibling-team policy
@@ -2497,7 +2531,7 @@ secured
             ? s.scopeType === RoutingPolicyScopeType.TEAM && s.scopeId === project.teamId
             : s.scopeType === RoutingPolicyScopeType.PROJECT && s.scopeId === project.id,
       );
-      if (!visible) {
+       if (!visible) {
         return errorResponse(c, {
           status: 404,
           code: "routing_policy_not_found",
