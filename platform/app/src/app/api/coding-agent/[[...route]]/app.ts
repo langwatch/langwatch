@@ -8,6 +8,7 @@ import { getApp } from "~/server/app-layer/app";
 import { MAX_SESSION_EVENTS_PAGE_SIZE } from "~/server/app-layer/coding-agent/coding-agent-session.service";
 import type { SessionEventsCursor } from "~/server/app-layer/coding-agent/repositories/coding-agent-session-events.repository";
 import { GithubPullRequestNotMappedError } from "~/server/app-layer/github/errors";
+import { getGithubHost } from "~/server/app-layer/github/githubHost";
 import { resolveCallerProjectScope } from "~/server/organizations/resolveCallerProjectScope";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
@@ -336,8 +337,16 @@ const usageQuerySchema = z.object({
     message: "repository must be owner/name",
   }),
   pullRequest: z.coerce.number().int().positive(),
-  /** Defaults to github.com, the only host the mapping covers today. */
-  host: z.string().min(1).default("github.com"),
+  /**
+   * Defaults to the GitHub host this instance is bound to, which is github.com
+   * unless an operator named an Enterprise Server. The published document
+   * states github.com, which is the default every instance has until it names
+   * another host.
+   */
+  host: z
+    .string()
+    .min(1)
+    .default(() => getGithubHost()),
 });
 
 // GET /pull-request-usage: what one pull request cost in assistant usage,

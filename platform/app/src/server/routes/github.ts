@@ -2,8 +2,9 @@
  * Hono routes for the organization's GitHub App installation flow.
  *
  * Surfaces:
- *   GET  /api/github/install: start, a session-gated redirect to
- *        github.com/apps/<slug>/installations/new with a signed state.
+ *   GET  /api/github/install: start, a session-gated redirect to the App's
+ *        public installation page on the configured GitHub host, with a signed
+ *        state.
  *   GET  /api/github/setup: GitHub's post-install redirect. Verify the
  *        signed state, record the installation against the organization it was
  *        bound to, then postMessage the opener (popup) or 302 back (redirect).
@@ -38,6 +39,7 @@ import {
 import { getApp } from "~/server/app-layer";
 import { GithubInstallationConflictError } from "~/server/app-layer/github/github-installations.service";
 import { getGithubAppConfig } from "~/server/app-layer/github/githubAppConfig";
+import { getGithubAppInstallUrl } from "~/server/app-layer/github/githubHost";
 import {
   consumeGithubInstallNonce,
   registerGithubInstallNonce,
@@ -73,7 +75,7 @@ const WEBHOOK_PUBLIC_REASON =
   "every payload is verified in-handler by its X-Hub-Signature-256 HMAC.";
 
 // /install is session-gated in-handler: it requires a logged-in user and an
-// org-membership check before signing state and redirecting to github.com.
+// org-membership check before signing state and redirecting to GitHub.
 const INSTALL_HANDLER_AUTH_REASON =
   "Install-start endpoint: requires a valid application session (checked " +
   "in-handler via getServerAuthSession) plus an org-membership check before " +
@@ -225,11 +227,7 @@ async function handleInstall(c: any): Promise<Response> {
 
   // GitHub redirects back to the App's configured Setup URL after install; the
   // signed `state` round-trips so /setup can bind the installation to the org.
-  const url = new URL(
-    `https://github.com/apps/${encodeURIComponent(
-      config.appSlug,
-    )}/installations/new`,
-  );
+  const url = new URL(getGithubAppInstallUrl(config.appSlug));
   url.searchParams.set("state", state);
   return c.redirect(url.toString(), 302);
 }
@@ -570,11 +568,13 @@ secured
   .access(publicEndpoint(WEBHOOK_PUBLIC_REASON))
   .post("/github/webhook", handleWebhook);
 
-// The GitHub App configuration on github.com points its Setup URL and its
-// webhook delivery at the legacy paths, so both stay mounted on the same
-// handlers until that configuration is flipped to the canonical paths above.
-// Removing these two mounts is a tracked follow-up. /install needs no alias: it
-// is ours to call, and every caller in this repo uses the canonical path.
+// `/api/github-langy/setup` and `/api/github-langy/webhook` are an external
+// contract, held by two sets of App registrations: the hosted App, and every
+// self-hosted App an operator registered while the documentation named these
+// paths. Both point their Setup URL and their webhook delivery here, so the
+// aliases stay mounted on the same handlers until there is a deprecation path
+// that can move a registration we do not own. /install needs no alias: it is
+// ours to call, and every caller in this repo uses the canonical path.
 secured
   .access(publicEndpoint(SETUP_PUBLIC_REASON))
   .get("/github-langy/setup", handleSetup);

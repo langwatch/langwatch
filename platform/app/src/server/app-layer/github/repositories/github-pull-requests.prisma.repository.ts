@@ -325,6 +325,16 @@ export class PrismaGithubPullRequestsRepository
     return record ? toBranchCheckRow(record) : null;
   }
 
+  /**
+   * The bookkeeping write. `lastRequestedAt` is the one column a caller may
+   * decline to write: null leaves whatever demand is stored, which is what
+   * keeps the sweep from renewing the signal it selects on.
+   *
+   * A create still needs a value, because the column is not nullable, so it
+   * falls back to `lastCheckedAt`, the same instant. That only applies to a
+   * row a sweep somehow creates, and the sweep reads its branches off rows that
+   * already exist, so in practice every create comes from demand.
+   */
   async upsertBranchCheck(input: UpsertGithubBranchCheckInput): Promise<void> {
     const repositoryFullName = normalizeFullName(input.repositoryFullName);
     const bookkeeping = {
@@ -333,7 +343,6 @@ export class PrismaGithubPullRequestsRepository
       notFoundAt: input.notFoundAt,
       recheckAfter: input.recheckAfter,
       attempts: input.attempts,
-      lastRequestedAt: input.lastRequestedAt,
     };
     await this.prisma.githubBranchPullRequestCheck.upsert({
       where: {
@@ -350,8 +359,11 @@ export class PrismaGithubPullRequestsRepository
         repositoryFullName,
         headBranch: input.headBranch,
         ...bookkeeping,
+        lastRequestedAt: input.lastRequestedAt ?? input.lastCheckedAt,
       },
-      update: bookkeeping,
+      update: input.lastRequestedAt
+        ? { ...bookkeeping, lastRequestedAt: input.lastRequestedAt }
+        : bookkeeping,
     });
   }
 
@@ -369,6 +381,10 @@ export class PrismaGithubPullRequestsRepository
    * Both concurrent callers reach the same conflict target; Postgres serializes
    * them on the unique index, so the second evaluates its predicate against the
    * first's committed row and updates zero rows.
+   *
+   * `shouldRecordDemand` picks whether the conflict path refreshes
+   * `lastRequestedAt` or keeps the stored value. A CASE rather than two
+   * statements, so the claim stays the one write it has to be.
    */
   async claimBranchLookup({
     organizationId,
@@ -378,6 +394,7 @@ export class PrismaGithubPullRequestsRepository
     now,
     freshMappingMs,
     leaseMs,
+    shouldRecordDemand,
   }: {
     organizationId: string;
     repositoryHost: string;
@@ -386,6 +403,7 @@ export class PrismaGithubPullRequestsRepository
     now: Date;
     freshMappingMs: number;
     leaseMs: number;
+    shouldRecordDemand: boolean;
   }): Promise<boolean> {
     const fullName = normalizeFullName(repositoryFullName);
     const host = normalizeHost(repositoryHost);
@@ -412,7 +430,10 @@ export class PrismaGithubPullRequestsRepository
       ON CONFLICT ("organizationId", "repositoryHost", "repositoryFullName", "headBranch")
       DO UPDATE SET
         "recheckAfter" = ${leaseUntil}::timestamp,
-        "lastRequestedAt" = ${at}::timestamp,
+        "lastRequestedAt" = CASE
+          WHEN ${shouldRecordDemand}::boolean THEN ${at}::timestamp
+          ELSE "GithubBranchPullRequestCheck"."lastRequestedAt"
+        END,
         "updatedAt" = ${at}::timestamp
       WHERE
         ("GithubBranchPullRequestCheck"."recheckAfter" IS NULL
@@ -509,9 +530,10 @@ export class PrismaGithubPullRequestsRepository
   }
 
   /**
-   * The retention prune. Two statements, in this order: the branch bookkeeping
-   * past the horizon, then the pull requests whose branch no longer has a row
-   * at all. Reversing them would leave a pull request orphaned for a day.
+   * The retention prune: the branch bookkeeping past the horizon, and nothing
+   * else. `GithubPullRequest` rows are kept for good, because they are the
+   * answer the Pull Requests page reads and their count is bounded by the pull
+   * requests the organization actually opened.
    *
    * Raw SQL, with the `-- @tenancy:` opt-out every other retention sweep in the
    * platform uses. Retention is system-owned maintenance and cannot name an
@@ -519,15 +541,13 @@ export class PrismaGithubPullRequestsRepository
    * a delete per tenant, which is a query per tenant to do one table scan's
    * work.
    *
-   * Both are single unbounded DELETEs over a predicate with no index of its
-   * own, and that is the deliberate trade: this runs once a day, while an index
-   * to serve it would be paid on every write to a table that takes a row per
-   * agent branch. Measured on 200k rows: 254 ms for the branch checks, 32 ms
-   * for the anti-join (which does use the branch table's unique index).
+   * One unbounded DELETE over a predicate with no index of its own, and that is
+   * the deliberate trade: this runs once a day, while an index to serve it
+   * would be paid on every write to a table that takes a row per agent branch.
+   * Measured on 200k rows: 254 ms.
    */
   async deleteStaleBefore({ before }: { before: Date }): Promise<{
     branchChecks: number;
-    pullRequests: number;
   }> {
     const cutoff = toPgTimestampUtc(before);
     const branchChecks = await this.prisma.$executeRaw`
@@ -535,17 +555,6 @@ export class PrismaGithubPullRequestsRepository
       WHERE "lastRequestedAt" < ${cutoff}::timestamp
       -- @tenancy: GitHub branch bookkeeping retention sweep (system-owned maintenance)
     `;
-    const pullRequests = await this.prisma.$executeRaw`
-      DELETE FROM "GithubPullRequest" pr
-      WHERE NOT EXISTS (
-        SELECT 1 FROM "GithubBranchPullRequestCheck" bc
-        WHERE bc."organizationId" = pr."organizationId"
-          AND bc."repositoryHost" = pr."repositoryHost"
-          AND bc."repositoryFullName" = pr."repositoryFullName"
-          AND bc."headBranch" = pr."headBranch"
-      )
-      -- @tenancy: GitHub pull-request retention sweep (system-owned maintenance)
-    `;
-    return { branchChecks, pullRequests };
+    return { branchChecks };
   }
 }

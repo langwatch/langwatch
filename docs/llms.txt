@@ -615,7 +615,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 - [Self-Hosting Langy](https://langwatch.ai/docs/self-hosting/langy/overview.md): Requirements and architecture for running Langy on your own Kubernetes cluster, including the separate agent pod and the gVisor requirement.
 - [Langy Assistant](https://langwatch.ai/docs/self-hosting/langy/setup.md): Run LangWatch's in-product AI assistant on your own cluster
-- [Register the Langy GitHub App](https://langwatch.ai/docs/self-hosting/langy/github-app.md): Deployment-time guide for the GitHub App that lets Langy open bot-authored pull requests, covering registration, permissions, the GITHUB_LANGY env vars, install, verify, and disconnect.
+- [Register the GitHub App](https://langwatch.ai/docs/self-hosting/langy/github-app.md): Deployment-time guide for the GitHub App the organization connects, covering registration, permissions, the GITHUB_LANGY env vars, GitHub Enterprise Server, restricted networks, install, verify, and disconnect.
 - [Langy Environment Variables](https://langwatch.ai/docs/self-hosting/langy/environment-variables.md): The environment variable reference for the Langy agent pod and its control-plane integration, grouped by core, workers, egress, mirror lane, and GitHub.
 - [Langy Networking and Egress](https://langwatch.ai/docs/self-hosting/langy/networking-and-egress.md): The NetworkPolicy and L7 egress adapter that govern what the Langy agent pod can reach, the GitHub FQDN floor, and the cooperative-vs-mandatory enforcement limit.
 

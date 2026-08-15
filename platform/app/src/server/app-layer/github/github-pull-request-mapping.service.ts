@@ -28,6 +28,11 @@ import {
   GithubRateLimitedError,
 } from "./githubAppToken";
 import {
+  getGithubHost,
+  isMappableGithubHost,
+  normalizeGithubHost,
+} from "./githubHost";
+import {
   type GithubPullRequestEvent,
   LINKING_PULL_REQUEST_ACTIONS,
 } from "./githubPullRequestEvent";
@@ -37,9 +42,6 @@ import type {
 } from "./repositories/github-pull-requests.repository";
 
 const logger = createLogger("langwatch:github:pull-request-mapping");
-
-/** The only host this maps. An unset host is the default one. */
-export const GITHUB_HOST = "github.com";
 
 /** How long a branch that resolved to a pull request is trusted. */
 const FRESH_MAPPING_MS = 15 * 60 * 1000;
@@ -132,6 +134,19 @@ export interface GithubPullRequestMappingServiceDeps {
   now?: () => number;
 }
 
+/**
+ * Why a branch is being mapped.
+ *
+ * `demand` means someone asked: a session folded on the branch, or an operator
+ * connected GitHub and the backfill is catching up. `sweep` means the periodic
+ * recheck picked the branch off its own due list.
+ *
+ * The distinction decides one column. `lastRequestedAt` records demand, and the
+ * sweep selects branches by it, so a sweep that wrote it would keep renewing
+ * the very signal it reads and no branch would ever leave the sweep.
+ */
+export type BranchMappingOrigin = "demand" | "sweep";
+
 /** A repository and branch, already resolved to an organization. */
 export interface BranchMappingTarget {
   organizationId: string;
@@ -139,6 +154,7 @@ export interface BranchMappingTarget {
   repositoryOwner: string;
   repositoryName: string;
   headBranch: string;
+  origin: BranchMappingOrigin;
 }
 
 /** The same, addressed by the project a session was folded under. */
@@ -148,26 +164,6 @@ export interface BranchMappingRequest {
   repositoryOwner: string;
   repositoryName: string;
   headBranch: string;
-}
-
-/**
- * An unset host means github.com; anything else is a host we do not map.
- *
- * Case-folded, because a session records whatever casing its git remote
- * carries and a host is case insensitive. A literal comparison here refuses
- * `GitHub.com` outright, so that session is never mapped at all, and every
- * reader downstream folds its host and then looks for a mapping row nothing
- * ever wrote.
- */
-export function isMappableHost(repositoryHost: string): boolean {
-  const host = repositoryHost.toLowerCase();
-  return host === "" || host === GITHUB_HOST;
-}
-
-/** The host to store: the default, spelled out and folded, so rows compare. */
-export function normalizeHost(repositoryHost: string): string {
-  const host = repositoryHost.toLowerCase();
-  return host === "" ? GITHUB_HOST : host;
 }
 
 /**
@@ -206,7 +202,7 @@ export class GithubPullRequestMappingService {
    * mapping can fix.
    */
   async requestBranchMapping(request: BranchMappingRequest): Promise<void> {
-    if (!isMappableHost(request.repositoryHost)) return;
+    if (!isMappableGithubHost(request.repositoryHost)) return;
     const organizationId = await this.deps.resolveOrganizationId(
       request.tenantId,
     );
@@ -217,6 +213,7 @@ export class GithubPullRequestMappingService {
       repositoryOwner: request.repositoryOwner,
       repositoryName: request.repositoryName,
       headBranch: request.headBranch,
+      origin: "demand",
     };
     // This entry point, and only this one, means a session just folded on the
     // branch. The sweep and the backfill call `mapBranch` directly and carry no
@@ -297,8 +294,9 @@ export class GithubPullRequestMappingService {
 
     const scope = branchScopeFor({
       organizationId: installation.organizationId,
-      // The App is a github.com App, so a delivery can only ever be about it.
-      repositoryHost: GITHUB_HOST,
+      // The App is registered on one GitHub, so a delivery can only ever be
+      // about that one.
+      repositoryHost: getGithubHost(),
       repositoryOwner: event.repositoryOwner,
       repositoryName: event.repositoryName,
       headBranch: event.headBranch,
@@ -309,6 +307,9 @@ export class GithubPullRequestMappingService {
       scope,
       pullRequests: [event.pullRequest],
       isExhaustive: false,
+      // A delivery says a person just acted on the branch, which is demand by
+      // the same reading a fold is.
+      origin: "demand",
     });
     return true;
   }
@@ -333,7 +334,7 @@ export class GithubPullRequestMappingService {
     // immediately.
     if (!covering) return;
 
-    if (!(await this.claimLookup(scope))) return;
+    if (!(await this.claimLookup({ scope, origin: target.origin }))) return;
 
     try {
       const pullRequests = await this.deps.appTokens.listPullRequestsForHead({
@@ -343,9 +344,14 @@ export class GithubPullRequestMappingService {
         repo: target.repositoryName,
         branch: scope.headBranch,
       });
-      await this.recordAnswer({ scope, pullRequests, isExhaustive: true });
+      await this.recordAnswer({
+        scope,
+        pullRequests,
+        isExhaustive: true,
+        origin: target.origin,
+      });
     } catch (error) {
-      await this.recordFailure({ scope, error });
+      await this.recordFailure({ scope, error, origin: target.origin });
     }
   }
 
@@ -444,7 +450,7 @@ export class GithubPullRequestMappingService {
     organizationId: string;
     session: BackfillSessionRow;
   }): BranchMappingTarget | null {
-    if (!isMappableHost(session.repositoryHost)) return null;
+    if (!isMappableGithubHost(session.repositoryHost)) return null;
     if (
       !session.repositoryOwner ||
       !session.repositoryName ||
@@ -454,10 +460,13 @@ export class GithubPullRequestMappingService {
     }
     return {
       organizationId,
-      repositoryHost: normalizeHost(session.repositoryHost),
+      repositoryHost: normalizeGithubHost(session.repositoryHost),
       repositoryOwner: session.repositoryOwner,
       repositoryName: session.repositoryName,
       headBranch: session.gitBranch,
+      // An operator connecting GitHub is asking for these branches, as plainly
+      // as a fold does.
+      origin: "demand",
     };
   }
 
@@ -488,16 +497,28 @@ export class GithubPullRequestMappingService {
    * other, both read "nothing stored yet", and both call GitHub. Whichever
    * caller loses the claim still keeps the branch inside the sweep's activity
    * window, throttled — that touch is the whole reason a skip writes at all.
+   *
+   * Both writes carry the origin, so only a caller acting on demand records
+   * demand. A sweep that lost the claim writes nothing: it had no demand to
+   * record, and the caller holding the claim records its own.
    */
-  private async claimLookup(scope: BranchScope): Promise<boolean> {
+  private async claimLookup({
+    scope,
+    origin,
+  }: {
+    scope: BranchScope;
+    origin: BranchMappingOrigin;
+  }): Promise<boolean> {
     const now = nowMs(this.deps);
     const claimed = await this.deps.repository.claimBranchLookup({
       ...scope,
       now: new Date(now),
       freshMappingMs: FRESH_MAPPING_MS,
       leaseMs: LOOKUP_CLAIM_LEASE_MS,
+      shouldRecordDemand: origin === "demand",
     });
     if (claimed) return true;
+    if (origin !== "demand") return false;
 
     await this.deps.repository.touchBranchCheckRequestedAt({
       ...scope,
@@ -515,6 +536,7 @@ export class GithubPullRequestMappingService {
     scope,
     pullRequests,
     isExhaustive,
+    origin,
   }: {
     scope: BranchScope;
     pullRequests: readonly GithubPullRequestSummary[];
@@ -526,6 +548,7 @@ export class GithubPullRequestMappingService {
      * which is the number the freshness guard on the lookup claim reads.
      */
     isExhaustive: boolean;
+    origin: BranchMappingOrigin;
   }): Promise<void> {
     const now = new Date(nowMs(this.deps));
     if (pullRequests.length > 0) {
@@ -553,7 +576,7 @@ export class GithubPullRequestMappingService {
         ? null
         : new Date(now.getTime() + backoffMsFor(attempts)),
       attempts,
-      lastRequestedAt: now,
+      lastRequestedAt: origin === "demand" ? now : null,
     });
   }
 
@@ -571,9 +594,11 @@ export class GithubPullRequestMappingService {
   private async recordFailure({
     scope,
     error,
+    origin,
   }: {
     scope: BranchScope;
     error: unknown;
+    origin: BranchMappingOrigin;
   }): Promise<void> {
     if (!(error instanceof GithubRateLimitedError)) {
       logger.warn({ error, ...scope }, "branch pull-request mapping failed");
@@ -589,7 +614,7 @@ export class GithubPullRequestMappingService {
       notFoundAt: existing?.notFoundAt ?? null,
       recheckAfter: new Date(now.getTime() + backoffMsFor(attempts)),
       attempts,
-      lastRequestedAt: now,
+      lastRequestedAt: origin === "demand" ? now : null,
     });
   }
 }
@@ -607,14 +632,16 @@ interface BranchScope {
  * connection can answer for. Every write in this service goes through it, so
  * the host fold and the owner/name/branch completeness check happen once.
  */
-function branchScopeFor(target: BranchMappingTarget): BranchScope | null {
-  if (!isMappableHost(target.repositoryHost)) return null;
+function branchScopeFor(
+  target: Omit<BranchMappingTarget, "origin">,
+): BranchScope | null {
+  if (!isMappableGithubHost(target.repositoryHost)) return null;
   if (!target.headBranch || !target.repositoryOwner || !target.repositoryName) {
     return null;
   }
   return {
     organizationId: target.organizationId,
-    repositoryHost: normalizeHost(target.repositoryHost),
+    repositoryHost: normalizeGithubHost(target.repositoryHost),
     repositoryFullName: `${target.repositoryOwner}/${target.repositoryName}`,
     headBranch: target.headBranch,
   };

@@ -523,7 +523,8 @@ describe("branch pull-request mapping", () => {
       expect(check?.notFoundAt).toBeNull();
     });
 
-    it("leaves a branch nobody has asked about in a week out of the sweep", async () => {
+    /** @scenario "A branch with no session demand for a week leaves the sweep" */
+    it("leaves a branch with no session demand for a week out of the sweep", async () => {
       await seedInstallation();
       const { mapping } = servicesWith({
         listPullRequestsForHead: vi.fn().mockResolvedValue([]),
@@ -640,8 +641,9 @@ describe("branch pull-request mapping", () => {
   });
 
   describe("given branches on both sides of the activity horizon", () => {
-    /** @scenario "Linkage rows nobody asks about stop accumulating" */
-    it("prunes the abandoned branch and its pull requests, and keeps the live one", async () => {
+    /** @scenario "Bookkeeping for a branch outside the activity window is removed" */
+    /** @scenario "A linked pull request stays after its branch goes quiet" */
+    it("prunes the abandoned branch's bookkeeping and keeps every pull request", async () => {
       await seedInstallation();
       // A distinct pull request per branch: the stored row is unique on the
       // pull-request NUMBER, so reusing one would move it between branches
@@ -673,7 +675,6 @@ describe("branch pull-request mapping", () => {
       const pruned = await runBranchRetentionPrune({ repository });
 
       expect(pruned.branchChecks).toBe(1);
-      expect(pruned.pullRequests).toBeGreaterThanOrEqual(1);
 
       const remainingChecks =
         await prisma.githubBranchPullRequestCheck.findMany({
@@ -684,13 +685,127 @@ describe("branch pull-request mapping", () => {
         "feat/still-read",
       ]);
 
+      // Both pull requests survive, including the one whose branch went quiet.
+      // A merged pull request is exactly what the Pull Requests page is for,
+      // and its branch stops seeing folds the moment it is merged.
       const remainingPullRequests = await prisma.githubPullRequest.findMany({
         where: { organizationId },
-        select: { headBranch: true },
+        select: { headBranch: true, prNumber: true },
+        orderBy: { prNumber: "asc" },
       });
-      expect(remainingPullRequests.map((row) => row.headBranch)).toEqual([
-        "feat/still-read",
+      expect(remainingPullRequests).toEqual([
+        { headBranch: "feat/abandoned", prNumber: 51 },
+        { headBranch: "feat/still-read", prNumber: 52 },
       ]);
+    });
+
+    it("re-maps the pruned branch from GitHub when a session folds on it again", async () => {
+      await seedInstallation();
+      const listPullRequestsForHead = vi.fn().mockResolvedValue([]);
+      const { mapping } = servicesWith({ listPullRequestsForHead });
+      const request = {
+        tenantId: projectId,
+        repositoryHost: "github.com",
+        repositoryOwner: `acme-${tag}`,
+        repositoryName: "widgets",
+        headBranch: "feat/comes-back",
+      };
+      await mapping.requestBranchMapping(request);
+      await prisma.githubBranchPullRequestCheck.updateMany({
+        where: { organizationId, headBranch: "feat/comes-back" },
+        data: {
+          lastRequestedAt: new Date(Date.now() - RECHECK_ACTIVE_WITHIN_MS - 1),
+        },
+      });
+      await runBranchRetentionPrune({ repository });
+      expect(await branchCheckFor("feat/comes-back")).toBeNull();
+
+      await mapping.requestBranchMapping(request);
+
+      expect(listPullRequestsForHead).toHaveBeenCalledTimes(2);
+      expect(await branchCheckFor("feat/comes-back")).not.toBeNull();
+    });
+  });
+
+  describe("given a branch the sweep asks GitHub about", () => {
+    /**
+     * The sweep selects branches by `lastRequestedAt` and used to write it on
+     * the way past, through both the lookup claim and the answer. A branch that
+     * never gets a pull request therefore renewed its own place in the sweep
+     * and was asked about once a day for as long as the connection existed,
+     * and its bookkeeping never reached the retention horizon either.
+     */
+    /** @scenario "The sweep does not renew the demand it selects on" */
+    it("leaves the branch's last demand time exactly where the fold left it", async () => {
+      await seedInstallation();
+      const listPullRequestsForHead = vi.fn().mockResolvedValue([]);
+      const { mapping } = servicesWith({ listPullRequestsForHead });
+      await mapping.requestBranchMapping({
+        tenantId: projectId,
+        repositoryHost: "github.com",
+        repositoryOwner: `acme-${tag}`,
+        repositoryName: "widgets",
+        headBranch: "feat/swept",
+      });
+      const afterFold = await branchCheckFor("feat/swept");
+      // Due now, and last asked for six days ago: inside the sweep's window,
+      // so the pass really does pick it up.
+      const demandedAt = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000);
+      await prisma.githubBranchPullRequestCheck.updateMany({
+        where: { organizationId, headBranch: "feat/swept" },
+        data: {
+          recheckAfter: new Date(Date.now() - 1000),
+          lastRequestedAt: demandedAt,
+        },
+      });
+
+      await runBranchRecheckPass({ repository, mapping });
+
+      const afterSweep = await branchCheckFor("feat/swept");
+      // GitHub was asked again, and the ladder moved on.
+      expect(listPullRequestsForHead).toHaveBeenCalledTimes(2);
+      expect(afterSweep?.attempts).toBe((afterFold?.attempts ?? 0) + 1);
+      expect(afterSweep?.recheckAfter?.getTime()).toBeGreaterThan(Date.now());
+      // But the demand signal did not move, so the week still runs out.
+      expect(afterSweep?.lastRequestedAt.getTime()).toBe(demandedAt.getTime());
+    });
+  });
+
+  describe("given a session folding on a branch with no pull request", () => {
+    /** @scenario "A session folding on a branch records demand for it" */
+    it("moves the branch's last demand time to the time of the fold", async () => {
+      await seedInstallation();
+      const { mapping } = servicesWith({
+        listPullRequestsForHead: vi.fn().mockResolvedValue([]),
+      });
+      const request = {
+        tenantId: projectId,
+        repositoryHost: "github.com",
+        repositoryOwner: `acme-${tag}`,
+        repositoryName: "widgets",
+        headBranch: "feat/demanded",
+      };
+      await mapping.requestBranchMapping(request);
+      const staleDemand = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000);
+      // Age the demand, and let the branch out of both the claim lease and the
+      // freshness window so the next fold really performs a lookup.
+      await prisma.githubBranchPullRequestCheck.updateMany({
+        where: { organizationId, headBranch: "feat/demanded" },
+        data: {
+          lastRequestedAt: staleDemand,
+          recheckAfter: new Date(Date.now() - 1000),
+        },
+      });
+
+      await mapping.requestBranchMapping(request);
+
+      const check = await branchCheckFor("feat/demanded");
+      expect(check?.lastRequestedAt.getTime()).toBeGreaterThan(
+        staleDemand.getTime(),
+      );
+      expect(check?.lastRequestedAt.getTime()).toBeGreaterThan(
+        Date.now() - 60_000,
+      );
     });
   });
 
@@ -727,6 +842,7 @@ describe("branch pull-request mapping", () => {
         repositoryOwner: `acme-${tag}`,
         repositoryName: "widgets",
         headBranch: "feat/backed-off",
+        origin: "demand",
       });
       await armLongestBackoff("feat/backed-off");
 
@@ -752,6 +868,7 @@ describe("branch pull-request mapping", () => {
         repositoryOwner: `acme-${tag}`,
         repositoryName: "widgets",
         headBranch: "feat/backed-off",
+        origin: "demand",
       });
 
       const afterEmpty = await branchCheckFor("feat/backed-off");
@@ -836,6 +953,7 @@ describe("branch pull-request mapping", () => {
         repositoryOwner: `acme-${tag}`,
         repositoryName: "widgets",
         headBranch: "feat/two-pulls",
+        origin: "demand",
       });
       expect((await branchCheckFor("feat/two-pulls"))?.prCount).toBe(2);
 
@@ -859,6 +977,7 @@ describe("branch pull-request mapping", () => {
         repositoryOwner: `acme-${tag}`,
         repositoryName: "widgets",
         headBranch: "feat/missed-hook",
+        origin: "demand",
       });
 
       // The pull request is opened and the delivery never arrives, so only the
@@ -990,6 +1109,7 @@ describe("branch pull-request mapping", () => {
         repositoryOwner: `acme-${tag}`,
         repositoryName: "widgets",
         headBranch: "feat/slow-listing",
+        origin: "demand" as const,
       };
 
       const listing = mapping.mapBranch(target);

@@ -18,10 +18,10 @@ import { createHash, randomBytes } from "crypto";
 import jwt from "jsonwebtoken";
 
 import { GithubRepositoryNotAccessibleError } from "./errors";
+import { GITHUB_DOT_COM, getGithubApiBase, getGithubHost } from "./githubHost";
 
 const logger = createLogger("langwatch:github:app-token");
 
-const GITHUB_API = "https://api.github.com";
 const HTTP_TIMEOUT_MS = 10_000;
 
 // App JWT lifetime. GitHub caps it at 10 minutes; use 9 with a -30s backdated
@@ -275,6 +275,24 @@ export function computeRepoScopeKey({
     .slice(0, 16);
 }
 
+/**
+ * Redis key prefix for one installation's cached token and liveness marker.
+ *
+ * An installation id is unique within one GitHub, not across two. Without the
+ * host in the key, installation 42 on github.com and installation 42 on an
+ * Enterprise Server share a cache entry, and a live bearer token minted for one
+ * is handed to the other.
+ *
+ * github.com keeps the unqualified shape, so tokens cached before this existed
+ * stay valid and the default deployment sees no change at all.
+ */
+function installationCacheKeyPrefix(installationId: string): string {
+  const host = getGithubHost();
+  const hostSegment = host === GITHUB_DOT_COM ? "" : `${host}:`;
+  // The `langy:` prefix is kept so tokens cached before the deploy stay valid.
+  return `langy:gh:insttoken:${hostSegment}${installationId}`;
+}
+
 export class GithubAppTokenService {
   constructor(
     private readonly appId: string,
@@ -312,7 +330,7 @@ export class GithubAppTokenService {
     installationId: string,
   ): Promise<GithubInstallationDetails> {
     const res = await this.githubFetch(
-      `${GITHUB_API}/app/installations/${encodeURIComponent(installationId)}`,
+      `${getGithubApiBase()}/app/installations/${encodeURIComponent(installationId)}`,
       { headers: { Authorization: `Bearer ${this.signAppJwt()}` } },
     );
     if (!res.ok) {
@@ -356,8 +374,7 @@ export class GithubAppTokenService {
   private async assertInstallationStillExists(
     installationId: string,
   ): Promise<void> {
-    // The `langy:` prefix is kept so tokens cached before the deploy stay valid.
-    const markerKey = `langy:gh:insttoken:${installationId}:liveness`;
+    const markerKey = `${installationCacheKeyPrefix(installationId)}:liveness`;
     if (await this.redisGet(markerKey)) return;
 
     // Lock-guarded the same way the mint path guards its own stampede: a
@@ -391,8 +408,9 @@ export class GithubAppTokenService {
       repositoryIds: args.repositoryIds,
       permissions: args.permissions,
     });
-    // The `langy:` prefix is kept so tokens cached before the deploy stay valid.
-    const cacheKey = `langy:gh:insttoken:${args.installationId}:${scopeKey}`;
+    const cacheKey = `${installationCacheKeyPrefix(
+      args.installationId,
+    )}:${scopeKey}`;
 
     const cached = await this.redisGet(cacheKey);
     if (cached) {
@@ -459,7 +477,7 @@ export class GithubAppTokenService {
     page: number;
   }): Promise<{ id: number; full_name: string }[]> {
     const res = await this.githubFetch(
-      `${GITHUB_API}/installation/repositories?per_page=100&page=${page}`,
+      `${getGithubApiBase()}/installation/repositories?per_page=100&page=${page}`,
       { headers: { Authorization: `Bearer ${token}` } },
     );
     if (!res.ok) {
@@ -557,7 +575,7 @@ export class GithubAppTokenService {
       >,
     });
     const res = await this.githubFetch(
-      `${GITHUB_API}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}${path}`,
+      `${getGithubApiBase()}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}${path}`,
       { headers: { Authorization: `Bearer ${minted.token}` } },
     );
     if (!res.ok) {
@@ -588,7 +606,7 @@ export class GithubAppTokenService {
       payload.repository_ids = args.repositoryIds.map((id) => Number(id));
     }
     const res = await this.githubFetch(
-      `${GITHUB_API}/app/installations/${encodeURIComponent(
+      `${getGithubApiBase()}/app/installations/${encodeURIComponent(
         args.installationId,
       )}/access_tokens`,
       {
