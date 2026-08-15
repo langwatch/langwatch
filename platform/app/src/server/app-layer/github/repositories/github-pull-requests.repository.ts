@@ -217,7 +217,7 @@ export interface GithubPullRequestsRepository {
      * because of demand already recorded, and renewing it here would keep the
      * branch on that list for good.
      */
-    recordsDemand: boolean;
+    shouldRecordDemand: boolean;
   }): Promise<boolean>;
 
   /**

@@ -33,7 +33,7 @@ That is why per-worker egress control lives at L7, in a per-worker CONNECT proxy
 | In-cluster LangWatch AI Gateway | All LLM traffic (traced, budgeted, policed) | Always, in-cluster |
 | In-cluster LangWatch app | The `langwatch` CLI (per-session key) | Always, in-cluster |
 | `github.com`, `api.github.com`, `codeload.github.com` | Clone and push for pull requests | Only when egress is on |
-| `api.github.com` (from the control plane, not the worker) | Mint 1-hour installation tokens, read installation metadata, and list pull requests for a branch | Control plane |
+| `api.github.com`, or `GITHUB_LANGY_HOST` when one is set (from the control plane, not the agent pod) | Mint 1-hour installation tokens, read installation metadata, and list pull requests for a branch | Control plane |
 
 Private ranges (RFC 1918), CGNAT (`100.64.0.0/10`), and the cloud metadata service are blocked at L3/L4 regardless of the egress toggle, which is the SSRF and IMDS protection.
 

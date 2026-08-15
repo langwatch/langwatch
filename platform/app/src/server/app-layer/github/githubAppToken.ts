@@ -18,7 +18,7 @@ import { createHash, randomBytes } from "crypto";
 import jwt from "jsonwebtoken";
 
 import { GithubRepositoryNotAccessibleError } from "./errors";
-import { getGithubApiBase } from "./githubHost";
+import { GITHUB_DOT_COM, getGithubApiBase, getGithubHost } from "./githubHost";
 
 const logger = createLogger("langwatch:github:app-token");
 
@@ -275,6 +275,24 @@ export function computeRepoScopeKey({
     .slice(0, 16);
 }
 
+/**
+ * Redis key prefix for one installation's cached token and liveness marker.
+ *
+ * An installation id is unique within one GitHub, not across two. Without the
+ * host in the key, installation 42 on github.com and installation 42 on an
+ * Enterprise Server share a cache entry, and a live bearer token minted for one
+ * is handed to the other.
+ *
+ * github.com keeps the unqualified shape, so tokens cached before this existed
+ * stay valid and the default deployment sees no change at all.
+ */
+function installationCacheKeyPrefix(installationId: string): string {
+  const host = getGithubHost();
+  const hostSegment = host === GITHUB_DOT_COM ? "" : `${host}:`;
+  // The `langy:` prefix is kept so tokens cached before the deploy stay valid.
+  return `langy:gh:insttoken:${hostSegment}${installationId}`;
+}
+
 export class GithubAppTokenService {
   constructor(
     private readonly appId: string,
@@ -356,8 +374,7 @@ export class GithubAppTokenService {
   private async assertInstallationStillExists(
     installationId: string,
   ): Promise<void> {
-    // The `langy:` prefix is kept so tokens cached before the deploy stay valid.
-    const markerKey = `langy:gh:insttoken:${installationId}:liveness`;
+    const markerKey = `${installationCacheKeyPrefix(installationId)}:liveness`;
     if (await this.redisGet(markerKey)) return;
 
     // Lock-guarded the same way the mint path guards its own stampede: a
@@ -391,8 +408,9 @@ export class GithubAppTokenService {
       repositoryIds: args.repositoryIds,
       permissions: args.permissions,
     });
-    // The `langy:` prefix is kept so tokens cached before the deploy stay valid.
-    const cacheKey = `langy:gh:insttoken:${args.installationId}:${scopeKey}`;
+    const cacheKey = `${installationCacheKeyPrefix(
+      args.installationId,
+    )}:${scopeKey}`;
 
     const cached = await this.redisGet(cacheKey);
     if (cached) {

@@ -86,7 +86,7 @@ function parsed(payload: unknown) {
   return event;
 }
 
-describe("branch mapping on an Enterprise Server instance", () => {
+describe("given an instance bound to a GitHub Enterprise Server host", () => {
   beforeEach(() => {
     mockEnv.GITHUB_LANGY_HOST = GHES;
   });
@@ -115,6 +115,7 @@ describe("branch mapping on an Enterprise Server instance", () => {
   });
 
   describe("when a session reports a repository on the configured host", () => {
+    /** @scenario "A repository on the configured host is mapped" */
     it("maps the branch and keys it by that host", async () => {
       const { service, repository, listPullRequestsForHead } = serviceWith();
 
@@ -150,6 +151,7 @@ describe("branch mapping on an Enterprise Server instance", () => {
   });
 
   describe("when a session reports a github.com repository", () => {
+    /** @scenario "A repository on github.com is not mapped by an Enterprise Server instance" */
     it("asks GitHub nothing, because this instance has no connection there", async () => {
       const { service, repository, listPullRequestsForHead } = serviceWith();
 

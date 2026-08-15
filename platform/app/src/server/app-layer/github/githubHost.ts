@@ -27,7 +27,7 @@ export function getGithubHost(): string {
   return configured === "" ? GITHUB_DOT_COM : configured;
 }
 
-/** Where the REST API answers. */
+/** github.com answers on a separate hostname; Enterprise Server does not. */
 export function getGithubApiBase(): string {
   const host = getGithubHost();
   return host === GITHUB_DOT_COM
@@ -35,7 +35,7 @@ export function getGithubApiBase(): string {
     : `https://${host}/api/v3`;
 }
 
-/** Where the web pages live: app pages, account settings, uninstall. */
+/** The origin the account settings and uninstall pages are addressed from. */
 export function getGithubWebBase(): string {
   return `https://${getGithubHost()}`;
 }

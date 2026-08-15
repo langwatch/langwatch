@@ -89,7 +89,6 @@ describe("the GitHub host this instance is bound to", () => {
       expect(isMappableGithubHost(GHES)).toBe(true);
     });
 
-    /** @scenario "A repository on the configured host is mapped" */
     it("maps a repository on that host, and one that reported no host", () => {
       expect(isMappableGithubHost(GHES)).toBe(true);
       expect(isMappableGithubHost(GHES.toUpperCase())).toBe(true);
@@ -98,7 +97,6 @@ describe("the GitHub host this instance is bound to", () => {
       expect(normalizeGithubHost("")).toBe(GHES);
     });
 
-    /** @scenario "A repository on github.com is not mapped by an Enterprise Server instance" */
     it("refuses github.com, which this instance has no connection to", () => {
       expect(isMappableGithubHost("github.com")).toBe(false);
     });

@@ -57685,7 +57685,7 @@ GITHUB_LANGY_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRI
 ```
 
 <Warning>
-`GITHUB_LANGY_PRIVATE_KEY` is the only credential for the whole GitHub integration and grants write access to installed repos. Keep it in a secrets manager, never in version control, and never expose it to a worker. It stays in the control plane.
+`GITHUB_LANGY_PRIVATE_KEY` is the only credential for the whole GitHub integration and grants write access to installed repos. Keep it in a secrets manager, never in version control, and never let it reach the Langy agent pod. It stays in the control plane.
 </Warning>
 
 There is no client id or secret; the bot-authored flow uses no user OAuth. `CREDENTIALS_SECRET` (already required for any production install) signs the install round-trip's state, so nothing new is needed there.
@@ -57709,7 +57709,9 @@ app:
       value: github.acme-corp.internal
 ```
 
-Set the same values on `workers` when you run the workers as their own deployment. The periodic branch recheck runs there, and without the private key it cannot mint a token.
+Set the same values on `workers` when you run the LangWatch workers as their own deployment. The periodic branch recheck runs there, and without the private key it cannot mint a token.
+
+The LangWatch `workers` deployment is part of the control plane. It is not the Langy agent pod, which runs customer code in a sandbox and never receives the private key.
 
 ## GitHub Enterprise Server
 
@@ -57775,8 +57777,8 @@ Go to **Settings > Integrations > Disconnect**, which opens GitHub's uninstall p
 
 ## Operational notes
 
-- **Token in worker, not on disk.** Workers receive a 1-hour installation token via `GH_TOKEN` env. The github skill wires `git config credential.helper '!gh auth git-credential'` so git pushes read it from env, with no `.gitconfig` and no `.git-credentials`. The clone directory lives inside the per-worker home that the idle reaper deletes (within 10 min).
-- **Nothing at rest.** No token or refresh token is stored control-plane side. The app private key is the only credential; it never leaves the control plane and never goes near a worker. Tokens are minted per turn, cached in Redis a hair under their 1h lifetime, and self-expire.
+- **Token in the agent pod, not on disk.** Langy workers receive a 1-hour installation token via `GH_TOKEN` env. The github skill wires `git config credential.helper '!gh auth git-credential'` so git pushes read it from env, with no `.gitconfig` and no `.git-credentials`. The clone directory lives inside the per-worker home that the idle reaper deletes (within 10 min).
+- **Nothing at rest.** No token or refresh token is stored control-plane side. The app private key is the only credential; it never leaves the control plane and never reaches the Langy agent pod. Tokens are minted per turn, cached in Redis a hair under their 1h lifetime, and self-expire. The cache key carries the GitHub host, so two GitHub instances cannot share an entry.
 - **Least privilege at mint time.** Tokens are minted with only `contents:write` and `pull_requests:write`, scoped to the installation's repositories (or a single repository when the turn targets one).
 - **Sticky worker tokens.** A worker spawned with token T keeps T until the idle reaper kills it. Removing the installation cuts off new turns immediately; a live worker may hold a token for up to the idle TTL (within 10 min) or until it self-expires (within 1h).
 - **Egress.** The control plane reaches `api.github.com` to mint installation tokens and read installation metadata, or `<GITHUB_LANGY_HOST>` when one is set. Workers need `github.com`, `api.github.com`, and `codeload.github.com` to clone and push, which requires outbound egress to be enabled. See [Networking and egress](/self-hosting/langy/networking-and-egress).
@@ -57820,7 +57822,7 @@ That is why per-worker egress control lives at L7, in a per-worker CONNECT proxy
 | In-cluster LangWatch AI Gateway | All LLM traffic (traced, budgeted, policed) | Always, in-cluster |
 | In-cluster LangWatch app | The `langwatch` CLI (per-session key) | Always, in-cluster |
 | `github.com`, `api.github.com`, `codeload.github.com` | Clone and push for pull requests | Only when egress is on |
-| `api.github.com` (from the control plane, not the worker) | Mint 1-hour installation tokens, read installation metadata, and list pull requests for a branch | Control plane |
+| `api.github.com`, or `GITHUB_LANGY_HOST` when one is set (from the control plane, not the agent pod) | Mint 1-hour installation tokens, read installation metadata, and list pull requests for a branch | Control plane |
 
 Private ranges (RFC 1918), CGNAT (`100.64.0.0/10`), and the cloud metadata service are blocked at L3/L4 regardless of the egress toggle, which is the SSRF and IMDS protection.
 

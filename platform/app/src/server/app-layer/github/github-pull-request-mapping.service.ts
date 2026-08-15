@@ -515,7 +515,7 @@ export class GithubPullRequestMappingService {
       now: new Date(now),
       freshMappingMs: FRESH_MAPPING_MS,
       leaseMs: LOOKUP_CLAIM_LEASE_MS,
-      recordsDemand: origin === "demand",
+      shouldRecordDemand: origin === "demand",
     });
     if (claimed) return true;
     if (origin !== "demand") return false;

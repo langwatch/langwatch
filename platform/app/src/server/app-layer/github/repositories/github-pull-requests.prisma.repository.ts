@@ -382,9 +382,9 @@ export class PrismaGithubPullRequestsRepository
    * them on the unique index, so the second evaluates its predicate against the
    * first's committed row and updates zero rows.
    *
-   * `recordsDemand` picks whether the conflict path refreshes `lastRequestedAt`
-   * or keeps the stored value. A CASE rather than two statements, so the claim
-   * stays the one write it has to be.
+   * `shouldRecordDemand` picks whether the conflict path refreshes
+   * `lastRequestedAt` or keeps the stored value. A CASE rather than two
+   * statements, so the claim stays the one write it has to be.
    */
   async claimBranchLookup({
     organizationId,
@@ -394,7 +394,7 @@ export class PrismaGithubPullRequestsRepository
     now,
     freshMappingMs,
     leaseMs,
-    recordsDemand,
+    shouldRecordDemand,
   }: {
     organizationId: string;
     repositoryHost: string;
@@ -403,7 +403,7 @@ export class PrismaGithubPullRequestsRepository
     now: Date;
     freshMappingMs: number;
     leaseMs: number;
-    recordsDemand: boolean;
+    shouldRecordDemand: boolean;
   }): Promise<boolean> {
     const fullName = normalizeFullName(repositoryFullName);
     const host = normalizeHost(repositoryHost);
@@ -431,7 +431,7 @@ export class PrismaGithubPullRequestsRepository
       DO UPDATE SET
         "recheckAfter" = ${leaseUntil}::timestamp,
         "lastRequestedAt" = CASE
-          WHEN ${recordsDemand}::boolean THEN ${at}::timestamp
+          WHEN ${shouldRecordDemand}::boolean THEN ${at}::timestamp
           ELSE "GithubBranchPullRequestCheck"."lastRequestedAt"
         END,
         "updatedAt" = ${at}::timestamp
