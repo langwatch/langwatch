@@ -14,7 +14,7 @@ Feature: AI Gateway Governance — Personal virtual keys
   inheritance the rest of the system uses.
 
   Personal VKs reference a `RoutingPolicy` that an org admin published once
-  (e.g. "developer-default" — providers + model allowlist + strategy).
+  (e.g. "developer-default", carrying providers plus the model name mapping).
   The admin configures providers + policies; users just get keys.
 
   Background:
@@ -25,8 +25,8 @@ Feature: AI Gateway Governance — Personal virtual keys
       | openai    | ORGANIZATION | "Acme OpenAI Prod"    |
       | gemini    | ORGANIZATION | "Acme Gemini Prod"    |
     And admin "carol@acme.com" has published a default RoutingPolicy "developer-default":
-      | scope | scopeId | strategy | providerCredentialIds         | modelAllowlist                                                          |
-      | ORG   | acme    | priority | [anthropic, openai, gemini]   | ["claude-*", "gpt-5-mini", "gpt-5", "gemini-2.5-flash", "gemini-2.5-pro"] |
+      | scope | scopeId | providerCredentialIds       | defaultModel                     |
+      | ORG   | acme    | [anthropic, openai, gemini] | anthropic/claude-sonnet-4-5      |
     And user "jane@acme.com" exists with role MEMBER
 
   # ---------------------------------------------------------------------------

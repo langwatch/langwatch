@@ -2765,31 +2765,36 @@ model RoutingPolicy {
   // Ordered list of ModelProvider.id values (post-iter-110: GPC merged
   // into MP, the chain refers to MPs directly). JSON for shape
   // flexibility; gateway materialises into provider chain at request
-  // time. Order = try-first when strategy = 'priority'.
+  // time. Order = the order the gateway tries them in.
   modelProviderIds Json @default("[]")
-
-  // Optional model allowlist (JSON array of glob patterns).
-  // null/empty = "all models the eligible providers can serve".
-  modelAllowlist Json?
 
   // Model name rewrites applied before dispatch. Shape:
   //   { "gpt-4o": "gpt-4o-mini", "claude": "anthropic/claude-haiku-4-5" }
   // Hoisted from per-VK config (iter 110) onto the RoutingPolicy so a
   // single policy edit updates every VK linked to it. Empty object = no
   // rewrites.
+  //
+  // The reserved tier names (complex / reasoning / fast, see
+  // src/utils/modelTierPresets.ts) live in here as ordinary entries. The
+  // gateway needs no knowledge of them: it looks a tier up the same way it
+  // looks up any other name.
   modelAliases Json @default("{}")
+
+  // The model a reserved tier name resolves to when this policy names no
+  // target for it. Applies to the tier names ONLY, never as a catch-all for
+  // an unrecognized model: a catch-all would serve a caller a model they
+  // never named, turn every typo into a billed call, and make an allowlist
+  // unenforceable because nothing would reach the rejection.
+  //
+  // Stores a concrete, provider-qualified model id. A moving name such as
+  // "openai/latest" would make the gateway dispatch a model literally called
+  // "latest".
+  defaultModel String?
 
   // Provider-agnostic policy rules - deny/allow lists per dimension.
   // Shape: { tools: { deny: string[]; allow: string[] | null }, mcp: {...}, urls: {...}, models: {...} }
   // Hoisted from per-VK config (iter 110). Enforced pre-provider-dispatch.
   policyRules Json @default("{}")
-
-  // Routing strategy applied across the model-eligible subset.
-  //   'priority'    - try modelProviderIds in order (default)
-  //   'cost'        - pick lowest unit cost first
-  //   'latency'     - pick fastest healthy provider
-  //   'round_robin' - distribute evenly
-  strategy String @default("priority")
 
   isDefault Boolean @default(false)
 

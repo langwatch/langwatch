@@ -120,7 +120,9 @@ func translateWalkError(ctx context.Context, err error) error {
 // in fallback order, or the error that explains why there are none:
 //
 //  1. Model-aware trim: providers that cannot serve the resolved model are
-//     skipped (eligibleCredentials, with its keep-something safety net).
+//     skipped (eligibleCredentials). A provider the request named that the
+//     key cannot reach refuses here rather than dispatching to whichever
+//     vendor happens to be left.
 //  2. Provider allowlist: a key narrowed to specific providers cannot
 //     dispatch outside them even if the bundle's credential chain is stale
 //     or hand-crafted. The control plane already materializes the chain

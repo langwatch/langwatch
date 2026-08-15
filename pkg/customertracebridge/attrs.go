@@ -49,4 +49,12 @@ const (
 	// into billing spend events so the caller's billing system can join
 	// events back to its own entities without a lookup.
 	AttrRequestMetadata = "langwatch.reserved.request_metadata"
+
+	// AttrRequestedModel is the model name the client sent, present only when
+	// a routing policy rewrote it. gen_ai.request.model carries the model that
+	// was dispatched, so without this the caller's own vocabulary is not in
+	// the trace at all: a policy that points the "complex" tier somewhere new
+	// would silently change what every trace says the caller asked for, and
+	// "who still sends gpt-4o" becomes unanswerable.
+	AttrRequestedModel = "langwatch.requested_model"
 )

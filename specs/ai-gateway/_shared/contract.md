@@ -220,10 +220,11 @@ Returns the warm-cache config (fat, not on hot path). Supports conditional `If-N
       "config": { /* per-provider tuning: deployment_name, rate_limit, health, etc */ }
     }
   ],
+  /* `chain` is the ordered provider slots; `max_attempts` bounds the walk.
+     Which failures walk it is not on the wire: the gateway decides that
+     from the real upstream outcome (§7), the same way for every key. */
   "fallback": {
-    "on": ["5xx", "timeout", "rate_limit_exceeded"],
     "chain": ["pc_primary", "pc_secondary", "pc_tertiary"],
-    "timeout_ms": 30000,
     "max_attempts": 3
   },
   "model_aliases": { "gpt-4o": "azure/my-deployment", "claude": "anthropic/claude-haiku-4-5-20251001" },
@@ -263,7 +264,8 @@ Returns the warm-cache config (fat, not on hot path). Supports conditional `If-N
        (user messages, tool args, system prompts), strips trailing punctuation,
        dedupes. Models dimension is regex policy — distinct from the static
        glob `models_allowed` allowlist; both compose (request passes only
-       if both allow). */
+       if both allow), and both judge the RESOLVED model, in either
+       spelling, so an alias cannot route around either (§11b). */
     "tools":  { "deny": ["^shell\\.", "^filesystem\\.write$"], "allow": null },
     "mcp":    { "deny": ["^.*@mcp/unverified.*$"], "allow": null },
     "urls":   { "deny": [], "allow": ["^https?://allowed\\.example\\.com/.*"] },
@@ -649,20 +651,22 @@ All errors OpenAI-compatible:
 
 ## 7. Fallback chain
 
-Triggers (configurable per VK in `config.fallback.on`):
+Triggers are **fixed, not per key**. The classification lives in one function, `classifyProviderError` in `services/aigateway/app/dispatch.go`, and is derived from the real upstream outcome; the retry engine's trigger set is `defaultTriggers` in `pkg/retry/retry.go`. A per-key trigger list could only ever narrow the set, and every narrowing turns a failure the gateway would have recovered from into a customer-visible one, so the wire carries no such field (§4.2).
 
-- `5xx` — any upstream 5xx.
-- `timeout` — upstream exceeds `config.fallback.timeout_ms`.
-- `rate_limit_exceeded` — upstream 429.
-- `network_error` — connection reset / DNS / TLS.
-- `circuit_breaker` — gateway-internal circuit breaker trips after N consecutive failures against a provider in the last M seconds (not a response trigger — preempts attempts).
+- `5xx`: any upstream 5xx, and any provider error the adapter could not classify more precisely.
+- `timeout`: the provider adapter reports the upstream never answered. A provider-reported `504` arrives as a status and classifies as `5xx`, which is retryable either way; the two differ only in the reason recorded on the attempt.
+- `rate_limit_exceeded`: upstream 429.
+- `network_error`: connection reset / DNS / TLS.
+- `404 Not Found`: in a multi-provider chain this usually means "this provider does not serve that model" (common with custom and OpenAI-compatible providers), and the next slot may.
+- `circuit_breaker`: gateway-internal circuit breaker trips after N consecutive failures against a provider in the last M seconds. Not a response trigger, it preempts attempts.
 
-**Does NOT trigger fallback** (these are client-fault and returned as-is):
+**Does NOT trigger fallback** (terminal, and returned as-is). Terminal is not the same as the caller's fault: a `401` or `403` is usually the operator's provider credential, and the point of not masking it is that switching credentials would hide the thing they have to fix.
 
 - `400 Bad Request` from upstream (malformed payload).
-- `401 Unauthorized` from upstream (provider credential bad — surface to customer so they fix their provider creds; don't mask by silently switching).
+- `401 Unauthorized` from upstream (provider credential bad: surface to customer so they fix their provider creds; don't mask by silently switching).
 - `403 Forbidden` from upstream.
-- `404 Not Found` (requested model doesn't exist at that provider).
+- Every other terminal 4xx.
+- A bare context cancellation or deadline: the CALLER abandoned the request, which is not a provider verdict, so it neither falls back nor feeds the circuit breaker.
 - `invalid_api_key` / `permission_denied` from our own auth layer (never reaches fallback).
 
 Behaviour:
@@ -776,6 +780,9 @@ Evaluated at the gateway **before** dispatch to the upstream provider. Each patt
 - **`tools`** — checked against every `tools[].function.name` in the request (OpenAI format) and every `tools[].name` (Anthropic format). First match in `deny` → 403 `tool_not_allowed` with `policies_triggered: ["policy_violation_tools"]`. If `allow` is non-null, any tool name not matching an `allow` entry is blocked.
 - **`mcp`** — checked against the `mcp_servers[].name` and `mcp_servers[].url` if the request declares MCP servers. Same allow/deny semantics.
 - **`urls`** — checked against any URL found inside tool-call arguments that look like outbound HTTP (heuristic: field name matches `/url|endpoint|uri/i`). Primarily advisory; hard enforcement requires egress proxy and is post-MVP.
+- **`models`**: evaluated **post-resolution**, against the model the resolver settled on, not the string the caller sent. It runs a step later than the other three, inside the model-resolve stage, because only there is the real model known. Both spellings of the resolved model are judged (bare id and `provider/model`), so a rule written either way reaches the same model. Two consequences follow and are the point: an alias pointing at a denied model **is** blocked, and a deny on a raw name that resolves elsewhere does **not** block, because nothing denied ever runs.
+
+The other three dimensions stay on the request body as sent: tools, MCP servers, and URLs are properties of what the client wrote, and resolution does not change them.
 
 OTel trace records each block with span attribute `langwatch.policy.violation=<kind>:<pattern>`.
 

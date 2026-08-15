@@ -62,10 +62,12 @@ type providerSlotWire struct {
 	DeploymentMap map[string]string `json:"deployment_map,omitempty"`
 }
 
+// fallbackWire is the fallback block of the config payload. Only max_attempts
+// and chain are read. A control plane that predates this build still sends
+// "on" and "timeout_ms"; they are ignored on decode, which is what keeps a
+// rolling deploy from needing the two sides to agree.
 type fallbackWire struct {
-	On          []string `json:"on"`
 	Chain       []string `json:"chain"`
-	TimeoutMs   int      `json:"timeout_ms"`
 	MaxAttempts int      `json:"max_attempts"`
 }
 
@@ -176,7 +178,6 @@ func (w *configWire) toDomain() domain.BundleConfig {
 		RoutingMode:      w.RoutingMode,
 		Fallback: domain.FallbackConfig{
 			MaxAttempts: w.Fallback.MaxAttempts,
-			On:          w.Fallback.On,
 		},
 		Guardrails: buildGuardrails(w.Guardrails, w.GuardrailAttachments),
 	}
