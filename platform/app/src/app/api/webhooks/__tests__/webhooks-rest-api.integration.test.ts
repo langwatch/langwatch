@@ -1003,11 +1003,21 @@ describe("Feature: Webhook endpoints REST API", () => {
           }),
         },
       );
-      const error = await expectCanonicalError(ambiguous, {
+      await expectCanonicalError(ambiguous, {
         status: 400,
         code: "webhook_endpoint_invalid",
       });
-      expect(error.message).toMatch(/different credential modes/i);
+      // A refused switch changes nothing. Half of it landing would be worse
+      // than either mode: the endpoint would hold credentials the caller never
+      // asked it to keep.
+      const afterRefusal = await prisma.webhookEndpoint.findFirst({
+        where: { id: created.data.id },
+        select: { sqsRoleArn: true, sqsAccessKeyId: true },
+      });
+      expect(afterRefusal).toEqual({
+        sqsRoleArn: null,
+        sqsAccessKeyId: "AKIATAKEOVER",
+      });
     });
 
     /** @scenario Saving an endpoint names the field its destination kind is missing */

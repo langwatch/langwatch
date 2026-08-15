@@ -177,8 +177,13 @@ function resolveCredentials({
   // treatment as the first: through the proxy if there is one, and bounded.
   // Without this the AssumeRole leg was the one unbounded request left, and it
   // runs before every delivery on a cold client.
+  //
+  // The China partition serves STS under .amazonaws.com.cn, and this name is
+  // only ever handed to the proxy resolver: spelling it the other way would
+  // ask the bypass rules about a host that does not exist, and the STS leg
+  // would take the opposite proxy decision from the service leg.
   const stsHost = present(region)
-    ? `sts.${region}.amazonaws.com`
+    ? `sts.${region}.amazonaws.com${region.startsWith("cn-") ? ".cn" : ""}`
     : "sts.amazonaws.com";
   // The role is assumed WITH whatever the outer credentials are, so a static
   // pair here means "these keys may assume that role"; absent, the

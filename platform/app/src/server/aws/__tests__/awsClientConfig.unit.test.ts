@@ -1,5 +1,5 @@
 import { fromTemporaryCredentials } from "@aws-sdk/credential-providers";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   buildAwsClientConfig,
   staticCredentialsOrUndefined,
@@ -12,22 +12,29 @@ vi.mock("@aws-sdk/credential-providers", () => ({
   fromTemporaryCredentials: vi.fn(() => vi.fn()),
 }));
 
+// A recorder of its own arguments, so the timeouts and the agent a handler was
+// built with are readable without touching the real class's private fields.
+vi.mock("@smithy/node-http-handler", () => ({
+  NodeHttpHandler: vi.fn(function (
+    this: { options: unknown },
+    options: unknown,
+  ) {
+    this.options = options;
+  }),
+}));
+
 /**
- * A `NodeHttpHandler` resolves its options lazily, so the timeouts it was
- * built with are only readable off the promise it holds.
+ * The options a handler was built with. A real `NodeHttpHandler` resolves them
+ * lazily behind a private field, so the handler is mocked as a recorder of its
+ * own arguments rather than read by reflection.
  */
-async function handlerTimeouts(handler: unknown): Promise<{
+function handlerOptions(handler: unknown): {
   connectionTimeout?: number;
   requestTimeout?: number;
-}> {
-  const resolved = (await Reflect.get(handler as object, "configProvider")) as {
-    connectionTimeout?: number;
-    requestTimeout?: number;
-  };
-  return {
-    connectionTimeout: resolved.connectionTimeout,
-    requestTimeout: resolved.requestTimeout,
-  };
+  httpAgent?: unknown;
+  httpsAgent?: unknown;
+} {
+  return (handler as { options: Record<string, unknown> }).options;
 }
 
 /**
@@ -37,9 +44,32 @@ async function handlerTimeouts(handler: unknown): Promise<{
  * answer and stops looking with. The pod had a role, and we told it we had
  * keys.
  */
+// Both cases matter: the resolver reads either, so clearing only the uppercase
+// names would leak the lowercase ones into the tests that follow.
+const PROXY_ENV_KEYS = [
+  "HTTPS_PROXY",
+  "HTTP_PROXY",
+  "NO_PROXY",
+  "https_proxy",
+  "http_proxy",
+  "no_proxy",
+] as const;
+
+const originalProxyEnv = Object.fromEntries(
+  PROXY_ENV_KEYS.map((key) => [key, process.env[key]]),
+);
+
 describe("buildAwsClientConfig", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    for (const key of PROXY_ENV_KEYS) delete process.env[key];
+  });
+
+  afterEach(() => {
+    for (const [key, value] of Object.entries(originalProxyEnv)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
   });
 
   describe("given an incomplete credential pair", () => {
@@ -129,7 +159,7 @@ describe("buildAwsClientConfig", () => {
 
   describe("when a role is assumed", () => {
     const paramsOfLastCall = () =>
-      vi.mocked(fromTemporaryCredentials).mock.calls[0]![0]!;
+      vi.mocked(fromTemporaryCredentials).mock.lastCall![0]!;
 
     /**
      * The ExternalId is what proves the AssumeRole request came from us rather
@@ -196,7 +226,7 @@ describe("buildAwsClientConfig", () => {
     // The AssumeRole leg is a second request to a second host, and it runs
     // before every delivery on a cold client. Unbounded, it is the one that
     // hangs a delivery worker with nothing left to end it.
-    it("bounds the STS call the same way it bounds the service call", async () => {
+    it("bounds the STS call the same way it bounds the service call", () => {
       buildAwsClientConfig({
         region: "eu-central-1",
         targetHost: "sqs.eu-central-1.amazonaws.com",
@@ -207,10 +237,33 @@ describe("buildAwsClientConfig", () => {
 
       const stsHandler = paramsOfLastCall().clientConfig?.requestHandler;
       expect(stsHandler).toBeDefined();
-      await expect(handlerTimeouts(stsHandler)).resolves.toEqual({
+      expect(handlerOptions(stsHandler)).toMatchObject({
         connectionTimeout: 5_000,
         requestTimeout: 20_000,
       });
+    });
+
+    /**
+     * The China partition serves both SQS and STS under .amazonaws.com.cn, and
+     * queue URLs in that partition are admitted. The STS host is only ever
+     * handed to the proxy resolver, so spelling it .amazonaws.com asks the
+     * bypass rules about a host that does not exist: a rule written for the
+     * partition never matches, and the two legs take opposite proxy decisions.
+     */
+    it("resolves the proxy against the China partition's own STS host", () => {
+      process.env.HTTPS_PROXY = "http://proxy.corp:8080";
+      process.env.NO_PROXY = ".amazonaws.com.cn";
+
+      buildAwsClientConfig({
+        region: "cn-north-1",
+        targetHost: "sqs.cn-north-1.amazonaws.com.cn",
+        assumeRole: {
+          roleArn: "arn:aws-cn:iam::123456789012:role/langwatch",
+        },
+      });
+
+      const stsHandler = paramsOfLastCall().clientConfig?.requestHandler;
+      expect(handlerOptions(stsHandler).httpsAgent).toBeUndefined();
     });
   });
 
@@ -220,13 +273,13 @@ describe("buildAwsClientConfig", () => {
      * default, so leaving the handler to the SDK is what let a request with no
      * answer sit open for as long as the socket did.
      */
-    it("still hands the client a bounded request handler", async () => {
+    it("still hands the client a bounded request handler", () => {
       const config = buildAwsClientConfig({
         region: "eu-central-1",
         targetHost: "sqs.eu-central-1.amazonaws.com",
       });
 
-      await expect(handlerTimeouts(config.requestHandler)).resolves.toEqual({
+      expect(handlerOptions(config.requestHandler)).toEqual({
         connectionTimeout: 5_000,
         requestTimeout: 20_000,
       });

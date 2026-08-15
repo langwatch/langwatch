@@ -99,22 +99,39 @@ describe("Feature: a queue endpoint's credential mode is switched from the CLI",
   });
 
   describe("when both credential flags are passed", () => {
+    const bothFlags = {
+      roleArn: "arn:aws:iam::381491922238:role/langwatch-producer",
+      accessKeyId: "AKIAEXAMPLE",
+    };
+
+    const saidOnStderr = (phrase: string) =>
+      stderr.mock.calls
+        .flat()
+        .some((line: unknown) => String(line).includes(phrase));
+
     it("refuses before sending anything, and says why", async () => {
       await expect(
-        updateWebhookCommand("wh_1", {
-          roleArn: "arn:aws:iam::381491922238:role/langwatch-producer",
-          accessKeyId: "AKIAEXAMPLE",
-        }),
+        updateWebhookCommand("wh_1", bothFlags),
       ).rejects.toBeInstanceOf(ProcessExitError);
 
       expect(mockUpdate).not.toHaveBeenCalled();
-      expect(
-        stderr.mock.calls
-          .flat()
-          .some((line: unknown) =>
-            String(line).includes("different credential modes"),
-          ),
-      ).toBe(true);
+      expect(saidOnStderr("different credential modes")).toBe(true);
+    });
+
+    /**
+     * The mode conflict is checked first on purpose. Asking for the missing
+     * secret of a key pair the caller cannot use anyway sends them to set a
+     * secret and then refuses the command a second time, for the real reason.
+     */
+    it("names the mode conflict, not the missing secret, when neither is set", async () => {
+      vi.stubEnv("LANGWATCH_SQS_SECRET_ACCESS_KEY", "");
+
+      await expect(
+        updateWebhookCommand("wh_1", bothFlags),
+      ).rejects.toBeInstanceOf(ProcessExitError);
+
+      expect(saidOnStderr("different credential modes")).toBe(true);
+      expect(saidOnStderr("LANGWATCH_SQS_SECRET_ACCESS_KEY")).toBe(false);
     });
   });
 });

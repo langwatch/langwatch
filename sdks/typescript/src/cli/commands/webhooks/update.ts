@@ -19,18 +19,21 @@ export const updateWebhookCommand = async (
   },
 ): Promise<CommandResult | void> => {
   const apiKey = checkOrgApiKey();
+  // Which mode was asked for comes first. Asking for the missing secret of a
+  // key pair the caller cannot use anyway sends them to set a secret and then
+  // refuses the command a second time, for the real reason.
+  if (options.roleArn !== undefined && options.accessKeyId !== undefined) {
+    console.error(
+      "--role-arn and --access-key-id select different credential modes. Pass one of them; the other mode's fields are cleared for you.",
+    );
+    process.exit(1);
+  }
   // The secret is read from the environment, never from an argument: an
   // argument lands in shell history, in ps output, and in CI logs.
   const secretAccessKey = sqsSecretFromEnv();
   if (options.accessKeyId !== undefined && !secretAccessKey) {
     console.error(
       `--access-key-id needs its secret in ${SQS_SECRET_ENV}. A secret passed as an argument ends up in shell history, in ps output, and in CI logs.`,
-    );
-    process.exit(1);
-  }
-  if (options.roleArn !== undefined && options.accessKeyId !== undefined) {
-    console.error(
-      "--role-arn and --access-key-id select different credential modes. Pass one of them; the other mode's fields are cleared for you.",
     );
     process.exit(1);
   }
