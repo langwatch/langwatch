@@ -928,7 +928,7 @@
         {
           "id": "ai-gateway.webhooks",
           "name": "Webhook endpoints",
-          "description": "Stripe-shaped outbound webhooks: subscribed event families, signed batched deliveries, retry ladder, delivery log, replay (enterprise)",
+          "description": "Stripe-shaped outbound webhooks: subscribed event families, signed batched deliveries to an HTTPS endpoint or an Amazon SQS queue, retry ladder, delivery log, replay (enterprise)",
           "surfaces": {
             "code": {
               "sdk": {

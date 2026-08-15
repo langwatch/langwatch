@@ -3391,7 +3391,7 @@ export interface paths {
         head?: never;
         /**
          * Update a webhook endpoint
-         * @description Update a webhook endpoint's url, event subscriptions, or status (`active` re-enables, `disabled` pauses; re-enabling does not re-send the gap, replay covers it)
+         * @description Update a webhook endpoint's address, event subscriptions, or status (`active` re-enables, `disabled` pauses; re-enabling does not re-send the gap, replay covers it). `destination_kind` cannot change: batches already planned against the old transport are in flight, so a move means a new endpoint alongside this one until it has drained.
          */
         patch: operations["patchApiWebhooksV1EndpointsById"];
         trace?: never;
@@ -23823,7 +23823,20 @@ export interface operations {
                     "application/json": {
                         data: {
                             id: string;
-                            url: string;
+                            /** @enum {string} */
+                            destination_kind: "http" | "sqs";
+                            url: string | null;
+                            sqs: {
+                                queue_url: string;
+                                region: string;
+                                account_id: string;
+                                queue_name: string;
+                                /** @enum {string} */
+                                credential_mode: "assume_role" | "static" | "ambient";
+                                role_arn: string | null;
+                                external_id: string | null;
+                                access_key_id: string | null;
+                            } | null;
                             enabled_events: string[];
                             /** @enum {string} */
                             status: "active" | "disabled";
@@ -23936,7 +23949,16 @@ export interface operations {
         requestBody?: {
             content: {
                 "application/json": {
-                    url: string;
+                    /** @enum {string} */
+                    destination_kind?: "http" | "sqs";
+                    url?: string;
+                    sqs?: {
+                        queue_url: string;
+                        role_arn?: string;
+                        external_id?: string;
+                        access_key_id?: string;
+                        secret_access_key?: string;
+                    };
                     enabled_events: string[];
                     max_batch_size?: number;
                     max_batch_delay_ms?: number;
@@ -23956,7 +23978,20 @@ export interface operations {
                     "application/json": {
                         data: {
                             id: string;
-                            url: string;
+                            /** @enum {string} */
+                            destination_kind: "http" | "sqs";
+                            url: string | null;
+                            sqs: {
+                                queue_url: string;
+                                region: string;
+                                account_id: string;
+                                queue_name: string;
+                                /** @enum {string} */
+                                credential_mode: "assume_role" | "static" | "ambient";
+                                role_arn: string | null;
+                                external_id: string | null;
+                                access_key_id: string | null;
+                            } | null;
                             enabled_events: string[];
                             /** @enum {string} */
                             status: "active" | "disabled";
@@ -24097,7 +24132,20 @@ export interface operations {
                     "application/json": {
                         data: {
                             id: string;
-                            url: string;
+                            /** @enum {string} */
+                            destination_kind: "http" | "sqs";
+                            url: string | null;
+                            sqs: {
+                                queue_url: string;
+                                region: string;
+                                account_id: string;
+                                queue_name: string;
+                                /** @enum {string} */
+                                credential_mode: "assume_role" | "static" | "ambient";
+                                role_arn: string | null;
+                                external_id: string | null;
+                                access_key_id: string | null;
+                            } | null;
                             enabled_events: string[];
                             /** @enum {string} */
                             status: "active" | "disabled";
@@ -24356,7 +24404,16 @@ export interface operations {
         requestBody?: {
             content: {
                 "application/json": {
+                    /** @enum {string} */
+                    destination_kind?: "http" | "sqs";
                     url?: string;
+                    sqs?: {
+                        queue_url?: string;
+                        role_arn?: string;
+                        external_id?: string;
+                        access_key_id?: string;
+                        secret_access_key?: string;
+                    };
                     enabled_events?: string[];
                     /** @enum {string} */
                     status?: "active" | "disabled";
@@ -24376,7 +24433,20 @@ export interface operations {
                     "application/json": {
                         data: {
                             id: string;
-                            url: string;
+                            /** @enum {string} */
+                            destination_kind: "http" | "sqs";
+                            url: string | null;
+                            sqs: {
+                                queue_url: string;
+                                region: string;
+                                account_id: string;
+                                queue_name: string;
+                                /** @enum {string} */
+                                credential_mode: "assume_role" | "static" | "ambient";
+                                role_arn: string | null;
+                                external_id: string | null;
+                                access_key_id: string | null;
+                            } | null;
                             enabled_events: string[];
                             /** @enum {string} */
                             status: "active" | "disabled";
@@ -24516,7 +24586,20 @@ export interface operations {
                     "application/json": {
                         data: {
                             id: string;
-                            url: string;
+                            /** @enum {string} */
+                            destination_kind: "http" | "sqs";
+                            url: string | null;
+                            sqs: {
+                                queue_url: string;
+                                region: string;
+                                account_id: string;
+                                queue_name: string;
+                                /** @enum {string} */
+                                credential_mode: "assume_role" | "static" | "ambient";
+                                role_arn: string | null;
+                                external_id: string | null;
+                                access_key_id: string | null;
+                            } | null;
                             enabled_events: string[];
                             /** @enum {string} */
                             status: "active" | "disabled";

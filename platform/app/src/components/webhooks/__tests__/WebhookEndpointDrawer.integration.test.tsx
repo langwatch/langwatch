@@ -30,6 +30,43 @@ const EVENT_TYPES = [
   },
 ];
 
+type DrawerEndpoint = NonNullable<
+  Parameters<typeof WebhookEndpointDrawer>[0]["endpoint"]
+>;
+
+/** A saved queue endpoint, with only the queue half worth varying. */
+function sqsEndpoint(
+  sqs: Partial<NonNullable<DrawerEndpoint["sqs"]>> = {},
+): DrawerEndpoint {
+  return {
+    id: "wh_1",
+    organizationId: "org_1",
+    destinationKind: "sqs",
+    url: null,
+    sqs: {
+      queueUrl: "https://sqs.eu-central-1.amazonaws.com/381491922238/lw-test",
+      region: "eu-central-1",
+      accountId: "381491922238",
+      queueName: "lw-test",
+      credentialMode: "assume_role",
+      roleArn: "arn:aws:iam::381491922238:role/langwatch-webhook-producer",
+      externalId: "lw-abc",
+      accessKeyId: null,
+      ...sqs,
+    },
+    enabledEvents: ["gateway.request.completed"],
+    status: "ACTIVE",
+    disabledReason: null,
+    disabledAt: null,
+    failingSince: null,
+    lastSuccessAt: null,
+    lastFailureAt: null,
+    maxBatchSize: 100,
+    maxBatchDelayMs: 250,
+    maxInFlight: 4,
+  } as DrawerEndpoint;
+}
+
 function renderDrawer(
   props: Partial<Parameters<typeof WebhookEndpointDrawer>[0]> = {},
 ) {
@@ -84,6 +121,7 @@ describe("WebhookEndpointDrawer", () => {
 
     await user.click(screen.getByTestId("webhook-save"));
     expect(onSave).toHaveBeenCalledWith({
+      destinationKind: "http",
       url: "https://example.com/hook",
       enabledEvents: ["gateway.*"],
       maxBatchSize: 100,
@@ -105,6 +143,7 @@ describe("WebhookEndpointDrawer", () => {
     );
     await user.click(screen.getByTestId("webhook-save"));
     expect(onSave).toHaveBeenCalledWith({
+      destinationKind: "http",
       url: "https://example.com/hook",
       enabledEvents: ["gateway.request.completed"],
       maxBatchSize: 100,
@@ -149,6 +188,7 @@ describe("WebhookSecretDialog", () => {
     await user.click(screen.getByTestId("webhook-save"));
 
     expect(onSave).toHaveBeenCalledWith({
+      destinationKind: "http",
       url: "https://example.com/hooks",
       enabledEvents: ["gateway.request.completed"],
       maxBatchSize: 25,
@@ -168,5 +208,156 @@ describe("WebhookSecretDialog", () => {
       "whsec_test123",
     );
     expect(screen.getByText(/shown only once/i)).toBeInTheDocument();
+  });
+
+  describe("when choosing where the endpoint delivers", () => {
+    /** @scenario The destination kind is a choice, and each kind asks for its own fields */
+    it("offers both destinations and swaps the address field with the choice", async () => {
+      const user = userEvent.setup();
+      renderDrawer();
+
+      expect(screen.getByText("HTTPS endpoint")).toBeInTheDocument();
+      expect(screen.getByText("Amazon SQS queue")).toBeInTheDocument();
+      // HTTPS is the default, so the URL field is the one on screen.
+      expect(screen.getByTestId("webhook-url-input")).toBeInTheDocument();
+      expect(
+        screen.queryByTestId("webhook-sqs-queue-url"),
+      ).not.toBeInTheDocument();
+
+      await user.click(screen.getByText("Amazon SQS queue"));
+
+      expect(screen.getByTestId("webhook-sqs-queue-url")).toBeInTheDocument();
+      expect(screen.queryByTestId("webhook-url-input")).not.toBeInTheDocument();
+    });
+
+    /** @scenario A queue endpoint saves only once its queue URL is filled in */
+    it("keeps save disabled until the queue URL is entered, then sends the queue", async () => {
+      const user = userEvent.setup();
+      const { onSave } = renderDrawer();
+
+      await user.click(screen.getByText("Amazon SQS queue"));
+      await user.click(
+        screen.getByTestId("webhook-event-gateway.request.completed"),
+      );
+      expect(screen.getByTestId("webhook-save")).toBeDisabled();
+
+      await user.type(
+        screen.getByTestId("webhook-sqs-queue-url"),
+        "https://sqs.eu-central-1.amazonaws.com/381491922238/lw-test",
+      );
+      // The queue URL alone is the whole requirement. Typing a role first
+      // would let a regression that makes role assumption mandatory pass.
+      expect(screen.getByTestId("webhook-save")).toBeEnabled();
+
+      await user.type(
+        screen.getByTestId("webhook-sqs-role-arn"),
+        "arn:aws:iam::381491922238:role/langwatch-webhook-producer",
+      );
+      expect(screen.getByTestId("webhook-save")).toBeEnabled();
+
+      await user.click(screen.getByTestId("webhook-save"));
+      expect(onSave).toHaveBeenCalledWith(
+        expect.objectContaining({
+          destinationKind: "sqs",
+          sqs: {
+            queueUrl:
+              "https://sqs.eu-central-1.amazonaws.com/381491922238/lw-test",
+            roleArn:
+              "arn:aws:iam::381491922238:role/langwatch-webhook-producer",
+          },
+        }),
+      );
+    });
+
+    /** @scenario A saved role destination shows the external id to trust */
+    it("shows the generated external id when editing, and never on a new endpoint", async () => {
+      const user = userEvent.setup();
+      // A role is worthless until its trust policy names this id, and the
+      // server is the only place it exists, so an edit that cannot read it
+      // back leaves the recommended credential mode impossible to finish.
+      renderDrawer({ endpoint: sqsEndpoint({ externalId: "lw-abc123" }) });
+
+      expect(screen.getByTestId("webhook-sqs-external-id")).toHaveTextContent(
+        "lw-abc123",
+      );
+
+      cleanup();
+      renderDrawer();
+      await user.click(screen.getByText("Amazon SQS queue"));
+      expect(
+        screen.queryByTestId("webhook-sqs-external-id"),
+      ).not.toBeInTheDocument();
+    });
+
+    /** @scenario A saved role destination shows the external id to trust */
+    it("shows no external id block for a queue reached with an access key pair", () => {
+      renderDrawer({
+        endpoint: sqsEndpoint({
+          externalId: null,
+          roleArn: null,
+          credentialMode: "static",
+          accessKeyId: "AKIAEXAMPLE",
+        }),
+      });
+
+      expect(
+        screen.queryByTestId("webhook-sqs-external-id"),
+      ).not.toBeInTheDocument();
+    });
+
+    /** @scenario An existing endpoint cannot be moved to another destination kind */
+    it("locks the choice once the endpoint exists", () => {
+      renderDrawer({
+        endpoint: {
+          id: "wh_1",
+          organizationId: "org_1",
+          destinationKind: "sqs",
+          url: null,
+          sqs: {
+            queueUrl:
+              "https://sqs.eu-central-1.amazonaws.com/381491922238/lw-test",
+            region: "eu-central-1",
+            accountId: "381491922238",
+            queueName: "lw-test",
+            credentialMode: "assume_role",
+            roleArn:
+              "arn:aws:iam::381491922238:role/langwatch-webhook-producer",
+            externalId: "lw-abc",
+            accessKeyId: null,
+          },
+          enabledEvents: ["gateway.request.completed"],
+          status: "ACTIVE",
+          disabledReason: null,
+          disabledAt: null,
+          failingSince: null,
+          lastSuccessAt: null,
+          lastFailureAt: null,
+          maxBatchSize: 100,
+          maxBatchDelayMs: 250,
+          maxInFlight: 4,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      });
+
+      const control = screen.getByTestId("webhook-destination-kind");
+      const options = [...control.querySelectorAll("input")];
+      // Assert the options exist before asserting anything about them: a
+      // for-of over an empty list passes while proving nothing.
+      expect(options).toHaveLength(2);
+      // Every option is unavailable, which is what says "not here" rather
+      // than letting a click silently do nothing.
+      for (const input of options) {
+        expect(input).toBeDisabled();
+      }
+      // The queue it already has is the field on screen, prefilled.
+      expect(screen.getByTestId("webhook-sqs-queue-url")).toHaveValue(
+        "https://sqs.eu-central-1.amazonaws.com/381491922238/lw-test",
+      );
+      // The stored secret is never prefilled: an empty box means keep it.
+      expect(screen.getByTestId("webhook-sqs-secret-access-key")).toHaveValue(
+        "",
+      );
+    });
   });
 });

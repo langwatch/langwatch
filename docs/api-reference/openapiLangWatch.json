@@ -51665,92 +51665,253 @@
                   "type": "object",
                   "properties": {
                     "data": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string"
-                        },
-                        "url": {
-                          "type": "string"
-                        },
-                        "enabled_events": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        },
-                        "status": {
-                          "type": "string",
-                          "enum": [
-                            "active",
-                            "disabled"
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "destination_kind": {
+                              "type": "string",
+                              "const": "http"
+                            },
+                            "url": {
+                              "type": "string"
+                            },
+                            "sqs": {
+                              "type": "null"
+                            },
+                            "id": {
+                              "type": "string"
+                            },
+                            "enabled_events": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "active",
+                                "disabled"
+                              ]
+                            },
+                            "disabled_reason": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "disabled_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "failing_since": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "last_success_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "last_failure_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "max_batch_size": {
+                              "type": "integer"
+                            },
+                            "max_batch_delay_ms": {
+                              "type": "integer"
+                            },
+                            "max_in_flight": {
+                              "type": "integer"
+                            },
+                            "created_at": {
+                              "type": "string"
+                            },
+                            "updated_at": {
+                              "type": "string"
+                            },
+                            "secret": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "destination_kind",
+                            "url",
+                            "sqs",
+                            "id",
+                            "enabled_events",
+                            "status",
+                            "disabled_reason",
+                            "disabled_at",
+                            "failing_since",
+                            "last_success_at",
+                            "last_failure_at",
+                            "max_batch_size",
+                            "max_batch_delay_ms",
+                            "max_in_flight",
+                            "created_at",
+                            "updated_at",
+                            "secret"
                           ]
                         },
-                        "disabled_reason": {
-                          "type": [
-                            "string",
-                            "null"
+                        {
+                          "type": "object",
+                          "properties": {
+                            "destination_kind": {
+                              "type": "string",
+                              "const": "sqs"
+                            },
+                            "url": {
+                              "type": "null"
+                            },
+                            "sqs": {
+                              "type": "object",
+                              "properties": {
+                                "queue_url": {
+                                  "type": "string"
+                                },
+                                "region": {
+                                  "type": "string"
+                                },
+                                "account_id": {
+                                  "type": "string"
+                                },
+                                "queue_name": {
+                                  "type": "string"
+                                },
+                                "credential_mode": {
+                                  "type": "string",
+                                  "enum": [
+                                    "assume_role",
+                                    "static",
+                                    "ambient"
+                                  ]
+                                },
+                                "role_arn": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "external_id": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "access_key_id": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "queue_url",
+                                "region",
+                                "account_id",
+                                "queue_name",
+                                "credential_mode",
+                                "role_arn",
+                                "external_id",
+                                "access_key_id"
+                              ]
+                            },
+                            "id": {
+                              "type": "string"
+                            },
+                            "enabled_events": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "active",
+                                "disabled"
+                              ]
+                            },
+                            "disabled_reason": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "disabled_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "failing_since": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "last_success_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "last_failure_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "max_batch_size": {
+                              "type": "integer"
+                            },
+                            "max_batch_delay_ms": {
+                              "type": "integer"
+                            },
+                            "max_in_flight": {
+                              "type": "integer"
+                            },
+                            "created_at": {
+                              "type": "string"
+                            },
+                            "updated_at": {
+                              "type": "string"
+                            },
+                            "secret": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "destination_kind",
+                            "url",
+                            "sqs",
+                            "id",
+                            "enabled_events",
+                            "status",
+                            "disabled_reason",
+                            "disabled_at",
+                            "failing_since",
+                            "last_success_at",
+                            "last_failure_at",
+                            "max_batch_size",
+                            "max_batch_delay_ms",
+                            "max_in_flight",
+                            "created_at",
+                            "updated_at",
+                            "secret"
                           ]
-                        },
-                        "disabled_at": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "failing_since": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "last_success_at": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "last_failure_at": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "max_batch_size": {
-                          "type": "integer"
-                        },
-                        "max_batch_delay_ms": {
-                          "type": "integer"
-                        },
-                        "max_in_flight": {
-                          "type": "integer"
-                        },
-                        "created_at": {
-                          "type": "string"
-                        },
-                        "updated_at": {
-                          "type": "string"
-                        },
-                        "secret": {
-                          "type": "string"
                         }
-                      },
-                      "required": [
-                        "id",
-                        "url",
-                        "enabled_events",
-                        "status",
-                        "disabled_reason",
-                        "disabled_at",
-                        "failing_since",
-                        "last_success_at",
-                        "last_failure_at",
-                        "max_batch_size",
-                        "max_batch_delay_ms",
-                        "max_in_flight",
-                        "created_at",
-                        "updated_at",
-                        "secret"
                       ]
                     }
                   },
@@ -52000,17 +52161,57 @@
           }
         ],
         "summary": "Create a webhook endpoint",
-        "description": "Create a webhook endpoint. The signing secret is returned ONCE in this response and never again; roll it to get a new one. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
+        "description": "Create a webhook endpoint. Name one destination: `url` for `destination_kind: http`, `sqs` for `destination_kind: sqs`. Naming the other kind's field is a 400 that says which field does not belong, rather than a 201 that saved half the body. `destination_kind` may be omitted and then means `http`. The signing secret is returned ONCE in this response and never again; roll it to get a new one. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
                 "properties": {
+                  "destination_kind": {
+                    "type": "string",
+                    "enum": [
+                      "http",
+                      "sqs"
+                    ]
+                  },
                   "url": {
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 2000
+                  },
+                  "sqs": {
+                    "type": "object",
+                    "properties": {
+                      "queue_url": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2000
+                      },
+                      "role_arn": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2048
+                      },
+                      "external_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1224
+                      },
+                      "access_key_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      },
+                      "secret_access_key": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256
+                      }
+                    },
+                    "required": [
+                      "queue_url"
+                    ]
                   },
                   "enabled_events": {
                     "type": "array",
@@ -52033,7 +52234,6 @@
                   }
                 },
                 "required": [
-                  "url",
                   "enabled_events"
                 ]
               }
@@ -52058,88 +52258,245 @@
                     "data": {
                       "type": "array",
                       "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string"
-                          },
-                          "url": {
-                            "type": "string"
-                          },
-                          "enabled_events": {
-                            "type": "array",
-                            "items": {
-                              "type": "string"
-                            }
-                          },
-                          "status": {
-                            "type": "string",
-                            "enum": [
-                              "active",
-                              "disabled"
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "destination_kind": {
+                                "type": "string",
+                                "const": "http"
+                              },
+                              "url": {
+                                "type": "string"
+                              },
+                              "sqs": {
+                                "type": "null"
+                              },
+                              "id": {
+                                "type": "string"
+                              },
+                              "enabled_events": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "active",
+                                  "disabled"
+                                ]
+                              },
+                              "disabled_reason": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "disabled_at": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "failing_since": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "last_success_at": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "last_failure_at": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "max_batch_size": {
+                                "type": "integer"
+                              },
+                              "max_batch_delay_ms": {
+                                "type": "integer"
+                              },
+                              "max_in_flight": {
+                                "type": "integer"
+                              },
+                              "created_at": {
+                                "type": "string"
+                              },
+                              "updated_at": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "destination_kind",
+                              "url",
+                              "sqs",
+                              "id",
+                              "enabled_events",
+                              "status",
+                              "disabled_reason",
+                              "disabled_at",
+                              "failing_since",
+                              "last_success_at",
+                              "last_failure_at",
+                              "max_batch_size",
+                              "max_batch_delay_ms",
+                              "max_in_flight",
+                              "created_at",
+                              "updated_at"
                             ]
                           },
-                          "disabled_reason": {
-                            "type": [
-                              "string",
-                              "null"
+                          {
+                            "type": "object",
+                            "properties": {
+                              "destination_kind": {
+                                "type": "string",
+                                "const": "sqs"
+                              },
+                              "url": {
+                                "type": "null"
+                              },
+                              "sqs": {
+                                "type": "object",
+                                "properties": {
+                                  "queue_url": {
+                                    "type": "string"
+                                  },
+                                  "region": {
+                                    "type": "string"
+                                  },
+                                  "account_id": {
+                                    "type": "string"
+                                  },
+                                  "queue_name": {
+                                    "type": "string"
+                                  },
+                                  "credential_mode": {
+                                    "type": "string",
+                                    "enum": [
+                                      "assume_role",
+                                      "static",
+                                      "ambient"
+                                    ]
+                                  },
+                                  "role_arn": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "external_id": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "access_key_id": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "queue_url",
+                                  "region",
+                                  "account_id",
+                                  "queue_name",
+                                  "credential_mode",
+                                  "role_arn",
+                                  "external_id",
+                                  "access_key_id"
+                                ]
+                              },
+                              "id": {
+                                "type": "string"
+                              },
+                              "enabled_events": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "active",
+                                  "disabled"
+                                ]
+                              },
+                              "disabled_reason": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "disabled_at": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "failing_since": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "last_success_at": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "last_failure_at": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "max_batch_size": {
+                                "type": "integer"
+                              },
+                              "max_batch_delay_ms": {
+                                "type": "integer"
+                              },
+                              "max_in_flight": {
+                                "type": "integer"
+                              },
+                              "created_at": {
+                                "type": "string"
+                              },
+                              "updated_at": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "destination_kind",
+                              "url",
+                              "sqs",
+                              "id",
+                              "enabled_events",
+                              "status",
+                              "disabled_reason",
+                              "disabled_at",
+                              "failing_since",
+                              "last_success_at",
+                              "last_failure_at",
+                              "max_batch_size",
+                              "max_batch_delay_ms",
+                              "max_in_flight",
+                              "created_at",
+                              "updated_at"
                             ]
-                          },
-                          "disabled_at": {
-                            "type": [
-                              "string",
-                              "null"
-                            ]
-                          },
-                          "failing_since": {
-                            "type": [
-                              "string",
-                              "null"
-                            ]
-                          },
-                          "last_success_at": {
-                            "type": [
-                              "string",
-                              "null"
-                            ]
-                          },
-                          "last_failure_at": {
-                            "type": [
-                              "string",
-                              "null"
-                            ]
-                          },
-                          "max_batch_size": {
-                            "type": "integer"
-                          },
-                          "max_batch_delay_ms": {
-                            "type": "integer"
-                          },
-                          "max_in_flight": {
-                            "type": "integer"
-                          },
-                          "created_at": {
-                            "type": "string"
-                          },
-                          "updated_at": {
-                            "type": "string"
                           }
-                        },
-                        "required": [
-                          "id",
-                          "url",
-                          "enabled_events",
-                          "status",
-                          "disabled_reason",
-                          "disabled_at",
-                          "failing_since",
-                          "last_success_at",
-                          "last_failure_at",
-                          "max_batch_size",
-                          "max_batch_delay_ms",
-                          "max_in_flight",
-                          "created_at",
-                          "updated_at"
                         ]
                       }
                     }
@@ -52353,88 +52710,245 @@
                   "type": "object",
                   "properties": {
                     "data": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string"
-                        },
-                        "url": {
-                          "type": "string"
-                        },
-                        "enabled_events": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        },
-                        "status": {
-                          "type": "string",
-                          "enum": [
-                            "active",
-                            "disabled"
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "destination_kind": {
+                              "type": "string",
+                              "const": "http"
+                            },
+                            "url": {
+                              "type": "string"
+                            },
+                            "sqs": {
+                              "type": "null"
+                            },
+                            "id": {
+                              "type": "string"
+                            },
+                            "enabled_events": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "active",
+                                "disabled"
+                              ]
+                            },
+                            "disabled_reason": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "disabled_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "failing_since": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "last_success_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "last_failure_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "max_batch_size": {
+                              "type": "integer"
+                            },
+                            "max_batch_delay_ms": {
+                              "type": "integer"
+                            },
+                            "max_in_flight": {
+                              "type": "integer"
+                            },
+                            "created_at": {
+                              "type": "string"
+                            },
+                            "updated_at": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "destination_kind",
+                            "url",
+                            "sqs",
+                            "id",
+                            "enabled_events",
+                            "status",
+                            "disabled_reason",
+                            "disabled_at",
+                            "failing_since",
+                            "last_success_at",
+                            "last_failure_at",
+                            "max_batch_size",
+                            "max_batch_delay_ms",
+                            "max_in_flight",
+                            "created_at",
+                            "updated_at"
                           ]
                         },
-                        "disabled_reason": {
-                          "type": [
-                            "string",
-                            "null"
+                        {
+                          "type": "object",
+                          "properties": {
+                            "destination_kind": {
+                              "type": "string",
+                              "const": "sqs"
+                            },
+                            "url": {
+                              "type": "null"
+                            },
+                            "sqs": {
+                              "type": "object",
+                              "properties": {
+                                "queue_url": {
+                                  "type": "string"
+                                },
+                                "region": {
+                                  "type": "string"
+                                },
+                                "account_id": {
+                                  "type": "string"
+                                },
+                                "queue_name": {
+                                  "type": "string"
+                                },
+                                "credential_mode": {
+                                  "type": "string",
+                                  "enum": [
+                                    "assume_role",
+                                    "static",
+                                    "ambient"
+                                  ]
+                                },
+                                "role_arn": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "external_id": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "access_key_id": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "queue_url",
+                                "region",
+                                "account_id",
+                                "queue_name",
+                                "credential_mode",
+                                "role_arn",
+                                "external_id",
+                                "access_key_id"
+                              ]
+                            },
+                            "id": {
+                              "type": "string"
+                            },
+                            "enabled_events": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "active",
+                                "disabled"
+                              ]
+                            },
+                            "disabled_reason": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "disabled_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "failing_since": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "last_success_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "last_failure_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "max_batch_size": {
+                              "type": "integer"
+                            },
+                            "max_batch_delay_ms": {
+                              "type": "integer"
+                            },
+                            "max_in_flight": {
+                              "type": "integer"
+                            },
+                            "created_at": {
+                              "type": "string"
+                            },
+                            "updated_at": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "destination_kind",
+                            "url",
+                            "sqs",
+                            "id",
+                            "enabled_events",
+                            "status",
+                            "disabled_reason",
+                            "disabled_at",
+                            "failing_since",
+                            "last_success_at",
+                            "last_failure_at",
+                            "max_batch_size",
+                            "max_batch_delay_ms",
+                            "max_in_flight",
+                            "created_at",
+                            "updated_at"
                           ]
-                        },
-                        "disabled_at": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "failing_since": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "last_success_at": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "last_failure_at": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "max_batch_size": {
-                          "type": "integer"
-                        },
-                        "max_batch_delay_ms": {
-                          "type": "integer"
-                        },
-                        "max_in_flight": {
-                          "type": "integer"
-                        },
-                        "created_at": {
-                          "type": "string"
-                        },
-                        "updated_at": {
-                          "type": "string"
                         }
-                      },
-                      "required": [
-                        "id",
-                        "url",
-                        "enabled_events",
-                        "status",
-                        "disabled_reason",
-                        "disabled_at",
-                        "failing_since",
-                        "last_success_at",
-                        "last_failure_at",
-                        "max_batch_size",
-                        "max_batch_delay_ms",
-                        "max_in_flight",
-                        "created_at",
-                        "updated_at"
                       ]
                     }
                   },
@@ -52698,88 +53212,245 @@
                   "type": "object",
                   "properties": {
                     "data": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string"
-                        },
-                        "url": {
-                          "type": "string"
-                        },
-                        "enabled_events": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        },
-                        "status": {
-                          "type": "string",
-                          "enum": [
-                            "active",
-                            "disabled"
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "destination_kind": {
+                              "type": "string",
+                              "const": "http"
+                            },
+                            "url": {
+                              "type": "string"
+                            },
+                            "sqs": {
+                              "type": "null"
+                            },
+                            "id": {
+                              "type": "string"
+                            },
+                            "enabled_events": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "active",
+                                "disabled"
+                              ]
+                            },
+                            "disabled_reason": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "disabled_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "failing_since": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "last_success_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "last_failure_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "max_batch_size": {
+                              "type": "integer"
+                            },
+                            "max_batch_delay_ms": {
+                              "type": "integer"
+                            },
+                            "max_in_flight": {
+                              "type": "integer"
+                            },
+                            "created_at": {
+                              "type": "string"
+                            },
+                            "updated_at": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "destination_kind",
+                            "url",
+                            "sqs",
+                            "id",
+                            "enabled_events",
+                            "status",
+                            "disabled_reason",
+                            "disabled_at",
+                            "failing_since",
+                            "last_success_at",
+                            "last_failure_at",
+                            "max_batch_size",
+                            "max_batch_delay_ms",
+                            "max_in_flight",
+                            "created_at",
+                            "updated_at"
                           ]
                         },
-                        "disabled_reason": {
-                          "type": [
-                            "string",
-                            "null"
+                        {
+                          "type": "object",
+                          "properties": {
+                            "destination_kind": {
+                              "type": "string",
+                              "const": "sqs"
+                            },
+                            "url": {
+                              "type": "null"
+                            },
+                            "sqs": {
+                              "type": "object",
+                              "properties": {
+                                "queue_url": {
+                                  "type": "string"
+                                },
+                                "region": {
+                                  "type": "string"
+                                },
+                                "account_id": {
+                                  "type": "string"
+                                },
+                                "queue_name": {
+                                  "type": "string"
+                                },
+                                "credential_mode": {
+                                  "type": "string",
+                                  "enum": [
+                                    "assume_role",
+                                    "static",
+                                    "ambient"
+                                  ]
+                                },
+                                "role_arn": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "external_id": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "access_key_id": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "queue_url",
+                                "region",
+                                "account_id",
+                                "queue_name",
+                                "credential_mode",
+                                "role_arn",
+                                "external_id",
+                                "access_key_id"
+                              ]
+                            },
+                            "id": {
+                              "type": "string"
+                            },
+                            "enabled_events": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "active",
+                                "disabled"
+                              ]
+                            },
+                            "disabled_reason": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "disabled_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "failing_since": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "last_success_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "last_failure_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "max_batch_size": {
+                              "type": "integer"
+                            },
+                            "max_batch_delay_ms": {
+                              "type": "integer"
+                            },
+                            "max_in_flight": {
+                              "type": "integer"
+                            },
+                            "created_at": {
+                              "type": "string"
+                            },
+                            "updated_at": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "destination_kind",
+                            "url",
+                            "sqs",
+                            "id",
+                            "enabled_events",
+                            "status",
+                            "disabled_reason",
+                            "disabled_at",
+                            "failing_since",
+                            "last_success_at",
+                            "last_failure_at",
+                            "max_batch_size",
+                            "max_batch_delay_ms",
+                            "max_in_flight",
+                            "created_at",
+                            "updated_at"
                           ]
-                        },
-                        "disabled_at": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "failing_since": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "last_success_at": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "last_failure_at": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "max_batch_size": {
-                          "type": "integer"
-                        },
-                        "max_batch_delay_ms": {
-                          "type": "integer"
-                        },
-                        "max_in_flight": {
-                          "type": "integer"
-                        },
-                        "created_at": {
-                          "type": "string"
-                        },
-                        "updated_at": {
-                          "type": "string"
                         }
-                      },
-                      "required": [
-                        "id",
-                        "url",
-                        "enabled_events",
-                        "status",
-                        "disabled_reason",
-                        "disabled_at",
-                        "failing_since",
-                        "last_success_at",
-                        "last_failure_at",
-                        "max_batch_size",
-                        "max_batch_delay_ms",
-                        "max_in_flight",
-                        "created_at",
-                        "updated_at"
                       ]
                     }
                   },
@@ -53026,17 +53697,54 @@
           }
         ],
         "summary": "Update a webhook endpoint",
-        "description": "Update a webhook endpoint's url, event subscriptions, or status (`active` re-enables, `disabled` pauses; re-enabling does not re-send the gap, replay covers it)",
+        "description": "Update a webhook endpoint's address, event subscriptions, or status (`active` re-enables, `disabled` pauses; re-enabling does not re-send the gap, replay covers it). `destination_kind` cannot change: batches already planned against the old transport are in flight, so a move means a new endpoint alongside this one until it has drained.",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
                 "properties": {
+                  "destination_kind": {
+                    "type": "string",
+                    "enum": [
+                      "http",
+                      "sqs"
+                    ]
+                  },
                   "url": {
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 2000
+                  },
+                  "sqs": {
+                    "type": "object",
+                    "properties": {
+                      "queue_url": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2000
+                      },
+                      "role_arn": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2048
+                      },
+                      "external_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1224
+                      },
+                      "access_key_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      },
+                      "secret_access_key": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256
+                      }
+                    }
                   },
                   "enabled_events": {
                     "type": "array",
@@ -53359,92 +54067,253 @@
                   "type": "object",
                   "properties": {
                     "data": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string"
-                        },
-                        "url": {
-                          "type": "string"
-                        },
-                        "enabled_events": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        },
-                        "status": {
-                          "type": "string",
-                          "enum": [
-                            "active",
-                            "disabled"
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "destination_kind": {
+                              "type": "string",
+                              "const": "http"
+                            },
+                            "url": {
+                              "type": "string"
+                            },
+                            "sqs": {
+                              "type": "null"
+                            },
+                            "id": {
+                              "type": "string"
+                            },
+                            "enabled_events": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "active",
+                                "disabled"
+                              ]
+                            },
+                            "disabled_reason": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "disabled_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "failing_since": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "last_success_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "last_failure_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "max_batch_size": {
+                              "type": "integer"
+                            },
+                            "max_batch_delay_ms": {
+                              "type": "integer"
+                            },
+                            "max_in_flight": {
+                              "type": "integer"
+                            },
+                            "created_at": {
+                              "type": "string"
+                            },
+                            "updated_at": {
+                              "type": "string"
+                            },
+                            "secret": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "destination_kind",
+                            "url",
+                            "sqs",
+                            "id",
+                            "enabled_events",
+                            "status",
+                            "disabled_reason",
+                            "disabled_at",
+                            "failing_since",
+                            "last_success_at",
+                            "last_failure_at",
+                            "max_batch_size",
+                            "max_batch_delay_ms",
+                            "max_in_flight",
+                            "created_at",
+                            "updated_at",
+                            "secret"
                           ]
                         },
-                        "disabled_reason": {
-                          "type": [
-                            "string",
-                            "null"
+                        {
+                          "type": "object",
+                          "properties": {
+                            "destination_kind": {
+                              "type": "string",
+                              "const": "sqs"
+                            },
+                            "url": {
+                              "type": "null"
+                            },
+                            "sqs": {
+                              "type": "object",
+                              "properties": {
+                                "queue_url": {
+                                  "type": "string"
+                                },
+                                "region": {
+                                  "type": "string"
+                                },
+                                "account_id": {
+                                  "type": "string"
+                                },
+                                "queue_name": {
+                                  "type": "string"
+                                },
+                                "credential_mode": {
+                                  "type": "string",
+                                  "enum": [
+                                    "assume_role",
+                                    "static",
+                                    "ambient"
+                                  ]
+                                },
+                                "role_arn": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "external_id": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "access_key_id": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "queue_url",
+                                "region",
+                                "account_id",
+                                "queue_name",
+                                "credential_mode",
+                                "role_arn",
+                                "external_id",
+                                "access_key_id"
+                              ]
+                            },
+                            "id": {
+                              "type": "string"
+                            },
+                            "enabled_events": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "active",
+                                "disabled"
+                              ]
+                            },
+                            "disabled_reason": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "disabled_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "failing_since": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "last_success_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "last_failure_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "max_batch_size": {
+                              "type": "integer"
+                            },
+                            "max_batch_delay_ms": {
+                              "type": "integer"
+                            },
+                            "max_in_flight": {
+                              "type": "integer"
+                            },
+                            "created_at": {
+                              "type": "string"
+                            },
+                            "updated_at": {
+                              "type": "string"
+                            },
+                            "secret": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "destination_kind",
+                            "url",
+                            "sqs",
+                            "id",
+                            "enabled_events",
+                            "status",
+                            "disabled_reason",
+                            "disabled_at",
+                            "failing_since",
+                            "last_success_at",
+                            "last_failure_at",
+                            "max_batch_size",
+                            "max_batch_delay_ms",
+                            "max_in_flight",
+                            "created_at",
+                            "updated_at",
+                            "secret"
                           ]
-                        },
-                        "disabled_at": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "failing_since": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "last_success_at": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "last_failure_at": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "max_batch_size": {
-                          "type": "integer"
-                        },
-                        "max_batch_delay_ms": {
-                          "type": "integer"
-                        },
-                        "max_in_flight": {
-                          "type": "integer"
-                        },
-                        "created_at": {
-                          "type": "string"
-                        },
-                        "updated_at": {
-                          "type": "string"
-                        },
-                        "secret": {
-                          "type": "string"
                         }
-                      },
-                      "required": [
-                        "id",
-                        "url",
-                        "enabled_events",
-                        "status",
-                        "disabled_reason",
-                        "disabled_at",
-                        "failing_since",
-                        "last_success_at",
-                        "last_failure_at",
-                        "max_batch_size",
-                        "max_batch_delay_ms",
-                        "max_in_flight",
-                        "created_at",
-                        "updated_at",
-                        "secret"
                       ]
                     }
                   },
