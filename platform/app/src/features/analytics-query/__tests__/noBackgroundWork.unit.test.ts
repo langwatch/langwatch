@@ -33,15 +33,39 @@ const SOURCE_EXTENSIONS = [".ts", ".tsx"];
 /**
  * Each entry is a way the surface could start working on its own, or start
  * remembering things the feature does not promise to remember.
+ *
+ * `token` is the name to look for. An entry may also carry a `pattern`, which
+ * is then what decides the offence: some of these names are only a problem
+ * when they are switched on, and the source is expected to carry them turned
+ * off. Matching the bare name there would fail the feature for doing the very
+ * thing this file exists to require.
  */
-const FORBIDDEN: readonly { token: string; because: string }[] = [
+const FORBIDDEN: readonly {
+  token: string;
+  because: string;
+  pattern?: RegExp;
+}[] = [
   {
     token: "setInterval",
     because: "a timer would rerun work nobody asked for",
   },
   {
+    token: "setTimeout",
+    because: "a self-rescheduling timeout is a poll under another name",
+  },
+  {
     token: "refetchInterval",
     because: "a polling query would rerun the SQL on a schedule",
+  },
+  {
+    token: "refetchOnWindowFocus",
+    pattern: /refetchOnWindowFocus:(?!\s*false\b)/,
+    because: "returning to the tab must not rerun the SQL on its own",
+  },
+  {
+    token: "refetchOnMount",
+    pattern: /refetchOnMount:(?!\s*false\b)/,
+    because: "remounting the surface must not rerun the SQL on its own",
   },
   {
     token: "localStorage",
@@ -87,12 +111,17 @@ function sourceFiles(directory: string): string[] {
   return found;
 }
 
+function offencesInSource(source: string): string[] {
+  return FORBIDDEN.filter(({ token, pattern }) =>
+    pattern ? pattern.test(source) : source.includes(token),
+  ).map(({ token, because }) => `${token} (${because})`);
+}
+
 function offencesIn(files: readonly string[]): string[] {
   return files.flatMap((file) => {
     const source = readFileSync(file, "utf8");
-    return FORBIDDEN.filter(({ token }) => source.includes(token)).map(
-      ({ token, because }) =>
-        `${file.slice(FEATURE_ROOT.length)}: ${token} (${because})`,
+    return offencesInSource(source).map(
+      (offence) => `${file.slice(FEATURE_ROOT.length)}: ${offence}`,
     );
   });
 }
@@ -107,6 +136,25 @@ describe("the workbench feature's source", () => {
       // this test could go quietly useless.
       expect(files.length).toBeGreaterThanOrEqual(8);
       expect(offencesIn(files)).toEqual([]);
+    });
+  });
+
+  describe("given the scan itself is put in front of the promise it makes", () => {
+    it("catches a timer that reschedules itself", () => {
+      expect(offencesInSource("setTimeout(() => poll(), 1000);")).not.toEqual(
+        [],
+      );
+    });
+
+    it("catches a refetch the member did not ask for", () => {
+      expect(offencesInSource("refetchOnWindowFocus: true,")).not.toEqual([]);
+      expect(offencesInSource("refetchOnMount: always,")).not.toEqual([]);
+    });
+
+    it("leaves a refetch that is switched off alone", () => {
+      expect(
+        offencesInSource("refetchOnWindowFocus: false,\nrefetchOnMount: false"),
+      ).toEqual([]);
     });
   });
 });

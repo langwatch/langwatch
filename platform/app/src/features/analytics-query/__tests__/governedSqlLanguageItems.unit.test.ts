@@ -14,6 +14,15 @@ import { GOVERNED_SQL_LANGUAGE_ITEMS } from "../logic/governedSqlLanguageItems";
 
 const labels = GOVERNED_SQL_LANGUAGE_ITEMS.map((item) => item.label);
 
+/**
+ * Anchored at the start and closed with a word boundary rather than `$`: a
+ * label is refused for the statement it opens, so `INSERT INTO` has to be
+ * caught by the same rule that catches `INSERT`. `GROUP BY` and `ORDER BY`
+ * stay safe because no forbidden word is their first one.
+ */
+const WRITING_STATEMENT =
+  /^(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|GRANT|REVOKE|SET|ATTACH|DETACH|RENAME|OPTIMIZE|SYSTEM)\b/i;
+
 describe("the editor's language suggestions", () => {
   describe("given the static keyword and function lists", () => {
     describe("when a member starts typing a statement", () => {
@@ -36,10 +45,32 @@ describe("the editor's language suggestions", () => {
 
     describe("when the list is checked against the surface's policy", () => {
       it("suggests nothing that could write, define, or grant", () => {
-        const forbidden =
-          /^(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|GRANT|REVOKE|SET|ATTACH|DETACH|RENAME|OPTIMIZE|SYSTEM)$/i;
         for (const label of labels) {
-          expect(label).not.toMatch(forbidden);
+          expect(label).not.toMatch(WRITING_STATEMENT);
+        }
+      });
+
+      it("refuses a writing statement by its opening word, not only alone", () => {
+        for (const statement of [
+          "INSERT INTO",
+          "CREATE TABLE",
+          "ALTER TABLE",
+          "DROP DATABASE",
+          "SET ROLE",
+        ]) {
+          expect(statement).toMatch(WRITING_STATEMENT);
+        }
+      });
+
+      it("leaves the reading clauses a member needs alone", () => {
+        for (const clause of [
+          "GROUP BY",
+          "ORDER BY",
+          "SELECT",
+          "SETTINGS",
+          "CREATED_AT",
+        ]) {
+          expect(clause).not.toMatch(WRITING_STATEMENT);
         }
       });
 
