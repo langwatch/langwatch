@@ -11,6 +11,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import ScenarioLibraryPage from "../[project]/simulations/scenarios/index";
 
 const { preloadDrawer } = vi.hoisted(() => ({
   preloadDrawer: vi.fn(() => Promise.resolve()),
@@ -82,10 +83,6 @@ vi.mock("~/utils/api", () => ({
     },
   },
 }));
-
-const ScenarioLibraryPage = (
-  await import("../[project]/simulations/scenarios/index")
-).default;
 
 let idleCallbacks: Array<(() => void) | undefined> = [];
 

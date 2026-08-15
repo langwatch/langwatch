@@ -65,14 +65,24 @@ export function reloadOnChunkError(err: unknown): boolean {
 let warmupsInFlight = 0;
 
 /**
+ * The errors that warm-ups caught, so the listener below can tell a download
+ * nobody waits for apart from one that a screen is held up by.
+ *
+ * A `WeakSet` keeps no error alive: an entry goes away with the error itself.
+ * A claim that outlives its event is harmless, because Vite builds a new error
+ * for every failed import, so no later event can carry the same one.
+ */
+const warmupFailures = new WeakSet<object>();
+
+/**
  * Run a chunk download that no screen is waiting for, such as a page fetching
  * the code of a drawer its rows open. Reports whether the code arrived.
  *
  * A warm-up asks for a content-hashed file the same way a real lazy import
  * does, so after a deploy it hits the same stale hash and fires the same
  * `vite:preloadError`. Reloading the page for it would take the screen away
- * from a person who asked for nothing, so the listener below stands down while
- * a warm-up is in flight. The next import of that chunk still recovers, at the
+ * from a person who asked for nothing, so the listener below drops the failures
+ * this function claims. The next import of that chunk still recovers, at the
  * point where somebody is waiting for it.
  */
 export async function warmChunk(
@@ -82,10 +92,14 @@ export async function warmChunk(
   try {
     await load();
     return true;
-  } catch {
-    // Nothing on screen is waiting for this, so there is nothing to report to.
-    // The open that needs the chunk reports its own failure. The caller gets
-    // `false` so it can leave everything as it was.
+  } catch (error) {
+    // Claim the failure as this warm-up's own. Nothing on screen is waiting for
+    // it, so there is nothing to report to: the open that needs the chunk
+    // reports its own failure. The caller gets `false` so it can leave
+    // everything as it was.
+    if (typeof error === "object" && error !== null) {
+      warmupFailures.add(error);
+    }
     return false;
   } finally {
     warmupsInFlight -= 1;
@@ -100,11 +114,35 @@ export async function warmChunk(
 export function registerChunkReloadListener(): void {
   if (typeof window === "undefined") return;
   window.addEventListener("vite:preloadError", (event) => {
-    if (warmupsInFlight > 0) return;
-    // Only suppress Vite's error when we actually scheduled a reload. If we're
-    // inside the cooldown (forceReloadOnce returns false), let the error
-    // propagate to the error boundary instead of swallowing it — otherwise the
-    // lazy import gets neither recovery nor the normal failure path.
-    if (forceReloadOnce()) event.preventDefault();
+    if (warmupsInFlight === 0) {
+      // Only suppress Vite's error when we actually scheduled a reload. If we're
+      // inside the cooldown (forceReloadOnce returns false), let the error
+      // propagate to the error boundary instead of swallowing it — otherwise the
+      // lazy import gets neither recovery nor the normal failure path.
+      if (forceReloadOnce()) event.preventDefault();
+      return;
+    }
+
+    // A warm-up is running, so this failure is either its own or belongs to
+    // something a person is waiting for. The event says which import failed
+    // only through `payload`, the error Vite is about to throw, so read the
+    // answer from `warmChunk` instead: it claims the errors it catches, and a
+    // timer runs after every promise callback, so the claim is in by then.
+    //
+    // An unclaimed failure reloads, which keeps recovery for a stale chunk that
+    // a warm-up happens to run next to. An event with no `payload` counts as
+    // unclaimed for the same reason: recovery is the more expensive one to
+    // lose.
+    //
+    // The error is left to propagate either way. A warm-up reports nothing, and
+    // a real open keeps its normal failure path until the reload lands.
+    const { payload } = event as { payload?: unknown };
+    setTimeout(() => {
+      const claimed =
+        typeof payload === "object" &&
+        payload !== null &&
+        warmupFailures.has(payload);
+      if (!claimed) forceReloadOnce();
+    }, 0);
   });
 }

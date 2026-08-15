@@ -15,6 +15,22 @@ import {
 const RELOAD_AT = "chunk-reload-at";
 const reloaded = () => sessionStorage.getItem(RELOAD_AT) !== null;
 
+/**
+ * The event Vite dispatches from its preload helper. `payload` is the error it
+ * is about to throw, and it is the only field that says which import failed.
+ */
+const preloadErrorEvent = (payload: Error) =>
+  Object.assign(new Event("vite:preloadError", { cancelable: true }), {
+    payload,
+  });
+
+const staleChunkError = () =>
+  new Error("Failed to fetch dynamically imported module");
+
+/** Let the listener's deferred reload decision run. */
+const settleDeferredReload = () =>
+  new Promise((resolve) => setTimeout(resolve, 0));
+
 describe("isChunkLoadError", () => {
   describe("when the message is a Vite dynamic-import failure", () => {
     it("classifies it as a chunk-load error", () => {
@@ -125,7 +141,7 @@ describe("registerChunkReloadListener", () => {
     it("reloads the page once to fetch the new chunk hashes", () => {
       registerChunkReloadListener();
 
-      const event = new Event("vite:preloadError", { cancelable: true });
+      const event = preloadErrorEvent(staleChunkError());
       window.dispatchEvent(event);
 
       expect(event.defaultPrevented).toBe(true);
@@ -139,7 +155,7 @@ describe("registerChunkReloadListener", () => {
       sessionStorage.setItem(RELOAD_AT, "9999999999999");
       registerChunkReloadListener();
 
-      const event = new Event("vite:preloadError", { cancelable: true });
+      const event = preloadErrorEvent(staleChunkError());
       window.dispatchEvent(event);
 
       // No reload scheduled → Vite's error must NOT be preventDefault()'d.
@@ -158,18 +174,43 @@ describe("warmChunk", () => {
     it("does not reload the page", async () => {
       registerChunkReloadListener();
 
-      await warmChunk(() => {
+      const loaded = await warmChunk(() => {
         // Vite fires the event from its preload helper, then rejects the
-        // import, so the warm-up is still in flight when the listener runs.
-        window.dispatchEvent(
-          new Event("vite:preloadError", { cancelable: true }),
-        );
-        return Promise.reject(
-          new Error("Failed to fetch dynamically imported module"),
-        );
+        // import with the same error, so the warm-up is still in flight when
+        // the listener runs.
+        const failure = staleChunkError();
+        window.dispatchEvent(preloadErrorEvent(failure));
+        return Promise.reject(failure);
       });
+      await settleDeferredReload();
 
+      expect(loaded).toBe(false);
       expect(reloaded()).toBe(false);
+    });
+  });
+
+  describe("when another import fails while a warm-up is in flight", () => {
+    /** @scenario "A stale file for a waiting screen reloads during a warm-up" */
+    it("reloads the page for the import somebody is waiting for", async () => {
+      registerChunkReloadListener();
+
+      let finishWarmup = () => {};
+      const warmup = warmChunk(
+        () =>
+          new Promise<void>((resolve) => {
+            finishWarmup = resolve;
+          }),
+      );
+
+      // A drawer the person just opened asks for a stale file. This error is
+      // not the warm-up's, so recovery must still run.
+      window.dispatchEvent(preloadErrorEvent(staleChunkError()));
+
+      finishWarmup();
+      await warmup;
+      await settleDeferredReload();
+
+      expect(reloaded()).toBe(true);
     });
   });
 
@@ -178,9 +219,7 @@ describe("warmChunk", () => {
       registerChunkReloadListener();
       await warmChunk(() => Promise.resolve());
 
-      window.dispatchEvent(
-        new Event("vite:preloadError", { cancelable: true }),
-      );
+      window.dispatchEvent(preloadErrorEvent(staleChunkError()));
 
       expect(reloaded()).toBe(true);
     });

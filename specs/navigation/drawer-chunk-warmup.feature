@@ -67,3 +67,13 @@ Feature: A screen fetches a drawer's code before the person opens it
       Given no warm-up is in flight
       When a download fails because the file is gone
       Then the page reloads once
+
+    # A warm-up runs in the background, so a person can open a drawer while one
+    # is still going. Standing down for the whole of a warm-up would take the
+    # recovery away from that open as well, so the page tells the two apart and
+    # stands down only for the warm-up's own download.
+    @unit
+    Scenario: A stale file for a waiting screen reloads during a warm-up
+      Given a warm-up is in flight
+      When another download fails because the file is gone
+      Then the page reloads once
