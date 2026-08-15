@@ -39,6 +39,62 @@ export function currentRegistryRateVersion(): string {
 
 const logger = createLogger("langwatch:gateway-spend:rating");
 
+/**
+ * The quantities a request reported, with the zeroes dropped. Empty means the
+ * request measured nothing at all, so a zero charge is the right answer and
+ * there is nothing to warn about.
+ */
+function measuredQuantities(usage: SpendUsage): Record<string, number> {
+  const measured: Record<string, number> = {};
+  for (const [name, value] of Object.entries(usage)) {
+    if (typeof value === "number" && value > 0) measured[name] = value;
+  }
+  return measured;
+}
+
+/**
+ * States, once per request, that the catalog could not price it.
+ *
+ * Two faults reach this point and only the first was ever visible. A model
+ * with no entry at all was warned about. A model WITH an entry that prices
+ * none of the quantities the request reported was not: the gpt-4o transcribe
+ * pair carried a per-second rate while the provider reports tokens and no
+ * duration, so every call multiplied that rate by zero seconds and settled at
+ * $0 with real usage on the row, indistinguishable from a free request. Both
+ * faults are only visible here, where quantities meet rates.
+ *
+ * A request that measured nothing is not a fault of either kind, so a rule
+ * that prices it at zero says nothing. An unknown model still warns even then,
+ * because the catalog gap is worth knowing about before a call carries usage.
+ */
+function warnUnpriced({
+  model,
+  usage,
+  matched,
+  rateVersion,
+}: {
+  model: string;
+  usage: SpendUsage;
+  matched: boolean;
+  rateVersion: string;
+}): void {
+  if (!model || model === "unknown") return;
+  const measured = measuredQuantities(usage);
+  const burnedSomething = Object.keys(measured).length > 0;
+  if (matched) {
+    if (!burnedSomething) return;
+    logger.warn(
+      { model, rateVersion, measured },
+      "rate rule prices none of the quantities this request reported; spend rated at zero",
+    );
+    return;
+  }
+  logger.warn(
+    { model, rateVersion, measured },
+    "no rate rule matched; spend rated at zero",
+  );
+}
+
 export function rateSpendNanoUsd({
   model,
   usage,
@@ -52,11 +108,6 @@ export function rateSpendNanoUsd({
     model,
     getStaticModelCosts(),
   );
-  if (!llmModelCost && model && model !== "unknown") {
-    // A missing rate rule must never disappear silently as a $0 charge:
-    // this is the catalog-freshness alarm's raw signal.
-    logger.warn({ model }, "no rate rule matched; spend rated at zero");
-  }
   const usd = llmModelCost
     ? estimateCost({
         llmModelCost,
@@ -73,11 +124,18 @@ export function rateSpendNanoUsd({
         audioSeconds: usage.audio_ms / 1000,
       })
     : 0;
-  return {
-    costNanoUsd: Math.round((usd ?? 0) * NANO_USD_PER_USD),
-    rateVersion:
-      rateVersion && rateVersion.length > 0
-        ? rateVersion
-        : currentRegistryRateVersion(),
-  };
+  const costNanoUsd = Math.round((usd ?? 0) * NANO_USD_PER_USD);
+  const stamp =
+    rateVersion && rateVersion.length > 0
+      ? rateVersion
+      : currentRegistryRateVersion();
+  if (costNanoUsd === 0) {
+    warnUnpriced({
+      model,
+      usage,
+      matched: llmModelCost != null,
+      rateVersion: stamp,
+    });
+  }
+  return { costNanoUsd, rateVersion: stamp };
 }

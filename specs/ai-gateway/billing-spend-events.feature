@@ -138,6 +138,31 @@ Feature: Billing spend events, one durable record per gateway request
       Then the missing quantity reads as zero
       And the record parses instead of failing
 
+  Rule: A request the catalog cannot price says so
+
+    A zero charge on a request that burned something is a catalog fault, and
+    it looks exactly like a free request on the record. Rating is the only
+    place both faults are visible: the model has no entry at all, or it has
+    an entry that prices none of the quantities the request reported.
+
+    @unit
+    Scenario: A rule that prices none of the reported quantities is reported
+      Given a model whose rate covers a quantity the request did not carry
+      When the request rates at zero
+      Then the model, the rate identity and the quantities it did carry are stated
+
+    @unit
+    Scenario: A model with no entry at all is reported
+      Given a model the catalog does not carry
+      When the request rates at zero
+      Then the miss is stated once, not twice
+
+    @unit
+    Scenario: A request that measured nothing is not a fault
+      Given a request that reported no quantity of any kind
+      When it rates at zero
+      Then nothing is reported, because zero is the right answer
+
     @unit
     Scenario: The failed payload keeps the full error taxonomy
       When a fail command is serialized

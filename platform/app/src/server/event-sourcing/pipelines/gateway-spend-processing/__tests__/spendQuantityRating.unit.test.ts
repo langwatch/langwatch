@@ -1,6 +1,18 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EMPTY_SPEND_USAGE, type SpendUsage } from "../schemas/commands";
 import { rateSpendNanoUsd } from "../services/spend-rating.service";
+
+// The rating service is the only place that can see a request burn something
+// and be charged nothing, and its one way of saying so is this logger.
+const warned = vi.fn();
+vi.mock("@langwatch/observability", () => ({
+  createLogger: () => ({
+    info: vi.fn(),
+    error: vi.fn(),
+    warn: (...args: unknown[]) => warned(...args),
+    debug: vi.fn(),
+  }),
+}));
 
 /**
  * Rating for the quantities that are not token classes.
@@ -107,6 +119,76 @@ describe("rateSpendNanoUsd", () => {
       });
       expect(costNanoUsd).toBe(0);
       expect(rateVersion.length).toBeGreaterThan(0);
+    });
+  });
+
+  /**
+   * A request that burned something and was charged nothing is a catalog
+   * fault, and it has to say so. The gpt-4o transcribe pair proved the quiet
+   * case: the model matched an entry, the entry priced seconds, the provider
+   * reported tokens, and every call settled at $0 with real usage on the row.
+   */
+  describe("given a request the catalog cannot price", () => {
+    beforeEach(() => {
+      warned.mockClear();
+    });
+
+    it("warns when a matched rule prices none of the reported quantities", () => {
+      const { costNanoUsd } = rateSpendNanoUsd({
+        model: "openai/tts-1",
+        usage: usage({ input_tokens: 65, output_tokens: 22 }),
+      });
+      expect(costNanoUsd).toBe(0);
+      expect(warned).toHaveBeenCalledTimes(1);
+      expect(warned.mock.calls[0]?.[1]).toContain(
+        "prices none of the quantities",
+      );
+    });
+
+    it("names the quantities the request did carry", () => {
+      rateSpendNanoUsd({
+        model: "openai/tts-1",
+        usage: usage({ input_tokens: 65, output_tokens: 22 }),
+      });
+      expect(warned.mock.calls[0]?.[0]).toMatchObject({
+        model: "openai/tts-1",
+        measured: { input_tokens: 65, output_tokens: 22 },
+      });
+    });
+
+    it("warns once, not twice, when the model is unknown as well", () => {
+      rateSpendNanoUsd({
+        model: "nonexistent-vendor/nonexistent-model-xyz",
+        usage: usage({ input_tokens: 1000 }),
+      });
+      expect(warned).toHaveBeenCalledTimes(1);
+      expect(warned.mock.calls[0]?.[1]).toContain("no rate rule matched");
+    });
+
+    it("stays quiet when the request measured nothing", () => {
+      const { costNanoUsd } = rateSpendNanoUsd({
+        model: "openai/tts-1",
+        usage: usage({}),
+      });
+      expect(costNanoUsd).toBe(0);
+      expect(warned).not.toHaveBeenCalled();
+    });
+
+    it("stays quiet when the rule priced the request", () => {
+      const { costNanoUsd } = rateSpendNanoUsd({
+        model: "openai/tts-1",
+        usage: usage({ input_chars: 4000 }),
+      });
+      expect(costNanoUsd).toBe(60_000_000);
+      expect(warned).not.toHaveBeenCalled();
+    });
+
+    it("still names an unknown model that measured nothing", () => {
+      rateSpendNanoUsd({
+        model: "nonexistent-vendor/nonexistent-model-xyz",
+        usage: usage({}),
+      });
+      expect(warned).toHaveBeenCalledTimes(1);
     });
   });
 });

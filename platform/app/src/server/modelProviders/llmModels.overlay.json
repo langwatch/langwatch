@@ -185,6 +185,48 @@
 			"supportsImageOutput": false,
 			"supportsAudioOutput": false
 		},
+		"openai/gpt-realtime-translate": {
+			"id": "openai/gpt-realtime-translate",
+			"name": "OpenAI: GPT Realtime Translate",
+			"provider": "openai",
+			"pricing": {
+				"inputCostPerToken": 0,
+				"outputCostPerToken": 0,
+				"inputCostPerSecond": 5.666666666666667e-4
+			},
+			"contextLength": 0,
+			"maxCompletionTokens": null,
+			"supportedParameters": [],
+			"defaultParameters": null,
+			"modality": "audio->audio",
+			"mode": "audio",
+			"description": "Live translation, priced by duration at $0.034 per minute (https://developers.openai.com/api/docs/pricing, verified 2026-08-15). Its own entry because the prefix-anchored match sent it to gpt-realtime, whose $32-per-million audio token rate has nothing to do with a per-minute live model. The gateway serves no realtime socket today, so this entry is a guard against the wrong rate rather than a rate in use.",
+			"supportsImageInput": false,
+			"supportsAudioInput": true,
+			"supportsImageOutput": false,
+			"supportsAudioOutput": true
+		},
+		"openai/gpt-live-transcribe": {
+			"id": "openai/gpt-live-transcribe",
+			"name": "OpenAI: GPT Live Transcribe",
+			"provider": "openai",
+			"pricing": {
+				"inputCostPerToken": 0,
+				"outputCostPerToken": 0,
+				"inputCostPerSecond": 2.8333333333333335e-4
+			},
+			"contextLength": 0,
+			"maxCompletionTokens": null,
+			"supportedParameters": [],
+			"defaultParameters": null,
+			"modality": "audio->text",
+			"mode": "audio",
+			"description": "Live transcription, priced by duration at $0.017 per minute (https://developers.openai.com/api/docs/pricing, verified 2026-08-15). It matched nothing in the catalog before. Its sibling gpt-realtime-whisper already carries the same rate in the base catalog. The gateway serves no realtime socket today.",
+			"supportsImageInput": false,
+			"supportsAudioInput": true,
+			"supportsImageOutput": false,
+			"supportsAudioOutput": false
+		},
 		"elevenlabs/eleven_multilingual_v2": {
 			"id": "elevenlabs/eleven_multilingual_v2",
 			"name": "ElevenLabs: Multilingual v2",
