@@ -20,13 +20,13 @@
 		"tsBuildInfoFile": "./node_modules/.cache/tsbuildinfo/tsc-editor.tsbuildinfo",
 		"noUncheckedIndexedAccess": true,
 		"verbatimModuleSyntax": true,
-      "paths": {
-        "./*": ["./*"],
-        "~/*": ["./src/*"],
-        "@ee/*": ["./ee/*"],
-        "@app/*": ["./src/server/app-layer/*"],
-        "./node_modules/zod/lib/helpers/errorUtil": ["./node_modules/zod/lib/helpers/errorUtil"]
-      },
+		"baseUrl": ".",
+		"paths": {
+			"~/*": ["./src/*"],
+			"@ee/*": ["./ee/*"],
+			"@app/*": ["./src/server/app-layer/*"],
+			"zod/lib/helpers/errorUtil": ["node_modules/zod/lib/helpers/errorUtil"]
+		},
 		"plugins": []
 	},
 	"include": [
