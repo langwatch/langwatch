@@ -112,6 +112,7 @@ describe("rateSpendNanoUsd", () => {
   });
 
   describe("given a model the catalog does not carry", () => {
+    /** @scenario A model with no entry at all is reported */
     it("rates zero and leaves the miss visible", () => {
       const { costNanoUsd, rateVersion } = rateSpendNanoUsd({
         model: "nonexistent-vendor/nonexistent-model-xyz",
@@ -133,6 +134,7 @@ describe("rateSpendNanoUsd", () => {
       warned.mockClear();
     });
 
+    /** @scenario A rule that prices none of the reported quantities is reported */
     it("warns when a matched rule prices none of the reported quantities", () => {
       const { costNanoUsd } = rateSpendNanoUsd({
         model: "openai/tts-1",
@@ -145,6 +147,7 @@ describe("rateSpendNanoUsd", () => {
       );
     });
 
+    /** @scenario A rule that prices none of the reported quantities is reported */
     it("names the quantities the request did carry", () => {
       rateSpendNanoUsd({
         model: "openai/tts-1",
@@ -156,6 +159,7 @@ describe("rateSpendNanoUsd", () => {
       });
     });
 
+    /** @scenario A model with no entry at all is reported */
     it("warns once, not twice, when the model is unknown as well", () => {
       rateSpendNanoUsd({
         model: "nonexistent-vendor/nonexistent-model-xyz",
@@ -165,6 +169,7 @@ describe("rateSpendNanoUsd", () => {
       expect(warned.mock.calls[0]?.[1]).toContain("no rate rule matched");
     });
 
+    /** @scenario A request that measured nothing is not a fault */
     it("stays quiet when the request measured nothing", () => {
       const { costNanoUsd } = rateSpendNanoUsd({
         model: "openai/tts-1",
@@ -174,6 +179,7 @@ describe("rateSpendNanoUsd", () => {
       expect(warned).not.toHaveBeenCalled();
     });
 
+    /** @scenario A request that measured nothing is not a fault */
     it("stays quiet when the rule priced the request", () => {
       const { costNanoUsd } = rateSpendNanoUsd({
         model: "openai/tts-1",
@@ -183,6 +189,7 @@ describe("rateSpendNanoUsd", () => {
       expect(warned).not.toHaveBeenCalled();
     });
 
+    /** @scenario A model with no entry at all is reported */
     it("still names an unknown model that measured nothing", () => {
       rateSpendNanoUsd({
         model: "nonexistent-vendor/nonexistent-model-xyz",

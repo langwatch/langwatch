@@ -49,6 +49,7 @@ func hasDropMarker(span sdktrace.ReadOnlySpan) bool {
 	return false
 }
 
+/** @scenario A span states its audio tokens apart from its text tokens */
 func TestEmitter_AudioTokens_AreStatedApartFromTheTextTotals(t *testing.T) {
 	span := recordChatSpanForUsage(t, domain.Usage{
 		PromptTokens:      200,
@@ -79,6 +80,7 @@ func TestEmitter_AudioTokens_AreStatedApartFromTheTextTotals(t *testing.T) {
 	assert.EqualValues(t, 1300, total, "the provider's total still counts every token")
 }
 
+/** @scenario A span states its audio tokens apart from its text tokens */
 func TestEmitter_NoAudioTokens_LeavesTheAudioAttributesOff(t *testing.T) {
 	span := recordChatSpanForUsage(t, domain.Usage{
 		PromptTokens:     200,
