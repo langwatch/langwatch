@@ -61,6 +61,7 @@ export function SortableColumnHeader<Column extends string>({
   onSort,
   align = "start",
   width,
+  minWidth,
 }: {
   label: string;
   column: Column;
@@ -73,6 +74,12 @@ export function SortableColumnHeader<Column extends string>({
    * to the columns that truncate.
    */
   width?: string;
+  /**
+   * Floor under the shrink-to-fit width, so a hugged column keeps clear air
+   * between its values and the next column's instead of butting its content
+   * against a hairline border.
+   */
+  minWidth?: string;
 }) {
   const active = sort.column === column;
   const direction = active ? sort.direction : null;
@@ -80,6 +87,7 @@ export function SortableColumnHeader<Column extends string>({
   return (
     <Table.ColumnHeader
       width={width}
+      minWidth={minWidth}
       whiteSpace={width === "1%" ? "nowrap" : undefined}
       aria-sort={ariaSortFor(direction)}
       // The band and the darker label do the highlighting. Weight is left to

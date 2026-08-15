@@ -685,8 +685,9 @@ describe("TerminalView", () => {
         sessionStartAtMs: 500,
       });
 
-      // The last entry is at 3,000ms; the session started at 500ms.
-      expect(screen.getByText("2.5s")).toBeInTheDocument();
+      // The last entry is at 3,000ms; the session started at 500ms, and the
+      // bar rounds to whole seconds the way the sessions table does.
+      expect(screen.getByText("3s")).toBeInTheDocument();
     });
 
     /** @scenario "Loading an earlier turn does not change the footer's totals" */

@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { formatDurationSeconds } from "~/components/me/duration";
 import type { TranscriptEntry } from "~/server/app-layer/traces/coding-agent-transcript.derivation";
 import {
   formatCost,
@@ -1659,7 +1660,11 @@ function StatusLine({
         </HStack>
         <HStack gap={3} flexWrap="wrap" justify="flex-end">
           {model && <Stat label={model} />}
-          {elapsedMs > 0 && <Stat label={formatDuration(elapsedMs)} />}
+          {/* Session-scale time: the clock is anchored at the session's first
+              turn, so it runs into hours and reads as a person says it. */}
+          {elapsedMs > 0 && (
+            <Stat label={formatDurationSeconds(elapsedMs / 1000)} />
+          )}
           {tokens > 0 && <Stat label={`${formatTokens(tokens)} tokens`} />}
           {costUsd > 0 && <Stat label={formatCost(costUsd)} accent />}
         </HStack>
