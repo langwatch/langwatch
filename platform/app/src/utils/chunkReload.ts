@@ -62,6 +62,36 @@ export function reloadOnChunkError(err: unknown): boolean {
   return true;
 }
 
+let warmupsInFlight = 0;
+
+/**
+ * Run a chunk download that no screen is waiting for, such as a page fetching
+ * the code of a drawer its rows open. Reports whether the code arrived.
+ *
+ * A warm-up asks for a content-hashed file the same way a real lazy import
+ * does, so after a deploy it hits the same stale hash and fires the same
+ * `vite:preloadError`. Reloading the page for it would take the screen away
+ * from a person who asked for nothing, so the listener below stands down while
+ * a warm-up is in flight. The next import of that chunk still recovers, at the
+ * point where somebody is waiting for it.
+ */
+export async function warmChunk(
+  load: () => Promise<unknown>,
+): Promise<boolean> {
+  warmupsInFlight += 1;
+  try {
+    await load();
+    return true;
+  } catch {
+    // Nothing on screen is waiting for this, so there is nothing to report to.
+    // The open that needs the chunk reports its own failure. The caller gets
+    // `false` so it can leave everything as it was.
+    return false;
+  } finally {
+    warmupsInFlight -= 1;
+  }
+}
+
 /**
  * Register the global recovery for component-level lazy imports. Vite fires
  * `vite:preloadError` on `window` whenever a dynamically imported chunk fails
@@ -70,6 +100,7 @@ export function reloadOnChunkError(err: unknown): boolean {
 export function registerChunkReloadListener(): void {
   if (typeof window === "undefined") return;
   window.addEventListener("vite:preloadError", (event) => {
+    if (warmupsInFlight > 0) return;
     // Only suppress Vite's error when we actually scheduled a reload. If we're
     // inside the cooldown (forceReloadOnce returns false), let the error
     // propagate to the error boundary instead of swallowing it — otherwise the

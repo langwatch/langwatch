@@ -5,6 +5,7 @@ import {
   isChunkLoadError,
   registerChunkReloadListener,
   reloadOnChunkError,
+  warmChunk,
 } from "./chunkReload";
 
 // jsdom locks down window.location (non-configurable, can't be deleted, redefined
@@ -120,6 +121,7 @@ describe("registerChunkReloadListener", () => {
   });
 
   describe("when Vite dispatches vite:preloadError for a stale chunk", () => {
+    /** @scenario "A stale file outside a warm-up still reloads the page" */
     it("reloads the page once to fetch the new chunk hashes", () => {
       registerChunkReloadListener();
 
@@ -142,6 +144,45 @@ describe("registerChunkReloadListener", () => {
 
       // No reload scheduled → Vite's error must NOT be preventDefault()'d.
       expect(event.defaultPrevented).toBe(false);
+    });
+  });
+});
+
+describe("warmChunk", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+  });
+
+  describe("when a warm-up asks for a file that is gone", () => {
+    /** @scenario "A stale file during a warm-up does not reload the page" */
+    it("does not reload the page", async () => {
+      registerChunkReloadListener();
+
+      await warmChunk(() => {
+        // Vite fires the event from its preload helper, then rejects the
+        // import, so the warm-up is still in flight when the listener runs.
+        window.dispatchEvent(
+          new Event("vite:preloadError", { cancelable: true }),
+        );
+        return Promise.reject(
+          new Error("Failed to fetch dynamically imported module"),
+        );
+      });
+
+      expect(reloaded()).toBe(false);
+    });
+  });
+
+  describe("when the warm-up has finished", () => {
+    it("leaves a later stale chunk to reload the page", async () => {
+      registerChunkReloadListener();
+      await warmChunk(() => Promise.resolve());
+
+      window.dispatchEvent(
+        new Event("vite:preloadError", { cancelable: true }),
+      );
+
+      expect(reloaded()).toBe(true);
     });
   });
 });
