@@ -40,46 +40,77 @@ function listItem(overrides: Partial<TraceListItem> = {}): TraceListItem {
 }
 
 const seeEverything = {
+  canSeeCosts: true,
   canSeeCapturedInput: true,
   canSeeCapturedOutput: true,
 };
 
 describe("toConversationContextTurn", () => {
   describe("given a listed turn of a session", () => {
-    /** @scenario "The turn list carries each turn's cost and tokens" */
-    it("carries the turn's total tokens and total cost", () => {
-      const turn = toConversationContextTurn(listItem(), seeEverything);
+    describe("when the viewer holds cost:view", () => {
+      /** @scenario "The turn list carries each turn's cost and tokens" */
+      it("carries the turn's total tokens and total cost", () => {
+        const turn = toConversationContextTurn(listItem(), seeEverything);
 
-      expect(turn.totalTokens).toBe(1_234);
-      expect(turn.totalCost).toBe(0.42);
+        expect(turn.totalTokens).toBe(1_234);
+        expect(turn.totalCost).toBe(0.42);
+      });
+
+      it("keeps the turn's identity and content", () => {
+        const turn = toConversationContextTurn(listItem(), seeEverything);
+
+        expect(turn.traceId).toBe("trace-1");
+        expect(turn.timestamp).toBe(1_000);
+        expect(turn.name).toBe("claude_code.turn");
+        expect(turn.input).toBe("bump the version");
+        expect(turn.output).toBe("Bumped.");
+      });
     });
 
-    it("keeps the turn's identity and content", () => {
-      const turn = toConversationContextTurn(listItem(), seeEverything);
+    describe("when the viewer does not hold cost:view", () => {
+      /** @scenario "A viewer without cost:view reads no per-turn spend" */
+      it("nulls the turn's cost and keeps its tokens", () => {
+        const turn = toConversationContextTurn(listItem(), {
+          canSeeCosts: false,
+          canSeeCapturedInput: true,
+          canSeeCapturedOutput: true,
+        });
 
-      expect(turn.traceId).toBe("trace-1");
-      expect(turn.timestamp).toBe(1_000);
-      expect(turn.name).toBe("claude_code.turn");
-      expect(turn.input).toBe("bump the version");
-      expect(turn.output).toBe("Bumped.");
+        expect(turn.totalCost).toBeNull();
+        expect(turn.totalTokens).toBe(1_234);
+        expect(turn.input).toBe("bump the version");
+      });
+
+      /** @scenario "A viewer without cost:view reads no per-turn spend" */
+      it("nulls the turn's cost when the permission is simply absent", () => {
+        const turn = toConversationContextTurn(listItem(), {
+          canSeeCapturedInput: true,
+          canSeeCapturedOutput: true,
+        });
+
+        expect(turn.totalCost).toBeNull();
+      });
     });
   });
 
   describe("given the viewer may not see captured content", () => {
-    it("nulls the content but still carries the totals", () => {
-      const turn = toConversationContextTurn(listItem(), {
-        canSeeCapturedInput: false,
-        canSeeCapturedOutput: false,
-        capturedInputVisibleTo: "Admins",
-        capturedOutputVisibleTo: "Admins",
-      });
+    describe("when the viewer still holds cost:view", () => {
+      it("nulls the content but still carries the totals", () => {
+        const turn = toConversationContextTurn(listItem(), {
+          canSeeCosts: true,
+          canSeeCapturedInput: false,
+          canSeeCapturedOutput: false,
+          capturedInputVisibleTo: "Admins",
+          capturedOutputVisibleTo: "Admins",
+        });
 
-      expect(turn.input).toBeNull();
-      expect(turn.output).toBeNull();
-      expect(turn.inputRedacted).toBe(true);
-      expect(turn.outputRedacted).toBe(true);
-      expect(turn.totalTokens).toBe(1_234);
-      expect(turn.totalCost).toBe(0.42);
+        expect(turn.input).toBeNull();
+        expect(turn.output).toBeNull();
+        expect(turn.inputRedacted).toBe(true);
+        expect(turn.outputRedacted).toBe(true);
+        expect(turn.totalTokens).toBe(1_234);
+        expect(turn.totalCost).toBe(0.42);
+      });
     });
   });
 });

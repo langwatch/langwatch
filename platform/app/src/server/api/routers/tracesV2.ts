@@ -503,6 +503,7 @@ type V2RedactionFlags = {
 
 /** Protection facts the V2 read mappers consume to enforce restrict at read. */
 type V2Protections = {
+  canSeeCosts?: boolean | null;
   canSeeCapturedInput?: boolean | null;
   canSeeCapturedOutput?: boolean | null;
   capturedInputVisibleTo?: string | null;
@@ -812,7 +813,11 @@ export function toConversationContextTurn(
     inputVisibleTo,
     outputVisibleTo,
     totalTokens: t.totalTokens,
-    totalCost: t.totalCost,
+    // Spend follows the viewer's own `cost:view` (ADR-057), the same rule the
+    // session rows and the trace header apply through `gateSessionCost` /
+    // `gateHeaderCost`. Without it a viewer who may not read the session
+    // rollup could add the same total up one turn at a time.
+    totalCost: protections.canSeeCosts === true ? t.totalCost : null,
   };
 }
 

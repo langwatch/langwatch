@@ -310,64 +310,82 @@ describe("useSessionScrollback", () => {
   });
 
   describe("given the session's turns carry their totals", () => {
-    /** @scenario "The footer counts the whole session up to the reader's position" */
-    it("sums the unloaded earlier turns and anchors the clock at turn one", () => {
-      const { result } = setup();
+    describe("when the drawer opens with the earlier turns unloaded", () => {
+      /** @scenario "The footer counts the whole session up to the reader's position" */
+      it("sums the unloaded earlier turns and anchors the clock at turn one", () => {
+        const { result } = setup();
 
-      expect(result.current.earlierTotals).toEqual({
-        tokens: 3_000,
-        costUsd: 1.2,
-      });
-      expect(result.current.sessionStartAtMs).toBe(1_000);
-    });
-
-    /** @scenario "Loading an earlier turn does not change the footer's totals" */
-    it("moves a loaded turn's share out of the baseline", async () => {
-      const { result } = setup();
-
-      await act(async () => {
-        result.current.loadEarlier();
-      });
-
-      expect(result.current.earlierTotals).toEqual({
-        tokens: 1_000,
-        costUsd: 0.5,
+        expect(result.current.earlierTotals).toEqual({
+          tokens: 3_000,
+          costUsd: 1.2,
+        });
+        expect(result.current.sessionStartAtMs).toBe(1_000);
       });
     });
 
-    it("counts a turn without totals as zero rather than dropping the rest", () => {
-      conversation.turns = [
-        { traceId: "turn-1", timestamp: 1_000 },
-        { traceId: "turn-2", timestamp: 2_000, totalTokens: 50, totalCost: 1 },
-        { traceId: "turn-3", timestamp: 3_000 },
-      ];
-      const { result } = setup();
+    describe("when an earlier turn is loaded", () => {
+      /** @scenario "Loading an earlier turn does not change the footer's totals" */
+      it("moves a loaded turn's share out of the baseline", async () => {
+        const { result } = setup();
 
-      expect(result.current.earlierTotals).toEqual({ tokens: 50, costUsd: 1 });
+        await act(async () => {
+          result.current.loadEarlier();
+        });
+
+        expect(result.current.earlierTotals).toEqual({
+          tokens: 1_000,
+          costUsd: 0.5,
+        });
+      });
+    });
+
+    describe("when one of the turns carries no totals", () => {
+      it("counts a turn without totals as zero rather than dropping the rest", () => {
+        conversation.turns = [
+          { traceId: "turn-1", timestamp: 1_000 },
+          {
+            traceId: "turn-2",
+            timestamp: 2_000,
+            totalTokens: 50,
+            totalCost: 1,
+          },
+          { traceId: "turn-3", timestamp: 3_000 },
+        ];
+        const { result } = setup();
+
+        expect(result.current.earlierTotals).toEqual({
+          tokens: 50,
+          costUsd: 1,
+        });
+      });
     });
   });
 
   describe("given the session's turn list is still being read", () => {
-    it("reports pending rather than a session-less trace", () => {
-      conversation.turns = [];
-      conversation.isLoading = true;
-      const { result } = setup();
+    describe("when the drawer asks for the scrollback", () => {
+      it("reports pending rather than a session-less trace", () => {
+        conversation.turns = [];
+        conversation.isLoading = true;
+        const { result } = setup();
 
-      expect(result.current.status).toBe("pending");
-      expect(result.current.earlierTotals).toBeNull();
-      expect(result.current.sessionStartAtMs).toBeNull();
+        expect(result.current.status).toBe("pending");
+        expect(result.current.earlierTotals).toBeNull();
+        expect(result.current.sessionStartAtMs).toBeNull();
+      });
     });
   });
 
   describe("given a trace that belongs to no session", () => {
-    it("offers no scrollback at all", () => {
-      const { result } = setup({ conversationId: null });
+    describe("when the drawer asks for the scrollback", () => {
+      it("offers no scrollback at all", () => {
+        const { result } = setup({ conversationId: null });
 
-      expect(result.current.status).toBe("hidden");
-      expect(result.current.earlierCount).toBe(0);
-      expect(result.current.entries).toEqual(OPENED_ENTRIES);
-      expect(result.current.earlierTotals).toBeNull();
-      expect(result.current.sessionStartAtMs).toBeNull();
+        expect(result.current.status).toBe("hidden");
+        expect(result.current.earlierCount).toBe(0);
+        expect(result.current.entries).toEqual(OPENED_ENTRIES);
+        expect(result.current.earlierTotals).toBeNull();
+        expect(result.current.sessionStartAtMs).toBeNull();
+      });
     });
   });
 

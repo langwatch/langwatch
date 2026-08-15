@@ -662,147 +662,157 @@ describe("TerminalView", () => {
   });
 
   describe("given the session's earlier turns are not loaded yet", () => {
-    /** @scenario "The footer counts the whole session up to the reader's position" */
-    it("counts the unloaded turns' tokens and cost into the bottom bar", () => {
-      renderView({
-        earlierTotals: { tokens: 1_000, costUsd: 1.0 },
-        sessionStartAtMs: 500,
-        scrollback: {
-          status: "available",
-          earlierCount: 5,
-          onLoadEarlier: vi.fn(),
-        },
-      });
-
-      // 1,000 tokens and $1.00 above the window, 175 tokens and $0.06 loaded.
-      expect(screen.getByText("1.2K tokens")).toBeInTheDocument();
-      expect(screen.getByText("$1.06")).toBeInTheDocument();
-    });
-
-    it("measures elapsed time from the session's first turn", () => {
-      renderView({
-        earlierTotals: { tokens: 0, costUsd: 0 },
-        sessionStartAtMs: 500,
-      });
-
-      // The last entry is at 3,000ms; the session started at 500ms, and the
-      // bar rounds to whole seconds the way the sessions table does.
-      expect(screen.getByText("3s")).toBeInTheDocument();
-    });
-
-    /** @scenario "Loading an earlier turn does not change the footer's totals" */
-    it("keeps the totals at the reader's position when an earlier turn lands", () => {
-      const view = renderScrollback({
-        earlierTotals: { tokens: 175, costUsd: 0.06 },
-        sessionStartAtMs: 500,
-        scrollback: {
-          status: "available",
-          earlierCount: 1,
-          onLoadEarlier: vi.fn(),
-        },
-      });
-      expect(screen.getByText("175 tokens")).toBeInTheDocument();
-      expect(screen.getByText("$0.06")).toBeInTheDocument();
-
-      // The earlier turn lands: its share moves out of the baseline and into
-      // the loaded entries, and the bar reads exactly the same.
-      act(() => {
-        fakeBox(view.screenEl, { scrollHeight: 500 });
-        view.rerender({
-          entries: [...EARLIER_TURN_WITH_CALL, ...OPENED_TURN],
-          rowKeys: [...EARLIER_WITH_CALL_KEYS, ...OPENED_KEYS],
-          turnDividers: TURN_DIVIDERS_AFTER_CALL,
-          earlierTotals: { tokens: 0, costUsd: 0 },
+    describe("when the reader reads the bottom bar", () => {
+      /** @scenario "The footer counts the whole session up to the reader's position" */
+      it("counts the unloaded turns' tokens and cost into the bottom bar", () => {
+        renderView({
+          earlierTotals: { tokens: 1_000, costUsd: 1.0 },
+          sessionStartAtMs: 500,
           scrollback: {
-            status: "start",
-            earlierCount: 0,
+            status: "available",
+            earlierCount: 5,
             onLoadEarlier: vi.fn(),
           },
         });
+
+        // 1,000 tokens and $1.00 above the window, 175 tokens and $0.06 loaded.
+        expect(screen.getByText("1.2K tokens")).toBeInTheDocument();
+        expect(screen.getByText("$1.06")).toBeInTheDocument();
       });
 
-      expect(screen.getByText("175 tokens")).toBeInTheDocument();
-      expect(screen.getByText("$0.06")).toBeInTheDocument();
+      it("measures elapsed time from the session's first turn", () => {
+        renderView({
+          earlierTotals: { tokens: 0, costUsd: 0 },
+          sessionStartAtMs: 500,
+        });
+
+        // The last entry is at 3,000ms; the session started at 500ms, and the
+        // bar rounds to whole seconds the way the sessions table does.
+        expect(screen.getByText("3s")).toBeInTheDocument();
+      });
+    });
+
+    describe("when an earlier turn lands above the reader", () => {
+      /** @scenario "Loading an earlier turn does not change the footer's totals" */
+      it("keeps the totals at the reader's position when an earlier turn lands", () => {
+        const view = renderScrollback({
+          earlierTotals: { tokens: 175, costUsd: 0.06 },
+          sessionStartAtMs: 500,
+          scrollback: {
+            status: "available",
+            earlierCount: 1,
+            onLoadEarlier: vi.fn(),
+          },
+        });
+        expect(screen.getByText("175 tokens")).toBeInTheDocument();
+        expect(screen.getByText("$0.06")).toBeInTheDocument();
+
+        // The earlier turn lands: its share moves out of the baseline and into
+        // the loaded entries, and the bar reads exactly the same.
+        act(() => {
+          fakeBox(view.screenEl, { scrollHeight: 500 });
+          view.rerender({
+            entries: [...EARLIER_TURN_WITH_CALL, ...OPENED_TURN],
+            rowKeys: [...EARLIER_WITH_CALL_KEYS, ...OPENED_KEYS],
+            turnDividers: TURN_DIVIDERS_AFTER_CALL,
+            earlierTotals: { tokens: 0, costUsd: 0 },
+            scrollback: {
+              status: "start",
+              earlierCount: 0,
+              onLoadEarlier: vi.fn(),
+            },
+          });
+        });
+
+        expect(screen.getByText("175 tokens")).toBeInTheDocument();
+        expect(screen.getByText("$0.06")).toBeInTheDocument();
+      });
     });
   });
 
   describe("given the loaded transcript starts mid-session with its context already grown", () => {
-    /** @scenario "A context note waits for the call before it" */
-    it("draws no context note while the call before it is unknown", () => {
-      renderView({
-        entries: GROWN_OPENED_TURN,
-        scrollback: {
-          status: "available",
-          earlierCount: 3,
-          onLoadEarlier: vi.fn(),
-        },
-      });
-
-      expect(screen.queryByText(/Context growing/)).not.toBeInTheDocument();
-    });
-
-    /** @scenario "A context note below the reader survives earlier turns loading" */
-    it("keeps the lines below the reader stable when the earlier turn lands", () => {
-      const view = renderScrollback({
-        entries: GROWN_OPENED_TURN,
-        rowKeys: ["turn-5#0", "turn-5#1"],
-        scrollback: {
-          status: "available",
-          earlierCount: 1,
-          onLoadEarlier: vi.fn(),
-        },
-      });
-      expect(screen.queryByText(/Context growing/)).not.toBeInTheDocument();
-
-      // The earlier turn was already in the growing band, so the crossing
-      // belongs to it: the note appears up there, and no note materializes at
-      // the opened turn below the reader.
-      act(() => {
-        fakeBox(view.screenEl, { scrollHeight: 500 });
-        view.rerender({
-          entries: [...GROWN_EARLIER_TURN, ...GROWN_OPENED_TURN],
-          rowKeys: ["turn-4#0", "turn-4#1", "turn-5#0", "turn-5#1"],
-          turnDividers: new Map([
-            [
-              GROWN_EARLIER_TURN.length,
-              { turnNumber: 5, turnCount: 5, atMs: 5000 },
-            ],
-          ]),
+    describe("when the transcript is drawn with the earlier turns missing", () => {
+      /** @scenario "A context note waits for the call before it" */
+      it("draws no context note while the call before it is unknown", () => {
+        renderView({
+          entries: GROWN_OPENED_TURN,
           scrollback: {
-            status: "start",
-            earlierCount: 0,
+            status: "available",
+            earlierCount: 3,
             onLoadEarlier: vi.fn(),
           },
         });
-      });
 
-      expect(
-        screen.getByText("Context growing: 52.0K tokens"),
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByText("Context growing: 60.0K tokens"),
-      ).not.toBeInTheDocument();
+        expect(screen.queryByText(/Context growing/)).not.toBeInTheDocument();
+      });
+    });
+
+    describe("when the earlier turn lands above the reader", () => {
+      /** @scenario "A context note below the reader survives earlier turns loading" */
+      it("keeps the lines below the reader stable when the earlier turn lands", () => {
+        const view = renderScrollback({
+          entries: GROWN_OPENED_TURN,
+          rowKeys: ["turn-5#0", "turn-5#1"],
+          scrollback: {
+            status: "available",
+            earlierCount: 1,
+            onLoadEarlier: vi.fn(),
+          },
+        });
+        expect(screen.queryByText(/Context growing/)).not.toBeInTheDocument();
+
+        // The earlier turn was already in the growing band, so the crossing
+        // belongs to it: the note appears up there, and no note materializes at
+        // the opened turn below the reader.
+        act(() => {
+          fakeBox(view.screenEl, { scrollHeight: 500 });
+          view.rerender({
+            entries: [...GROWN_EARLIER_TURN, ...GROWN_OPENED_TURN],
+            rowKeys: ["turn-4#0", "turn-4#1", "turn-5#0", "turn-5#1"],
+            turnDividers: new Map([
+              [
+                GROWN_EARLIER_TURN.length,
+                { turnNumber: 5, turnCount: 5, atMs: 5000 },
+              ],
+            ]),
+            scrollback: {
+              status: "start",
+              earlierCount: 0,
+              onLoadEarlier: vi.fn(),
+            },
+          });
+        });
+
+        expect(
+          screen.getByText("Context growing: 52.0K tokens"),
+        ).toBeInTheDocument();
+        expect(
+          screen.queryByText("Context growing: 60.0K tokens"),
+        ).not.toBeInTheDocument();
+      });
     });
   });
 
   describe("given the session's turn list is still being read", () => {
-    it("offers nothing at the top until it resolves", () => {
-      renderScrollback({
-        banner: {
-          agent: "claude_code",
-          version: "2.1.207",
-          model: "claude-opus-4-8",
-          repo: "langwatch/langwatch",
-        },
-        scrollback: {
-          status: "pending",
-          earlierCount: 0,
-          onLoadEarlier: vi.fn(),
-        },
-      });
+    describe("when the reader looks at the top of the screen", () => {
+      it("offers nothing at the top until it resolves", () => {
+        renderScrollback({
+          banner: {
+            agent: "claude_code",
+            version: "2.1.207",
+            model: "claude-opus-4-8",
+            repo: "langwatch/langwatch",
+          },
+          scrollback: {
+            status: "pending",
+            earlierCount: 0,
+            onLoadEarlier: vi.fn(),
+          },
+        });
 
-      expect(screen.queryByText(/Claude Code v/)).not.toBeInTheDocument();
-      expect(screen.queryByText(/earlier turn/)).not.toBeInTheDocument();
+        expect(screen.queryByText(/Claude Code v/)).not.toBeInTheDocument();
+        expect(screen.queryByText(/earlier turn/)).not.toBeInTheDocument();
+      });
     });
   });
 

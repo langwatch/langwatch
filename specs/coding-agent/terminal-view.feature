@@ -192,6 +192,18 @@ Rule: The terminal reads back the whole session
     When a turn of the session is listed
     Then it carries the turn's total tokens and total cost
 
+  # Spend follows the reader's own cost permission everywhere it is shown. A
+  # reader who may not see the session's cost on the sessions screen must not
+  # be able to add the same total up one turn at a time from the turn list.
+
+  @unit
+  Scenario: A viewer without cost:view reads no per-turn spend
+    Given a session whose turns are listed by the conversation read
+    And the reader may not see cost
+    When a turn of the session is listed
+    Then the turn carries no cost
+    And the turn still carries its total tokens
+
   # Agents inject blocks into the user's message that the human never typed: a
   # monitor firing, a hook's system reminder, a queued task notification. Printed
   # verbatim behind the prompt caret they read as the reader's own words, which
