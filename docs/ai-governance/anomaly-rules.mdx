@@ -108,7 +108,7 @@ Two angles, same data:
 
 **CLI**: `langwatch governance status` shows `hasAnomalyRules: true` once at least one rule exists. The `recentAnomalies` query is wired into the same `api.activityMonitor.recentAnomalies` tRPC procedure the dashboard reads.
 
-For a dogfood loop you can drive yourself:
+To verify it yourself, end to end:
 
 1. Create a `spend_spike` rule scoped to your test IngestionSource with `minBaselineUsd: 0.001` (tiny floor) and `ratioVsBaseline: 1.5`.
 2. Send one OTel event with `gen_ai.usage.cost_usd: 0.05` (baseline seed), see [otel-generic, Test it now](/ai-gateway/governance/ingestion-sources/otel-generic#test-it-now--copy-paste-curl).

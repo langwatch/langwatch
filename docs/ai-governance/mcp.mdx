@@ -71,7 +71,7 @@ Governance MCP tools register inside LangWatch's existing MCP server (served on 
 
 The 9 governance tools register via `registerGovernanceMcpTools(server, ctx)` from `platform/app/src/mcp/governance-tools.ts` (Lane-Q at `7639b6c2b`). The same registration runs at all three `createMcpServer()` callsites in `handler.ts` so the tools are available regardless of which MCP transport the client chose.
 
-<Note>**Dev-environment port routing**: in production, LangWatch listens on a single port and the `/mcp` + `/sse` + `/oauth/*` + `/.well-known/oauth-*` routes are all reachable on the same host. In dev (Vite), external MCP clients (e.g. Claude Code) hit `FRONTEND_PORT` (default `5560`) which proxies the seven MCP route prefixes through to the API port. Local Claude Code runbook: `claude mcp add langwatch http://localhost:5560/mcp` (or the OAuth flow at `http://localhost:5560/api/mcp/authorize` for write tools). The proxy wiring + a real-SDK probe at `platform/app/scripts/dogfood/governance/mcp-client-probe.ts` shipped at `82375478e`; the probe asserts all 9 tools register, that read tools return the catalog with a project apiKey Bearer, and that write tools return `AUTH_REQUIRED:` until the OAuth flow completes.</Note>
+<Note>**Dev-environment port routing**: in production, LangWatch listens on a single port and the `/mcp` + `/sse` + `/oauth/*` + `/.well-known/oauth-*` routes are all reachable on the same host. In dev (Vite), external MCP clients (e.g. Claude Code) hit `FRONTEND_PORT` (default `5560`) which proxies the seven MCP route prefixes through to the API port. Local Claude Code runbook: `claude mcp add langwatch http://localhost:5560/mcp` (or the OAuth flow at `http://localhost:5560/api/mcp/authorize` for write tools). All 9 tools register over that proxy, read tools return the catalog with a project apiKey Bearer, and write tools return `AUTH_REQUIRED:` until the OAuth flow completes.</Note>
 
 ## RBAC enforcement
 
@@ -118,11 +118,9 @@ Payload shapes are identical to the REST API's audit rows apart from `metadata.s
 
 The contract is service-layer-asserted by `platform/app/src/mcp/__tests__/governance-tools.audit-uniform.integration.test.ts` (Lane B-MCP audit at `66fd35162`), 3 cases against real Postgres: `governance_ingestion_templates_create` stamps `metadata.surface = "mcp"`, `governance_ingestion_keys_mint` stamps `metadata.surface = "mcp"`, and the `AUTH_REQUIRED:` negative path fails before any audit row is written. No wire-level MCP test is needed (per the Path B architecture there is no MCP-over-HTTP wire to assert at).
 
-For the agent-end-to-end gate (real Claude Code agent provisions governance via MCP only, no UI clicks) the runbook lives at `dev/docs/runbooks/governance-dogfood-mcp-claude-code.md`. Six steps: `claude mcp add langwatch http://localhost:5560/mcp` → read-tool walkthrough (list + get with project apiKey) → write-tool walkthrough (admin_list + clone + update_ottl_rules + archive after OAuth → 3 audit rows with `metadata.surface = "mcp"`) → ingestion-key mint (1 audit row + one-time `sk-lw-…` token) → fail-closed `AUTH_REQUIRED:` negative case → checklist for pasting evidence back.
+## Agent setup from scratch
 
-## Agent setup-from-scratch (the dogfood gate)
-
-The umbrella spec defines an end-to-end test: an agent connecting with admin apiKey can fully configure governance via a sequence of MCP tool calls:
+An agent connecting with an admin apiKey can fully configure governance through a sequence of MCP tool calls:
 
 1. `governance_ingestion_templates_list`, read existing platform templates
 2. `governance_ingestion_templates_clone_from_platform`, clone `claude_code` into the org (delegates to `POST /api/governance/ingestion-templates/clone`)
@@ -130,7 +128,7 @@ The umbrella spec defines an end-to-end test: an agent connecting with admin api
 4. `governance_role_bindings_assign_to_user`, give a user `governance:view`
 5. `governance_audit_log_query`, verify steps 2–4 all emitted audit rows
 
-If every step succeeds and step 5 returns the matching audit rows, the MCP surface is genuinely agentic-usable. The dogfood-gate runbook is co-owned with QA (Lane-Q) and lives alongside the IngestionTemplate v1 dogfood discipline.
+If every step succeeds and step 5 returns the matching audit rows, an agent can run the whole setup without a single UI click.
 
 ## Cross-references
 

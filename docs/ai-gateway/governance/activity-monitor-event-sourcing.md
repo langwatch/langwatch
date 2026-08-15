@@ -130,7 +130,7 @@ The redesign ships as four slices, C0 through C3:
   writing CH directly.
 - Map projection `activityEventStorage` writes to
   `gateway_activity_events` (replaces today's direct insert).
-- Dogfood: curl → 202 → row visible in CH (same as today, just via
+- Manual check: curl → 202 → row visible in CH (same as today, just via
   event-sourced path).
 
 ### C2: AnomalyAlert and anomaly reactor for one rule type
@@ -141,7 +141,7 @@ The redesign ships as four slices, C0 through C3:
   (cleanest mapping to the existing CostUSD field).
 - Wire into `api.activityMonitor.recentAnomalies` (replaces current
   `[]` stub).
-- Dogfood: create a rule in the anomaly rules UI → curl a violating
+- Manual check: create a rule in the anomaly rules UI → curl a violating
   event → alert appears on `/governance` within ~30s.
 
 ### C3: Dispatch destinations
@@ -171,8 +171,8 @@ The redesign ships as four slices, C0 through C3:
 
 ## Test strategy per slice
 
-| Slice | BDD spec | Integration test | Dogfood |
-|-------|----------|------------------|---------|
+| Slice | BDD spec | Integration test | Manual check |
+|-------|----------|------------------|--------------|
 | C0 (this) | anomaly-detection.feature updated | n/a (doc + schema) | architecture review in-channel |
 | C1 | activity-monitor pipeline scenarios in `activity-monitor.feature` | pipeline test: append event → projection fires → CH row | curl → 202 → CH SELECT |
 | C2 | spend_spike scenario in anomaly-detection.feature | reactor test: violating fold state → AnomalyAlert.upsert called | UI rule + violating event → /governance shows alert |

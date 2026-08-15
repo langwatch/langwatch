@@ -70,8 +70,8 @@ The org's IngestionSources, active by default. Pass `--all` to include archived 
 
 ```text
 $ langwatch ingest list
-NAME                        TYPE          STATUS  LAST EVENT
-Dogfood OTel · alexis lane  otel_generic  active  46m ago
+NAME                    TYPE          STATUS  LAST EVENT
+Generic OTel · eu-west  otel_generic  active  46m ago
 ```
 
 Status colouring:
@@ -87,7 +87,7 @@ $ langwatch ingest list --json
 [
   {
     "id": "JxQztBgN90QeX12-afJ0C",
-    "name": "Dogfood OTel · alexis lane",
+    "name": "Generic OTel · eu-west",
     "sourceType": "otel_generic",
     "description": null,
     "status": "active",
@@ -106,7 +106,7 @@ A one-shot snapshot: events received in the last 24h, 7d, 30d, plus the timestam
 
 ```text
 $ langwatch ingest health JxQztBgN90QeX12-afJ0C
-Dogfood OTel · alexis lane  (JxQztBgN90QeX12-afJ0C)
+Generic OTel · eu-west  (JxQztBgN90QeX12-afJ0C)
 Status:        active
 Events (24h):  1
 Events (7d):   1
@@ -121,7 +121,7 @@ $ langwatch ingest health JxQztBgN90QeX12-afJ0C --json
 {
   "source": {
     "id": "JxQztBgN90QeX12-afJ0C",
-    "name": "Dogfood OTel · alexis lane",
+    "name": "Generic OTel · eu-west",
     "status": "active"
   },
   "health": {

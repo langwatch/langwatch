@@ -333,13 +333,10 @@ weaponized against the org or other orgs:
 Cross-org cost integrity is structurally protected on both tiers by the attribution-keys
 re-stamp regardless of OTTL, admin OTTL in org-A cannot misattribute cost to org-B.
 
-Concretely, before each tile flips to green-checked we run a **two-track dogfood
-discipline**: (a) a fixture-track verification, canned OTLP payloads emitted via
-`scripts/dogfood/emit-otlp.sh`, including forge-attempt regressions against both the
-base and tier-2 protected lists, and (b) a real-user track, admin publishes via
-`/settings/governance/tool-catalog`, a real user installs via `/me`, the real upstream
-tool emits a real trace, and the result is verified end-to-end with cross-user isolation.
-Per-template rituals live at `platform/app/ee/governance/ingestion-templates/<slug>/dogfood.md`.
+A tile flips to green-checked only after the template is verified end to end on a real
+install: an admin publishes it via `/settings/governance/tool-catalog`, a user installs it
+via `/me`, the upstream tool emits a real trace, and the resulting attribution holds up
+under cross-user isolation and forge attempts against both protected lists.
 
 ### What is audited
 
@@ -396,21 +393,6 @@ fallback works today. If you'd like a custom template for another tool, file a r
 and we'll evaluate.
 
 ---
-
-## Verifying the contract
-
-The full admin OTTL authoring flow has a Playwright real-user dogfood at
-`platform/app/e2e/admin-ottl-dogfood.ts` (~30s loop), 8 steps end-to-end:
-navigate → list 3 platform rows → View OTTL drawer → Clone-to-customise →
-Save OTTL → list 4 rows → Edit OTTL → Archive. Pairs with the
-service-level integration test at
-`platform/app/ee/governance/services/__tests__/ingestionTemplate.authoring.integration.test.ts`
-and the wire-level REST integration test at
-`platform/app/src/app/api/governance/__tests__/governance-rest-api.integration.test.ts`.
-
-If you're touching the IngestionTemplatesEditor surface, the OttlEditor
-component, or the IngestionTemplateService, run the dogfood + both
-integration tests locally as a regression playbook before opening a PR.
 
 ## Related
 

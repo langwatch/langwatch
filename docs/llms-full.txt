@@ -7606,63 +7606,29 @@ The reference server passes all of:
 - `/logout` is idempotent: passing an unknown / already-revoked refresh
   token still returns `200 { ok: true }`
 
-## Try it locally (dogfood loop)
+## Verify it yourself
 
-The repo ships dogfood helpers that mint a personal virtual key and
-fire a real completion through your local Go gateway, so you can see
-real spend land in `/me/usage` and the governance dashboard before you
-roll out to your team.
+Mint a personal virtual key for your own account and send one request
+through it. The spend then lands in the same surfaces your users and
+admins read.
 
-```bash
-# 1. Bring up the stack (postgres + redis + clickhouse + app + workers)
-make quickstart all-local
-make service svc=aigateway   # in a second terminal
-
-# 2. Sign up a persona-4 admin (uses /api/auth/sign-up/email)
-curl -X POST http://localhost:5560/api/auth/sign-up/email \
-  -H 'content-type: application/json' \
-  -d '{"email":"jane@acme.test","password":"...","name":"Jane Acme"}'
-
-# 3. Seed the persona's personal team + project + VK
-pnpm tsx scripts/dogfood/seed-personas.ts \
-  --email jane@acme.test --persona p4 --mint-vk
-# → prints VK secret to stdout (capture it; it's shown once)
-
-# 4. Fire a real completion through the gateway
-pnpm tsx scripts/dogfood/fire-completion.ts \
-  --vk vk-lw-<...> \
-  --model claude-sonnet-4 \
-  --prompt "Write a haiku about retrieval-augmented generation."
-
-# 5. Wait ~5s for the trace pipeline, then visit:
-#    /me/usage      (see Budget caveat below)
-#    /governance    (admin's governance home with live activity)
-```
-
-The `seed-personas.ts` helper covers persona 1 (admin), persona 3
-(LLMOps majority, no chrome change), and persona 4 (admin who also
-uses the CLI). Add `--mint-vk` to the latter two to get a usable
-personal VK.
+1. Open `/me`, pick a provider you connected in step 2, and mint a
+   personal virtual key. The secret is shown once.
+2. Send one completion through the gateway with that key, from the
+   `langwatch` CLI or any OpenAI-compatible client.
+3. Wait a few seconds for the trace pipeline, then open `/me/usage`
+   for your own spend and `/governance` for the org-wide activity.
 
 <Note>
-  **Budget caveat for `/me/usage`**: spend is computed from the
-  `gateway_budget_ledger_events` fold, which only writes ledger rows
-  when a Budget applies to the request. A fresh `--mint-vk` seed
-  produces a working personal VK but no Budget binding by default,
-  so `/me/usage` shows `$0.00` even though real spans landed in the
-  trace store.
+  **Why `/me/usage` can read `$0.00`**: spend is computed from the
+  `gateway_budget_ledger_events` fold, which writes ledger rows only
+  when a Budget applies to the request. A personal virtual key with no
+  Budget bound produces real spans in the trace store and no ledger
+  rows, so `/me/usage` stays at `$0.00`.
 
-  This matches production behavior. Admins attach budgets in step 4
-  above, and `/me/usage` spend appears once a Budget is bound to the
-  user (or to the personal VK directly). To prove real spend in a
-  dogfood run today, attach a $0-limit tracking budget to the
-  seeded user (or to the personal team) before firing completions.
-
-  **Product follow-up**: separating the usage-display query from the
-  Budget-limit machinery (so `/me/usage` aggregates spans directly
-  scoped by `principal_user_id` regardless of Budget binding) is on
-  the post-merge follow-up list. Until then, `/me/usage` is
-  Budget-gated by design.
+  Bind a Budget to the user, to the personal team, or to the personal
+  virtual key ([step 4](#4-set-per-user-budgets)) before you send the
+  request, and the spend appears.
 </Note>
 
 ## What's next
@@ -8228,7 +8194,7 @@ If you're curious about the platform side:
 ## For admins setting this up
 
 - [Admin setup](/ai-gateway/governance/admin-setup): SSO, gateway provider keys, org-wide monthly budget ceiling
-- [Try it locally (dogfood loop)](/ai-gateway/governance/admin-setup#try-it-locally-dogfood-loop): mint a persona, fire a real completion, watch real spend land on `/me/usage`
+- [Verify it yourself](/ai-gateway/governance/admin-setup#verify-it-yourself): mint a personal virtual key, send a real completion, watch the spend land on `/me/usage`
 - [Control plane](/ai-gateway/governance/control-plane): the full Tier 1-5 governance dashboard architecture
 
 ---
@@ -13777,7 +13743,7 @@ Two angles, same data:
 
 **CLI**: `langwatch governance status` shows `hasAnomalyRules: true` once at least one rule exists. The `recentAnomalies` query is wired into the same `api.activityMonitor.recentAnomalies` tRPC procedure the dashboard reads.
 
-For a dogfood loop you can drive yourself:
+To verify it yourself, end to end:
 
 1. Create a `spend_spike` rule scoped to your test IngestionSource with `minBaselineUsd: 0.001` (tiny floor) and `ratioVsBaseline: 1.5`.
 2. Send one OTel event with `gen_ai.usage.cost_usd: 0.05` (baseline seed), see [otel-generic, Test it now](/ai-gateway/governance/ingestion-sources/otel-generic#test-it-now--copy-paste-curl).
@@ -14126,8 +14092,8 @@ The org's IngestionSources, active by default. Pass `--all` to include archived 
 
 ```text
 $ langwatch ingest list
-NAME                        TYPE          STATUS  LAST EVENT
-Dogfood OTel · alexis lane  otel_generic  active  46m ago
+NAME                    TYPE          STATUS  LAST EVENT
+Generic OTel · eu-west  otel_generic  active  46m ago
 ```
 
 Status colouring:
@@ -14143,7 +14109,7 @@ $ langwatch ingest list --json
 [
   {
     "id": "JxQztBgN90QeX12-afJ0C",
-    "name": "Dogfood OTel · alexis lane",
+    "name": "Generic OTel · eu-west",
     "sourceType": "otel_generic",
     "description": null,
     "status": "active",
@@ -14162,7 +14128,7 @@ A one-shot snapshot: events received in the last 24h, 7d, 30d, plus the timestam
 
 ```text
 $ langwatch ingest health JxQztBgN90QeX12-afJ0C
-Dogfood OTel · alexis lane  (JxQztBgN90QeX12-afJ0C)
+Generic OTel · eu-west  (JxQztBgN90QeX12-afJ0C)
 Status:        active
 Events (24h):  1
 Events (7d):   1
@@ -14177,7 +14143,7 @@ $ langwatch ingest health JxQztBgN90QeX12-afJ0C --json
 {
   "source": {
     "id": "JxQztBgN90QeX12-afJ0C",
-    "name": "Dogfood OTel · alexis lane",
+    "name": "Generic OTel · eu-west",
     "status": "active"
   },
   "health": {
@@ -14420,7 +14386,7 @@ langwatch governance audit-log query --filter 'surface=cli' --since '24h ago'
 
 ## Setup-from-scratch via agent (v1 preview)
 
-The end-state, what the umbrella spec calls the "agentic dogfood gate", is that an agent can fully configure governance for a fresh org by chaining CLI commands. The v1 preview ships the IngestionTemplate authoring + ingestion-key mint slice; budgets, anomaly-rules, audit-log fold in as their CLI surfaces ship.
+The end state is that an agent can fully configure governance for a fresh org by chaining CLI commands. The v1 preview ships the IngestionTemplate authoring + ingestion-key mint slice; budgets, anomaly-rules, audit-log fold in as their CLI surfaces ship.
 
 ```bash
 # 1. List existing platform templates (admin shape, includes ottl_rules)
@@ -14944,137 +14910,13 @@ In flight on the same branch:
   one-time secret in a "paste this into upstream" modal.
 - 🚧 Architecture deep-dive doc (the diagram + per-tier internals).
 
-## Verified end-to-end (D2 foundation)
-
-The IngestionSource auth path, the OTel receiver, and the
-`lastEventAt` flip were dogfooded against `pnpm dev` on `:6660`.
-The transcript IS the proof artifact (no UI to screenshot at this
-layer, that's lane B's setup form, in flight).
-
-```
-$ pnpm tsx tmp/dogfood-ingestion.ts
-✓ Planted IngestionSource
-  org:   123123123-NiG5AY
-  id:    uotNPpD9TpASqQHTv6OXo
-  name:  dogfood-otel-1777270498068
-  status: awaiting_first_event
-  ingestSecret: lw_is_kgOa878p…REDACTED
-
-$ curl -sS -X POST \
-    -H 'Authorization: Bearer lw_is_kgOa878p…REDACTED' \
-    -d '{"resource_spans":[…]}' \
-    :6660/api/ingest/otel/uotNPpD9TpASqQHTv6OXo
-
-{"accepted":true,"bytes":68}
-HTTP 202
-
-$ pnpm tsx tmp/dogfood-ingestion.ts --check
-status:        active                            ← flipped from awaiting_first_event
-lastEventAt:   2026-04-27T06:15:03.361Z
-```
-
-Auth matrix verified in the same dogfood pass:
-
-| Authorization header | Path source-id | Expected | Observed |
-|----------------------|---------------|----------|----------|
-| (none) | valid | 401 | 401 |
-| `Bearer lw_is_unknown` | valid | 401 | 401 |
-| `Bearer <valid>` | wrong | 401 | 401 |
-| `Bearer <valid>` | matching | 202 | 202 |
-| `Bearer <valid>` (replay) | matching | 202 + `lastEventAt` advances monotonically | 202, advanced |
-
-### Web UI full loop (Lane B dogfood)
-
-The same backend, exercised end-to-end through the admin UI:
-admin opens `/settings/governance/ingestion-sources`, fills the
-composer, hits Save, a one-time-reveal modal exposes the
-`lw_is_*` secret + OTLP URL, the admin copies, curls the
-upstream, the list page polls and flips the source from
-**Awaiting first event** → **Active** with "last event Ns ago".
-
-The hero shot is the list page after the flip:
-
-![IngestionSource list, Active after curl receipt](https://i.img402.dev/supafck5au.png)
-
-Full 6-step carousel for reviewers:
-
-| # | Step | Shot |
-|---|------|------|
-| 1 | `/settings/governance/ingestion-sources`, empty state | [open](https://i.img402.dev/wx4v7m7a8g.png) |
-| 2 | Composer open, `sourceType` picker + dynamic per-type form | [open](https://i.img402.dev/ycld8afavo.png) |
-| 3 | Composer filled, Generic OTel example | [open](https://i.img402.dev/yixqegurj3.png) |
-| 4 | One-time secret reveal modal, `ingestSecret` + OTLP URL + Copy | [open](https://i.img402.dev/w4fl31ukrc.png) |
-| 5 | List polled, flipped to **Active**, last event 13 s ago | [open](https://i.img402.dev/supafck5au.png) |
-
-The dogfood walks the full Tier-3 push contract: admin issues
-secret in UI → upstream curl with that secret → 202 ack →
-`lastEventAt` flips → admin sees the flip on the next poll.
-Secret is shown exactly once and never returned by the list/get
-endpoints afterwards.
-
-### CLI ingest debug (Lane A dogfood)
-
-The same backend, exercised through the CLI without ever opening
-a browser. After `langwatch login --device`, four read-only
-governance debug helpers go live:
-
-```text
-$ langwatch governance status
-Governance setup state
-  · Personal VKs
-  · Routing policies
-  ✓ Ingestion sources
-  ✓ Anomaly rules
-  ✓ Recent activity (30d)
-
-Governance active: yes
-
-$ langwatch ingest list
-NAME                        TYPE          STATUS  LAST EVENT
-Dogfood OTel · alexis lane  otel_generic  active  46m ago
-
-$ langwatch ingest health JxQztBgN90QeX12-afJ0C
-Dogfood OTel · alexis lane  (JxQztBgN90QeX12-afJ0C)
-Status:        active
-Events (24h):  1
-Events (7d):   1
-Events (30d):  1
-Last event:    47m ago
-
-$ langwatch ingest tail JxQztBgN90QeX12-afJ0C --limit 5
-2026-04-27T07:11:18.963Z  api.call  chat_completion → claude-3-5-sonnet
-```
-
-Every command also accepts `--json` for machine output (exact
-contract match with the equivalent tRPC procedure, web UI render).
-`langwatch ingest tail --follow` polls every 3 s and dedupes by
-`eventId`, so the CLI and the per-source detail page show the
-same event stream byte-for-byte.
-
-Auth for these REST adapters reuses the same Bearer
-`access_token` the device flow persists in
-`~/.langwatch/config.json`, no separate token. Unauthenticated
-calls bounce with `Not logged in. Run \`langwatch login --device\` first.`;
-unknown source IDs surface the underlying tRPC `NOT_FOUND` as
-`Error: IngestionSource not found`. Both error paths are
-asserted in `specs/ai-gateway/governance/cli-ingest-debug.feature`
-(12 scenarios).
-
-### Admin oversight wired to real data (no mocks)
+## Admin oversight on real data
 
 Once a source is `active` and events are flowing, the admin
 oversight dashboard at `/settings/governance` queries
 `gateway_activity_events` via the `api.activityMonitor.*` tRPC
 procedures. Empty data renders a setup checklist; data present
 renders live cards + per-user table + source-health strip.
-
-| Surface | Real-data state | Shot |
-|---------|------------------|------|
-| `/settings/governance`, setup checklist + first real source visible in the health strip | live (`api.activityMonitor.{summary, spendByUser, ingestionSourcesHealth, recentAnomalies}`) | [open](https://i.img402.dev/hhghiq7gbb.png) |
-| `/settings/governance/ingestion-sources`, list page after the iter-13 customer-name scrub | live (`api.ingestionSources.list`) | [open](https://i.img402.dev/kfvazcuczp.png) |
-| `/settings/governance/anomaly-rules`, empty list (no rules yet) | live (`api.anomalyRules.list`) | [open](https://i.img402.dev/9fjdw9we08.png) |
-| `/settings/governance/anomaly-rules`, composer (name + severity + ruleType + scope + JSONB threshold/destination configs) | live (`api.anomalyRules.create`) | [open](https://i.img402.dev/9v33n8zzrk.png) |
-| `/settings/governance/anomaly-rules`, list after Create roundtrip; persisted rule grouped under Critical with the "rules persist now; evaluation + alerts arrive with the detection backend" banner | live (PG persistence; eval engine = Sergey Option C, deferred) | [open](https://i.img402.dev/15z3h6k32v.png) |
 
 Tier 2, Tier 5 are deferred; the architecture doesn't preclude them
 and the control-plane primitives already accommodate them.
@@ -15107,6 +14949,9 @@ Governance sits behind a single fence on each surface:
   [Routing policies](/ai-gateway/governance/routing-policies).
 - For per-tool CLI config (env vars, dialect notes):
   [Coding CLI Integrations](/ai-gateway/cli/overview).
+- For the read-only CLI checks on ingestion sources
+  (`langwatch governance status`, `langwatch ingest list | health |
+  tail`): [CLI ingest debug](/ai-governance/cli-debug).
 - For the architecture deep-dive once published:
   `architecture.md` (in flight on this branch).
 
@@ -17000,13 +16845,10 @@ weaponized against the org or other orgs:
 Cross-org cost integrity is structurally protected on both tiers by the attribution-keys
 re-stamp regardless of OTTL, admin OTTL in org-A cannot misattribute cost to org-B.
 
-Concretely, before each tile flips to green-checked we run a **two-track dogfood
-discipline**: (a) a fixture-track verification, canned OTLP payloads emitted via
-`scripts/dogfood/emit-otlp.sh`, including forge-attempt regressions against both the
-base and tier-2 protected lists, and (b) a real-user track, admin publishes via
-`/settings/governance/tool-catalog`, a real user installs via `/me`, the real upstream
-tool emits a real trace, and the result is verified end-to-end with cross-user isolation.
-Per-template rituals live at `platform/app/ee/governance/ingestion-templates/<slug>/dogfood.md`.
+A tile flips to green-checked only after the template is verified end to end on a real
+install: an admin publishes it via `/settings/governance/tool-catalog`, a user installs it
+via `/me`, the upstream tool emits a real trace, and the resulting attribution holds up
+under cross-user isolation and forge attempts against both protected lists.
 
 ### What is audited
 
@@ -17063,21 +16905,6 @@ fallback works today. If you'd like a custom template for another tool, file a r
 and we'll evaluate.
 
 ---
-
-## Verifying the contract
-
-The full admin OTTL authoring flow has a Playwright real-user dogfood at
-`platform/app/e2e/admin-ottl-dogfood.ts` (~30s loop), 8 steps end-to-end:
-navigate → list 3 platform rows → View OTTL drawer → Clone-to-customise →
-Save OTTL → list 4 rows → Edit OTTL → Archive. Pairs with the
-service-level integration test at
-`platform/app/ee/governance/services/__tests__/ingestionTemplate.authoring.integration.test.ts`
-and the wire-level REST integration test at
-`platform/app/src/app/api/governance/__tests__/governance-rest-api.integration.test.ts`.
-
-If you're touching the IngestionTemplatesEditor surface, the OttlEditor
-component, or the IngestionTemplateService, run the dogfood + both
-integration tests locally as a regression playbook before opening a PR.
 
 ## Related
 
@@ -17166,7 +16993,7 @@ Governance MCP tools register inside LangWatch's existing MCP server (served on 
 
 The 9 governance tools register via `registerGovernanceMcpTools(server, ctx)` from `platform/app/src/mcp/governance-tools.ts` (Lane-Q at `7639b6c2b`). The same registration runs at all three `createMcpServer()` callsites in `handler.ts` so the tools are available regardless of which MCP transport the client chose.
 
-<Note>**Dev-environment port routing**: in production, LangWatch listens on a single port and the `/mcp` + `/sse` + `/oauth/*` + `/.well-known/oauth-*` routes are all reachable on the same host. In dev (Vite), external MCP clients (e.g. Claude Code) hit `FRONTEND_PORT` (default `5560`) which proxies the seven MCP route prefixes through to the API port. Local Claude Code runbook: `claude mcp add langwatch http://localhost:5560/mcp` (or the OAuth flow at `http://localhost:5560/api/mcp/authorize` for write tools). The proxy wiring + a real-SDK probe at `platform/app/scripts/dogfood/governance/mcp-client-probe.ts` shipped at `82375478e`; the probe asserts all 9 tools register, that read tools return the catalog with a project apiKey Bearer, and that write tools return `AUTH_REQUIRED:` until the OAuth flow completes.</Note>
+<Note>**Dev-environment port routing**: in production, LangWatch listens on a single port and the `/mcp` + `/sse` + `/oauth/*` + `/.well-known/oauth-*` routes are all reachable on the same host. In dev (Vite), external MCP clients (e.g. Claude Code) hit `FRONTEND_PORT` (default `5560`) which proxies the seven MCP route prefixes through to the API port. Local Claude Code runbook: `claude mcp add langwatch http://localhost:5560/mcp` (or the OAuth flow at `http://localhost:5560/api/mcp/authorize` for write tools). All 9 tools register over that proxy, read tools return the catalog with a project apiKey Bearer, and write tools return `AUTH_REQUIRED:` until the OAuth flow completes.</Note>
 
 ## RBAC enforcement
 
@@ -17213,11 +17040,9 @@ Payload shapes are identical to the REST API's audit rows apart from `metadata.s
 
 The contract is service-layer-asserted by `platform/app/src/mcp/__tests__/governance-tools.audit-uniform.integration.test.ts` (Lane B-MCP audit at `66fd35162`), 3 cases against real Postgres: `governance_ingestion_templates_create` stamps `metadata.surface = "mcp"`, `governance_ingestion_keys_mint` stamps `metadata.surface = "mcp"`, and the `AUTH_REQUIRED:` negative path fails before any audit row is written. No wire-level MCP test is needed (per the Path B architecture there is no MCP-over-HTTP wire to assert at).
 
-For the agent-end-to-end gate (real Claude Code agent provisions governance via MCP only, no UI clicks) the runbook lives at `dev/docs/runbooks/governance-dogfood-mcp-claude-code.md`. Six steps: `claude mcp add langwatch http://localhost:5560/mcp` → read-tool walkthrough (list + get with project apiKey) → write-tool walkthrough (admin_list + clone + update_ottl_rules + archive after OAuth → 3 audit rows with `metadata.surface = "mcp"`) → ingestion-key mint (1 audit row + one-time `sk-lw-…` token) → fail-closed `AUTH_REQUIRED:` negative case → checklist for pasting evidence back.
+## Agent setup from scratch
 
-## Agent setup-from-scratch (the dogfood gate)
-
-The umbrella spec defines an end-to-end test: an agent connecting with admin apiKey can fully configure governance via a sequence of MCP tool calls:
+An agent connecting with an admin apiKey can fully configure governance through a sequence of MCP tool calls:
 
 1. `governance_ingestion_templates_list`, read existing platform templates
 2. `governance_ingestion_templates_clone_from_platform`, clone `claude_code` into the org (delegates to `POST /api/governance/ingestion-templates/clone`)
@@ -17225,7 +17050,7 @@ The umbrella spec defines an end-to-end test: an agent connecting with admin api
 4. `governance_role_bindings_assign_to_user`, give a user `governance:view`
 5. `governance_audit_log_query`, verify steps 2–4 all emitted audit rows
 
-If every step succeeds and step 5 returns the matching audit rows, the MCP surface is genuinely agentic-usable. The dogfood-gate runbook is co-owned with QA (Lane-Q) and lives alongside the IngestionTemplate v1 dogfood discipline.
+If every step succeeds and step 5 returns the matching audit rows, an agent can run the whole setup without a single UI click.
 
 ## Cross-references
 
@@ -17512,9 +17337,9 @@ The header is the first line of the file, written as `SPDX-License-Identifier: <
 
 The directory is what the license follows, read most-specific row first rather than as a single Apache-2.0-unless-`ee` rule. The SPDX header records the result per file, and files that predate the convention do not carry one yet.
 
-## Local dev, QA license generation
+## Enabling the Enterprise surface
 
-Self-hosted dogfood, QA scripts, and seed flows that need the Enterprise feature surface enabled use a real signed license, there is no env-var bypass. See [License generator](https://github.com/langwatch/langwatch/blob/main/dev/docs/license-generator.md) for the script + programmatic API.
+Turning on the Enterprise feature surface takes a real signed license key. There is no environment-variable bypass. See [Editions and licensing](/self-hosting/licensing) for how to request a key and where to set it.
 
 ---
 
