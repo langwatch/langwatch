@@ -43,6 +43,23 @@ const names = (files: string[]): string[] =>
     .map((component) => component.name)
     .sort();
 
+/**
+ * The version release-please records for a component today. The guard prints
+ * it from the live manifest, so a test that expects the printed line must read
+ * the same file. A literal here goes stale the next time that SDK releases.
+ */
+const liveVersion = (componentPath: string): string => {
+  const manifest = JSON.parse(
+    readFileSync(
+      resolve(repoRoot, ".github/.release-please-manifest.json"),
+      "utf8",
+    ),
+  ) as Record<string, string>;
+  const version = manifest[componentPath];
+  assert.ok(version, `no manifest entry for ${componentPath}`);
+  return version;
+};
+
 const temporaryRoots: string[] = [];
 
 after(() => {
@@ -430,7 +447,9 @@ describe("breaking-change scope guard", () => {
       assert.equal(result.status, 1);
       assert.ok(
         result.stderr.includes(
-          "- typescript-sdk (sdks/typescript), now 1.4.0, pinned to 1.5.0",
+          `- typescript-sdk (sdks/typescript), now ${liveVersion(
+            "sdks/typescript",
+          )}, pinned to 1.5.0`,
         ),
         result.stderr,
       );
