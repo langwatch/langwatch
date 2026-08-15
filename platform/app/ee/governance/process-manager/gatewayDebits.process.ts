@@ -116,6 +116,8 @@ export const writeGatewayDebitsSchema = z.object({
       cache_read_input_tokens: z.number().int().min(0),
       cache_creation_input_tokens: z.number().int().min(0),
       reasoning_tokens: z.number().int().min(0),
+      input_chars: z.number().int().min(0).default(0),
+      audio_seconds: z.number().min(0).default(0),
     })
     .nullable(),
   /** The price the outcome event carried, in integer nano-USD. */
@@ -392,7 +394,9 @@ function movedNothing(outcome: SpendOutcome): boolean {
     usage.output_tokens === 0 &&
     usage.cache_read_input_tokens === 0 &&
     usage.cache_creation_input_tokens === 0 &&
-    usage.reasoning_tokens === 0
+    usage.reasoning_tokens === 0 &&
+    usage.input_chars === 0 &&
+    usage.audio_seconds === 0
   );
 }
 

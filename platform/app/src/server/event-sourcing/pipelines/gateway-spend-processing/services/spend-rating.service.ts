@@ -64,6 +64,8 @@ export function rateSpendNanoUsd({
         outputTokens: usage.output_tokens,
         cacheReadTokens: usage.cache_read_input_tokens,
         cacheCreationTokens: usage.cache_creation_input_tokens,
+        inputCharacters: usage.input_chars,
+        audioSeconds: usage.audio_seconds,
       })
     : 0;
   return {

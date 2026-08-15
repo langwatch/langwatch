@@ -34,15 +34,17 @@ type Record struct {
 	PodSeq  uint64          `json:"pod_seq"`
 }
 
-// UsagePayload is the token-class breakdown carried by confirm and fail
-// payloads. Token counts only: rating happens in the pipeline, so cost
-// never travels on this wire.
+// UsagePayload is the token and audio-quantity breakdown carried by confirm
+// and fail payloads. Quantities only: rating happens in the pipeline, so
+// cost never travels on this wire.
 type UsagePayload struct {
-	InputTokens         int `json:"input_tokens"`
-	OutputTokens        int `json:"output_tokens"`
-	CacheReadTokens     int `json:"cache_read_input_tokens"`
-	CacheCreationTokens int `json:"cache_creation_input_tokens"`
-	ReasoningTokens     int `json:"reasoning_tokens"`
+	InputTokens         int     `json:"input_tokens"`
+	OutputTokens        int     `json:"output_tokens"`
+	CacheReadTokens     int     `json:"cache_read_input_tokens"`
+	CacheCreationTokens int     `json:"cache_creation_input_tokens"`
+	ReasoningTokens     int     `json:"reasoning_tokens"`
+	InputChars          int     `json:"input_chars"`
+	AudioSeconds        float64 `json:"audio_seconds"`
 }
 
 // AdmittedPayload records that a request entered the gateway: identity and
@@ -113,5 +115,7 @@ func usageFromDomain(u domain.Usage, reasoning int) UsagePayload {
 		CacheReadTokens:     u.CacheReadTokens,
 		CacheCreationTokens: u.CacheCreationTokens,
 		ReasoningTokens:     reasoning,
+		InputChars:          u.InputChars,
+		AudioSeconds:        u.AudioSeconds,
 	}
 }

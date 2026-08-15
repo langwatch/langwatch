@@ -125,6 +125,36 @@ func TestContractConfirmedPayload(t *testing.T) {
 }
 
 /** @scenario The failed payload keeps the full error taxonomy */
+
+/** @scenario Audio usage quantities ride the spend wire for character- and second-priced models */
+func TestContractConfirmedAudioPayload(t *testing.T) {
+	s := openTestSpool(t, t.TempDir())
+	defer s.Close()
+	e := NewEmitter(s)
+
+	e.ConfirmSpend(pipeline.SpendOutcome{
+		GatewayRequestID: "req_audio",
+		OccurredAt:       time.Now(),
+		ProjectID:        "proj_x",
+		Usage: domain.Usage{
+			InputChars:   12000,
+			AudioSeconds: 3.4,
+		},
+		Model:           "openai/tts-1",
+		ModelProviderID: "mp_1",
+		Duration:        1200 * time.Millisecond,
+	})
+
+	records := drainRecords(t, s, 1)
+	require.Equal(t, "confirmSpend", records[0].Command)
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(records[0].Payload, &payload))
+	usage, ok := payload["usage"].(map[string]any)
+	require.True(t, ok)
+	assert.EqualValues(t, 12000, usage["input_chars"])
+	assert.EqualValues(t, 3.4, usage["audio_seconds"])
+}
+
 func TestContractFailedPayload(t *testing.T) {
 	s := openTestSpool(t, t.TempDir())
 	defer s.Close()

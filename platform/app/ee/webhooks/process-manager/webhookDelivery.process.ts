@@ -163,6 +163,8 @@ const spendUsagePayloadSchema = z.object({
   cache_read_input_tokens: z.number().int().min(0),
   cache_creation_input_tokens: z.number().int().min(0),
   reasoning_tokens: z.number().int().min(0),
+  input_chars: z.number().int().min(0).default(0),
+  audio_seconds: z.number().min(0).default(0),
 });
 
 /** Everything the deliver executor needs to rate, build the envelope, and
