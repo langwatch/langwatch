@@ -259,30 +259,33 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 		return
 	}
 
-	// The span's token counts are the provider's own totals, audio included.
-	// domain.Usage carries audio tokens out of the prompt and completion
-	// totals so the billing wire can price them at their own rate; the span
-	// has no audio-token attribute to price them from, so folding them back
-	// in keeps a trace costing what it always did.
-	promptTokens := params.Usage.PromptTokens + params.Usage.InputAudioTokens
-	completionTokens := params.Usage.CompletionTokens + params.Usage.OutputAudioTokens
-
 	// PromptTokens includes any cached tokens; the span reports the fresh,
 	// non-cached input separately from the cache-read/cache-write counts so the
 	// cost calc prices each bucket once. Fall back to the full prompt if a
 	// provider ever reports cache counts that aren't folded into PromptTokens.
-	freshInput := promptTokens - params.Usage.CacheReadTokens - params.Usage.CacheCreationTokens
+	freshInput := params.Usage.PromptTokens - params.Usage.CacheReadTokens - params.Usage.CacheCreationTokens
 	if freshInput < 0 {
-		freshInput = promptTokens
+		freshInput = params.Usage.PromptTokens
 	}
 
 	attrs := []attribute.KeyValue{
 		semconv.GenAIProviderNameKey.String(string(params.ProviderID)),
 		semconv.GenAIRequestModelKey.String(canonicalModelID(params.ProviderID, params.Model)),
 		semconv.GenAIUsageInputTokensKey.Int(freshInput),
-		semconv.GenAIUsageOutputTokensKey.Int(completionTokens),
+		semconv.GenAIUsageOutputTokensKey.Int(params.Usage.CompletionTokens),
 		attrTotalUsage.Int(params.Usage.TotalTokens),
 		attrCost.Int64(params.Usage.CostMicroUSD),
+	}
+	// Audio tokens ride beside the text totals, not inside them, so the cost
+	// pipeline can price them at the audio rate. Reporting them inside
+	// gen_ai.usage.input_tokens instead priced an eight-times-dearer token at
+	// the text rate, which is why a trace and its budget disagreed on every
+	// audio call.
+	if params.Usage.InputAudioTokens > 0 {
+		attrs = append(attrs, attribute.Int(AttrGenAIUsageInputAudioTokens, params.Usage.InputAudioTokens))
+	}
+	if params.Usage.OutputAudioTokens > 0 {
+		attrs = append(attrs, attribute.Int(AttrGenAIUsageOutputAudioTokens, params.Usage.OutputAudioTokens))
 	}
 	if params.Usage.CacheReadTokens > 0 {
 		attrs = append(attrs, attribute.Int(AttrGenAIUsageCacheRead, params.Usage.CacheReadTokens))
@@ -387,13 +390,14 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 	// calls that structurally never carry completion tokens or extracted
 	// output: TTS spans (binary audio response), duration-priced STT spans
 	// (scribe reports seconds, not tokens), and embeddings.
-	// completionTokens, not params.Usage.CompletionTokens: an audio-native
-	// model answers entirely in audio tokens, which are carried out of the
-	// completion total, so reading the raw field would drop a real answer as
-	// an empty probe.
+	// Audio tokens count as output here even though they are carried out of
+	// the completion total: an audio-native model answers entirely in audio
+	// tokens, so reading the completion field alone would drop a real answer
+	// as an empty probe.
+	answeredTokens := params.Usage.CompletionTokens + params.Usage.OutputAudioTokens
 	isProbeShape := params.RequestType == domain.RequestTypeChat ||
 		params.RequestType == domain.RequestTypeMessages
-	if !isError && isProbeShape && completionTokens == 0 && params.Usage.CostMicroUSD == 0 && output == "" {
+	if !isError && isProbeShape && answeredTokens == 0 && params.Usage.CostMicroUSD == 0 && output == "" {
 		span.SetAttributes(attrDrop.Bool(true))
 	}
 

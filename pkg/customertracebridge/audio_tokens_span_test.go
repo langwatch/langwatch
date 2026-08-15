@@ -14,10 +14,10 @@ import (
 )
 
 // Audio tokens on the customer span. domain.Usage carries them OUT of the
-// prompt and completion totals so the billing wire can price them at their
-// own rate. The span has no audio-token attribute to price from, so it folds
-// them back in: a trace costs what it always did, and an audio-native answer
-// is not mistaken for an empty one.
+// prompt and completion totals so every consumer prices them at the audio
+// rate, and the span states them under their own attributes, disjoint from
+// the text totals exactly as the cache buckets are. An audio-native answer
+// is still not mistaken for an empty one.
 
 // recordChatSpanForUsage runs the emitter's span lifecycle for a chat-shaped
 // request, which is the shape the empty-probe filter applies to.
@@ -49,7 +49,7 @@ func hasDropMarker(span sdktrace.ReadOnlySpan) bool {
 	return false
 }
 
-func TestEmitter_AudioTokens_CountTowardTheSpansTokenTotals(t *testing.T) {
+func TestEmitter_AudioTokens_AreStatedApartFromTheTextTotals(t *testing.T) {
 	span := recordChatSpanForUsage(t, domain.Usage{
 		PromptTokens:      200,
 		InputAudioTokens:  800,
@@ -60,11 +60,37 @@ func TestEmitter_AudioTokens_CountTowardTheSpansTokenTotals(t *testing.T) {
 
 	input, ok := findIntAttr(span, "gen_ai.usage.input_tokens")
 	require.True(t, ok)
-	assert.EqualValues(t, 1000, input, "audio input folds back into the span total")
+	assert.EqualValues(t, 200, input, "the text total excludes audio input")
 
 	output, ok := findIntAttr(span, "gen_ai.usage.output_tokens")
 	require.True(t, ok)
-	assert.EqualValues(t, 300, output, "audio output folds back into the span total")
+	assert.EqualValues(t, 50, output, "the text total excludes audio output")
+
+	inputAudio, ok := findIntAttr(span, AttrGenAIUsageInputAudioTokens)
+	require.True(t, ok)
+	assert.EqualValues(t, 800, inputAudio)
+
+	outputAudio, ok := findIntAttr(span, AttrGenAIUsageOutputAudioTokens)
+	require.True(t, ok)
+	assert.EqualValues(t, 250, outputAudio)
+
+	total, ok := findIntAttr(span, string(attrTotalUsage))
+	require.True(t, ok)
+	assert.EqualValues(t, 1300, total, "the provider's total still counts every token")
+}
+
+func TestEmitter_NoAudioTokens_LeavesTheAudioAttributesOff(t *testing.T) {
+	span := recordChatSpanForUsage(t, domain.Usage{
+		PromptTokens:     200,
+		CompletionTokens: 50,
+		TotalTokens:      250,
+	})
+
+	_, hasInput := findIntAttr(span, AttrGenAIUsageInputAudioTokens)
+	assert.False(t, hasInput, "a text-only call states no audio input")
+
+	_, hasOutput := findIntAttr(span, AttrGenAIUsageOutputAudioTokens)
+	assert.False(t, hasOutput, "a text-only call states no audio output")
 }
 
 func TestEmitter_AudioOnlyAnswer_IsNotDroppedAsAnEmptyProbe(t *testing.T) {

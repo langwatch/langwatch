@@ -155,6 +155,14 @@ Feature: Gateway audio endpoints, OpenAI-compatible TTS and STT for OpenAI and E
     Then a gateway span is exported with the resolved model
     And the span carries the audio duration (or the provider's token usage when reported) as the measure STT is priced by
 
+  @integration
+  Scenario: A span states its audio tokens apart from its text tokens
+    Given a model that answers in audio tokens and prices them above text
+    When the call completes
+    Then the span carries the audio token counts under their own attributes
+    And the text token attributes exclude them, as the cache counts already are
+    And the trace cost equals the cost the budget was charged
+
   # ============================================================
   # Group: Dogfood (proven with the Scenario voice harness)
   # ============================================================
