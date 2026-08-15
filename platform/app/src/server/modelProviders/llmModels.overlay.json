@@ -247,6 +247,27 @@
 			"supportsAudioInput": false,
 			"supportsImageOutput": false,
 			"supportsAudioOutput": true
+		},
+		"openai/gpt-audio-mini": {
+			"id": "openai/gpt-audio-mini",
+			"name": "OpenAI: GPT Audio Mini",
+			"provider": "openai",
+			"pricing": {
+				"inputCostPerToken": 6e-7,
+				"outputCostPerToken": 2.4e-6,
+				"audioCostPerToken": 1e-5
+			},
+			"contextLength": 128000,
+			"maxCompletionTokens": 16384,
+			"supportedParameters": [],
+			"defaultParameters": null,
+			"modality": "text+audio->text+audio",
+			"mode": "chat",
+			"description": "A cost-efficient version of GPT Audio. Text is $0.60 per million input and $2.40 per million output; audio is $10.00 per million input tokens and $20.00 per million output tokens (https://developers.openai.com/api/docs/pricing, verified 2026-08-15). This entry exists because one upstream source reports the audio rate as the text rate, $0.60, which billed audio at a sixteenth of the published price. The other source carries the correct $10.00. Retire this entry once the wrong source is corrected; the weekly price audit reports the disagreement until then.",
+			"supportsImageInput": false,
+			"supportsAudioInput": true,
+			"supportsImageOutput": false,
+			"supportsAudioOutput": true
 		}
 	}
 }
