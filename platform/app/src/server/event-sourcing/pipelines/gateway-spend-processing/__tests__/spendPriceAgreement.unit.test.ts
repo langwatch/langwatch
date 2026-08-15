@@ -206,48 +206,52 @@ beforeEach(() => {
 
 describe("one price per gateway request", () => {
   /** @scenario The price is fixed when the outcome is recorded and every surface repeats it */
-  /** @scenario Character- and second-priced audio usage prices the same in billing as in observability */
-  it("audio outcomes price by characters and seconds instead of zero", () => {
-    const ttsUsage = {
-      input_tokens: 0,
-      output_tokens: 0,
-      cache_read_input_tokens: 0,
-      cache_creation_input_tokens: 0,
-      reasoning_tokens: 0,
-      input_chars: 12000,
-      audio_seconds: 0,
-    };
-    const pricedTts = rateSpendNanoUsd({ model: "openai/tts-1", usage: ttsUsage });
-    expect(pricedTts.costNanoUsd).toBe(180_000_000);
+  describe("given an audio outcome", () => {
+    describe("when the spend is rated", () => {
+    /** @scenario Character- and second-priced audio usage prices the same in billing as in observability */
+    it("audio outcomes price by characters and seconds instead of zero", () => {
+      const ttsUsage = {
+        input_tokens: 0,
+        output_tokens: 0,
+        cache_read_input_tokens: 0,
+        cache_creation_input_tokens: 0,
+        reasoning_tokens: 0,
+        input_chars: 12000,
+        audio_seconds: 0,
+      };
+      const pricedTts = rateSpendNanoUsd({ model: "openai/tts-1", usage: ttsUsage });
+      expect(pricedTts.costNanoUsd).toBe(180_000_000);
 
-    const sttUsage = {
-      ...ttsUsage,
-      input_chars: 0,
-      audio_seconds: 3,
-    };
-    const pricedStt = rateSpendNanoUsd({
-      model: "openai/whisper-1",
-      usage: sttUsage,
+      const sttUsage = {
+        ...ttsUsage,
+        input_chars: 0,
+        audio_seconds: 3,
+      };
+      const pricedStt = rateSpendNanoUsd({
+        model: "openai/whisper-1",
+        usage: sttUsage,
+      });
+      expect(pricedStt.costNanoUsd).toBe(300_000);
+
+      const confirmed: ConfirmSpendCommandData = {
+        gateway_request_id: REQUEST,
+        occurred_at: T0 + 3800,
+        tenantId: TENANT,
+        model: "openai/tts-1",
+        model_provider_id: "mp_1",
+        usage: ttsUsage,
+        cost_nano_usd: pricedTts.costNanoUsd,
+        rate_version: pricedTts.rateVersion,
+        duration_ms: 1200,
+      };
+      const debit = intentPayloadFor(
+        (builder) => gatewayDebitsPM({} as never)(builder as never),
+        "writeDebits",
+        confirmed,
+      );
+      expect(debit.cost_nano_usd).toBe(pricedTts.costNanoUsd);
     });
-    expect(pricedStt.costNanoUsd).toBe(300_000);
-
-    const confirmed: ConfirmSpendCommandData = {
-      gateway_request_id: REQUEST,
-      occurred_at: T0 + 3800,
-      tenantId: TENANT,
-      model: "openai/tts-1",
-      model_provider_id: "mp_1",
-      usage: ttsUsage,
-      cost_nano_usd: pricedTts.costNanoUsd,
-      rate_version: pricedTts.rateVersion,
-      duration_ms: 1200,
-    };
-    const debit = intentPayloadFor(
-      (builder) => gatewayDebitsPM({} as never)(builder as never),
-      "writeDebits",
-      confirmed,
-    );
-    expect(debit.cost_nano_usd).toBe(pricedTts.costNanoUsd);
+    });
   });
 
   it("the ledger, the budget debit, and the webhook envelope agree across a catalog change", () => {
