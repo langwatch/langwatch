@@ -42,7 +42,10 @@ import { type createProjectApp, requires } from "~/server/api/security";
 import { getProtectionsForProject } from "~/server/api/utils";
 import { validator as zValidator } from "~/server/api/validation";
 import { prisma } from "~/server/db";
-import { canonicalBaseResponses } from "../../shared/base-responses";
+import {
+  canonicalBaseResponses,
+  canonicalUnprocessableResponses,
+} from "../../shared/base-responses";
 import { governedSqlProject } from "./routeGuards";
 
 const logger = createLogger("langwatch:api:analytics-sql");
@@ -152,6 +155,9 @@ export function registerGovernedSqlRoutes(
       tags: ["Analytics / Governed SQL"],
       responses: {
         ...canonicalBaseResponses,
+        // A scan-ceiling refusal: the statement is well formed, the volume it
+        // would read is not allowed. QueryScanLimitExceededError carries 422.
+        ...canonicalUnprocessableResponses,
         200: {
           description:
             "The query ran, and the result is scoped to the caller's project",
