@@ -93,6 +93,13 @@ function ExpandedValue({
   columnName: string;
 }) {
   const [open, setOpen] = useState(false);
+  /**
+   * A structured cell is shown indented and copied compact, and the difference
+   * is deliberate: reading JSON in a popover wants the line breaks, pasting it
+   * somewhere else usually does not. `pretty` is a getter, so the indented form
+   * is only built for the one cell a member opens, never for the other ten
+   * thousand in the table. Every other kind shows exactly what it copies.
+   */
   const full =
     cell.kind === "structured"
       ? cell.pretty
