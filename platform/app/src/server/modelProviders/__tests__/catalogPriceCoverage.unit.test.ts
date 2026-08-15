@@ -114,140 +114,164 @@ const KNOWN_UNIT_MISMATCH: Record<string, string> = {
 const catalogEntries = Object.entries(llmModels.models);
 
 describe("catalog price coverage", () => {
-  it("loads a catalog worth checking", () => {
-    expect(catalogEntries.length).toBeGreaterThan(100);
-  });
-
-  it("prices every model that is not free on purpose", () => {
-    const unpriced = catalogEntries
-      .filter(([id]) => !isPricedElsewhere(id))
-      .filter(([, entry]) => pricedUnits(entry).size === 0)
-      .map(([id]) => id)
-      .sort();
-
-    const unexpected = unpriced.filter((id) => !(id in KNOWN_UNPRICED));
-    expect(
-      unexpected,
-      "A model with no rate bills every request at zero dollars and the spend row still settles. " +
-        "Add the rate, or add the id to KNOWN_UNPRICED with the reason.",
-    ).toEqual([]);
-  });
-
-  it("keeps the known-unpriced list honest", () => {
-    // A model that gained a price must leave the list, or the list slowly
-    // becomes a place where real gaps hide.
-    const stillUnpriced = Object.keys(KNOWN_UNPRICED).filter((id) => {
-      const entry = llmModels.models[id];
-      return !entry || pricedUnits(entry).size === 0;
+  describe("given the merged model catalog", () => {
+    it("loads a catalog worth checking", () => {
+      expect(catalogEntries.length).toBeGreaterThan(100);
     });
-    expect(stillUnpriced.sort()).toEqual(Object.keys(KNOWN_UNPRICED).sort());
-  });
 
-  it("rates a non-zero cost for every priced model", () => {
-    const costs = getStaticModelCosts();
-    const zeroRated: string[] = [];
+    describe("when a model carries no rate at all", () => {
+      it("finds none outside the known-unpriced list", () => {
+        const unpriced = catalogEntries
+          .filter(([id]) => !isPricedElsewhere(id))
+          .filter(([, entry]) => pricedUnits(entry).size === 0)
+          .map(([id]) => id)
+          .sort();
 
-    for (const [id] of catalogEntries) {
-      if (isPricedElsewhere(id) || id in KNOWN_UNPRICED) continue;
+        const unexpected = unpriced.filter((id) => !(id in KNOWN_UNPRICED));
+        expect(
+          unexpected,
+          "A model with no rate bills every request at zero dollars and the spend row still settles. " +
+            "Add the rate, or add the id to KNOWN_UNPRICED with the reason.",
+        ).toEqual([]);
+      });
 
-      const matched = matchModelCostWithFallbacks(id, costs);
-      if (!matched) {
-        zeroRated.push(`${id} (no cost rule matched)`);
-        continue;
-      }
-      const cost = estimateCost({ llmModelCost: matched, ...ONE_OF_EVERYTHING });
-      if (!cost || cost <= 0) {
-        zeroRated.push(`${id} (matched ${matched.model}, rated ${cost ?? 0})`);
-      }
-    }
-
-    expect(
-      zeroRated,
-      "These models rate zero even when every billable quantity is one, so a real request bills nothing.",
-    ).toEqual([]);
-  });
-
-  it("routes each audio model to its own cost rule, not a shorter prefix", () => {
-    // `openai/gpt-4o-transcribe` prefix-matches `openai/gpt-4o` unless it has
-    // its own entry, which is how a transcription request came to be priced
-    // with chat token rates.
-    const costs = getStaticModelCosts();
-    const misrouted: string[] = [];
-
-    for (const [id, entry] of catalogEntries) {
-      if (entry.mode !== "audio") continue;
-      const matched = matchModelCostWithFallbacks(id, costs);
-      if (matched?.model !== id) {
-        misrouted.push(`${id} -> ${matched?.model ?? "no match"}`);
-      }
-    }
-
-    expect(
-      misrouted,
-      "An audio model matched to another model's rule is billed in that model's units.",
-    ).toEqual([]);
-  });
-
-  it("bills each audio model in a unit it can actually report", () => {
-    // Transcription that bills per second needs a duration; transcription
-    // that bills per token needs tokens. An entry carrying only the unit the
-    // API does not return rates every request at zero, and still looks like
-    // a complete entry.
-    const wrong: string[] = [];
-    for (const [id, unit] of Object.entries(BILLING_UNITS)) {
-      if (id in KNOWN_UNIT_MISMATCH) continue;
-      const entry = llmModels.models[id];
-      if (!entry) continue; // covered by the coverage test above
-      const units = pricedUnits(entry);
-      if (!units.has(unit)) {
-        wrong.push(
-          `${id} prices ${[...units].join("+") || "nothing"}, bills ${unit}`,
-        );
-      }
-    }
-    expect(
-      wrong,
-      "A rate in the wrong unit rates every request at zero. Fix the rate, or add the id to KNOWN_UNIT_MISMATCH with where the fix lands.",
-    ).toEqual([]);
-  });
-
-  it("keeps the known-mismatch list honest", () => {
-    // Once an entry is corrected its line must go, or the baseline becomes a
-    // place where the next mismatch hides.
-    const stillWrong = Object.keys(KNOWN_UNIT_MISMATCH).filter((id) => {
-      const entry = llmModels.models[id];
-      const unit = BILLING_UNITS[id];
-      if (!entry || !unit) return true;
-      return !pricedUnits(entry).has(unit);
+      it("still finds every id the known-unpriced list claims", () => {
+        // A model that gained a price must leave the list, or the list slowly
+        // becomes a place where real gaps hide.
+        const stillUnpriced = Object.keys(KNOWN_UNPRICED).filter((id) => {
+          const entry = llmModels.models[id];
+          return !entry || pricedUnits(entry).size === 0;
+        });
+        expect(stillUnpriced.sort()).toEqual(Object.keys(KNOWN_UNPRICED).sort());
+      });
     });
-    expect(
-      stillWrong.sort(),
-      "An entry in KNOWN_UNIT_MISMATCH now prices the right unit. Delete its line.",
-    ).toEqual(Object.keys(KNOWN_UNIT_MISMATCH).sort());
+
+    describe("when every billable quantity is one", () => {
+      it("rates a cost above zero for every priced model", () => {
+        const costs = getStaticModelCosts();
+        const zeroRated: string[] = [];
+
+        for (const [id] of catalogEntries) {
+          if (isPricedElsewhere(id) || id in KNOWN_UNPRICED) continue;
+
+          const matched = matchModelCostWithFallbacks(id, costs);
+          if (!matched) {
+            zeroRated.push(`${id} (no cost rule matched)`);
+            continue;
+          }
+          const cost = estimateCost({
+            llmModelCost: matched,
+            ...ONE_OF_EVERYTHING,
+          });
+          if (!cost || cost <= 0) {
+            zeroRated.push(`${id} (matched ${matched.model}, rated ${cost ?? 0})`);
+          }
+        }
+
+        expect(
+          zeroRated,
+          "These models rate zero even when every billable quantity is one, so a real request bills nothing.",
+        ).toEqual([]);
+      });
+    });
+  });
+
+  describe("given an audio model, which bills in more than one unit", () => {
+    describe("when the cost matcher picks its rule", () => {
+      it("picks that model's own rule, not a shorter prefix", () => {
+        // `openai/gpt-4o-transcribe` prefix-matches `openai/gpt-4o` unless it
+        // has its own entry, which is how a transcription request came to be
+        // priced with chat token rates.
+        const costs = getStaticModelCosts();
+        const misrouted: string[] = [];
+
+        for (const [id, entry] of catalogEntries) {
+          if (entry.mode !== "audio") continue;
+          const matched = matchModelCostWithFallbacks(id, costs);
+          if (matched?.model !== id) {
+            misrouted.push(`${id} -> ${matched?.model ?? "no match"}`);
+          }
+        }
+
+        expect(
+          misrouted,
+          "An audio model matched to another model's rule is billed in that model's units.",
+        ).toEqual([]);
+      });
+    });
+
+    describe("when its rate is compared with the unit the vendor bills", () => {
+      it("prices a unit the model can actually report", () => {
+        // Transcription that bills per second needs a duration; transcription
+        // that bills per token needs tokens. An entry carrying only the unit
+        // the API does not return rates every request at zero, and still
+        // looks like a complete entry.
+        const wrong: string[] = [];
+        for (const [id, unit] of Object.entries(BILLING_UNITS)) {
+          if (id in KNOWN_UNIT_MISMATCH) continue;
+          const entry = llmModels.models[id];
+          if (!entry) continue; // covered by the coverage tests above
+          const units = pricedUnits(entry);
+          if (!units.has(unit)) {
+            wrong.push(
+              `${id} prices ${[...units].join("+") || "nothing"}, bills ${unit}`,
+            );
+          }
+        }
+        expect(
+          wrong,
+          "A rate in the wrong unit rates every request at zero. Fix the rate, or add the id to KNOWN_UNIT_MISMATCH with where the fix lands.",
+        ).toEqual([]);
+      });
+
+      it("still finds every id the known-mismatch list claims", () => {
+        // Once an entry is corrected its line must go, or the baseline becomes
+        // a place where the next mismatch hides.
+        const stillWrong = Object.keys(KNOWN_UNIT_MISMATCH).filter((id) => {
+          const entry = llmModels.models[id];
+          const unit = BILLING_UNITS[id];
+          if (!entry || !unit) return true;
+          return !pricedUnits(entry).has(unit);
+        });
+        expect(
+          stillWrong.sort(),
+          "An entry in KNOWN_UNIT_MISMATCH now prices the right unit. Delete its line.",
+        ).toEqual(Object.keys(KNOWN_UNIT_MISMATCH).sort());
+      });
+    });
   });
 });
 
 describe("overlay precedence", () => {
-  it("lets a hand-written entry override the generated catalog", () => {
-    // The overlay is the correction lane. When it loses to the base file it
-    // cannot correct a wrong generated rate, which is the whole reason it
-    // exists.
-    for (const id of overlayOverriddenModelIds) {
-      expect(
-        llmModels.models[id]?.pricing,
-        `overlay entry ${id} is not the one in force`,
-      ).toEqual(overlayModels[id]?.pricing);
-    }
+  describe("given an overlay entry whose id the base catalog also carries", () => {
+    describe("when the catalog is merged", () => {
+      it("puts the hand-written entry in force", () => {
+        // The overlay is the correction lane. When it loses to the base file
+        // it cannot correct a wrong generated rate, which is the whole reason
+        // it exists.
+        for (const id of overlayOverriddenModelIds) {
+          expect(
+            llmModels.models[id]?.pricing,
+            `overlay entry ${id} is not the one in force`,
+          ).toEqual(overlayModels[id]?.pricing);
+        }
+      });
+    });
   });
 
-  it("prices gpt-audio-mini audio at the published rate, not the text rate", () => {
-    // One upstream source reports this model's audio input rate as its text
-    // rate, sixteen times under the published price. The overlay corrects it,
-    // which only works while the overlay wins the merge.
-    const entry = llmModels.models["openai/gpt-audio-mini"];
-    expect(entry).toBeDefined();
-    expect(entry!.pricing.audioCostPerToken).toBe(1e-5);
-    expect(entry!.pricing.inputCostPerToken).toBe(6e-7);
-    expect(overlayOverriddenModelIds).toContain("openai/gpt-audio-mini");
+  describe("given gpt-audio-mini, whose generated audio rate is its text rate", () => {
+    describe("when the catalog is merged", () => {
+      it("prices audio input at the published rate, not the text rate", () => {
+        // One upstream source reports this model's audio input rate as its
+        // text rate, sixteen times under the published price. The overlay
+        // corrects it, which only works while the overlay wins the merge.
+        // The output side is derived from this input rate by the cost layer.
+        const entry = llmModels.models["openai/gpt-audio-mini"];
+        expect(entry).toBeDefined();
+        expect(entry!.pricing.audioCostPerToken).toBe(1e-5);
+        expect(entry!.pricing.inputCostPerToken).toBe(6e-7);
+        expect(overlayOverriddenModelIds).toContain("openai/gpt-audio-mini");
+      });
+    });
   });
 });
