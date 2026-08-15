@@ -15,7 +15,7 @@ description: Set up online evaluation monitors in LangWatch to score outputs ins
 
 After you run all your experiments and get your LLM application live in production, you need to keep monitoring it. Online evaluation checks that the quality is good and that the application is safe for your users in production, and gives you the data to improve it.
 
-Online evaluation alerts you when things go wrong, guards against safety issues, generates insights, and builds your datasets automatically, so you keep collecting data for optimizing your AI application.
+Online evaluation alerts you when things go wrong, detects safety issues, generates insights, and builds your datasets automatically, so you keep collecting data for optimizing your AI application.
 
 {/* In this guide, we'll explore in depth a few use cases for online evaluation, and how you can set them up in LangWatch:
 
@@ -33,7 +33,7 @@ Online evaluation alerts you when things go wrong, guards against safety issues,
 
 ## Real-Time Evaluations for Safety
 
-Just like all web applications need standard safety protections from for example DDOS attacks, it's now the default practice to add sane protections to LLM applications too, like PII detection to know when sensitive data is being exposed, or protection against Prompt Injection, listed as the number 1 vulnerability for LLMs on the [OWASP Top 10](https://owasp.org/www-project-top-10-for-large-language-model-applications/).
+Just like all web applications need standard safety protections against DDoS attacks, it's now the default practice to add sane protections to LLM applications too, like PII detection to know when sensitive data is being exposed, or protection against prompt injection, listed as the number 1 vulnerability for LLMs on the [OWASP Top 10](https://owasp.org/www-project-top-10-for-large-language-model-applications/).
 
 ### Setting up a Prompt Injection detection monitor
 

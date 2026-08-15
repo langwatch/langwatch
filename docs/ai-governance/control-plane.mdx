@@ -66,8 +66,9 @@ if (data?.governanceActive && hasOrgManagePermission) {
 ```
 
 This satisfies the "don't lose LLMOps" constraint: an admin whose org
-has no personal VKs, no IngestionSources and no recent gateway
-activity gets `governanceActive=false` and sees no nav change at all.
+has no personal VKs, no routing policies, no IngestionSources, no
+anomaly rules and no recent gateway activity gets
+`governanceActive=false` and sees no nav change at all.
 
 ## The split: control plane vs data plane
 

@@ -45,7 +45,7 @@ The same steps work in Claude Cowork and in Claude chat on the web.
 Run this command to add the MCP server:
 
 ```bash
-claude mcp add langwatch -- npx -y @langwatch/mcp-server --apiKey your-api-key-here
+claude mcp add langwatch --env LANGWATCH_API_KEY=your-api-key-here -- npx -y @langwatch/mcp-server
 ```
 
 Or add it manually to your `~/.claude.json`. Under the `mcpServers` object, add an entry named `langwatch` with these fields:

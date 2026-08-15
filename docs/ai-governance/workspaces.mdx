@@ -52,7 +52,7 @@ What you can't do:
 
 ### Personal-workspace privacy
 
-By default, *other users' Personal Workspaces are invisible to you*: even when you're the org admin. The privacy contract is enforced at four layers:
+By default, *other users' Personal Workspaces are invisible to you*, outside the admin-only surfaces listed at the end of this section. The privacy contract is enforced at four layers:
 
 1. **Picker procedures** (`team.getTeamsWithMembers`, `team.getTeamWithMembers`, `organization.getOrganizationWithMembersAndTheirTeams`) strip personal teams owned by other users from the result, AND null-redact other members' email addresses while preserving the caller's own email.
 2. **Workspace data** (`useWorkspaceData` hook) fail-closes on null `ownerUserId`, an orphaned personal team without a clear owner is hidden from everyone.

@@ -94,8 +94,8 @@ groups:
           summary: "Gateway spend records dropped (reason={{ $labels.reason }})"
           description: |
             Budget debits are written from the spend records this pod spools,
-            so a dropped record is spend that nothing bills and no budget
-            enforces against. reason=intake means the pod produced faster than the
+            so a dropped record is spend that is neither billed nor counted
+            against a budget. reason=intake means the pod produced faster than the
             spool could write; reason=overflow means the drainer is not
             shipping fast enough and the oldest segments were deleted to stay
             inside the size bound. Check the control plane's spend-command

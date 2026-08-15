@@ -6,7 +6,7 @@ keywords: LangWatch, concepts, tracing, observability, LLM, AI, travel, blog, us
 
 import AgentReportNotice from "/snippets/agent-report-notice.mdx";
 
-LangWatch organizes what your LLM application sends into threads, traces and spans, and identifies them with a user ID, a customer ID and labels. The examples below come from an AI travel assistant and a text generation service.
+LangWatch organizes what your LLM application sends into threads, traces and spans, each with its own ID. The optional `user_id`, `customer_id` and `labels` fields add correlation and filtering on top of them. The examples below come from an AI travel assistant and a text generation service.
 
 ### Threads: The Whole Conversation
 
@@ -50,7 +50,7 @@ Simple but crucial: The **User ID** identifies the actual end-user interacting w
 
 Field: `customer_id`
 
-Are you building a platform *for other companies* to create *their own* LLM apps? That is what the **Customer ID** is for. If you're providing the tools for others (your customers) to build AI assistants for *their* users, the `customer_id` lets you (and them!) track usage and performance per customer account. It's perfect for offering custom analytics dashboards, showing your customers how *their* AI implementations are doing.
+Are you building a platform *for other companies* to create *their own* LLM apps? That is what the **Customer ID** is for. If you're providing the tools for others (your customers) to build AI assistants for *their* users, the `customer_id` lets you (and them!) track usage and performance per customer account. Scoping analytics by `customer_id` is what lets you give each customer a dashboard of how *their* AI implementation is doing.
 
 ### Labels: Organizing and Filtering Traces
 

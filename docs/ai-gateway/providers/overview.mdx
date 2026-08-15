@@ -40,7 +40,7 @@ Pick one or two fallback providers. Guidelines:
 
 - **Anthropic-first** with Bedrock-Anthropic fallback. Same models on both sides; Bedrock is a warm backup during Anthropic direct outages.
 - **OpenAI-first** with Anthropic fallback. Different model families but Claude Haiku can serve `gpt-5-mini` traffic acceptably for coding tasks.
-- **Azure-first** with OpenAI direct fallback. Keeps traffic inside Azure data-residency except when a regional Azure outage moves it to OpenAI direct.
+- **Azure-first** with OpenAI direct fallback. Keeps traffic inside Azure data-residency until a configured fallback trigger (by default `5xx`, `timeout`, `rate_limit`) moves it to OpenAI direct.
 
 See [Fallback Chains](/ai-gateway/providers/fallback-chains) for trigger semantics.
 

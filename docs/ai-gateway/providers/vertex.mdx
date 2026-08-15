@@ -48,7 +48,7 @@ Gemini's implicit context caches are exposed via a separate API (`caches.create`
 
 ## Known quirks
 
-- **Region availability.** Anthropic-on-Vertex is not in every GCP region; `us-central1`, `us-east5`, `europe-west1`, and `asia-southeast1` serve it. A 404 with "publisher not found" means wrong region.
+- **Region availability.** Anthropic-on-Vertex is not in every GCP region, and the regions differ per model version; `us-central1`, `us-east5`, `europe-west1`, and `asia-southeast1` are the common ones. Check the model card for the version you pin. A 404 with "publisher not found" means wrong region.
 - **Token refresh.** Service-account tokens expire after ~1 hour. Bifrost/core caches and auto-refreshes, no configuration needed from the VK owner.
 - **Quota headers.** Vertex returns `x-vertex-ai-quota-remaining` and throttles with 429 when exhausted. Bifrost/core surfaces the 429 to the fallback engine.
 - **Provisioned throughput vs on-demand.** Provisioned throughput ("Committed Use Discounts") has separate regional ARNs. If you're using provisioned, pass the PT-specific URL on the ModelProvider.

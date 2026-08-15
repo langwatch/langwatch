@@ -92,7 +92,7 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check that file before you ask for a new key. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
+So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check that file before you ask for a new key. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
 
 Then read the Scenario-specific pages:
 
@@ -715,7 +715,7 @@ If the user is on a paid tier with higher TTS limits, bump the group/maxConcurre
 
 - **Long timeouts.** Voice scenarios take 30–120s per run. Set `testTimeout: 240_000` (vitest) or `@pytest.mark.timeout(300)` (pytest).
 - **Hosted ConvAI multi-turn brittleness.** `ElevenLabsAgentAdapter` is server-VAD-driven; scripted `user()` turns past the first reply can hit `receiveAudio timed out`. Prefer single-exchange scripts (greeting → user → agent → judge), or use a composable agent under test.
-- **Voice convention: agent greets first.** Twilio, ElevenLabs and OpenAI Realtime all send a `first_message` on connect. Lead the script with `scenario.agent()` so the greeting drains before the user audio fires.
+- **Voice convention: agent greets first.** Twilio, ElevenLabs and OpenAI Realtime can each send a `first_message` on connect, depending on how the agent is configured. When the agent greets first, lead the script with `scenario.agent()` so the greeting drains before the user audio fires.
 - **ElevenLabs concurrency caps.** The starter tier limits to 3 concurrent TTS requests. When running ≥4 scenarios in parallel, batch them (`pytest-asyncio-concurrent` group of ≤3) or you'll hit 429s.
 
 ---

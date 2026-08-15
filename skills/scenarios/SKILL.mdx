@@ -687,7 +687,7 @@ If the user is on a paid tier with higher TTS limits, bump the group/maxConcurre
 
 - **Long timeouts.** Voice scenarios take 30–120s per run. Set `testTimeout: 240_000` (vitest) or `@pytest.mark.timeout(300)` (pytest).
 - **Hosted ConvAI multi-turn brittleness.** `ElevenLabsAgentAdapter` is server-VAD-driven; scripted `user()` turns past the first reply can hit `receiveAudio timed out`. Prefer single-exchange scripts (greeting → user → agent → judge), or use a composable agent under test.
-- **Voice convention: agent greets first.** Twilio, ElevenLabs and OpenAI Realtime all send a `first_message` on connect. Lead the script with `scenario.agent()` so the greeting drains before the user audio fires.
+- **Voice convention: agent greets first.** Twilio, ElevenLabs and OpenAI Realtime can each send a `first_message` on connect, depending on how the agent is configured. When the agent greets first, lead the script with `scenario.agent()` so the greeting drains before the user audio fires.
 - **ElevenLabs concurrency caps.** The starter tier limits to 3 concurrent TTS requests. When running ≥4 scenarios in parallel, batch them (`pytest-asyncio-concurrent` group of ≤3) or you'll hit 429s.
 
 ---

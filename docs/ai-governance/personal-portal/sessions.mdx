@@ -76,8 +76,8 @@ session survives rotation without re-prompting login.
 
 Click **Revoke** on any session card. The corresponding access-token +
 refresh-token Redis keys are immediately deleted. The next CLI request
-from that device returns 401. The CLI tries to refresh once, the
-refresh is refused too because the pair was deleted, and it prints
+from that device returns 401. The CLI tries to refresh once. That
+refresh is refused too because the pair was deleted, and the CLI prints
 "Session expired, run `langwatch login --device` again".
 
 **Revoke all sessions** clears every active session in one action,

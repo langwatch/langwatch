@@ -40,7 +40,7 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check that file before you ask for a new key. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
+So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check that file before you ask for a new key. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
 
 ## Step 2: Gather Evidence Before Proposing Anything
 
@@ -102,7 +102,7 @@ Examples: an LLM-judge evaluator flagging stale-data answers, a monitor on refus
 
 ### Settle open questions with experiments
 
-When two approaches compete (two prompts, two models, two retrieval settings), run an experiment instead of arguing: build a dataset from real traces (`datasets` skill), then run it once per variant with `langwatch experiment run <slug> --param model=<variant>` and compare. A `--param name=value` pair is a constant value merged into every dataset row, so one experiment covers both variants.
+When two approaches compete (two prompts, two models, two retrieval settings), run an experiment instead of arguing: build a dataset from real traces (`datasets` skill), then run it once per variant with `langwatch experiment run <slug> --param model=<variant>` and compare. A `--param name=value` pair is a constant value merged into every dataset row, so each run pins one variant against the same dataset.
 
 LangWatch's free plan has limits on prompts, scenarios, evaluators, experiments, and datasets. When you hit a limit, the API returns `"Free plan limit of N reached..."` with an upgrade link.
 

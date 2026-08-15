@@ -24,7 +24,7 @@ arrive, not a worker that polls.
 
 ## The pipeline
 
-```
+```text
 ┌────────────────────────────────────────────────────────────────┐
 │  /api/ingest/otel/:sourceId  /api/ingest/webhook/:sourceId      │
 │  (Hono routes: auth, validate sourceId, parse body)             │
@@ -93,7 +93,7 @@ aggregate semantics clean.
 
 ## Aggregate identity
 
-```
+```text
 aggregateType:  "activity_event"
 aggregateId:    EventId  (one event = one aggregate, no fold across events)
 tenantId:       IngestionSource.id  (matches gateway_activity_events.TenantId)
@@ -111,6 +111,7 @@ hours. Same machinery, different aggregate semantics.
 The redesign ships as four slices, C0 through C3:
 
 ### C0: this doc and spec updates
+
 - This architecture doc.
 - `specs/ai-gateway/governance/anomaly-detection.feature` updated to
   drop poller language; reactor framing throughout.
@@ -121,6 +122,7 @@ The redesign ships as four slices, C0 through C3:
   before more code moves.
 
 ### C1: receiver → event_log → projection reactor
+
 - New event schema: `ActivityEventReceived` with the OCSF-normalised
   ActivityEventRow shape.
 - New command: `RecordActivityEventCommand` wired into the
@@ -134,6 +136,7 @@ The redesign ships as four slices, C0 through C3:
   event-sourced path).
 
 ### C2: AnomalyAlert and anomaly reactor for one rule type
+
 - Apply the AnomalyAlert migration that's already drafted but
   doesn't ship behaviour yet.
 - Add `anomalyWindow` fold projection (per-tenant rolling totals).
@@ -145,6 +148,7 @@ The redesign ships as four slices, C0 through C3:
   event → alert appears on `/governance` within ~30s.
 
 ### C3: Dispatch destinations
+
 - Generic webhook + log-only first (matches PR #3351's
   triggerActionDispatch shape).
 - Slack / PagerDuty / SIEM / email follow as per-destination

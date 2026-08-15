@@ -70,7 +70,7 @@ The four pre-built team roles. A user can have **different** team roles on diffe
 | Team role | What it grants by default |
 |---|---|
 | **ADMIN** | The full team-scoped permission set: `project:create/update`, `analytics:manage`, `traces:create`, `virtualKeys:create/update/rotate/manage`, `gatewayBudgets:view/manage`, `gatewayProviders:view/update/manage`, `routingPolicies:view/manage`, `gatewayGuardrails:view/attach/detach/manage`, `gatewayLogs:view`, `auditLog:view`, `gatewayUsage:view`, `gatewayCacheRules:*`. |
-| **MEMBER** | Same shape minus the `*:manage` permissions. Read, create and update on the same resources; can't delete or reconfigure providers, policies. |
+| **MEMBER** | The team-scoped working set: `project:view/create/update`, `analytics:manage`, `traces:create/update/share`, and `*:manage` on annotations, evaluations, workflows, experiments, datasets, triggers, prompts, scenarios and secrets. On the gateway it runs its own keys (`virtualKeys:view/create/update/rotate`) and reads the rest (`gatewayBudgets:view`, `gatewayProviders:view`, `routingPolicies:view`, `gatewayGuardrails:view`, `gatewayLogs:view`, `auditLog:view`, `gatewayUsage:view`, `gatewayCacheRules:view`), so it can't delete or reconfigure providers and policies. |
 | **VIEWER** | View-only across the team. No create, update, delete on anything. The right shape for stakeholders who need read access to a team's traces but should never reconfigure anything. |
 | **CUSTOM** | Empty by default. Permissions come from the `CustomRolePermissions` JSON column on the `RoleBinding` row, see [Custom roles](#custom-roles) below. |
 

@@ -26,7 +26,7 @@ const anthropic = new Anthropic({
 });
 ```
 
-Two env-var changes. That's the whole code migration if you're happy with default gateway behaviour (no budget, cache-respect, fallback disabled). Read on for the policy additions.
+Two lines per client: the `baseURL` and the key it reads. That's the whole code migration if you're happy with default gateway behaviour (no budget, cache-respect, fallback disabled). Read on for the policy additions.
 
 ## Pre-migration checklist
 

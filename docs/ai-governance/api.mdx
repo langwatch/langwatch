@@ -31,7 +31,7 @@ Both paths call into the same service-layer functions, there is no business-logi
 
 ## Resource × verb matrix
 
-Every governance resource exposes the full CRUD set, `list`, `get`, `create`, `update`, `delete`, over Hono, the CLI, and the MCP server. The umbrella spec lists the resource set; each resource gets its own OpenAPI path group.
+Governance resources expose the full CRUD set, `list`, `get`, `create`, `update`, `delete`, over Hono, the CLI, and the MCP server, except where the table below names a narrower verb set (`audit-log` is read-only, ingestion keys mint through their own route). The umbrella spec lists the resource set; each resource gets its own OpenAPI path group.
 
 | Resource | OpenAPI path group | Detail page |
 |---|---|---|

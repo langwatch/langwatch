@@ -123,7 +123,7 @@ description: Explore core concepts of LLM tracing, observability, datasets, and 
 keywords: LangWatch, concepts, tracing, observability, LLM, AI, travel, blog, user, customer, labels, threads, traces, spans
 ---
 
-LangWatch organizes what your LLM application sends into threads, traces and spans, and identifies them with a user ID, a customer ID and labels. The examples below come from an AI travel assistant and a text generation service.
+LangWatch organizes what your LLM application sends into threads, traces and spans, each with its own ID. The optional `user_id`, `customer_id` and `labels` fields add correlation and filtering on top of them. The examples below come from an AI travel assistant and a text generation service.
 
 ### Threads: The Whole Conversation
 
@@ -167,7 +167,7 @@ Simple but crucial: The **User ID** identifies the actual end-user interacting w
 
 Field: `customer_id`
 
-Are you building a platform *for other companies* to create *their own* LLM apps? That is what the **Customer ID** is for. If you're providing the tools for others (your customers) to build AI assistants for *their* users, the `customer_id` lets you (and them!) track usage and performance per customer account. It's perfect for offering custom analytics dashboards, showing your customers how *their* AI implementations are doing.
+Are you building a platform *for other companies* to create *their own* LLM apps? That is what the **Customer ID** is for. If you're providing the tools for others (your customers) to build AI assistants for *their* users, the `customer_id` lets you (and them!) track usage and performance per customer account. Scoping analytics by `customer_id` is what lets you give each customer a dashboard of how *their* AI implementation is doing.
 
 ### Labels: Organizing and Filtering Traces
 
@@ -2265,7 +2265,7 @@ Response:
 
 `purpose: "langy"` marks a product-managed key (auto-provisioned by LangWatch). Those rows appear in listings but refuse every mutation; filter on `purpose` when scripting bulk operations.
 
-`last_used_at` advances when the gateway resolves the key, which it does periodically rather than per request, because it serves traffic from a cached configuration in between. Read it as "this key has been in use recently", not as the timestamp of the last request. A revoked or disabled key never advances it, since the refusal happens before the bump, so the field is a reliable way to find unused keys.
+`last_used_at` advances when the gateway resolves the key, which it does periodically rather than per request, because it serves traffic from a cached configuration in between. Read it as "this key has been in use recently", not as the timestamp of the last request. A revoked or disabled key never advances it, since the refusal happens before the bump, so the field is a reliable way to find keys with no recent use.
 
 ### Create
 
@@ -11252,7 +11252,7 @@ Postgres:
 
 ClickHouse:
 
-- Trace/span data is per-organization, partitioned on `TenantId`. Queries from the UI always include a `TenantId` predicate enforced at middleware. The ClickHouse query layer is what blocks a cross-tenant read, so a caller cannot opt out of it.
+- Trace/span data is per-organization, partitioned on `TenantId`. Queries from the UI always include a `TenantId` predicate enforced at middleware. Every query the application builds carries that predicate, which is what keeps a read inside one organization.
 
 ## Self-hosted deployments
 
@@ -18402,7 +18402,7 @@ The four pre-built team roles. A user can have **different** team roles on diffe
 | Team role | What it grants by default |
 |---|---|
 | **ADMIN** | The full team-scoped permission set: `project:create/update`, `analytics:manage`, `traces:create`, `virtualKeys:create/update/rotate/manage`, `gatewayBudgets:view/manage`, `gatewayProviders:view/update/manage`, `routingPolicies:view/manage`, `gatewayGuardrails:view/attach/detach/manage`, `gatewayLogs:view`, `auditLog:view`, `gatewayUsage:view`, `gatewayCacheRules:*`. |
-| **MEMBER** | Same shape minus the `*:manage` permissions. Read, create and update on the same resources; can't delete or reconfigure providers, policies. |
+| **MEMBER** | The team-scoped working set: `project:view/create/update`, `analytics:manage`, `traces:create/update/share`, and `*:manage` on annotations, evaluations, workflows, experiments, datasets, triggers, prompts, scenarios and secrets. On the gateway it runs its own keys (`virtualKeys:view/create/update/rotate`) and reads the rest (`gatewayBudgets:view`, `gatewayProviders:view`, `routingPolicies:view`, `gatewayGuardrails:view`, `gatewayLogs:view`, `auditLog:view`, `gatewayUsage:view`, `gatewayCacheRules:view`), so it can't delete or reconfigure providers and policies. |
 | **VIEWER** | View-only across the team. No create, update, delete on anything. The right shape for stakeholders who need read access to a team's traces but should never reconfigure anything. |
 | **CUSTOM** | Empty by default. Permissions come from the `CustomRolePermissions` JSON column on the `RoleBinding` row, see [Custom roles](#custom-roles) below. |
 
@@ -30133,7 +30133,7 @@ The same steps work in Claude Cowork and in Claude chat on the web.
 Run this command to add the MCP server:
 
 ```bash
-claude mcp add langwatch -- npx -y @langwatch/mcp-server --apiKey your-api-key-here
+claude mcp add langwatch --env LANGWATCH_API_KEY=your-api-key-here -- npx -y @langwatch/mcp-server
 ```
 
 Or add it manually to your `~/.claude.json`. Under the `mcpServers` object, add an entry named `langwatch` with these fields:
@@ -45881,7 +45881,7 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check that file before you ask for a new key. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
+So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check that file before you ask for a new key. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
 
 Then fetch the integration guide for this project's framework:
 
@@ -46072,7 +46072,7 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check that file before you ask for a new key. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
+So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check that file before you ask for a new key. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
 
 Read the experiment documentation before writing code:
 
@@ -46354,7 +46354,7 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check that file before you ask for a new key. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
+So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check that file before you ask for a new key. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
 
 Read the relevant documentation before changing configuration or code:
 
@@ -46707,7 +46707,7 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check that file before you ask for a new key. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
+So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check that file before you ask for a new key. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
 
 Then read the Scenario-specific pages:
 
@@ -47330,7 +47330,7 @@ If the user is on a paid tier with higher TTS limits, bump the group/maxConcurre
 
 - **Long timeouts.** Voice scenarios take 30–120s per run. Set `testTimeout: 240_000` (vitest) or `@pytest.mark.timeout(300)` (pytest).
 - **Hosted ConvAI multi-turn brittleness.** `ElevenLabsAgentAdapter` is server-VAD-driven; scripted `user()` turns past the first reply can hit `receiveAudio timed out`. Prefer single-exchange scripts (greeting → user → agent → judge), or use a composable agent under test.
-- **Voice convention: agent greets first.** Twilio, ElevenLabs and OpenAI Realtime all send a `first_message` on connect. Lead the script with `scenario.agent()` so the greeting drains before the user audio fires.
+- **Voice convention: agent greets first.** Twilio, ElevenLabs and OpenAI Realtime can each send a `first_message` on connect, depending on how the agent is configured. When the agent greets first, lead the script with `scenario.agent()` so the greeting drains before the user audio fires.
 - **ElevenLabs concurrency caps.** The starter tier limits to 3 concurrent TTS requests. When running ≥4 scenarios in parallel, batch them (`pytest-asyncio-concurrent` group of ≤3) or you'll hit 429s.
 
 ---
@@ -47646,7 +47646,7 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check that file before you ask for a new key. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
+So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check that file before you ask for a new key. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
 
 Then specifically read the Prompts CLI guide:
 
@@ -48355,7 +48355,7 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check that file before you ask for a new key. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
+So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check that file before you ask for a new key. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
 
 Then fetch the integration guide for this project's framework:
 
@@ -49592,7 +49592,7 @@ If the user is on a paid tier with higher TTS limits, bump the group/maxConcurre
 
 - **Long timeouts.** Voice scenarios take 30–120s per run. Set `testTimeout: 240_000` (vitest) or `@pytest.mark.timeout(300)` (pytest).
 - **Hosted ConvAI multi-turn brittleness.** `ElevenLabsAgentAdapter` is server-VAD-driven; scripted `user()` turns past the first reply can hit `receiveAudio timed out`. Prefer single-exchange scripts (greeting → user → agent → judge), or use a composable agent under test.
-- **Voice convention: agent greets first.** Twilio, ElevenLabs and OpenAI Realtime all send a `first_message` on connect. Lead the script with `scenario.agent()` so the greeting drains before the user audio fires.
+- **Voice convention: agent greets first.** Twilio, ElevenLabs and OpenAI Realtime can each send a `first_message` on connect, depending on how the agent is configured. When the agent greets first, lead the script with `scenario.agent()` so the greeting drains before the user audio fires.
 - **ElevenLabs concurrency caps.** The starter tier limits to 3 concurrent TTS requests. When running ≥4 scenarios in parallel, batch them (`pytest-asyncio-concurrent` group of ≤3) or you'll hit 429s.
 
 ---
@@ -49897,7 +49897,7 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check that file before you ask for a new key. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
+So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check that file before you ask for a new key. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
 
 ## Step 2: Gather Evidence Before Proposing Anything
 
@@ -49959,7 +49959,7 @@ Examples: an LLM-judge evaluator flagging stale-data answers, a monitor on refus
 
 ### Settle open questions with experiments
 
-When two approaches compete (two prompts, two models, two retrieval settings), run an experiment instead of arguing: build a dataset from real traces (`datasets` skill), then run it once per variant with `langwatch experiment run <slug> --param model=<variant>` and compare. A `--param name=value` pair is a constant value merged into every dataset row, so one experiment covers both variants.
+When two approaches compete (two prompts, two models, two retrieval settings), run an experiment instead of arguing: build a dataset from real traces (`datasets` skill), then run it once per variant with `langwatch experiment run <slug> --param model=<variant>` and compare. A `--param name=value` pair is a constant value merged into every dataset row, so each run pins one variant against the same dataset.
 
 LangWatch's free plan has limits on prompts, scenarios, evaluators, experiments, and datasets. When you hit a limit, the API returns `"Free plan limit of N reached..."` with an upgrade link.
 
@@ -50079,7 +50079,7 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check that file before you ask for a new key. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
+So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check that file before you ask for a new key. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
 
 ## Step 2: Baseline the Vital Signs
 
@@ -51671,7 +51671,7 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check that file before you ask for a new key. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
+So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check that file before you ask for a new key. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
 
 ## Step 2: Baseline the Vital Signs
 
@@ -51872,7 +51872,7 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check that file before you ask for a new key. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
+So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check that file before you ask for a new key. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
 
 Then read the Scenario-specific pages:
 
@@ -52495,7 +52495,7 @@ If the user is on a paid tier with higher TTS limits, bump the group/maxConcurre
 
 - **Long timeouts.** Voice scenarios take 30–120s per run. Set `testTimeout: 240_000` (vitest) or `@pytest.mark.timeout(300)` (pytest).
 - **Hosted ConvAI multi-turn brittleness.** `ElevenLabsAgentAdapter` is server-VAD-driven; scripted `user()` turns past the first reply can hit `receiveAudio timed out`. Prefer single-exchange scripts (greeting → user → agent → judge), or use a composable agent under test.
-- **Voice convention: agent greets first.** Twilio, ElevenLabs and OpenAI Realtime all send a `first_message` on connect. Lead the script with `scenario.agent()` so the greeting drains before the user audio fires.
+- **Voice convention: agent greets first.** Twilio, ElevenLabs and OpenAI Realtime can each send a `first_message` on connect, depending on how the agent is configured. When the agent greets first, lead the script with `scenario.agent()` so the greeting drains before the user audio fires.
 - **ElevenLabs concurrency caps.** The starter tier limits to 3 concurrent TTS requests. When running ≥4 scenarios in parallel, batch them (`pytest-asyncio-concurrent` group of ≤3) or you'll hit 429s.
 
 ---

@@ -260,7 +260,7 @@ langwatch.setup(
 
 ## Integrations
 
-LangWatch integrates with a range of Python libraries and frameworks. These integrations instrument your code automatically and capture data from your LLM applications with minimal setup.
+LangWatch integrates with a range of Python libraries and frameworks. These integrations instrument your code automatically and capture data from your LLM applications.
 
 Below is a list of currently supported integrations. Click on each to learn more about specific setup instructions and available features:
 
@@ -285,7 +285,7 @@ If you are using a library that is not listed here, you can still instrument you
 
 <AccordionGroup>
   <Accordion title="How do I track LLM costs and token usage?">
-    LangWatch captures cost and token data automatically. If you're missing costs or token counts, our [cost tracking tutorial](/integration/python/tutorials/tracking-llm-costs) covers troubleshooting steps, model cost configuration, and manual token tracking setup.
+    LangWatch captures token counts from the span and prices them against the model registry in **Settings > Model Costs**, so a model that is in the registry gets its cost automatically. If you're missing costs or token counts, our [cost tracking tutorial](/integration/python/tutorials/tracking-llm-costs) covers troubleshooting steps, model cost configuration, and manual token tracking setup.
   </Accordion>
 
   <Accordion title="How do I capture RAG (Retrieval Augmented Generation) contexts?">

@@ -213,8 +213,9 @@ receiver:
 7. **Hands off** to the trace pipeline, same path as every other ingest source from
    here.
 
-Two primitives enforce security on this path: the ingest-only ceiling at step 3 and
-the principal-field guard at step 6.
+Two primitives stop a template from raising its own reach or attributing payloads to
+another principal: the ingest-only ceiling at step 3 and the principal-field guard at
+step 6. Key verification at step 2 and the tenant binding at step 4 still apply.
 
 ### What the principal-field guard protects
 

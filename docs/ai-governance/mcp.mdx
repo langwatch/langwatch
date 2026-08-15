@@ -120,7 +120,7 @@ The contract is service-layer-asserted by `platform/app/src/mcp/__tests__/govern
 
 ## Agent setup from scratch
 
-An agent connecting with an admin apiKey can fully configure governance through a sequence of MCP tool calls:
+An agent connecting through the OAuth flow as an admin can fully configure governance through a sequence of MCP tool calls (the write tools below reject a project-key-only caller):
 
 1. `governance_ingestion_templates_list`, read existing platform templates
 2. `governance_ingestion_templates_clone_from_platform`, clone `claude_code` into the org (delegates to `POST /api/governance/ingestion-templates/clone`)

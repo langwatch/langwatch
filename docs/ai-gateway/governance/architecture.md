@@ -318,8 +318,8 @@ docs/ai-gateway/self-hosting/                        # Operator docs
 
 ## Where to read more
 
-- [`gateway.md`](https://github.com/langwatch/langwatch): full
-  product strategy doc that drives this architecture.
+- [langwatch/langwatch](https://github.com/langwatch/langwatch): the repository
+  that holds the gateway product strategy doc driving this architecture.
 - [`feature-flag-gating.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/feature-flag-gating.feature):
   the single-flag / single-env-var contract.
 - [`activity-monitor.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/activity-monitor.feature):

@@ -122,7 +122,7 @@ Postgres:
 
 ClickHouse:
 
-- Trace/span data is per-organization, partitioned on `TenantId`. Queries from the UI always include a `TenantId` predicate enforced at middleware. The ClickHouse query layer is what blocks a cross-tenant read, so a caller cannot opt out of it.
+- Trace/span data is per-organization, partitioned on `TenantId`. Queries from the UI always include a `TenantId` predicate enforced at middleware. Every query the application builds carries that predicate, which is what keeps a read inside one organization.
 
 ## Self-hosted deployments
 
