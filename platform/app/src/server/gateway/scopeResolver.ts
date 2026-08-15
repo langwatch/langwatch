@@ -34,7 +34,7 @@ import type {
   Prisma,
   PrismaClient,
 } from "~/generated/prisma/client";
-import { modelProviders } from "../modelProviders/registry";
+import { isDispatchableProvider } from "~/server/modelProviders/registry";
 import type { ScopeInput, VirtualKeyWithScopes } from "./virtualKey.repository";
 
 export type EligibleModelProvider = ModelProvider;
@@ -57,7 +57,7 @@ export async function eligibleModelProvidersForVk(
         scopes: { some: { OR: scopePredicates } },
       },
     })
-  ).filter(isDispatchableProvider);
+  ).filter((mp) => isDispatchableProvider(mp.provider));
 
   if (vk.routingPolicyId) {
     const policy = await client.routingPolicy.findUnique({
@@ -74,18 +74,6 @@ export async function eligibleModelProvidersForVk(
   }
 
   return candidates.sort(deterministicMpOrder);
-}
-
-// Non-LLM providers (registry type "safety", e.g. azure_safety) hold
-// credentials for evaluators, not chat dispatch. The Go gateway's Bifrost
-// router has no adapter for them, so letting one into the VK chain makes
-// fallback attempts fail with "unsupported provider: azure_safety".
-// Providers absent from the registry pass through: they may be newer than
-// this build's registry snapshot, and the materialiser's default branch
-// still knows how to shape their credentials.
-function isDispatchableProvider(mp: ModelProvider): boolean {
-  const entry = modelProviders[mp.provider as keyof typeof modelProviders];
-  return !entry || entry.type === "llm";
 }
 
 function deterministicMpOrder(a: ModelProvider, b: ModelProvider): number {

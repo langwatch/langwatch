@@ -9,7 +9,8 @@
  *
  *   - No preference means the async contract is untouched: 202, ids only, and
  *     the durable fold is never even consulted.
- *   - A settled turn comes back 200 with `Preference-Applied: wait` and the
+ *   - A settled turn comes back 200 with `Preference-Applied: wait=<applied>`
+ *     (the value echoed per RFC 7240 §3, so a capped caller can tell) and the
  *     assistant's text, keyed on the turnId THIS request started — a terminal
  *     event for some other turn on the same conversation must not satisfy the
  *     wait.
@@ -82,6 +83,9 @@ vi.mock("~/server/app-layer/app", () => ({
       conversations: { getEventsAfter: mockGetEventsAfter },
     },
   })),
+  // No Redis in this suite: awaitTurnSettlement exercises its fold-poll
+  // fallback, which is the deterministic path a unit suite can pin.
+  tryGetApp: vi.fn(() => null),
 }));
 
 // Imported AFTER every mock, same as the sibling suite.
@@ -201,7 +205,7 @@ describe("/api/langy wait mode (Prefer: wait)", () => {
     const res = await postTurn({ Prefer: "wait=30" });
 
     expect(res.status).toBe(200);
-    expect(res.headers.get("preference-applied")).toBe("wait");
+    expect(res.headers.get("preference-applied")).toBe("wait=30");
     expect(await res.json()).toEqual({
       conversationId: "conv-1",
       turnId: "turn-1",
@@ -234,12 +238,18 @@ describe("/api/langy wait mode (Prefer: wait)", () => {
         truncated: false,
       });
 
-    const res = await postTurn({ Prefer: "wait=30" });
-    const body = (await res.json()) as { reply: { text: string } };
+    vi.useFakeTimers();
+    try {
+      const pending = postTurn({ Prefer: "wait=30" });
+      await vi.advanceTimersByTimeAsync(1_000);
+      const res = await pending;
+      const body = (await res.json()) as { reply: { text: string } };
 
-    expect(res.status).toBe(200);
-    expect(body.reply.text).toBe("yours");
-    expect(mockGetEventsAfter.mock.calls.length).toBeGreaterThanOrEqual(2);
+      expect(res.status).toBe(200);
+      expect(body.reply.text).toBe("yours");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   /** @scenario "A failed turn settles the wait as a domain outcome, not a transport refusal" */
@@ -286,11 +296,18 @@ describe("/api/langy wait mode (Prefer: wait)", () => {
         truncated: false,
       });
 
-    const res = await postTurn({ Prefer: "wait=30" });
-    const body = (await res.json()) as { reply: { text: string } };
+    vi.useFakeTimers();
+    try {
+      const pending = postTurn({ Prefer: "wait=30" });
+      await vi.advanceTimersByTimeAsync(1_000);
+      const res = await pending;
+      const body = (await res.json()) as { reply: { text: string } };
 
-    expect(res.status).toBe(200);
-    expect(body.reply.text).toBe("late but here");
+      expect(res.status).toBe(200);
+      expect(body.reply.text).toBe("late but here");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   /** @scenario "A plain-text message is accepted without the parts structure" */
@@ -341,5 +358,83 @@ describe("/api/langy wait mode (Prefer: wait)", () => {
       conversationId: "conv-1",
       turnId: "turn-1",
     });
+  });
+
+  it("caps the wait at MAX_WAIT_SECONDS and echoes the applied value", async () => {
+    mockGetEventsAfter.mockResolvedValue({
+      events: [respondedEvent({ turnId: "turn-1", text: "capped" })],
+      cursor: { acceptedAt: 1, eventId: "evt-turn-1" },
+      truncated: false,
+    });
+
+    const res = await postTurn({ Prefer: "wait=99999" });
+
+    expect(res.status).toBe(200);
+    // RFC 7240 §3: the echoed value is how the caller learns the cap.
+    expect(res.headers.get("preference-applied")).toBe("wait=120");
+  });
+
+  it("treats wait=0 as no preference: 202 without consulting the fold", async () => {
+    const res = await postTurn({ Prefer: "wait=0" });
+
+    expect(res.status).toBe(202);
+    expect(res.headers.get("preference-applied")).toBeNull();
+    expect(mockGetEventsAfter).not.toHaveBeenCalled();
+  });
+
+  it("ignores a negative wait and answers 202", async () => {
+    const res = await postTurn({ Prefer: "wait=-5" });
+
+    expect(res.status).toBe(202);
+    expect(mockGetEventsAfter).not.toHaveBeenCalled();
+  });
+
+  it("parses wait when it is not the first preference in the header", async () => {
+    mockGetEventsAfter.mockResolvedValue({
+      events: [respondedEvent({ turnId: "turn-1", text: "mid-header" })],
+      cursor: { acceptedAt: 1, eventId: "evt-turn-1" },
+      truncated: false,
+    });
+
+    const res = await postTurn({ Prefer: "respond-async, wait=30" });
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("preference-applied")).toBe("wait=30");
+  });
+
+  it('parses the RFC 7240 quoted-string form wait="30"', async () => {
+    mockGetEventsAfter.mockResolvedValue({
+      events: [respondedEvent({ turnId: "turn-1", text: "quoted" })],
+      cursor: { acceptedAt: 1, eventId: "evt-turn-1" },
+      truncated: false,
+    });
+
+    const res = await postTurn({ Prefer: 'wait="30"' });
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("preference-applied")).toBe("wait=30");
+  });
+
+  it("stops waiting and degrades to 202 when the client disconnects", async () => {
+    mockGetEventsAfter.mockResolvedValue(emptyTail);
+    const client = new AbortController();
+
+    const pending = testApp.request(TURN_URL, {
+      method: "POST",
+      headers: {
+        "X-Auth-Token": "test-token",
+        "Content-Type": "application/json",
+        Prefer: "wait=30",
+      },
+      body: JSON.stringify(VALID_TURN_BODY),
+      signal: client.signal,
+    });
+    // Let the turn start and the wait enter its first poll delay, then walk away.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    client.abort();
+    const res = await pending;
+
+    expect(res.status).toBe(202);
+    expect(res.headers.get("preference-applied")).toBeNull();
   });
 });

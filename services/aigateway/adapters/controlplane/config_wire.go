@@ -303,7 +303,7 @@ func buildModelAlias(target string) domain.ModelAlias {
 	if !found || provider == "" || model == "" {
 		return domain.ModelAlias{Model: target}
 	}
-	return domain.ModelAlias{ProviderID: normalizeProviderType(provider), Model: model}
+	return domain.ModelAlias{ProviderID: domain.NormalizeProviderID(provider), Model: model}
 }
 
 func buildPolicyRules(pr policyRulesWire) []domain.PolicyRule {
@@ -385,7 +385,7 @@ func buildCacheRules(wires []cacheRuleWire) []domain.CacheRule {
 func providerSlotToCredential(p providerSlotWire) domain.Credential {
 	cred := domain.Credential{
 		ID:         p.ID,
-		ProviderID: normalizeProviderType(p.Type),
+		ProviderID: domain.NormalizeProviderID(p.Type),
 	}
 
 	getString := func(key string) string {
@@ -461,8 +461,4 @@ func providerSlotToCredential(p providerSlotWire) domain.Credential {
 	}
 
 	return cred
-}
-
-func normalizeProviderType(t string) domain.ProviderID {
-	return domain.NormalizeProviderID(t)
 }

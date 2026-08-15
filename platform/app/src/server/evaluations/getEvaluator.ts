@@ -6,6 +6,18 @@ import {
   type EvaluatorTypes,
 } from "./evaluators";
 
+/**
+ * The shape `getEvaluatorIncludingCustom` builds for a project's custom
+ * (workflow-derived) evaluators: contract only — a name and the input fields
+ * the caller must supply. Unlike a built-in `EvaluatorDefinition` it carries
+ * no `settings`, which is why `getEvaluatorDefaultSettings` accepts the union
+ * and answers `{}` for this arm.
+ */
+export type CustomEvaluatorDefinition = {
+  name: string;
+  requiredFields: string[];
+};
+
 export const getEvaluatorDefinitions = (evaluator: string) => {
   for (const [key, val] of Object.entries(AVAILABLE_EVALUATORS)) {
     if (key === evaluator) return val;
@@ -24,10 +36,7 @@ export const getEvaluatorDefinitions = (evaluator: string) => {
  * nothing to say (e.g. server-side callers without project context).
  */
 export const getEvaluatorDefaultSettings = <T extends EvaluatorTypes>(
-  evaluator:
-    | EvaluatorDefinition<T>
-    | { name: string; requiredFields: string[] }
-    | undefined,
+  evaluator: EvaluatorDefinition<T> | CustomEvaluatorDefinition | undefined,
   resolved?: {
     defaultModel?: string | null;
     embeddingsModel?: string | null;

@@ -81,10 +81,6 @@
  * HandledError that is re-thrown untouched.
  */
 
-import {
-  LANGY_CONVERSATION_EVENT_TYPES,
-  type LangyEventCursor,
-} from "@langwatch/langy";
 import type { Context } from "hono";
 import { z } from "zod";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
@@ -99,12 +95,11 @@ import {
   LangyApiCredentialMissingError,
   LangyApiIdentityDeniedError,
   LangyApiRequestInvalidError,
-  LangyConversationNotFoundError,
 } from "~/server/app-layer/langy/errors";
-import { extractTextFromParts } from "~/server/app-layer/langy/langy-message.service";
 import type { LangyChatMessageInput } from "~/server/app-layer/langy/langy-turn.service";
 import { resolveLangyActorSession } from "~/server/app-layer/langy/langyApiKeyActorSession";
 import { resolveLangyKeyIdentity } from "~/server/app-layer/langy/langyApiKeyIdentity";
+import { awaitTurnSettlement } from "~/server/app-layer/langy/streaming/awaitTurnSettlement";
 import { prisma } from "~/server/db";
 import { featureFlagService } from "~/server/featureFlag";
 import { bodyLimit } from "./_lib/body-limit";
@@ -255,108 +250,14 @@ async function authorizeTurn(c: Context) {
  * response degrades to the exact 202 the async path returns.
  */
 const MAX_WAIT_SECONDS = 120;
-const WAIT_POLL_INTERVAL_MS = 750;
 
 function requestedWaitSeconds(c: Context): number | null {
   const prefer = c.req.header("prefer");
   if (!prefer) return null;
-  const match = /(?:^|[,;\s])wait=(\d{1,4})/i.exec(prefer);
+  // RFC 7240 §2: the value may be a token or a quoted-string (`wait="30"`).
+  const match = /(?:^|[,;\s])wait="?(\d{1,4})"?/i.exec(prefer);
   if (!match?.[1]) return null;
   return Math.min(Number(match[1]), MAX_WAIT_SECONDS);
-}
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-/**
- * Watch the conversation's durable TURN events until THIS turn settles.
- *
- * The durable fold, not the Redis token buffer, is the source of truth here:
- * `AGENT_RESPONDED` / `AGENT_RESPONSE_FAILED` both carry the `turnId`, so the
- * wait can key on exactly the turn this request started — a concurrent or
- * replayed turn on the same conversation cannot satisfy it. The buffer is
- * best-effort live delivery and may be absent entirely (no Redis); the fold is
- * what `finalizeTurn` calls "the real backend confirmation".
- *
- * `LangyConversationNotFoundError` inside the loop is projection lag — the
- * accepted turn's row has not landed yet — so it means "keep waiting", not
- * "gone". Every other error propagates.
- */
-type TurnSettlement = {
-  outcome: string;
-  error: string | null;
-  text: string;
-};
-
-type ConversationTurnEvents = Awaited<
-  ReturnType<
-    ReturnType<typeof getApp>["langy"]["conversations"]["getEventsAfter"]
-  >
->;
-
-function settlementFromEvents(
-  events: ConversationTurnEvents["events"],
-  turnId: string,
-): TurnSettlement | null {
-  for (const event of events) {
-    if (
-      event.type === LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED &&
-      event.data.turnId === turnId
-    ) {
-      return {
-        outcome: event.data.outcome,
-        error: event.data.error ?? null,
-        text: extractTextFromParts(event.data.parts),
-      };
-    }
-    if (
-      event.type === LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONSE_FAILED &&
-      event.data.turnId === turnId
-    ) {
-      return { outcome: "failed", error: event.data.error, text: "" };
-    }
-  }
-  return null;
-}
-
-async function waitForTurnSettlement({
-  projectId,
-  conversationId,
-  turnId,
-  userId,
-  deadlineMs,
-}: {
-  projectId: string;
-  conversationId: string;
-  turnId: string;
-  userId: string;
-  deadlineMs: number;
-}): Promise<TurnSettlement | null> {
-  let cursor: LangyEventCursor = { acceptedAt: 0, eventId: "" };
-  while (Date.now() < deadlineMs) {
-    const events = await getApp()
-      .langy.conversations.getEventsAfter({
-        projectId,
-        conversationId,
-        userId,
-        after: cursor,
-      })
-      .catch((error: unknown) => {
-        if (error instanceof LangyConversationNotFoundError) return null;
-        throw error;
-      });
-    if (!events) {
-      await sleep(WAIT_POLL_INTERVAL_MS);
-      continue;
-    }
-
-    const settlement = settlementFromEvents(events.events, turnId);
-    if (settlement) return settlement;
-
-    cursor = events.cursor;
-    if (events.truncated) continue;
-    await sleep(WAIT_POLL_INTERVAL_MS);
-  }
-  return null;
 }
 
 /**
@@ -403,15 +304,22 @@ async function startTurn({
   // the 202 below, indistinguishable from never having asked.
   const waitSeconds = requestedWaitSeconds(c);
   if (waitSeconds && waitSeconds > 0) {
-    const settlement = await waitForTurnSettlement({
+    // Client disconnect and the wait deadline are one signal: an abandoned
+    // hold stops consuming fold reads (and its blocking Redis read) at once.
+    const settlement = await awaitTurnSettlement({
       projectId: auth.projectId,
       conversationId: result.conversationId,
       turnId: result.turnId,
       userId: auth.session.user.id,
-      deadlineMs: Date.now() + waitSeconds * 1000,
+      signal: AbortSignal.any([
+        c.req.raw.signal,
+        AbortSignal.timeout(waitSeconds * 1000),
+      ]),
     });
     if (settlement) {
-      c.header("Preference-Applied", "wait");
+      // RFC 7240 §3: echo the applied value — it is how a caller asking for
+      // more than MAX_WAIT_SECONDS learns what they actually got.
+      c.header("Preference-Applied", `wait=${waitSeconds}`);
       // 200 even when the turn itself failed: the REQUEST succeeded — it was
       // authorized, accepted and settled — and `status`/`error` carry the
       // turn's own outcome. Failure here is a domain result, not a transport
@@ -421,10 +329,9 @@ async function startTurn({
           ...result,
           status: settlement.outcome,
           error: settlement.error,
-          reply:
-            settlement.outcome === "failed"
-              ? null
-              : { role: "assistant" as const, text: settlement.text },
+          reply: settlement.succeeded
+            ? { role: "assistant" as const, text: settlement.text }
+            : null,
         },
         200,
       );

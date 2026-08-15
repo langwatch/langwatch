@@ -32,13 +32,6 @@ import (
 // dispatcher rejects the request as model_provider_not_bound before
 // the provider is ever reached.
 func audioRouter(capture *domain.Request, extraCreds ...domain.Credential) http.Handler {
-	auth := &mockAuth{
-		resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
-			b := testBundle()
-			b.Credentials = append(b.Credentials, extraCreds...)
-			return b, nil
-		},
-	}
 	provider := &mockProvider{
 		dispatchFn: func(_ context.Context, req *domain.Request, _ domain.Credential) (*domain.Response, error) {
 			if capture != nil {
@@ -64,11 +57,22 @@ func audioRouter(capture *domain.Request, extraCreds ...domain.Credential) http.
 		},
 	}
 	return buildRouter(
-		app.WithAuth(auth),
+		app.WithAuth(audioAuth(extraCreds...)),
 		app.WithProviders(provider),
 		app.WithModels(modelresolver.New()),
 		app.WithLogger(zap.NewNop()),
 	)
+}
+
+// audioAuth resolves every key to the default bundle plus extraCreds.
+func audioAuth(extraCreds ...domain.Credential) *mockAuth {
+	return &mockAuth{
+		resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
+			b := testBundle()
+			b.Credentials = append(b.Credentials, extraCreds...)
+			return b, nil
+		},
+	}
 }
 
 func multipartBody(t *testing.T, fields map[string]string, fileField, filename string, fileBytes []byte) (*bytes.Buffer, string) {

@@ -107,7 +107,7 @@ func (r *Resolver) Resolve(ctx context.Context, req *domain.Request, config doma
 	if strings.Contains(target, "/") {
 		source = domain.ModelSourceExplicit
 		parts := strings.SplitN(target, "/", 2)
-		providerID := normalizeProvider(parts[0])
+		providerID := domain.NormalizeProviderID(parts[0])
 		modelID := parts[1]
 
 		if !modelAllowed(config, modelID) {
@@ -131,10 +131,6 @@ func (r *Resolver) Resolve(ctx context.Context, req *domain.Request, config doma
 		ProviderID: "", // will be filled by credential selection
 		Source:     source,
 	}, nil
-}
-
-func normalizeProvider(raw string) domain.ProviderID {
-	return domain.NormalizeProviderID(raw)
 }
 
 func modelAllowed(config domain.BundleConfig, model string) bool {
