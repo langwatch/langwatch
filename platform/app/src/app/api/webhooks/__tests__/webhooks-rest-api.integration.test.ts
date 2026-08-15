@@ -930,6 +930,86 @@ describe("Feature: Webhook endpoints REST API", () => {
       expect(row?.sqsSecretAccessKeyEncrypted).toBeNull();
     });
 
+    /** @scenario Switching credential mode drops the mode it left */
+    it("drops the role when the update moves the endpoint onto a key pair", async () => {
+      planHasWebhookEndpoints = true;
+      const res = await createEndpoint({
+        destination_kind: "sqs",
+        sqs: {
+          queue_url: QUEUE_URL,
+          role_arn: "arn:aws:iam::381491922238:role/langwatch-producer",
+        },
+        enabled_events: ["gateway.request.completed"],
+      });
+      expect(res.status).toBe(201);
+      const created = (await res.json()) as { data: { id: string } };
+
+      const moved = await app.request(
+        `/api/webhooks/v1/endpoints/${created.data.id}`,
+        {
+          method: "PATCH",
+          headers: headers(),
+          body: JSON.stringify({
+            sqs: {
+              access_key_id: "AKIATAKEOVER",
+              secret_access_key: "the-key-that-must-win",
+            },
+          }),
+        },
+      );
+      expect(moved.status).toBe(200);
+      const view = (await moved.json()) as {
+        data: {
+          sqs: {
+            credential_mode: string;
+            role_arn: string | null;
+            external_id: string | null;
+            access_key_id: string | null;
+          };
+        };
+      };
+      // The role used to outrank the key pair being set, so the switch
+      // answered 200 and the endpoint went on assuming the role.
+      expect(view.data.sqs.credential_mode).toBe("static");
+      expect(view.data.sqs.role_arn).toBeNull();
+      expect(view.data.sqs.external_id).toBeNull();
+      expect(view.data.sqs.access_key_id).toBe("AKIATAKEOVER");
+
+      const row = await prisma.webhookEndpoint.findFirst({
+        where: { id: created.data.id },
+        select: {
+          sqsRoleArn: true,
+          sqsExternalId: true,
+          sqsAccessKeyId: true,
+          sqsSecretAccessKeyEncrypted: true,
+        },
+      });
+      expect(row?.sqsRoleArn).toBeNull();
+      expect(row?.sqsExternalId).toBeNull();
+      expect(row?.sqsAccessKeyId).toBe("AKIATAKEOVER");
+      expect(row?.sqsSecretAccessKeyEncrypted).not.toBeNull();
+
+      const ambiguous = await app.request(
+        `/api/webhooks/v1/endpoints/${created.data.id}`,
+        {
+          method: "PATCH",
+          headers: headers(),
+          body: JSON.stringify({
+            sqs: {
+              role_arn: "arn:aws:iam::381491922238:role/langwatch-producer",
+              access_key_id: "AKIABOTH",
+              secret_access_key: "and-a-secret",
+            },
+          }),
+        },
+      );
+      const error = await expectCanonicalError(ambiguous, {
+        status: 400,
+        code: "webhook_endpoint_invalid",
+      });
+      expect(error.message).toMatch(/different credential modes/i);
+    });
+
     /** @scenario Saving an endpoint names the field its destination kind is missing */
     it("names the missing field for the kind rather than refusing the whole body", async () => {
       planHasWebhookEndpoints = true;
@@ -945,6 +1025,38 @@ describe("Feature: Webhook endpoints REST API", () => {
       expect(error.meta?.fields).toEqual(
         expect.arrayContaining(["sqs.queue_url"]),
       );
+    });
+
+    /** @scenario Saving an endpoint refuses the address of the other destination kind */
+    it("refuses a body that names one kind and the other kind's address", async () => {
+      planHasWebhookEndpoints = true;
+      process.env.WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS = "1";
+
+      const httpWithQueue = await createEndpoint({
+        destination_kind: "http",
+        url: "https://example.com/hooks/mixed",
+        sqs: { queue_url: QUEUE_URL },
+        enabled_events: ["gateway.request.completed"],
+      });
+      const httpError = await expectCanonicalError(httpWithQueue, {
+        status: 400,
+        type: "bad_request",
+        code: "validation_error",
+      });
+      expect(httpError.meta?.fields).toEqual(expect.arrayContaining(["sqs"]));
+
+      const queueWithUrl = await createEndpoint({
+        destination_kind: "sqs",
+        url: "https://example.com/hooks/mixed",
+        sqs: { queue_url: QUEUE_URL },
+        enabled_events: ["gateway.request.completed"],
+      });
+      const queueError = await expectCanonicalError(queueWithUrl, {
+        status: 400,
+        type: "bad_request",
+        code: "validation_error",
+      });
+      expect(queueError.meta?.fields).toEqual(expect.arrayContaining(["url"]));
     });
 
     /** @scenario An endpoint never changes its destination kind */

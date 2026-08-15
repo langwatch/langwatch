@@ -444,10 +444,39 @@ function assertDestinationUnchanged({
   }
 }
 
+/** A credential field this request actually named, as opposed to one it left
+ *  out or cleared with null. */
+function selects(value: string | null | undefined): boolean {
+  return typeof value === "string" && value.trim() !== "";
+}
+
+/**
+ * What one credential field becomes: nothing when the request chose the other
+ * mode, otherwise what the request named, otherwise what the row already held.
+ */
+function mergedCredentialField({
+  isCleared,
+  sent,
+  stored,
+}: {
+  isCleared: boolean;
+  sent: string | null | undefined;
+  stored: string | null;
+}): string | null {
+  if (isCleared) return null;
+  return sent !== undefined ? sent : stored;
+}
+
 /**
  * A partial queue update, validated as the whole it will become. Fields the
  * caller left out keep their stored values, so changing only the role never
  * silently drops the queue URL.
+ *
+ * Which credential mode the update selects is read from what THIS request
+ * named, not from what the row already holds. Merging first and resolving
+ * after let a stored role outrank a key pair the caller had just sent: the
+ * endpoint kept assuming the role, the new key was dropped, and the API
+ * answered 200. A switch either takes or is refused, never both.
  */
 function assertValidSqsUpdate({
   endpoint,
@@ -456,21 +485,37 @@ function assertValidSqsUpdate({
   endpoint: WebhookEndpoint;
   sqs: Partial<SqsDestinationInput>;
 }): StoredDestination {
+  const selectsRole = selects(sqs.roleArn);
+  const selectsStatic = selects(sqs.accessKeyId);
+  if (selectsRole && selectsStatic) {
+    throw new WebhookEndpointValidationError(
+      "sqs.role_arn and sqs.access_key_id select different credential modes; send one of them, and null for the other",
+    );
+  }
   const merged: SqsDestinationInput = {
     queueUrl: sqs.queueUrl ?? endpoint.sqsQueueUrl ?? "",
-    roleArn: sqs.roleArn !== undefined ? sqs.roleArn : endpoint.sqsRoleArn,
-    externalId:
-      sqs.externalId !== undefined ? sqs.externalId : endpoint.sqsExternalId,
-    accessKeyId:
-      sqs.accessKeyId !== undefined ? sqs.accessKeyId : endpoint.sqsAccessKeyId,
-    // The stored secret is only ever compared for presence here; its value
-    // never leaves the row except at dispatch.
-    secretAccessKey:
-      sqs.secretAccessKey !== undefined
-        ? sqs.secretAccessKey
-        : endpoint.sqsSecretAccessKeyEncrypted
-          ? KEPT_SECRET
-          : null,
+    roleArn: mergedCredentialField({
+      isCleared: selectsStatic,
+      sent: sqs.roleArn,
+      stored: endpoint.sqsRoleArn,
+    }),
+    externalId: mergedCredentialField({
+      isCleared: selectsStatic,
+      sent: sqs.externalId,
+      stored: endpoint.sqsExternalId,
+    }),
+    accessKeyId: mergedCredentialField({
+      isCleared: selectsRole,
+      sent: sqs.accessKeyId,
+      stored: endpoint.sqsAccessKeyId,
+    }),
+    secretAccessKey: mergedCredentialField({
+      isCleared: selectsRole,
+      sent: sqs.secretAccessKey,
+      // The stored secret is only ever compared for presence here; its value
+      // never leaves the row except at dispatch.
+      stored: endpoint.sqsSecretAccessKeyEncrypted ? KEPT_SECRET : null,
+    }),
   };
   // One mode at a time. Adding a role to an endpoint that had static keys
   // would otherwise leave the key pair stored, unused and unreachable through

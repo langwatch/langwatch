@@ -51487,160 +51487,253 @@
                   "type": "object",
                   "properties": {
                     "data": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string"
-                        },
-                        "destination_kind": {
-                          "type": "string",
-                          "enum": [
-                            "http",
-                            "sqs"
-                          ]
-                        },
-                        "url": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "sqs": {
-                          "type": [
-                            "object",
-                            "null"
-                          ],
+                      "oneOf": [
+                        {
+                          "type": "object",
                           "properties": {
-                            "queue_url": {
+                            "destination_kind": {
+                              "type": "string",
+                              "const": "http"
+                            },
+                            "url": {
                               "type": "string"
                             },
-                            "region": {
+                            "sqs": {
+                              "type": "null"
+                            },
+                            "id": {
                               "type": "string"
                             },
-                            "account_id": {
-                              "type": "string"
+                            "enabled_events": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
                             },
-                            "queue_name": {
-                              "type": "string"
-                            },
-                            "credential_mode": {
+                            "status": {
                               "type": "string",
                               "enum": [
-                                "assume_role",
-                                "static",
-                                "ambient"
+                                "active",
+                                "disabled"
                               ]
                             },
-                            "role_arn": {
+                            "disabled_reason": {
                               "type": [
                                 "string",
                                 "null"
                               ]
                             },
-                            "external_id": {
+                            "disabled_at": {
                               "type": [
                                 "string",
                                 "null"
                               ]
                             },
-                            "access_key_id": {
+                            "failing_since": {
                               "type": [
                                 "string",
                                 "null"
                               ]
+                            },
+                            "last_success_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "last_failure_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "max_batch_size": {
+                              "type": "integer"
+                            },
+                            "max_batch_delay_ms": {
+                              "type": "integer"
+                            },
+                            "max_in_flight": {
+                              "type": "integer"
+                            },
+                            "created_at": {
+                              "type": "string"
+                            },
+                            "updated_at": {
+                              "type": "string"
+                            },
+                            "secret": {
+                              "type": "string"
                             }
                           },
                           "required": [
-                            "queue_url",
-                            "region",
-                            "account_id",
-                            "queue_name",
-                            "credential_mode",
-                            "role_arn",
-                            "external_id",
-                            "access_key_id"
+                            "destination_kind",
+                            "url",
+                            "sqs",
+                            "id",
+                            "enabled_events",
+                            "status",
+                            "disabled_reason",
+                            "disabled_at",
+                            "failing_since",
+                            "last_success_at",
+                            "last_failure_at",
+                            "max_batch_size",
+                            "max_batch_delay_ms",
+                            "max_in_flight",
+                            "created_at",
+                            "updated_at",
+                            "secret"
                           ]
                         },
-                        "enabled_events": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        },
-                        "status": {
-                          "type": "string",
-                          "enum": [
-                            "active",
-                            "disabled"
+                        {
+                          "type": "object",
+                          "properties": {
+                            "destination_kind": {
+                              "type": "string",
+                              "const": "sqs"
+                            },
+                            "url": {
+                              "type": "null"
+                            },
+                            "sqs": {
+                              "type": "object",
+                              "properties": {
+                                "queue_url": {
+                                  "type": "string"
+                                },
+                                "region": {
+                                  "type": "string"
+                                },
+                                "account_id": {
+                                  "type": "string"
+                                },
+                                "queue_name": {
+                                  "type": "string"
+                                },
+                                "credential_mode": {
+                                  "type": "string",
+                                  "enum": [
+                                    "assume_role",
+                                    "static",
+                                    "ambient"
+                                  ]
+                                },
+                                "role_arn": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "external_id": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "access_key_id": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "queue_url",
+                                "region",
+                                "account_id",
+                                "queue_name",
+                                "credential_mode",
+                                "role_arn",
+                                "external_id",
+                                "access_key_id"
+                              ]
+                            },
+                            "id": {
+                              "type": "string"
+                            },
+                            "enabled_events": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "active",
+                                "disabled"
+                              ]
+                            },
+                            "disabled_reason": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "disabled_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "failing_since": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "last_success_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "last_failure_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "max_batch_size": {
+                              "type": "integer"
+                            },
+                            "max_batch_delay_ms": {
+                              "type": "integer"
+                            },
+                            "max_in_flight": {
+                              "type": "integer"
+                            },
+                            "created_at": {
+                              "type": "string"
+                            },
+                            "updated_at": {
+                              "type": "string"
+                            },
+                            "secret": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "destination_kind",
+                            "url",
+                            "sqs",
+                            "id",
+                            "enabled_events",
+                            "status",
+                            "disabled_reason",
+                            "disabled_at",
+                            "failing_since",
+                            "last_success_at",
+                            "last_failure_at",
+                            "max_batch_size",
+                            "max_batch_delay_ms",
+                            "max_in_flight",
+                            "created_at",
+                            "updated_at",
+                            "secret"
                           ]
-                        },
-                        "disabled_reason": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "disabled_at": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "failing_since": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "last_success_at": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "last_failure_at": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "max_batch_size": {
-                          "type": "integer"
-                        },
-                        "max_batch_delay_ms": {
-                          "type": "integer"
-                        },
-                        "max_in_flight": {
-                          "type": "integer"
-                        },
-                        "created_at": {
-                          "type": "string"
-                        },
-                        "updated_at": {
-                          "type": "string"
-                        },
-                        "secret": {
-                          "type": "string"
                         }
-                      },
-                      "required": [
-                        "id",
-                        "destination_kind",
-                        "url",
-                        "sqs",
-                        "enabled_events",
-                        "status",
-                        "disabled_reason",
-                        "disabled_at",
-                        "failing_since",
-                        "last_success_at",
-                        "last_failure_at",
-                        "max_batch_size",
-                        "max_batch_delay_ms",
-                        "max_in_flight",
-                        "created_at",
-                        "updated_at",
-                        "secret"
                       ]
                     }
                   },
@@ -51890,7 +51983,7 @@
           }
         ],
         "summary": "Create a webhook endpoint",
-        "description": "Create a webhook endpoint. The signing secret is returned ONCE in this response and never again; roll it to get a new one. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
+        "description": "Create a webhook endpoint. Name one destination: `url` for `destination_kind: http`, `sqs` for `destination_kind: sqs`. Naming the other kind's field is a 400 that says which field does not belong, rather than a 201 that saved half the body. `destination_kind` may be omitted and then means `http`. The signing secret is returned ONCE in this response and never again; roll it to get a new one. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -51987,156 +52080,245 @@
                     "data": {
                       "type": "array",
                       "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string"
-                          },
-                          "destination_kind": {
-                            "type": "string",
-                            "enum": [
-                              "http",
-                              "sqs"
-                            ]
-                          },
-                          "url": {
-                            "type": [
-                              "string",
-                              "null"
-                            ]
-                          },
-                          "sqs": {
-                            "type": [
-                              "object",
-                              "null"
-                            ],
+                        "oneOf": [
+                          {
+                            "type": "object",
                             "properties": {
-                              "queue_url": {
+                              "destination_kind": {
+                                "type": "string",
+                                "const": "http"
+                              },
+                              "url": {
                                 "type": "string"
                               },
-                              "region": {
+                              "sqs": {
+                                "type": "null"
+                              },
+                              "id": {
                                 "type": "string"
                               },
-                              "account_id": {
-                                "type": "string"
+                              "enabled_events": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
                               },
-                              "queue_name": {
-                                "type": "string"
-                              },
-                              "credential_mode": {
+                              "status": {
                                 "type": "string",
                                 "enum": [
-                                  "assume_role",
-                                  "static",
-                                  "ambient"
+                                  "active",
+                                  "disabled"
                                 ]
                               },
-                              "role_arn": {
+                              "disabled_reason": {
                                 "type": [
                                   "string",
                                   "null"
                                 ]
                               },
-                              "external_id": {
+                              "disabled_at": {
                                 "type": [
                                   "string",
                                   "null"
                                 ]
                               },
-                              "access_key_id": {
+                              "failing_since": {
                                 "type": [
                                   "string",
                                   "null"
                                 ]
+                              },
+                              "last_success_at": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "last_failure_at": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "max_batch_size": {
+                                "type": "integer"
+                              },
+                              "max_batch_delay_ms": {
+                                "type": "integer"
+                              },
+                              "max_in_flight": {
+                                "type": "integer"
+                              },
+                              "created_at": {
+                                "type": "string"
+                              },
+                              "updated_at": {
+                                "type": "string"
                               }
                             },
                             "required": [
-                              "queue_url",
-                              "region",
-                              "account_id",
-                              "queue_name",
-                              "credential_mode",
-                              "role_arn",
-                              "external_id",
-                              "access_key_id"
+                              "destination_kind",
+                              "url",
+                              "sqs",
+                              "id",
+                              "enabled_events",
+                              "status",
+                              "disabled_reason",
+                              "disabled_at",
+                              "failing_since",
+                              "last_success_at",
+                              "last_failure_at",
+                              "max_batch_size",
+                              "max_batch_delay_ms",
+                              "max_in_flight",
+                              "created_at",
+                              "updated_at"
                             ]
                           },
-                          "enabled_events": {
-                            "type": "array",
-                            "items": {
-                              "type": "string"
-                            }
-                          },
-                          "status": {
-                            "type": "string",
-                            "enum": [
-                              "active",
-                              "disabled"
+                          {
+                            "type": "object",
+                            "properties": {
+                              "destination_kind": {
+                                "type": "string",
+                                "const": "sqs"
+                              },
+                              "url": {
+                                "type": "null"
+                              },
+                              "sqs": {
+                                "type": "object",
+                                "properties": {
+                                  "queue_url": {
+                                    "type": "string"
+                                  },
+                                  "region": {
+                                    "type": "string"
+                                  },
+                                  "account_id": {
+                                    "type": "string"
+                                  },
+                                  "queue_name": {
+                                    "type": "string"
+                                  },
+                                  "credential_mode": {
+                                    "type": "string",
+                                    "enum": [
+                                      "assume_role",
+                                      "static",
+                                      "ambient"
+                                    ]
+                                  },
+                                  "role_arn": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "external_id": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "access_key_id": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "queue_url",
+                                  "region",
+                                  "account_id",
+                                  "queue_name",
+                                  "credential_mode",
+                                  "role_arn",
+                                  "external_id",
+                                  "access_key_id"
+                                ]
+                              },
+                              "id": {
+                                "type": "string"
+                              },
+                              "enabled_events": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "active",
+                                  "disabled"
+                                ]
+                              },
+                              "disabled_reason": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "disabled_at": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "failing_since": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "last_success_at": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "last_failure_at": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "max_batch_size": {
+                                "type": "integer"
+                              },
+                              "max_batch_delay_ms": {
+                                "type": "integer"
+                              },
+                              "max_in_flight": {
+                                "type": "integer"
+                              },
+                              "created_at": {
+                                "type": "string"
+                              },
+                              "updated_at": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "destination_kind",
+                              "url",
+                              "sqs",
+                              "id",
+                              "enabled_events",
+                              "status",
+                              "disabled_reason",
+                              "disabled_at",
+                              "failing_since",
+                              "last_success_at",
+                              "last_failure_at",
+                              "max_batch_size",
+                              "max_batch_delay_ms",
+                              "max_in_flight",
+                              "created_at",
+                              "updated_at"
                             ]
-                          },
-                          "disabled_reason": {
-                            "type": [
-                              "string",
-                              "null"
-                            ]
-                          },
-                          "disabled_at": {
-                            "type": [
-                              "string",
-                              "null"
-                            ]
-                          },
-                          "failing_since": {
-                            "type": [
-                              "string",
-                              "null"
-                            ]
-                          },
-                          "last_success_at": {
-                            "type": [
-                              "string",
-                              "null"
-                            ]
-                          },
-                          "last_failure_at": {
-                            "type": [
-                              "string",
-                              "null"
-                            ]
-                          },
-                          "max_batch_size": {
-                            "type": "integer"
-                          },
-                          "max_batch_delay_ms": {
-                            "type": "integer"
-                          },
-                          "max_in_flight": {
-                            "type": "integer"
-                          },
-                          "created_at": {
-                            "type": "string"
-                          },
-                          "updated_at": {
-                            "type": "string"
                           }
-                        },
-                        "required": [
-                          "id",
-                          "destination_kind",
-                          "url",
-                          "sqs",
-                          "enabled_events",
-                          "status",
-                          "disabled_reason",
-                          "disabled_at",
-                          "failing_since",
-                          "last_success_at",
-                          "last_failure_at",
-                          "max_batch_size",
-                          "max_batch_delay_ms",
-                          "max_in_flight",
-                          "created_at",
-                          "updated_at"
                         ]
                       }
                     }
@@ -52350,156 +52532,245 @@
                   "type": "object",
                   "properties": {
                     "data": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string"
-                        },
-                        "destination_kind": {
-                          "type": "string",
-                          "enum": [
-                            "http",
-                            "sqs"
-                          ]
-                        },
-                        "url": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "sqs": {
-                          "type": [
-                            "object",
-                            "null"
-                          ],
+                      "oneOf": [
+                        {
+                          "type": "object",
                           "properties": {
-                            "queue_url": {
+                            "destination_kind": {
+                              "type": "string",
+                              "const": "http"
+                            },
+                            "url": {
                               "type": "string"
                             },
-                            "region": {
+                            "sqs": {
+                              "type": "null"
+                            },
+                            "id": {
                               "type": "string"
                             },
-                            "account_id": {
-                              "type": "string"
+                            "enabled_events": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
                             },
-                            "queue_name": {
-                              "type": "string"
-                            },
-                            "credential_mode": {
+                            "status": {
                               "type": "string",
                               "enum": [
-                                "assume_role",
-                                "static",
-                                "ambient"
+                                "active",
+                                "disabled"
                               ]
                             },
-                            "role_arn": {
+                            "disabled_reason": {
                               "type": [
                                 "string",
                                 "null"
                               ]
                             },
-                            "external_id": {
+                            "disabled_at": {
                               "type": [
                                 "string",
                                 "null"
                               ]
                             },
-                            "access_key_id": {
+                            "failing_since": {
                               "type": [
                                 "string",
                                 "null"
                               ]
+                            },
+                            "last_success_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "last_failure_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "max_batch_size": {
+                              "type": "integer"
+                            },
+                            "max_batch_delay_ms": {
+                              "type": "integer"
+                            },
+                            "max_in_flight": {
+                              "type": "integer"
+                            },
+                            "created_at": {
+                              "type": "string"
+                            },
+                            "updated_at": {
+                              "type": "string"
                             }
                           },
                           "required": [
-                            "queue_url",
-                            "region",
-                            "account_id",
-                            "queue_name",
-                            "credential_mode",
-                            "role_arn",
-                            "external_id",
-                            "access_key_id"
+                            "destination_kind",
+                            "url",
+                            "sqs",
+                            "id",
+                            "enabled_events",
+                            "status",
+                            "disabled_reason",
+                            "disabled_at",
+                            "failing_since",
+                            "last_success_at",
+                            "last_failure_at",
+                            "max_batch_size",
+                            "max_batch_delay_ms",
+                            "max_in_flight",
+                            "created_at",
+                            "updated_at"
                           ]
                         },
-                        "enabled_events": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        },
-                        "status": {
-                          "type": "string",
-                          "enum": [
-                            "active",
-                            "disabled"
+                        {
+                          "type": "object",
+                          "properties": {
+                            "destination_kind": {
+                              "type": "string",
+                              "const": "sqs"
+                            },
+                            "url": {
+                              "type": "null"
+                            },
+                            "sqs": {
+                              "type": "object",
+                              "properties": {
+                                "queue_url": {
+                                  "type": "string"
+                                },
+                                "region": {
+                                  "type": "string"
+                                },
+                                "account_id": {
+                                  "type": "string"
+                                },
+                                "queue_name": {
+                                  "type": "string"
+                                },
+                                "credential_mode": {
+                                  "type": "string",
+                                  "enum": [
+                                    "assume_role",
+                                    "static",
+                                    "ambient"
+                                  ]
+                                },
+                                "role_arn": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "external_id": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "access_key_id": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "queue_url",
+                                "region",
+                                "account_id",
+                                "queue_name",
+                                "credential_mode",
+                                "role_arn",
+                                "external_id",
+                                "access_key_id"
+                              ]
+                            },
+                            "id": {
+                              "type": "string"
+                            },
+                            "enabled_events": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "active",
+                                "disabled"
+                              ]
+                            },
+                            "disabled_reason": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "disabled_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "failing_since": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "last_success_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "last_failure_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "max_batch_size": {
+                              "type": "integer"
+                            },
+                            "max_batch_delay_ms": {
+                              "type": "integer"
+                            },
+                            "max_in_flight": {
+                              "type": "integer"
+                            },
+                            "created_at": {
+                              "type": "string"
+                            },
+                            "updated_at": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "destination_kind",
+                            "url",
+                            "sqs",
+                            "id",
+                            "enabled_events",
+                            "status",
+                            "disabled_reason",
+                            "disabled_at",
+                            "failing_since",
+                            "last_success_at",
+                            "last_failure_at",
+                            "max_batch_size",
+                            "max_batch_delay_ms",
+                            "max_in_flight",
+                            "created_at",
+                            "updated_at"
                           ]
-                        },
-                        "disabled_reason": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "disabled_at": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "failing_since": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "last_success_at": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "last_failure_at": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "max_batch_size": {
-                          "type": "integer"
-                        },
-                        "max_batch_delay_ms": {
-                          "type": "integer"
-                        },
-                        "max_in_flight": {
-                          "type": "integer"
-                        },
-                        "created_at": {
-                          "type": "string"
-                        },
-                        "updated_at": {
-                          "type": "string"
                         }
-                      },
-                      "required": [
-                        "id",
-                        "destination_kind",
-                        "url",
-                        "sqs",
-                        "enabled_events",
-                        "status",
-                        "disabled_reason",
-                        "disabled_at",
-                        "failing_since",
-                        "last_success_at",
-                        "last_failure_at",
-                        "max_batch_size",
-                        "max_batch_delay_ms",
-                        "max_in_flight",
-                        "created_at",
-                        "updated_at"
                       ]
                     }
                   },
@@ -52763,156 +53034,245 @@
                   "type": "object",
                   "properties": {
                     "data": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string"
-                        },
-                        "destination_kind": {
-                          "type": "string",
-                          "enum": [
-                            "http",
-                            "sqs"
-                          ]
-                        },
-                        "url": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "sqs": {
-                          "type": [
-                            "object",
-                            "null"
-                          ],
+                      "oneOf": [
+                        {
+                          "type": "object",
                           "properties": {
-                            "queue_url": {
+                            "destination_kind": {
+                              "type": "string",
+                              "const": "http"
+                            },
+                            "url": {
                               "type": "string"
                             },
-                            "region": {
+                            "sqs": {
+                              "type": "null"
+                            },
+                            "id": {
                               "type": "string"
                             },
-                            "account_id": {
-                              "type": "string"
+                            "enabled_events": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
                             },
-                            "queue_name": {
-                              "type": "string"
-                            },
-                            "credential_mode": {
+                            "status": {
                               "type": "string",
                               "enum": [
-                                "assume_role",
-                                "static",
-                                "ambient"
+                                "active",
+                                "disabled"
                               ]
                             },
-                            "role_arn": {
+                            "disabled_reason": {
                               "type": [
                                 "string",
                                 "null"
                               ]
                             },
-                            "external_id": {
+                            "disabled_at": {
                               "type": [
                                 "string",
                                 "null"
                               ]
                             },
-                            "access_key_id": {
+                            "failing_since": {
                               "type": [
                                 "string",
                                 "null"
                               ]
+                            },
+                            "last_success_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "last_failure_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "max_batch_size": {
+                              "type": "integer"
+                            },
+                            "max_batch_delay_ms": {
+                              "type": "integer"
+                            },
+                            "max_in_flight": {
+                              "type": "integer"
+                            },
+                            "created_at": {
+                              "type": "string"
+                            },
+                            "updated_at": {
+                              "type": "string"
                             }
                           },
                           "required": [
-                            "queue_url",
-                            "region",
-                            "account_id",
-                            "queue_name",
-                            "credential_mode",
-                            "role_arn",
-                            "external_id",
-                            "access_key_id"
+                            "destination_kind",
+                            "url",
+                            "sqs",
+                            "id",
+                            "enabled_events",
+                            "status",
+                            "disabled_reason",
+                            "disabled_at",
+                            "failing_since",
+                            "last_success_at",
+                            "last_failure_at",
+                            "max_batch_size",
+                            "max_batch_delay_ms",
+                            "max_in_flight",
+                            "created_at",
+                            "updated_at"
                           ]
                         },
-                        "enabled_events": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        },
-                        "status": {
-                          "type": "string",
-                          "enum": [
-                            "active",
-                            "disabled"
+                        {
+                          "type": "object",
+                          "properties": {
+                            "destination_kind": {
+                              "type": "string",
+                              "const": "sqs"
+                            },
+                            "url": {
+                              "type": "null"
+                            },
+                            "sqs": {
+                              "type": "object",
+                              "properties": {
+                                "queue_url": {
+                                  "type": "string"
+                                },
+                                "region": {
+                                  "type": "string"
+                                },
+                                "account_id": {
+                                  "type": "string"
+                                },
+                                "queue_name": {
+                                  "type": "string"
+                                },
+                                "credential_mode": {
+                                  "type": "string",
+                                  "enum": [
+                                    "assume_role",
+                                    "static",
+                                    "ambient"
+                                  ]
+                                },
+                                "role_arn": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "external_id": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "access_key_id": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "queue_url",
+                                "region",
+                                "account_id",
+                                "queue_name",
+                                "credential_mode",
+                                "role_arn",
+                                "external_id",
+                                "access_key_id"
+                              ]
+                            },
+                            "id": {
+                              "type": "string"
+                            },
+                            "enabled_events": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "active",
+                                "disabled"
+                              ]
+                            },
+                            "disabled_reason": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "disabled_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "failing_since": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "last_success_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "last_failure_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "max_batch_size": {
+                              "type": "integer"
+                            },
+                            "max_batch_delay_ms": {
+                              "type": "integer"
+                            },
+                            "max_in_flight": {
+                              "type": "integer"
+                            },
+                            "created_at": {
+                              "type": "string"
+                            },
+                            "updated_at": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "destination_kind",
+                            "url",
+                            "sqs",
+                            "id",
+                            "enabled_events",
+                            "status",
+                            "disabled_reason",
+                            "disabled_at",
+                            "failing_since",
+                            "last_success_at",
+                            "last_failure_at",
+                            "max_batch_size",
+                            "max_batch_delay_ms",
+                            "max_in_flight",
+                            "created_at",
+                            "updated_at"
                           ]
-                        },
-                        "disabled_reason": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "disabled_at": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "failing_since": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "last_success_at": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "last_failure_at": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "max_batch_size": {
-                          "type": "integer"
-                        },
-                        "max_batch_delay_ms": {
-                          "type": "integer"
-                        },
-                        "max_in_flight": {
-                          "type": "integer"
-                        },
-                        "created_at": {
-                          "type": "string"
-                        },
-                        "updated_at": {
-                          "type": "string"
                         }
-                      },
-                      "required": [
-                        "id",
-                        "destination_kind",
-                        "url",
-                        "sqs",
-                        "enabled_events",
-                        "status",
-                        "disabled_reason",
-                        "disabled_at",
-                        "failing_since",
-                        "last_success_at",
-                        "last_failure_at",
-                        "max_batch_size",
-                        "max_batch_delay_ms",
-                        "max_in_flight",
-                        "created_at",
-                        "updated_at"
                       ]
                     }
                   },
@@ -53529,160 +53889,253 @@
                   "type": "object",
                   "properties": {
                     "data": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string"
-                        },
-                        "destination_kind": {
-                          "type": "string",
-                          "enum": [
-                            "http",
-                            "sqs"
-                          ]
-                        },
-                        "url": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "sqs": {
-                          "type": [
-                            "object",
-                            "null"
-                          ],
+                      "oneOf": [
+                        {
+                          "type": "object",
                           "properties": {
-                            "queue_url": {
+                            "destination_kind": {
+                              "type": "string",
+                              "const": "http"
+                            },
+                            "url": {
                               "type": "string"
                             },
-                            "region": {
+                            "sqs": {
+                              "type": "null"
+                            },
+                            "id": {
                               "type": "string"
                             },
-                            "account_id": {
-                              "type": "string"
+                            "enabled_events": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
                             },
-                            "queue_name": {
-                              "type": "string"
-                            },
-                            "credential_mode": {
+                            "status": {
                               "type": "string",
                               "enum": [
-                                "assume_role",
-                                "static",
-                                "ambient"
+                                "active",
+                                "disabled"
                               ]
                             },
-                            "role_arn": {
+                            "disabled_reason": {
                               "type": [
                                 "string",
                                 "null"
                               ]
                             },
-                            "external_id": {
+                            "disabled_at": {
                               "type": [
                                 "string",
                                 "null"
                               ]
                             },
-                            "access_key_id": {
+                            "failing_since": {
                               "type": [
                                 "string",
                                 "null"
                               ]
+                            },
+                            "last_success_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "last_failure_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "max_batch_size": {
+                              "type": "integer"
+                            },
+                            "max_batch_delay_ms": {
+                              "type": "integer"
+                            },
+                            "max_in_flight": {
+                              "type": "integer"
+                            },
+                            "created_at": {
+                              "type": "string"
+                            },
+                            "updated_at": {
+                              "type": "string"
+                            },
+                            "secret": {
+                              "type": "string"
                             }
                           },
                           "required": [
-                            "queue_url",
-                            "region",
-                            "account_id",
-                            "queue_name",
-                            "credential_mode",
-                            "role_arn",
-                            "external_id",
-                            "access_key_id"
+                            "destination_kind",
+                            "url",
+                            "sqs",
+                            "id",
+                            "enabled_events",
+                            "status",
+                            "disabled_reason",
+                            "disabled_at",
+                            "failing_since",
+                            "last_success_at",
+                            "last_failure_at",
+                            "max_batch_size",
+                            "max_batch_delay_ms",
+                            "max_in_flight",
+                            "created_at",
+                            "updated_at",
+                            "secret"
                           ]
                         },
-                        "enabled_events": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        },
-                        "status": {
-                          "type": "string",
-                          "enum": [
-                            "active",
-                            "disabled"
+                        {
+                          "type": "object",
+                          "properties": {
+                            "destination_kind": {
+                              "type": "string",
+                              "const": "sqs"
+                            },
+                            "url": {
+                              "type": "null"
+                            },
+                            "sqs": {
+                              "type": "object",
+                              "properties": {
+                                "queue_url": {
+                                  "type": "string"
+                                },
+                                "region": {
+                                  "type": "string"
+                                },
+                                "account_id": {
+                                  "type": "string"
+                                },
+                                "queue_name": {
+                                  "type": "string"
+                                },
+                                "credential_mode": {
+                                  "type": "string",
+                                  "enum": [
+                                    "assume_role",
+                                    "static",
+                                    "ambient"
+                                  ]
+                                },
+                                "role_arn": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "external_id": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "access_key_id": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "queue_url",
+                                "region",
+                                "account_id",
+                                "queue_name",
+                                "credential_mode",
+                                "role_arn",
+                                "external_id",
+                                "access_key_id"
+                              ]
+                            },
+                            "id": {
+                              "type": "string"
+                            },
+                            "enabled_events": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "active",
+                                "disabled"
+                              ]
+                            },
+                            "disabled_reason": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "disabled_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "failing_since": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "last_success_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "last_failure_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "max_batch_size": {
+                              "type": "integer"
+                            },
+                            "max_batch_delay_ms": {
+                              "type": "integer"
+                            },
+                            "max_in_flight": {
+                              "type": "integer"
+                            },
+                            "created_at": {
+                              "type": "string"
+                            },
+                            "updated_at": {
+                              "type": "string"
+                            },
+                            "secret": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "destination_kind",
+                            "url",
+                            "sqs",
+                            "id",
+                            "enabled_events",
+                            "status",
+                            "disabled_reason",
+                            "disabled_at",
+                            "failing_since",
+                            "last_success_at",
+                            "last_failure_at",
+                            "max_batch_size",
+                            "max_batch_delay_ms",
+                            "max_in_flight",
+                            "created_at",
+                            "updated_at",
+                            "secret"
                           ]
-                        },
-                        "disabled_reason": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "disabled_at": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "failing_since": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "last_success_at": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "last_failure_at": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "max_batch_size": {
-                          "type": "integer"
-                        },
-                        "max_batch_delay_ms": {
-                          "type": "integer"
-                        },
-                        "max_in_flight": {
-                          "type": "integer"
-                        },
-                        "created_at": {
-                          "type": "string"
-                        },
-                        "updated_at": {
-                          "type": "string"
-                        },
-                        "secret": {
-                          "type": "string"
                         }
-                      },
-                      "required": [
-                        "id",
-                        "destination_kind",
-                        "url",
-                        "sqs",
-                        "enabled_events",
-                        "status",
-                        "disabled_reason",
-                        "disabled_at",
-                        "failing_since",
-                        "last_success_at",
-                        "last_failure_at",
-                        "max_batch_size",
-                        "max_batch_delay_ms",
-                        "max_in_flight",
-                        "created_at",
-                        "updated_at",
-                        "secret"
                       ]
                     }
                   },

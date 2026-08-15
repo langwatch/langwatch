@@ -28,11 +28,32 @@ export const updateWebhookCommand = async (
     );
     process.exit(1);
   }
+  if (options.roleArn !== undefined && options.accessKeyId !== undefined) {
+    console.error(
+      "--role-arn and --access-key-id select different credential modes. Pass one of them; the other mode's fields are cleared for you.",
+    );
+    process.exit(1);
+  }
+  // A credential flag names a mode, and the mode it leaves has to be cleared
+  // on the same request. Sending only the new fields would leave the old
+  // mode's stored beside them: an encrypted key nothing reads, or a role that
+  // goes on winning over the key that was just set.
   const sqsFields = {
     ...(options.queueUrl !== undefined ? { queue_url: options.queueUrl } : {}),
-    ...(options.roleArn !== undefined ? { role_arn: options.roleArn } : {}),
+    ...(options.roleArn !== undefined
+      ? {
+          role_arn: options.roleArn,
+          access_key_id: null,
+          secret_access_key: null,
+        }
+      : {}),
     ...(options.accessKeyId !== undefined
-      ? { access_key_id: options.accessKeyId, secret_access_key: secretAccessKey }
+      ? {
+          access_key_id: options.accessKeyId,
+          secret_access_key: secretAccessKey,
+          role_arn: null,
+          external_id: null,
+        }
       : {}),
   };
   if (

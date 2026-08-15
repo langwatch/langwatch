@@ -117,10 +117,15 @@ const sqsDestinationSchema = z.object({
 });
 
 /**
- * Each kind requires its own address, and a 400 has to say WHICH field is
- * missing rather than that the body is wrong somewhere. A superRefine puts
- * the message on the path of the field that is absent, which is what turns
- * the refusal into an instruction.
+ * Each kind requires its own address and refuses the other kind's, and a 400
+ * has to say WHICH field is wrong rather than that the body is wrong
+ * somewhere. A superRefine puts the message on the path of the offending
+ * field, which is what turns the refusal into an instruction.
+ *
+ * The second half matters as much as the first. An endpoint stores one
+ * address, so a body carrying both would have half of it dropped on the way
+ * to the row, and a 201 would tell the caller their queue configuration was
+ * saved when it was discarded.
  */
 function refineDestinationShape(
   body: {
@@ -138,11 +143,27 @@ function refineDestinationShape(
       message: "url is required when destination_kind is http",
     });
   }
+  if (kind === "http" && body.sqs !== undefined) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["sqs"],
+      message:
+        "sqs does not apply when destination_kind is http; remove it, or set destination_kind to sqs",
+    });
+  }
   if (kind === "sqs" && !body.sqs?.queue_url) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["sqs", "queue_url"],
       message: "sqs.queue_url is required when destination_kind is sqs",
+    });
+  }
+  if (kind === "sqs" && body.url !== undefined) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["url"],
+      message:
+        "url does not apply when destination_kind is sqs; the queue URL goes in sqs.queue_url",
     });
   }
 }
@@ -251,13 +272,9 @@ const sqsDestinationDtoSchema = z.object({
   access_key_id: z.string().nullable(),
 });
 
-const endpointDtoSchema = z.object({
+/** Everything an endpoint carries that is not its destination. */
+const endpointCommonDtoFields = {
   id: z.string(),
-  destination_kind: destinationKindSchema,
-  /** The receiver URL on an `http` endpoint, null on every other kind. */
-  url: z.string().nullable(),
-  /** The queue on an `sqs` endpoint, null on every other kind. */
-  sqs: sqsDestinationDtoSchema.nullable(),
   enabled_events: z.array(z.string()),
   status: endpointStatusSchema,
   /** `manual` when an operator paused it, `auto_failures_72h` when the
@@ -272,16 +289,47 @@ const endpointDtoSchema = z.object({
   max_in_flight: z.number().int(),
   created_at: z.string(),
   updated_at: z.string(),
+};
+
+/**
+ * The destination is a union on `destination_kind`, not two independent
+ * nullable fields.
+ *
+ * Described as two nullable fields, the document permitted `destination_kind:
+ * "http"` beside a populated `sqs`, and a generated client had to null-check
+ * both and hope. As a union each branch states exactly one address, and the
+ * kind narrows to it.
+ */
+const httpEndpointDtoSchema = z.object({
+  destination_kind: z.literal("http"),
+  /** The receiver URL. An http endpoint always has one. */
+  url: z.string(),
+  sqs: z.null(),
+  ...endpointCommonDtoFields,
 });
+
+const sqsEndpointDtoSchema = z.object({
+  destination_kind: z.literal("sqs"),
+  url: z.null(),
+  /** The queue this endpoint delivers to. */
+  sqs: sqsDestinationDtoSchema,
+  ...endpointCommonDtoFields,
+});
+
+const endpointDtoSchema = z.discriminatedUnion("destination_kind", [
+  httpEndpointDtoSchema,
+  sqsEndpointDtoSchema,
+]);
 
 /**
  * The endpoint plus its plaintext signing secret. Create and roll-secret are
  * the only two responses that carry it; every read serves
  * {@link endpointDtoSchema}, which has no `secret` field to be absent from.
  */
-const endpointWithSecretDtoSchema = endpointDtoSchema.extend({
-  secret: z.string(),
-});
+const endpointWithSecretDtoSchema = z.discriminatedUnion("destination_kind", [
+  httpEndpointDtoSchema.extend({ secret: z.string() }),
+  sqsEndpointDtoSchema.extend({ secret: z.string() }),
+]);
 
 const deliveryDtoSchema = z.object({
   id: z.string(),
@@ -477,7 +525,7 @@ secured.access(requires("webhookEndpoints:manage")).post(
     tags: ["Webhooks"],
     summary: "Create a webhook endpoint",
     description:
-      "Create a webhook endpoint. The signing secret is returned ONCE in this response and never again; roll it to get a new one. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
+      "Create a webhook endpoint. Name one destination: `url` for `destination_kind: http`, `sqs` for `destination_kind: sqs`. Naming the other kind's field is a 400 that says which field does not belong, rather than a 201 that saved half the body. `destination_kind` may be omitted and then means `http`. The signing secret is returned ONCE in this response and never again; roll it to get a new one. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
     parameters: [idempotencyKeyParameter],
     responses: {
       ...canonicalBaseResponses,

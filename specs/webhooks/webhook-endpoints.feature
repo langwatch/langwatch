@@ -153,6 +153,8 @@ Feature: Webhook endpoints, signed outbound event delivery
       Given a signed batch delivered to a queue
       Then the signature travels under the same name as its HTTP header
       And so do the delivery id and the delivery attempt
+      And a test fire is marked as one, under its own header name
+      And an ordinary delivery carries no test-fire mark
       # A consumer sees no attributes at all unless it asks for them by
       # passing MessageAttributeNames: ["All"] to ReceiveMessage.
 
@@ -204,6 +206,18 @@ Feature: Webhook endpoints, signed outbound event delivery
       Then no read of the endpoint returns the secret
       And the secret cannot be recovered from anywhere the endpoint is stored
 
+    # A role outranks a key pair when the endpoint is read, so the direction
+    # that matters is the one INTO the key pair: a stored role that survives
+    # the switch goes on being used while the new key sits unread, and the
+    # update still answers success.
+    @integration
+    Scenario: Switching credential mode drops the mode it left
+      Given a queue endpoint that assumes a role
+      When the update sets a static access key and secret
+      Then the endpoint reports the static mode
+      And the role and its external id are gone from the row
+      And an update naming both modes at once is refused
+
     @unit
     Scenario: A missing or forbidden queue is terminal, a throttled one retries
       Given a queue delivery that failed
@@ -226,6 +240,15 @@ Feature: Webhook endpoints, signed outbound event delivery
       When an endpoint of a kind is saved without the field that kind requires
       Then the response status is 400
       And the refusal names the missing field rather than the whole body
+
+    # An endpoint stores one address. A body carrying both would have half of
+    # it dropped on the way to the row, and a 201 would report a queue as saved
+    # that was never written.
+    @integration
+    Scenario: Saving an endpoint refuses the address of the other destination kind
+      When an endpoint is saved naming one kind and the other kind's address
+      Then the response status is 400
+      And the refusal names the field that does not belong
 
     @integration
     Scenario: An endpoint never changes its destination kind

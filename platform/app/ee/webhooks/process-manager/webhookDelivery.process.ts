@@ -794,10 +794,14 @@ async function recordWebhookBatchOutcome({
     return;
   }
 
+  // A transport may return a failure verdict with nothing to say. One reason
+  // stands in for both the log row and the throw, so a delivery-log reader
+  // never sees a failed attempt with a blank reason column.
+  const reason = result.error ?? "delivery failed";
   await deps.endpoints.recordDeliveryAttempt({
     ...attempt,
     outcome: result.verdict,
-    error: result.error ?? "",
+    error: reason,
     response: {
       body: result.body,
       ...(result.retryAfterMs !== undefined
@@ -808,7 +812,7 @@ async function recordWebhookBatchOutcome({
   // The same classification just recorded, as the throw the dispatcher acts
   // on: it ladders retryables and dead-letters terminals immediately.
   throw new DispatchError({
-    message: `Webhook endpoint ${payload.endpointId}: ${result.error ?? "delivery failed"}`,
+    message: `Webhook endpoint ${payload.endpointId}: ${reason}`,
     retryable: result.verdict === "retryable",
     // Honor the receiver's backpressure on a retryable verdict (ADR-040 §5);
     // the queue folds it into its backoff as a floor.
