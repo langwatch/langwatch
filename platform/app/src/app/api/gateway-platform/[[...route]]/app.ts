@@ -19,6 +19,7 @@
  * service-to-service write path can drop the synthetic id entirely.
  */
 
+import { RoutingPolicyService } from "@ee/governance/services/routingPolicy.service";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
@@ -28,16 +29,14 @@ import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
 import type { AuthMiddlewareVariables } from "~/app/api/middleware/auth";
-import { RoutingPolicyScopeType } from "~/generated/prisma/client";
+import { requireEnterprisePlanRest } from "~/app/api/middleware/enterprise-gate";
 import type { GatewayCacheRule, Project } from "~/generated/prisma/client";
+import { RoutingPolicyScopeType } from "~/generated/prisma/client";
 import {
   IDEMPOTENCY_KEY_HEADER,
   readIdempotencyKey,
   withIdempotency,
 } from "~/server/api/idempotency";
-import { RoutingPolicyService } from "@ee/governance/services/routingPolicy.service";
-import { requireEnterprisePlanRest } from "~/app/api/middleware/enterprise-gate";
-import { type Organization } from "~/generated/prisma/client";
 import { apiKeyPermission, createProjectApp } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { getApp } from "~/server/app-layer/app";
@@ -2384,7 +2383,7 @@ async function addOrganizationToContext(c: any, next: () => Promise<void>) {
   if (!resolvedToken) {
     throw new Error("No resolved token found on context");
   }
-  
+
   let organizationId: string;
   if (resolvedToken.type === "legacyProjectKey") {
     organizationId = resolvedToken.project.team.organizationId;
@@ -2393,15 +2392,15 @@ async function addOrganizationToContext(c: any, next: () => Promise<void>) {
   } else {
     throw new Error("Unsupported token type: " + resolvedToken.type);
   }
-  
+
   const organization = await prisma.organization.findUnique({
     where: { id: organizationId },
   });
-  
+
   if (!organization) {
     throw new Error("Organization not found");
   }
-  
+
   c.set("organization", organization);
   await next();
 }
@@ -2428,89 +2427,85 @@ function toRoutingPolicyDto(policy: {
   };
 }
 
-secured
-  .access(apiKeyPermission("routingPolicies:view"))
-  .get(
-    "/routing-policies",
-    addOrganizationToContext,
-    enterpriseGate,
-    describeRoute({
-      summary: "List routing policies",
-      description:
-        "Returns the routing policies selectable at the caller's project scope: those scoped to this project, to its team, or to the whole organization — irrespective of isDefault. The envelope matches the sibling gateway-platform list routes ({ data: [...], next_cursor }). Empty result is an empty data array, not a 404.",
-      tags: ["Routing Policies"],
-      responses: {
-        ...canonicalBaseResponses,
-        200: {
-          description: "Selectable routing policies",
-          content: {
-            "application/json": {
-              schema: resolver(
-                z.object({
-                  data: z.array(routingPolicyDtoSchema),
-                  next_cursor: nextCursorSchema,
-                }),
-              ),
-            },
+secured.access(apiKeyPermission("routingPolicies:view")).get(
+  "/routing-policies",
+  addOrganizationToContext,
+  enterpriseGate,
+  describeRoute({
+    summary: "List routing policies",
+    description:
+      "Returns the routing policies selectable at the caller's project scope: those scoped to this project, to its team, or to the whole organization — irrespective of isDefault. The envelope matches the sibling gateway-platform list routes ({ data: [...], next_cursor }). Empty result is an empty data array, not a 404.",
+    tags: ["Routing Policies"],
+    responses: {
+      ...canonicalBaseResponses,
+      200: {
+        description: "Selectable routing policies",
+        content: {
+          "application/json": {
+            schema: resolver(
+              z.object({
+                data: z.array(routingPolicyDtoSchema),
+                next_cursor: nextCursorSchema,
+              }),
+            ),
           },
         },
       },
-    }),
-    zValidator("query", pageQuerySchema),
-    async (c) => {
-      const project = c.get("project");
-      const organizationId = await orgIdForProject(project.id);
-      const service = new RoutingPolicyService(prisma);
-      const rows = await service.list({
-        organizationId,
-        selectableForScope: {
-          scopeType: RoutingPolicyScopeType.PROJECT,
-          scopeId: project.id,
-        },
-      });
-      return c.json({
-        data: rows.map((p) => toRoutingPolicyDto(p)),
-        next_cursor: null,
-      });
     },
-  );
+  }),
+  zValidator("query", pageQuerySchema),
+  async (c) => {
+    const project = c.get("project");
+    const organizationId = await orgIdForProject(project.id);
+    const service = new RoutingPolicyService(prisma);
+    const rows = await service.list({
+      organizationId,
+      selectableForScope: {
+        scopeType: RoutingPolicyScopeType.PROJECT,
+        scopeId: project.id,
+      },
+    });
+    return c.json({
+      data: rows.map((p) => toRoutingPolicyDto(p)),
+      next_cursor: null,
+    });
+  },
+);
 
-secured
-  .access(apiKeyPermission("routingPolicies:view"))
-  .get(
-    "/routing-policies/:id",
-    addOrganizationToContext,
-    enterpriseGate,
-    describeRoute({
-      summary: "Get routing policy",
-      description:
-        "One routing policy in the same five-field summary shape GET /routing-policies returns. The by-id lookup is NEVER the sole authorization: a policy belonging to another organization, or scoped to a sibling project the caller cannot see, answers the routing_policy_not_found error body — byte-identical to an nonexistent id — so no 404 can leak existence across tenant boundaries.",
-      tags: ["Routing Policies"],
-      responses: {
-        ...canonicalBaseResponses,
-        200: {
-          description: "The routing policy",
-          content: {
-            "application/json": {
-              schema: resolver(routingPolicyDtoSchema),
-            },
-          },
-        },
-        404: {
-          description: "Not found",
-          content: {
-            "application/json": { schema: resolver(apiErrorSchema) },
+secured.access(apiKeyPermission("routingPolicies:view")).get(
+  "/routing-policies/:id",
+  addOrganizationToContext,
+  enterpriseGate,
+  describeRoute({
+    summary: "Get routing policy",
+    description:
+      "One routing policy in the same five-field summary shape GET /routing-policies returns. The by-id lookup is NEVER the sole authorization: a policy belonging to another organization, or scoped to a sibling project the caller cannot see, answers the routing_policy_not_found error body — byte-identical to an nonexistent id — so no 404 can leak existence across tenant boundaries.",
+    tags: ["Routing Policies"],
+    responses: {
+      ...canonicalBaseResponses,
+      200: {
+        description: "The routing policy",
+        content: {
+          "application/json": {
+            schema: resolver(routingPolicyDtoSchema),
           },
         },
       },
-    }),
-    async (c) => {
-      const project = c.get("project");
-      const id = c.req.param("id");
-      const organizationId = await orgIdForProject(project.id);
-      const service = new RoutingPolicyService(prisma);
-      const policy = await service.findById(id);
-     if (!policy || policy.organizationId !== organizationId) {
+      404: {
+        description: "Not found",
+        content: {
+          "application/json": { schema: resolver(apiErrorSchema) },
+        },
+      },
+    },
+  }),
+  async (c) => {
+    const project = c.get("project");
+    const id = c.req.param("id");
+    const organizationId = await orgIdForProject(project.id);
+    const service = new RoutingPolicyService(prisma);
+    const policy = await service.findById(id);
+    if (!policy || policy.organizationId !== organizationId) {
       // Collapse "not found" + "found-but-wrong-org" into the same 404:
       // findById carries no tenancy filter, so a foreign org's id must
       // NOT leak existence here.
@@ -2520,25 +2515,28 @@ secured
         message: `routing policy ${id} not found`,
       });
     }
-      // Explicit scope authorization: a policy in this org is only visible
-      // if selectable from the project's cascade (PROJECT, the project's
-      // TEAM, or the ORG). A sibling-project or a sibling-team policy
-      // answers the SAME 404 so no 404 can leak existence across scopes.
-      const visible = policy.scopes.some(
-        (s) =>
-          (s.scopeType === RoutingPolicyScopeType.ORGANIZATION && s.scopeId === organizationId) ||
-          (s.scopeType === RoutingPolicyScopeType.TEAM && s.scopeId === project.teamId) ||
-          (s.scopeType === RoutingPolicyScopeType.PROJECT && s.scopeId === project.id),
-      );
-       if (!visible) {
-        return errorResponse(c, {
-          status: 404,
-          code: "routing_policy_not_found",
-          message: `routing policy ${id} not found`,
-        });
-      }
-      return c.json(toRoutingPolicyDto(policy));
-    },
-  );
+    // Explicit scope authorization: a policy in this org is only visible
+    // if selectable from the project's cascade (PROJECT, the project's
+    // TEAM, or the ORG). A sibling-project or a sibling-team policy
+    // answers the SAME 404 so no 404 can leak existence across scopes.
+    const visible = policy.scopes.some(
+      (s) =>
+        (s.scopeType === RoutingPolicyScopeType.ORGANIZATION &&
+          s.scopeId === organizationId) ||
+        (s.scopeType === RoutingPolicyScopeType.TEAM &&
+          s.scopeId === project.teamId) ||
+        (s.scopeType === RoutingPolicyScopeType.PROJECT &&
+          s.scopeId === project.id),
+    );
+    if (!visible) {
+      return errorResponse(c, {
+        status: 404,
+        code: "routing_policy_not_found",
+        message: `routing policy ${id} not found`,
+      });
+    }
+    return c.json(toRoutingPolicyDto(policy));
+  },
+);
 
 export const app = secured.hono;

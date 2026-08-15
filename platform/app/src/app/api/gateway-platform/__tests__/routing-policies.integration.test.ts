@@ -8,12 +8,12 @@
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { RoutingPolicyScopeType } from "~/generated/prisma/client";
-import { prisma } from "~/server/db";
-import { app } from "../[[...route]]/app";
-import { createTestApp } from "~/server/app-layer/presets";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { createTestApp } from "~/server/app-layer/presets";
 import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
+import { prisma } from "~/server/db";
 import { ENTERPRISE_TEST_PLAN } from "~/test-utils/managementApiOrg";
+import { app } from "../[[...route]]/app";
 
 const jsonHeaders = { "Content-Type": "application/json" };
 
@@ -43,7 +43,7 @@ const FOREIGN_ORG_ID = `org-rp-foreign-${suffix}`;
 const FOREIGN_POLICY_ID = `pol-rp-foreign-${suffix}`;
 
 let projectApiKey: string;
-let foreignProjectApiKey: string;
+let _foreignProjectApiKey: string;
 
 beforeAll(async () => {
   // Routing policies are Enterprise-gated on every route, and this suite is about
@@ -71,7 +71,7 @@ beforeAll(async () => {
       slug: `foreign-org-${suffix}`,
     },
   });
-  
+
   // Setup enterprise subscriptions for the organizations
   await prisma.subscription.create({
     data: {
@@ -100,7 +100,7 @@ beforeAll(async () => {
   // Setup projects
   const LEGACY_KEY = `sk-lw-${nanoid(48)}`;
   const SIBLING_LEGACY_KEY = `sk-lw-${nanoid(48)}`;
-  
+
   await prisma.project.create({
     data: {
       id: PROJECT_ID,
@@ -125,7 +125,7 @@ beforeAll(async () => {
   });
 
   // Setup routing policies with different scopes
-   await prisma.routingPolicy.createMany({
+  await prisma.routingPolicy.createMany({
     data: [
       {
         id: POLICY_PROJECT_ID,
@@ -208,7 +208,7 @@ beforeAll(async () => {
 
   // Use the project's own apiKey for authentication
   projectApiKey = LEGACY_KEY;
-  foreignProjectApiKey = SIBLING_LEGACY_KEY;
+  _foreignProjectApiKey = SIBLING_LEGACY_KEY;
 });
 
 afterAll(async () => {
@@ -216,7 +216,13 @@ afterAll(async () => {
   await prisma.routingPolicyScope.deleteMany({
     where: {
       routingPolicyId: {
-        in: [POLICY_PROJECT_ID, POLICY_TEAM_ID, POLICY_ORG_ID, POLICY_SIBLING_ID, FOREIGN_POLICY_ID],
+        in: [
+          POLICY_PROJECT_ID,
+          POLICY_TEAM_ID,
+          POLICY_ORG_ID,
+          POLICY_SIBLING_ID,
+          FOREIGN_POLICY_ID,
+        ],
       },
     },
   });
@@ -224,7 +230,13 @@ afterAll(async () => {
   await prisma.routingPolicy.deleteMany({
     where: {
       id: {
-        in: [POLICY_PROJECT_ID, POLICY_TEAM_ID, POLICY_ORG_ID, POLICY_SIBLING_ID, FOREIGN_POLICY_ID],
+        in: [
+          POLICY_PROJECT_ID,
+          POLICY_TEAM_ID,
+          POLICY_ORG_ID,
+          POLICY_SIBLING_ID,
+          FOREIGN_POLICY_ID,
+        ],
       },
     },
   });
@@ -253,7 +265,7 @@ afterAll(async () => {
       },
     },
   });
-  
+
   await prisma.organization.deleteMany({
     where: {
       id: {
@@ -263,22 +275,19 @@ afterAll(async () => {
   });
 });
 
-  describe("GET /routing-policies", () => {
-    it("returns exactly the policies selectable at the project's scope", async () => {
-      const response = await app.request(
-        `/api/gateway/v1/routing-policies`,
-        {
-          method: "GET",
-          headers: apiKeyAuth(projectApiKey),
-        },
-      );
+describe("GET /routing-policies", () => {
+  it("returns exactly the policies selectable at the project's scope", async () => {
+    const response = await app.request(`/api/gateway/v1/routing-policies`, {
+      method: "GET",
+      headers: apiKeyAuth(projectApiKey),
+    });
 
     expect(response.status).toBe(200);
     const body = await response.json();
-    
+
     expect(body).toHaveProperty("data");
     expect(Array.isArray(body.data)).toBe(true);
-    
+
     const returnedIds = new Set(body.data.map((p: any) => p.id));
     expect(returnedIds).toEqual(
       new Set([POLICY_PROJECT_ID, POLICY_TEAM_ID, POLICY_ORG_ID]),
@@ -286,23 +295,26 @@ afterAll(async () => {
   });
 
   it("returns policy objects with exactly the five-field summary subset", async () => {
-    const response = await app.request(
-      `/api/gateway/v1/routing-policies`,
-      {
-        method: "GET",
-        headers: apiKeyAuth(projectApiKey),
-      },
-    );
+    const response = await app.request(`/api/gateway/v1/routing-policies`, {
+      method: "GET",
+      headers: apiKeyAuth(projectApiKey),
+    });
 
     expect(response.status).toBe(200);
     const body = await response.json();
 
     expect(body.data.length).toBeGreaterThan(0);
-    
+
     for (const policy of body.data) {
       const keys = Object.keys(policy);
-      expect(keys).toEqual(["id", "name", "description", "strategy", "is_default"]);
-      
+      expect(keys).toEqual([
+        "id",
+        "name",
+        "description",
+        "strategy",
+        "is_default",
+      ]);
+
       // Ensure no sensitive fields are included
       expect(policy).not.toHaveProperty("policyRules");
       expect(policy).not.toHaveProperty("modelAliases");
@@ -314,13 +326,10 @@ afterAll(async () => {
   });
 
   it("never returns another organization's policies", async () => {
-    const response = await app.request(
-      `/api/gateway/v1/routing-policies`,
-      {
-        method: "GET",
-        headers: apiKeyAuth(projectApiKey),
-      },
-    );
+    const response = await app.request(`/api/gateway/v1/routing-policies`, {
+      method: "GET",
+      headers: apiKeyAuth(projectApiKey),
+    });
 
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -330,13 +339,10 @@ afterAll(async () => {
   });
 
   it("never returns a same-org sibling project's private policies", async () => {
-    const response = await app.request(
-      `/api/gateway/v1/routing-policies`,
-      {
-        method: "GET",
-        headers: apiKeyAuth(projectApiKey),
-      },
-    );
+    const response = await app.request(`/api/gateway/v1/routing-policies`, {
+      method: "GET",
+      headers: apiKeyAuth(projectApiKey),
+    });
 
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -346,21 +352,27 @@ afterAll(async () => {
   });
 });
 
-  describe("GET /routing-policies/:id", () => {
-    it("returns the same five-field subset", async () => {
-      const response = await app.request(
-        `/api/gateway/v1/routing-policies/${POLICY_PROJECT_ID}`,
-        {
-          method: "GET",
-          headers: apiKeyAuth(projectApiKey),
-        },
-      );
+describe("GET /routing-policies/:id", () => {
+  it("returns the same five-field subset", async () => {
+    const response = await app.request(
+      `/api/gateway/v1/routing-policies/${POLICY_PROJECT_ID}`,
+      {
+        method: "GET",
+        headers: apiKeyAuth(projectApiKey),
+      },
+    );
 
     expect(response.status).toBe(200);
     const body = await response.json();
 
     const keys = Object.keys(body);
-    expect(keys).toEqual(["id", "name", "description", "strategy", "is_default"]);
+    expect(keys).toEqual([
+      "id",
+      "name",
+      "description",
+      "strategy",
+      "is_default",
+    ]);
   });
 
   it("returns 404 for a policy in another organization", async () => {
@@ -374,7 +386,7 @@ afterAll(async () => {
 
     expect(response.status).toBe(404);
     const body = await response.json();
-    console.log("DEBUG: Response body:", JSON.stringify(body, null, 2));
+
     expect(body.error).toHaveProperty("code", "routing_policy_not_found");
   });
 
@@ -418,15 +430,20 @@ afterAll(async () => {
         createdById: "user",
         updatedById: "user",
         scopes: {
-          create: [{ scopeType: RoutingPolicyScopeType.ORGANIZATION, scopeId: ORG_ID }],
+          create: [
+            { scopeType: RoutingPolicyScopeType.ORGANIZATION, scopeId: ORG_ID },
+          ],
         },
       },
     });
 
-    const res = await app.request(`/api/gateway/v1/routing-policies/${policyId}`, {
-      method: "GET",
-      headers: apiKeyAuth(projectApiKey),
-    });
+    const res = await app.request(
+      `/api/gateway/v1/routing-policies/${policyId}`,
+      {
+        method: "GET",
+        headers: apiKeyAuth(projectApiKey),
+      },
+    );
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.id).toBe(policyId);
