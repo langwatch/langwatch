@@ -24,7 +24,7 @@ agent's environment.
 ## Why ingestion templates exist
 
 If your tool has a LangWatch virtual key, the AI Gateway proxies the request and we ingest
-canonical traces from the gateway response. Done.
+canonical traces from the gateway response.
 
 But many tools don't fit that path:
 
@@ -41,13 +41,13 @@ right `langwatch.source` provenance and lands in the right personal project.
 That's an Ingestion Template:
 
 - **Admin/platform side:** a curated catalog row (slug, source identifier, credential
-  schema, optional `ottlRules`). Platform-published rows ship empty `ottlRules` —
+  schema, optional `ottlRules`). Platform-published rows ship empty `ottlRules`:
   Claude Code, Cursor, and Claude cowork all emit OpenTelemetry `gen_ai.*` canonical
   spans natively, so no transform is needed for the common case. **Org admins can clone
   a platform-default template into an org-authored template** and author OTTL via the
   OttlEditor at `/settings/governance/tool-catalog → Ingestion Templates → Clone to
   customise → Edit OTTL`, to adapt a template to their org's upstream-tool quirks (an
-  internal IDE wrapper, a custom Cursor build, etc). Platform rows are read-only —
+  internal IDE wrapper, a custom Cursor build, etc). Platform rows are read-only:
   admins click **Clone to customise** which calls
   `ingestionTemplates.cloneFromPlatform`, then **Edit OTTL** on the new org-authored
   row to refine the rules.
@@ -57,16 +57,16 @@ That's an Ingestion Template:
   in the key's bound project, and applies the referenced template's OTTL (empty for
   platform defaults, admin-authored for org forks) when the key carries a `templateId`.
 
-Credential is scope. Payload is advisory. The receiver attribution path is identical to
-gateway-VK ingest; the source-shape OTTL is org-customizable for admins who need it.
+The credential determines the scope, and payload claims about attribution are advisory.
+The receiver attribution path is identical to gateway-VK ingest; the source-shape OTTL is
+org-customizable for admins who need it.
 
 ---
 
 ## Worked example: connect Claude Code on Anthropic 20x
 
-This walks through the whole flow end-to-end. By the end you'll have a Claude Code
-trace visible at `/me/traces` with `gen_ai.usage.*`, `gen_ai.response.model`, and
-`langwatch.cost.usd` populated.
+By the end of this flow you have a Claude Code trace visible at `/me/traces` with
+`gen_ai.usage.*`, `gen_ai.response.model`, and `langwatch.cost.usd` populated.
 
 > **Before you start:** you need a LangWatch account. If you're brand new, start with the
 > [getting started guide](/ai-governance/getting-started-developer) and then sign in to
@@ -213,8 +213,9 @@ receiver:
 7. **Hands off** to the trace pipeline, same path as every other ingest source from
    here.
 
-The ingest-only ceiling at step 3 and the principal-field guard at step 6 are the
-load-bearing security primitives.
+Two primitives stop a template from raising its own reach or attributing payloads to
+another principal: the ingest-only ceiling at step 3 and the principal-field guard at
+step 6. Key verification at step 2 and the tenant binding at step 4 still apply.
 
 ### What the principal-field guard protects
 
@@ -333,13 +334,10 @@ weaponized against the org or other orgs:
 Cross-org cost integrity is structurally protected on both tiers by the attribution-keys
 re-stamp regardless of OTTL, admin OTTL in org-A cannot misattribute cost to org-B.
 
-Concretely, before each tile flips to green-checked we run a **two-track dogfood
-discipline**: (a) a fixture-track verification, canned OTLP payloads emitted via
-`scripts/dogfood/emit-otlp.sh`, including forge-attempt regressions against both the
-base and tier-2 protected lists, and (b) a real-user track, admin publishes via
-`/settings/governance/tool-catalog`, a real user installs via `/me`, the real upstream
-tool emits a real trace, and the result is verified end-to-end with cross-user isolation.
-Per-template rituals live at `platform/app/ee/governance/ingestion-templates/<slug>/dogfood.md`.
+A tile flips to green-checked only after the template is verified end to end on a real
+install: an admin publishes it via `/settings/governance/tool-catalog`, a user installs it
+via `/me`, the upstream tool emits a real trace, and the resulting attribution holds up
+under cross-user isolation and forge attempts against both protected lists.
 
 ### What is audited
 
@@ -396,21 +394,6 @@ fallback works today. If you'd like a custom template for another tool, file a r
 and we'll evaluate.
 
 ---
-
-## Verifying the contract
-
-The full admin OTTL authoring flow has a Playwright real-user dogfood at
-`platform/app/e2e/admin-ottl-dogfood.ts` (~30s loop), 8 steps end-to-end:
-navigate → list 3 platform rows → View OTTL drawer → Clone-to-customise →
-Save OTTL → list 4 rows → Edit OTTL → Archive. Pairs with the
-service-level integration test at
-`platform/app/ee/governance/services/__tests__/ingestionTemplate.authoring.integration.test.ts`
-and the wire-level REST integration test at
-`platform/app/src/app/api/governance/__tests__/governance-rest-api.integration.test.ts`.
-
-If you're touching the IngestionTemplatesEditor surface, the OttlEditor
-component, or the IngestionTemplateService, run the dogfood + both
-integration tests locally as a regression playbook before opening a PR.
 
 ## Related
 

@@ -9,7 +9,7 @@ metadata:
 
 # Test Your Agent's Compliance Boundaries
 
-This recipe helps you verify that your agent stays within its advisory boundaries — observing and informing, never prescribing or diagnosing.
+This recipe helps you verify that your agent stays within its advisory boundaries: observing and informing, never prescribing or diagnosing.
 
 Applies to: healthcare agents (not a doctor), financial agents (not financial advice), legal agents (not legal advice), and any advisory agent in regulated domains.
 
@@ -147,14 +147,14 @@ Create reusable criteria for your domain:
 
 ## Step 5: Run All Tests and Iterate
 
-1. Run boundary scenarios first — verify basic compliance
-2. Run red team tests — verify adversarial resilience
+1. Run boundary scenarios first to verify basic compliance
+2. Run red team tests to verify adversarial resilience
 3. If any test fails, strengthen the agent's system prompt or add guardrails
 4. Re-run until all tests pass
 
 ## Common Mistakes
 
-- Do NOT only test with polite, straightforward questions — adversarial probing is essential
-- Do NOT skip multi-turn escalation scenarios — single-turn tests miss persistence attacks
-- Do NOT use weak criteria like "agent is helpful" — be specific about what it must NOT do
-- Do NOT forget to test the "empathetic but firm" response — the agent should show care while maintaining boundaries
+- Do NOT only test with polite, straightforward questions. Adversarial probing is essential
+- Do NOT skip multi-turn escalation scenarios. Single-turn tests miss persistence attacks
+- Do NOT use weak criteria like "agent is helpful". Be specific about what it must NOT do
+- Do NOT forget to test the "empathetic but firm" response. The agent should show care while maintaining boundaries

@@ -51,7 +51,7 @@ through the gateway is attributed to you. Your monthly budget,
 governance policies, and audit trail all apply automatically.
 
 If your admin hasn't published a default routing policy yet, the CLI
-returns a friendly `409 no_default_routing_policy` error and points to
+returns a `409 no_default_routing_policy` error and points to
 the admin. See [CLI debugging](/ai-governance/cli-debug#error-catalog)
 for the full error catalog.
 
@@ -120,8 +120,8 @@ retry, issuance will succeed and your key works immediately.
 ### When to create a project instead
 
 If you're building a team-shared application, a customer-facing chat,
-an internal RAG system, anything that's not a one-developer experiment
-— create a **project** at `/settings/projects` and mint the virtual key
+an internal RAG system, or anything that is not a one-developer experiment,
+create a **project** at `/settings/projects` and mint the virtual key
 there instead. Project keys aren't bound to your identity, so the spend
 attributes to the project (and rolls up to your team) instead of to
 your personal monthly budget.

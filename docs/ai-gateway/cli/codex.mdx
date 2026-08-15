@@ -4,7 +4,7 @@ description: Route the OpenAI Codex CLI through the LangWatch AI Gateway.
 sidebarTitle: Codex CLI
 ---
 
-The Codex CLI speaks the OpenAI Chat Completions and Responses APIs. Both are available from the LangWatch AI Gateway and Codex will work with either, set the two env vars and go.
+The Codex CLI speaks the OpenAI Chat Completions and Responses APIs. Both are available from the LangWatch AI Gateway, and Codex works with either once you set the two env vars.
 
 ## Quick path: `langwatch codex` wrapper (recommended for personal IDE keys)
 
@@ -26,7 +26,7 @@ export OPENAI_API_KEY="vk-lw-01HZX..."
 codex exec "explain this repo"
 ```
 
-That's it. Every Codex call hits the gateway, which applies your VK's policies (budget, guardrails, blocked patterns, fallback) and emits a LangWatch trace.
+Every Codex call hits the gateway, which applies your VK's policies (budget, guardrails, blocked patterns, fallback) and emits a LangWatch trace.
 
 ### Using the Responses API
 

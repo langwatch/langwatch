@@ -8,8 +8,8 @@ description: Run experiments programmatically from notebooks or scripts to batch
   **Let your agent set this up.** [Copy the evaluations prompt](/skills/code-prompts#set-up-evaluations) into your coding agent to get started automatically.
 </Tip>
 
-LangWatch makes it easy to run experiments from code.
-Just add a few lines to start tracking your experiments.
+The LangWatch SDK runs experiments from your Python or TypeScript code and tracks
+each run in LangWatch.
 
 Not using Python or TypeScript? The SDKs call the same REST endpoints you can call
 yourself: [create an experiment](/api-reference/experiments/create-an-experiment),
@@ -46,7 +46,7 @@ import langwatch
 langwatch.login()
 ```
 
-Be sure to login or create an account on the link that will be displayed, then provide your API key when prompted.
+Be sure to log in or create an account using the displayed link, then provide your API key when prompted.
   </Tab>
   <Tab title="Environment Variable">
 ```bash
@@ -111,7 +111,7 @@ await evaluation.run(dataset, async ({ item, index }) => {
   </Tab>
 </Tabs>
 
-That's it! Your evaluation metrics are now being tracked and visualized in LangWatch.
+Your evaluation metrics are now tracked and visualized in LangWatch.
 
 <Frame>
 <img src="/images/offline-evaluation/evaluation-sample.png" alt="Evaluation Results Sample" />
@@ -422,11 +422,11 @@ await evaluation.run(dataset, async ({ item, index }) => {
 
 ## Built-in Evaluators
 
-LangWatch provides a comprehensive suite of evaluation metrics out of the box.
+LangWatch provides a library of evaluation metrics out of the box.
 
 <Tabs>
   <Tab title="Python">
-Use `evaluation.run()` to leverage pre-built evaluators:
+Use `evaluation.evaluate()` with pre-built evaluators:
 
 ```python
 for index, row in evaluation.loop(df.iterrows()):
@@ -455,7 +455,7 @@ for index, row in evaluation.loop(df.iterrows()):
 ```
   </Tab>
   <Tab title="TypeScript">
-Use `evaluation.evaluate()` to leverage pre-built evaluators:
+Use `evaluation.evaluate()` with pre-built evaluators:
 
 ```typescript
 await evaluation.run(dataset, async ({ item, index }) => {
@@ -539,7 +539,7 @@ The candidates are whatever each `withTarget()` callback returned.
   </Tab>
 </Tabs>
 
-The winner comes back named with the target name you registered. Two candidates is not a different call from five: `compare()` judges however many the row has, and a target that produced nothing for the row, or only an empty output, is simply not a candidate.
+The winner comes back named with the target name you registered. `compare()` judges however many candidates the row has, and a target that produced nothing for the row, or only an empty output, is not a candidate.
 
 <Info>
   Compare a row once its targets have finished. In Python that is after the row's last `target()` block has closed, and in TypeScript after its `withTarget()` calls have settled, which under the usual `Promise.all` is right after the `await`.
@@ -962,7 +962,7 @@ Click the **Export to CSV** button in the top-right corner of the evaluation res
 
 ### CSV Structure
 
-The exported CSV contains comprehensive data organized by dataset rows and targets. Here's the complete column structure:
+The exported CSV organizes the data by dataset rows and targets. Here's the complete column structure:
 
 #### Row Index
 
@@ -1041,7 +1041,7 @@ index,question,expected,gpt-4_model,gpt-4_output,gpt-4_cost,gpt-4_duration_ms,gp
 
 ### Using the Data
 
-The CSV export enables powerful analysis workflows:
+The CSV export supports these analysis workflows:
 
 <AccordionGroup>
 <Accordion title="Filter and compare models">

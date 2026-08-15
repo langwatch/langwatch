@@ -4,7 +4,7 @@ sidebarTitle: Claude Code
 description: Monitor Claude Code usage with LangWatch using OpenTelemetry traces
 ---
 
-Claude Code supports OpenTelemetry (OTel) traces for monitoring and observability. This guide shows you how to configure Claude Code to send trace data to LangWatch, giving you insights into usage patterns and performance.
+Claude Code supports OpenTelemetry (OTel) traces for monitoring and observability. This guide shows you how to configure Claude Code to send that trace data to LangWatch, so you can see usage patterns and performance.
 
 <Note>
   OpenTelemetry support in Claude Code is currently in beta and details are subject to change.
@@ -119,7 +119,7 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer your-langwatch-api-key"
 
 ## Available Trace Data
 
-Claude Code exports comprehensive trace data that integrates seamlessly with LangWatch's observability platform.
+Claude Code exports its trace data over OTLP to the LangWatch endpoint you configured above.
 
 ### Standard Attributes
 
@@ -308,7 +308,7 @@ echo $OTEL_EXPORTER_OTLP_HEADERS
 <AccordionGroup>
   <Accordion title="No data appearing in LangWatch">
     - Verify `CLAUDE_CODE_ENABLE_TELEMETRY=1` is set
-    - Verify `OTEL_LOGS_EXPORTER=otlp` is set — Claude Code 2.1.x ships its cost-bearing events as OTLP logs, not spans. With only `OTEL_TRACES_EXPORTER` set you'll see nothing in LangWatch
+    - Verify `OTEL_LOGS_EXPORTER=otlp` is set. Claude Code 2.1.x ships its cost-bearing events as OTLP logs, not spans, so with only `OTEL_TRACES_EXPORTER` set you'll see nothing in LangWatch
     - Check that the endpoint URL is correct: `https://app.langwatch.ai/api/otel`
     - Ensure your API key is valid and has proper permissions
     - Check network connectivity to the LangWatch endpoint
@@ -316,11 +316,11 @@ echo $OTEL_EXPORTER_OTLP_HEADERS
   </Accordion>
 
   <Accordion title="Trace lands but has no tool call tree, latencies, or subagents">
-    Set `CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1`. It is the experimental flag that turns span tracing on, and `OTEL_TRACES_EXPORTER` is a no-op without it. Cost and token events still arrive over the logs exporter, so the session shows up, but with no spans LangWatch has no structure to hang them on: every subagent folds into the main session instead of branching off it. `OTEL_LOG_TOOL_CONTENT` also depends on this flag, because the tool input and output it unlocks are written as span events.
+    Set `CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1`. It is the experimental flag that turns span tracing on, and `OTEL_TRACES_EXPORTER` is a no-op without it. Cost and token events still arrive over the logs exporter, so the session shows up, but with no spans LangWatch has no structure to hang them on: every subagent folds into the main session instead of branching off it. `OTEL_LOG_TOOL_CONTENT` also depends on this flag, because the tool input and output it enables are written as span events.
   </Accordion>
 
   <Accordion title="Trace shows but input/prompt is empty">
-    Set `OTEL_LOG_USER_PROMPTS=1`. Claude Code redacts the prompt body on its `user_prompt` event by default — without this env, the receiver has no input text to attach to the synthesized trace.
+    Set `OTEL_LOG_USER_PROMPTS=1`. Claude Code redacts the prompt body on its `user_prompt` event by default. Without this env, the receiver has no input text to attach to the synthesized trace.
   </Accordion>
 
   <Accordion title="Trace shows but output/response is empty">

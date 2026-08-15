@@ -60,7 +60,7 @@ curl https://gateway.langwatch.ai/v1/chat/completions \
 
 A per-VK redirect from a client-facing name to a concrete `provider/model`. Aliases decouple client code from provider specifics, you can repoint `coding-small` from OpenAI to Bedrock in a single VK edit without touching any caller.
 
-See [Model Aliases](/ai-gateway/model-aliases) for the full story, including how an alias is judged against `models_allowed` and the `GET /v1/models` discovery endpoint.
+See [Model Aliases](/ai-gateway/model-aliases) for the full rules, including how an alias is judged against `models_allowed` and the `GET /v1/models` discovery endpoint.
 
 ## How resolution works
 
@@ -126,6 +126,6 @@ The error surfaces the accepted names so an integrator can fix the request witho
 
 ## Why not just pick one convention?
 
-Most gateways in the ecosystem (litellm, OpenRouter, Portkey) use `provider/model`. Most SDK codebases use the bare name. Requiring either one would create friction for the other population.
+Gateways in the ecosystem (litellm, OpenRouter, Portkey) use `provider/model`. Provider SDK codebases use the bare name. Requiring either one would create friction for the other population.
 
-Accepting both, with a single O(1) resolution step, not a retry loop, lets you write whichever is natural for your code and the gateway figures it out at zero hot-path cost.
+Accepting both, with a single O(1) resolution step, not a retry loop, lets you write whichever is natural for your code.

@@ -6,15 +6,13 @@ sidebarTitle: Control plane
 
 <Info>**Pairs with:** [AI Gateway → Overview](/ai-gateway/overview). The gateway is the data plane (request path); this page is the control plane (configuration + fold reactors) that sits next to it in the same compose stack and Helm chart.</Info>
 
-LangWatch is positioned as a **control plane** above every AI tool an
-enterprise uses, not just the ones whose API key path you own. The
+LangWatch is a **control plane** above every AI tool an enterprise uses,
+including the ones whose API key path you do not own. The
 data plane (the AI Gateway proxy) is one of five integration tiers; the
 control plane is what stays the same across all of them.
 
-This page is the navigation map for "where does X fit?". Use it to
-locate the surface you're configuring (or asking about) on the larger
-ladder. Sister docs go deep on individual tiers; this one only
-explains the relationships.
+Sister docs go deep on individual tiers; this page only explains the
+relationships between them.
 
 ## Daily-use surfaces vs admin-authoring surfaces
 
@@ -67,10 +65,10 @@ if (data?.governanceActive && hasOrgManagePermission) {
 }
 ```
 
-This satisfies the "don't lose LLMOps" constraint: the vast
-majority of current admins (no personal VKs, no IngestionSources,
-no recent gateway activity) get `governanceActive=false` and see
-no nav change at all.
+This satisfies the "don't lose LLMOps" constraint: an admin whose org
+has no personal VKs, no routing policies, no IngestionSources, no
+anomaly rules and no recent gateway activity gets
+`governanceActive=false` and sees no nav change at all.
 
 ## The split: control plane vs data plane
 
@@ -318,9 +316,8 @@ The current branch (PR #3524) implements Tier 1 end-to-end:
   `organization:manage` permission AND
   `api.governance.setupState.governanceActive === true`. Renders
   a "GOVERN · Preview" section between LIBRARY and AI GATEWAY ·
-  Beta with an Eye-icon link to `/settings/governance`. Vast
-  majority of current LLMOps admins (no governance state) see no
-  nav change at all.
+  Beta with an Eye-icon link to `/settings/governance`. Current
+  LLMOps admins with no governance state see no nav change at all.
 
   ![MainMenu showing GOVERN Preview section with Governance entry, only visible when governanceActive=true](https://i.img402.dev/mck1l1ar3g.png)
 
@@ -331,137 +328,13 @@ In flight on the same branch:
   one-time secret in a "paste this into upstream" modal.
 - 🚧 Architecture deep-dive doc (the diagram + per-tier internals).
 
-## Verified end-to-end (D2 foundation)
-
-The IngestionSource auth path, the OTel receiver, and the
-`lastEventAt` flip were dogfooded against `pnpm dev` on `:6660`.
-The transcript IS the proof artifact (no UI to screenshot at this
-layer, that's lane B's setup form, in flight).
-
-```
-$ pnpm tsx tmp/dogfood-ingestion.ts
-✓ Planted IngestionSource
-  org:   123123123-NiG5AY
-  id:    uotNPpD9TpASqQHTv6OXo
-  name:  dogfood-otel-1777270498068
-  status: awaiting_first_event
-  ingestSecret: lw_is_kgOa878p…REDACTED
-
-$ curl -sS -X POST \
-    -H 'Authorization: Bearer lw_is_kgOa878p…REDACTED' \
-    -d '{"resource_spans":[…]}' \
-    :6660/api/ingest/otel/uotNPpD9TpASqQHTv6OXo
-
-{"accepted":true,"bytes":68}
-HTTP 202
-
-$ pnpm tsx tmp/dogfood-ingestion.ts --check
-status:        active                            ← flipped from awaiting_first_event
-lastEventAt:   2026-04-27T06:15:03.361Z
-```
-
-Auth matrix verified in the same dogfood pass:
-
-| Authorization header | Path source-id | Expected | Observed |
-|----------------------|---------------|----------|----------|
-| (none) | valid | 401 | 401 |
-| `Bearer lw_is_unknown` | valid | 401 | 401 |
-| `Bearer <valid>` | wrong | 401 | 401 |
-| `Bearer <valid>` | matching | 202 | 202 |
-| `Bearer <valid>` (replay) | matching | 202 + `lastEventAt` advances monotonically | 202, advanced |
-
-### Web UI full loop (Lane B dogfood)
-
-The same backend, exercised end-to-end through the admin UI:
-admin opens `/settings/governance/ingestion-sources`, fills the
-composer, hits Save, a one-time-reveal modal exposes the
-`lw_is_*` secret + OTLP URL, the admin copies, curls the
-upstream, the list page polls and flips the source from
-**Awaiting first event** → **Active** with "last event Ns ago".
-
-The hero shot is the list page after the flip:
-
-![IngestionSource list, Active after curl receipt](https://i.img402.dev/supafck5au.png)
-
-Full 6-step carousel for reviewers:
-
-| # | Step | Shot |
-|---|------|------|
-| 1 | `/settings/governance/ingestion-sources`, empty state | [open](https://i.img402.dev/wx4v7m7a8g.png) |
-| 2 | Composer open, `sourceType` picker + dynamic per-type form | [open](https://i.img402.dev/ycld8afavo.png) |
-| 3 | Composer filled, Generic OTel example | [open](https://i.img402.dev/yixqegurj3.png) |
-| 4 | One-time secret reveal modal, `ingestSecret` + OTLP URL + Copy | [open](https://i.img402.dev/w4fl31ukrc.png) |
-| 5 | List polled, flipped to **Active**, last event 13 s ago | [open](https://i.img402.dev/supafck5au.png) |
-
-The dogfood walks the full Tier-3 push contract: admin issues
-secret in UI → upstream curl with that secret → 202 ack →
-`lastEventAt` flips → admin sees the flip on the next poll.
-Secret is shown exactly once and never returned by the list/get
-endpoints afterwards.
-
-### CLI ingest debug (Lane A dogfood)
-
-The same backend, exercised through the CLI without ever opening
-a browser. After `langwatch login --device`, four read-only
-governance debug helpers go live:
-
-```text
-$ langwatch governance status
-Governance setup state
-  · Personal VKs
-  · Routing policies
-  ✓ Ingestion sources
-  ✓ Anomaly rules
-  ✓ Recent activity (30d)
-
-Governance active: yes
-
-$ langwatch ingest list
-NAME                        TYPE          STATUS  LAST EVENT
-Dogfood OTel · alexis lane  otel_generic  active  46m ago
-
-$ langwatch ingest health JxQztBgN90QeX12-afJ0C
-Dogfood OTel · alexis lane  (JxQztBgN90QeX12-afJ0C)
-Status:        active
-Events (24h):  1
-Events (7d):   1
-Events (30d):  1
-Last event:    47m ago
-
-$ langwatch ingest tail JxQztBgN90QeX12-afJ0C --limit 5
-2026-04-27T07:11:18.963Z  api.call  chat_completion → claude-3-5-sonnet
-```
-
-Every command also accepts `--json` for machine output (exact
-contract match with the equivalent tRPC procedure, web UI render).
-`langwatch ingest tail --follow` polls every 3 s and dedupes by
-`eventId`, so the CLI and the per-source detail page show the
-same event stream byte-for-byte.
-
-Auth for these REST adapters reuses the same Bearer
-`access_token` the device flow persists in
-`~/.langwatch/config.json`, no separate token. Unauthenticated
-calls bounce with `Not logged in — run \`langwatch login --device\` first`;
-unknown source IDs surface the underlying tRPC `NOT_FOUND` as
-`Error: IngestionSource not found`. Both error paths are
-asserted in `specs/ai-gateway/governance/cli-ingest-debug.feature`
-(12 scenarios).
-
-### Admin oversight wired to real data (no mocks)
+## Admin oversight on real data
 
 Once a source is `active` and events are flowing, the admin
 oversight dashboard at `/settings/governance` queries
 `gateway_activity_events` via the `api.activityMonitor.*` tRPC
 procedures. Empty data renders a setup checklist; data present
 renders live cards + per-user table + source-health strip.
-
-| Surface | Real-data state | Shot |
-|---------|------------------|------|
-| `/settings/governance`, setup checklist + first real source visible in the health strip | live (`api.activityMonitor.{summary, spendByUser, ingestionSourcesHealth, recentAnomalies}`) | [open](https://i.img402.dev/hhghiq7gbb.png) |
-| `/settings/governance/ingestion-sources`, list page after the iter-13 customer-name scrub | live (`api.ingestionSources.list`) | [open](https://i.img402.dev/kfvazcuczp.png) |
-| `/settings/governance/anomaly-rules`, empty list (no rules yet) | live (`api.anomalyRules.list`) | [open](https://i.img402.dev/9fjdw9we08.png) |
-| `/settings/governance/anomaly-rules`, composer (name + severity + ruleType + scope + JSONB threshold/destination configs) | live (`api.anomalyRules.create`) | [open](https://i.img402.dev/9v33n8zzrk.png) |
-| `/settings/governance/anomaly-rules`, list after Create roundtrip; persisted rule grouped under Critical with the honest "rules persist now; evaluation + alerts arrive with the detection backend" banner | live (PG persistence; eval engine = Sergey Option C, deferred) | [open](https://i.img402.dev/15z3h6k32v.png) |
 
 Tier 2, Tier 5 are deferred; the architecture doesn't preclude them
 and the control-plane primitives already accommodate them.
@@ -494,5 +367,8 @@ Governance sits behind a single fence on each surface:
   [Routing policies](/ai-gateway/governance/routing-policies).
 - For per-tool CLI config (env vars, dialect notes):
   [Coding CLI Integrations](/ai-gateway/cli/overview).
+- For the read-only CLI checks on ingestion sources
+  (`langwatch governance status`, `langwatch ingest list | health |
+  tail`): [CLI ingest debug](/ai-governance/cli-debug).
 - For the architecture deep-dive once published:
   `architecture.md` (in flight on this branch).

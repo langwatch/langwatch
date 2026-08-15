@@ -275,7 +275,7 @@ Rolling twice inside a window discards the secret that was already rolling off, 
 
 ## Signing automation webhooks
 
-Endpoints are not the only thing LangWatch POSTs to you: an [automation trigger](/features/automations) can call a webhook when it fires. Those requests go out unsigned unless you give the trigger a signing secret, in the webhook action's **Signing secret** field.
+An [automation trigger](/features/automations) can also call a webhook when it fires. Those requests go out unsigned unless you give the trigger a signing secret, in the webhook action's **Signing secret** field.
 
 Set one and every fire from that trigger carries the same `X-LangWatch-Signature: t=...,v1=...` header, computed the same way, so the verifier above validates it without a single change. The trigger's own id header is `X-LangWatch-Event-Id` rather than `X-LangWatch-Delivery-Id`, and it groups the attempts of one fire.
 
@@ -313,10 +313,10 @@ stateDiagram-v2
 
 ## Delivering to an Amazon SQS queue
 
-An endpoint can put each batch on your own Amazon SQS queue instead of POSTing it to a URL. Everything above the last hop is the same machinery: the same batching, the same retry ladder, the same delivery log, the same signature over the same bytes.
+An endpoint can put each batch on your own Amazon SQS queue instead of POSTing it to a URL. Only the last hop changes. The batching, the retry ladder, the delivery log, and the signature over the same bytes all work as they do for an HTTPS endpoint.
 
 <Warning>
-**`ReceiveMessage` returns no message attributes unless you ask for them by name.** Pass `MessageAttributeNames: ["All"]`. Without it your consumer sees a body with no signature beside it and rejects every delivery it is sent, while the body in front of you looks perfectly fine. This is the single most common mistake when moving a receiver onto a queue.
+**`ReceiveMessage` returns no message attributes unless you ask for them by name.** Pass `MessageAttributeNames: ["All"]`. Without it your consumer sees a body with no signature beside it and rejects every delivery, even though the body itself is correct. Check this first when a receiver that worked over HTTPS rejects everything on the queue.
 </Warning>
 
 **The body is byte-identical to the HTTP body.** `MessageBody` is the exact same `{"batch": [...]}` JSON an HTTPS receiver would be POSTed. There is no outer wrapper. The signature, the delivery id and the attempt ride as **message attributes** under the same names they use as HTTP headers:
@@ -372,13 +372,13 @@ On LangWatch Cloud, ask support for the principal to trust; it is a property of 
 
 **Rules the queue itself must satisfy:**
 
-- **Standard queues only.** A `.fifo` queue is refused at save time. Delivery is at-least-once and consumers deduplicate on the envelope `id`, which is what a standard queue asks of them; ordering was never part of the contract, and a FIFO queue would add a throughput ceiling for a guarantee nothing here needs.
+- **Standard queues only.** A `.fifo` queue is refused at save time. Delivery is at-least-once and consumers deduplicate on the envelope `id`, which is what a standard queue asks of them; ordering is not part of the delivery contract, and a FIFO queue would add a throughput ceiling for a guarantee this path does not need.
 - **A canonical Amazon SQS queue URL**, `https://sqs.<region>.amazonaws.com/<account id>/<queue name>`. The region and the owning account are read from it, so they can never disagree with the queue. Anything else is refused.
 - **One batch is one message, and LangWatch caps it at 256 KiB** including the attributes. Amazon SQS itself accepts up to 1 MiB; the lower cap is ours, and it keeps one slow consumer from having to hold a megabyte in memory per message. A batch over the cap fails terminally and says so; lower `max_batch_size` so each delivery carries fewer events.
 
 **Deduplicate on the envelope `id`.** A standard queue is at-least-once and can redeliver a message on its own, and it has no queue-level deduplication of its own to lean on. `X-LangWatch-Delivery-Id` names the batch delivery, not an event, so deduplicating on it would drop every envelope in the batch but one. The `id` inside each envelope is the idempotency key.
 
-**How to say "retry".** Delete the message only after the batch is durably ingested. Leaving it alone is the retry: it reappears after the visibility timeout, and after your queue's `maxReceiveCount` it lands in your dead letter queue. Set a redrive policy; a message your consumer can never accept belongs somewhere you can look at it.
+**Asking for a retry.** Delete the message only after the batch is durably ingested. Leaving it alone is the retry: it reappears after the visibility timeout, and after your queue's `maxReceiveCount` it lands in your dead letter queue. Set a redrive policy, so a message your consumer can never accept lands somewhere you can inspect it.
 
 **Changing where an endpoint delivers** is not an update. `destination_kind` is fixed once created, because batches already planned against the old transport are in flight. Create a second endpoint, let the first drain, then archive it.
 

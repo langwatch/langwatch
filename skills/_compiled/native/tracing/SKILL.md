@@ -13,7 +13,7 @@ compatibility: Works with Claude Code and similar coding agents. The `langwatch`
 If the user's request is **general** ("instrument my code", "add tracing", "set up observability"):
 
 - Read the full codebase to understand the agent's architecture
-- Study git history to understand what changed and why — focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
+- Study git history to understand what changed and why: focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
 - Add comprehensive tracing across all LLM call sites
 
 If the user's request is **specific** ("add tracing to the payment function", "trace this endpoint"):
@@ -22,7 +22,7 @@ If the user's request is **specific** ("add tracing to the payment function", "t
 - Add tracing only where requested
 - Verify the instrumentation works in context
 
-This skill is code-only — there is no platform path for tracing. If the user has no codebase, explain that tracing requires code instrumentation.
+This skill is code-only: there is no platform path for tracing. If the user has no codebase, explain that tracing requires code instrumentation.
 
 ## Step 1: Read the Integration Docs
 
@@ -47,14 +47,14 @@ If anything fails or confuses you while following this skill (broken commands, d
 LangWatch has two kinds of project:
 
 - **Team / shared projects**: real projects inside an organization. Evaluations, experiments, prompts, datasets, simulations and instrumentation must always target one of these.
-- **Personal projects**: a private "My Workspace" scratch space tied to a single user. Never send a user's evaluations, experiments or production traces here: it is for personal exploration only and is easily confused with a real project.
+- **Personal projects**: a private "My Workspace" scratch space tied to a single user. Never send a user's evaluations, experiments or production traces here: it is for personal exploration only, and you can mistake it for a real project.
 
 And two ways to authenticate:
 
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env` — most environments already have this provisioned. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
+So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
 
 Then fetch the integration guide for this project's framework:
 
@@ -73,7 +73,7 @@ CRITICAL: Do NOT guess how to instrument. Different frameworks have different in
 For Python: `pip install langwatch` (or `uv add langwatch`).
 For TypeScript: `npm install langwatch` (or `pnpm add langwatch`).
 
-If install fails due to peer dependency conflicts, widen the conflicting range and retry — do NOT silently skip.
+If install fails due to peer dependency conflicts, widen the conflicting range and retry. Do NOT silently skip.
 
 ## Step 3: Add Instrumentation
 
@@ -97,7 +97,7 @@ import { LangWatch } from "langwatch";
 const langwatch = new LangWatch();
 ```
 
-The exact pattern depends on the framework — follow the docs, not these examples.
+The exact pattern depends on the framework, so follow the docs, not these examples.
 
 ## Step 4: Verify
 
@@ -110,6 +110,6 @@ Do NOT consider the work complete without verifying. In order:
 
 ## Common Mistakes
 
-- Do NOT invent instrumentation patterns — read the framework-specific doc
+- Do NOT invent instrumentation patterns. Read the framework-specific doc
 - Do NOT skip `langwatch.setup()` in Python
-- Do NOT skip Step 1 — instrumentation patterns vary across OpenAI/LangGraph/Vercel/Mastra/Agno and guessing breaks subtly
+- Do NOT skip Step 1; instrumentation patterns vary across OpenAI/LangGraph/Vercel/Mastra/Agno and guessing breaks subtly

@@ -7,7 +7,7 @@ description: Reference project secrets from an HTTP target, and connect an API p
 
 # Testing Agents Behind Authentication
 
-Many production agents sit behind an API that requires authentication. A **static credential** (`bearer` / `api_key` / `basic`) is sufficient for most of them, and an HTTP target reads that credential from your project's secrets. An **OAuth2 client-credentials** flow (Auth0 "machine-to-machine" is the usual example) needs more, because a token must be **exchanged** first.
+Many production agents sit behind an API that requires authentication. A **static credential** (`bearer` / `api_key` / `basic`) is enough when the API accepts a fixed token, and an HTTP target reads that credential from your project's secrets. An **OAuth2 client-credentials** flow (Auth0 "machine-to-machine" is the usual example) needs more, because a token must be **exchanged** first.
 
 Start with the HTTP target below. When the credential must be exchanged, use a **custom code agent**. It is a few lines of Python that fetch the token and call your API with it. The credentials stay in your project's encrypted secret store, never in the agent's stored source.
 
@@ -40,7 +40,7 @@ A value that is not a credential, for example a tenant or a fixture id, goes in 
 
 1. **Project secrets** hold the client ID and client secret, encrypted at rest. They are exposed to your code agent's Python as the injected `secrets` namespace.
 2. **The code agent** exchanges the credentials for an access token and calls your protected API with it.
-3. **A scenario** drives the agent like a real user and judges the answers, and the agent only passes if it actually got through the auth wall.
+3. **A scenario** drives the agent like a real user and judges the answers. The agent only passes if it got through the auth wall.
 
 ## 1. Store the credentials as project secrets
 
@@ -103,10 +103,10 @@ class Code:
 Things the sandbox enforces, in the order people trip on them:
 
 - **Entry point**: `class Code` with `__call__` (no constructor arguments).
-- **`secrets` is injected** into the module globals, and it is *not* the Python stdlib `secrets` module. Do **not** `import secrets`; that would shadow the injected namespace. `os.environ` is *not* populated in the sandbox.
+- **`secrets` is injected** into the module globals. It is *not* the Python stdlib `secrets` module. Do **not** `import secrets`; that would shadow the injected namespace. `os.environ` is *not* populated in the sandbox.
 - **Return every declared output key**, or the run fails with `missing_output`.
 - **Available packages**: `requests`, `httpx`, `pydantic`, `langwatch`.
-- **Budget**: the token fetch *plus* your API call must finish inside the runner's wall-clock limit (60s by default), so keep explicit timeouts on both requests.
+- **Budget**: the token fetch *plus* your API call must finish inside the runner's wall-clock limit (60s by default). Keep explicit timeouts on both requests.
 - **Failure behavior**: `raise_for_status()` puts the URL and status code in the error, never the request body, so a rejected credential fails loudly without exposing the secret.
 
 ## 3. Map the agent's input for scenarios
@@ -119,7 +119,7 @@ Because everything else rides the secrets namespace, the agent has a **single in
 
 ## 4. Run a scenario against it
 
-Create a scenario whose criteria can only pass if the agent really got through the auth wall, for example facts that only your protected API returns, bundle it with the agent in a [suite](/agent-simulations/getting-started), and run it. The simulation transcript shows the agent's answers; the run fails if the exchange breaks.
+Create a scenario whose criteria can only pass if the agent got through the auth wall, for example facts that only your protected API returns. Bundle it with the agent in a [suite](/agent-simulations/getting-started), and run it. The simulation transcript shows the agent's answers; the run fails if the exchange breaks.
 
 ```text
 [user]      where is my order #1042?
@@ -127,7 +127,7 @@ Create a scenario whose criteria can only pass if the agent really got through t
             and arrives Thursday before noon.
 ```
 
-That answer exists only behind the auth wall, which is the point: the scenario passing *is* the proof that authentication works.
+That answer exists only behind the auth wall, so the scenario passing is the proof that authentication works.
 
 ## Troubleshooting
 
