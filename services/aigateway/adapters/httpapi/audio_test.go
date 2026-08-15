@@ -427,15 +427,9 @@ func TestAudioSpeech_UpstreamProviderErrorPassesThrough(t *testing.T) {
 			}, nil
 		},
 	}
-	auth := &mockAuth{
-		resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
-			b := testBundle()
-			b.Credentials = append(b.Credentials, domain.Credential{
-				ID: "cred-11labs", ProviderID: domain.ProviderElevenLabs, APIKey: "sk-11labs-test",
-			})
-			return b, nil
-		},
-	}
+	auth := audioAuth(domain.Credential{
+		ID: "cred-11labs", ProviderID: domain.ProviderElevenLabs, APIKey: "sk-11labs-test",
+	})
 	router := buildRouter(
 		app.WithAuth(auth),
 		app.WithProviders(provider),
