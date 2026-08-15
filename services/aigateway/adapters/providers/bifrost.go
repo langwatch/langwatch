@@ -1885,7 +1885,14 @@ func parseGeminiPassthroughUsage(body []byte) (domain.Usage, bool) {
 		return domain.Usage{}, false
 	}
 	prompt := int(usage.Get("promptTokenCount").Int())
-	completion := int(usage.Get("candidatesTokenCount").Int())
+	// Gemini reports its thinking tokens OUTSIDE candidatesTokenCount
+	// (totalTokenCount = promptTokenCount + candidatesTokenCount +
+	// thoughtsTokenCount), unlike OpenAI, whose completion total already
+	// contains them. Google bills thoughts at the output rate, so the
+	// completion total has to carry them or every thinking call under-bills:
+	// a 47-token answer with 196 thinking tokens billed for 47.
+	thoughts := int(usage.Get("thoughtsTokenCount").Int())
+	completion := int(usage.Get("candidatesTokenCount").Int()) + thoughts
 	total := int(usage.Get("totalTokenCount").Int())
 	if prompt == 0 && completion == 0 && total == 0 {
 		return domain.Usage{}, false
@@ -1901,6 +1908,8 @@ func parseGeminiPassthroughUsage(body []byte) (domain.Usage, bool) {
 		CompletionTokens: completion,
 		TotalTokens:      total,
 		CacheReadTokens:  int(usage.Get("cachedContentTokenCount").Int()),
+		// The reported subset of the completion total, never priced on its own.
+		ReasoningTokens: thoughts,
 	}, true
 }
 
