@@ -10,6 +10,8 @@ sidebarTitle: Anomaly rules
 
 Anomaly rules are the "Detect" layer of the [governance control plane](/ai-governance/control-plane#tier-3--audit-log-ingest). The composer at `/settings/governance/anomaly-rules` accepts a rule definition and persists it; the [event-sourcing reactor](/ai-gateway/governance/activity-monitor-event-sourcing) evaluates each rule against incoming events and produces an `AnomalyAlert` row when a violation is detected.
 
+This page documents what the reactor evaluates today and what is preview-only, so you don't author rules that look "active" in the list but never fire.
+
 ## Rule-type coverage
 
 The composer's rule-type dropdown surfaces every shape the schema can hold; the reactor only evaluates one of them today.

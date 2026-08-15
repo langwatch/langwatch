@@ -10,6 +10,8 @@ LangWatch captures information about your Azure OpenAI LLM calls automatically. 
 1.  **Using `autotrack_openai_calls()`**: This method, part of the LangWatch SDK, dynamically patches your `AzureOpenAI` client instance to capture calls made through it within a specific trace.
 2.  **Using Community OpenTelemetry Instrumentors**: Use existing OpenTelemetry instrumentation libraries like those from OpenInference or OpenLLMetry. These can be integrated with LangWatch by either passing them to the `langwatch.setup()` function or by using their native `instrument()` methods if you're managing your OpenTelemetry setup more directly.
 
+This guide walks you through both methods.
+
 ## Using `autotrack_openai_calls()`
 
 The `autotrack_openai_calls()` function provides a straightforward way to capture all Azure OpenAI calls made with a specific client instance for the duration of the current trace.

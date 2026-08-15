@@ -10,6 +10,8 @@ sidebarTitle: Compliance architecture
 
 LangWatch AI Gateway governance is built on a **unified observability substrate**: every audit event, OTel span, webhook delivery, and S3 replay row lands in the same trace store that powers the rest of the platform. That single store is what underwrites the compliance posture below: one source of truth, one append-only event log, one set of retention controls, one set of access controls.
 
+This page maps each compliance framework you might need to the mechanisms in LangWatch that underwrite it, and names what is deferred and why.
+
 ## The substrate, in one diagram
 
 ```

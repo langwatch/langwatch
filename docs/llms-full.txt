@@ -5203,7 +5203,7 @@ description: End-to-end playbook for when a virtual key (or the underlying provi
 sidebarTitle: Credential-leak incident
 ---
 
-A virtual key, or the upstream provider credential behind it, can leak: pushed to a public repo, left on an ex-employee's laptop, mirrored into a vendor log by CI. The gateway surfaces below contain the leak without breaking every legitimate caller at the same time.
+A virtual key, or the upstream provider credential behind it, can leak: pushed to a public repo, left on an ex-employee's laptop, mirrored into a vendor log by CI. This cookbook walks the end-to-end path: the gateway surfaces below contain a leaked virtual key without breaking every legitimate caller at the same time. A leaked provider credential is rotated in the provider console instead, see [What NOT to do](#what-not-to-do).
 
 **Estimated time**: 5 min for rotation-class incidents, 15 min for revoke-class. Both scale independently of how many clients use the leaked secret.
 
@@ -5767,7 +5767,7 @@ sidebarTitle: Metering & Rebilling
 keywords: rebilling, metering, multi-tenant billing, spend events, webhooks, budgets, end users
 ---
 
-A platform whose customers consume LLMs through it can meter and rebill that usage end to end on LangWatch: one virtual key per tenant, caps for the tenant and for each of their end users, signed spend events into your billing ledger, reconciliation, breach handling, and period close. Your product keeps zero metering code of its own.
+A platform whose customers consume LLMs through it can meter and rebill that usage. This cookbook wires that end to end on LangWatch: one virtual key per tenant, caps for the tenant and for each of their end users, signed spend events into your billing ledger, reconciliation, breach handling, and period close. Your product keeps zero metering code of its own.
 
 <Card title="The runnable reference: agent-billing-demo" icon="github" href="https://github.com/langwatch/agent-billing-demo">
   A tiny open-source agent-platform SaaS implementing every step below: sign-up provisions a real tenant key and real caps, chat rides the gateway, and the meters on screen are driven by the signed events its own receiver ingests. The webhook receiver, ledger, reconciliation loop, and provisioning exist in **both TypeScript and Python**. Point your coding agent at that repo as the canonical integration example; every file is written to be copied from.
@@ -5826,7 +5826,7 @@ curl -sS $LW/api/gateway/v1/budgets \
 
 Choices worth making deliberately:
 
-- **Stamp your own id and retry safely.** Put your customer id in `external_id` on the key and every budget, and send an `Idempotency-Key` on each create. Then a signup that times out halfway can be replayed: the calls that already succeeded return their original response instead of minting a second key, and `external_id` lets you find what you created without having stored our ids first. That is what turns provisioning from "store four ids in a transaction and hope" into a retryable job, and it means you can look a tenant up with `?external_id=acme-tenant-4171` instead of keeping a mapping table in sync. See [retrying a create safely](/ai-gateway/api/management#retrying-a-create-safely).
+- **Stamp your own id and retry safely.** Put your customer id in `external_id` on the key and every budget, and send an `Idempotency-Key` on each create. A signup that times out halfway then replays with the same key and the same body: the calls that already succeeded return their original response instead of minting a second key, and `external_id` lets you find what you created without having stored our ids first. That is what turns provisioning from "store four ids in a transaction and hope" into a retryable job, and it means you can look a tenant up with `?external_id=acme-tenant-4171` instead of keeping a mapping table in sync. See [retrying a create safely](/ai-gateway/api/management#retrying-a-create-safely).
 - **`manual` windows for tenant caps** put period close in your hands: the budget accrues until your billing cycle resets it (step 6). Use calendar windows (`month`, aligned UTC) instead if you bill on calendar months and want automatic resets, or set `cycle_anchor_at` to the moment the customer signed up so their period rolls on their own anniversary rather than the 1st. The three combine freely.
 - **The hard and soft caps are two budgets**, not one field: `block` at the real ceiling, `warn` below it. Crossing 80 percent of either emits `gateway.budget.threshold_crossed`; hitting a limit emits `gateway.budget.breached`. See [Budgets](/ai-gateway/budgets).
 - **The attributed-user template** is one rule, "each distinct end user on this key: $25 per month". Buckets appear lazily on first spend; there is nothing to create or delete per user. Non-uniform caps are additional templates on other anchors.
@@ -6010,7 +6010,7 @@ description: Move from app → OpenAI/Anthropic to app → LangWatch Gateway →
 sidebarTitle: Migrate from direct
 ---
 
-The LangWatch Gateway sits between your application and the providers you already call directly (OpenAI, Anthropic, Bedrock, and the rest). It adds governance, budgets, fallback, policy-rule patterns, and per-engineer attribution, and the migration below changes two env vars rather than your integration code.
+The LangWatch Gateway sits between your application and the providers you already call directly (OpenAI, Anthropic, Bedrock, and the rest). It adds governance, budgets, fallback, policy-rule patterns, and per-engineer attribution. This cookbook shows the migration: each client gets the gateway's `baseURL` and reads one virtual key instead of the provider key, and the rest of your integration code stays as it is.
 
 ## Before
 
@@ -6032,7 +6032,7 @@ const anthropic = new Anthropic({
 });
 ```
 
-Two env-var changes. That's the whole code migration if you're happy with default gateway behaviour (no budget, cache-respect, fallback disabled). Read on for the policy additions.
+Two lines per client: the `baseURL` and the key it reads. That's the whole code migration if you're happy with default gateway behaviour (no budget, cache-respect, fallback disabled). Read on for the policy additions.
 
 ## Pre-migration checklist
 
@@ -7026,8 +7026,8 @@ groups:
           summary: "Gateway spend records dropped (reason={{ $labels.reason }})"
           description: |
             Budget debits are written from the spend records this pod spools,
-            so a dropped record is spend that nothing bills and no budget
-            enforces against. reason=intake means the pod produced faster than the
+            so a dropped record is spend that is neither billed nor counted
+            against a budget. reason=intake means the pod produced faster than the
             spool could write; reason=overflow means the drainer is not
             shipping fast enough and the oldest segments were deleted to stay
             inside the size bound. Check the control plane's spend-command
@@ -7650,7 +7650,7 @@ description: Pull LangWatch governance events into Splunk, Datadog Security, AWS
 sidebarTitle: OCSF / SIEM export
 ---
 
-LangWatch governance events (per-user spend, per-source activity, anomaly alerts) go into your security team's SIEM alongside your other audit feeds.
+LangWatch governance events (per-user spend, per-source activity, anomaly alerts) can be pulled into your security team's SIEM alongside your other audit feeds.
 
 The OCSF (Open Cybersecurity Schema Framework) v1.1 read API gives your SIEM a cursor-paginated source it can pull on a cron schedule. Six platforms supported as cron-pull targets out of the box (any platform with a generic JSON pull adapter works the same way).
 
@@ -7945,7 +7945,7 @@ sidebarTitle: Personal keys
 ---
 
 A personal IDE key is a single virtual key that Claude Code, Codex,
-Cursor, and Gemini CLI all share. Your IT admin issues it through
+Cursor, Gemini CLI, and opencode all share. Your IT admin issues it through
 LangWatch Governance, and it is bound to your identity and governed by
 your team's policy.
 
@@ -9656,7 +9656,7 @@ description: Configure Azure OpenAI (deployment-based model ids) as a provider b
 sidebarTitle: Azure OpenAI
 ---
 
-Azure OpenAI is enterprise OpenAI with data-residency, AAD integration, and SLA guarantees, but with a deployment-based model-id convention that OpenAI SDKs do not speak out of the box. The gateway handles Azure's quirks via bifrost/core, so an OpenAI-shaped client needs no change.
+Azure OpenAI is enterprise OpenAI with data-residency, AAD integration, and SLA guarantees, but with a deployment-based model-id convention that the plain OpenAI client does not speak out of the box. The gateway handles Azure's quirks via bifrost/core, so an OpenAI-shaped client needs no change.
 
 ## Configure the provider credential
 
@@ -10122,7 +10122,7 @@ description: Every LLM provider the LangWatch AI Gateway can dispatch to.
 sidebarTitle: Overview
 ---
 
-The gateway delegates provider-specific dispatch to [`bifrost/core`](https://github.com/maximhq/bifrost), which LangWatch embeds as a Go library.
+The gateway delegates provider-specific dispatch to [`bifrost/core`](https://github.com/maximhq/bifrost), which LangWatch embeds as a Go library. This page lists the providers the gateway can talk to today and the path to configuring each.
 
 ## Configure a provider credential once, use from many VKs
 
@@ -10158,7 +10158,7 @@ Pick one or two fallback providers. Guidelines:
 
 - **Anthropic-first** with Bedrock-Anthropic fallback. Same models on both sides; Bedrock is a warm backup during Anthropic direct outages.
 - **OpenAI-first** with Anthropic fallback. Different model families but Claude Haiku can serve `gpt-5-mini` traffic acceptably for coding tasks.
-- **Azure-first** with OpenAI direct fallback. Keeps traffic inside Azure data-residency except when a regional Azure outage moves it to OpenAI direct.
+- **Azure-first** with OpenAI direct fallback. Keeps traffic inside Azure data-residency until a configured fallback trigger (by default `5xx`, `timeout`, `rate_limit`) moves it to OpenAI direct.
 
 See [Fallback Chains](/ai-gateway/providers/fallback-chains) for trigger semantics.
 
@@ -10220,7 +10220,7 @@ Gemini's implicit context caches are exposed via a separate API (`caches.create`
 
 ## Known quirks
 
-- **Region availability.** Anthropic-on-Vertex is not in every GCP region; `us-central1`, `us-east5`, `europe-west1`, and `asia-southeast1` serve it. A 404 with "publisher not found" means wrong region.
+- **Region availability.** Anthropic-on-Vertex is not in every GCP region, and the regions differ per model version; `us-central1`, `us-east5`, `europe-west1`, and `asia-southeast1` are the common ones. Check the model card for the version you pin. A 404 with "publisher not found" means wrong region.
 - **Token refresh.** Service-account tokens expire after ~1 hour. Bifrost/core caches and auto-refreshes, no configuration needed from the VK owner.
 - **Quota headers.** Vertex returns `x-vertex-ai-quota-remaining` and throttles with 429 when exhausted. Bifrost/core surfaces the 429 to the fallback engine.
 - **Provisioned throughput vs on-demand.** Provisioned throughput ("Committed Use Discounts") has separate regional ARNs. If you're using provisioned, pass the PT-specific URL on the ModelProvider.
@@ -10709,6 +10709,8 @@ sidebarTitle: Python
 
 The gateway is designed to be a drop-in replacement for provider base URLs, every Python LLM SDK works by setting its base URL env var and using a LangWatch virtual key as the API key.
 
+This page covers the standard setup and how to propagate trace ids through the gateway so you don't double-count cost.
+
 ## OpenAI Python SDK
 
 ### Minimal setup
@@ -10933,6 +10935,8 @@ sidebarTitle: TypeScript
 ---
 
 Every TypeScript LLM SDK works by overriding its base URL and using a LangWatch virtual key. The gateway handles the rest.
+
+This page covers the standard setup and how to propagate trace ids so you don't double-count cost.
 
 ## OpenAI TypeScript SDK
 
@@ -13523,7 +13527,7 @@ Clicking a row in the list opens the detail page (`/gateway/virtual-keys/<vk_id>
 
 1. **Header**: name + action bar: **Audit history** (deep-links into `/settings/audit-log?targetKind=virtual_key&targetId=<vk_id>` with a pre-filled filter chip showing only this VK's events alongside any related platform actions), **Edit**, **Rotate**, **Revoke**. The Audit history deep-link is the fastest way to reconstruct "who changed this VK, when" during an incident.
 2. **Identity, Activity**: id, prefix, environment, status, description, and humanised **Last used** + **Created** (hover for exact timestamp). Revision number shown when non-zero, increments on every `gateway.virtual_key.updated` audit row.
-3. **Provider fallback chain**: ordered rows, each showing provider icon + readable name + ModelProvider id + position badge (`primary`, `fallback-1`, `fallback-2`, …). The list is computed from the bound routing policy (or the default policy if none is pinned). It shows which provider serves the request first and which ones take over when that one errors.
+3. **Provider fallback chain**: ordered rows, each showing provider icon + readable name + ModelProvider id + position badge (`primary`, `fallback-1`, `fallback-2`, …). The list is computed from the bound routing policy (or the default policy if none is pinned). It shows which provider serves the request first and the order the others are tried in.
 4. **Configuration summary**: compact read-only view (no drawer needed) of the runtime config that's actually in effect:
    - **Tags**: colored subtle badges, the same strings shown on the list row.
    - **Cache mode**: badge (`respect`, `force`, `disable`) + TTL on force.
@@ -13644,6 +13648,8 @@ sidebarTitle: Anomaly rules
 <Note>**Available on Enterprise plans.** Non-enterprise organizations see an upgrade card on `/settings/governance/anomaly-rules` instead of the composer. See [Open-core licensing](/ai-governance/overview#open-core-licensing) for the full Apache 2.0, Enterprise split.</Note>
 
 Anomaly rules are the "Detect" layer of the [governance control plane](/ai-governance/control-plane#tier-3--audit-log-ingest). The composer at `/settings/governance/anomaly-rules` accepts a rule definition and persists it; the [event-sourcing reactor](/ai-gateway/governance/activity-monitor-event-sourcing) evaluates each rule against incoming events and produces an `AnomalyAlert` row when a violation is detected.
+
+This page documents what the reactor evaluates today and what is preview-only, so you don't author rules that look "active" in the list but never fire.
 
 ## Rule-type coverage
 
@@ -13792,7 +13798,7 @@ Both paths call into the same service-layer functions, there is no business-logi
 
 ## Resource × verb matrix
 
-Every governance resource exposes the full CRUD set, `list`, `get`, `create`, `update`, `delete`, over Hono, the CLI, and the MCP server. The umbrella spec lists the resource set; each resource gets its own OpenAPI path group.
+Governance resources expose the full CRUD set, `list`, `get`, `create`, `update`, `delete`, over Hono, the CLI, and the MCP server, except where the table below names a narrower verb set (`audit-log` is read-only, ingestion keys mint through their own route). The umbrella spec lists the resource set; each resource gets its own OpenAPI path group.
 
 | Resource | OpenAPI path group | Detail page |
 |---|---|---|
@@ -14433,6 +14439,8 @@ sidebarTitle: Compliance architecture
 
 LangWatch AI Gateway governance is built on a **unified observability substrate**: every audit event, OTel span, webhook delivery, and S3 replay row lands in the same trace store that powers the rest of the platform. That single store is what underwrites the compliance posture below: one source of truth, one append-only event log, one set of retention controls, one set of access controls.
 
+This page maps each compliance framework you might need to the mechanisms in LangWatch that underwrite it, and names what is deferred and why.
+
 ## The substrate, in one diagram
 
 ```
@@ -14649,8 +14657,9 @@ if (data?.governanceActive && hasOrgManagePermission) {
 ```
 
 This satisfies the "don't lose LLMOps" constraint: an admin whose org
-has no personal VKs, no IngestionSources and no recent gateway
-activity gets `governanceActive=false` and sees no nav change at all.
+has no personal VKs, no routing policies, no IngestionSources, no
+anomaly rules and no recent gateway activity gets
+`governanceActive=false` and sees no nav change at all.
 
 ## The split: control plane vs data plane
 
@@ -16725,8 +16734,9 @@ receiver:
 7. **Hands off** to the trace pipeline, same path as every other ingest source from
    here.
 
-Two primitives enforce security on this path: the ingest-only ceiling at step 3 and
-the principal-field guard at step 6.
+Two primitives stop a template from raising its own reach or attributing payloads to
+another principal: the ingest-only ceiling at step 3 and the principal-field guard at
+step 6. Key verification at step 2 and the tenant binding at step 4 still apply.
 
 ### What the principal-field guard protects
 
@@ -17042,7 +17052,7 @@ The contract is service-layer-asserted by `platform/app/src/mcp/__tests__/govern
 
 ## Agent setup from scratch
 
-An agent connecting with an admin apiKey can fully configure governance through a sequence of MCP tool calls:
+An agent connecting through the OAuth flow as an admin can fully configure governance through a sequence of MCP tool calls (the write tools below reject a project-key-only caller):
 
 1. `governance_ingestion_templates_list`, read existing platform templates
 2. `governance_ingestion_templates_clone_from_platform`, clone `claude_code` into the org (delegates to `POST /api/governance/ingestion-templates/clone`)
@@ -17607,6 +17617,8 @@ activity) is unchanged.
 
 <Info>**Pairs with:** [Personal IDE keys](/ai-gateway/governance/personal-keys) (the device-flow login the coding-assistant tiles trigger).</Info>
 
+This page walks through what happens when you click each tile class.
+
 ## Coding-assistant tiles
 
 Examples: Claude Code, Copilot, Cursor, Codex, Gemini CLI.
@@ -17713,7 +17725,7 @@ retry, issuance will succeed and your key works immediately.
 ### When to create a project instead
 
 If you're building a team-shared application, a customer-facing chat,
-an internal RAG system, anything that's not a one-developer experiment,
+an internal RAG system, or anything that is not a one-developer experiment,
 create a **project** at `/settings/projects` and mint the virtual key
 there instead. Project keys aren't bound to your identity, so the spend
 attributes to the project (and rolls up to your team) instead of to
@@ -17963,8 +17975,8 @@ session survives rotation without re-prompting login.
 
 Click **Revoke** on any session card. The corresponding access-token +
 refresh-token Redis keys are immediately deleted. The next CLI request
-from that device returns 401. The CLI tries to refresh once, the
-refresh is refused too because the pair was deleted, and it prints
+from that device returns 401. The CLI tries to refresh once. That
+refresh is refused too because the pair was deleted, and the CLI prints
 "Session expired, run `langwatch login --device` again".
 
 **Revoke all sessions** clears every active session in one action,
@@ -18035,6 +18047,9 @@ LangWatch supports four distinct work patterns and routes each to its
 natural home page on first paint after sign-in. The detection is signal-
 based, your role, your org membership, and your recent activity, not a
 manual setting (though you can override it in your personal settings).
+
+This page explains who each persona is, where they land, and how to
+override the default.
 
 ## The four personas
 
@@ -18484,7 +18499,7 @@ sidebarTitle: Track your Claude Code usage
 
 The Anthropic Console gives you a monthly total, but nothing about which prompt cost what, which model handled which turn, how many tokens came from the prompt cache vs fresh, or what the assistant actually said in long agentic runs. Without that, you can't debug your own agent.
 
-Wire Claude Code to LangWatch and all of that lands there, where you can browse:
+This guide wires Claude Code up so all of that lands on LangWatch, where you can browse:
 
 - Cost per session and per turn
 - Model used per turn, including subagents
@@ -18850,7 +18865,7 @@ What you can't do:
 
 ### Personal-workspace privacy
 
-By default, *other users' Personal Workspaces are invisible to you*: even when you're the org admin. The privacy contract is enforced at four layers:
+By default, *other users' Personal Workspaces are invisible to you*, outside the admin-only surfaces listed at the end of this section. The privacy contract is enforced at four layers:
 
 1. **Picker procedures** (`team.getTeamsWithMembers`, `team.getTeamWithMembers`, `organization.getOrganizationWithMembersAndTheirTeams`) strip personal teams owned by other users from the result, AND null-redact other members' email addresses while preserving the caller's own email.
 2. **Workspace data** (`useWorkspaceData` hook) fail-closes on null `ownerUserId`, an orphaned personal team without a clear owner is hidden from everyone.
@@ -19661,6 +19676,8 @@ keywords: aws, bedrock, boto3, instrumentation, opentelemetry, openinference, la
 ---
 
 AWS Bedrock, accessed via the `boto3` library, gives you access to foundation models. The OpenInference Bedrock instrumentor captures OpenTelemetry traces for your Bedrock API calls. LangWatch is OpenTelemetry-compatible, so it ingests those traces directly.
+
+This guide explains how to configure your Python application to send Bedrock traces to LangWatch.
 
 ## Prerequisites
 
@@ -21249,6 +21266,8 @@ LangWatch captures information about your Azure OpenAI LLM calls automatically. 
 
 1.  **Using `autotrack_openai_calls()`**: This method, part of the LangWatch SDK, dynamically patches your `AzureOpenAI` client instance to capture calls made through it within a specific trace.
 2.  **Using Community OpenTelemetry Instrumentors**: Use existing OpenTelemetry instrumentation libraries like those from OpenInference or OpenLLMetry. These can be integrated with LangWatch by either passing them to the `langwatch.setup()` function or by using their native `instrument()` methods if you're managing your OpenTelemetry setup more directly.
+
+This guide walks you through both methods.
 
 ## Using `autotrack_openai_calls()`
 
@@ -23045,6 +23064,8 @@ LangWatch distinguishes between two main types of custom data:
 *   **Trace Metadata**: Information that applies to the entire lifecycle of a request or a complete operation.
 *   **Span Attributes**: Information specific to a particular unit of work or step within a trace.
 
+This tutorial walks you through capturing both types using the Python SDK.
+
 ## Trace Metadata
 
 Trace metadata provides context for the entire trace. It's ideal for information that remains constant throughout the execution of a traced operation, such as:
@@ -24003,6 +24024,8 @@ By default, LangWatch automatically captures token usage and calculates cost for
   alt="LLM costs analytics graph"
 />
 
+This page explains exactly how that works, which token types are captured, which OpenTelemetry attributes are read, what happens when token counts are missing, and how to adjust costs manually.
+
 ## How cost calculation works
 
 LangWatch calculates costs in three steps:
@@ -24405,7 +24428,7 @@ keywords: azure openai, langwatch, typescript, javascript, sdk, instrumentation,
   </div>
 </div>
 
-The LangWatch library integrates your TypeScript application with LangWatch, the messages are synced on the background so it doesn't intercept or block your LLM calls.
+The LangWatch library integrates your TypeScript application with LangWatch. The library syncs the messages in the background, so it doesn't intercept or block your LLM calls.
 
 <LLMsTxtProtip />
 
@@ -24565,7 +24588,7 @@ You can also use generic spans to capture any type of operation, its inputs and 
 
 ## Capturing Exceptions
 
-To capture also when your code throws an exception, you can wrap your code around a try/catch, and update or end the span with the exception:
+To capture the case where your code throws an exception, wrap the code in a `try/catch` block. In the `catch`, update or end the span with the exception:
 
 <TypeScriptExceptions />
 
@@ -24873,7 +24896,7 @@ keywords: openai, langwatch, typescript, javascript, sdk, instrumentation
   </div>
 </div>
 
-The LangWatch library integrates your TypeScript application with LangWatch, the messages are synced on the background so it doesn't intercept or block your LLM calls.
+The LangWatch library integrates your TypeScript application with LangWatch. The library syncs the messages in the background, so it doesn't intercept or block your LLM calls.
 
 <LLMsTxtProtip />
 
@@ -24967,7 +24990,7 @@ You can also use generic spans to capture any type of operation, its inputs and 
 
 ## Capturing Exceptions
 
-To capture also when your code throws an exception, you can wrap your code around a try/catch, and update or end the span with the exception:
+To capture the case where your code throws an exception, wrap the code in a `try/catch` block. In the `catch`, update or end the span with the exception:
 
 <TypeScriptExceptions />
 
@@ -25014,7 +25037,7 @@ keywords: vercel ai sdk, langwatch, tracing, observability, vercel, ai, sdk
   </div>
 </div>
 
-The LangWatch library integrates your TypeScript application with LangWatch, the messages are synced on the background so it doesn't intercept or block your LLM calls.
+The LangWatch library integrates your TypeScript application with LangWatch. The library syncs the messages in the background, so it doesn't intercept or block your LLM calls.
 
 <LLMsTxtProtip />
 
@@ -27723,6 +27746,8 @@ By default, LangWatch automatically captures token usage and calculates cost for
   alt="LLM costs analytics graph"
 />
 
+This page explains exactly how that works, which token types are captured, which OpenTelemetry attributes are read, what happens when token counts are missing, and how to adjust costs manually.
+
 ## How cost calculation works
 
 LangWatch calculates costs in three steps:
@@ -28973,7 +28998,9 @@ icon: telescope
 keywords: langwatch, opentelemetry, integration, guide, java, c#, .net, python, typescript, javascript, go, sdk, open telemetry, open telemetry integration, open telemetry guide, open telemetry integration guide, open telemetry integration guide java, open telemetry integration guide c#, open telemetry integration guide .net, open telemetry integration guide python, open telemetry integration guide typescript, open telemetry integration guide javascript, open telemetry integration guide go
 ---
 
-OpenTelemetry is a vendor-neutral standard for observability that provides a unified way to capture traces, metrics, and logs. LangWatch is compatible with OpenTelemetry, so you can use any OpenTelemetry-compatible library in any programming language to capture your LLM traces and send them to LangWatch's OTEL API endpoint.
+OpenTelemetry is a vendor-neutral standard for observability that provides a unified way to capture traces, metrics, and logs. LangWatch is compatible with OpenTelemetry, so you can use any OpenTelemetry-compatible library in any programming language to capture your LLM traces.
+
+This guide shows you how to set up OpenTelemetry instrumentation in any language and configure it to export traces to LangWatch's OTEL API endpoint.
 
 ## Prerequisites
 
@@ -30585,7 +30612,7 @@ sidebarTitle: Claude Code
 description: Monitor Claude Code usage with LangWatch using OpenTelemetry traces
 ---
 
-Claude Code supports OpenTelemetry (OTel) traces for monitoring and observability. Send that trace data to LangWatch to see usage patterns and performance.
+Claude Code supports OpenTelemetry (OTel) traces for monitoring and observability. This guide shows you how to configure Claude Code to send that trace data to LangWatch, so you can see usage patterns and performance.
 
 <Note>
   OpenTelemetry support in Claude Code is currently in beta and details are subject to change.
@@ -32415,7 +32442,7 @@ Simulations complement evaluations by testing the **agent as a whole system** ra
 
 ## Why Traditional Evaluation Isn't Enough for Agents
 
-Dataset evaluations are based on a static set of cases, those are hard to get specially when you are just getting started, they often require a great amount of examples to be valuable, and an expected answer to be provided, but more than anything, they are static, like input to output, or query to expected_contexts.
+Dataset evaluations are based on a static set of cases. Those cases are hard to get, especially when you are just getting started: they need many examples to be valuable, and an expected answer for each one. Above all they are static, like input to output, or query to expected_contexts.
 
 Agents, however, aren't simple input-output functions. They are processes. An agent behaves like a program, executing a sequence of operations, using tools, and maintaining state.
 
@@ -35507,7 +35534,7 @@ import langwatch
 langwatch.login()
 ```
 
-Be sure to login or create an account on the link that is displayed, then provide your API key when prompted.
+Be sure to log in or create an account using the displayed link, then provide your API key when prompted.
 
 ## 3. Start tracking
 
@@ -35825,7 +35852,7 @@ description: Export LangWatch analytics into your own dashboards to monitor LLM 
 
 LangWatch offers you the possibility to build and integrate LangWatch graphs on your own systems and applications, to display it to your customers in another interface.
 
-On LangWatch dashboard, you can use our custom chart builder tool, to plot any data collected and generated by LangWatch, and customize the way you want to display it. You can then use our REST API to fetch the graph data.
+In the LangWatch dashboard, use the custom chart builder to plot any data LangWatch collects or generates, and to set how it is displayed. You then use our REST API to fetch the graph data.
 
 **Usage:**
 You will need to obtain your JSON payload from the custom graph section in our application. You can find this on the Analytics page > Custom Reports > Add chart.
@@ -38739,7 +38766,7 @@ import langwatch
 langwatch.login()
 ```
 
-Be sure to login or create an account on the link that is displayed, then provide your API key when prompted.
+Be sure to log in or create an account using the displayed link, then provide your API key when prompted.
 
   ### Environment Variable
 
@@ -39862,6 +39889,8 @@ LLMs are non-deterministic systems that generate responses to open-ended questio
 
 A systematic approach to measuring and improving LLM application quality requires two components: a dataset with representative test examples to evaluate your application, and well-defined quality metrics. These metrics can be strict (e.g., golden answers, retrieval metrics) or flexible (e.g., task completion, defined criteria and style guidelines).
 
+This guide demonstrates how to implement LLM evaluations with experiments in LangWatch.
+
 ## Evaluating if the LLM is generating the right answers
 
 Consider scenarios where a correct answer exists for your LLM given a set of example questions. This applies when you have internal documents for answer generation or when building a customer support agent that must provide accurate responses.
@@ -40190,7 +40219,7 @@ description: Add guardrails to your LLM application to block harmful content in 
   **Let your agent set this up.** [Copy the evaluations prompt](/skills/code-prompts#set-up-evaluations) into your coding agent to get started automatically.
 </Tip>
 
-The LangWatch SDK runs guardrail evaluators synchronously and returns results you can act on immediately.
+This guide shows how to integrate guardrails into your application using the LangWatch SDK. Guardrails run evaluators synchronously and return results you can act on immediately.
 
 ## Basic Usage
 
@@ -41108,7 +41137,7 @@ description: Set up online evaluation monitors in LangWatch to score outputs ins
 
 After you run all your experiments and get your LLM application live in production, you need to keep monitoring it. Online evaluation checks that the quality is good and that the application is safe for your users in production, and gives you the data to improve it.
 
-Online evaluation alerts you when things go wrong, guards against safety issues, generates insights, and builds your datasets automatically, so you keep collecting data for optimizing your AI application.
+Online evaluation alerts you when things go wrong, detects safety issues, generates insights, and builds your datasets automatically, so you keep collecting data for optimizing your AI application.
 
 {/* In this guide, we'll explore in depth a few use cases for online evaluation, and how you can set them up in LangWatch:
 
@@ -41126,7 +41155,7 @@ Online evaluation alerts you when things go wrong, guards against safety issues,
 
 ## Real-Time Evaluations for Safety
 
-Just like all web applications need standard safety protections from for example DDOS attacks, it's now the default practice to add sane protections to LLM applications too, like PII detection to know when sensitive data is being exposed, or protection against Prompt Injection, listed as the number 1 vulnerability for LLMs on the [OWASP Top 10](https://owasp.org/www-project-top-10-for-large-language-model-applications/).
+Just like all web applications need standard safety protections against DDoS attacks, it's now the default practice to add sane protections to LLM applications too, like PII detection to know when sensitive data is being exposed, or protection against prompt injection, listed as the number 1 vulnerability for LLMs on the [OWASP Top 10](https://owasp.org/www-project-top-10-for-large-language-model-applications/).
 
 ### Setting up a Prompt Injection detection monitor
 
@@ -42251,7 +42280,7 @@ For the full notebook, check it out on: [GitHub](https://github.com/langwatch/co
 
 ---
 title: Finetuning Agents with GRPO
-description: Fine-tuning agentic systems with Generalized Reinforcement from Preference Optimization (GRPO) to improve their performance.
+description: Fine-tuning agentic systems with Group Relative Policy Optimization (GRPO) to improve their performance.
 keywords:
   [
     finetuning agents,
@@ -42263,7 +42292,7 @@ keywords:
   ]
 ---
 
-In this cookbook, we'll explore how to enhance the performance of agentic systems by fine-tuning them with Generalized Reinforcement from Preference Optimization (GRPO). Specifically, we'll focus on query rewriting - a critical component in retrieval systems that transforms vague user questions into more effective search queries.
+In this cookbook, we'll explore how to enhance the performance of agentic systems by fine-tuning them with Group Relative Policy Optimization (GRPO). Specifically, we'll focus on query rewriting - a critical component in retrieval systems that transforms vague user questions into more effective search queries.
 
 We use a smaller model, Qwen 1.7B, rather than a massive model like GPT-5. This demonstrates how GRPO raises the capability of more efficient, cost-effective models that can run locally or on modest hardware.
 
@@ -43980,7 +44009,7 @@ description: Evaluate AI coaching systems using LangWatch with LLM-as-a-Judge sc
 keywords: AI coach, evaluation, LangWatch, AI therapist, AI Leadership
 ---
 
-Build an evaluation pipeline for a conversational AI, like an AI coach. Since coaching quality is subjective, we'll use a panel of specialized LLM-as-a-Judge evaluators to score different aspects of the conversation.
+This guide demonstrates how to build an evaluation pipeline for a conversational AI, like an AI coach. Since coaching quality is subjective, we'll use a panel of specialized LLM-as-a-Judge evaluators to score different aspects of the conversation.
 
 We'll use LangWatch to orchestrate this evaluation, track the boolean (pass/fail) outputs from each judge, and compare them against an expert-annotated dataset.
 
@@ -53771,7 +53800,7 @@ Install and disconnect actions are recorded in the audit log as `langy.github.in
 
 ---
 title: How Langy is Isolated
-description: Langy runs each conversation as an isolated worker under a gVisor sandbox, with per-worker file and control-port walls and an L7 egress adapter that is cooperative rather than mandatory today.
+description: Langy runs each conversation as an isolated worker under a gVisor sandbox, with per-worker file and control-port walls and an L7 egress adapter. This page states what each layer blocks and where the boundary is cooperative rather than mandatory today.
 sidebarTitle: Sandbox and isolation
 keywords:
   - ai agent sandbox
@@ -55220,11 +55249,11 @@ spec:
 ### PostgreSQL
 
 - Grows slowly: metadata only (users, projects, configurations)
-- 10-20 GB is sufficient
+- 10-20 GB is sufficient for the size profiles on this page
 
 ### Redis
 
-- Minimal storage: job queue and cache only
+- Minimal storage: job queue, cache and sessions
 - 1-5 GB is sufficient
 
 ## Cloud Instance Recommendations
@@ -59656,7 +59685,7 @@ title: Migrate to v3
 description: "Step-by-step guide to upgrade LangWatch from v1.x or v2.x to v3.0"
 ---
 
-LangWatch v3 replaces Elasticsearch/OpenSearch with **ClickHouse** as the primary data store. The migration is the same whether you're coming from v1.x or v2.x.
+LangWatch v3 replaces Elasticsearch/OpenSearch with **ClickHouse** as the primary data store. This guide walks you through the full migration. The process is the same whether you're coming from v1.x or v2.x.
 
 <Tip>
 This is a **zero-downtime migration**. Elasticsearch and ClickHouse run side-by-side during the transition. New data flows to ClickHouse immediately, and you migrate historical data at your own pace.

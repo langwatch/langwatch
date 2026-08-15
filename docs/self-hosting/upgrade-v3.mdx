@@ -3,7 +3,7 @@ title: Migrate to v3
 description: "Step-by-step guide to upgrade LangWatch from v1.x or v2.x to v3.0"
 ---
 
-LangWatch v3 replaces Elasticsearch/OpenSearch with **ClickHouse** as the primary data store. The migration is the same whether you're coming from v1.x or v2.x.
+LangWatch v3 replaces Elasticsearch/OpenSearch with **ClickHouse** as the primary data store. This guide walks you through the full migration. The process is the same whether you're coming from v1.x or v2.x.
 
 <Tip>
 This is a **zero-downtime migration**. Elasticsearch and ClickHouse run side-by-side during the transition. New data flows to ClickHouse immediately, and you migrate historical data at your own pace.

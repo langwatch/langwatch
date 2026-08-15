@@ -4,7 +4,7 @@ description: Move from app → OpenAI/Anthropic to app → LangWatch Gateway →
 sidebarTitle: Migrate from direct
 ---
 
-The LangWatch Gateway sits between your application and the providers you already call directly (OpenAI, Anthropic, Bedrock, and the rest). It adds governance, budgets, fallback, policy-rule patterns, and per-engineer attribution, and the migration below changes two env vars rather than your integration code.
+The LangWatch Gateway sits between your application and the providers you already call directly (OpenAI, Anthropic, Bedrock, and the rest). It adds governance, budgets, fallback, policy-rule patterns, and per-engineer attribution. This cookbook shows the migration: each client gets the gateway's `baseURL` and reads one virtual key instead of the provider key, and the rest of your integration code stays as it is.
 
 ## Before
 
