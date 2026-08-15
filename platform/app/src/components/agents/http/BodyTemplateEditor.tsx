@@ -11,6 +11,11 @@ export const STANDARD_AGENT_VARIABLES = [
     description: "Unique identifier for the conversation thread",
   },
   { name: "messages", description: "Array of chat messages in OpenAI format" },
+  {
+    name: "params.NAME",
+    description:
+      "A parameter the running scenario declares, resolved for this run",
+  },
 ] as const;
 
 export type BodyTemplateEditorProps = {

@@ -50,6 +50,7 @@ describe("createAdapter", () => {
         url: "https://api.example.com/chat",
         method: "POST",
         headers: [],
+        secrets: {},
       };
 
       const adapter = createAdapter({

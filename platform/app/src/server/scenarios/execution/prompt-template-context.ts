@@ -17,6 +17,7 @@
  */
 
 import type { AgentInput } from "@langwatch/scenario";
+import type { RunParameterValues } from "../parameters";
 import {
   computeBestMatchMappings,
   resolveFieldMappings,
@@ -32,7 +33,7 @@ export interface PromptInputDeclaration {
 
 export interface PromptTemplateContextResult {
   /** Names and values the Liquid template renders against. */
-  context: Record<string, string>;
+  context: Record<string, unknown>;
   /**
    * Declared inputs a simulation has no value for. Reported by the caller so
    * the reason an answer looks wrong is visible next to the run, not inferred.
@@ -106,15 +107,20 @@ function lastUserMessageText(messages: AgentInput["messages"]): string {
  * @param inputs - The prompt's declared input variables
  * @param scenarioMappings - Explicit bindings configured on the suite target.
  *   These win; every declared input they leave out is matched by name.
+ * @param parameters - The values the run resolved, bound as `params` so the
+ *   template reads `{{ params.account_tier }}`. Bound before the declared
+ *   inputs, so a prompt input named `params` still wins.
  */
 export function buildPromptTemplateContext({
   input,
   inputs = [],
   scenarioMappings,
+  parameters,
 }: {
   input: AgentInput;
   inputs?: PromptInputDeclaration[];
   scenarioMappings?: Record<string, FieldMapping>;
+  parameters?: RunParameterValues;
 }): PromptTemplateContextResult {
   const sanitized = {
     ...input,
@@ -123,7 +129,9 @@ export function buildPromptTemplateContext({
 
   const transcript = transcriptForPrompt(sanitized.messages);
 
-  const context: Record<string, string> = {
+  const threadId = input.threadId ?? DEFAULT_SCENARIO_THREAD_ID;
+
+  const context: Record<string, unknown> = {
     input: lastUserMessageText(sanitized.messages),
     messages: transcript,
     // The structured escape hatch for templates that parsed the pre-#6590
@@ -132,7 +140,8 @@ export function buildPromptTemplateContext({
     // itself stays prose because a model shown a JSON transcript answers with
     // one, and that reply re-escapes one level deeper every turn (#6590).
     messagesJson: JSON.stringify(sanitized.messages),
-    threadId: input.threadId ?? DEFAULT_SCENARIO_THREAD_ID,
+    threadId,
+    params: parameters ?? {},
   };
 
   const effectiveMappings: Record<string, FieldMapping> = {
@@ -156,7 +165,7 @@ export function buildPromptTemplateContext({
       sourceField === "messages"
         ? transcript
         : sourceField === "threadId"
-          ? context.threadId!
+          ? threadId
           : value;
   }
 

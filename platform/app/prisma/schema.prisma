@@ -1975,7 +1975,12 @@ model LlmPromptConfig {
 
   @@unique([handle], map: "LlmPromptConfig_handle_key")
   @@index([projectId])
-  @@index([organizationId], map: "LlmPromptConfig_organizationId_idx")
+  // Listing queries filter on (organizationId, scope) together. On a plain
+  // organizationId index one large organization matches almost every row and
+  // the planner falls back to scanning the table; scope in the index keeps
+  // the lookup selective. The composite also serves organizationId-only
+  // filters as its prefix, so a separate single-column index is not needed.
+  @@index([organizationId, scope])
   @@index([copiedFromPromptId])
 }
 
@@ -2109,7 +2114,7 @@ model Agent {
   projectId         String
   project           Project   @relation(fields: [projectId], references: [id])
   name              String
-  type              String // "signature" | "code" | "workflow"
+  type              String // "signature" | "code" | "workflow" | "http"
   config            Json // Node configuration (model, prompt, code, etc.)
   workflowId        String? // For "workflow" type - top level for joins
   workflow          Workflow? @relation(fields: [workflowId], references: [id])
@@ -2158,6 +2163,14 @@ model Scenario {
   situation       String
   criteria        String[]
   labels          String[]
+  // Named parameters the scenario declares, as an array of
+  // { name, description?, defaultValue? }. Values are supplied or overridden
+  // when a run starts, delivered to the target under test, and readable from
+  // the scenario's own situation and criteria as `params.NAME`. Null and an
+  // empty array both mean "this scenario declares none", which is the path
+  // that renders its text untouched. See
+  // specs/scenarios/scenario-run-parameters.feature.
+  parameters      Json?
   // Optional per-scenario model overrides for the run. When null the run
   // resolves the project's scenarios.user_simulator / scenarios.judge
   // DEFAULT-role models. See specs/scenarios/scenario-model-selection.feature.

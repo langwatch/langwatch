@@ -43751,6 +43751,41 @@
                           "type": "string"
                         }
                       },
+                      "parameters": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                              "minLength": 1,
+                              "maxLength": 64
+                            },
+                            "description": {
+                              "type": "string",
+                              "maxLength": 500
+                            },
+                            "defaultValue": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "maxLength": 4096
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "name"
+                          ]
+                        }
+                      },
                       "platformUrl": {
                         "type": "string",
                         "format": "uri"
@@ -43762,6 +43797,7 @@
                       "situation",
                       "criteria",
                       "labels",
+                      "parameters",
                       "platformUrl"
                     ]
                   }
@@ -43893,6 +43929,41 @@
                         "type": "string"
                       }
                     },
+                    "parameters": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                            "minLength": 1,
+                            "maxLength": 64
+                          },
+                          "description": {
+                            "type": "string",
+                            "maxLength": 500
+                          },
+                          "defaultValue": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 4096
+                              },
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "boolean"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "name"
+                        ]
+                      }
+                    },
                     "platformUrl": {
                       "type": "string",
                       "format": "uri"
@@ -43904,6 +43975,7 @@
                     "situation",
                     "criteria",
                     "labels",
+                    "parameters",
                     "platformUrl"
                   ]
                 }
@@ -44024,6 +44096,43 @@
                       "type": "string"
                     },
                     "default": []
+                  },
+                  "parameters": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                          "minLength": 1,
+                          "maxLength": 64
+                        },
+                        "description": {
+                          "type": "string",
+                          "maxLength": 500
+                        },
+                        "defaultValue": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "maxLength": 4096
+                            },
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "boolean"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ]
+                    },
+                    "maxItems": 20,
+                    "description": "The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME."
                   }
                 },
                 "required": [
@@ -44072,6 +44181,41 @@
                         "type": "string"
                       }
                     },
+                    "parameters": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                            "minLength": 1,
+                            "maxLength": 64
+                          },
+                          "description": {
+                            "type": "string",
+                            "maxLength": 500
+                          },
+                          "defaultValue": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 4096
+                              },
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "boolean"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "name"
+                        ]
+                      }
+                    },
                     "platformUrl": {
                       "type": "string",
                       "format": "uri"
@@ -44083,6 +44227,7 @@
                     "situation",
                     "criteria",
                     "labels",
+                    "parameters",
                     "platformUrl"
                   ]
                 }
@@ -44243,6 +44388,41 @@
                         "type": "string"
                       }
                     },
+                    "parameters": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                            "minLength": 1,
+                            "maxLength": 64
+                          },
+                          "description": {
+                            "type": "string",
+                            "maxLength": 500
+                          },
+                          "defaultValue": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 4096
+                              },
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "boolean"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "name"
+                        ]
+                      }
+                    },
                     "platformUrl": {
                       "type": "string",
                       "format": "uri"
@@ -44254,6 +44434,7 @@
                     "situation",
                     "criteria",
                     "labels",
+                    "parameters",
                     "platformUrl"
                   ]
                 }
@@ -44402,6 +44583,43 @@
                     "items": {
                       "type": "string"
                     }
+                  },
+                  "parameters": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                          "minLength": 1,
+                          "maxLength": 64
+                        },
+                        "description": {
+                          "type": "string",
+                          "maxLength": 500
+                        },
+                        "defaultValue": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "maxLength": 4096
+                            },
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "boolean"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ]
+                    },
+                    "maxItems": 20,
+                    "description": "The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME."
                   }
                 }
               }
@@ -48051,6 +48269,24 @@
                 "properties": {
                   "idempotencyKey": {
                     "type": "string"
+                  },
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 4096
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        }
+                      ]
+                    },
+                    "description": "Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name."
                   }
                 }
               }

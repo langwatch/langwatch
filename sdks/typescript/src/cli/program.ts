@@ -33,6 +33,28 @@ import {
 
 declare const __CLI_VERSION__: string;
 
+/**
+ * Help for the repeatable `--param key=value` flag the run commands share.
+ * Written here rather than imported so the command tree keeps its own boot
+ * cost; the reading it describes lives in `cli/utils/keyValueFlags.ts`.
+ */
+const PARAM_FLAG_HELP =
+  "Value for one parameter the run supplies, written key=value. Repeat the flag for more than one. A value is read as text, unless it is exactly true or false, which is read as a boolean, or a plain number, which is read as a number.";
+
+const WORKFLOW_PARAM_FLAG_HELP = `${PARAM_FLAG_HELP} The workflow receives it as an entry input, and a pair given here wins over the same key in --input.`;
+
+/**
+ * Collect a repeated `--param` into the list the run commands read.
+ *
+ * One value per occurrence rather than a variadic `<pair...>`: a variadic
+ * option keeps eating argv until the next flag, so `--param env=prod my-suite`
+ * would swallow the id the command is about to run.
+ */
+const collectParam = (pair: string, previous: string[] = []): string[] => [
+  ...previous,
+  pair,
+];
+
 // Import commands with proper async handling
 const addCommand = async (name: string, options: { version?: string; localFile?: string }): Promise<void> => {
   const { addCommand: addCommandImpl } = await import("./commands/add.js");
@@ -1395,8 +1417,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .command("run <slug>")
       .description("Start an experiment run by slug")
       .option("--wait", "Wait for the experiment to complete before returning")
+      .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (slug: string, options: { wait?: boolean }) => {
+    async (slug: string, options: { wait?: boolean; param?: string[] }) => {
       const { runExperimentCommand: impl } = await import("./commands/experiment/run.js");
       return impl(slug, options);
     },
@@ -1503,10 +1526,11 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .command("run <id>")
       .description("Execute a workflow with JSON input")
       .option("--input <json>", "Input data as JSON string")
+      .option("--param <pair>", WORKFLOW_PARAM_FLAG_HELP, collectParam)
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string, options: { input?: string }) => {
+    async (id: string, options: { input?: string; param?: string[] }) => {
       const { runWorkflowCommand: impl } = await import("./commands/workflows/run.js");
-      return impl(id, options);
+      return impl({ id, options });
     },
   );
 
@@ -2540,8 +2564,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .description("Run a scenario against a target (agent or prompt)")
     .requiredOption("--target <target>", "Target to run against, as <type>:<referenceId> (e.g., http:agent_abc123)")
     .option("--wait", "Wait for the scenario run to complete")
+    .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
     .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (id: string, options: { target: string; wait?: boolean; format?: string }) => {
+    .action(async (id: string, options: { target: string; wait?: boolean; format?: string; param?: string[] }) => {
       const { runScenarioCommand: impl } = await import("./commands/scenarios/run.js");
       await impl(id, options);
     });
@@ -2632,10 +2657,11 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .command("run <id>")
     .description("Execute a suite run — schedules all scenario × target × repeat jobs")
     .option("--wait", "Wait for the suite run to complete before returning")
+    .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
     .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (id: string, options: { wait?: boolean; format?: string }) => {
+    .action(async (id: string, options: { wait?: boolean; format?: string; param?: string[] }) => {
       const { runSuiteCommand: impl } = await import("./commands/suites/run.js");
-      await impl(id, options);
+      await impl({ id, options });
     });
 
   emitsResult(

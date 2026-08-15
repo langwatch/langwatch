@@ -60,6 +60,36 @@ const str = (
   return typeof value === "string" && value.length > 0 ? value : fallback;
 };
 
+/**
+ * Reads a list of short identifiers out of `meta` without trusting it.
+ *
+ * Bounded on both axes because the sentence these end up in is read by a
+ * person: a long list stops being copy and becomes a dump, and a single
+ * oversized entry would push the rest off the screen.
+ */
+const strList = (error: HandledErrorShape, key: string): string[] => {
+  const value = error.meta[key];
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((entry): entry is string => typeof entry === "string")
+    .filter((entry) => entry.length > 0 && entry.length <= 64)
+    .slice(0, 10);
+};
+
+/**
+ * Names the piece of a scenario a parameter failure came from, so the copy can
+ * point at it instead of asking the reader to search their own text.
+ * `meta.field` is written by the renderer as `situation` or `criteria[N]`,
+ * zero-based; criteria are numbered from one for the reader.
+ */
+const scenarioFieldLabel = (error: HandledErrorShape): string => {
+  const field = str(error, "field", "");
+  if (field === "situation") return "The situation";
+  const criterion = /^criteria\[(\d+)\]$/.exec(field);
+  if (criterion) return `Criterion ${Number(criterion[1]) + 1}`;
+  return "The scenario's text";
+};
+
 type MissingModelRequestType =
   | "chat"
   | "messages"
@@ -1123,6 +1153,44 @@ const presentations = {
         : "Send the credential class this endpoint accepts. Organization API keys are created in Settings > API Keys.";
     },
   },
+  // ---- scenario run parameters ----
+  scenario_parameter_unknown: {
+    // Both lists are our own names, not free text: the run dialog needs to
+    // show the rejected one so the typo is visible, and the declared ones so
+    // the customer can see what they meant to write.
+    title: "No scenario in this run has a parameter by that name",
+    describe: (error) => {
+      const unknown = strList(error, "unknownKeys");
+      const declared = strList(error, "declaredNames");
+      const rejected =
+        unknown.length > 0
+          ? `${listLabels(unknown)} ${unknown.length === 1 ? "isn't" : "aren't"} declared by any scenario in this run.`
+          : "One of the values supplied isn't declared by any scenario in this run.";
+      return declared.length > 0
+        ? `${rejected} You can set ${listLabels(declared)}.`
+        : `${rejected} None of its scenarios declare parameters.`;
+    },
+  },
+  scenario_parameter_missing: {
+    title: "This run is missing a parameter value",
+    describe: (error) => {
+      const missing = strList(error, "names");
+      const plural = missing.length > 1;
+      const subject =
+        missing.length > 0
+          ? `${listLabels(missing)} ${plural ? "have no values" : "has no value"}.`
+          : "A parameter the scenario reads has no value.";
+      const remedy = plural
+        ? "Set values for this run, or give each parameter a default on the scenario."
+        : "Set a value for this run, or give the parameter a default on the scenario.";
+      return `${subject} ${scenarioFieldLabel(error)} reads ${plural ? "them" : "it"}. ${remedy}`;
+    },
+  },
+  scenario_parameter_template_invalid: {
+    title: "This scenario's text couldn't be filled in",
+    describe: (error) =>
+      `${scenarioFieldLabel(error)} references a parameter in a way we can't read. Check it is written as params.name, then try again.`,
+  },
   scenario_run_export_unauthenticated: {
     title: "Log in to export simulation runs",
     describe: () =>
@@ -1717,6 +1785,11 @@ const presentations = {
   no_provider_configured: {
     title: "No model provider configured",
     describe: () => "Add a provider in settings to continue.",
+  },
+  model_provider_not_bound: {
+    title: "That provider isn't bound to this key",
+    describe: () =>
+      "The model name asks for a provider this virtual key has no slot for. Bind that provider to the key, or drop the prefix from the model name.",
   },
   guardrail_blocked: {
     title: "Blocked by a guardrail",

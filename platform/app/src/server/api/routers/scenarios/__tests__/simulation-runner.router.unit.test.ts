@@ -22,6 +22,29 @@ vi.mock("~/server/scenarios/scenario.ids", () => ({
   generateBatchRunId: vi.fn().mockReturnValue("batch_test_123"),
 }));
 
+// The run resolves the scenario's declared parameters before it queues
+// anything, which is the router's only database read. Stubbed here so this
+// suite stays a unit test of the router's own decisions.
+const mockGetRunConfigByIds = vi.fn<
+  (params: { ids: string[]; projectId: string }) => Promise<unknown[]>
+>(async ({ ids }) =>
+  ids.map((id) => ({
+    id,
+    name: "Test Scenario",
+    situation: "User asks a question",
+    criteria: ["Must respond politely"],
+    parameters: null,
+  })),
+);
+vi.mock("~/server/scenarios/scenario.service", () => ({
+  ScenarioService: {
+    create: vi.fn().mockReturnValue({
+      getRunConfigByIds: (params: { ids: string[]; projectId: string }) =>
+        mockGetRunConfigByIds(params),
+    }),
+  },
+}));
+
 const mockQueueRun = vi.fn().mockResolvedValue(undefined);
 vi.mock("~/server/app-layer/app", () => ({
   // Consumers that degrade without Redis read through this one.
@@ -255,6 +278,7 @@ describe("simulationRunnerRouter.run", () => {
             criteria: ["Must respond politely"],
             labels: [],
           },
+          parameters: {},
           adapterData: {
             type: "prompt",
             promptId: "prompt_123",
@@ -322,6 +346,7 @@ describe("simulationRunnerRouter.run", () => {
             criteria: ["Must respond politely"],
             labels: [],
           },
+          parameters: {},
           adapterData: {
             type: "prompt",
             promptId: "prompt_123",
@@ -433,6 +458,65 @@ describe("simulationRunnerRouter.run", () => {
           batchRunId: "batch_test_123",
           scenarioRunId: "scenariorun_test_456",
         });
+      });
+    });
+
+    describe("when the scenario declares parameters", () => {
+      beforeEach(() => {
+        mockGetRunConfigByIds.mockImplementation(async ({ ids }) =>
+          ids.map((id) => ({
+            id,
+            name: "Test Scenario",
+            situation: "A {{ params.account_tier }} customer asks a question",
+            criteria: ["Must respond politely"],
+            parameters: [
+              { name: "account_tier", defaultValue: "gold" },
+              { name: "region", defaultValue: "eu-central" },
+            ],
+          })),
+        );
+      });
+
+      it("records the resolved values on the queued run's metadata", async () => {
+        await caller.run({
+          ...defaultInput,
+          parameters: { account_tier: "platinum" },
+        });
+
+        expect(mockQueueRun).toHaveBeenCalledWith(
+          expect.objectContaining({
+            metadata: {
+              parameters: { account_tier: "platinum", region: "eu-central" },
+            },
+          }),
+        );
+      });
+
+      it("hands the resolved values to the prefetch that validates the run", async () => {
+        await caller.run({
+          ...defaultInput,
+          parameters: { account_tier: "platinum" },
+        });
+
+        expect(mockPrefetchScenarioData).toHaveBeenCalledWith(
+          expect.objectContaining({
+            parameters: { account_tier: "platinum", region: "eu-central" },
+          }),
+          expect.anything(),
+          expect.anything(),
+        );
+      });
+
+      it("rejects a name no scenario declares before anything is queued", async () => {
+        await expect(
+          caller.run({ ...defaultInput, parameters: { regoin: "eu-west" } }),
+        ).rejects.toMatchObject({
+          code: "UNPROCESSABLE_CONTENT",
+          cause: { code: "scenario_parameter_unknown" },
+        });
+
+        expect(mockPrefetchScenarioData).not.toHaveBeenCalled();
+        expect(mockQueueRun).not.toHaveBeenCalled();
       });
     });
   });

@@ -59,6 +59,7 @@ const MP_ANTHROPIC_BASE_ID = `mp-mat-anthropic-base-${suffix}`;
 const ANTHROPIC_BASE_URL_OVERRIDE = "http://vllm-anthropic:8000";
 const MP_ANTHROPIC_PLAIN_ID = `mp-mat-anthropic-plain-${suffix}`;
 const MP_ANTHROPIC_KEYLESS_ID = `mp-mat-anthropic-keyless-${suffix}`;
+const MP_SAFETY_ID = `mp-mat-safety-${suffix}`;
 const RP_ID = `rp-mat-${suffix}`;
 const GUARDRAIL_ID = `gr-mat-${suffix}`;
 const VK_ID = `vk-mat-${suffix}`;
@@ -253,6 +254,25 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
         },
       },
     });
+    // Safety-type provider (azure_safety): holds evaluator credentials,
+    // not chat-dispatchable — must never appear in a gateway bundle's
+    // providers[] (the Go router has no Bifrost adapter for it).
+    await prisma.modelProvider.create({
+      data: {
+        id: MP_SAFETY_ID,
+        name: "azure-safety",
+        provider: "azure_safety",
+        enabled: true,
+        organizationId: ORG_ID,
+        customKeys: {
+          AZURE_CONTENT_SAFETY_ENDPOINT: "https://safety.example.com",
+          AZURE_CONTENT_SAFETY_KEY: "safety-key",
+        },
+        scopes: {
+          create: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+        },
+      },
+    });
     await prisma.routingPolicy.create({
       data: {
         id: RP_ID,
@@ -417,6 +437,7 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
       MP_ANTHROPIC_BASE_ID,
       MP_ANTHROPIC_PLAIN_ID,
       MP_ANTHROPIC_KEYLESS_ID,
+      MP_SAFETY_ID,
     ];
     await prisma.modelProviderScope.deleteMany({
       where: {
@@ -609,6 +630,21 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
   });
 
   describe("when materialising a VK with no linked RoutingPolicy", () => {
+    /** @scenario Safety-type providers are excluded from gateway dispatch chains */
+    it("excludes safety-type providers (azure_safety) from the dispatch chain", async () => {
+      const repo = new VirtualKeyRepository(prisma);
+      const vk = await repo.findById(VK_NO_RP_ID, ORG_ID);
+      const mat = new GatewayConfigMaterialiser(prisma, null);
+      const bundle = await mat.materialise(vk!);
+      // Naming the LLM provider that must survive, rather than just
+      // asserting a non-empty list, keeps this from passing vacuously if
+      // the filter ever drops dispatchable providers too.
+      expect(bundle.providers.map((p) => p.id)).toContain(MP_ID);
+      expect(bundle.providers.map((p) => p.id)).not.toContain(MP_SAFETY_ID);
+      expect(bundle.fallback.chain).toContain(MP_ID);
+      expect(bundle.fallback.chain).not.toContain(MP_SAFETY_ID);
+    });
+
     it("returns empty model_aliases + normalized empty policy_rules", async () => {
       const repo = new VirtualKeyRepository(prisma);
       const vk = await repo.findById(VK_NO_RP_ID, ORG_ID);

@@ -197,3 +197,63 @@ describe("body template JSON safety", () => {
     });
   });
 });
+
+describe("run parameters in the template context", () => {
+  describe("given a run that resolved values", () => {
+    /** @scenario "An http target reads params in its url and body templates" */
+    it("makes each one reachable as params.NAME", () => {
+      const context = buildTemplateContext({
+        input: inputWith("hi"),
+        parameters: { account_tier: "platinum", seats: 12 },
+      });
+
+      expect(context.params).toEqual({ account_tier: "platinum", seats: 12 });
+    });
+
+    /** @scenario "An http target reads params in its url and body templates" */
+    it("renders one into a body template", () => {
+      const body = renderBodyTemplate({
+        template: '{"tier": "{{ params.account_tier }}"}',
+        context: buildTemplateContext({
+          input: inputWith("hi"),
+          parameters: { account_tier: "platinum" },
+        }),
+      });
+
+      expect(JSON.parse(body).tier).toBe("platinum");
+    });
+
+    it("leaves the conversation bindings alone", () => {
+      const context = buildTemplateContext({
+        input: inputWith("hi"),
+        parameters: { input: "not the conversation", threadId: "not-the-id" },
+      });
+
+      expect(context.input).toBe("hi");
+      expect(context.threadId).toBe("thread-1");
+      expect(String(context.messages)).toContain("hi");
+    });
+  });
+
+  describe("given a run that resolved none", () => {
+    it("binds an empty namespace rather than nothing", () => {
+      const context = buildTemplateContext({ input: inputWith("hi") });
+
+      expect(context.params).toEqual({});
+    });
+  });
+
+  describe("given a data mapping already named params", () => {
+    it("keeps the mapping, so an existing target is unchanged", () => {
+      const context = buildTemplateContext({
+        input: inputWith("hi"),
+        parameters: { account_tier: "platinum" },
+        scenarioMappings: {
+          params: { type: "value", value: "the mapping wins" },
+        },
+      });
+
+      expect(context.params).toBe("the mapping wins");
+    });
+  });
+});
