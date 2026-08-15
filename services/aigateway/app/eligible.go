@@ -3,11 +3,74 @@ package app
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
+
+// routableChain trims the credential chain to the credentials that could
+// actually serve this request: first to the providers the inbound route
+// speaks, then to the providers the resolved model names.
+func routableChain(ctx context.Context, req *domain.Request, creds []domain.Credential) ([]domain.Credential, error) {
+	creds, err := surfaceCredentials(ctx, creds, req)
+	if err != nil {
+		return nil, err
+	}
+	return eligibleCredentials(ctx, creds, req.Resolved)
+}
+
+// surfaceCredentials keeps only the credentials whose provider speaks the
+// wire of the route the request arrived on.
+//
+// A raw-forward route sends the caller's body and URL path to the vendor
+// unchanged, so the route decides the vendor. Before this trim, the Gemini
+// /v1beta surface let the credential chain decide instead: a key holding an
+// OpenAI credential and no Google one sent a Gemini-shaped body to OpenAI,
+// which answered 404 for a model it never had. The 404 hides the real cost.
+// The prompt had already left for a vendor the caller never named.
+//
+// Routes the gateway translates pin nothing and are untouched here. Under
+// /v1 the body is rewritten per provider before it leaves, so any provider
+// can serve the request and eligibleCredentials makes the choice.
+func surfaceCredentials(ctx context.Context, creds []domain.Credential, req *domain.Request) ([]domain.Credential, error) {
+	surface := req.InboundSurface()
+	if len(creds) == 0 || len(surface.Providers) == 0 {
+		return creds, nil
+	}
+
+	out := make([]domain.Credential, 0, len(creds))
+	for _, c := range creds {
+		if slices.Contains(surface.Providers, c.ProviderID) {
+			out = append(out, c)
+		}
+	}
+	if len(out) == 0 {
+		names := providerNames(surface.Providers)
+		return nil, herr.New(ctx, domain.ErrProviderNotBound, herr.M{
+			"message": fmt.Sprintf("%s sends the request to the provider unchanged, so only %s can serve it, and this key has none of them",
+				surface.Name, names),
+			"hint": fmt.Sprintf("bind one of %s to this virtual key, or send the request to /v1/chat/completions, which the gateway translates for any provider",
+				names),
+			"fault": "customer",
+		})
+	}
+	return out, nil
+}
+
+// providerNames renders a provider list for an error message, as
+// `"gemini" or "vertex"`.
+func providerNames(providers []domain.ProviderID) string {
+	quoted := make([]string, len(providers))
+	for i, p := range providers {
+		quoted[i] = fmt.Sprintf("%q", string(p))
+	}
+	if len(quoted) < 2 {
+		return strings.Join(quoted, "")
+	}
+	return strings.Join(quoted[:len(quoted)-1], ", ") + " or " + quoted[len(quoted)-1]
+}
 
 // eligibleCredentials returns the subset of `creds` that can serve the
 // resolved model, preserving caller-supplied order so the existing
