@@ -73,6 +73,13 @@ export interface OutboxDispatcherServiceOptions {
    * time chaining do), or tolerate reordering.
    */
   concurrency?: number;
+  /**
+   * Wall clock for measuring elapsed time inside one drain (the lease
+   * budget check). Distinct from runOnce's `now`, which is the batch's
+   * logical time for lease and lag math. Injectable so fake-timer tests
+   * control both.
+   */
+  clock?: () => number;
   tracer?: Tracer;
   logger?: Logger;
 }
@@ -81,11 +88,18 @@ export interface DispatchReport {
   dispatched: string[];
   retried: string[];
   dead: string[];
+  /** Returned to the pool un-attempted: the batch ran out of lease budget. */
+  released: string[];
+  /** Acknowledgements that matched no row — the lease lapsed mid-delivery. */
+  fenced: string[];
 }
 
 const DEFAULT_MAX_ATTEMPTS = 10;
 const DEFAULT_LEASE_DURATION_MS = 30_000;
 const SLOW_OUTBOX_DELIVERY_MS = 10_000;
+/** Never start a delivery with less lease budget left than this. */
+const LEASE_SAFETY_MARGIN_CAP_MS = 10_000;
+const LEASE_SAFETY_MARGIN_FRACTION = 0.2;
 
 function defaultRetryDelayMs({ attempt }: { attempt: number }): number {
   return Math.min(1_000 * 2 ** (attempt - 1), 60_000);
@@ -127,6 +141,8 @@ export class OutboxDispatcherService {
   private readonly leaseDurationMs: number;
   private readonly processNames: readonly string[] | undefined;
   private readonly concurrency: number;
+  private readonly clock: () => number;
+  private readonly leaseSafetyMarginMs: number;
   private readonly tracer: Tracer;
   private readonly logger: Logger;
 
@@ -138,6 +154,11 @@ export class OutboxDispatcherService {
     this.leaseDurationMs = options.leaseDurationMs ?? DEFAULT_LEASE_DURATION_MS;
     this.processNames = options.processNames;
     this.concurrency = Math.max(1, options.concurrency ?? 1);
+    this.clock = options.clock ?? Date.now;
+    this.leaseSafetyMarginMs = Math.min(
+      this.leaseDurationMs * LEASE_SAFETY_MARGIN_FRACTION,
+      LEASE_SAFETY_MARGIN_CAP_MS,
+    );
     this.tracer =
       options.tracer ?? trace.getTracer("langwatch.process-manager");
     this.logger =
@@ -154,11 +175,23 @@ export class OutboxDispatcherService {
       leaseDurationMs: this.leaseDurationMs,
       ...(this.processNames ? { processNames: this.processNames } : {}),
     });
+    const leaseStartedAt = this.clock();
 
-    const report: DispatchReport = { dispatched: [], retried: [], dead: [] };
+    const report: DispatchReport = {
+      dispatched: [],
+      retried: [],
+      dead: [],
+      released: [],
+      fenced: [],
+    };
     if (this.concurrency <= 1) {
       for (const message of leased) {
-        await this.dispatchOne({ message, now: params.now, report });
+        await this.dispatchOrShed({
+          message,
+          now: params.now,
+          leaseStartedAt,
+          report,
+        });
       }
       return report;
     }
@@ -172,12 +205,146 @@ export class OutboxDispatcherService {
       async () => {
         while (cursor < leased.length) {
           const message = leased[cursor++]!;
-          await this.dispatchOne({ message, now: params.now, report });
+          await this.dispatchOrShed({
+            message,
+            now: params.now,
+            leaseStartedAt,
+            report,
+          });
         }
       },
     );
     await Promise.all(workers);
     return report;
+  }
+
+  /**
+   * The two checks that keep a slow batch honest, applied before each
+   * delivery starts (issue #7016):
+   *
+   * Retirement — leasing increments `attempts`, so a message whose earlier
+   * deliveries never acknowledged (lease lapsed every time) eventually
+   * arrives here past `maxAttempts` and retires as dead WITHOUT running the
+   * handler again. Before this check such a message redelivered forever.
+   *
+   * Lease budget — the batch was leased up front, so a message deep in a
+   * slow batch may reach its turn with the shared lease nearly spent.
+   * Starting it would guarantee its acknowledgement is fenced and the
+   * effect runs twice; releasing it un-attempted keeps every delivery
+   * inside its lease.
+   */
+  private async dispatchOrShed(params: {
+    message: LeasedOutboxMessageRecord;
+    now: number;
+    leaseStartedAt: number;
+    report: DispatchReport;
+  }): Promise<void> {
+    const { message, now, leaseStartedAt, report } = params;
+    const identity = {
+      processName: message.processName,
+      projectId: message.projectId,
+      messageKey: message.messageKey,
+    };
+
+    if (message.attempts > this.maxAttempts) {
+      const { applied } = await this.store.markFailed({
+        identity,
+        leaseToken: message.leaseToken,
+        now,
+        nextAttemptAt: now,
+        dead: true,
+      });
+      if (!applied) {
+        this.countFenced({ message, report, phase: "retirement" });
+        return;
+      }
+      report.dead.push(message.messageKey);
+      incrementEsProcessOutboxTotal({
+        processName: message.processName,
+        intentType: message.intentType,
+        status: "dead",
+      });
+      this.logger.error(
+        {
+          processName: message.processName,
+          processKey: message.processKey,
+          projectId: message.projectId,
+          tenantId: message.tenantId,
+          messageKey: message.messageKey,
+          intentType: message.intentType,
+          attempts: message.attempts,
+        },
+        "Process-manager outbox message exhausted its attempts without ever " +
+          "acknowledging — retiring it as dead. Its handler is either not " +
+          "settling or repeatedly outliving the lease.",
+      );
+      return;
+    }
+
+    const elapsedMs = this.clock() - leaseStartedAt;
+    if (this.leaseDurationMs - elapsedMs < this.leaseSafetyMarginMs) {
+      const { applied } = await this.store.releaseLease({
+        identity,
+        leaseToken: message.leaseToken,
+        now,
+      });
+      if (applied) {
+        report.released.push(message.messageKey);
+        incrementEsProcessOutboxTotal({
+          processName: message.processName,
+          intentType: message.intentType,
+          status: "released",
+        });
+      }
+      this.logger.debug(
+        {
+          processName: message.processName,
+          messageKey: message.messageKey,
+          intentType: message.intentType,
+          elapsedMs: Math.round(elapsedMs),
+          leaseDurationMs: this.leaseDurationMs,
+          applied,
+        },
+        "Released a leased outbox message un-attempted; the batch ran out of lease budget",
+      );
+      return;
+    }
+
+    await this.dispatchOne({ message, now, report });
+  }
+
+  private countFenced(params: {
+    message: LeasedOutboxMessageRecord;
+    report: DispatchReport;
+    phase: "dispatched" | "failed" | "retirement";
+    durationMs?: number;
+  }): void {
+    const { message, report, phase, durationMs } = params;
+    report.fenced.push(message.messageKey);
+    incrementEsProcessOutboxTotal({
+      processName: message.processName,
+      intentType: message.intentType,
+      status: "fenced",
+    });
+    this.logger.warn(
+      {
+        processName: message.processName,
+        processKey: message.processKey,
+        projectId: message.projectId,
+        tenantId: message.tenantId,
+        messageKey: message.messageKey,
+        intentType: message.intentType,
+        attempt: message.attempts,
+        phase,
+        ...(durationMs !== undefined
+          ? { durationMs: Math.round(durationMs) }
+          : {}),
+      },
+      "Process-manager outbox acknowledgement was fenced by a lapsed lease — " +
+        "another dispatcher superseded it and the effect may have run more " +
+        "than once; message-key idempotency in the handler absorbs the " +
+        "duplicate",
+    );
   }
 
   private async dispatchOne(params: {
@@ -186,7 +353,9 @@ export class OutboxDispatcherService {
     report: DispatchReport;
   }): Promise<void> {
     const { message, now, report } = params;
-    const attempt = message.attempts + 1;
+    // Leasing already incremented `attempts`, so the leased record carries
+    // this delivery's 1-based attempt number.
+    const attempt = message.attempts;
     const identity = {
       processName: message.processName,
       projectId: message.projectId,
@@ -246,11 +415,20 @@ export class OutboxDispatcherService {
               attempt,
             },
           });
-          await this.store.markDispatched({
+          const { applied } = await this.store.markDispatched({
             identity,
             leaseToken: message.leaseToken,
             now,
           });
+          if (!applied) {
+            this.countFenced({
+              message,
+              report,
+              phase: "dispatched",
+              durationMs: performance.now() - startedAt,
+            });
+            return;
+          }
           report.dispatched.push(message.messageKey);
           incrementEsProcessOutboxTotal({
             processName: message.processName,
@@ -269,13 +447,22 @@ export class OutboxDispatcherService {
             this.retryDelayMs({ attempt }),
             retryAfterMsOf(error) ?? 0,
           );
-          await this.store.markFailed({
+          const { applied } = await this.store.markFailed({
             identity,
             leaseToken: message.leaseToken,
             now,
             nextAttemptAt: now + retryDelayMs,
             dead,
           });
+          if (!applied) {
+            this.countFenced({
+              message,
+              report,
+              phase: "failed",
+              durationMs: performance.now() - startedAt,
+            });
+            return;
+          }
           (dead ? report.dead : report.retried).push(message.messageKey);
           incrementEsProcessOutboxTotal({
             processName: message.processName,

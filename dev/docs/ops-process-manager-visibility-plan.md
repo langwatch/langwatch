@@ -33,7 +33,18 @@ Implementation notes that differ from the sketch below:
   the index is ops-managed via CREATE INDEX CONCURRENTLY per the
   table-purge runbook.
 - Grafana alert routes on the `pm_*` gauges are a saas-infra change, tracked
-  there, not here.
+  there, not here. The expressions to provision (from the #7016 forensics;
+  the chart's Alertmanager is disabled, so these live in production Grafana):
+  - `max(pm_outbox_overdue_pending{process_name="triggerSettlement"}) > 200`
+    sustained 30m warns; `> 1000` sustained 30m pages. Always `max()` across
+    pods, never `sum()` — the gauges are global table counts reported per pod.
+  - `sum(rate(es_process_outbox_total{status="fenced"}[10m])) > 0` sustained
+    15m — an acknowledgement fenced by a lapsed lease means a delivery ran
+    past its lease and may have run twice.
+  - `sum(rate(es_process_outbox_stuck_drains_total[10m])) > 0` — a drain that
+    never settled; the watchdog recovered the loop, the cause needs a look.
+  - `histogram_quantile(0.95, sum by (le, process_name) (rate(es_process_outbox_dispatch_lag_milliseconds_bucket[15m]))) > 900000`
+    sustained 30m — the outbox is not draining for that process.
 
 The `/ops` surface covers queues (groups, blocked, DLQ, parked), projections,
 blobs, and the scheduler. The process-manager substrate (ADR-049) has **no

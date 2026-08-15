@@ -311,39 +311,89 @@ describe("PrismaProcessStore", () => {
       projectId: "project-1",
       messageKey: "message-1",
     };
-    await store.markDispatched({
+    const staleDispatch = await store.markDispatched({
       identity,
       leaseToken: first.leaseToken,
       now: base + 101,
     });
-    await store.markFailed({
+    const staleFail = await store.markFailed({
       identity,
       leaseToken: first.leaseToken,
       now: base + 102,
       nextAttemptAt: base + 1_000,
       dead: true,
     });
+    expect(staleDispatch).toEqual({ applied: false });
+    expect(staleFail).toEqual({ applied: false });
 
+    // Each lease charged one delivery start; the fenced acknowledgements
+    // changed nothing.
     expect(await store.findMessagesByRef({ ref: ref() })).toEqual([
       expect.objectContaining({
         status: "pending",
-        attempts: 0,
+        attempts: 2,
         leaseToken: second.leaseToken,
       }),
     ]);
 
-    await store.markDispatched({
+    const liveDispatch = await store.markDispatched({
       identity,
       leaseToken: second.leaseToken,
       now: base + 103,
     });
+    expect(liveDispatch).toEqual({ applied: true });
     expect(await store.findMessagesByRef({ ref: ref() })).toEqual([
       expect.objectContaining({
         status: "dispatched",
-        attempts: 1,
+        attempts: 2,
         leaseToken: null,
       }),
     ]);
+  });
+
+  it("releases a leased message un-attempted and leaves it immediately due", async () => {
+    const base = 1_700_000_000_000;
+    await store.commit(commit({ now: base }));
+    const leased = (
+      await store.leaseDueMessages({
+        now: base,
+        limit: 1,
+        leaseDurationMs: 30_000,
+      })
+    )[0]!;
+    expect(leased.attempts).toBe(1);
+
+    const identity = {
+      processName,
+      projectId: "project-1",
+      messageKey: "message-1",
+    };
+    const released = await store.releaseLease({
+      identity,
+      leaseToken: leased.leaseToken,
+      now: base + 10,
+    });
+    expect(released).toEqual({ applied: true });
+
+    // The attempt the lease charged was handed back, and the message is
+    // leasable in the same instant — no backoff for work that never ran.
+    const again = (
+      await store.leaseDueMessages({
+        now: base + 10,
+        limit: 1,
+        leaseDurationMs: 30_000,
+      })
+    )[0]!;
+    expect(again.messageKey).toBe("message-1");
+    expect(again.attempts).toBe(1);
+
+    // A release with the superseded token is a no-op.
+    const stale = await store.releaseLease({
+      identity,
+      leaseToken: leased.leaseToken,
+      now: base + 20,
+    });
+    expect(stale).toEqual({ applied: false });
   });
 
   it("persists retry, dead, and dispatched transitions with exact epoch times", async () => {
@@ -856,10 +906,12 @@ describe("PrismaProcessStore", () => {
         processNames: [processName],
       });
       expect(leased).toHaveLength(1);
+      // The requeue reset the budget to zero; the fresh lease then charged
+      // the first delivery start.
       expect(leased[0]).toMatchObject({
         messageKey: "send:endpoint-a:deadbeef",
         status: "pending",
-        attempts: 0,
+        attempts: 1,
       });
     });
 

@@ -239,7 +239,14 @@ export class ProcessRuntime {
     const outboxWorker = new ProcessOutboxWorker({
       dispatcher,
       logger: this.logger,
+      name: config.name,
       batchSize: config.outbox?.batchSize,
+      // Far above any legitimate drain (a full batch of slow deliveries fits
+      // in one lease), so only a never-settling delivery trips it.
+      stuckDrainTimeoutMs: Math.max(
+        5 * (config.outbox?.leaseDurationMs ?? 30_000),
+        300_000,
+      ),
     });
     const registered = { definition, manager, outboxWorker };
     this.managers.set(config.name, registered);
