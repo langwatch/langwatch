@@ -34,7 +34,7 @@ import type {
   Prisma,
   PrismaClient,
 } from "~/generated/prisma/client";
-
+import { isDispatchableProvider } from "~/server/modelProviders/registry";
 import type { ScopeInput, VirtualKeyWithScopes } from "./virtualKey.repository";
 
 export type EligibleModelProvider = ModelProvider;
@@ -49,13 +49,15 @@ export async function eligibleModelProvidersForVk(
   const scopePredicates = await buildScopePredicates(client, vk);
   if (scopePredicates.length === 0) return [];
 
-  const candidates = await client.modelProvider.findMany({
-    where: {
-      enabled: true,
-      disabledAt: null,
-      scopes: { some: { OR: scopePredicates } },
-    },
-  });
+  const candidates = (
+    await client.modelProvider.findMany({
+      where: {
+        enabled: true,
+        disabledAt: null,
+        scopes: { some: { OR: scopePredicates } },
+      },
+    })
+  ).filter((mp) => isDispatchableProvider(mp.provider));
 
   if (vk.routingPolicyId) {
     const policy = await client.routingPolicy.findUnique({

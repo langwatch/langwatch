@@ -32,6 +32,12 @@ export interface GithubPullRequestRow {
   prCreatedAt: Date;
   prClosedAt: Date | null;
   prMergedAt: Date | null;
+  /**
+   * GitHub's own `updated_at` for the snapshot in this row. Null for a row
+   * written before the column existed, which reads as "unknown" and accepts
+   * the next write.
+   */
+  prUpdatedAt: Date | null;
   mappedAt: Date;
   lastCheckedAt: Date;
 }
@@ -51,6 +57,8 @@ export interface UpsertGithubPullRequestInput {
   prCreatedAt: Date;
   prClosedAt: Date | null;
   prMergedAt: Date | null;
+  /** When GitHub last changed this snapshot. The write's ordering key. */
+  prUpdatedAt: Date;
 }
 
 /** The columns a live read refreshes when the stored snapshot has drifted. */
@@ -64,6 +72,8 @@ export interface RefreshGithubPullRequestSnapshotInput {
   isDraft: boolean;
   prClosedAt: Date | null;
   prMergedAt: Date | null;
+  /** When GitHub last changed this snapshot. The write's ordering key. */
+  prUpdatedAt: Date;
 }
 
 /** One branch's lookup bookkeeping. */
@@ -94,7 +104,22 @@ export interface UpsertGithubBranchCheckInput {
 }
 
 export interface GithubPullRequestsRepository {
-  /** Idempotent write of a mapping run's pull requests, by the unique key. */
+  /**
+   * Idempotent write of a mapping run's pull requests, by the unique key, and
+   * ONLY when the incoming snapshot is at least as fresh as the stored one.
+   *
+   * Both writers into this table can arrive late. GitHub permits out-of-order
+   * webhook delivery, so a delayed `opened` or `edited` can land after `closed`
+   * was applied, and a slow REST listing can answer after a webhook already
+   * stored a newer state. Written last-write-wins, either one reopens a merged
+   * pull request and clears `prClosedAt` and `prMergedAt` — the two columns
+   * session-to-pull-request attribution reads to decide which sessions belong
+   * to which pull request — and regresses the title the page shows.
+   *
+   * `prUpdatedAt` orders the writes. A strictly older snapshot is skipped
+   * silently; an equal one still writes, so a redelivery stays idempotent
+   * rather than becoming a no-op that depends on delivery order.
+   */
   upsertPullRequests(params: {
     pullRequests: readonly UpsertGithubPullRequestInput[];
   }): Promise<void>;
@@ -133,6 +158,10 @@ export interface GithubPullRequestsRepository {
    * Refresh the snapshot columns a live status read found to have drifted.
    * A no-op when the row is gone; a live read must never resurrect a mapping
    * the mapping run has not made.
+   *
+   * Guarded by `prUpdatedAt` exactly as `upsertPullRequests` is: this read runs
+   * while a page is open, so its answer can be overtaken by a webhook before
+   * the write lands.
    */
   refreshSnapshot(input: RefreshGithubPullRequestSnapshotInput): Promise<void>;
 
@@ -187,6 +216,25 @@ export interface GithubPullRequestsRepository {
     headBranch: string;
     lastRequestedAt: Date;
     staleBefore: Date;
+  }): Promise<void>;
+
+  /**
+   * Pull a branch's next question forward to `dueAt`, and put its attempt count
+   * back to zero, for a branch fresh session activity says is still being
+   * worked on.
+   *
+   * Only ever brings it forward: a row already due at or before `dueAt` is left
+   * alone, so this cannot push a question further away, and a branch that has
+   * already mapped (`recheckAfter` is null) is not touched at all. That bound is
+   * what makes it safe to call on every fold: several agent worktrees folding
+   * on one branch within a minute all land on the same due date.
+   */
+  bringBranchRecheckForward(params: {
+    organizationId: string;
+    repositoryHost: string;
+    repositoryFullName: string;
+    headBranch: string;
+    dueAt: Date;
   }): Promise<void>;
 
   /**
@@ -258,6 +306,7 @@ export class NullGithubPullRequestsRepository
     return false;
   }
   async touchBranchCheckRequestedAt(): Promise<void> {}
+  async bringBranchRecheckForward(): Promise<void> {}
   async findRecheckDue(): Promise<GithubBranchCheckRow[]> {
     return [];
   }

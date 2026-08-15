@@ -14,6 +14,11 @@ import { findPhoneNumbersInText } from "libphonenumber-js";
  * a nearby context word, merge overlapping spans preferring the longer, then
  * rebuild the string in one pass replacing each survivor with its typed marker
  * (`[EMAIL_ADDRESS]`, `[PHONE_NUMBER]`, ...).
+ *
+ * Machine identifiers are held out of that: an attribute value that is
+ * exclusively one identifier-shaped token runs only the self-proving
+ * recognizers, and a phone number inside a longer token that carries letters is
+ * dropped wherever it appears.
  */
 
 const MAX_SCAN_LENGTH = 250_000;
@@ -49,6 +54,13 @@ interface Recognizer {
   /** Low-confidence patterns only fire when one of these words is within the window. */
   contextRequired?: boolean;
   contextWords?: string[];
+  /**
+   * The match carries its own proof: a checksum, or a marker no machine
+   * identifier holds by accident. Only these recognizers keep running on a
+   * value that is exclusively one identifier-shaped token
+   * (see {@link isIdentifierShapedValue}).
+   */
+  isSelfProving?: boolean;
 }
 
 function luhnValid(raw: string): boolean {
@@ -117,6 +129,7 @@ const RECOGNIZERS: Recognizer[] = [
   {
     entity: "EMAIL_ADDRESS",
     regex: /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g,
+    isSelfProving: true,
   },
   {
     entity: "IP_ADDRESS",
@@ -132,16 +145,19 @@ const RECOGNIZERS: Recognizer[] = [
     entity: "CREDIT_CARD",
     regex: /\b\d(?:[ -]?\d){12,18}\b/g,
     validate: luhnValid,
+    isSelfProving: true,
   },
   {
     entity: "IBAN_CODE",
     regex: /\b[A-Z]{2}\d{2}[A-Z0-9]{11,30}\b/g,
     validate: ibanValid,
+    isSelfProving: true,
   },
-  { entity: "CRYPTO", regex: /\b0x[a-fA-F0-9]{40}\b/g },
+  { entity: "CRYPTO", regex: /\b0x[a-fA-F0-9]{40}\b/g, isSelfProving: true },
   {
     entity: "CRYPTO",
     regex: /\b(?:bc1[a-z0-9]{25,62}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})\b/g,
+    isSelfProving: true,
   },
   // Hyphenated US SSN is distinctive enough to fire without context.
   { entity: "US_SSN", regex: /\b\d{3}-\d{2}-\d{4}\b/g },
@@ -226,6 +242,7 @@ const RECOGNIZERS: Recognizer[] = [
     entity: "BR_CPF",
     regex: /\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/g,
     validate: cpfValid,
+    isSelfProving: true,
   },
 ];
 
@@ -234,6 +251,81 @@ interface Span {
   end: number;
   /** The PII entity that matched here, written as the redaction marker. */
   entity: string;
+}
+
+const HAS_WHITESPACE = /\s/;
+const HAS_LETTER = /[A-Za-z]/;
+const HAS_DIGIT = /\d/;
+const HAS_LOWERCASE = /[a-z]/;
+const HAS_UPPERCASE = /[A-Z]/;
+const UUID_VALUE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const HEX_RUN_VALUE = /^[0-9a-f]{16,}$/i;
+const BASE64ISH_VALUE = /^[A-Za-z0-9+/_=-]{16,}$/;
+
+/**
+ * The characters an identifier is written with: letters, digits, and the
+ * separators ids use. A quote, a brace, a comma or a slash means the text is
+ * structure that HOLDS values rather than one identifier, so minified JSON and
+ * URLs stay fully scanned.
+ */
+const IDENTIFIER_VALUE = /^[A-Za-z0-9._:-]+$/;
+
+/**
+ * The characters that carry on an identifier around a detected span. Narrower
+ * than {@link IDENTIFIER_VALUE}: a dot or a colon ends the token here, so
+ * sentence punctuation and `"phone":"+1..."` in minified JSON cannot pull a
+ * detected number into an identifier that surrounds it.
+ */
+const IDENTIFIER_TOKEN_CHAR = /[A-Za-z0-9_-]/;
+
+/**
+ * How far the identifier rules read. Identifiers people send as references are
+ * far shorter, and the cap keeps both checks flat in the ingestion path however
+ * long the text is.
+ */
+const MAX_IDENTIFIER_LENGTH = 256;
+
+/**
+ * Whether a whole attribute value is exclusively one identifier-shaped token:
+ * letters together with digits and identifier separators
+ * (`hosted-eu-20260812-09`), or the shape of a uuid, a hex digest, or a
+ * base64-style token.
+ *
+ * The letter requirement is what keeps personal data in scope. A value built
+ * only from digits and separators (`+31 6 12345678`, `20260812-09`, a bare card
+ * number) is never identifier-shaped here, however much a customer means it as
+ * a reference.
+ */
+function isIdentifierShapedValue(value: string): boolean {
+  if (value.length > MAX_IDENTIFIER_LENGTH || !HAS_LETTER.test(value)) {
+    return false;
+  }
+  if (HAS_DIGIT.test(value) && IDENTIFIER_VALUE.test(value)) return true;
+  if (UUID_VALUE.test(value) || HEX_RUN_VALUE.test(value)) return true;
+  return (
+    BASE64ISH_VALUE.test(value) &&
+    HAS_LOWERCASE.test(value) &&
+    HAS_UPPERCASE.test(value)
+  );
+}
+
+/**
+ * Whether a match sits inside a longer identifier: the identifier characters
+ * around it reach past the match and carry a letter, as the `20260812-09` in
+ * `hosted-eu-20260812-09` does. A match that itself holds whitespace
+ * (`+31 6 12345678`) covers more than one token, so it is never inside one.
+ */
+function insideIdentifierToken(text: string, span: Span): boolean {
+  if (HAS_WHITESPACE.test(text.slice(span.start, span.end))) return false;
+  const floor = Math.max(0, span.start - MAX_IDENTIFIER_LENGTH);
+  let start = span.start;
+  while (start > floor && IDENTIFIER_TOKEN_CHAR.test(text[start - 1]!)) start--;
+  const ceiling = Math.min(text.length, span.end + MAX_IDENTIFIER_LENGTH);
+  let end = span.end;
+  while (end < ceiling && IDENTIFIER_TOKEN_CHAR.test(text[end]!)) end++;
+  if (start === span.start && end === span.end) return false;
+  return HAS_LETTER.test(text.slice(start, end));
 }
 
 function hasContextWord(
@@ -382,8 +474,28 @@ function recognizedSpanFor({
 }
 
 /**
- * Regex/checksum recognizer pass: every `RECOGNIZERS` entry allowed by
- * `allowed`, reduced match-by-match via `recognizedSpanFor`. Split out of
+ * Whether one recognizer runs in this pass: the custom level can narrow the
+ * set through `allowed`, and on an identifier-shaped value only the recognizers
+ * that prove their own finding run. That value is one token a customer sends as
+ * a reference, so a shape, or a word inside that same token, is not evidence of
+ * personal data.
+ */
+function recognizerRuns({
+  recognizer,
+  allowed,
+  isIdentifierShaped,
+}: {
+  recognizer: Recognizer;
+  allowed: ReadonlySet<string> | null;
+  isIdentifierShaped: boolean;
+}): boolean {
+  if (allowed && !allowed.has(recognizer.entity)) return false;
+  return !isIdentifierShaped || recognizer.isSelfProving === true;
+}
+
+/**
+ * Regex/checksum recognizer pass: every `RECOGNIZERS` entry `recognizerRuns`
+ * keeps, reduced match-by-match via `recognizedSpanFor`. Split out of
  * `collectCandidateSpans` so each pass stays independently under the
  * cognitive-complexity budget.
  */
@@ -391,14 +503,16 @@ function collectRecognizerSpans({
   text,
   allowed,
   excepted,
+  isIdentifierShaped,
 }: {
   text: string;
   allowed: ReadonlySet<string> | null;
   excepted: (span: Span) => boolean;
+  isIdentifierShaped: boolean;
 }): Span[] {
   const spans: Span[] = [];
   for (const recognizer of RECOGNIZERS) {
-    if (allowed && !allowed.has(recognizer.entity)) continue;
+    if (!recognizerRuns({ recognizer, allowed, isIdentifierShaped })) continue;
     for (const match of text.matchAll(recognizer.regex)) {
       const span = recognizedSpanFor({ recognizer, match, text, excepted });
       if (span) spans.push(span);
@@ -412,16 +526,24 @@ function collectRecognizerSpans({
  * the regex recognizers. Kept separate from `collectRecognizerSpans`: it is a
  * different library and match shape (`startsAt`/`endsAt`, not a regex match),
  * not a different set of rules.
+ *
+ * The detector has no checksum and no context word to prove a finding: any
+ * digit run that parses as a dialable number matches. Two rules hold it to
+ * digits a customer wrote as a number. It never runs on an identifier-shaped
+ * value, and a match inside a longer token that carries letters is dropped.
  */
 function collectPhoneSpans({
   text,
   allowed,
   excepted,
+  isIdentifierShaped,
 }: {
   text: string;
   allowed: ReadonlySet<string> | null;
   excepted: (span: Span) => boolean;
+  isIdentifierShaped: boolean;
 }): Span[] {
+  if (isIdentifierShaped) return [];
   if (allowed && !allowed.has("PHONE_NUMBER")) return [];
   const spans: Span[] = [];
   try {
@@ -433,6 +555,7 @@ function collectPhoneSpans({
         end: phone.endsAt,
         entity: "PHONE_NUMBER",
       };
+      if (insideIdentifierToken(text, span)) continue;
       if (excepted(span)) continue;
       spans.push(span);
     }
@@ -454,11 +577,13 @@ function collectCandidateSpans({
   allowed,
   exceptPatterns,
   protectedRanges,
+  isIdentifierShaped,
 }: {
   text: string;
   allowed: ReadonlySet<string> | null;
   exceptPatterns: readonly RegExp[] | undefined;
   protectedRanges: ProtectedRange[];
+  isIdentifierShaped: boolean;
 }): Span[] {
   const excepted = (span: Span): boolean => {
     const veto =
@@ -470,8 +595,8 @@ function collectCandidateSpans({
   };
 
   return [
-    ...collectRecognizerSpans({ text, allowed, excepted }),
-    ...collectPhoneSpans({ text, allowed, excepted }),
+    ...collectRecognizerSpans({ text, allowed, excepted, isIdentifierShaped }),
+    ...collectPhoneSpans({ text, allowed, excepted, isIdentifierShaped }),
   ];
 }
 
@@ -522,15 +647,23 @@ function maskSpans({
  * `exceptPatterns` are the policy's do-not-redact exceptions (pre-anchored via
  * `compilePiiExceptPatterns`): a detected span whose entire matched text
  * matches one of them is left as it was.
+ *
+ * `isAttributeValue` says the text is one attribute value rather than free
+ * text. A value that is exclusively one identifier-shaped token then runs only
+ * the self-proving recognizers, because customers send identifiers on purpose
+ * and a shape alone does not make one personal data. Free text never takes the
+ * exemption: a document with no spaces in it is still a document.
  */
 export function redactEssentialPiiInText({
   text,
   entities,
   exceptPatterns,
+  isAttributeValue = false,
 }: {
   text: string;
   entities?: readonly string[];
   exceptPatterns?: readonly RegExp[];
+  isAttributeValue?: boolean;
 }): PiiRedactionResult {
   if (
     typeof text !== "string" ||
@@ -546,6 +679,7 @@ export function redactEssentialPiiInText({
     allowed: entities ? new Set(entities) : null,
     exceptPatterns,
     protectedRanges,
+    isIdentifierShaped: isAttributeValue && isIdentifierShapedValue(text),
   });
   if (spans.length === 0) return { text, redactedCount: 0 };
 

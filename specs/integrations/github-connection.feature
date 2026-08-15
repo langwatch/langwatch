@@ -55,6 +55,15 @@ Rule: Connection state is visible to members, managed by organization managers
     Then I see that the GitHub integration is unavailable on this instance
     And I am not offered an Install button
 
+  # The install link is a deep link into github.com built from the App slug, so
+  # an instance holding an id and a key but no slug mints tokens perfectly well
+  # and still has nowhere to send someone who clicks Connect.
+  @unit
+  Scenario: An instance that cannot start an installation offers no install link
+    Given the instance is missing part of what starting an installation needs
+    When I read the connection status
+    Then no install link comes back
+
 Rule: The installation flow verifies who is installing what
 
   @integration

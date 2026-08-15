@@ -24,8 +24,13 @@ import { createLogger } from "@langwatch/observability";
 import type { GithubInstallationsService } from "./github-installations.service";
 import {
   type GithubAppTokenService,
+  type GithubPullRequestSummary,
   GithubRateLimitedError,
 } from "./githubAppToken";
+import {
+  type GithubPullRequestEvent,
+  LINKING_PULL_REQUEST_ACTIONS,
+} from "./githubPullRequestEvent";
 import type {
   GithubPullRequestsRepository,
   UpsertGithubPullRequestInput,
@@ -58,9 +63,16 @@ const REQUEST_TOUCH_MS = 60 * 60 * 1000;
 
 /**
  * The backoff a branch with no pull request walks, indexed by how many empty
- * answers it has given. The last entry is the cap: a branch that has been empty
- * four times is a branch whose work never became a pull request, and asking
- * daily is generous.
+ * answers it has given. The last entry is the cap for a branch nothing has
+ * anything more to say about.
+ *
+ * A branch someone is actually working on does not reach that cap. Two things
+ * keep it off: a pull request being opened arrives as a `pull_request` webhook
+ * and is linked on the spot rather than waited for, and a session folding on
+ * the branch brings its next question back to the first rung. Both matter,
+ * because the ladder on its own is climbing fastest exactly when the pull
+ * request is about to appear: branches are cut first, worked for hours, and
+ * turned into a pull request last.
  */
 const EMPTY_BACKOFF_MS = [
   15 * 60 * 1000,
@@ -68,6 +80,17 @@ const EMPTY_BACKOFF_MS = [
   4 * 60 * 60 * 1000,
   24 * 60 * 60 * 1000,
 ] as const;
+
+/**
+ * The longest a branch with fresh session activity waits before being asked
+ * again: the first rung, whatever the branch had climbed to.
+ *
+ * A ceiling rather than a reset to zero, deliberately. However many agent
+ * worktrees fold on one branch in a minute, the branch is still not asked about
+ * again until this much time has passed, so bringing the question forward
+ * cannot turn into a call per fold.
+ */
+const ACTIVE_BRANCH_MAX_BACKOFF_MS = EMPTY_BACKOFF_MS[0];
 
 /** How far back the post-connect backfill looks for branches to map. */
 export const BACKFILL_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
@@ -188,13 +211,106 @@ export class GithubPullRequestMappingService {
       request.tenantId,
     );
     if (!organizationId) return;
-    await this.mapBranch({
+    const target: BranchMappingTarget = {
       organizationId,
       repositoryHost: request.repositoryHost,
       repositoryOwner: request.repositoryOwner,
       repositoryName: request.repositoryName,
       headBranch: request.headBranch,
+    };
+    // This entry point, and only this one, means a session just folded on the
+    // branch. The sweep and the backfill call `mapBranch` directly and carry no
+    // such evidence.
+    await this.bringRecheckForward(target);
+    await this.mapBranch(target);
+  }
+
+  /**
+   * Cancel however far a branch had climbed the backoff, because a session just
+   * ran on it.
+   *
+   * The branch's own empty answers are what put it there, on the reading that a
+   * branch which has answered empty enough times never will have a pull
+   * request. A session folding on that branch is the plainest evidence against
+   * it. Bounded by {@link ACTIVE_BRANCH_MAX_BACKOFF_MS} rather than cleared, so
+   * the branch rejoins the sweep at the first rung instead of being asked about
+   * on every fold, and the attempt count goes back to zero so a later empty
+   * answer starts the ladder again rather than resuming near its cap.
+   *
+   * A no-op for a branch already due sooner, for one that has already mapped
+   * (its `recheckAfter` is null), and for one with no bookkeeping row at all,
+   * which `mapBranch` is about to create.
+   */
+  private async bringRecheckForward(
+    target: BranchMappingTarget,
+  ): Promise<void> {
+    const scope = branchScopeFor(target);
+    if (!scope) return;
+    await this.deps.repository.bringBranchRecheckForward({
+      ...scope,
+      dueAt: new Date(nowMs(this.deps) + ACTIVE_BRANCH_MAX_BACKOFF_MS),
     });
+  }
+
+  /**
+   * Link a branch from a `pull_request` webhook delivery: the event-driven half
+   * of linkage, and the one that makes it feel immediate.
+   *
+   * Nothing here calls GitHub. The delivery already carries the pull request in
+   * the same shape the REST listing returns, so it goes through the same
+   * normalisation and the same write as a listing's answer, and the write
+   * clears the branch's negative cache exactly as a found pull request does.
+   *
+   * Three things it deliberately does NOT check:
+   *
+   *   - the lookup claim, which exists to stop concurrent callers making the
+   *     same GitHub call. There is no call to serialise here, and both writes
+   *     are upserts on the same unique keys, so a redelivered event lands on
+   *     the same row with the same values.
+   *   - whether the installation is suspended. GitHub does not deliver for a
+   *     suspended installation, so the delivery is itself fresher evidence than
+   *     a local flag that a missed `suspend`/`unsuspend` pair may have stranded.
+   *   - whether the connection covers the repository. GitHub only delivers for
+   *     repositories the installation is actually on, which is a better answer
+   *     than the cached repository selection this instance holds.
+   *
+   * Tenancy comes from the installation row and nothing in the payload: an
+   * installation id maps to exactly one organization, bound at `/setup` behind
+   * the cross-tenant takeover guard. An installation this instance has no row
+   * for is dropped, because there is no organization to attribute it to.
+   *
+   * Returns whether the event was applied, which is what the route logs.
+   */
+  async applyPullRequestEvent(event: GithubPullRequestEvent): Promise<boolean> {
+    if (!LINKING_PULL_REQUEST_ACTIONS.has(event.action)) return false;
+
+    const installation = await this.deps.installations.getByInstallationId(
+      event.installationId,
+    );
+    if (!installation) {
+      logger.info(
+        { installationId: event.installationId, action: event.action },
+        "pull request event for an installation with no local record",
+      );
+      return false;
+    }
+
+    const scope = branchScopeFor({
+      organizationId: installation.organizationId,
+      // The App is a github.com App, so a delivery can only ever be about it.
+      repositoryHost: GITHUB_HOST,
+      repositoryOwner: event.repositoryOwner,
+      repositoryName: event.repositoryName,
+      headBranch: event.headBranch,
+    });
+    if (!scope) return false;
+
+    await this.recordAnswer({
+      scope,
+      pullRequests: [event.pullRequest],
+      isExhaustive: false,
+    });
+    return true;
   }
 
   /**
@@ -202,20 +318,8 @@ export class GithubPullRequestMappingService {
    * directly, having read the organization off the bookkeeping row.
    */
   async mapBranch(target: BranchMappingTarget): Promise<void> {
-    if (!isMappableHost(target.repositoryHost)) return;
-    const scope = {
-      organizationId: target.organizationId,
-      repositoryHost: normalizeHost(target.repositoryHost),
-      repositoryFullName: `${target.repositoryOwner}/${target.repositoryName}`,
-      headBranch: target.headBranch,
-    };
-    if (
-      !scope.headBranch ||
-      !target.repositoryOwner ||
-      !target.repositoryName
-    ) {
-      return;
-    }
+    const scope = branchScopeFor(target);
+    if (!scope) return;
 
     const covering =
       await this.deps.installations.resolveInstallationForRepository({
@@ -239,7 +343,7 @@ export class GithubPullRequestMappingService {
         repo: target.repositoryName,
         branch: scope.headBranch,
       });
-      await this.recordAnswer({ scope, pullRequests });
+      await this.recordAnswer({ scope, pullRequests, isExhaustive: true });
     } catch (error) {
       await this.recordFailure({ scope, error });
     }
@@ -403,15 +507,25 @@ export class GithubPullRequestMappingService {
     return false;
   }
 
-  /** Store what GitHub answered, and set the next question's due date. */
+  /**
+   * Store what GitHub said, and set the next question's due date. Shared by
+   * both halves of linkage: a listing's answer, and a webhook's announcement.
+   */
   private async recordAnswer({
     scope,
     pullRequests,
+    isExhaustive,
   }: {
     scope: BranchScope;
-    pullRequests: Awaited<
-      ReturnType<GithubAppTokenService["listPullRequestsForHead"]>
-    >;
+    pullRequests: readonly GithubPullRequestSummary[];
+    /**
+     * Whether `pullRequests` is everything the branch has. A listing answers
+     * for the whole branch, so its count replaces the stored one; a webhook
+     * describes a single pull request, so it may only raise that count. Lower
+     * it and a branch known to host two pull requests reads as hosting one,
+     * which is the number the freshness guard on the lookup claim reads.
+     */
+    isExhaustive: boolean;
   }): Promise<void> {
     const now = new Date(nowMs(this.deps));
     if (pullRequests.length > 0) {
@@ -428,7 +542,9 @@ export class GithubPullRequestMappingService {
     await this.deps.repository.upsertBranchCheck({
       ...scope,
       lastCheckedAt: now,
-      prCount: pullRequests.length,
+      prCount: isExhaustive
+        ? pullRequests.length
+        : Math.max(existing?.prCount ?? 0, pullRequests.length),
       // A pull request clears the negative cache outright: the branch has an
       // answer, and a stale notFoundAt would keep the sweep asking about it
       // forever.
@@ -486,14 +602,30 @@ interface BranchScope {
   headBranch: string;
 }
 
+/**
+ * The bookkeeping key for a target, or null when it names no branch this
+ * connection can answer for. Every write in this service goes through it, so
+ * the host fold and the owner/name/branch completeness check happen once.
+ */
+function branchScopeFor(target: BranchMappingTarget): BranchScope | null {
+  if (!isMappableHost(target.repositoryHost)) return null;
+  if (!target.headBranch || !target.repositoryOwner || !target.repositoryName) {
+    return null;
+  }
+  return {
+    organizationId: target.organizationId,
+    repositoryHost: normalizeHost(target.repositoryHost),
+    repositoryFullName: `${target.repositoryOwner}/${target.repositoryName}`,
+    headBranch: target.headBranch,
+  };
+}
+
 function toUpsertInput({
   scope,
   pull,
 }: {
   scope: BranchScope;
-  pull: Awaited<
-    ReturnType<GithubAppTokenService["listPullRequestsForHead"]>
-  >[number];
+  pull: GithubPullRequestSummary;
 }): UpsertGithubPullRequestInput {
   return {
     organizationId: scope.organizationId,
@@ -509,5 +641,9 @@ function toUpsertInput({
     prCreatedAt: new Date(pull.createdAt),
     prClosedAt: pull.closedAt ? new Date(pull.closedAt) : null,
     prMergedAt: pull.mergedAt ? new Date(pull.mergedAt) : null,
+    // The ordering key the store writes behind. Both a webhook and a listing
+    // can arrive after a newer snapshot was already stored, and this is what
+    // stops either from rolling the row back.
+    prUpdatedAt: new Date(pull.updatedAt),
   };
 }

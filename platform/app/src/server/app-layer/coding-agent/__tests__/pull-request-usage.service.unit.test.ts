@@ -35,6 +35,7 @@ function pullRequestRow(
     prCreatedAt: new Date(NOW - 10 * HOUR),
     prClosedAt: null,
     prMergedAt: null,
+    prUpdatedAt: new Date(NOW - 10 * HOUR),
     mappedAt: new Date(NOW - 10 * HOUR),
     lastCheckedAt: new Date(NOW),
     ...over,

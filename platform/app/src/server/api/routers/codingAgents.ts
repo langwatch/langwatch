@@ -2,6 +2,7 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { GithubPullRequestNotMappedError } from "~/server/app-layer/github/errors";
+import { getGithubAppConfig } from "~/server/app-layer/github/githubAppConfig";
 import {
   type CallerProjectScope,
   resolveCallerProjectScope,
@@ -253,6 +254,11 @@ async function scopeFor({
  * route answers 503 there, and a link that cannot start its flow is worse than
  * no link at all. It is the only availability signal in this payload, so its
  * absence is what tells the page not to offer connecting.
+ *
+ * "Configured" is read the way the install route reads it, App slug included.
+ * The token service answers a narrower question, whether it can mint, and an
+ * instance holding an id and a key but no slug mints happily while the deep
+ * link this builds has nowhere on github.com to point.
  */
 async function connectionFor(projectId: string): Promise<{
   connected: boolean;
@@ -264,7 +270,7 @@ async function connectionFor(projectId: string): Promise<{
   const existing = await installations.getAllForOrganization(organizationId);
   return {
     connected: existing.length > 0,
-    installUrl: installations.configured
+    installUrl: getGithubAppConfig().configured
       ? `/api/github/install?organizationId=${encodeURIComponent(organizationId)}`
       : null,
   };

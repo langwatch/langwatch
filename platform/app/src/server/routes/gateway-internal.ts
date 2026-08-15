@@ -52,6 +52,7 @@ import {
   parseVirtualKey,
   VirtualKeyCryptoError,
 } from "~/server/gateway/virtualKey.crypto";
+import { ROUTING_POLICY_SELECT } from "~/server/gateway/virtualKey.repository";
 import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
 import { CodexGatewayRefreshService } from "~/server/modelProviders/codexAccount.service";
 import { ModelProviderRepository } from "~/server/modelProviders/modelProvider.repository";
@@ -524,9 +525,7 @@ secured.access(gatewayPolicy()).get("/config/:vk_id", async (c) => {
       // Without it the materialiser reads an absent relation and emits an
       // empty alias map plus empty deny/allow lists, so the gateway never
       // resolves an alias and never enforces a model deny rule.
-      routingPolicy: {
-        select: { id: true, modelAliases: true, policyRules: true },
-      },
+      routingPolicy: { select: ROUTING_POLICY_SELECT },
     },
   });
   if (!vk) {

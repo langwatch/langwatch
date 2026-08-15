@@ -372,7 +372,7 @@ worktree:
 	@./dev/scripts/worktree.sh $(WORKTREE_ARG)
 
 sync-all-openapi:
-	pnpm run task generateOpenAPISpec
+	cd platform/app && pnpm run task generateOpenAPISpec
 	cd sdks/typescript && pnpm run generate:openapi-types
 	cd sdks/python && make generate/api-client
 

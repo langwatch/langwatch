@@ -44,6 +44,7 @@ import { HandledErrorAlert, showErrorToast } from "~/features/errors";
 import type { SimulationSuite } from "~/generated/prisma/client";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { usePreloadDrawer } from "~/hooks/usePreloadDrawer";
 import { useScenarioTabFollow } from "~/hooks/useScenarioTabFollow";
 import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
 import type { ScenarioTabNavigatePayload } from "~/server/scenarios/browser-tab/scenario-tab-events";
@@ -55,6 +56,10 @@ import { NowProvider } from "./NowProvider";
 export default function SimulationsPage() {
   const { project } = useOrganizationTeamProject();
   const { openDrawer, setFlowCallbacks } = useDrawer();
+  // The rows open a run's detail and the sidebar opens the run plan editor,
+  // both separate downloads. Fetch them while the person reads the runs, so
+  // the click opens the drawer rather than a spinner.
+  usePreloadDrawer("scenarioRunDetail", "suiteEditor");
   const utils = api.useUtils();
   const { selectedSuiteSlug, navigateToSuite, highlightBatchId } =
     useSuiteRouting();

@@ -1,5 +1,5 @@
 import { nanoid } from "nanoid";
-import type { PrismaClient } from "~/generated/prisma/client";
+import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import { toPgTimestampUtc } from "~/server/utils/pgTimestamp";
 
 import type {
@@ -50,6 +50,7 @@ type PullRequestRecord = {
   prCreatedAt: Date;
   prClosedAt: Date | null;
   prMergedAt: Date | null;
+  prUpdatedAt: Date | null;
   mappedAt: Date;
   lastCheckedAt: Date;
 };
@@ -82,9 +83,33 @@ function toPullRequestRow(record: PullRequestRecord): GithubPullRequestRow {
     prCreatedAt: record.prCreatedAt,
     prClosedAt: record.prClosedAt,
     prMergedAt: record.prMergedAt,
+    prUpdatedAt: record.prUpdatedAt,
     mappedAt: record.mappedAt,
     lastCheckedAt: record.lastCheckedAt,
   };
+}
+
+/**
+ * The predicate that makes a snapshot write monotonic: accept it only when the
+ * stored row has no source timestamp, or has one at or before the incoming
+ * snapshot's.
+ *
+ * `lte` rather than `lt` on purpose. GitHub redelivers, and two events can
+ * share one `updated_at` (a label added in the same second as an edit, say), so
+ * refusing an equal timestamp would make the winner depend on which delivery
+ * arrived first.
+ */
+function freshnessGuard(prUpdatedAt: Date) {
+  return {
+    OR: [{ prUpdatedAt: null }, { prUpdatedAt: { lte: prUpdatedAt } }],
+  };
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2002"
+  );
 }
 
 function toBranchCheckRow(record: BranchCheckRecord): GithubBranchCheckRow {
@@ -113,38 +138,66 @@ export class PrismaGithubPullRequestsRepository
     pullRequests: readonly UpsertGithubPullRequestInput[];
   }): Promise<void> {
     for (const pullRequest of pullRequests) {
-      const repositoryFullName = normalizeFullName(
-        pullRequest.repositoryFullName,
-      );
-      const snapshot = {
-        headBranch: pullRequest.headBranch,
-        htmlUrl: pullRequest.htmlUrl,
-        title: pullRequest.title,
-        state: pullRequest.state,
-        isDraft: pullRequest.isDraft,
-        authorLogin: pullRequest.authorLogin,
-        prCreatedAt: pullRequest.prCreatedAt,
-        prClosedAt: pullRequest.prClosedAt,
-        prMergedAt: pullRequest.prMergedAt,
-        lastCheckedAt: new Date(),
-      };
-      await this.prisma.githubPullRequest.upsert({
-        where: {
-          organizationId_repositoryHost_repositoryFullName_prNumber: {
-            organizationId: pullRequest.organizationId,
-            repositoryHost: normalizeHost(pullRequest.repositoryHost),
-            repositoryFullName,
-            prNumber: pullRequest.prNumber,
-          },
-        },
-        create: {
-          organizationId: pullRequest.organizationId,
-          repositoryHost: normalizeHost(pullRequest.repositoryHost),
-          repositoryFullName,
-          prNumber: pullRequest.prNumber,
-          ...snapshot,
-        },
-        update: snapshot,
+      await this.writeSnapshot(pullRequest);
+    }
+  }
+
+  /**
+   * One pull request, written only when its snapshot is at least as fresh as
+   * the stored one.
+   *
+   * Prisma's `upsert` cannot express it: its `update` is unconditional, and the
+   * whole point is that an older snapshot must match nothing. So the write is
+   * a guarded `updateMany` first, and a `create` only when that matched no row.
+   *
+   * `create` racing another writer is expected rather than exceptional, and the
+   * unique index is what decides it. The loser catches the violation and runs
+   * the same guarded update against the winner's committed row, so whichever
+   * order the two arrive in, the fresher snapshot is the one left stored.
+   *
+   * A strictly older snapshot walks all three steps and changes nothing, which
+   * is the intended outcome and is not reported: a late delivery is ordinary,
+   * not a failure the caller can act on.
+   */
+  private async writeSnapshot(
+    pullRequest: UpsertGithubPullRequestInput,
+  ): Promise<void> {
+    const key = {
+      organizationId: pullRequest.organizationId,
+      repositoryHost: normalizeHost(pullRequest.repositoryHost),
+      repositoryFullName: normalizeFullName(pullRequest.repositoryFullName),
+      prNumber: pullRequest.prNumber,
+    };
+    const snapshot = {
+      headBranch: pullRequest.headBranch,
+      htmlUrl: pullRequest.htmlUrl,
+      title: pullRequest.title,
+      state: pullRequest.state,
+      isDraft: pullRequest.isDraft,
+      authorLogin: pullRequest.authorLogin,
+      prCreatedAt: pullRequest.prCreatedAt,
+      prClosedAt: pullRequest.prClosedAt,
+      prMergedAt: pullRequest.prMergedAt,
+      prUpdatedAt: pullRequest.prUpdatedAt,
+      lastCheckedAt: new Date(),
+    };
+    const guard = freshnessGuard(pullRequest.prUpdatedAt);
+
+    const updated = await this.prisma.githubPullRequest.updateMany({
+      where: { ...key, ...guard },
+      data: snapshot,
+    });
+    if (updated.count > 0) return;
+
+    try {
+      await this.prisma.githubPullRequest.create({
+        data: { ...key, ...snapshot },
+      });
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+      await this.prisma.githubPullRequest.updateMany({
+        where: { ...key, ...guard },
+        data: snapshot,
       });
     }
   }
@@ -232,6 +285,9 @@ export class PrismaGithubPullRequestsRepository
         repositoryHost: normalizeHost(input.repositoryHost),
         repositoryFullName: normalizeFullName(input.repositoryFullName),
         prNumber: input.prNumber,
+        // A live read is answered while a page is open, so a webhook can store
+        // a newer snapshot between the read and this write.
+        ...freshnessGuard(input.prUpdatedAt),
       },
       data: {
         title: input.title,
@@ -239,6 +295,7 @@ export class PrismaGithubPullRequestsRepository
         isDraft: input.isDraft,
         prClosedAt: input.prClosedAt,
         prMergedAt: input.prMergedAt,
+        prUpdatedAt: input.prUpdatedAt,
         lastCheckedAt: new Date(),
       },
     });
@@ -392,6 +449,34 @@ export class PrismaGithubPullRequestsRepository
         lastRequestedAt: { lte: staleBefore },
       },
       data: { lastRequestedAt },
+    });
+  }
+
+  async bringBranchRecheckForward({
+    organizationId,
+    repositoryHost,
+    repositoryFullName,
+    headBranch,
+    dueAt,
+  }: {
+    organizationId: string;
+    repositoryHost: string;
+    repositoryFullName: string;
+    headBranch: string;
+    dueAt: Date;
+  }): Promise<void> {
+    await this.prisma.githubBranchPullRequestCheck.updateMany({
+      where: {
+        organizationId,
+        repositoryHost: normalizeHost(repositoryHost),
+        repositoryFullName: normalizeFullName(repositoryFullName),
+        headBranch,
+        // Only a branch waiting longer than this. A row already due sooner is
+        // left alone, which is also what keeps a live lookup claim, whose lease
+        // sits seconds away, from being extended by a concurrent fold.
+        recheckAfter: { gt: dueAt },
+      },
+      data: { recheckAfter: dueAt, attempts: 0 },
     });
   }
 

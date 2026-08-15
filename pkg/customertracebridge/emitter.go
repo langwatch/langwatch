@@ -276,6 +276,9 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 		attrTotalUsage.Int(params.Usage.TotalTokens),
 		attrCost.Int64(params.Usage.CostMicroUSD),
 	}
+	if params.RequestedModel != "" {
+		attrs = append(attrs, attribute.String(AttrRequestedModel, params.RequestedModel))
+	}
 	// Audio tokens ride beside the text totals, not inside them, so the cost
 	// pipeline can price them at the audio rate. Reporting them inside
 	// gen_ai.usage.input_tokens instead priced an eight-times-dearer token at

@@ -395,7 +395,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Governance overview](https://langwatch.ai/docs/ai-gateway/governance/overview.md): One control plane for every AI tool in your enterprise — virtual keys, SSO, per-user identity, policy, and budgets across Claude Code, Codex, Cursor, Gemini CLI, and your custom agents.
 - [Personal IDE keys — your AI tools, governed by your company](https://langwatch.ai/docs/ai-gateway/governance/personal-keys.md): Install LangWatch, run `langwatch login`, and use Claude Code / Cursor / Codex with org-attributed spend, a personal monthly budget, and zero per-tool config.
 - [Admin setup](https://langwatch.ai/docs/ai-gateway/governance/admin-setup.md): One-time configuration for an organization rolling out LangWatch Governance — SSO, providers, routing policies, and budgets.
-- [Routing policies](https://langwatch.ai/docs/ai-gateway/governance/routing-policies.md): Decouple the credential from the provider chain — admins publish routing policies once, virtual keys reference them by ID.
+- [Routing policies](https://langwatch.ai/docs/ai-gateway/governance/routing-policies.md): An admin decides once which providers and models a key can reach. Virtual keys point at that decision instead of carrying their own copy.
 - [Retention](https://langwatch.ai/docs/ai-gateway/governance/retention.md): How long governance and gateway data lives, tenant retention policies, what is deliberately exempt, and what that means for compliance evidence.
 
 ## Providers

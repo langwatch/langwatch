@@ -43,6 +43,10 @@ export const SPAN_ATTR_MAPPINGS = [
   // row id), so usage views can break spend down by the vendor that served
   // the call.
   ["langwatch.model_provider_id", "langwatch.model_provider_id"],
+  // The model name the client sent, present only when a routing policy
+  // rewrote it. gen_ai.request.model holds the model that was dispatched,
+  // so this is what answers which tier or which legacy name a caller uses.
+  ["langwatch.requested_model", "langwatch.requested_model"],
   // Governance ingest markers — stamped on every span by the
   // /api/ingest/otel/:sourceId receiver (platform/app/src/server/routes/ingest/ingestionRoutes.ts).
   // Hoisted into trace_summaries so the ActivityMonitorService dashboard

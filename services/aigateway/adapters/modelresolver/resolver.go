@@ -92,8 +92,17 @@ func (r *Resolver) Resolve(ctx context.Context, req *domain.Request, config doma
 	target := rawModel
 	source := domain.ModelSourceImplicit
 
-	// 1. Check aliases
+	// 1. Check aliases. The allowlist judges the model the alias resolves to,
+	// not the name the caller typed: an alias is a convenience for naming a
+	// model, never a way to reach one this key may not use. Returning here
+	// without the check is what let an alias route around models_allowed.
 	if alias, ok := config.ModelAliases[rawModel]; ok {
+		if !config.AllowsResolvedModel(alias.ProviderID, alias.Model) {
+			return nil, herr.New(ctx, domain.ErrModelNotAllowed, herr.M{
+				"message": "model not allowed: " + alias.Model + ` (named "` + rawModel + `" by this key)`,
+				"fault":   "customer",
+			})
+		}
 		target = alias.Model
 		source = domain.ModelSourceAlias
 		return &domain.ResolvedModel{
@@ -107,11 +116,17 @@ func (r *Resolver) Resolve(ctx context.Context, req *domain.Request, config doma
 	if strings.Contains(target, "/") {
 		source = domain.ModelSourceExplicit
 		parts := strings.SplitN(target, "/", 2)
-		providerID := normalizeProvider(parts[0])
+		providerID := domain.NormalizeProviderID(parts[0])
 		modelID := parts[1]
 
-		if !modelAllowed(config, modelID) {
-			return nil, herr.New(ctx, domain.ErrModelNotAllowed, herr.M{"message": "model not allowed: " + modelID})
+		if !config.AllowsResolvedModel(providerID, modelID) {
+			// Echo the spelling the caller sent. Naming the bare model here
+			// reads as a different refusal than the one they asked for, since
+			// the same model under another provider is a separate allowance.
+			return nil, herr.New(ctx, domain.ErrModelNotAllowed, herr.M{
+				"message": "model not allowed: " + target,
+				"fault":   "customer",
+			})
 		}
 
 		return &domain.ResolvedModel{
@@ -123,7 +138,10 @@ func (r *Resolver) Resolve(ctx context.Context, req *domain.Request, config doma
 
 	// 3. Implicit: infer provider from first credential
 	if !modelAllowed(config, target) {
-		return nil, herr.New(ctx, domain.ErrModelNotAllowed, herr.M{"message": "model not allowed: " + target})
+		return nil, herr.New(ctx, domain.ErrModelNotAllowed, herr.M{
+			"message": "model not allowed: " + target,
+			"fault":   "customer",
+		})
 	}
 
 	return &domain.ResolvedModel{
@@ -131,25 +149,6 @@ func (r *Resolver) Resolve(ctx context.Context, req *domain.Request, config doma
 		ProviderID: "", // will be filled by credential selection
 		Source:     source,
 	}, nil
-}
-
-func normalizeProvider(raw string) domain.ProviderID {
-	switch raw {
-	case "azure_openai", "azure":
-		return domain.ProviderAzure
-	case "google_vertex", "vertex":
-		return domain.ProviderVertex
-	case "aws_bedrock", "bedrock":
-		return domain.ProviderBedrock
-	case "google_gemini", "gemini":
-		return domain.ProviderGemini
-	case "anthropic":
-		return domain.ProviderAnthropic
-	case "openai":
-		return domain.ProviderOpenAI
-	default:
-		return domain.ProviderID(raw)
-	}
 }
 
 func modelAllowed(config domain.BundleConfig, model string) bool {

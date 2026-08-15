@@ -62,10 +62,12 @@ type providerSlotWire struct {
 	DeploymentMap map[string]string `json:"deployment_map,omitempty"`
 }
 
+// fallbackWire is the fallback block of the config payload. Only max_attempts
+// and chain are read. A control plane that predates this build still sends
+// "on" and "timeout_ms"; they are ignored on decode, which is what keeps a
+// rolling deploy from needing the two sides to agree.
 type fallbackWire struct {
-	On          []string `json:"on"`
 	Chain       []string `json:"chain"`
-	TimeoutMs   int      `json:"timeout_ms"`
 	MaxAttempts int      `json:"max_attempts"`
 }
 
@@ -176,7 +178,6 @@ func (w *configWire) toDomain() domain.BundleConfig {
 		RoutingMode:      w.RoutingMode,
 		Fallback: domain.FallbackConfig{
 			MaxAttempts: w.Fallback.MaxAttempts,
-			On:          w.Fallback.On,
 		},
 		Guardrails: buildGuardrails(w.Guardrails, w.GuardrailAttachments),
 	}
@@ -303,7 +304,7 @@ func buildModelAlias(target string) domain.ModelAlias {
 	if !found || provider == "" || model == "" {
 		return domain.ModelAlias{Model: target}
 	}
-	return domain.ModelAlias{ProviderID: normalizeProviderType(provider), Model: model}
+	return domain.ModelAlias{ProviderID: domain.NormalizeProviderID(provider), Model: model}
 }
 
 func buildPolicyRules(pr policyRulesWire) []domain.PolicyRule {
@@ -385,7 +386,7 @@ func buildCacheRules(wires []cacheRuleWire) []domain.CacheRule {
 func providerSlotToCredential(p providerSlotWire) domain.Credential {
 	cred := domain.Credential{
 		ID:         p.ID,
-		ProviderID: normalizeProviderType(p.Type),
+		ProviderID: domain.NormalizeProviderID(p.Type),
 	}
 
 	getString := func(key string) string {
@@ -461,25 +462,4 @@ func providerSlotToCredential(p providerSlotWire) domain.Credential {
 	}
 
 	return cred
-}
-
-func normalizeProviderType(t string) domain.ProviderID {
-	switch t {
-	case "azure":
-		return domain.ProviderAzure
-	case "bedrock", "aws_bedrock":
-		return domain.ProviderBedrock
-	case "vertex", "vertex_ai", "google_vertex":
-		return domain.ProviderVertex
-	case "gemini", "google_gemini":
-		return domain.ProviderGemini
-	case "anthropic":
-		return domain.ProviderAnthropic
-	case "openai":
-		return domain.ProviderOpenAI
-	case "openai_codex":
-		return domain.ProviderOpenAICodex
-	default:
-		return domain.ProviderID(t)
-	}
 }
