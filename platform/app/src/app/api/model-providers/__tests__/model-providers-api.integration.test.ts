@@ -145,7 +145,7 @@ describe("Model Providers API", () => {
       });
     });
 
-    describe("when a provider stores credentials that are not named as keys", () => {
+    describe("given a provider stores credentials that are not named as keys", () => {
       // The response is reachable with a project API key, which customers
       // deploy into their own applications and CI. Nothing in it may carry a
       // credential value, whatever the field is called. The OAuth-device
