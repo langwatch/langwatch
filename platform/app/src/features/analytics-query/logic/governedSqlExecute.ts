@@ -13,7 +13,7 @@
 import { getUntypedClient } from "@trpc/client";
 
 import type { GovernedSqlQueryResult } from "~/server/analytics/governed-sql";
-import type { api } from "~/utils/api";
+import type { api, RouterInputs } from "~/utils/api";
 
 import type { GovernedSqlExecute } from "./governedSqlRequestController";
 import type { GovernedSqlParameterValue } from "./governedSqlRequestState";
@@ -22,6 +22,34 @@ type TrpcUtils = ReturnType<typeof api.useUtils>;
 
 /** Dotted path, because the call is made through the untyped client. */
 const GOVERNED_SQL_QUERY_PATH = "analytics.governedSql.query";
+
+/**
+ * The input the pinned call signature below declares.
+ *
+ * Written out rather than inferred because the dotted-path call defeats
+ * inference (see {@link createGovernedSqlExecute}). Naming it is what lets the
+ * assertion underneath tie it back to the procedure's own schema.
+ */
+type GovernedSqlQueryInput = {
+  projectId: string;
+  sql: string;
+  parameters?: Readonly<Record<string, GovernedSqlParameterValue>>;
+  timeWindow?: { start: Date; end: Date };
+};
+
+/**
+ * Binds the hand-written shape to the router's schema at compile time.
+ *
+ * Pinning the signature is unavoidable, but drifting from the procedure is
+ * not: if `analytics.governedSql.query` gains, drops or retypes a field, the
+ * constraint below stops being satisfied and this file fails to compile
+ * instead of failing at runtime.
+ */
+type AssignableToQueryInput<
+  T extends RouterInputs["analytics"]["governedSql"]["query"],
+> = T;
+type _GovernedSqlQueryInputMatchesRouter =
+  AssignableToQueryInput<GovernedSqlQueryInput>;
 
 /**
  * Binds an executor to one project.
@@ -47,12 +75,7 @@ export function createGovernedSqlExecute({
   );
   const mutate = client.mutation.bind(client) as (
     path: typeof GOVERNED_SQL_QUERY_PATH,
-    input: {
-      projectId: string;
-      sql: string;
-      parameters?: Readonly<Record<string, GovernedSqlParameterValue>>;
-      timeWindow?: { start: Date; end: Date };
-    },
+    input: GovernedSqlQueryInput,
     options?: { signal?: AbortSignal },
   ) => Promise<GovernedSqlQueryResult>;
 
