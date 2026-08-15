@@ -230,5 +230,16 @@ func extractTranscriptionUsage(resp *bfschemas.BifrostTranscriptionResponse) dom
 	if resp.Usage.Seconds != nil {
 		u.AudioSeconds = float64(*resp.Usage.Seconds)
 	}
+	// The gpt-4o transcribe family states how much of the input was audio
+	// ("input_token_details":{"text_tokens":0,"audio_tokens":65}). Taking the
+	// audio out of the prompt total is what lets a caller see the measure the
+	// model actually consumed, and prices it at the audio rate where the
+	// provider charges one.
+	if d := resp.Usage.InputTokenDetails; d != nil {
+		u = u.SplitAudioTokens(domain.AudioTokenSplit{
+			InputAudio: d.AudioTokens,
+			InputText:  d.TextTokens,
+		})
+	}
 	return u
 }

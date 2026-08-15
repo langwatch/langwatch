@@ -114,6 +114,41 @@ func TestExtractSpeechUsage_SplitsAudioOutOfTheInputTotal(t *testing.T) {
 	assert.Equal(t, 4000, u.InputChars)
 }
 
+// A gpt-4o transcribe response states the whole input as audio
+// ("input_token_details":{"text_tokens":0,"audio_tokens":65}), so the prompt
+// total goes to zero and the audio count carries the measure.
+func TestExtractTranscriptionUsage_SplitsAudioOutOfTheInputTotal(t *testing.T) {
+	inputTokens, outputTokens, totalTokens := 65, 32, 97
+	u := extractTranscriptionUsage(&bfschemas.BifrostTranscriptionResponse{
+		Usage: &bfschemas.TranscriptionUsage{
+			Type:         "tokens",
+			InputTokens:  &inputTokens,
+			OutputTokens: &outputTokens,
+			TotalTokens:  &totalTokens,
+			InputTokenDetails: &bfschemas.TranscriptionUsageInputTokenDetails{
+				TextTokens: 0, AudioTokens: 65,
+			},
+		},
+	})
+
+	assert.Equal(t, 0, u.PromptTokens)
+	assert.Equal(t, 65, u.InputAudioTokens)
+	assert.Equal(t, 32, u.CompletionTokens)
+	assert.Equal(t, 97, u.TotalTokens)
+}
+
+// whisper-1 bills by duration and states no token details at all.
+func TestExtractTranscriptionUsage_KeepsTheDurationShapeUntouched(t *testing.T) {
+	seconds := 7
+	u := extractTranscriptionUsage(&bfschemas.BifrostTranscriptionResponse{
+		Usage: &bfschemas.TranscriptionUsage{Type: "duration", Seconds: &seconds},
+	})
+
+	assert.InDelta(t, 7.0, u.AudioSeconds, 1e-9)
+	assert.Zero(t, u.InputAudioTokens)
+	assert.Zero(t, u.PromptTokens)
+}
+
 func TestStreamIterator_KeepsAudioTokensAcrossChunks(t *testing.T) {
 	ch := make(chan *bfschemas.BifrostStreamChunk, 3)
 	// A passthrough stream that states the audio split once and then keeps
