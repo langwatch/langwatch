@@ -106,20 +106,32 @@ export function validateAgainstVegaLiteSchema(
 }
 
 /**
- * Keeps the errors with the longest instance path — the ones that point at a
+ * Keeps the errors at the deepest instance path — the ones that point at a
  * property rather than at the whole document — and drops the `anyOf`/`oneOf`
  * wrappers that only say a branch failed.
+ *
+ * Depth is counted in JSON Pointer segments, not characters. `instancePath` is
+ * a string, so ranking it by `.length` would score `/encoding` (9 characters,
+ * one segment deep) above `/x/y` (4 characters, two segments deep) and then
+ * drop the genuinely nested error — a long property name at the top level would
+ * outrank a real nested one.
  */
+function pointerDepth(error: ErrorObject): number {
+  return error.instancePath === ""
+    ? 0
+    : error.instancePath.split("/").length - 1;
+}
+
 function mostSpecificErrors(errors: readonly ErrorObject[]): ErrorObject[] {
   const concrete = errors.filter(
     (error) => !["anyOf", "oneOf", "if", "not"].includes(error.keyword),
   );
   const pool = concrete.length > 0 ? concrete : [...errors];
-  const deepest = Math.max(...pool.map((error) => error.instancePath.length));
+  const deepest = Math.max(...pool.map(pointerDepth));
 
   const seen = new Set<string>();
   return pool
-    .filter((error) => error.instancePath.length === deepest)
+    .filter((error) => pointerDepth(error) === deepest)
     .filter((error) => {
       const key = `${error.instancePath}|${error.keyword}|${error.message ?? ""}`;
       if (seen.has(key)) return false;
