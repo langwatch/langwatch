@@ -153,9 +153,9 @@ describe("the governed SQL request machine", () => {
       });
     });
 
-    describe("when a second submission is cancelled before it answers", () => {
-      /** @scenario "Editing SQL or parameters marks the result stale and restores Run query" */
-      it("leaves the earlier result stale rather than crediting it to the cancelled request", async () => {
+    describe("when the workbench is disposed before the second submission answers", () => {
+      /** @scenario "A stale result stays labelled as belonging to the previous submission" */
+      it("leaves the earlier result stale rather than crediting it to the abandoned request", async () => {
         const { calls, controller } = controllerWith({ sql: "SELECT 1" });
 
         controller.runQuery();
@@ -183,7 +183,7 @@ describe("the governed SQL request machine", () => {
     });
 
     describe("when a later submission fails after an earlier one succeeded", () => {
-      /** @scenario "A stale result stays labelled as belonging to the previous submission" */
+      /** @scenario "Editing SQL or parameters marks the result stale and restores Run query" */
       it("replaces the visible result with the failure, credited to the request that failed", async () => {
         const { calls, controller } = controllerWith({ sql: "SELECT 1" });
 

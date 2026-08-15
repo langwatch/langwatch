@@ -189,6 +189,38 @@ describe("the governed schema browser", () => {
           screen.queryByTestId("governed-schema-column-trace_id"),
         ).not.toBeInTheDocument();
       });
+
+      /**
+       * A search holds every matching row open, so the header click has
+       * nothing visible to do. It used to still flip the underlying set, and
+       * that flip only surfaced once the search box was cleared — the row the
+       * member left collapsed came back open, with no action of theirs that
+       * could explain it.
+       *
+       * @scenario "A search narrows the schema browser"
+       */
+      it("does not let a click during the search silently flip a row open", () => {
+        renderBrowser();
+
+        fireEvent.change(screen.getByRole("searchbox"), {
+          target: { value: "latency" },
+        });
+
+        const toggle = datasetToggle("analytics.traces_daily");
+        // The search already opened it, so the control has nothing to offer.
+        expect(toggle).toHaveAttribute("aria-expanded", "true");
+        expect(toggle).toBeDisabled();
+
+        fireEvent.click(toggle);
+        fireEvent.change(screen.getByRole("searchbox"), {
+          target: { value: "" },
+        });
+
+        expect(datasetToggle("analytics.traces_daily")).toHaveAttribute(
+          "aria-expanded",
+          "false",
+        );
+      });
     });
 
     describe("when the member reads what the browser says about time", () => {

@@ -137,11 +137,18 @@ function ColumnRow({
 function DatasetEntry({
   dataset,
   expanded,
+  canToggle,
   onToggle,
   onInsert,
 }: {
   dataset: GovernedSchemaDatasetModel;
   expanded: boolean;
+  /**
+   * False while a search holds the row open. The click would otherwise flip
+   * expansion the member cannot see, and that hidden flip would then surface
+   * as a silently changed row the moment they clear the search box.
+   */
+  canToggle: boolean;
   onToggle: () => void;
   onInsert: (text: string) => void;
 }) {
@@ -157,10 +164,11 @@ function DatasetEntry({
         paddingY={1.5}
         borderRadius="6px"
         textAlign="left"
-        cursor="pointer"
-        _hover={{ background: "bg.muted" }}
+        cursor={canToggle ? "pointer" : "default"}
+        _hover={canToggle ? { background: "bg.muted" } : undefined}
         aria-expanded={expanded}
-        onClick={onToggle}
+        disabled={!canToggle}
+        onClick={canToggle ? onToggle : undefined}
       >
         <Box aria-hidden="true" display="flex" color="fg.subtle">
           {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
@@ -315,6 +323,7 @@ export function GovernedSchemaBrowser({
               key={dataset.name}
               dataset={dataset}
               expanded={expanded.has(dataset.name) || search.trim().length > 0}
+              canToggle={search.trim().length === 0}
               onToggle={() => toggle(dataset.name)}
               onInsert={onInsert}
             />
