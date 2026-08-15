@@ -1,8 +1,11 @@
 package app
 
 import (
+	"context"
+	"fmt"
 	"strings"
 
+	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -28,22 +31,32 @@ import (
 //     no provider knows the prefix, leave the chain untouched (fall
 //     back to existing behavior).
 //
-// Safety net: if the filter empties the chain entirely, return the
-// original creds. We never want this helper to convert "the user has
-// a usable provider somewhere" into a hard-fail; a wrong-provider
-// dispatch surfaces a clear error from Bifrost, but no-providers
-// surfaces an opaque internal error to the caller.
-func eligibleCredentials(creds []domain.Credential, resolved *domain.ResolvedModel) []domain.Credential {
+// Safety net (implicit names only): if inferring a provider from a bare
+// model name empties the chain, return the original creds — a bare model
+// name carries no provider prefix, so each attempt dispatches with the
+// credential's own provider and fails with that provider's real error.
+//
+// Explicitly-named providers (a "provider/model" prefix or an alias) get
+// the opposite treatment: an empty filter is a hard fail with
+// ErrProviderNotBound. Dispatching anyway would forward the prefixed
+// model string with a mismatched credential, and Bifrost's model-prefix
+// provider override then reads that credential through the wrong
+// provider's key-config shape — surfacing as opaque errors like
+// "deployments not set" (Azure), "no keys found that support model"
+// (Gemini), or raw HTML error pages (Vertex) instead of telling the
+// caller the provider isn't configured.
+func eligibleCredentials(ctx context.Context, creds []domain.Credential, resolved *domain.ResolvedModel) ([]domain.Credential, error) {
 	if len(creds) == 0 || resolved == nil {
-		return creds
+		return creds, nil
 	}
 
 	target := resolved.ProviderID
+	explicit := target != ""
 	if target == "" {
 		target = inferProviderFromModel(resolved.ModelID)
 	}
 	if target == "" {
-		return creds
+		return creds, nil
 	}
 
 	out := make([]domain.Credential, 0, len(creds))
@@ -53,9 +66,15 @@ func eligibleCredentials(creds []domain.Credential, resolved *domain.ResolvedMod
 		}
 	}
 	if len(out) == 0 {
-		return creds
+		if explicit {
+			return nil, herr.New(ctx, domain.ErrProviderNotBound, herr.M{
+				"message": fmt.Sprintf("no %q provider is configured for this key", target),
+				"hint":    fmt.Sprintf("bind a %q provider slot to this virtual key, or drop the %q model prefix", target, target),
+			})
+		}
+		return creds, nil
 	}
-	return out
+	return out, nil
 }
 
 // inferProviderFromModel maps a bare model name to the provider that

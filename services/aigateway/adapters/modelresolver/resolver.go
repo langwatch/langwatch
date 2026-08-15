@@ -107,7 +107,7 @@ func (r *Resolver) Resolve(ctx context.Context, req *domain.Request, config doma
 	if strings.Contains(target, "/") {
 		source = domain.ModelSourceExplicit
 		parts := strings.SplitN(target, "/", 2)
-		providerID := normalizeProvider(parts[0])
+		providerID := domain.NormalizeProviderID(parts[0])
 		modelID := parts[1]
 
 		if !modelAllowed(config, modelID) {
@@ -131,25 +131,6 @@ func (r *Resolver) Resolve(ctx context.Context, req *domain.Request, config doma
 		ProviderID: "", // will be filled by credential selection
 		Source:     source,
 	}, nil
-}
-
-func normalizeProvider(raw string) domain.ProviderID {
-	switch raw {
-	case "azure_openai", "azure":
-		return domain.ProviderAzure
-	case "google_vertex", "vertex":
-		return domain.ProviderVertex
-	case "aws_bedrock", "bedrock":
-		return domain.ProviderBedrock
-	case "google_gemini", "gemini":
-		return domain.ProviderGemini
-	case "anthropic":
-		return domain.ProviderAnthropic
-	case "openai":
-		return domain.ProviderOpenAI
-	default:
-		return domain.ProviderID(raw)
-	}
 }
 
 func modelAllowed(config domain.BundleConfig, model string) bool {
