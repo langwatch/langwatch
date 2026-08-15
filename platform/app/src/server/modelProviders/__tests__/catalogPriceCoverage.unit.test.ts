@@ -265,7 +265,10 @@ describe("overlay precedence", () => {
         // One upstream source reports this model's audio input rate as its
         // text rate, sixteen times under the published price. The overlay
         // corrects it, which only works while the overlay wins the merge.
-        // The output side is derived from this input rate by the cost layer.
+        // The cost layer does not price audio tokens yet; langwatch#7021 adds
+        // that, and derives the output rate from the input rate asserted here.
+        // Correcting the input rate first is what stops that derivation from
+        // producing a wrong output rate.
         const entry = llmModels.models["openai/gpt-audio-mini"];
         expect(entry).toBeDefined();
         expect(entry!.pricing.audioCostPerToken).toBe(1e-5);
