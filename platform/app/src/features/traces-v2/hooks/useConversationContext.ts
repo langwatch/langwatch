@@ -23,6 +23,14 @@ export interface ConversationTurn {
   outputRedacted?: boolean | null;
   inputVisibleTo?: string | null;
   outputVisibleTo?: string | null;
+  /**
+   * The turn's own totals, so the terminal view can count the session's turns
+   * above its loaded window without reading their transcripts. Optional
+   * because a cached response from before the fields existed may not carry
+   * them.
+   */
+  totalTokens?: number | null;
+  totalCost?: number | null;
 }
 
 export interface ConversationContextResult {

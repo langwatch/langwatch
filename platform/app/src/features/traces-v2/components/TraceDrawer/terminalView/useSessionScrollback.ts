@@ -28,14 +28,17 @@ interface TurnTarget {
 /**
  * What the top of the screen is currently offering.
  *
+ * - `pending`: the session's turn list is still being read, so whether
+ *   anything sits above this turn is not yet known.
  * - `hidden`: the trace belongs to no session, so there is nothing above it.
- * - `available`: earlier turns exist and are one gesture away.
+ * - `available`: earlier turns exist and are ready to load.
  * - `loading`: one is being read.
  * - `error`: the read failed and can be retried.
  * - `start`: the oldest loaded turn is the session's first.
  * - `unavailable`: the session is longer than the turn list can reach.
  */
 export type ScrollbackStatus =
+  | "pending"
   | "hidden"
   | "available"
   | "loading"
@@ -51,6 +54,15 @@ export interface SessionScrollback {
   status: ScrollbackStatus;
   /** Turns of the session still older than the oldest one loaded. */
   earlierCount: number;
+  /**
+   * Totals of those unloaded earlier turns, from the session's turn list, so
+   * the bottom bar can count the whole session up to the reader's position.
+   * Loading a turn moves its share from here into the loaded entries, so the
+   * sum the bar shows stays put. Null when the trace has no walkable session.
+   */
+  earlierTotals: { tokens: number; costUsd: number } | null;
+  /** When the session's first turn started; null without a walkable session. */
+  sessionStartAtMs: number | null;
   loadEarlier: () => void;
 }
 
@@ -122,16 +134,20 @@ function deriveStatus({
   hasSession,
   conversationId,
   turnCount,
+  turnListLoading,
   phase,
   earlierCount,
 }: {
   hasSession: boolean;
   conversationId: string | null;
   turnCount: number;
+  /** The session's turn list read is still in flight. */
+  turnListLoading: boolean;
   phase: Ledger["phase"];
   earlierCount: number;
 }): ScrollbackStatus {
   if (!hasSession) {
+    if (conversationId && turnListLoading) return "pending";
     return conversationId && turnCount >= CONVERSATION_TURN_CAP
       ? "unavailable"
       : "hidden";
@@ -295,7 +311,10 @@ export function useSessionScrollback({
   openedTranscript,
   openedToolSpans,
 }: SessionScrollbackInput): SessionScrollback {
-  const { turns } = useConversationContext(conversationId, traceId);
+  const { turns, isLoading: turnListLoading } = useConversationContext(
+    conversationId,
+    traceId,
+  );
   const key = `${projectId}|${traceId}|${conversationId ?? ""}`;
   const { current, loadTurn } = useTurnLedger({ key, projectId });
 
@@ -315,6 +334,7 @@ export function useSessionScrollback({
     hasSession,
     conversationId,
     turnCount: turns.length,
+    turnListLoading,
     phase: current.phase,
     earlierCount,
   });
@@ -341,6 +361,22 @@ export function useSessionScrollback({
     firstTurnNumber: oldestLoadedIndex + 1,
   });
 
+  // What the unloaded turns above the window add up to. Each turn's totals
+  // come from the session's turn list, so no transcript read is needed, and
+  // loading a turn moves its share from this sum into the loaded entries:
+  // the bottom bar's total at a fixed position never moves.
+  const earlierTotals = useMemo(() => {
+    if (!hasSession) return null;
+    let tokens = 0;
+    let costUsd = 0;
+    for (let i = 0; i < oldestLoadedIndex; i++) {
+      tokens += turns[i]?.totalTokens ?? 0;
+      costUsd += turns[i]?.totalCost ?? 0;
+    }
+    return { tokens, costUsd };
+  }, [hasSession, turns, oldestLoadedIndex]);
+  const sessionStartAtMs = hasSession ? (turns[0]?.timestamp ?? null) : null;
+
   const loadEarlier = useCallback(() => {
     if (!hasSession) return;
     const target = turns[oldestLoadedIndex - 1];
@@ -357,8 +393,17 @@ export function useSessionScrollback({
       turnDividers: merged.turnDividers,
       status,
       earlierCount,
+      earlierTotals,
+      sessionStartAtMs,
       loadEarlier,
     }),
-    [merged, status, earlierCount, loadEarlier],
+    [
+      merged,
+      status,
+      earlierCount,
+      earlierTotals,
+      sessionStartAtMs,
+      loadEarlier,
+    ],
   );
 }

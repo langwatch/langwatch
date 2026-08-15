@@ -87,11 +87,28 @@ Feature: Coding agent terminal view
   # `tracesV2.conversationContext`, so the view walks backwards through them and
   # prepends each earlier turn above the one already loaded.
   #
-  # Loading is driven by the reader's gesture, not by a sentinel's position: the
-  # tab opens at the top of its own turn, so anything position-triggered would
-  # walk the whole session back to turn one before the reader had read a line.
+  # The view opens pinned to the session's latest line, the way a terminal sits
+  # at its prompt, and keeps a buffer of earlier turns loaded above the reader:
+  # on open the buffer fills the screen with the turns that came before, and
+  # while reading back it stays ahead of the scroll so a short turn never loads
+  # in front of the reader's eyes. The buffer is a couple of viewports deep, so
+  # walking a long session back still happens turn by turn as the reader asks
+  # for it, not all at once.
 
 Rule: The terminal reads back the whole session
+
+  @integration
+  Scenario: Opening a session lands at its latest line
+    Given the terminal opened on the last turn of a session
+    When the transcript first renders
+    Then the screen is scrolled to the transcript's end
+    And the turns before it start loading above without any gesture
+
+  @integration
+  Scenario: Earlier turns preload before the reader reaches the top
+    Given the terminal opened on a later turn of a session
+    When the reader scrolls to within a couple of viewports of the top
+    Then the previous turn is asked for before the top is on screen
 
   @integration
   Scenario: Scrolling up past the top loads the previous turn
@@ -105,6 +122,26 @@ Rule: The terminal reads back the whole session
     Given a turn short enough that the reader is at the bottom of it
     When an earlier turn is prepended above it
     Then the screen stays where the reader left it instead of following the tail
+
+  # A context note says the context crossed into a bigger size band, which is a
+  # comparison against the call BEFORE the crossing. While earlier turns are
+  # still unloaded that call is unknown, and a note drawn from a guess gets
+  # redrawn when the truth arrives: the note the reader was looking at vanishes
+  # and the transcript under it shifts. A note is only drawn once the call
+  # before it is on screen, so loading history can only ever add lines above
+  # the reader, never remove one below them.
+
+  @integration
+  Scenario: A context note below the reader survives earlier turns loading
+    Given the loaded transcript starts mid-session with its context already grown
+    When an earlier turn is loaded above it
+    Then no context note below the loaded turn appears or disappears
+
+  @integration
+  Scenario: A context note waits for the call before it
+    Given the loaded transcript starts mid-session with its context already grown
+    When the notes are derived before the previous turn is loaded
+    Then no note claims the crossing happened at the first loaded call
 
   @integration
   Scenario: Reaching the first turn shows the session start
@@ -129,6 +166,31 @@ Rule: The terminal reads back the whole session
     Given an earlier turn was loaded above the opened turn
     When the reader reads the bottom bar
     Then the step count covers the earlier turn's beats as well
+
+  # The bottom bar reports what the session had cost by the beat the reader is
+  # on. That accumulation starts at turn one of the SESSION, not at the oldest
+  # turn that happens to be loaded: the turns above the loaded window carry
+  # their totals in the session's turn list, so the bar can count them without
+  # loading their transcripts, and loading one moves nothing.
+
+  @integration
+  Scenario: The footer counts the whole session up to the reader's position
+    Given the terminal opened on the last turn of a long session
+    When the reader reads the bottom bar
+    Then the cost and tokens cover every earlier turn of the session
+    And the elapsed time is measured from the session's first turn
+
+  @integration
+  Scenario: Loading an earlier turn does not change the footer's totals
+    Given the bottom bar reports the totals at the reader's position
+    When an earlier turn is loaded above the reader
+    Then the cost, tokens, and elapsed time at that position stay the same
+
+  @unit
+  Scenario: The turn list carries each turn's cost and tokens
+    Given a session whose turns are listed by the conversation read
+    When a turn of the session is listed
+    Then it carries the turn's total tokens and total cost
 
   # Agents inject blocks into the user's message that the human never typed: a
   # monitor firing, a hook's system reminder, a queued task notification. Printed

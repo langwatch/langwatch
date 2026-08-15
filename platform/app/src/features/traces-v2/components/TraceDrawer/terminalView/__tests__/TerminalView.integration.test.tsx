@@ -453,23 +453,24 @@ describe("TerminalView", () => {
     });
   });
 
-  describe("given earlier turns are one gesture away", () => {
-    describe("when the reader scrolls upward into the top", () => {
-      it("asks for the earlier turn once", () => {
+  describe("given earlier turns are available above", () => {
+    describe("when the reader is within the preload buffer of the top", () => {
+      /** @scenario "Earlier turns preload before the reader reaches the top" */
+      it("asks for the previous turn before the top is on screen", () => {
         const onLoadEarlier = vi.fn();
         const view = renderScrollback({
           scrollback: { status: "available", earlierCount: 3, onLoadEarlier },
         });
         fakeBox(view.screenEl, { scrollHeight: 1000 });
 
+        // Two viewports of 200px: anything under 400 is inside the buffer.
         scrollTo(view.screenEl, 300);
-        scrollTo(view.screenEl, 50);
 
-        expect(onLoadEarlier).toHaveBeenCalledTimes(1);
+        expect(onLoadEarlier).toHaveBeenCalled();
       });
     });
 
-    describe("when the reader scrolls upward but stays far from the top", () => {
+    describe("when the reader is beyond the preload buffer", () => {
       it("asks for nothing, because they are still reading this turn", () => {
         const onLoadEarlier = vi.fn();
         const view = renderScrollback({
@@ -484,44 +485,21 @@ describe("TerminalView", () => {
       });
     });
 
-    describe("when the reader moves downward at the same position", () => {
-      it("asks for nothing, because reading on is not reading back", () => {
-        const onLoadEarlier = vi.fn();
-        const view = renderScrollback({
-          scrollback: { status: "available", earlierCount: 3, onLoadEarlier },
-        });
-        fakeBox(view.screenEl, { scrollHeight: 1000 });
-
-        scrollTo(view.screenEl, 0);
-        scrollTo(view.screenEl, 120);
-
-        expect(onLoadEarlier).not.toHaveBeenCalled();
-      });
-    });
-
-    describe("when the turn is too short to scroll at all", () => {
-      it("reads the wheel instead, which is the only gesture left", () => {
+    describe("when a commit lands while the screen is not yet full", () => {
+      it("asks for the next turn without any gesture", () => {
         const onLoadEarlier = vi.fn();
         const view = renderScrollback({
           scrollback: { status: "available", earlierCount: 3, onLoadEarlier },
         });
         fakeBox(view.screenEl, { scrollHeight: 100 });
 
-        fireEvent.wheel(view.screenEl, { deltaY: -80 });
-
-        expect(onLoadEarlier).toHaveBeenCalledTimes(1);
-      });
-
-      it("ignores a wheel pointed the other way", () => {
-        const onLoadEarlier = vi.fn();
-        const view = renderScrollback({
-          scrollback: { status: "available", earlierCount: 3, onLoadEarlier },
+        // A commit re-checks the buffer on its own; no scroll or wheel
+        // reaches a screen whose content is too short to emit one.
+        act(() => {
+          view.rerender({ entries: [...OPENED_TURN] });
         });
-        fakeBox(view.screenEl, { scrollHeight: 100 });
 
-        fireEvent.wheel(view.screenEl, { deltaY: 80 });
-
-        expect(onLoadEarlier).not.toHaveBeenCalled();
+        expect(onLoadEarlier).toHaveBeenCalled();
       });
     });
 
@@ -535,9 +513,38 @@ describe("TerminalView", () => {
 
         scrollTo(view.screenEl, 300);
         scrollTo(view.screenEl, 50);
-        fireEvent.wheel(view.screenEl, { deltaY: -80 });
 
         expect(onLoadEarlier).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given the view just opened", () => {
+    describe("when the transcript first overflows the screen", () => {
+      /** @scenario "Opening a session lands at its latest line" */
+      it("lands at the session's latest line", () => {
+        const view = renderScrollback();
+
+        act(() => {
+          fakeBox(view.screenEl, { scrollHeight: 1000 });
+          view.rerender({ entries: [...OPENED_TURN] });
+        });
+
+        expect(view.screenEl.scrollTop).toBe(1000);
+      });
+    });
+
+    describe("when the reader has scrolled themselves", () => {
+      it("never jumps them to the end again", () => {
+        const view = renderScrollback();
+        fakeBox(view.screenEl, { scrollHeight: 1000 });
+        scrollTo(view.screenEl, 500);
+
+        act(() => {
+          view.rerender({ entries: [...OPENED_TURN] });
+        });
+
+        expect(view.screenEl.scrollTop).toBe(500);
       });
     });
   });
@@ -654,6 +661,150 @@ describe("TerminalView", () => {
     });
   });
 
+  describe("given the session's earlier turns are not loaded yet", () => {
+    /** @scenario "The footer counts the whole session up to the reader's position" */
+    it("counts the unloaded turns' tokens and cost into the bottom bar", () => {
+      renderView({
+        earlierTotals: { tokens: 1_000, costUsd: 1.0 },
+        sessionStartAtMs: 500,
+        scrollback: {
+          status: "available",
+          earlierCount: 5,
+          onLoadEarlier: vi.fn(),
+        },
+      });
+
+      // 1,000 tokens and $1.00 above the window, 175 tokens and $0.06 loaded.
+      expect(screen.getByText("1.2K tokens")).toBeInTheDocument();
+      expect(screen.getByText("$1.06")).toBeInTheDocument();
+    });
+
+    it("measures elapsed time from the session's first turn", () => {
+      renderView({
+        earlierTotals: { tokens: 0, costUsd: 0 },
+        sessionStartAtMs: 500,
+      });
+
+      // The last entry is at 3,000ms; the session started at 500ms.
+      expect(screen.getByText("2.5s")).toBeInTheDocument();
+    });
+
+    /** @scenario "Loading an earlier turn does not change the footer's totals" */
+    it("keeps the totals at the reader's position when an earlier turn lands", () => {
+      const view = renderScrollback({
+        earlierTotals: { tokens: 175, costUsd: 0.06 },
+        sessionStartAtMs: 500,
+        scrollback: {
+          status: "available",
+          earlierCount: 1,
+          onLoadEarlier: vi.fn(),
+        },
+      });
+      expect(screen.getByText("175 tokens")).toBeInTheDocument();
+      expect(screen.getByText("$0.06")).toBeInTheDocument();
+
+      // The earlier turn lands: its share moves out of the baseline and into
+      // the loaded entries, and the bar reads exactly the same.
+      act(() => {
+        fakeBox(view.screenEl, { scrollHeight: 500 });
+        view.rerender({
+          entries: [...EARLIER_TURN_WITH_CALL, ...OPENED_TURN],
+          rowKeys: [...EARLIER_WITH_CALL_KEYS, ...OPENED_KEYS],
+          turnDividers: TURN_DIVIDERS_AFTER_CALL,
+          earlierTotals: { tokens: 0, costUsd: 0 },
+          scrollback: {
+            status: "start",
+            earlierCount: 0,
+            onLoadEarlier: vi.fn(),
+          },
+        });
+      });
+
+      expect(screen.getByText("175 tokens")).toBeInTheDocument();
+      expect(screen.getByText("$0.06")).toBeInTheDocument();
+    });
+  });
+
+  describe("given the loaded transcript starts mid-session with its context already grown", () => {
+    /** @scenario "A context note waits for the call before it" */
+    it("draws no context note while the call before it is unknown", () => {
+      renderView({
+        entries: GROWN_OPENED_TURN,
+        scrollback: {
+          status: "available",
+          earlierCount: 3,
+          onLoadEarlier: vi.fn(),
+        },
+      });
+
+      expect(screen.queryByText(/Context growing/)).not.toBeInTheDocument();
+    });
+
+    /** @scenario "A context note below the reader survives earlier turns loading" */
+    it("keeps the lines below the reader stable when the earlier turn lands", () => {
+      const view = renderScrollback({
+        entries: GROWN_OPENED_TURN,
+        rowKeys: ["turn-5#0", "turn-5#1"],
+        scrollback: {
+          status: "available",
+          earlierCount: 1,
+          onLoadEarlier: vi.fn(),
+        },
+      });
+      expect(screen.queryByText(/Context growing/)).not.toBeInTheDocument();
+
+      // The earlier turn was already in the growing band, so the crossing
+      // belongs to it: the note appears up there, and no note materializes at
+      // the opened turn below the reader.
+      act(() => {
+        fakeBox(view.screenEl, { scrollHeight: 500 });
+        view.rerender({
+          entries: [...GROWN_EARLIER_TURN, ...GROWN_OPENED_TURN],
+          rowKeys: ["turn-4#0", "turn-4#1", "turn-5#0", "turn-5#1"],
+          turnDividers: new Map([
+            [
+              GROWN_EARLIER_TURN.length,
+              { turnNumber: 5, turnCount: 5, atMs: 5000 },
+            ],
+          ]),
+          scrollback: {
+            status: "start",
+            earlierCount: 0,
+            onLoadEarlier: vi.fn(),
+          },
+        });
+      });
+
+      expect(
+        screen.getByText("Context growing: 52.0K tokens"),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText("Context growing: 60.0K tokens"),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given the session's turn list is still being read", () => {
+    it("offers nothing at the top until it resolves", () => {
+      renderScrollback({
+        banner: {
+          agent: "claude_code",
+          version: "2.1.207",
+          model: "claude-opus-4-8",
+          repo: "langwatch/langwatch",
+        },
+        scrollback: {
+          status: "pending",
+          earlierCount: 0,
+          onLoadEarlier: vi.fn(),
+        },
+      });
+
+      expect(screen.queryByText(/Claude Code v/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/earlier turn/)).not.toBeInTheDocument();
+    });
+  });
+
   describe("given a user message an agent injected a block into", () => {
     const taskNotification = [
       "<task-notification>",
@@ -753,6 +904,74 @@ const APPENDED_REPLY: TranscriptEntry = {
   text: "Pushed.",
   model: "claude-opus-4",
 };
+
+/** An earlier turn that carries the model call the baseline covered. */
+const EARLIER_TURN_WITH_CALL: TranscriptEntry[] = [
+  { kind: "user_prompt", atMs: 1100, text: "check git status", chars: 16 },
+  {
+    kind: "model_call",
+    atMs: 1200,
+    model: "claude-opus-4",
+    tokens: 175,
+    costUsd: 0.06,
+    durationMs: 400,
+    spanId: "llm-1200",
+    inputTokens: 150,
+    outputTokens: 25,
+    cacheReadTokens: 0,
+    cacheCreationTokens: 0,
+  },
+];
+const EARLIER_WITH_CALL_KEYS = ["turn-4#0", "turn-4#1"];
+const TURN_DIVIDERS_AFTER_CALL: ReadonlyMap<number, TurnDivider> = new Map([
+  [EARLIER_TURN_WITH_CALL.length, { turnNumber: 5, turnCount: 5, atMs: 5000 }],
+]);
+
+/** An opened turn whose context is already inside the "growing" band. */
+const GROWN_OPENED_TURN: TranscriptEntry[] = [
+  {
+    kind: "model_call",
+    atMs: 5000,
+    model: "claude-opus-4",
+    tokens: 300,
+    costUsd: 0.1,
+    durationMs: 400,
+    spanId: "llm-5000",
+    inputTokens: 200,
+    outputTokens: 100,
+    cacheReadTokens: 59_000,
+    cacheCreationTokens: 1_000,
+  },
+  {
+    kind: "assistant_message",
+    atMs: 5100,
+    text: "Context is big.",
+    model: "claude-opus-4",
+  },
+];
+
+/** The turn before it, whose context had already crossed into the band. */
+const GROWN_EARLIER_TURN: TranscriptEntry[] = [
+  {
+    kind: "model_call",
+    atMs: 4000,
+    model: "claude-opus-4",
+    tokens: 250,
+    costUsd: 0.08,
+    durationMs: 400,
+    spanId: "llm-4000",
+    inputTokens: 150,
+    outputTokens: 100,
+    cacheReadTokens: 22_000,
+    cacheCreationTokens: 30_000,
+  },
+  {
+    kind: "assistant_message",
+    atMs: 4100,
+    text: "Working.",
+    model: "claude-opus-4",
+  },
+];
 
 /**
  * jsdom has no layout engine, so `scrollHeight` and `clientHeight` are a hard

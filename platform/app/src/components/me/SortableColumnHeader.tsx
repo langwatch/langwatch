@@ -60,18 +60,27 @@ export function SortableColumnHeader<Column extends string>({
   sort,
   onSort,
   align = "start",
+  width,
 }: {
   label: string;
   column: Column;
   sort: ColumnSortState<Column>;
   onSort: (column: Column) => void;
   align?: "start" | "end";
+  /**
+   * Column width. `"1%"` with nowrap content is the shrink-to-fit idiom: the
+   * column hugs its widest cell and grows with it, and the freed width goes
+   * to the columns that truncate.
+   */
+  width?: string;
 }) {
   const active = sort.column === column;
   const direction = active ? sort.direction : null;
 
   return (
     <Table.ColumnHeader
+      width={width}
+      whiteSpace={width === "1%" ? "nowrap" : undefined}
       aria-sort={ariaSortFor(direction)}
       // The band and the darker label do the highlighting. Weight is left to
       // the table's own heading style, which is already bold: overriding it

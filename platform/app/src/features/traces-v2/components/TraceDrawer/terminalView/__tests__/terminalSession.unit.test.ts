@@ -56,6 +56,27 @@ describe("buildEntryTimeline", () => {
     });
   });
 
+  describe("given the session's own start time", () => {
+    it("measures elapsed time from the session start, not the loaded window", () => {
+      const timeline = buildEntryTimeline([note(5000), note(8000)], {
+        startAtMs: 1000,
+      });
+      expect(timeline.map((p) => p.elapsedMs)).toEqual([4000, 7000]);
+    });
+
+    it("never reads negative when an entry predates the anchor by a hair", () => {
+      const timeline = buildEntryTimeline([note(990)], { startAtMs: 1000 });
+      expect(timeline[0]!.elapsedMs).toBe(0);
+    });
+
+    it("falls back to the first entry when the anchor is null", () => {
+      const timeline = buildEntryTimeline([note(1000), note(4000)], {
+        startAtMs: null,
+      });
+      expect(timeline.map((p) => p.elapsedMs)).toEqual([0, 3000]);
+    });
+  });
+
   describe("given non-model-call entries", () => {
     it("carries the running totals forward without adding to them", () => {
       const timeline = buildEntryTimeline([modelCall(1000, 10, 0), note(2000)]);

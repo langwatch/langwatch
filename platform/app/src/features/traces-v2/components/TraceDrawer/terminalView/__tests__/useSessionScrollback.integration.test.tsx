@@ -27,7 +27,13 @@ const { fetchTranscript, fetchSpans, fetchEvents, utils, conversation } =
       },
       /** The session's turns, time ascending, as the conversation read returns them. */
       conversation: {
-        turns: [] as Array<{ traceId: string; timestamp: number }>,
+        turns: [] as Array<{
+          traceId: string;
+          timestamp: number;
+          totalTokens?: number | null;
+          totalCost?: number | null;
+        }>,
+        isLoading: false,
       },
     };
   });
@@ -35,13 +41,16 @@ const { fetchTranscript, fetchSpans, fetchEvents, utils, conversation } =
 vi.mock("~/utils/api", () => ({ api: { useUtils: () => utils } }));
 
 vi.mock("../../../../hooks/useConversationContext", () => ({
-  useConversationContext: () => ({ turns: conversation.turns }),
+  useConversationContext: () => ({
+    turns: conversation.turns,
+    isLoading: conversation.isLoading,
+  }),
 }));
 
 const SESSION_TURNS = [
-  { traceId: "turn-1", timestamp: 1_000 },
-  { traceId: "turn-2", timestamp: 2_000 },
-  { traceId: "turn-3", timestamp: 3_000 },
+  { traceId: "turn-1", timestamp: 1_000, totalTokens: 1_000, totalCost: 0.5 },
+  { traceId: "turn-2", timestamp: 2_000, totalTokens: 2_000, totalCost: 0.7 },
+  { traceId: "turn-3", timestamp: 3_000, totalTokens: 300, totalCost: 0.06 },
 ];
 
 const OPENED_ENTRIES: TranscriptEntry[] = [
@@ -93,6 +102,7 @@ async function flush() {
 
 beforeEach(() => {
   conversation.turns = SESSION_TURNS;
+  conversation.isLoading = false;
   fetchTranscript.mockReset();
   fetchSpans.mockReset();
   fetchEvents.mockReset();
@@ -299,6 +309,56 @@ describe("useSessionScrollback", () => {
     });
   });
 
+  describe("given the session's turns carry their totals", () => {
+    /** @scenario "The footer counts the whole session up to the reader's position" */
+    it("sums the unloaded earlier turns and anchors the clock at turn one", () => {
+      const { result } = setup();
+
+      expect(result.current.earlierTotals).toEqual({
+        tokens: 3_000,
+        costUsd: 1.2,
+      });
+      expect(result.current.sessionStartAtMs).toBe(1_000);
+    });
+
+    /** @scenario "Loading an earlier turn does not change the footer's totals" */
+    it("moves a loaded turn's share out of the baseline", async () => {
+      const { result } = setup();
+
+      await act(async () => {
+        result.current.loadEarlier();
+      });
+
+      expect(result.current.earlierTotals).toEqual({
+        tokens: 1_000,
+        costUsd: 0.5,
+      });
+    });
+
+    it("counts a turn without totals as zero rather than dropping the rest", () => {
+      conversation.turns = [
+        { traceId: "turn-1", timestamp: 1_000 },
+        { traceId: "turn-2", timestamp: 2_000, totalTokens: 50, totalCost: 1 },
+        { traceId: "turn-3", timestamp: 3_000 },
+      ];
+      const { result } = setup();
+
+      expect(result.current.earlierTotals).toEqual({ tokens: 50, costUsd: 1 });
+    });
+  });
+
+  describe("given the session's turn list is still being read", () => {
+    it("reports pending rather than a session-less trace", () => {
+      conversation.turns = [];
+      conversation.isLoading = true;
+      const { result } = setup();
+
+      expect(result.current.status).toBe("pending");
+      expect(result.current.earlierTotals).toBeNull();
+      expect(result.current.sessionStartAtMs).toBeNull();
+    });
+  });
+
   describe("given a trace that belongs to no session", () => {
     it("offers no scrollback at all", () => {
       const { result } = setup({ conversationId: null });
@@ -306,6 +366,8 @@ describe("useSessionScrollback", () => {
       expect(result.current.status).toBe("hidden");
       expect(result.current.earlierCount).toBe(0);
       expect(result.current.entries).toEqual(OPENED_ENTRIES);
+      expect(result.current.earlierTotals).toBeNull();
+      expect(result.current.sessionStartAtMs).toBeNull();
     });
   });
 

@@ -43,6 +43,7 @@ import type {
   SpanSummaryRow,
   TraceEventRollup,
 } from "~/server/app-layer/traces/repositories/span-storage.repository";
+import type { TraceListItem } from "~/server/app-layer/traces/trace-list.service";
 import {
   traceMetadataUpdateSchema,
   updateTraceMetadata,
@@ -768,6 +769,54 @@ export function redactV2Content<
 }
 
 /**
+ * One turn of a session, as `conversationContext` lists it. Carries the
+ * permission-nulled input/output AND the redaction flags so a hidden turn
+ * renders the "Redacted" marker in the conversation strip / view instead of an
+ * empty "(no message)" placeholder that would read as a genuinely-absent turn.
+ * Carries the turn's totals so the terminal's bottom bar can count the
+ * session's turns above its loaded window without reading their transcripts.
+ */
+export function toConversationContextTurn(
+  t: TraceListItem,
+  protections: V2Protections,
+) {
+  const {
+    input,
+    output,
+    inputRedacted,
+    outputRedacted,
+    inputVisibleTo,
+    outputVisibleTo,
+  } = redactV2Content(
+    {
+      traceId: t.traceId,
+      timestamp: t.timestamp,
+      name: t.traceName || t.name,
+      rootSpanType: t.rootSpanType ?? null,
+      status: t.status,
+      input: t.input ?? null,
+      output: t.output ?? null,
+    },
+    protections,
+  );
+  return {
+    traceId: t.traceId,
+    timestamp: t.timestamp,
+    name: t.traceName || t.name,
+    rootSpanType: t.rootSpanType ?? null,
+    status: t.status,
+    input,
+    output,
+    inputRedacted,
+    outputRedacted,
+    inputVisibleTo,
+    outputVisibleTo,
+    totalTokens: t.totalTokens,
+    totalCost: t.totalCost,
+  };
+}
+
+/**
  * Read a dotted-key string attribute from mapped span params. The span mapper
  * unflattens dotted attribute keys into nested objects, so a marker lands at the
  * matching nested path rather than as a flat key.
@@ -1301,44 +1350,9 @@ export const tracesV2Router = createTRPCRouter({
           input.projectId,
         ),
       });
-      const turns = page.items.map((t) => {
-        // Carry the permission-nulled input/output AND the redaction flags so a
-        // hidden turn renders the "Redacted" marker in the conversation strip /
-        // view instead of an empty "(no message)" placeholder that would read
-        // as a genuinely-absent turn.
-        const {
-          input,
-          output,
-          inputRedacted,
-          outputRedacted,
-          inputVisibleTo,
-          outputVisibleTo,
-        } = redactV2Content(
-          {
-            traceId: t.traceId,
-            timestamp: t.timestamp,
-            name: t.traceName || t.name,
-            rootSpanType: t.rootSpanType ?? null,
-            status: t.status,
-            input: t.input ?? null,
-            output: t.output ?? null,
-          },
-          protections,
-        );
-        return {
-          traceId: t.traceId,
-          timestamp: t.timestamp,
-          name: t.traceName || t.name,
-          rootSpanType: t.rootSpanType ?? null,
-          status: t.status,
-          input,
-          output,
-          inputRedacted,
-          outputRedacted,
-          inputVisibleTo,
-          outputVisibleTo,
-        };
-      });
+      const turns = page.items.map((t) =>
+        toConversationContextTurn(t, protections),
+      );
       // Position/previous/next are derived client-side from the active
       // traceId so the cache key doesn't churn on J/K navigation.
       return {
