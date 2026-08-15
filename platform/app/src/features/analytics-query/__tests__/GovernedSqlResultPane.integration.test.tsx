@@ -386,6 +386,31 @@ describe("the governed SQL result pane", () => {
         );
         expect(screen.getByRole("table")).toBeInTheDocument();
       });
+
+      /**
+       * A panel with no `aria-labelledby` is announced as an unnamed
+       * tabpanel, and an `aria-labelledby` pointing at an id nothing wrote is
+       * worse than none at all — so this asserts the tab it names is really
+       * in the document, not merely that the attribute is set.
+       *
+       * @scenario "The first successful result opens in Table mode"
+       */
+      it("names the table panel after the tab that controls it", () => {
+        renderPane(
+          stateWith({
+            answer: { kind: "result", result: governedSqlResult() },
+          }),
+        );
+
+        const tab = screen.getByRole("tab", { name: "Table" });
+        const panel = screen.getByRole("tabpanel");
+
+        const labelledBy = panel.getAttribute("aria-labelledby");
+        expect(labelledBy).toBeTruthy();
+        expect(document.getElementById(labelledBy ?? "")).toBe(tab);
+        // The relation holds in both directions.
+        expect(tab).toHaveAttribute("aria-controls", panel.id);
+      });
     });
   });
 

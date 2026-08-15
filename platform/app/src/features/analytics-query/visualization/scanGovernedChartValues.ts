@@ -53,7 +53,14 @@ export function encodedFieldsByDataset({
 }): Record<string, string[]> {
   const referenced = new Set<string>();
   for (const { node } of visitJsonObjects(spec)) {
-    if (typeof node.field === "string") referenced.add(node.field);
+    if (typeof node.field !== "string") continue;
+    referenced.add(node.field);
+    // Vega-Lite escapes a literal `.` in a column name as `\.`, so a column
+    // named `a.b` reaches the spec as `a\.b` while the response still carries
+    // `a.b`. Without the unescaped form the column drops out of the scan set
+    // and its non-finite and wide-integer warnings are never reported.
+    // `vegaLiteFields.ts` applies the same rule when it matches a field.
+    referenced.add(node.field.replace(/\\(.)/g, "$1"));
   }
 
   return Object.fromEntries(

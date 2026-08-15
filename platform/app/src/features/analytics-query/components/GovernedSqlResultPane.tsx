@@ -319,14 +319,25 @@ function RunningState() {
   );
 }
 
+/**
+ * The id of the tab that names a panel. Tab and panel derive it from the same
+ * base so an `aria-labelledby` can never point at an id the strip never wrote.
+ */
+function tabIdFor(base: string, view: GovernedSqlResultView): string {
+  return `${base}-tab-${view}`;
+}
+
 /** The pill strip that switches between readings of the result. */
 function ViewTabs({
   view,
   onViewChange,
   panelIdFor,
+  panelIdBase,
 }: {
   view: GovernedSqlResultView;
   onViewChange: (view: GovernedSqlResultView) => void;
+  /** Base for the tab ids that the panels point back at. */
+  panelIdBase: string;
   /**
    * The panel a tab controls, or `undefined` while that panel is not in the
    * document — a tab pointing at a missing id reads to a screen reader as a
@@ -357,6 +368,7 @@ function ViewTabs({
         return (
           <Button
             key={entry.value}
+            id={tabIdFor(panelIdBase, entry.value)}
             role="tab"
             aria-selected={selected}
             {...(panelId ? { "aria-controls": panelId } : {})}
@@ -435,6 +447,7 @@ export function GovernedSqlResultPane({
               view={view}
               onViewChange={changeView}
               panelIdFor={panelIdFor}
+              panelIdBase={panelIdBase}
             />
           ) : undefined
         }
@@ -601,6 +614,7 @@ function ResultBody({
         overflow="auto"
         role="tabpanel"
         id={`${panelIdBase}-table`}
+        aria-labelledby={tabIdFor(panelIdBase, "table")}
         display={view === "table" ? undefined : "none"}
       >
         <GovernedSqlResultTable result={result} />
@@ -615,6 +629,12 @@ function ResultBody({
           overflow="auto"
           role="tabpanel"
           id={`${panelIdBase}-chart-area`}
+          // Chart and Specification share this one panel, so it is named by
+          // whichever of the two is currently selected.
+          aria-labelledby={tabIdFor(
+            panelIdBase,
+            view === "specification" ? "specification" : "chart",
+          )}
           display={view === "table" ? "none" : undefined}
           padding={view === "specification" ? 0 : 4}
         >

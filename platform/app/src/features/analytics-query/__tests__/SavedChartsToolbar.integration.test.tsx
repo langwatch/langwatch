@@ -154,6 +154,53 @@ describe("the saved chart toolbar", () => {
         });
       });
 
+      /**
+       * The menu that opens this dialog is only rendered while a chart is
+       * open, but the parent's state can change under the open dialog. Falling
+       * through to Save would answer "rename this chart" by creating a second
+       * one — the exact outcome the rest of this file exists to prevent.
+       *
+       * @scenario "A saved chart can be renamed or deleted from the list"
+       */
+      it("refuses the rename, rather than saving a new chart, when the chart closes under the dialog", async () => {
+        const user = userEvent.setup();
+        const handlers = {
+          onSave: vi.fn(),
+          onOpen: vi.fn(),
+          onRename: vi.fn(),
+          onDelete: vi.fn(),
+          onSaveAsNew: vi.fn(),
+        };
+        const toolbar = (openedChartId: string | null) => (
+          <ChakraProvider value={defaultSystem}>
+            <SavedChartsToolbar
+              charts={CHARTS}
+              openedChartId={openedChartId}
+              openedChartName={openedChartId === null ? null : "Traces per day"}
+              isSaving={false}
+              canSave={true}
+              {...handlers}
+            />
+          </ChakraProvider>
+        );
+
+        const { rerender } = render(toolbar("chart-1"));
+
+        await user.click(screen.getByTestId("opened-chart-actions"));
+        await user.click(await screen.findByText("Rename"));
+        const field = await screen.findByLabelText("Chart name");
+
+        // The chart closes while the dialog is still up.
+        rerender(toolbar(null));
+
+        await user.clear(field);
+        await user.type(field, "Traces per week");
+        await user.click(screen.getByRole("button", { name: "Save" }));
+
+        expect(handlers.onRename).not.toHaveBeenCalled();
+        expect(handlers.onSave).not.toHaveBeenCalled();
+      });
+
       /** @scenario "A saved chart can be renamed or deleted from the list" */
       it("deletes through the same menu, once the member confirms", async () => {
         const user = userEvent.setup();

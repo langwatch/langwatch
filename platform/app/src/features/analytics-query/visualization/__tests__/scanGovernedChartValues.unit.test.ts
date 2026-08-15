@@ -162,4 +162,34 @@ describe("reading which columns a specification encodes", () => {
       ).toEqual({ query_result: [] });
     });
   });
+
+  describe("given a column whose name contains a literal dot", () => {
+    const DOTTED: readonly GovernedDatasetColumn[] = [
+      { name: "model", type: "String" },
+      { name: "usage.total_tokens", type: "UInt64" },
+    ];
+
+    /**
+     * Vega-Lite writes such a column as `usage\.total_tokens`, while the
+     * response carries the unescaped name. Matching only the raw spelling
+     * dropped the column from the scan set, and a dropped column is silently
+     * never checked for non-finite or wide-integer values.
+     */
+    it("recognises the escaped spelling as that column", () => {
+      expect(
+        encodedFieldsByDataset({
+          spec: {
+            data: { name: "query_result" },
+            mark: "bar",
+            encoding: {
+              x: { field: "model", type: "nominal" },
+              y: { field: "usage\\.total_tokens", type: "quantitative" },
+            },
+          },
+          datasetNames: ["query_result"],
+          columnsByDataset: { query_result: DOTTED },
+        }),
+      ).toEqual({ query_result: ["model", "usage.total_tokens"] });
+    });
+  });
 });

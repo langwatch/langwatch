@@ -282,8 +282,10 @@ export function SavedChartsToolbar({
           if (!open) setNaming(null);
         }}
         onSubmit={(name) => {
-          if (naming === "rename" && openedChartId) {
-            onRename({ id: openedChartId, name });
+          // A rename with no chart open must refuse, not fall through: saving
+          // instead would answer "rename this chart" by creating a second one.
+          if (naming === "rename") {
+            if (openedChartId) onRename({ id: openedChartId, name });
             return;
           }
           onSave({ name });
