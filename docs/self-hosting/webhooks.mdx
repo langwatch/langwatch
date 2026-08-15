@@ -32,6 +32,24 @@ WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS=1
 
 With the flag set, endpoint URLs may use `http://` and resolve to private or loopback addresses. **Only** the local-address fence is relaxed: size caps, timeouts, no-redirects, and signing all stay in force. Leave this unset in production unless your receivers are deliberately internal; it is the difference between "our workers can only call out" and "our workers can reach anything on the pod network".
 
+## Amazon SQS destinations and whose credentials they use
+
+An endpoint can deliver to an Amazon SQS queue instead of an HTTPS receiver ([how it works](/features/webhooks#delivering-to-an-amazon-sqs-queue)). A queue endpoint normally carries credentials of its own: a role LangWatch assumes with a generated ExternalId, or an encrypted static key pair.
+
+It can also run on **this deployment's own AWS identity** (an instance role, IRSA, or a developer's SSO session), which needs an explicit opt-in:
+
+```
+WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS=1
+```
+
+With the flag set, an endpoint may name a queue and supply no credentials, and deliveries are written with whatever AWS identity the workers run as.
+
+<Warning>
+Leave this unset on any deployment serving more than one organization. With it on, anyone who can create a webhook endpoint can name **any queue this deployment's role is allowed to write to**, including another tenant's, and the platform writes to it. It is safe only on a single-tenant install whose queues are its own, and in local development.
+</Warning>
+
+The queue URL never passes through the SSRF fence above because the AWS SDK dials it rather than the platform. It is pinned instead to the canonical Amazon SQS shape, and the region and owning account are read from the URL, so they always match the queue.
+
 ## Authentication model
 
 Webhook and billing REST surfaces authenticate with an **organization API key** and organization-tier permissions (`webhookEndpoints:view|manage`, `gatewaySpend:view|manage`). These permissions are organization-exclusive: a team- or project-scoped role binding can never grant them, so a project-level credential cannot register an endpoint that streams org-wide events out. Grant them through org roles or a custom org-scoped role; see [RBAC](/ai-gateway/rbac).

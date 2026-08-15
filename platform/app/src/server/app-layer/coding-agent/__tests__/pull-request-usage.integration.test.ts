@@ -286,6 +286,7 @@ beforeAll(async () => {
         prCreatedAt: new Date(Date.now() - 5 * HOUR),
         prClosedAt: null,
         prMergedAt: null,
+        prUpdatedAt: new Date(Date.now() - 5 * HOUR),
       },
     ],
   });

@@ -92,8 +92,7 @@ Each engineer's Claude Code usage is metered against their personal cap; no one 
 ### Fallback to Bedrock on Anthropic outage
 
 - VK fallback chain: `anthropic-primary → bedrock-us-east-1`.
-- `fallback.on: [5xx, timeout, rate_limit]`.
-- `fallback.timeout_ms: 30000`.
+- `fallback.max_attempts: 2`, one attempt per credential in the chain.
 
 When Anthropic's API is degraded, Claude Code sessions continue through Bedrock's Anthropic models transparently, the engineer sees a tiny latency bump but no error.
 

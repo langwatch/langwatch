@@ -73,17 +73,19 @@ Aliases always win over explicit `provider/model` form if both are defined for t
 
 ## Fallback chain
 
-Ordered list of **ModelProvider** ids (not models) the VK may dispatch through. Carried on the routing policy bound to the VK (or, when the VK pins no policy, on the org's default policy). Triggered by:
+Ordered list of **ModelProvider** ids (not models) the VK can dispatch through. Carried on the routing policy bound to the VK (or, when the VK pins no policy, on the org's default policy). The gateway decides which failures move to the next provider. It reads the real upstream result, and the rule is the same for every key. Triggered by:
 
 - `5xx` from upstream.
-- `timeout` exceeding the VK's configured `fallback.timeout_ms`.
+- `timeout` from upstream.
 - `429 rate_limit_exceeded` from upstream.
 - `network_error` (connection reset, DNS, TLS).
+- Upstream `404`. In a chain with more than one provider, this usually means that this provider does not serve that model.
 - `circuit_breaker`, gateway-internal tripped after N consecutive failures.
 
 **Does not** trigger fallback:
 
-- Upstream `400 / 401 / 403 / 404`, those are client-fault errors; masking them would confuse the caller.
+- Upstream `400 / 401 / 403`. These stop the request. A `400` points to the request itself. A `401` or `403` usually points to the provider credential. A different provider would hide the fault that you must repair.
+- A caller that disconnected, or a caller deadline that ended. This tells nothing about the provider.
 - Any LangWatch-internal error (`invalid_api_key`, `permission_denied`, etc).
 
 For streaming: if the primary fails **before the first chunk**, fallback is transparent. Once chunks have started flowing, the stream stays on the original provider, otherwise the client would see a Frankenstein stream.

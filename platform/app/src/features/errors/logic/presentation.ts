@@ -1786,6 +1786,11 @@ const presentations = {
     title: "No model provider configured",
     describe: () => "Add a provider in settings to continue.",
   },
+  model_provider_not_bound: {
+    title: "That provider isn't bound to this key",
+    describe: () =>
+      "The model name asks for a provider this virtual key has no slot for. Bind that provider to the key, or drop the prefix from the model name.",
+  },
   guardrail_blocked: {
     title: "Blocked by a guardrail",
     describe: () => "This request didn't pass one of your configured policies.",
@@ -2010,12 +2015,12 @@ const presentations = {
       "It may have been archived, or the id may belong to another organization. List your endpoints to see the ones that are live.",
   },
   webhook_endpoint_invalid: {
-    // Names the three things the endpoint form can get wrong, rather than
-    // echoing the server's sentence: `meta.message` on this code can carry
-    // an internal reason, and the customer channel is not where that goes.
+    // Names what the endpoint form can get wrong, rather than echoing the
+    // server's sentence: `meta.message` on this code can carry an internal
+    // reason, and the customer channel is not where that goes.
     title: "That webhook endpoint can't be saved",
     describe: () =>
-      "Check the URL is reachable over HTTPS, that every subscribed event type is one the catalog lists, and that the delivery controls are inside their limits.",
+      "Check the address matches the destination: an HTTPS endpoint needs a URL reachable over HTTPS, and an Amazon SQS destination needs a standard queue URL plus credentials that may write to it. Then check that every subscribed event type is one the catalog lists, that the delivery controls are inside their limits, and that you are not moving an existing endpoint to another destination, which needs a new endpoint instead.",
   },
   webhook_event_not_found: {
     // Says the two things a caller can act on: the log's horizon, and that

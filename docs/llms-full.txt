@@ -1759,7 +1759,7 @@ curl https://gateway.langwatch.ai/v1/chat/completions \
 
 Per-VK rate limits are configurable (`rate_limits.rpm|tpm|rpd`) and enforced at the gateway before the request leaves for the provider. Breaches return `429 rate_limit_exceeded` with a `Retry-After` header in seconds.
 
-Upstream provider rate limits are opaque to the VK owner but can trigger fallback (if `rate_limit` is in the VK's `fallback.on`). A `Retry-After` from upstream is surfaced to the client when no fallback remains.
+Upstream provider rate limits are opaque to the VK owner. An upstream 429 is fallback-eligible: the gateway moves to the next credential in the VK's chain when there is one and the attempt budget allows it. A `Retry-After` from upstream is surfaced to the client when no fallback remains.
 
 ## Observability
 
@@ -1938,7 +1938,7 @@ Errors (like successes) always carry:
 | `cache_override_not_implemented` | `400` | The `X-LangWatch-Cache` header was well-formed but named a mode deferred to v1.1 (`force` or `ttl=NNN`). `respect` and `disable` are the v1 modes. |
 | `provider_error` | `502` | An upstream provider returned a non-recoverable error and fallback (if any) was exhausted. |
 | `circuit_open` | `503` | Repeated upstream 5xx/timeout/network failures opened the credential's circuit breaker, so the gateway declined to dial the provider for this request. Retryable; the breaker probes the upstream again after its cooldown. Answered 4xx (rate limits, quota, bad requests) never open the breaker. |
-| `upstream_timeout` | `504` | An upstream provider exceeded `timeout_ms` and fallback (if any) was exhausted. |
+| `upstream_timeout` | `504` | An upstream provider timed out and fallback (if any) was exhausted. |
 | `bad_request` | `400` | Validation error on the incoming payload. |
 | `missing_model` | `400` | The request names no model. `message` and `meta.request_type` say where that endpoint expects one. |
 | `unsupported_parameter` | `400` | The parameter policy refused a request parameter for the target lane: either the request depends on it functionally and the lane cannot honor it, or `drop_tuning_params` is `false` and the lane has no mapping for it. The message names the parameter, the lane, and why. See [Parameter mapping](/ai-gateway/parameter-mapping). |
@@ -3933,8 +3933,7 @@ Each engineer's Claude Code usage is metered against their personal cap; no one 
 ### Fallback to Bedrock on Anthropic outage
 
 - VK fallback chain: `anthropic-primary → bedrock-us-east-1`.
-- `fallback.on: [5xx, timeout, rate_limit]`.
-- `fallback.timeout_ms: 30000`.
+- `fallback.max_attempts: 2`, one attempt per credential in the chain.
 
 When Anthropic's API is degraded, Claude Code sessions continue through Bedrock's Anthropic models transparently, the engineer sees a tiny latency bump but no error.
 
@@ -4105,8 +4104,16 @@ Every engineer's Codex usage counts against the team budget. The team lead gets 
 The combination that's been most-tested with Codex on v1:
 
 - VK `cache.mode: respect`.
-- VK `fallback.on: [5xx, timeout, 429]`, chain: `openai-primary → anthropic-fallback`.
+- VK fallback chain: `openai-primary → anthropic-fallback`.
 - VK `models_allowed: ["gpt-5-mini", "gpt-5", "gpt-4o", "claude-haiku-4-5-20251001"]`.
+
+  A chain across two providers only moves over for models that the two
+  providers serve. The gateway does not call a credential that cannot serve
+  the resolved model. So a request for `gpt-5-mini` never reaches the
+  Anthropic slot: that model gets one attempt, and an OpenAI outage shows in
+  Codex. To give a model a backup, map its name on the routing policy, or
+  point a [model tier](/ai-gateway/model-aliases) to a model from each
+  provider and let Codex ask for the tier.
 - Personal-access VK bound to the engineer.
 - Monthly `principal` budget with `warn` at 80%, `block` at 100%.
 
@@ -4725,17 +4732,19 @@ Aliases always win over explicit `provider/model` form if both are defined for t
 
 ## Fallback chain
 
-Ordered list of **ModelProvider** ids (not models) the VK may dispatch through. Carried on the routing policy bound to the VK (or, when the VK pins no policy, on the org's default policy). Triggered by:
+Ordered list of **ModelProvider** ids (not models) the VK can dispatch through. Carried on the routing policy bound to the VK (or, when the VK pins no policy, on the org's default policy). The gateway decides which failures move to the next provider. It reads the real upstream result, and the rule is the same for every key. Triggered by:
 
 - `5xx` from upstream.
-- `timeout` exceeding the VK's configured `fallback.timeout_ms`.
+- `timeout` from upstream.
 - `429 rate_limit_exceeded` from upstream.
 - `network_error` (connection reset, DNS, TLS).
+- Upstream `404`. In a chain with more than one provider, this usually means that this provider does not serve that model.
 - `circuit_breaker`, gateway-internal tripped after N consecutive failures.
 
 **Does not** trigger fallback:
 
-- Upstream `400 / 401 / 403 / 404`, those are client-fault errors; masking them would confuse the caller.
+- Upstream `400 / 401 / 403`. These stop the request. A `400` points to the request itself. A `401` or `403` usually points to the provider credential. A different provider would hide the fault that you must repair.
+- A caller that disconnected, or a caller deadline that ended. This tells nothing about the provider.
 - Any LangWatch-internal error (`invalid_api_key`, `permission_denied`, etc).
 
 For streaming: if the primary fails **before the first chunk**, fallback is transparent. Once chunks have started flowing, the stream stays on the original provider, otherwise the client would see a Frankenstein stream.
@@ -7633,12 +7642,11 @@ admins read.
 
 ## What's next
 
-- [Routing policies](/ai-gateway/governance/routing-policies) for the
-  full policy DSL (priority/cost/latency/round_robin strategies,
-  model allowlists, cascading defaults).
-- [`langwatch` CLI](/integration/cli): the unified CLI lives in the
-  TypeScript SDK, and the device-flow login wraps every coding
-  CLI through your governance plane.
+- [Routing policies](/ai-gateway/governance/routing-policies) for
+  provider order, model tiers, model name mapping, and restrictions.
+- [`langwatch` CLI](/integration/cli). The unified CLI lives in the
+  TypeScript SDK. Its device-flow login sends every coding CLI
+  through your governance plane.
 
 ---
 
@@ -8248,190 +8256,227 @@ The same doctrine covers LangWatch's own usage-metering ledgers. The knock-on wo
 
 ---
 title: Routing policies
-description: Decouple the credential from the provider chain. Admins publish routing policies once, virtual keys reference them by ID.
+description: An admin decides once which providers and models a key can reach. Virtual keys point at that decision instead of carrying their own copy.
 sidebarTitle: Routing policies
 ---
 
-A **routing policy** answers: "when one of my organization's users
-wants to call a model, which providers can serve it, in what order,
-under what allowlist?"
+A routing policy is one decision, written down. It says which
+providers serve a request, and in which order. It says which model
+names a client can send.
 
-Until v1.x, this was embedded in every virtual key's config: every
-service VK had its own copy of "Anthropic primary, OpenAI fallback,
-allow these models." That worked for service VKs created by hand.
-It does not scale to a thousand personal VKs, where the answer is
-the same for every dev.
-
-Routing policies pull that decision out of the credential. A VK
-references a policy by ID; the policy holds the strategy.
+An admin writes the policy one time. Each virtual key points to the
+policy. To change the routing of many keys, change the policy. Do
+not change each key.
 
 ## Shape
 
 ```ts
 RoutingPolicy {
-  id:             string
-  organizationId: string
-  scope:          'organization' | 'team' | 'project'
-  scopeId:        string
-  name:           string             // unique within (org, scope, scopeId)
-  description?:   string
-  providerCredentialIds: string[]    // ordered preference
-  modelAllowlist?:        string[]   // glob-supported, e.g. "claude-3-5-*"
-  strategy:               'priority' | 'cost' | 'latency' | 'round_robin'
-  isDefault:              boolean    // exactly one default per (org, scope, scopeId)
+  id:               string
+  organizationId:   string
+  name:             string
+  description?:     string
+
+  // The providers this policy routes through, in order. The gateway
+  // tries the first provider. If the request fails in a way that a
+  // different provider can answer, the gateway tries the next one.
+  modelProviderIds: string[]
+
+  // Model name mapping. The key is the name the client sends. The
+  // value is the model that serves the request. The three tier names
+  // are entries in this map.
+  modelAliases:     Record<string, string>
+
+  // The model that serves a tier when the map has no entry for it.
+  // Applies only to the three tier names.
+  defaultModel?:    string
+
+  // What a request can reach. Four groups: tools, mcp, urls, models.
+  // Each group has a deny list and an allow list.
+  policyRules:      { tools: {...}, mcp: {...}, urls: {...}, models: {...} }
+
+  isDefault:        boolean
+  scopes:           { scopeType: 'ORGANIZATION' | 'TEAM' | 'PROJECT', scopeId: string }[]
 }
 ```
 
-## Strategy variants
+A policy can apply in more than one place. Each entry in `scopes`
+adds one organization, one team, or one project.
 
+## Model tiers
 
-  ### priority (default)
+A client can send a tier name in the `model` field. The policy maps
+the tier name to a model. When you move to a newer model, you change
+the policy. The client code does not change.
 
-    Try `providerCredentialIds[0]` first. On retryable error, try
-    `[1]`, then `[2]`, …. This matches the v1 fallback chain
-    semantics.
+The gateway knows three tier names:
 
-    Use when: you have a clearly-preferred provider (Anthropic
-    native), and want a cheaper/legacy provider as backup
-    (Bedrock, in case Anthropic 5xx's).
+| Tier | Use |
+| --- | --- |
+| `complex` | The strongest model you have. Use it when quality is more important than cost. |
+| `reasoning` | A model that thinks before it answers. Use it for plans, analysis, and difficult debugging. |
+| `fast` | A small model for high volumes. Use it for classification, extraction, routing, and short replies. |
 
-  ### cost
+The client sends the tier name where a model name goes:
 
-    For every request, pick the provider with the lowest
-    LangWatch-tracked unit cost for the resolved model.
-
-    Use when: providers serve overlapping models (gpt-4o-mini on
-    OpenAI vs Azure OpenAI) and you want the cheaper one
-    automatically.
-
-  ### latency
-
-    Pick the provider with the lowest p50 latency for this model
-    over the last 5 minutes.
-
-    Use when: latency-sensitive workloads (interactive completions),
-    multiple equivalent providers.
-
-  ### round_robin
-
-    Round-robin across providers per request. Within a request,
-    fallback works as `priority` if a provider errors.
-
-    Use when: load-balancing identical providers (e.g. multiple
-    Bedrock regions) for throughput.
-
-
-
-All strategies still respect the model-aware filter: providers that
-can't serve the resolved model are excluded before the strategy
-runs.
-
-## Cascading defaults
-
-The gateway resolves a VK's effective policy at issuance time using
-the most-specific `isDefault=true` policy:
-
-```
-PROJECT default  >  TEAM default  >  ORG default
+```json
+{
+  "model": "complex"
+}
 ```
 
-Concretely: when a personal VK is auto-issued for a user (member of
-some team in their org), the gateway picks:
+Set a model for each tier in the policy. A tier without a model uses
+`defaultModel`. A tier without a model and without `defaultModel` is
+not a known name. The gateway refuses a request that sends it.
 
-1. Is there a `PROJECT`-scoped default for their personal project?
-   No. Personal projects don't carry their own routing policies.
-2. Is there a `TEAM`-scoped default for the user's team? Maybe.
-3. If not, fall back to the `ORG`-scoped default for their
-   organization.
+`defaultModel` applies only to the three tier names. A model name
+with a typo in it still gets a refusal. The gateway does not put the
+default model in its place.
 
-Override at the team level by creating a `TEAM`-scoped policy and
-marking it default. Members of that team automatically inherit it
-without their VK changing.
+Write a full model id, for example `openai/gpt-5-mini`. Do not write
+a name that changes over time, for example `openai/latest`. The
+gateway reads the value as one literal model name, so it would call
+a model named `latest`. The app refuses to save such a name.
 
-## Model allowlist
+`GET /v1/models` lists each tier that has a model. The tier shows in
+a model picker with the other names. If you set `defaultModel`, the
+list has all three tiers. A tier without a model and without
+`defaultModel` is not in the list, because the gateway refuses it.
 
-`modelAllowlist` is an array of glob patterns. Empty/absent =
-all models allowed. Each pattern supports `*` wildcards:
+## Model name mapping
 
-```js
-["claude-3-5-*", "gpt-4o*", "gemini-2.5-flash"]
-// Allows claude-3-5-sonnet, claude-3-5-haiku, gpt-4o, gpt-4o-mini,
-// gemini-2.5-flash. Denies gpt-3.5-turbo, claude-3-opus, etc.
+`modelAliases` also maps usual model names. Use it to point an old
+name to its replacement. Use it to give a model the name your teams
+already use.
+
+```json
+{
+  "gpt-4o": "openai/gpt-5-mini",
+  "coding": "anthropic/claude-haiku-4-5"
+}
 ```
 
-Allowlists compose with the gateway's per-VK `models_allowed`
-config: a request must satisfy both to be allowed.
+A mapping cannot reach a model that the key is not permitted to use.
+The gateway examines the model that the mapping points to, not the
+name that the client sent.
 
-## Model-aware dispatch
+## Restrictions
 
-A VK that can use Anthropic + OpenAI + Gemini behind it doesn't
-waste fallback budget when the user asks for an OpenAI-only model.
-The gateway dispatcher filters the credential chain to providers
-that can serve the resolved model **before** applying the
-strategy:
+`policyRules` has four groups of patterns. Each group has a deny
+list and an allow list.
 
-- Resolved provider explicit (e.g. `anthropic/claude-3-5-sonnet`):
-  filter to matching providers.
-- Resolved provider implicit (`gpt-4o-mini`): infer from the model
-  name prefix (`gpt-`, `o[1|3|4]-` → OpenAI; `claude-` → Anthropic;
-  `gemini-` → Gemini) and filter accordingly.
-- Filter empties the chain (e.g. user asked for a Bedrock-only
-  model but the policy doesn't include Bedrock): fall back to
-  trying the original chain so the user gets a clear Bifrost
-  "model not available" error rather than an opaque "no providers".
+- `tools`: the name of each tool in the request.
+- `mcp`: the name and the address of each MCP server in the request.
+- `urls`: each address in the request. This includes messages,
+  system prompts, and tool arguments.
+- `models`: the model that the request resolves to.
 
-For the rationale and the curated prefix table, see the
-implementation in `services/aigateway/app/eligible.go`.
+The gateway refuses a request that matches a deny pattern. The
+refusal comes before the request costs money. If a group has one or
+more allow patterns, a request must match one of them. Deny wins
+over allow.
 
-## Manage via the UI
+The gateway applies the `models` group after the name mapping. A
+mapping cannot go around it.
 
-**AI Gateway → Routing Policies** lists all policies in your
-org. Click **New policy** to create one; the drawer lets you:
+## Provider order
 
-- Pick the scope (Organization / Team / Project).
-- Drag-reorder provider credentials (the drag-handle is the order in
-  the resolved chain).
-- Add allowlist patterns one at a time.
-- Pick a strategy.
-- Mark as default (atomically swaps any current default at that
-  scope; warns if you're about to override).
+`modelProviderIds` is an ordered list. The gateway tries the first
+provider. If the request fails in a way that a different provider
+can answer, the gateway tries the next one.
 
-## Manage via tRPC
+The gateway does not call a provider that cannot serve the model. A
+chain across two vendors only moves over for models that the two
+vendors serve. To give one model a backup, map its name to a model
+from each vendor, or point a tier to a model from each vendor.
+
+The gateway also removes a provider that the key cannot reach. This
+occurs, for example, when an admin removes the provider from the
+key's scope.
+
+A model name that contains a provider, for example
+`openai/gpt-5-mini`, runs only on that provider. If the key cannot
+reach the provider, the gateway refuses the request. It does not
+send the request to a different vendor. A tier or a mapping that
+points to a removed provider gets the same refusal, and
+`GET /v1/models` stops listing it.
+
+## Defaults
+
+One policy in each scope can be the default. When you make a policy
+the default, the app clears the flag on the other policies in the
+same scope. This occurs in one step. Two policies are never both the
+default for one scope.
+
+A key routes through the policy that it names. The default policy is
+the one the app offers first when someone makes a key in that scope.
+
+## Manage in the app
+
+Open **AI Gateway → Routing Policies**. The page lists your policies
+by where they apply. Select **New policy**, or open the actions menu
+on a policy and select **Edit**.
+
+In the editor you can:
+
+- Give the policy a name and a description.
+- Select where it applies.
+- Select the providers and put them in order.
+- Select a model for each tier, and a default model.
+- Map other model names.
+- Add restrictions.
+
+The editor has its own address. A link to a policy opens that
+policy.
+
+## Manage with tRPC
 
 ```ts
-// List policies in scope
+// List the policies in an organization.
+trpc.routingPolicy.list.useQuery({ organizationId });
+
+// List only the policies a scope can select.
 trpc.routingPolicy.list.useQuery({
   organizationId,
-  scope: 'organization', // optional filter
+  selectableForScope: { scopeType: "TEAM", scopeId: teamId },
 });
 
-// Create
+// Read one policy.
+trpc.routingPolicy.get.useQuery({ organizationId, id });
+
+// Suggest models for a tier.
+trpc.routingPolicy.tierSuggestions.useQuery({
+  organizationId,
+  tier: "complex",
+  boundProviderTypes: ["openai", "anthropic"],
+});
+
 trpc.routingPolicy.create.useMutation();
-
-// Update
 trpc.routingPolicy.update.useMutation();
-
-// Atomic default swap (also un-marks any sibling default)
 trpc.routingPolicy.setDefault.useMutation();
+trpc.routingPolicy.delete.useMutation();
 ```
 
-Auth: `routing_policy:manage` permission for create/update/delete;
-`routing_policy:view` to list. Both are part of the standard
-`organization:admin` role.
+`create`, `update`, `setDefault`, and `delete` need the
+`routingPolicies:manage` permission. `list`, `get`, and
+`tierSuggestions` need `routingPolicies:view`.
 
-## Migration from embedded VK config
+## Keys that name no policy
 
-Existing service VKs continue to work. Their `routingPolicyId` is
-`null`, so the gateway uses the legacy embedded `config.fallback`
-chain. To migrate a VK to a policy:
+A key that names no policy uses its own routing mode. `NONE` sends
+the request to one provider and returns that provider's answer.
+`FALLBACK_ALL` tries the providers that the key can reach, in a set
+order.
 
-1. Create a `RoutingPolicy` matching the VK's existing config.
-2. Update the VK's `routingPolicyId` to the new policy ID.
-3. Verify with `langwatch claude` that requests still route
-   correctly.
+To move a key to a policy:
 
-The recommended path for new VKs is to always reference a policy.
-Embedding config inline is supported but considered legacy.
+1. Make a policy with the providers that the key uses.
+2. Set the key's routing policy.
+3. Send a request. Make sure that it reaches the provider you
+   expect.
+
+Point new keys to a policy. Then the routing decision stays in one
+place.
 
 ---
 
@@ -8637,7 +8682,7 @@ Every client using `model: "claude"` now hits Bedrock. Switch back in one edit. 
 Given a request with `model: "<name>"`:
 
 1. If `<name>` has a `/` in it (explicit `provider/model` form), **aliases are bypassed** and the gateway routes directly to that provider, subject to `models_allowed` and the VK's `providers[]` list.
-2. Otherwise, `<name>` is looked up in `model_aliases`. If found, the mapped `provider/model` is used.
+2. Otherwise the gateway looks up `<name>` in `model_aliases`. If there is an entry, the gateway checks the mapped `provider/model` against `models_allowed`. If the check passes, the gateway dispatches it.
 3. If not found in aliases, the gateway checks `models_allowed`. If the model is allowed, it's dispatched to the VK's primary provider.
 4. If none of the above, returns `403 model_not_allowed`.
 
@@ -8647,26 +8692,15 @@ If the alias map has an entry for `gpt-4o` **and** the client sends `model: "gpt
 
 This lets you have an `openai/` namespace that addresses OpenAI directly for tests or debugging while the alias `gpt-4o` redirects to Azure for production traffic.
 
-## `:fallback` suffix (advanced)
-
-Optional suffix that picks a different model when a fallback provider is used:
-
-```json
-{
-  "model_aliases": {
-    "coding-small":            "openai/gpt-5-mini",
-    "coding-small:fallback":   "anthropic/claude-haiku-4-5-20251001"
-  }
-}
-```
-
-If the primary (OpenAI) fails and fallback kicks in, the gateway uses `claude-haiku-4-5-20251001` against Anthropic. Without `:fallback`, it would try the same model name (`gpt-5-mini`) which might not exist on Anthropic.
-
 ## Enforcement
 
-Aliases do not bypass `models_allowed`. If `models_allowed: ["gpt-5-mini", "claude-haiku-4-5-20251001"]` and an alias maps to `openai/o3`, a request using the alias returns `403 model_not_allowed`, the resolved model fails the allowlist.
+Aliases do not go around `models_allowed`. The allowlist judges the model that the alias resolves to, never the name that the caller typed. It accepts the two spellings of that model: an entry of `gpt-5-mini` and an entry of `openai/gpt-5-mini` match the same resolved model. Write the form that your team reads.
 
-This matters for security: don't grant a model via aliases that you wouldn't grant explicitly.
+If `models_allowed: ["gpt-5-mini", "claude-haiku-4-5-20251001"]` and an alias maps to `openai/o3`, the gateway refuses a request that uses the alias with `model_not_allowed`. The refusal names `o3`, the resolved model, and it names the alias. The operator can see which side to correct.
+
+This matters for security: do not grant a model through an alias that you would not grant directly.
+
+[Policy rules](/ai-gateway/policy-rules) judge the resolved model in the same way. An alias that points to a denied model is blocked.
 
 ## Discovery via `/v1/models`
 
@@ -8756,7 +8790,7 @@ curl https://gateway.langwatch.ai/v1/chat/completions \
 
 A per-VK redirect from a client-facing name to a concrete `provider/model`. Aliases decouple client code from provider specifics, you can repoint `coding-small` from OpenAI to Bedrock in a single VK edit without touching any caller.
 
-See [Model Aliases](/ai-gateway/model-aliases) for the full story, including the `:fallback` suffix for cross-provider remap and the `GET /v1/models` discovery endpoint.
+See [Model Aliases](/ai-gateway/model-aliases) for the full rules, including how an alias is judged against `models_allowed` and the `GET /v1/models` discovery endpoint.
 
 ## How resolution works
 
@@ -8816,7 +8850,7 @@ The error surfaces the accepted names so an integrator can fix the request witho
     Use an alias. Edit the VK once, zero caller changes. See [Model Aliases](/ai-gateway/model-aliases).
   </Step>
   <Step title="Cross-provider fallback (primary dies, secondary takes over)">
-    Alias with `:fallback` suffix. `"coding-small": "openai/gpt-5-mini"` + `"coding-small:fallback": "anthropic/claude-haiku-4-5-20251001"`. See [Model Aliases → :fallback suffix](/ai-gateway/model-aliases#fallback-suffix-advanced).
+    Name a model that the fallback providers also serve, for example an Anthropic model with an Anthropic credential and a Bedrock credential on the VK. One request resolves to one model. The gateway carries that same model name to the next credential in the chain. See [Fallback Chains](/ai-gateway/providers/fallback-chains).
   </Step>
 </Steps>
 
@@ -9136,7 +9170,7 @@ The LangWatch AI Gateway replaces every direct provider call with a single call 
 - **Per-request guardrails**: invoke your LangWatch evaluators inline on the request, response, or each streaming chunk. Decisions: `allow`, `block`, `modify` (redact).
 - **Tool, MCP, URL policy**: block or allowlist tool calls, MCP server references, or outbound URLs by regex before the request ever leaves your gateway.
 - **Caching passthrough**: Anthropic `cache_control` markers are forwarded byte-for-byte by default (protecting your 90% cache discount). Override per-request with `X-LangWatch-Cache: respect|force|disable`.
-- **Fallback, when the key asks for it**: per-virtual-key routing is an explicit choice. New keys default to no fallback (a provider failure surfaces to the caller); a key set to fall back walks its eligible chain (e.g. OpenAI → Anthropic → Bedrock) on 5xx, timeout, 429, or circuit-breaker-open. 400/401 client errors never trigger fallback.
+- **Fallback, when the key asks for it**: per-virtual-key routing is an explicit choice. New keys default to no fallback (a provider failure surfaces to the caller); a key set to fall back walks its eligible chain (e.g. OpenAI → Anthropic → Bedrock) on 5xx, timeout, 429, network error, 404, or circuit-breaker-open. Terminal 4xx client errors like 400 and 401 never trigger fallback.
 - **Per-tenant observability**: every request emits a LangWatch trace to the owning project with `langwatch.virtual_key_id`, `langwatch.project_id`, `langwatch.principal_id`, `langwatch.cost_usd`, cache-hit token breakdown, and status. Shared multi-tenant gateway, per-tenant trace routing.
 - **Coding-CLI integrations**: preserves the tool-call streaming deltas that Claude Code and Codex depend on. Documented setup for the major coding assistants in [CLI Integrations](/ai-gateway/cli/overview).
 - **Self-hostable**: ships as a Helm chart alongside the LangWatch app. Horizontally scales, serves traffic during control-plane outages (with bootstrap mode).
@@ -9311,11 +9345,11 @@ Four kinds of patterns:
 - **Tools**: matched against the names of tools the client declares.
 - **MCP servers**: matched against MCP server names, URLs the client declares.
 - **URLs**: heuristically matched against outbound URLs in tool-call arguments.
-- **Models**: regex-matched against the requested model id (distinct from the glob-based `models_allowed` allowlist, see [Models dimension vs models_allowed](#models-dimension-vs-models_allowed)).
+- **Models**: regex-matched against the resolved model id (distinct from the glob-based `models_allowed` allowlist, see [Models dimension vs models_allowed](#models-dimension-vs-models_allowed)).
 
 Each has a `deny` list and an optional `allow` list.
 
-<Note>**Enforcement point:** policy-rule checks run immediately after authentication and rate limiting, **before** request-body parsing, guardrails, budget reconciliation, or the upstream provider. A blocked request never incurs a provider token cost, a guardrail evaluator run, or a budget debit. This is the cheapest possible reject path in the dispatcher.</Note>
+<Note>**Enforcement point:** policy-rule checks run immediately after authentication and rate limiting, **before** guardrails, budget reconciliation, or the upstream provider. The tools, MCP, and URL dimensions judge the request body as sent. The models dimension runs one step later, at model resolution, and judges the resolved model. A blocked request never incurs a provider token cost, a guardrail evaluator run, or a budget debit. This is the cheapest possible reject path in the dispatcher.</Note>
 
 ## How it works
 
@@ -9373,7 +9407,16 @@ First URL that hits a deny rule (or falls outside a non-null `allow` list) → `
 
 ### Models
 
-Every request's `model` field is RE2-matched against the `models` dimension before dispatch. This is policy-by-regex (e.g. "block anything matching `^gpt-4(-turbo)?$`"), distinct from the static `models_allowed` glob allowlist on the VK.
+The `models` dimension is RE2-matched against the **resolved** model id, the model that serves the request and gets billed, not the string that the caller typed. Alias resolution runs first. Then the rules judge its result. This is policy-by-regex (e.g. "block anything matching `^gpt-4(-turbo)?$`"), distinct from the static `models_allowed` glob allowlist on the VK.
+
+Judging the resolved id has two effects:
+
+- An alias that points to a denied model **is** blocked. An alias named `gpt-4` does not go around a rule that denies `^gpt-4(-turbo)?$`.
+- A rule that denies a name that resolves to a different model does **not** block. If `gpt-4` is an alias for `azure/my-eastus-deployment`, a deny on `^gpt-4$` never fires. The denied name never runs.
+
+Rules match the two spellings of the resolved model, the bare id and the provider-qualified id. `^gpt-4.*` and `^openai/gpt-4.*` both reach `openai/gpt-4o`. Write one form. You do not need both.
+
+The other three dimensions read the request body as sent. The gateway judges tools, MCP servers, and URLs as the client wrote them.
 
 Blocked → `403 model_not_allowed`. Attribution via request-id correlation (see [§Tools](#tools) above).
 
@@ -9386,7 +9429,7 @@ Both gate which models a VK can call, but they solve different problems:
 | `models_allowed` | `["claude-haiku-*", "gpt-5-mini"]` (glob allowlist) | Static, human-readable "these models and no others." Simplest case. |
 | `policy_rules.models` | `{deny: [...], allow: [...]}` (RE2 regex) | Policy that needs regex power, "deny any `gpt-4*` except `gpt-4o-mini`," "deny anything not from a provider prefix." |
 
-They compose: a request passes only if both checks allow it. Use `models_allowed` unless you need regex semantics, then reach for `policy_rules.models`.
+They compose: a request passes only if both checks allow it. The gateway applies `models_allowed` first, at model resolution. The regex rules then judge the resolved model. The two checks read the resolved model in the two spellings, so an alias cannot go around them. Use `models_allowed` unless you need regex semantics, then reach for `policy_rules.models`.
 
 ## Common policies
 
@@ -9432,7 +9475,7 @@ On the VK edit screen (Gateway → Virtual Keys → **Edit**), the **Policy Rule
 | **Tools** | RE2 regexes, one per line. Match against `tools[].function.name` (OpenAI) and `tools[].name` (Anthropic). | Non-empty → only tools matching `allow` pass. Empty → deny-only. |
 | **MCP** | RE2 regexes for MCP server names and URLs. | Same allow semantics. |
 | **URLs** | RE2 regexes matched against every `http(s)://` URL extracted from the request body. | Same allow semantics. |
-| **Models** | RE2 regex policy on the `model` field (distinct from the static `models_allowed` glob on the top of the VK form). | Same allow semantics. |
+| **Models** | RE2 regex policy on the resolved model, after any alias is applied (distinct from the static `models_allowed` glob on the top of the VK form). | Same allow semantics. |
 
 The section header links to the relevant 403 error codes (`tool_not_allowed`, `url_not_allowed`, `model_not_allowed`) and calls out the fail-closed behaviour: **if any regex is invalid, the VK fails with 503 service_unavailable, never silent-bypass**. Fix the pattern, save the VK, and the next request picks it up (the bundle refresh invalidates the broken compiled cache).
 
@@ -9881,53 +9924,47 @@ On the VK edit screen:
 
 1. Select a **primary** provider credential.
 2. Add one or more **fallback** credentials in the order they should be tried.
-3. Pick which conditions trigger fallback (by default: `5xx`, `timeout`, `rate_limit`).
-4. Set `timeout_ms` (default `30000`) and `max_attempts` (default `3`).
+
+The VK's resolved configuration carries the chain and the attempt limit:
 
 ```json
 {
   "fallback": {
     "chain":        ["pc_primary_openai", "pc_anthropic", "pc_bedrock_us_east"],
-    "on":           ["5xx", "timeout", "rate_limit", "network_error"],
-    "timeout_ms":   30000,
     "max_attempts": 3
   }
 }
 ```
 
+`chain` is the ordered credential list. `max_attempts` (default `3`) sets how many of them the gateway tries for one request. A key with no fallback gets exactly one attempt.
+
 ## When fallback triggers
+
+The gateway decides which failures move to the next provider. It reads the real upstream result, and the rule is the same for every virtual key. There is no per-key trigger list. A narrowed list could only turn a failure the gateway can recover from into one that your callers see.
 
 | Condition | Fires? | Why |
 |---|---|---|
 | Upstream `5xx` | ✅ | Provider's fault; next provider may work. |
-| `timeout` (> `timeout_ms`) | ✅ | Provider degraded. |
+| `timeout` | ✅ | Provider degraded. |
 | `429 rate_limit_exceeded` | ✅ | Primary is throttled; secondary may have headroom. |
 | `network_error` (DNS/TCP/TLS) | ✅ | Connectivity issue to primary. |
+| Upstream `404 Not Found` | ✅ | In a chain with more than one provider, this usually means that this provider does not serve that model. The next one can. Common with self-hosted and OpenAI-compatible providers. |
 | `circuit_breaker` open | ✅ | Preemptive, gateway knows primary has been failing recently. |
 | Upstream `400 Bad Request` | ❌ | Client-fault. Surfacing the error is correct. |
 | Upstream `401 Unauthorized` | ❌ | Provider credential bad. Needs human fix, not masking. |
 | Upstream `403 Forbidden` | ❌ | Authorization issue. Silent switch would hide a real problem. |
-| Upstream `404 Not Found` | ❌ | Requested model doesn't exist. |
+| Client disconnect or an expired request deadline | ❌ | The caller went away. This tells nothing about the provider's health. |
 | LangWatch-internal `invalid_api_key` etc | ❌ | Never reaches the fallback layer. |
 
-## Model translation across providers
+## Crossing providers mid-chain
 
 A single VK may have mixed providers (OpenAI + Anthropic + Bedrock). The gateway uses [Bifrost's provider-dispatch library](https://github.com/maximhq/bifrost) to translate payloads: same `messages` schema, different wire formats.
 
-If the client requests `gpt-5-mini` and fails over to Anthropic, the gateway applies the VK's `model_aliases` to pick the Anthropic equivalent (e.g. `claude-haiku-4-5-20251001`). Configure this per VK:
+The model does not change across the chain. One request resolves to one model. The gateway sends that same model name to the next credential and expects the provider to serve it. So a chain helps when its entries overlap on the models you call: an Anthropic credential with a Bedrock credential that serves Anthropic models, or two OpenAI accounts in different regions.
 
-```json
-{
-  "model_aliases": {
-    "gpt-5-mini":              "openai/gpt-5-mini",
-    "gpt-5-mini:fallback":     "anthropic/claude-haiku-4-5-20251001",
-    "claude-haiku-4-5-20251001":        "anthropic/claude-haiku-4-5-20251001",
-    "claude-haiku-4-5-20251001:fallback": "bedrock/anthropic.claude-haiku-4-5-20251001"
-  }
-}
-```
+The gateway skips a credential that cannot serve the resolved model. It does not call it. When the model name tells the gateway which provider owns it, through an alias, the `provider/model` form, or a known bare name, the chain visits only that provider's credentials on the VK. If the name tells the gateway nothing, the gateway walks the chain as configured, and the providers' own answers decide the outcome.
 
-The `:fallback` suffix is optional, if absent the gateway uses the same model name against the next provider and expects it to exist.
+A VK narrowed to specific providers is enforced here too. If the model resolves to a provider that the key cannot use, the gateway refuses with `model_not_allowed`. The refusal names the model and tells the key's owner to widen the key's provider access.
 
 ## Streaming
 
@@ -9979,7 +10016,7 @@ When a request hits a circuit that's currently `open`, the gateway skips to the 
 
 ## Sizing the chain
 
-Diminishing returns after 3 entries. With the default `timeout_ms=30000` and `max_attempts=3`, the worst-case wall-clock to exhaust the chain is ~90s; the latency budget of the original call is gone well before then and the client has probably given up. Use chains of 2-3 for latency-sensitive traffic and lower per-entry `timeout_ms` if you need a tighter total budget; longer chains are fine for batch/offline.
+Returns decrease after 3 entries. Each extra attempt spends one more provider round-trip, one after the other. With the default `max_attempts=3`, the worst case is three upstream calls in a row. The client has usually stopped waiting before the last one answers. Use chains of 2 to 3 entries for latency-sensitive traffic. Lower `max_attempts` if you need a tighter total budget. Keep longer chains for batch and offline work, where wall-clock time is cheap.
 
 ---
 
@@ -10110,7 +10147,7 @@ Reasoning models return a `reasoning_tokens` count in `usage.completion_tokens_d
 
 - **Responses API vs Chat Completions API**: the two have slightly different payload shapes. The gateway proxies whichever endpoint the client hits; it does not translate between them. Codex users should see [Codex CLI](/ai-gateway/cli/codex) for guidance on `wire_api` config.
 - **Organization header on egress**: if the VK doesn't set a custom Organization, the upstream OpenAI request uses the ModelProvider's default.
-- **Rate-limit responses (429)**: OpenAI's 429 includes a `Retry-After` header the gateway surfaces to the client when there is no fallback, or uses as a signal to trigger fallback if `fallback.on` includes `rate_limit`.
+- **Rate-limit responses (429)**: a 429 moves to the next credential in the VK's [fallback chain](/ai-gateway/providers/fallback-chains). When the chain is used up, or the VK has no chain, the gateway sends OpenAI's `Retry-After` header to the client as is.
 
 ---
 
@@ -35934,7 +35971,9 @@ An endpoint belongs to your **organization** and carries:
 
 | Field | Meaning |
 |---|---|
-| `url` | Where batches are POSTed. See [what a receiver URL must look like](#what-a-receiver-url-must-look-like). |
+| `destination_kind` | Where batches go: `http` (the default) or `sqs`. See [Delivering to an Amazon SQS queue](#delivering-to-an-amazon-sqs-queue). Set at creation and fixed for the endpoint's life. |
+| `url` | Where batches are POSTed, on an `http` endpoint. Null on the others. See [what a receiver URL must look like](#what-a-receiver-url-must-look-like). |
+| `sqs` | The queue, on an `sqs` endpoint. Null on the others. |
 | `enabled_events` | The subscription: exact types (`gateway.request.completed`), a family wildcard (`gateway.*`), or `*` for everything. An endpoint receives only what it subscribed to. |
 | `status` | `active` or `disabled`. Disabled endpoints receive nothing; sources keep accruing. |
 | Signing secret | Shown **once** at creation. Roll it to get a new one. Every delivery is signed with it. |
@@ -36223,6 +36262,77 @@ stateDiagram-v2
     Retrying --> Disabled: 72h of consecutive failures
     Disabled --> Pending: re-enable, then replay the gap
 ```
+
+## Delivering to an Amazon SQS queue
+
+An endpoint can put each batch on your own Amazon SQS queue instead of POSTing it to a URL. Only the last hop changes. The batching, the retry ladder, the delivery log, and the signature over the same bytes all work as they do for an HTTPS endpoint.
+
+<Warning>
+**`ReceiveMessage` returns no message attributes unless you ask for them by name.** Pass `MessageAttributeNames: ["All"]`. Without it your consumer sees a body with no signature beside it and rejects every delivery, even though the body itself is correct. Check this first when a receiver that worked over HTTPS rejects everything on the queue.
+</Warning>
+
+**The body is byte-identical to the HTTP body.** `MessageBody` is the exact same `{"batch": [...]}` JSON an HTTPS receiver would be POSTed. There is no outer wrapper. The signature, the delivery id and the attempt ride as **message attributes** under the same names they use as HTTP headers:
+
+| Message attribute | Same as the HTTP header |
+|---|---|
+| `X-LangWatch-Signature` | `t=<unix>,v1=<hmac>`, one `v1` per valid secret |
+| `X-LangWatch-Delivery-Id` | Groups the retries of one delivery; never the dedup key |
+| `X-LangWatch-Delivery-Attempt` | 1-based attempt number |
+| `X-LangWatch-Test-Fire` | `"true"`, and present only on a test fire. Absent on every real delivery |
+
+So verification is the same call over the same bytes, and moving an integration from HTTP to a queue does not change your verification code.
+
+```bash
+curl -X POST https://app.langwatch.ai/api/webhooks/v1/endpoints \
+  -H "Authorization: Bearer $LANGWATCH_ORG_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "destination_kind": "sqs",
+    "sqs": {
+      "queue_url": "https://sqs.eu-central-1.amazonaws.com/123456789012/billing-events",
+      "role_arn": "arn:aws:iam::123456789012:role/langwatch-webhook-producer"
+    },
+    "enabled_events": ["gateway.request.completed"]
+  }'
+```
+
+**Granting access.** Three modes, in the order to prefer them:
+
+| Mode | How | When |
+|---|---|---|
+| `assume_role` | Give `sqs.role_arn`. The response carries a generated `external_id`; put it in that role's trust policy as `sts:ExternalId`, and allow `sqs:SendMessage` on the queue. | The recommended mode. Nothing long-lived is stored, and you revoke us by editing your own trust policy. |
+| `static` | Give `sqs.access_key_id` and `sqs.secret_access_key`. The secret is encrypted at rest and never returned by any read. | When you cannot create a cross-account role. |
+| `ambient` | Give neither, so LangWatch's own AWS identity writes to the queue. Refused unless the operator set `WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS=1`. | Self-hosted, single-tenant installs only. |
+
+The trust policy on your role, with the `external_id` the create response returned:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Principal": { "AWS": "<the LangWatch principal for your deployment>" },
+    "Action": "sts:AssumeRole",
+    "Condition": { "StringEquals": { "sts:ExternalId": "lw-<the external id from the response>" } }
+  }]
+}
+```
+
+<Note>
+On LangWatch Cloud, ask support for the principal to trust; it is a property of the deployment, not of your endpoint. On a self-hosted install it is whatever identity your workers run as.
+</Note>
+
+**Rules the queue itself must satisfy:**
+
+- **Standard queues only.** A `.fifo` queue is refused at save time. Delivery is at-least-once and consumers deduplicate on the envelope `id`, which is what a standard queue asks of them; ordering is not part of the delivery contract, and a FIFO queue would add a throughput ceiling for a guarantee this path does not need.
+- **A canonical Amazon SQS queue URL**, `https://sqs.<region>.amazonaws.com/<account id>/<queue name>`. The region and the owning account are read from it, so they can never disagree with the queue. Anything else is refused.
+- **One batch is one message, and LangWatch caps it at 256 KiB** including the attributes. Amazon SQS itself accepts up to 1 MiB; the lower cap is ours, and it keeps one slow consumer from having to hold a megabyte in memory per message. A batch over the cap fails terminally and says so; lower `max_batch_size` so each delivery carries fewer events.
+
+**Deduplicate on the envelope `id`.** A standard queue is at-least-once and can redeliver a message on its own, and it has no queue-level deduplication of its own to lean on. `X-LangWatch-Delivery-Id` names the batch delivery, not an event, so deduplicating on it would drop every envelope in the batch but one. The `id` inside each envelope is the idempotency key.
+
+**Asking for a retry.** Delete the message only after the batch is durably ingested. Leaving it alone is the retry: it reappears after the visibility timeout, and after your queue's `maxReceiveCount` it lands in your dead letter queue. Set a redrive policy, so a message your consumer can never accept lands somewhere you can inspect it.
+
+**Changing where an endpoint delivers** is not an update. `destination_kind` is fixed once created, because batches already planned against the old transport are in flight. Create a second endpoint, let the first drain, then archive it.
 
 ## Delivery controls
 
@@ -53768,7 +53878,19 @@ These are the only repository permissions the app requests:
 | Pull requests | Read and write |
 | Metadata | Read |
 
-The app subscribes to no events beyond the installation lifecycle that GitHub sends automatically (`installation`, `installation_repositories`).
+The app subscribes to the `pull_request` event, plus the installation lifecycle that GitHub sends automatically (`installation`, `installation_repositories`). The event is what links a pull request to the coding-agent sessions that worked on it.
+
+These are the fields the platform keeps from it:
+
+| Field | Kept as |
+|---|---|
+| Number, title, web URL | The row the Pull Requests page shows |
+| State, draft flag | The status the page draws |
+| Head branch | The key that matches sessions to the pull request |
+| Author login | The GitHub account that opened it, shown as the contributor |
+| Created, updated, closed and merged times | The pull request's lifetime, which decides the sessions counted under it |
+
+The event carries no file content and no diff.
 
 <Note>
 `Contents: Read and write` is what lets Langy clone a repository, create a branch, and push commits to that branch. It does not let Langy merge; merging a pull request is a separate action that a human takes in GitHub after review.
@@ -57308,7 +57430,9 @@ Set the repository permissions to exactly these, nothing more. Tighter scope mea
 | Pull requests | Read & write |
 | Metadata | Read |
 
-Subscribe to no events beyond the installation lifecycle, which GitHub sends automatically (`installation`, `installation_repositories`).
+Under **Subscribe to events**, select **Pull request**. GitHub sends the installation lifecycle events (`installation`, `installation_repositories`) on its own. Subscribe to nothing else.
+
+The `pull_request` event links a pull request to its coding-agent sessions as soon as GitHub announces it. Without the event, linkage still works, but it waits for the periodic sweep, which can take up to a day for a branch that has been asked about a few times already.
 
 Click **Create GitHub App**. On the resulting page:
 
@@ -57358,6 +57482,8 @@ In a session, ask Langy something like "open a PR on `<a repo the app is install
     Langy clones the repo into the per-session worker home, branches, commits, pushes, and posts the PR URL, rendered as a PR card. The PR is authored by the app, with the requester credited as co-author.
   </Step>
 </Steps>
+
+To check the `pull_request` subscription, open a pull request on a repository the app is installed on, from a branch a coding-agent session ran on. GitHub records the delivery under **Advanced > Recent Deliveries** on the app registration, and the pull request appears on the LangWatch Pull Requests page without waiting for the sweep.
 
 If anything goes wrong, the audit log (`langy.github.install`, `langy.github.disconnect`) and Sentry capture the failure paths.
 
@@ -60250,6 +60376,24 @@ WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS=1
 ```
 
 With the flag set, endpoint URLs may use `http://` and resolve to private or loopback addresses. **Only** the local-address fence is relaxed: size caps, timeouts, no-redirects, and signing all stay in force. Leave this unset in production unless your receivers are deliberately internal; it is the difference between "our workers can only call out" and "our workers can reach anything on the pod network".
+
+## Amazon SQS destinations and whose credentials they use
+
+An endpoint can deliver to an Amazon SQS queue instead of an HTTPS receiver ([how it works](/features/webhooks#delivering-to-an-amazon-sqs-queue)). A queue endpoint normally carries credentials of its own: a role LangWatch assumes with a generated ExternalId, or an encrypted static key pair.
+
+It can also run on **this deployment's own AWS identity** (an instance role, IRSA, or a developer's SSO session), which needs an explicit opt-in:
+
+```
+WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS=1
+```
+
+With the flag set, an endpoint may name a queue and supply no credentials, and deliveries are written with whatever AWS identity the workers run as.
+
+<Warning>
+Leave this unset on any deployment serving more than one organization. With it on, anyone who can create a webhook endpoint can name **any queue this deployment's role is allowed to write to**, including another tenant's, and the platform writes to it. It is safe only on a single-tenant install whose queues are its own, and in local development.
+</Warning>
+
+The queue URL never passes through the SSRF fence above because the AWS SDK dials it rather than the platform. It is pinned instead to the canonical Amazon SQS shape, and the region and owning account are read from the URL, so they always match the queue.
 
 ## Authentication model
 

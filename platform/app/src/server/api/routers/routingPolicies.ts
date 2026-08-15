@@ -11,6 +11,7 @@
  */
 
 import {
+  RoutingPolicyModelMustBeConcreteError,
   RoutingPolicyMustHaveProviderError,
   RoutingPolicyMustHaveScopeError,
   RoutingPolicyService,
@@ -18,6 +19,9 @@ import {
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { RoutingPolicyScopeType } from "~/generated/prisma/client";
+
+import { suggestTierTargets } from "~/server/modelProviders/suggestTierTargets";
+import { MODEL_TIERS } from "~/utils/modelTierPresets";
 
 import { checkOrganizationPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -41,6 +45,13 @@ function mapServiceErrorToTrpc(err: unknown): never {
       cause: err,
     });
   }
+  if (err instanceof RoutingPolicyModelMustBeConcreteError) {
+    throw new TRPCError({
+      code: "UNPROCESSABLE_CONTENT",
+      message: err.message,
+      cause: err,
+    });
+  }
   throw err;
 }
 
@@ -48,8 +59,13 @@ const scopeTypeSchema = z.nativeEnum(RoutingPolicyScopeType);
 const scopesArraySchema = z
   .array(z.object({ scopeType: scopeTypeSchema, scopeId: z.string() }))
   .min(1, "Routing policy must include at least one scope");
-const strategySchema = z.enum(["priority", "cost", "latency", "round_robin"]);
 const aliasesSchema = z.record(z.string(), z.string()).optional();
+/**
+ * A concrete, provider-qualified model id. Never a moving name: writing
+ * "openai/latest" here would make the gateway dispatch a model literally
+ * called "latest".
+ */
+const defaultModelSchema = z.string().min(1).max(256).nullable().optional();
 const policyRulesSchema = z.record(z.string(), z.unknown()).optional();
 
 export const routingPoliciesRouter = createTRPCRouter({
@@ -87,6 +103,27 @@ export const routingPoliciesRouter = createTRPCRouter({
       return policy;
     }),
 
+  /**
+   * Models worth pointing a tier at, ranked. Server-side because the model
+   * catalog is far too large to ship to the browser; the tier names and
+   * labels themselves are client-safe and live in utils/modelTierPresets.
+   */
+  tierSuggestions: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        tier: z.enum(MODEL_TIERS),
+        boundProviderTypes: z.array(z.string()).default([]),
+      }),
+    )
+    .use(checkOrganizationPermission("routingPolicies:view"))
+    .query(({ input }) =>
+      suggestTierTargets({
+        tier: input.tier,
+        boundProviderTypes: input.boundProviderTypes,
+      }),
+    ),
+
   create: protectedProcedure
     .input(
       z.object({
@@ -100,10 +137,9 @@ export const routingPoliciesRouter = createTRPCRouter({
             1,
             "Routing policy must reference at least one provider credential",
           ),
-        modelAllowlist: z.array(z.string()).nullable().optional(),
-        strategy: strategySchema.default("priority"),
         isDefault: z.boolean().default(false),
         modelAliases: aliasesSchema,
+        defaultModel: defaultModelSchema,
         policyRules: policyRulesSchema,
       }),
     )
@@ -117,10 +153,9 @@ export const routingPoliciesRouter = createTRPCRouter({
           name: input.name,
           description: input.description ?? null,
           modelProviderIds: input.modelProviderIds,
-          modelAllowlist: input.modelAllowlist ?? null,
-          strategy: input.strategy,
           isDefault: input.isDefault,
           modelAliases: input.modelAliases,
+          defaultModel: input.defaultModel ?? null,
           policyRules: input.policyRules,
           actorUserId: ctx.session.user.id,
         });
@@ -143,9 +178,8 @@ export const routingPoliciesRouter = createTRPCRouter({
             "Routing policy must reference at least one provider credential",
           )
           .optional(),
-        modelAllowlist: z.array(z.string()).nullable().optional(),
-        strategy: strategySchema.optional(),
         modelAliases: aliasesSchema,
+        defaultModel: defaultModelSchema,
         policyRules: policyRulesSchema,
       }),
     )
@@ -159,9 +193,8 @@ export const routingPoliciesRouter = createTRPCRouter({
           name: input.name,
           description: input.description,
           modelProviderIds: input.modelProviderIds,
-          modelAllowlist: input.modelAllowlist,
-          strategy: input.strategy,
           modelAliases: input.modelAliases,
+          defaultModel: input.defaultModel,
           policyRules: input.policyRules,
           actorUserId: ctx.session.user.id,
         });

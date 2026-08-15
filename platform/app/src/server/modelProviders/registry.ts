@@ -564,6 +564,28 @@ export const modelProviders = {
 } satisfies Record<string, ModelProviderDefinition>;
 
 /**
+ * Whether the gateway's chat dispatcher can route to this provider — the ONE
+ * predicate behind both the server-side eligibility walk
+ * (`gateway/scopeResolver.eligibleModelProvidersForVk`) and the client-side
+ * mirror (`components/gateway/eligibleModelProviders.isRoutable`), so the
+ * binding picker never offers a provider the dispatch chain would drop.
+ *
+ * Non-LLM providers (registry type "safety", e.g. azure_safety) hold
+ * credentials for evaluators, not chat dispatch; the Go gateway's Bifrost
+ * router has no adapter for them, so letting one into a VK chain makes
+ * fallback attempts fail with "unsupported provider: azure_safety".
+ *
+ * This dimension deliberately fails OPEN for ids absent from the registry:
+ * they may be newer than this build's registry snapshot, and the
+ * materialiser's default branch still knows how to shape their credentials.
+ * (The enabled/disabledAt dimension, checked elsewhere, fails closed.)
+ */
+export function isDispatchableProvider(providerId: string): boolean {
+  const entry = modelProviders[providerId as keyof typeof modelProviders];
+  return !entry || entry.type === "llm";
+}
+
+/**
  * The deprecation on a provider, or undefined when it still accepts new
  * rows.
  *

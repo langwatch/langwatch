@@ -162,9 +162,19 @@ function scenarioDeclaring(parameters: unknown[]) {
 }
 
 function renderDrawer() {
-  render(<ScenarioFormDrawer open={true} onClose={vi.fn()} />, {
-    wrapper: Wrapper,
-  });
+  // Being pointed at a scenario is what makes this an edit, so the id is what
+  // decides that a save updates rather than creates. These cases are all about
+  // a scenario that already exists, so they say so.
+  render(
+    <ScenarioFormDrawer
+      open={true}
+      onClose={vi.fn()}
+      scenarioId="scenario-1"
+    />,
+    {
+      wrapper: Wrapper,
+    },
+  );
   return userEvent.setup();
 }
 

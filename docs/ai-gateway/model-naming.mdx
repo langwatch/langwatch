@@ -60,7 +60,7 @@ curl https://gateway.langwatch.ai/v1/chat/completions \
 
 A per-VK redirect from a client-facing name to a concrete `provider/model`. Aliases decouple client code from provider specifics, you can repoint `coding-small` from OpenAI to Bedrock in a single VK edit without touching any caller.
 
-See [Model Aliases](/ai-gateway/model-aliases) for the full story, including the `:fallback` suffix for cross-provider remap and the `GET /v1/models` discovery endpoint.
+See [Model Aliases](/ai-gateway/model-aliases) for the full rules, including how an alias is judged against `models_allowed` and the `GET /v1/models` discovery endpoint.
 
 ## How resolution works
 
@@ -120,7 +120,7 @@ The error surfaces the accepted names so an integrator can fix the request witho
     Use an alias. Edit the VK once, zero caller changes. See [Model Aliases](/ai-gateway/model-aliases).
   </Step>
   <Step title="Cross-provider fallback (primary dies, secondary takes over)">
-    Alias with `:fallback` suffix. `"coding-small": "openai/gpt-5-mini"` + `"coding-small:fallback": "anthropic/claude-haiku-4-5-20251001"`. See [Model Aliases → :fallback suffix](/ai-gateway/model-aliases#fallback-suffix-advanced).
+    Name a model that the fallback providers also serve, for example an Anthropic model with an Anthropic credential and a Bedrock credential on the VK. One request resolves to one model. The gateway carries that same model name to the next credential in the chain. See [Fallback Chains](/ai-gateway/providers/fallback-chains).
   </Step>
 </Steps>
 

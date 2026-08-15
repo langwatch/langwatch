@@ -101,12 +101,18 @@ Feature: AI Gateway — model disambiguation when a VK has multiple providers
     # The provider is clear (openai/), the MODEL is invalid. Ambiguity check
     # passed; upstream error pass-through takes over.
 
-  @integration @v1 @unimplemented
+  @integration @v1
   Scenario: Unknown provider prefix on VK returns 400 with clear envelope
     When I POST with body `{"model": "bedrock/claude-3-haiku", ...}` on "vk_multi" (no bedrock slot)
     Then the response status is 400
-    And the response body.type is "model_provider_not_bound"
-    And the response body.hint contains "bind a `bedrock` provider slot to this VK, or drop the prefix"
+    # The provider-binding failure is exposed through the nested error envelope.
+    And the response body.error.code is "model_provider_not_bound"
+    And the response body.error.hint contains "bind a \"bedrock\" provider slot to this virtual key"
+    # Without this hard-fail the request would dispatch with a mismatched
+    # credential; Bifrost's model-prefix provider override then reads that
+    # credential through the wrong provider's key-config shape, surfacing
+    # opaque errors ("deployments not set", "no keys found that support
+    # model", raw HTML error pages) instead of the real problem.
 
   # ============================================================================
   # Observability — operators should be able to measure ambiguity incidence
@@ -149,3 +155,75 @@ Feature: AI Gateway — model disambiguation when a VK has multiple providers
     And the response sets `X-LangWatch-Model-Warn: ambiguous: chose primary of [primary, fallback-1]`
     # Gives migration teams a soft-landing window to update client configs
     # without 400-ing every request. Strict mode is the default.
+
+  # ============================================================================
+  # models_allowed and aliases
+  # ============================================================================
+
+  Rule: An alias never reaches a model the key is not allowed to use
+
+    An alias is a convenience for naming a model, not a second door into
+    models_allowed. Resolution used to return the alias target before any
+    allowlist check ran, so naming a forbidden model in an alias was enough
+    to reach it, while the documentation promised the opposite.
+
+    The allowlist judges what the alias resolved to, in either spelling: an
+    operator who allowed "openai/gpt-5-mini" and one who allowed "gpt-5-mini"
+    allowed the same model, and neither should have to guess which form the
+    resolver will hand the check.
+
+    @unit
+    Scenario: An alias resolving outside models_allowed is refused
+      Given a virtual key allowing only "claude-*"
+      And the key aliases "coding" to "openai/gpt-5-mini"
+      When a request names model "coding"
+      Then the request is refused as model not allowed
+      And the rejection names the model the alias resolved to
+      And no call is made to any provider
+
+    @unit
+    Scenario: An alias resolving inside models_allowed is served
+      Given a virtual key allowing only "claude-*"
+      And the key aliases "coding" to "anthropic/claude-haiku-4-5"
+      When a request names model "coding"
+      Then the request resolves to "claude-haiku-4-5" on provider "anthropic"
+
+    @unit
+    Scenario: The allowlist accepts either spelling of the same model
+      Given a virtual key allowing only "openai/gpt-5-mini"
+      And the key aliases "coding" to "openai/gpt-5-mini"
+      When a request names model "coding"
+      Then the request resolves to "gpt-5-mini" on provider "openai"
+      And a key allowing the bare "gpt-5-mini" resolves the same alias
+
+    @unit
+    Scenario: A key with no allowlist keeps serving every alias it defines
+      Given a virtual key with no models_allowed
+      And the key aliases "coding" to "openai/gpt-5-mini"
+      When a request names model "coding"
+      Then the request resolves to "gpt-5-mini" on provider "openai"
+
+  Rule: A model refusal says who can fix it, and names what was refused
+
+    Every model the gateway turns away is the caller's to fix: they can send
+    a different name, or ask an admin to widen the key. A refusal that does
+    not say so leaves the caller reading it as a fault on our side, and the
+    same refusal has to read the same way however the name was written.
+
+    A key can allow a model under one provider and not another, so a refusal
+    that drops the provider half describes a rule the caller did not hit.
+
+    @unit
+    Scenario: Every model refusal names the caller as the fault
+      Given a virtual key allowing only "openai/gpt-5.6-sol"
+      When a request names a model the key does not allow
+      Then the request is refused as model not allowed
+      And the refusal states the caller can fix it
+      And it does so whether the name came from an alias, a provider prefix, or a bare model
+
+    @unit
+    Scenario: A refused provider-qualified model is named the way it was sent
+      Given a virtual key allowing only "openai/gpt-4"
+      When a request names model "anthropic/gpt-4"
+      Then the request is refused as model not allowed
+      And the refusal names "anthropic/gpt-4" rather than the model half alone

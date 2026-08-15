@@ -880,10 +880,31 @@ enum WebhookDeliveryOutcome {
 /// or family wildcards ("gateway.*", "*"). Failure-streak columns drive the
 /// 72h auto-disable. Spec: specs/webhooks/webhook-endpoints.feature.
 model WebhookEndpoint {
-  id                      String                @id
-  organizationId          String
-  organization            Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  url                     String
+  id             String       @id
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  /// Where this endpoint delivers. Everything above the last hop is shared:
+  /// same batching, same retry ladder, same delivery log, same signature over
+  /// the same bytes.
+  destinationKind WebhookDestinationKind @default(http)
+  /// The receiver URL. Present on `http` endpoints and null on the others;
+  /// the per-kind shape is pinned by a CHECK constraint Prisma cannot model.
+  url             String?
+  /// The Amazon SQS queue this endpoint delivers to, on `sqs` endpoints. The
+  /// region and the owning account are read off it rather than configured
+  /// separately, so they can never disagree with the queue.
+  sqsQueueUrl     String?
+  /// The role we assume to write to the queue, and the ExternalId that proves
+  /// the request came from us rather than from anyone who learned the role's
+  /// name. The recommended credential mode.
+  sqsRoleArn      String?
+  sqsExternalId   String?
+  /// A static key pair for the queue, encrypted at rest exactly like the
+  /// signing secret. Both halves are present or both are absent: a half-filled
+  /// pair is what the AWS SDK reads as "we have credentials" and stops looking
+  /// with, so the CHECK constraint refuses it.
+  sqsAccessKeyId              String?
+  sqsSecretAccessKeyEncrypted String?
   secretEncrypted         String
   /// The secret this endpoint signed with before the last roll. Deliveries
   /// carry a second `v1=` computed from it until it expires, so a receiver
@@ -915,6 +936,14 @@ model WebhookEndpoint {
   deliveries WebhookEndpointDelivery[]
 
   @@index([organizationId, status])
+}
+
+/// The last hop a webhook endpoint delivers over. Lowercase because these
+/// values are the wire spelling: the same strings appear in the REST DTO,
+/// both SDKs and the CLI.
+enum WebhookDestinationKind {
+  http
+  sqs
 }
 
 enum WebhookEndpointStatus {
@@ -1277,6 +1306,12 @@ model GithubPullRequest {
   prCreatedAt        DateTime
   prClosedAt         DateTime?
   prMergedAt         DateTime?
+  /// GitHub's own `updated_at` for the snapshot this row holds, and the
+  /// freshness guard on every write to it: a snapshot older than the stored one
+  /// is skipped. GitHub may deliver webhooks out of order, and without the
+  /// guard a late `opened` lands after `closed` and reopens a merged pull
+  /// request. NULL means the row predates the column, so any write is accepted.
+  prUpdatedAt        DateTime?
   /// When this row was first mapped to its branch.
   mappedAt           DateTime     @default(now())
   /// When the snapshot columns were last refreshed from GitHub.
@@ -1946,7 +1981,12 @@ model LlmPromptConfig {
 
   @@unique([handle], map: "LlmPromptConfig_handle_key")
   @@index([projectId])
-  @@index([organizationId], map: "LlmPromptConfig_organizationId_idx")
+  // Listing queries filter on (organizationId, scope) together. On a plain
+  // organizationId index one large organization matches almost every row and
+  // the planner falls back to scanning the table; scope in the index keeps
+  // the lookup selective. The composite also serves organizationId-only
+  // filters as its prefix, so a separate single-column index is not needed.
+  @@index([organizationId, scope])
   @@index([copiedFromPromptId])
 }
 
@@ -2754,31 +2794,36 @@ model RoutingPolicy {
   // Ordered list of ModelProvider.id values (post-iter-110: GPC merged
   // into MP, the chain refers to MPs directly). JSON for shape
   // flexibility; gateway materialises into provider chain at request
-  // time. Order = try-first when strategy = 'priority'.
+  // time. Order = the order the gateway tries them in.
   modelProviderIds Json @default("[]")
-
-  // Optional model allowlist (JSON array of glob patterns).
-  // null/empty = "all models the eligible providers can serve".
-  modelAllowlist Json?
 
   // Model name rewrites applied before dispatch. Shape:
   //   { "gpt-4o": "gpt-4o-mini", "claude": "anthropic/claude-haiku-4-5" }
   // Hoisted from per-VK config (iter 110) onto the RoutingPolicy so a
   // single policy edit updates every VK linked to it. Empty object = no
   // rewrites.
+  //
+  // The reserved tier names (complex / reasoning / fast, see
+  // src/utils/modelTierPresets.ts) live in here as ordinary entries. The
+  // gateway needs no knowledge of them: it looks a tier up the same way it
+  // looks up any other name.
   modelAliases Json @default("{}")
+
+  // The model a reserved tier name resolves to when this policy names no
+  // target for it. Applies to the tier names ONLY, never as a catch-all for
+  // an unrecognized model: a catch-all would serve a caller a model they
+  // never named, turn every typo into a billed call, and make an allowlist
+  // unenforceable because nothing would reach the rejection.
+  //
+  // Stores a concrete, provider-qualified model id. A moving name such as
+  // "openai/latest" would make the gateway dispatch a model literally called
+  // "latest".
+  defaultModel String?
 
   // Provider-agnostic policy rules - deny/allow lists per dimension.
   // Shape: { tools: { deny: string[]; allow: string[] | null }, mcp: {...}, urls: {...}, models: {...} }
   // Hoisted from per-VK config (iter 110). Enforced pre-provider-dispatch.
   policyRules Json @default("{}")
-
-  // Routing strategy applied across the model-eligible subset.
-  //   'priority'    - try modelProviderIds in order (default)
-  //   'cost'        - pick lowest unit cost first
-  //   'latency'     - pick fastest healthy provider
-  //   'round_robin' - distribute evenly
-  strategy String @default("priority")
 
   isDefault Boolean @default(false)
 

@@ -2,6 +2,8 @@
 #
 # Implementation:
 #   platform/app/src/server/app-layer/github/github-pull-request-mapping.service.ts   (branch-to-PR mapping + negative cache)
+#   platform/app/src/server/app-layer/github/githubPullRequestEvent.ts                 (the pull_request webhook payload, validated)
+#   platform/app/src/server/routes/github.ts                                           (the webhook delivery target)
 #   platform/app/src/server/app-layer/github/github-pull-request-status.service.ts    (live status, Redis-cached, never the queue)
 #   platform/app/src/server/event-sourcing/pipelines/coding-agent-processing/reactors/pullRequestMapping.reactor.ts (fold trigger)
 #   platform/app/src/server/app-layer/coding-agent/pull-request-assignment.ts          (session-to-PR tenure rule)
@@ -105,6 +107,110 @@ Rule: Branches map to their pull requests through the organization connection
     Given sessions with repo and branch folded before any GitHub connection existed
     When the organization connects GitHub
     Then the recent branches are mapped without waiting for new sessions
+
+Rule: A pull request links itself the moment GitHub announces it
+
+  # Polling alone linked a branch up to a day after its pull request was
+  # opened, because a branch is at its most backed-off exactly when the pull
+  # request finally appears: people and coding agents branch first, work for
+  # hours, and open the pull request last.
+  @integration
+  Scenario: A pull request opened on a branch is linked without waiting for a recheck
+    Given an organization whose GitHub connection covers a repository
+    And a branch with no pull request yet
+    When GitHub announces that a pull request was opened for that branch
+    Then the pull request is stored for the branch straight away
+    And GitHub is not asked to list the branch's pull requests
+
+  @integration
+  Scenario: The announcement clears the branch's backoff
+    Given a branch whose repeated empty answers armed the longest backoff
+    When GitHub announces a pull request for that branch
+    Then the branch is no longer waiting to be asked again
+    And a later empty answer arms the shortest backoff rather than the longest
+
+  @integration
+  Scenario: A pull request that merges is announced as merged
+    Given a stored pull request that is open
+    When GitHub announces that it was merged
+    Then the stored pull request reads as merged
+
+  @unit
+  Scenario: An announcement for a connection this instance does not hold is dropped
+    Given an announcement carrying an installation with no local record
+    When it arrives
+    Then nothing is stored for it
+
+  @unit
+  Scenario: An announcement that changes nothing the page shows is dropped
+    Given an announcement that a label was added to a pull request
+    When it arrives
+    Then nothing is written
+
+  # The head of a pull request from a fork lives in another repository, which
+  # is a repository a session on this one never names.
+  @unit
+  Scenario: An announcement for a pull request opened from a fork is dropped
+    Given an announcement whose head branch lives in a different repository
+    When it arrives
+    Then nothing is stored for it
+
+  @integration
+  Scenario: Every announcement is acknowledged, applied or not
+    Given a signed announcement this instance has nothing to do with
+    When GitHub delivers it
+    Then GitHub is told the delivery succeeded
+
+  @integration
+  Scenario: A redelivered announcement changes nothing
+    Given an announcement that has already been applied
+    When GitHub delivers it a second time
+    Then the branch still carries exactly one pull request, unchanged
+
+  # GitHub does not promise the order it delivers announcements in, and a
+  # pull request's close and merge times are what decide which sessions are
+  # priced under it. A late announcement written over a newer one reopens a
+  # merged pull request and takes the sessions that ran after it closed.
+  @integration
+  Scenario: A late delivery about an earlier state does not roll the pull request back
+    Given a pull request stored as merged
+    When an announcement about its earlier state arrives after the merge
+    Then the pull request still reads as merged
+    And its close and merge times are unchanged
+    And its title is not put back to the earlier one
+
+  @integration
+  Scenario: A listing that answers after a newer announcement does not roll it back
+    Given a listing of a branch's pull requests still waiting on GitHub
+    When the pull request is announced as merged before the listing answers
+    Then the listing's older answer leaves the stored pull request as merged
+
+  # Deliveries get missed, installations get suspended and resumed, and a
+  # self-hosted instance may never be reachable by GitHub at all. The recheck
+  # is the floor under the announcement, not something it replaces.
+  @integration
+  Scenario: A branch whose announcement never arrived is still linked by the recheck
+    Given a pull request opened for a branch and no announcement delivered
+    When the periodic recheck runs after the branch's backoff elapses
+    Then the pull request is linked
+
+Rule: A branch a session just ran on is asked about again soon
+
+  # The backoff grew on the theory that a branch empty four times is a branch
+  # whose work never became a pull request. A session folding on that branch is
+  # the plainest evidence to the contrary, so it brings the next question
+  # forward instead of inheriting a day-long wait.
+  @integration
+  Scenario: A new session on a branch brings its next question forward
+    Given a branch sitting on the longest backoff with no pull request
+    When a coding-agent session folds on that branch
+    Then the branch is due to be asked about again within the shortest backoff
+
+  @integration
+  Scenario: Repeated folds on one branch still ask GitHub once per backoff
+    Given a branch a session just folded on and asked GitHub about
+    When more sessions fold on it before the backoff elapses
+    Then GitHub is not asked again
 
 Rule: Sessions attach to pull requests by the pull request's lifetime
 
