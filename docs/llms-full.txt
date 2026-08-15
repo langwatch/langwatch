@@ -10281,7 +10281,7 @@ description: Make your first request through the LangWatch AI Gateway in five mi
 sidebarTitle: Quickstart
 ---
 
-The steps below create a virtual key, send a request through it, read the trace, and cap the spend with a budget.
+This walkthrough takes you from zero to a traced, budget-gated LLM response.
 
 ## Are you a developer or an admin?
 
