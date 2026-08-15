@@ -25,7 +25,12 @@ import {
 } from "~/server/tracer/collector/cost";
 import { getStaticModelCosts } from "../llmModelCost";
 import { llmModels, overlayOverriddenModelIds } from "../loadModelCatalog";
+import * as overlayRaw from "../llmModels.overlay.json";
 import type { LLMModelEntry } from "../llmModels.types";
+
+const overlayModels = (
+  overlayRaw as unknown as { models: Record<string, LLMModelEntry> }
+).models;
 
 /**
  * Models the catalog prices at zero on purpose.
@@ -142,7 +147,7 @@ describe("catalog price coverage", () => {
     const costs = getStaticModelCosts();
     const zeroRated: string[] = [];
 
-    for (const [id, entry] of catalogEntries) {
+    for (const [id] of catalogEntries) {
       if (isPricedElsewhere(id) || id in KNOWN_UNPRICED) continue;
 
       const matched = matchModelCostWithFallbacks(id, costs);
@@ -228,13 +233,10 @@ describe("overlay precedence", () => {
     // cannot correct a wrong generated rate, which is the whole reason it
     // exists.
     for (const id of overlayOverriddenModelIds) {
-      const overlay = require("../llmModels.overlay.json") as {
-        models: Record<string, LLMModelEntry>;
-      };
       expect(
         llmModels.models[id]?.pricing,
         `overlay entry ${id} is not the one in force`,
-      ).toEqual(overlay.models[id]?.pricing);
+      ).toEqual(overlayModels[id]?.pricing);
     }
   });
 
