@@ -150,6 +150,68 @@ describe("ProcessOutboxWorker", () => {
     await worker.stop();
   });
 
+  it("stops starting drains once too many abandoned ones are still pending", async () => {
+    vi.useFakeTimers();
+    const logger = makeLogger();
+    const never = new Promise<void>(() => undefined);
+    const runOnce = vi.fn().mockImplementation(async () => never);
+    const worker = new ProcessOutboxWorker({
+      dispatcher: { runOnce },
+      logger,
+      name: "pilot",
+      intervalMs: 100,
+      stuckDrainTimeoutMs: 1_000,
+    });
+
+    worker.start();
+    // One drain abandoned per threshold, each replaced by the next poll,
+    // until five are retained and the worker refuses to retain a sixth.
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    expect(runOnce).toHaveBeenCalledTimes(5);
+    const refusals = vi
+      .mocked(logger.error)
+      .mock.calls.filter(([, message]) =>
+        String(message).includes("refusing to start another"),
+      );
+    // Said once, not once per poll: the refusal must not flood the logs.
+    expect(refusals).toHaveLength(1);
+    await worker.stop();
+  });
+
+  it("resumes draining when an abandoned drain finally settles", async () => {
+    vi.useFakeTimers();
+    const releases: Array<() => void> = [];
+    const runOnce = vi.fn().mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          releases.push(resolve);
+        }),
+    );
+    const worker = new ProcessOutboxWorker({
+      dispatcher: { runOnce },
+      logger: makeLogger(),
+      name: "pilot",
+      intervalMs: 100,
+      stuckDrainTimeoutMs: 1_000,
+    });
+
+    worker.start();
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(runOnce).toHaveBeenCalledTimes(5);
+
+    // The first hung delivery settles after all, so its slot comes back and
+    // polling recovers without a restart.
+    releases[0]?.();
+    await vi.advanceTimersByTimeAsync(100);
+
+    expect(runOnce).toHaveBeenCalledTimes(6);
+
+    for (const release of releases) release();
+    await vi.advanceTimersByTimeAsync(0);
+    await worker.stop();
+  });
+
   it("does not abandon a drain that is merely slow but under the threshold", async () => {
     vi.useFakeTimers();
     const logger = makeLogger();

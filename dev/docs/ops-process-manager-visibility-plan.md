@@ -38,11 +38,15 @@ Implementation notes that differ from the sketch below:
   - `max(pm_outbox_overdue_pending{process_name="triggerSettlement"}) > 200`
     sustained 30m warns; `> 1000` sustained 30m pages. Always `max()` across
     pods, never `sum()` — the gauges are global table counts reported per pod.
-  - `sum(rate(es_process_outbox_total{status="fenced"}[10m])) > 0` sustained
-    15m — an acknowledgement fenced by a lapsed lease means a delivery ran
-    past its lease and may have run twice.
-  - `sum(rate(es_process_outbox_stuck_drains_total[10m])) > 0` — a drain that
-    never settled; the watchdog recovered the loop, the cause needs a look.
+  - `sum by (process_name) (rate(es_process_outbox_total{status="fenced"}[30m])) > 0`
+    sustained 15m. An acknowledgement fenced by a lapsed lease means a
+    delivery ran past its lease and may have run twice. The rate window must
+    stay at least as long as the sustain period: with a `[10m]` window the
+    expression goes false 10m after the last fence, so a single fence could
+    never hold the 15m condition and only a continuous burst would alert.
+  - `sum by (process_name) (rate(es_process_outbox_stuck_drains_total[10m])) > 0`,
+    no sustain. A drain that never settled; the watchdog recovered the loop,
+    the cause needs a look.
   - `histogram_quantile(0.95, sum by (le, process_name) (rate(es_process_outbox_dispatch_lag_milliseconds_bucket[15m]))) > 900000`
     sustained 30m — the outbox is not draining for that process.
 

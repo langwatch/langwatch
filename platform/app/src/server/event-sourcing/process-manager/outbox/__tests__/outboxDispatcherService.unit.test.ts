@@ -13,11 +13,20 @@ import {
   OutboxDispatcherService,
 } from "../outboxDispatcherService";
 
+const { observeDispatchLag } = vi.hoisted(() => ({
+  observeDispatchLag: vi.fn(),
+}));
+vi.mock("~/server/metrics", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("~/server/metrics")>()),
+  observeEsProcessOutboxDispatchLag: observeDispatchLag,
+}));
+
 describe("OutboxDispatcherService", () => {
   let store: InMemoryProcessStore;
   let service: ProcessManagerService<PilotState>;
 
   beforeEach(() => {
+    observeDispatchLag.mockClear();
     store = new InMemoryProcessStore();
     service = new ProcessManagerService({
       definition: pilotDefinition,
@@ -310,136 +319,187 @@ describe("OutboxDispatcherService", () => {
   describe("given a lease that lapses mid-delivery", () => {
     beforeEach(commitStartedTurn);
 
-    it("reports the superseded acknowledgement as fenced, never as dispatched", async () => {
-      let releaseSlowHandler!: () => void;
-      const blocked = new Promise<void>((resolve) => {
-        releaseSlowHandler = resolve;
-      });
-      const slow = new OutboxDispatcherService({
-        store,
-        handlers: { "worker-dispatch": vi.fn().mockReturnValue(blocked) },
-        leaseDurationMs: 100,
-      });
-      const fast = new OutboxDispatcherService({
-        store,
-        handlers: { "worker-dispatch": vi.fn().mockResolvedValue(undefined) },
-        leaseDurationMs: 100,
-      });
+    describe("when the superseded delivery succeeds", () => {
+      it("reports the acknowledgement as fenced, never as dispatched", async () => {
+        let releaseSlowHandler!: () => void;
+        const blocked = new Promise<void>((resolve) => {
+          releaseSlowHandler = resolve;
+        });
+        const slow = new OutboxDispatcherService({
+          store,
+          handlers: { "worker-dispatch": vi.fn().mockReturnValue(blocked) },
+          leaseDurationMs: 100,
+        });
+        const fast = new OutboxDispatcherService({
+          store,
+          handlers: { "worker-dispatch": vi.fn().mockResolvedValue(undefined) },
+          leaseDurationMs: 100,
+        });
 
-      const slowRun = slow.runOnce({ now: T0 + 1 });
-      // The slow dispatcher's lease lapses; a second dispatcher re-leases
-      // and completes the same message.
-      const fastReport = await fast.runOnce({ now: T0 + 200 });
-      expect(fastReport.dispatched).toEqual(["dispatch:turn_1:1"]);
+        const slowRun = slow.runOnce({ now: T0 + 1 });
+        // The slow dispatcher's lease lapses; a second dispatcher re-leases
+        // and completes the same message.
+        const fastReport = await fast.runOnce({ now: T0 + 200 });
+        expect(fastReport.dispatched).toEqual(["dispatch:turn_1:1"]);
 
-      releaseSlowHandler();
-      const slowReport = await slowRun;
-      expect(slowReport.fenced).toEqual(["dispatch:turn_1:1"]);
-      expect(slowReport.dispatched).toEqual([]);
+        releaseSlowHandler();
+        const slowReport = await slowRun;
+        expect(slowReport.fenced).toEqual(["dispatch:turn_1:1"]);
+        expect(slowReport.dispatched).toEqual([]);
+      });
+    });
+
+    describe("when the superseded delivery fails", () => {
+      it("reports the acknowledgement as fenced, never as retried or dead", async () => {
+        let rejectSlowHandler!: (error: Error) => void;
+        const blocked = new Promise<void>((_resolve, reject) => {
+          rejectSlowHandler = reject;
+        });
+        const slow = new OutboxDispatcherService({
+          store,
+          handlers: { "worker-dispatch": vi.fn().mockReturnValue(blocked) },
+          leaseDurationMs: 100,
+        });
+        const fast = new OutboxDispatcherService({
+          store,
+          handlers: { "worker-dispatch": vi.fn().mockResolvedValue(undefined) },
+          leaseDurationMs: 100,
+        });
+
+        const slowRun = slow.runOnce({ now: T0 + 1 });
+        const fastReport = await fast.runOnce({ now: T0 + 200 });
+        expect(fastReport.dispatched).toEqual(["dispatch:turn_1:1"]);
+
+        rejectSlowHandler(new Error("handler failed after the lease lapsed"));
+        const slowReport = await slowRun;
+        expect(slowReport.fenced).toEqual(["dispatch:turn_1:1"]);
+        expect(slowReport.retried).toEqual([]);
+        expect(slowReport.dead).toEqual([]);
+
+        // The rival's success stands: a fenced failure must not reopen a
+        // message another dispatcher already completed.
+        const rows = await store.findMessagesByRef({ ref: pilotRef });
+        expect(rows[0]).toMatchObject({ status: "dispatched", attempts: 2 });
+      });
     });
   });
 
   describe("given a batch whose earlier deliveries consume the lease budget", () => {
-    it("releases the tail un-attempted and leaves it immediately leasable", async () => {
-      for (let index = 0; index < 3; index++) {
-        await service.handleEvent({
-          envelope: pilotEvent({
-            eventId: `evt_start_${index}`,
-            processKey: `conv_${index}`,
-            payload: { turnId: `turn_${index}` },
-          }),
-          now: T0,
+    describe("when the dispatcher reaches the remaining messages", () => {
+      it("releases the tail un-attempted and leaves it immediately leasable", async () => {
+        for (let index = 0; index < 3; index++) {
+          await service.handleEvent({
+            envelope: pilotEvent({
+              eventId: `evt_start_${index}`,
+              processKey: `conv_${index}`,
+              payload: { turnId: `turn_${index}` },
+            }),
+            now: T0,
+          });
+        }
+        let elapsed = 0;
+        const handler = vi.fn().mockImplementation(async () => {
+          elapsed += 600;
         });
-      }
-      let elapsed = 0;
-      const handler = vi.fn().mockImplementation(async () => {
-        elapsed += 600;
-      });
-      const dispatcher = new OutboxDispatcherService({
-        store,
-        handlers: { "worker-dispatch": handler },
-        leaseDurationMs: 1_000,
-        clock: () => elapsed,
-      });
+        const dispatcher = new OutboxDispatcherService({
+          store,
+          handlers: { "worker-dispatch": handler },
+          leaseDurationMs: 1_000,
+          clock: () => elapsed,
+        });
 
-      // Safety margin is 200ms (20% of the lease). Deliveries one and two
-      // fit; the third would start with none of the lease left.
-      const first = await dispatcher.runOnce({ now: T0 + 1 });
-      expect(first.dispatched).toHaveLength(2);
-      expect(first.released).toHaveLength(1);
-      expect(handler).toHaveBeenCalledTimes(2);
+        // Safety margin is 200ms (20% of the lease). Deliveries one and two
+        // fit; the third would start with none of the lease left.
+        const first = await dispatcher.runOnce({ now: T0 + 1 });
+        expect(first.dispatched).toHaveLength(2);
+        expect(first.released).toHaveLength(1);
+        expect(handler).toHaveBeenCalledTimes(2);
 
-      // The released message was returned to the pool, not delayed: the next
-      // drain at the same logical time picks it up.
-      const second = await dispatcher.runOnce({ now: T0 + 2 });
-      expect(second.dispatched).toEqual(first.released);
+        // The released message was returned to the pool, not delayed: the
+        // next drain at the same logical time picks it up.
+        const second = await dispatcher.runOnce({ now: T0 + 2 });
+        expect(second.dispatched).toEqual(first.released);
+      });
     });
   });
 
   describe("given a message whose leases keep lapsing without any acknowledgement", () => {
     beforeEach(commitStartedTurn);
 
-    it("retires it as dead without invoking the handler again", async () => {
-      // Two delivery starts that never acknowledge (crashed mid-delivery):
-      // each lease charges an attempt, each lease lapses.
-      await store.leaseDueMessages({
-        now: T0 + 1,
-        limit: 1,
-        leaseDurationMs: 100,
+    describe("when a dispatcher leases it again", () => {
+      it("retires it as dead without invoking the handler again", async () => {
+        // Two delivery starts that never acknowledge (crashed mid-delivery):
+        // each lease charges an attempt, each lease lapses.
+        await store.leaseDueMessages({
+          now: T0 + 1,
+          limit: 1,
+          leaseDurationMs: 100,
+        });
+        await store.leaseDueMessages({
+          now: T0 + 200,
+          limit: 1,
+          leaseDurationMs: 100,
+        });
+
+        const handler = vi.fn().mockResolvedValue(undefined);
+        const dispatcher = new OutboxDispatcherService({
+          store,
+          handlers: { "worker-dispatch": handler },
+          maxAttempts: 2,
+          leaseDurationMs: 100,
+        });
+
+        const report = await dispatcher.runOnce({ now: T0 + 400 });
+
+        expect(report.dead).toEqual(["dispatch:turn_1:1"]);
+        expect(handler).not.toHaveBeenCalled();
+
+        const rows = await store.findMessagesByRef({ ref: pilotRef });
+        expect(rows[0]).toMatchObject({ status: "dead" });
       });
-      await store.leaseDueMessages({
-        now: T0 + 200,
-        limit: 1,
-        leaseDurationMs: 100,
-      });
-
-      const handler = vi.fn().mockResolvedValue(undefined);
-      const dispatcher = new OutboxDispatcherService({
-        store,
-        handlers: { "worker-dispatch": handler },
-        maxAttempts: 2,
-        leaseDurationMs: 100,
-      });
-
-      const report = await dispatcher.runOnce({ now: T0 + 400 });
-
-      expect(report.dead).toEqual(["dispatch:turn_1:1"]);
-      expect(handler).not.toHaveBeenCalled();
-
-      const rows = await store.findMessagesByRef({ ref: pilotRef });
-      expect(rows[0]).toMatchObject({ status: "dead" });
     });
   });
 
   describe("given a delivery that crashed between the handler and its acknowledgement", () => {
     beforeEach(commitStartedTurn);
 
-    /** @scenario Attempt counting survives crashes between delivery and acknowledgement */
-    it("redelivers with a higher attempt number instead of attempt one forever", async () => {
-      // The crash: a lease is taken (charging attempt one) and never
-      // acknowledged.
-      await store.leaseDueMessages({
-        now: T0 + 1,
-        limit: 1,
-        leaseDurationMs: 100,
-      });
+    describe("when the lease lapses and another dispatcher leases the message", () => {
+      /** @scenario Attempt counting survives crashes between delivery and acknowledgement */
+      it("redelivers with a higher attempt number and observes dispatch lag only once", async () => {
+        // The crash: the first delivery starts, charging attempt one and
+        // observing the commit-to-dispatch lag, and never acknowledges.
+        const crashed = new OutboxDispatcherService({
+          store,
+          handlers: {
+            "worker-dispatch": vi
+              .fn()
+              .mockReturnValue(new Promise<void>(() => undefined)),
+          },
+          leaseDurationMs: 100,
+        });
+        void crashed.runOnce({ now: T0 + 1 });
+        await vi.waitFor(() =>
+          expect(observeDispatchLag).toHaveBeenCalledTimes(1),
+        );
 
-      const handler = vi.fn().mockResolvedValue(undefined);
-      const dispatcher = new OutboxDispatcherService({
-        store,
-        handlers: { "worker-dispatch": handler },
-        leaseDurationMs: 100,
-      });
-      const report = await dispatcher.runOnce({ now: T0 + 200 });
+        const handler = vi.fn().mockResolvedValue(undefined);
+        const dispatcher = new OutboxDispatcherService({
+          store,
+          handlers: { "worker-dispatch": handler },
+          leaseDurationMs: 100,
+        });
+        const report = await dispatcher.runOnce({ now: T0 + 200 });
 
-      expect(report.dispatched).toEqual(["dispatch:turn_1:1"]);
-      const { message } = handler.mock.calls[0]![0] as {
-        message: DispatchableMessage;
-      };
-      // Before attempts were counted at lease time, this redelivery reported
-      // attempt one forever — re-observing first-attempt dispatch lag on
-      // every redelivery and never crossing maxAttempts.
-      expect(message.attempt).toBe(2);
+        expect(report.dispatched).toEqual(["dispatch:turn_1:1"]);
+        const { message } = handler.mock.calls[0]![0] as {
+          message: DispatchableMessage;
+        };
+        // Before attempts were counted at lease time, this redelivery
+        // reported attempt one forever: it re-observed first-attempt dispatch
+        // lag on every redelivery and never crossed maxAttempts.
+        expect(message.attempt).toBe(2);
+        expect(observeDispatchLag).toHaveBeenCalledTimes(1);
+      });
     });
   });
 });

@@ -67,20 +67,27 @@ describe("outbox backlog drain under slow deliveries", () => {
       expect(result.outcome).toBe("committed");
 
       const invocations = new Map<string, number>();
+      // The wedge's arithmetic (10 x 16s of delivery against a 120s lease in
+      // prod), sized so the outcome does not depend on timing luck:
+      //   lease 1500ms, safety margin 20% = 300ms, so a delivery starts only
+      //   while elapsed <= 1200ms, admitting at most 15 of them.
+      // Both dispatchers therefore shed a tail even if they split the backlog
+      // evenly (20 each), and the last admitted delivery still acknowledges
+      // 220ms inside its lease (1200 + 80 handler vs 1500), which is the
+      // headroom the Postgres round trip needs on a loaded runner.
+      const handlerMs = 80;
       const makeDispatcher = () =>
         new OutboxDispatcherService({
           store,
           processNames: [processName],
-          // 10 x 40ms of delivery against a 250ms lease: the batch cannot
-          // fit, which is the wedge's arithmetic (10 x 16s vs 120s in prod).
-          leaseDurationMs: 250,
+          leaseDurationMs: 1_500,
           handlers: {
             "test.persist": async ({ message }) => {
               invocations.set(
                 message.messageKey,
                 (invocations.get(message.messageKey) ?? 0) + 1,
               );
-              await sleep(40);
+              await sleep(handlerMs);
             },
           },
         });
@@ -92,8 +99,8 @@ describe("outbox backlog drain under slow deliveries", () => {
       let fenced = 0;
       for (let cycle = 0; cycle < 30 && dispatched < total; cycle++) {
         const reports = await Promise.all([
-          dispatcherA.runOnce({ now: Date.now() }),
-          dispatcherB.runOnce({ now: Date.now() }),
+          dispatcherA.runOnce({ now: Date.now(), limit: total }),
+          dispatcherB.runOnce({ now: Date.now(), limit: total }),
         ]);
         for (const report of reports) {
           dispatched += report.dispatched.length;
