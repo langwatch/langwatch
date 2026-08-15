@@ -261,12 +261,10 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 
 	// PromptTokens includes any cached tokens; the span reports the fresh,
 	// non-cached input separately from the cache-read/cache-write counts so the
-	// cost calc prices each bucket once. Fall back to the full prompt if a
-	// provider ever reports cache counts that aren't folded into PromptTokens.
-	freshInput := params.Usage.PromptTokens - params.Usage.CacheReadTokens - params.Usage.CacheCreationTokens
-	if freshInput < 0 {
-		freshInput = params.Usage.PromptTokens
-	}
+	// cost calc prices each bucket once. The spend record reports the same
+	// remainder from the same helper, which is what keeps a trace and its bill
+	// on one number.
+	freshInput := params.Usage.BillableInputTokens()
 
 	attrs := []attribute.KeyValue{
 		semconv.GenAIProviderNameKey.String(string(params.ProviderID)),

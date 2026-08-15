@@ -131,6 +131,23 @@ Feature: Billing spend events, one durable record per gateway request
       And audio tokens are stated apart from the text totals they came out of
       And a text-only request carries the same token counts it always did
 
+    # A provider reports one prompt total that already holds the tokens it
+    # served from its cache. The rating seam prices the cache buckets on top of
+    # the input bucket, so a total shipped whole charges every cached token
+    # twice: once at the input rate and once at its own. On a model whose cache
+    # read costs a tenth of its input, that is eleven times the published rate.
+    # The customer span already states the split; the spend record has to state
+    # the same one or a trace and its bill disagree.
+
+    @unit
+    Scenario: The confirm command states the cached tokens apart from the input it charges at the input rate
+      Given a request whose prompt was mostly served from the provider's cache
+      When the gateway confirms it
+      Then the input token count is the non-cached remainder
+      And the cache-read and cache-write counts travel beside it
+      And a request with no cache activity carries the full prompt as input
+      And the count matches the one the customer span reports
+
     @unit
     Scenario: A quantity added to the vocabulary defaults on records written before it
       Given a confirmation recorded before a quantity existed

@@ -21,8 +21,10 @@ type Response struct {
 //
 // PromptTokens is the provider's full prompt total and INCLUDES any cached
 // tokens (Bifrost sums cache reads/writes into it). CacheReadTokens and
-// CacheCreationTokens carry the cache breakdown so the span can report the
-// fresh, non-cached input separately and the cost can price each bucket once.
+// CacheCreationTokens carry the cache breakdown. Nothing that prices a
+// request reads PromptTokens directly: the span and the spend record both
+// report BillableInputTokens, the remainder with the cache buckets taken
+// out, so each bucket is priced exactly once.
 type Usage struct {
 	PromptTokens        int
 	CompletionTokens    int
@@ -63,6 +65,29 @@ type Usage struct {
 	// thinking. The provider already bills those tokens inside the
 	// completion total, so this count is reported and never priced.
 	ReasoningTokens int
+}
+
+// BillableInputTokens is the input to charge at the plain input rate: the
+// provider's prompt total with the cached tokens taken out.
+//
+// Every pricing path adds the cache-read and cache-write buckets ON TOP of
+// the input bucket, so a total that still holds the cached tokens charges
+// them twice, at the input rate plus their own. On a Sonnet-class model that
+// makes a cache read cost about eleven times the published cache-read rate,
+// and a cache write about 1.8 times its own rate. The span and the spend
+// record both report this remainder, which is what keeps a trace and its
+// bill on one number.
+//
+// A negative remainder means the provider's own counts disagree with each
+// other. The full prompt is the answer there: it is what every caller
+// charged before the cache counts existed, and it never charges less than
+// the tokens the request really used.
+func (u Usage) BillableInputTokens() int {
+	fresh := u.PromptTokens - u.CacheReadTokens - u.CacheCreationTokens
+	if fresh < 0 {
+		return u.PromptTokens
+	}
+	return fresh
 }
 
 // AudioTokenSplit is one provider's audio/text token breakdown, as reported

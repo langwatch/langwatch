@@ -84,8 +84,9 @@ func TestConfirmLeavesATextOnlyPayloadUnchanged(t *testing.T) {
 
 	// The token classes keep the values they always carried, and every
 	// quantity the widening added is exactly zero: pure-text traffic prices
-	// the same before and after.
-	assert.EqualValues(t, 869, usage["input_tokens"])
+	// the same before and after. Input is 869 - 11 - 5, the part of the
+	// prompt the plain input rate applies to.
+	assert.EqualValues(t, 853, usage["input_tokens"])
 	assert.EqualValues(t, 207, usage["output_tokens"])
 	assert.EqualValues(t, 11, usage["cache_read_input_tokens"])
 	assert.EqualValues(t, 5, usage["cache_creation_input_tokens"])

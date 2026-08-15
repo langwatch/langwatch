@@ -46,9 +46,11 @@ type Record struct {
 //
 // InputAudioTokens and OutputAudioTokens are DISJOINT from InputTokens and
 // OutputTokens (domain.Usage.SplitAudioTokens makes them so), because they
-// price at their own, much higher, rate. ReasoningTokens is the one
-// exception: it stays a subset of OutputTokens, is reported for display,
-// and is never priced.
+// price at their own, much higher, rate. CacheReadTokens and
+// CacheCreationTokens are disjoint from InputTokens for the same reason
+// (domain.Usage.BillableInputTokens takes them out), and the customer span
+// states the identical split. ReasoningTokens is the one exception: it stays
+// a subset of OutputTokens, is reported for display, and is never priced.
 type UsagePayload struct {
 	InputTokens           int `json:"input_tokens"`
 	OutputTokens          int `json:"output_tokens"`
@@ -125,7 +127,7 @@ type ErrorPayload struct {
 // usageFromDomain maps every measured quantity onto the wire payload.
 func usageFromDomain(u domain.Usage) UsagePayload {
 	return UsagePayload{
-		InputTokens:           u.PromptTokens,
+		InputTokens:           u.BillableInputTokens(),
 		OutputTokens:          u.CompletionTokens,
 		CacheReadTokens:       u.CacheReadTokens,
 		CacheCreationTokens:   u.CacheCreationTokens,
