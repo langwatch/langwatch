@@ -30,6 +30,43 @@ const EVENT_TYPES = [
   },
 ];
 
+type DrawerEndpoint = NonNullable<
+  Parameters<typeof WebhookEndpointDrawer>[0]["endpoint"]
+>;
+
+/** A saved queue endpoint, with only the queue half worth varying. */
+function sqsEndpoint(
+  sqs: Partial<NonNullable<DrawerEndpoint["sqs"]>> = {},
+): DrawerEndpoint {
+  return {
+    id: "wh_1",
+    organizationId: "org_1",
+    destinationKind: "sqs",
+    url: null,
+    sqs: {
+      queueUrl: "https://sqs.eu-central-1.amazonaws.com/381491922238/lw-test",
+      region: "eu-central-1",
+      accountId: "381491922238",
+      queueName: "lw-test",
+      credentialMode: "assume_role",
+      roleArn: "arn:aws:iam::381491922238:role/langwatch-webhook-producer",
+      externalId: "lw-abc",
+      accessKeyId: null,
+      ...sqs,
+    },
+    enabledEvents: ["gateway.request.completed"],
+    status: "ACTIVE",
+    disabledReason: null,
+    disabledAt: null,
+    failingSince: null,
+    lastSuccessAt: null,
+    lastFailureAt: null,
+    maxBatchSize: 100,
+    maxBatchDelayMs: 250,
+    maxInFlight: 4,
+  } as DrawerEndpoint;
+}
+
 function renderDrawer(
   props: Partial<Parameters<typeof WebhookEndpointDrawer>[0]> = {},
 ) {
@@ -208,6 +245,10 @@ describe("WebhookSecretDialog", () => {
         screen.getByTestId("webhook-sqs-queue-url"),
         "https://sqs.eu-central-1.amazonaws.com/381491922238/lw-test",
       );
+      // The queue URL alone is the whole requirement. Typing a role first
+      // would let a regression that makes role assumption mandatory pass.
+      expect(screen.getByTestId("webhook-save")).toBeEnabled();
+
       await user.type(
         screen.getByTestId("webhook-sqs-role-arn"),
         "arn:aws:iam::381491922238:role/langwatch-webhook-producer",
@@ -226,6 +267,42 @@ describe("WebhookSecretDialog", () => {
           },
         }),
       );
+    });
+
+    /** @scenario A saved role destination shows the external id to trust */
+    it("shows the generated external id when editing, and never on a new endpoint", async () => {
+      const user = userEvent.setup();
+      // A role is worthless until its trust policy names this id, and the
+      // server is the only place it exists, so an edit that cannot read it
+      // back leaves the recommended credential mode impossible to finish.
+      renderDrawer({ endpoint: sqsEndpoint({ externalId: "lw-abc123" }) });
+
+      expect(screen.getByTestId("webhook-sqs-external-id")).toHaveTextContent(
+        "lw-abc123",
+      );
+
+      cleanup();
+      renderDrawer();
+      await user.click(screen.getByText("Amazon SQS queue"));
+      expect(
+        screen.queryByTestId("webhook-sqs-external-id"),
+      ).not.toBeInTheDocument();
+    });
+
+    /** @scenario A saved role destination shows the external id to trust */
+    it("shows no external id block for a queue reached with an access key pair", () => {
+      renderDrawer({
+        endpoint: sqsEndpoint({
+          externalId: null,
+          roleArn: null,
+          credentialMode: "static",
+          accessKeyId: "AKIAEXAMPLE",
+        }),
+      });
+
+      expect(
+        screen.queryByTestId("webhook-sqs-external-id"),
+      ).not.toBeInTheDocument();
     });
 
     /** @scenario An existing endpoint cannot be moved to another destination kind */

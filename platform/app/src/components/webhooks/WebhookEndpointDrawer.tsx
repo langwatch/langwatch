@@ -1,6 +1,7 @@
 import {
   Badge,
   Button,
+  Code,
   Heading,
   HStack,
   Input,
@@ -9,11 +10,13 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { WebhookEventType } from "@ee/webhooks/eventRegistry";
+import { Copy } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Checkbox } from "~/components/ui/checkbox";
 import { Drawer } from "~/components/ui/drawer";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { SegmentedControl } from "~/components/ui/segmented-control";
+import { toaster } from "~/components/ui/toaster";
 import type { RouterOutputs } from "~/utils/api";
 import {
   WEBHOOK_DESTINATION_LABELS,
@@ -125,6 +128,9 @@ function useDestinationFields(isOpen: boolean, endpoint: EndpointView | null) {
     setQueueUrl,
     roleArn,
     setRoleArn,
+    // Read-only: the server mints it when a role is first named, and the
+    // customer needs to read it back to write the role's trust policy.
+    externalId: endpoint?.sqs?.externalId ?? null,
     accessKeyId,
     setAccessKeyId,
     secretAccessKey,
@@ -255,7 +261,6 @@ function EndpointUrlField({
   );
 }
 
-/** One labelled text field of the queue destination. */
 function DestinationTextField({
   label,
   description,
@@ -296,7 +301,59 @@ function DestinationTextField({
   );
 }
 
-/** The queue's address and the credentials that reach it. */
+/**
+ * The external id LangWatch sends when it assumes the customer's role. It is
+ * read-only because the server mints it, and it is on screen because the
+ * trust policy that makes the role usable cannot be written without it.
+ */
+function ExternalIdField({ externalId }: { externalId: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const copy = () => {
+    void (async () => {
+      try {
+        await navigator.clipboard.writeText(externalId);
+        setCopied(true);
+      } catch {
+        toaster.create({
+          title: "Copy failed. Select the external id and copy it manually.",
+          type: "error",
+          meta: { closable: true },
+        });
+      }
+    })();
+  };
+
+  return (
+    <VStack gap={2} align="start" width="full">
+      <HStack gap={1}>
+        <Text fontWeight="600" fontSize="sm">
+          External id
+        </Text>
+        <FieldInfoTooltip
+          description="Put this in the Condition block of the role's trust policy, as sts:ExternalId. LangWatch sends it on every assume, and AWS refuses the assume when it does not match. It is not a secret: it is worthless to anyone who cannot already assume the role."
+          testId="webhook-sqs-external-id-info"
+        />
+      </HStack>
+      <HStack width="full" gap={2}>
+        <Code
+          flex={1}
+          padding={2}
+          fontSize="sm"
+          wordBreak="break-all"
+          data-testid="webhook-sqs-external-id"
+        >
+          {externalId}
+        </Code>
+        <Button size="sm" variant="outline" onClick={copy}>
+          <Copy size={14} />
+          {copied ? "Copied" : "Copy"}
+        </Button>
+      </HStack>
+    </VStack>
+  );
+}
+
 function SqsDestinationFields({ form }: { form: EndpointForm }) {
   return (
     <>
@@ -316,6 +373,9 @@ function SqsDestinationFields({ form }: { form: EndpointForm }) {
         onChange={form.setRoleArn}
         testId="webhook-sqs-role-arn"
       />
+      {form.externalId ? (
+        <ExternalIdField externalId={form.externalId} />
+      ) : null}
       <DestinationTextField
         label="Access key id"
         description="An alternative to assuming a role: a key pair belonging to a user that may send messages to the queue."

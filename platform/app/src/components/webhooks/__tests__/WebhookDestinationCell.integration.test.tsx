@@ -49,6 +49,8 @@ describe("WebhookDestinationCell", () => {
           sqs: {
             queueUrl:
               "https://sqs.eu-central-1.amazonaws.com/381491922238/lw-billing",
+            accountId: "381491922238",
+            queueName: "lw-billing",
           },
         },
       ]);
@@ -66,10 +68,76 @@ describe("WebhookDestinationCell", () => {
       // A queue row shows the queue rather than the blank a `url` read would
       // leave, since a queue endpoint has no URL at all.
       expect(
-        screen.getByTestId("webhook-destination-address-wh_sqs"),
-      ).toHaveTextContent(
+        screen.getByTestId("webhook-destination-address-wh_sqs").textContent,
+      ).toBe("381491922238/lw-billing");
+    });
+  });
+
+  describe("given two queues that differ only past the shared URL prefix", () => {
+    /** @scenario The list tells one queue from another */
+    it("prints the account and the queue name, and keeps the URL in the title", () => {
+      renderCells([
+        {
+          id: "wh_a",
+          destinationKind: "sqs",
+          url: null,
+          sqs: {
+            queueUrl:
+              "https://sqs.eu-central-1.amazonaws.com/381491922238/lw-billing",
+            accountId: "381491922238",
+            queueName: "lw-billing",
+          },
+        },
+        {
+          id: "wh_b",
+          destinationKind: "sqs",
+          url: null,
+          sqs: {
+            queueUrl:
+              "https://sqs.eu-central-1.amazonaws.com/999988887777/lw-billing-eu",
+            accountId: "999988887777",
+            queueName: "lw-billing-eu",
+          },
+        },
+      ]);
+
+      // The cell clips the tail, and every queue URL opens with the same
+      // `https://sqs.<region>.amazonaws.com/`, so printing the URL made both
+      // rows read the same and hid the only parts that differ.
+      const first = screen.getByTestId("webhook-destination-address-wh_a");
+      const second = screen.getByTestId("webhook-destination-address-wh_b");
+      // Exact equality, not `toHaveTextContent`: that matches a substring, and
+      // the full URL contains the account and queue name, so it would pass on
+      // the very rendering this test exists to rule out.
+      expect(first.textContent).toBe("381491922238/lw-billing");
+      expect(second.textContent).toBe("999988887777/lw-billing-eu");
+
+      expect(first).toHaveAttribute(
+        "title",
         "https://sqs.eu-central-1.amazonaws.com/381491922238/lw-billing",
       );
+    });
+  });
+
+  describe("given a stored queue URL the parser could not split", () => {
+    /** @scenario The list tells one queue from another */
+    it("falls back to the whole URL rather than printing a bare slash", () => {
+      renderCells([
+        {
+          id: "wh_odd",
+          destinationKind: "sqs",
+          url: null,
+          sqs: {
+            queueUrl: "https://sqs.eu-central-1.amazonaws.com/queue",
+            accountId: "",
+            queueName: "",
+          },
+        },
+      ]);
+
+      expect(
+        screen.getByTestId("webhook-destination-address-wh_odd"),
+      ).toHaveTextContent("https://sqs.eu-central-1.amazonaws.com/queue");
     });
   });
 });
