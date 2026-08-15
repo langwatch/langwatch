@@ -756,6 +756,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{projectId}/analytics/query/clickhouse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run governed analytics SQL
+         * @description Executes one read-only ClickHouse SELECT over the governed analytics datasets and returns typed columns, rows, execution statistics, truncation state and diagnostics. The query runs as a restricted database identity scoped to the authenticated project. Diagnostics are advisory and never reject a query. An empty diagnostics list means no known issue was detected. It is not proof that the answer is the one you meant.
+         */
+        post: operations["postApiV1ProjectsByProjectIdAnalyticsQueryClickhouse"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/analytics/schema": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Discover the governed analytics schema
+         * @description Lists the governed analytics datasets this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join keys, partition-pruning time column, freshness and a runnable example query.
+         */
+        get: operations["getApiV1ProjectsByProjectIdAnalyticsSchema"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/coding-agent/sessions/{sessionId}/events": {
         parameters: {
             query?: never;
@@ -4934,6 +4974,198 @@ export interface operations {
                         }[];
                         previousPeriod: {
                             [key: string]: unknown;
+                        }[];
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    postApiV1ProjectsByProjectIdAnalyticsQueryClickhouse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    sql: string;
+                    parameters?: {
+                        [key: string]: string | number | boolean | null;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description The query ran, and the result is scoped to the caller's project */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        columns: {
+                            name: string;
+                            type: string;
+                        }[];
+                        rows: {
+                            [key: string]: unknown;
+                        }[];
+                        statistics: {
+                            elapsedMs: number;
+                            rowsRead: number;
+                            bytesRead: number;
+                            rowsReturned: number;
+                        };
+                        truncated: boolean;
+                        diagnostics: {
+                            /** @enum {string} */
+                            code: "RESULT_TRUNCATED" | "POSSIBLE_FANOUT" | "UNBOUNDED_TIME_RANGE" | "MISSING_TIME_BUCKETS" | "INCOMPLETE_COMPARISON_PERIOD";
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                        }[];
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    getApiV1ProjectsByProjectIdAnalyticsSchema: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The governed schema, scoped to the caller's permissions */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        database: string;
+                        datasets: {
+                            name: string;
+                            description: string;
+                            grain: string;
+                            joinKeys: string[];
+                            timeColumn: string;
+                            freshness: string;
+                            columns: {
+                                name: string;
+                                type: string;
+                                description: string;
+                                /** @enum {string|null} */
+                                unit: "ms" | "USD" | "tokens" | "tokens/s" | null;
+                                gates: ("input" | "output" | "costs")[];
+                                available: boolean;
+                            }[];
+                            exampleSql: string;
                         }[];
                     };
                 };

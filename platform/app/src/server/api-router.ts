@@ -11,6 +11,7 @@ import { createServiceApp, publicEndpoint } from "~/server/api/security";
 import { app as adminApp } from "../../ee/admin/routes/admin";
 import { app as agentsApp } from "../app/api/agents/[[...route]]/app";
 import { app as analyticsApp } from "../app/api/analytics/[...route]/app";
+import { app as analyticsSqlApp } from "../app/api/analytics-sql/[[...route]]/app";
 import { app as apiKeysApp } from "../app/api/api-keys/[[...route]]/app";
 import { app as codingAgentApp } from "../app/api/coding-agent/[[...route]]/app";
 import { app as copilotKitApp } from "../app/api/copilotkit/[[...route]]/app";
@@ -121,6 +122,7 @@ export function createApiRouter() {
 
   api.route("/", agentsApp);
   api.route("/", analyticsApp);
+  api.route("/", analyticsSqlApp); // /api/v1/projects/:projectId/analytics/* — governed SQL
   api.route("/", copilotKitApp);
   api.route("/", codingAgentApp);
   api.route("/", dashboardsApp);

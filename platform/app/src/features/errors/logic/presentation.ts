@@ -259,6 +259,11 @@ const presentations = {
     describe: () =>
       "Narrow the time range, add a filter, or select fewer fields.",
   },
+  query_scan_limit_exceeded: {
+    title: "This query read too much data",
+    describe: () =>
+      "Narrow the time range or add filters so the query reads less.",
+  },
   time_range_too_wide: {
     title: "Time range is too wide",
     describe: () => "Pick a shorter range and try again.",
@@ -278,6 +283,63 @@ const presentations = {
       const field = str(error, "field", "");
       return field ? `There's no field called "${field}".` : "";
     },
+  },
+  governed_sql_unparseable: {
+    title: "This query couldn't be read",
+    describe: () => "Check the SQL syntax and try again.",
+  },
+  governed_sql_not_permitted: {
+    title: "This query isn't allowed here",
+    describe: () =>
+      "This endpoint runs one read-only SELECT over the analytics datasets. Remove anything else and try again.",
+  },
+  governed_sql_parameter_missing: {
+    title: "This query is missing a value",
+    describe: () =>
+      "The query declares parameters that weren't given values. Supply one for each and try again.",
+  },
+  governed_sql_reserved_parameter_supplied: {
+    title: "The time window isn't yours to set",
+    describe: () =>
+      "period_start and period_end come from the period this page is showing. Remove them from your parameters and change the period instead.",
+  },
+  governed_sql_reserved_parameter_type: {
+    title: "The time window has to be a date and time",
+    describe: () =>
+      "Declare period_start and period_end as DateTime, for example {period_start:DateTime}, and run the query again.",
+  },
+  governed_sql_not_enabled: {
+    title: "Custom SQL isn't switched on here",
+    describe: () =>
+      "This project doesn't have the SQL workbench enabled yet. Ask your administrator to switch it on.",
+  },
+  saved_workbench_chart_already_exists: {
+    title: "That chart id is already taken",
+    describe: () =>
+      "A saved chart with this id already exists in this project. Save again with a different id, or leave the id out to have one chosen for you.",
+  },
+  saved_workbench_chart_not_found: {
+    title: "That saved chart isn't here",
+    describe: () =>
+      "It may have been deleted, or it belongs to another project. Check the list of saved charts.",
+  },
+  saved_workbench_chart_specification_refused: {
+    title: "This chart specification isn't allowed",
+    describe: () =>
+      "The specification reads something the chart policy doesn't permit. Repair the parts it names and save again.",
+  },
+  saved_workbench_chart_definition_invalid: {
+    title: "This saved chart can't be opened",
+    describe: () =>
+      "We can't read what was stored for it. Rebuild the chart in the workbench and save it again.",
+  },
+  governed_sql_unavailable: {
+    // Names the workspace administrator first: on a self-hosted deployment
+    // the reader's own operator controls whether this is provisioned, and
+    // LangWatch support cannot switch it on there.
+    title: "Analytics SQL isn't available here",
+    describe: () =>
+      "This feature isn't switched on for this workspace yet. Ask your workspace administrator to enable it, or contact support.",
   },
   clickhouse_unavailable: {
     title: "Search is temporarily unavailable",

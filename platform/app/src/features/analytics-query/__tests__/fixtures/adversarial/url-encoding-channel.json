@@ -1,0 +1,17 @@
+{
+	"$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+	"data": {
+		"name": "query_result"
+	},
+	"mark": "point",
+	"encoding": {
+		"x": {
+			"field": "model",
+			"type": "nominal"
+		},
+		"url": {
+			"field": "payload",
+			"type": "nominal"
+		}
+	}
+}

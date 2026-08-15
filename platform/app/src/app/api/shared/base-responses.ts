@@ -69,12 +69,29 @@ function canonicalResponse(description: string): RouteResponse {
  * 422 is absent on purpose: the canonical families answer request-validation
  * failures 400 `validation_error`, so documenting a 422 would describe a
  * status they never send.
+ *
+ * That reasoning covers validation only. A route that can refuse for a reason
+ * which is not a malformed request — a deliberate ceiling the caller can clear
+ * by asking for less — does send a 422, and documents it by spreading
+ * {@link canonicalUnprocessableResponses} alongside these.
  */
 export const canonicalBaseResponses: Record<number, RouteResponse> = {
   400: canonicalResponse("Bad Request"),
   401: canonicalResponse("Unauthorized"),
   403: canonicalResponse("Forbidden"),
   500: canonicalResponse("Internal Server Error"),
+};
+
+/**
+ * The canonical 422, for routes that refuse a well-formed request on a
+ * deliberate ceiling rather than on its shape.
+ *
+ * Kept separate from {@link canonicalBaseResponses} so that spreading it is a
+ * per-route statement that this route really can answer 422 — the families
+ * that only ever answer 400 for a bad request stay accurate by omission.
+ */
+export const canonicalUnprocessableResponses: Record<422, RouteResponse> = {
+  422: canonicalResponse("Unprocessable Entity"),
 };
 
 /** The canonical 409, for families that publish the canonical envelope. */
