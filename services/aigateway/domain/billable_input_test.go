@@ -71,9 +71,10 @@ func TestBillableInputTokens(t *testing.T) {
 	}
 }
 
-// Audio tokens leave the prompt total before the cache tokens do, and both
-// splits have to hold at once: a call that reports audio input AND a cache
-// read must not charge either bucket at the input rate as well.
+// The two subtractions have to compose. Audio leaves the prompt total first,
+// the cache buckets leave what is left, and every input token the provider
+// counted must end up in exactly one priced bucket: no token subtracted twice,
+// none left unattributed.
 func TestBillableInputTokensAfterTheAudioSplit(t *testing.T) {
 	usage := Usage{PromptTokens: 1000, CacheReadTokens: 150}.
 		SplitAudioTokens(AudioTokenSplit{InputAudio: 800, InputText: 200})
@@ -81,4 +82,28 @@ func TestBillableInputTokensAfterTheAudioSplit(t *testing.T) {
 	assert.Equal(t, 200, usage.PromptTokens, "audio comes out of the prompt total first")
 	assert.Equal(t, 50, usage.BillableInputTokens(),
 		"the cache read then comes out of what audio left behind")
+
+	priced := usage.BillableInputTokens() + usage.CacheReadTokens +
+		usage.CacheCreationTokens + usage.InputAudioTokens
+	assert.Equal(t, 1000, priced,
+		"the priced buckets add back up to the input the provider counted")
+}
+
+// A provider can report cached tokens that cover part of the audio share, and
+// the counts it gives cannot say how much. Subtracting the whole cache read
+// from what audio left behind would go below zero, so the guard keeps the
+// audio-exclusive total, which is what the span reported before this helper
+// existed. The request is then charged for more tokens than it used, at the
+// cheaper cache rate for the overlap, rather than for fewer.
+//
+// Reading the overlap needs the per-modality cached breakdown, which the
+// pinned Bifrost release does not report; that is #7048. No request reaches a
+// model with cached audio through the gateway today.
+func TestBillableInputTokensWhenTheCacheCountCoversTheAudioShare(t *testing.T) {
+	usage := Usage{PromptTokens: 1000, CacheReadTokens: 900}.
+		SplitAudioTokens(AudioTokenSplit{InputAudio: 800, InputText: 200})
+
+	assert.Equal(t, 200, usage.PromptTokens)
+	assert.Equal(t, 200, usage.BillableInputTokens(),
+		"the guard keeps the audio-exclusive total rather than a negative count")
 }
