@@ -21,6 +21,14 @@ Feature: Scenario run parameters
     When the scenario is saved and read back
     Then the declaration is still there with its description and its default
 
+  @integration
+  Scenario: The parameters editor opens ready to declare the first parameter
+    Given a scenario that declares no parameters
+    When its parameters editor opens
+    Then an empty row is ready with its name, description and default value fields
+    And the name field hints an example name
+    And closing the editor without typing leaves the scenario declaring none
+
   @unit
   Scenario: A run-time value overrides the scenario's default value
     Given a scenario declaring "account_tier" with the default "gold"

@@ -287,12 +287,40 @@ describe("scenario editor parameters", () => {
   });
 
   describe("given a scenario that declares none", () => {
+    describe("when the parameters editor opens", () => {
+      /** @scenario "The parameters editor opens ready to declare the first parameter" */
+      it("offers an empty row with an example name in the name field", async () => {
+        const user = renderDrawer();
+
+        await openParametersEditor(user);
+
+        const name = screen.getByTestId("scenario-parameter-name-0");
+        expect(name).toHaveValue("");
+        expect(name).toHaveAttribute("placeholder", "e.g. account_tier");
+        expect(
+          screen.getByTestId("scenario-parameter-description-0"),
+        ).toHaveValue("");
+        expect(screen.getByTestId("scenario-parameter-default-0")).toHaveValue(
+          "",
+        );
+      });
+
+      /** @scenario "The parameters editor opens ready to declare the first parameter" */
+      it("saves no parameters when the editor closes untouched", async () => {
+        const user = renderDrawer();
+
+        await openParametersEditor(user);
+        await clickDone(user);
+
+        expect(await save(user)).toMatchObject({ parameters: [] });
+      });
+    });
+
     describe("when a parameter is added and the scenario is saved", () => {
       it("carries the new declaration in the saved scenario", async () => {
         const user = renderDrawer();
 
         await openParametersEditor(user);
-        await user.click(screen.getByText("Add the first parameter"));
         await user.type(
           screen.getByTestId("scenario-parameter-name-0"),
           "region",
@@ -322,7 +350,6 @@ describe("scenario editor parameters", () => {
         const user = renderDrawer();
 
         await openParametersEditor(user);
-        await user.click(screen.getByText("Add the first parameter"));
         await user.type(
           screen.getByTestId("scenario-parameter-name-0"),
           "region",
@@ -339,7 +366,6 @@ describe("scenario editor parameters", () => {
         const user = renderDrawer();
 
         await openParametersEditor(user);
-        await user.click(screen.getByText("Add the first parameter"));
         await user.type(
           screen.getByTestId("scenario-parameter-name-0"),
           "seats",
@@ -361,7 +387,6 @@ describe("scenario editor parameters", () => {
         const user = renderDrawer();
 
         await openParametersEditor(user);
-        await user.click(screen.getByText("Add the first parameter"));
         await user.type(
           screen.getByTestId("scenario-parameter-name-0"),
           "account tier",
