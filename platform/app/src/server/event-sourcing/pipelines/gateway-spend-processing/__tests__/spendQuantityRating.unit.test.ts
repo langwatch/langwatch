@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EMPTY_SPEND_USAGE, type SpendUsage } from "../schemas/commands";
-import { rateSpendNanoUsd } from "../services/spend-rating.service";
+import {
+  NO_RATE_RULE_CODE,
+  rateSpendNanoUsd,
+  UNPRICED_QUANTITIES_CODE,
+} from "../services/spend-rating.service";
 
 // The rating service is the only place that can see a request burn something
 // and be charged nothing, and its one way of saying so is this logger.
@@ -129,6 +133,27 @@ describe("rateSpendNanoUsd", () => {
    * case: the model matched an entry, the entry priced seconds, the provider
    * reported tokens, and every call settled at $0 with real usage on the row.
    */
+  describe("given a model the catalog prices at zero on purpose", () => {
+    beforeEach(() => {
+      warned.mockClear();
+    });
+
+    describe("when rateSpendNanoUsd rates a request that burned tokens", () => {
+      /** @scenario A request that measured nothing is not a fault */
+      // A catalog entry whose every rate is zero is a free or bundled model,
+      // not a gap. Warning on it would report a fault on every request.
+      it("stays quiet, because charging nothing is the right answer", () => {
+        const { costNanoUsd } = rateSpendNanoUsd({
+          model: "gemini/lyria-3-pro-preview",
+          usage: usage({ input_tokens: 1200, output_tokens: 300 }),
+        });
+
+        expect(costNanoUsd).toBe(0);
+        expect(warned).not.toHaveBeenCalled();
+      });
+    });
+  });
+
   describe("given a request the catalog cannot price", () => {
     beforeEach(() => {
       warned.mockClear();
@@ -142,9 +167,9 @@ describe("rateSpendNanoUsd", () => {
       });
       expect(costNanoUsd).toBe(0);
       expect(warned).toHaveBeenCalledTimes(1);
-      expect(warned.mock.calls[0]?.[1]).toContain(
-        "prices none of the quantities",
-      );
+      expect(warned.mock.calls[0]?.[0]).toMatchObject({
+        code: UNPRICED_QUANTITIES_CODE,
+      });
     });
 
     /** @scenario A rule that prices none of the reported quantities is reported */
@@ -166,7 +191,9 @@ describe("rateSpendNanoUsd", () => {
         usage: usage({ input_tokens: 1000 }),
       });
       expect(warned).toHaveBeenCalledTimes(1);
-      expect(warned.mock.calls[0]?.[1]).toContain("no rate rule matched");
+      expect(warned.mock.calls[0]?.[0]).toMatchObject({
+        code: NO_RATE_RULE_CODE,
+      });
     });
 
     /** @scenario A request that measured nothing is not a fault */

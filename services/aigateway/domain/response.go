@@ -106,13 +106,19 @@ type AudioTokenSplit struct {
 // Providers report audio tokens INSIDE those totals. Pricing the totals at
 // the text rate and the audio counts at the audio rate on top charges the
 // audio portion twice, at rates that differ by 8x, so the counts have to be
-// made disjoint before anything prices them. The provider's own text count
-// wins when it reports one; otherwise the audio count comes off the total.
+// made disjoint before anything prices them.
 //
-// A pair that does not add up leaves the totals alone. A negative remainder
-// means the provider's own numbers disagree, and an unsplit total charges
-// the audio at the text rate, which is the behavior every caller had
-// before this split existed.
+// The provider's own text count is used only when text plus audio accounts
+// for the whole total. A total also holds image and reasoning tokens, which
+// this split has no field for: trusting a text count that leaves some of the
+// total unexplained would drop those tokens out of rating and undercharge the
+// request. Gemini reporting 100 input tokens as 60 text, 20 audio and 20
+// image is exactly that shape.
+//
+// Anything the counts cannot explain leaves the totals alone and reports no
+// audio. That is what every caller charged before this split existed: the
+// audio prices at the text rate, which is too little for audio and never less
+// than the tokens the request really used.
 func (u Usage) SplitAudioTokens(split AudioTokenSplit) Usage {
 	u.InputAudioTokens, u.PromptTokens = resolveAudioSplit(
 		split.InputAudio, split.InputText, u.PromptTokens)
@@ -127,9 +133,19 @@ func resolveAudioSplit(audio, text, total int) (int, int) {
 	if audio <= 0 {
 		return 0, total
 	}
+	// The provider's text count is trusted only when the two account for the
+	// whole total. A total carrying image or reasoning tokens as well leaves a
+	// remainder this split cannot name, and keeping only text plus audio would
+	// bill neither.
 	if text > 0 {
-		return audio, text
+		if text+audio == total {
+			return audio, text
+		}
+		return 0, total
 	}
+	// No text count reported: everything that is not audio is the text side,
+	// whatever modality it really is. Nothing is lost, and any other modality
+	// keeps pricing at the text rate exactly as it did before.
 	if remainder := total - audio; remainder >= 0 {
 		return audio, remainder
 	}

@@ -1,5 +1,8 @@
 import { createLogger } from "@langwatch/observability";
-import { getStaticModelCosts } from "~/server/modelProviders/llmModelCost";
+import {
+  getStaticModelCosts,
+  type MaybeStoredLLMModelCost,
+} from "~/server/modelProviders/llmModelCost";
 import { llmModels } from "~/server/modelProviders/loadModelCatalog";
 import {
   estimateCost,
@@ -52,6 +55,34 @@ function measuredQuantities(usage: SpendUsage): Record<string, number> {
   return measured;
 }
 
+/** Stable identities for the two catalog faults. The message beside them is
+ *  copy; these are what an alert or a log filter keys on. */
+export const UNPRICED_QUANTITIES_CODE = "spend_rating.unpriced_quantities";
+export const NO_RATE_RULE_CODE = "spend_rating.no_rate_rule";
+
+/**
+ * Whether the rule prices anything at all.
+ *
+ * A rule whose every rate is zero is a deliberately free or bundled model, the
+ * shape the codex entries take because that usage counts against the caller's
+ * own subscription. Charging nothing is the right answer there, so it is not a
+ * catalog fault and never warns. A rule that prices SOMETHING but nothing this
+ * request reported is the fault worth stating.
+ */
+function pricesAnything(rule: MaybeStoredLLMModelCost): boolean {
+  return [
+    rule.inputCostPerToken,
+    rule.outputCostPerToken,
+    rule.cacheReadCostPerToken,
+    rule.cacheCreationCostPerToken,
+    rule.cacheCreation1hCostPerToken,
+    rule.inputAudioCostPerToken,
+    rule.outputAudioCostPerToken,
+    rule.inputCostPerCharacter,
+    rule.inputCostPerSecond,
+  ].some((rate) => (rate ?? 0) > 0);
+}
+
 /**
  * States, once per request, that the catalog could not price it.
  *
@@ -70,27 +101,27 @@ function measuredQuantities(usage: SpendUsage): Record<string, number> {
 function warnUnpriced({
   model,
   usage,
-  matched,
+  rule,
   rateVersion,
 }: {
   model: string;
   usage: SpendUsage;
-  matched: boolean;
+  rule: MaybeStoredLLMModelCost | undefined;
   rateVersion: string;
 }): void {
   if (!model || model === "unknown") return;
   const measured = measuredQuantities(usage);
   const burnedSomething = Object.keys(measured).length > 0;
-  if (matched) {
-    if (!burnedSomething) return;
+  if (rule) {
+    if (!burnedSomething || !pricesAnything(rule)) return;
     logger.warn(
-      { model, rateVersion, measured },
+      { code: UNPRICED_QUANTITIES_CODE, model, rateVersion, measured },
       "rate rule prices none of the quantities this request reported; spend rated at zero",
     );
     return;
   }
   logger.warn(
-    { model, rateVersion, measured },
+    { code: NO_RATE_RULE_CODE, model, rateVersion, measured },
     "no rate rule matched; spend rated at zero",
   );
 }
@@ -130,12 +161,7 @@ export function rateSpendNanoUsd({
       ? rateVersion
       : currentRegistryRateVersion();
   if (costNanoUsd === 0) {
-    warnUnpriced({
-      model,
-      usage,
-      matched: llmModelCost != null,
-      rateVersion: stamp,
-    });
+    warnUnpriced({ model, usage, rule: llmModelCost, rateVersion: stamp });
   }
   return { costNanoUsd, rateVersion: stamp };
 }
