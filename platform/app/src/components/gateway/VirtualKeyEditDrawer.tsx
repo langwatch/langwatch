@@ -134,9 +134,7 @@ export function VirtualKeyEditDrawer({
     setRpm(vk.config.rateLimits?.rpm?.toString() ?? "");
     setTpm(vk.config.rateLimits?.tpm?.toString() ?? "");
     setRpd(vk.config.rateLimits?.rpd?.toString() ?? "");
-    setMaxOpenSessions(
-      vk.config.realtime?.maxOpenSessions?.toString() ?? "",
-    );
+    setMaxOpenSessions(vk.config.realtime?.maxOpenSessions?.toString() ?? "");
     const providersAllowed = vk.config.providersAllowed ?? null;
     setProviderAccess({
       allProviders: !providersAllowed || providersAllowed.length === 0,

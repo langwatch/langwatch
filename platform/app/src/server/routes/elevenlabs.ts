@@ -99,28 +99,36 @@ export function verifyElevenLabsSignature(params: {
   secret: string;
   nowSeconds?: number;
 }): boolean {
-  if (!params.header || !params.secret) return false;
-  let timestamp = "";
-  let signature = "";
-  for (const part of params.header.split(",")) {
-    const [name, value] = part.trim().split("=", 2);
-    if (name === "t") timestamp = value ?? "";
-    if (name === "v0") signature = value ?? "";
-  }
-  if (!timestamp || !signature) return false;
+  if (!params.secret) return false;
+  const parsed = parseSignatureHeader(params.header);
+  if (!parsed) return false;
 
-  const sentAt = Number(timestamp);
   const now = params.nowSeconds ?? Math.floor(Date.now() / 1000);
-  if (!Number.isFinite(sentAt) || Math.abs(now - sentAt) > SIGNATURE_TOLERANCE_SECONDS) {
-    return false;
-  }
+  if (Math.abs(now - parsed.sentAt) > SIGNATURE_TOLERANCE_SECONDS) return false;
 
   const expected = createHmac("sha256", params.secret)
-    .update(`${timestamp}.${params.rawBody}`)
+    .update(`${parsed.timestamp}.${params.rawBody}`)
     .digest("hex");
-  const a = Buffer.from(signature);
+  const a = Buffer.from(parsed.signature);
   const b = Buffer.from(expected);
   return a.length === b.length && timingSafeEqual(a, b);
+}
+
+/** The `t=` and `v0=` parts of the header, or null when either is missing. */
+function parseSignatureHeader(
+  header: string | undefined,
+): { timestamp: string; sentAt: number; signature: string } | null {
+  const parts = new Map(
+    (header ?? "").split(",").map((part) => {
+      const [name, value] = part.trim().split("=", 2);
+      return [name ?? "", value ?? ""] as const;
+    }),
+  );
+  const timestamp = parts.get("t") ?? "";
+  const signature = parts.get("v0") ?? "";
+  const sentAt = Number(timestamp);
+  if (!timestamp || !signature || !Number.isFinite(sentAt)) return null;
+  return { timestamp, sentAt, signature };
 }
 
 /** The workspace webhook secret stored on one provider row, or "". */
@@ -137,7 +145,7 @@ async function webhookSecretFor(modelProviderId: string): Promise<{
       customKeys: true,
     },
   });
-  if (!provider || provider.provider !== "elevenlabs") return null;
+  if (provider?.provider !== "elevenlabs") return null;
   const keys = decryptCustomKeys(provider.customKeys);
   const secret = keys[ELEVENLABS_WEBHOOK_SECRET_KEY];
   if (typeof secret !== "string" || secret.length === 0) return null;
@@ -149,11 +157,12 @@ async function webhookSecretFor(modelProviderId: string): Promise<{
  * variables. Used only when the delivery carries no conversation id we
  * already recorded.
  */
-function echoedSessionId(payload: z.infer<typeof postCallSchema>): string | undefined {
+function echoedSessionId(
+  payload: z.infer<typeof postCallSchema>,
+): string | undefined {
   const value =
-    payload.data?.conversation_initiation_client_data?.dynamic_variables?.[
-      "lw_session_id"
-    ];
+    payload.data?.conversation_initiation_client_data?.dynamic_variables
+      ?.lw_session_id;
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
@@ -173,7 +182,8 @@ async function handleElevenLabsWebhook(c: any): Promise<Response> {
     !verifyElevenLabsSignature({
       rawBody,
       header:
-        c.req.header("elevenlabs-signature") ?? c.req.header("ElevenLabs-Signature"),
+        c.req.header("elevenlabs-signature") ??
+        c.req.header("ElevenLabs-Signature"),
       secret: configured.secret,
     })
   ) {
@@ -223,7 +233,10 @@ async function applyPostCallReport(params: {
   // The vendor prices a conversation by duration, so duration is the
   // quantity. It arrives in whole seconds and every quantity on the spend
   // wire is an integer, so it becomes milliseconds here, once.
-  const durationSecs = Math.max(0, Math.round(data?.metadata?.call_duration_secs ?? 0));
+  const durationSecs = Math.max(
+    0,
+    Math.round(data?.metadata?.call_duration_secs ?? 0),
+  );
   await closeAndConfirmRealtimeSession({
     session,
     usage: { audio_ms: durationSecs * 1000 },

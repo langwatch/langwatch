@@ -29,8 +29,8 @@ import {
   admitSpendWireSchema,
   confirmSpendWireSchema,
   failSpendWireSchema,
-  spendUsageSchema,
   type SpendUsage,
+  spendUsageSchema,
 } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/commands";
 import { GATEWAY_SPEND_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/constants";
 import { rateSpendNanoUsd } from "~/server/event-sourcing/pipelines/gateway-spend-processing/services/spend-rating.service";
@@ -42,17 +42,17 @@ import {
 } from "~/server/gateway/budgetResolution.service";
 import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
 import { GatewayConfigMaterialiser } from "~/server/gateway/config.materialiser";
+import { signGatewayJwt } from "~/server/gateway/gatewayJwt";
+import {
+  GatewayGuardrailEvaluationService,
+  GUARDRAIL_WIRE_DIRECTIONS,
+} from "~/server/gateway/guardrailEvaluation.service";
 import {
   closeAndConfirmRealtimeSession,
   correlateRealtimeSession,
   releaseRealtimeSession,
   reserveRealtimeSession,
 } from "~/server/gateway/realtimeSession.service";
-import { signGatewayJwt } from "~/server/gateway/gatewayJwt";
-import {
-  GatewayGuardrailEvaluationService,
-  GUARDRAIL_WIRE_DIRECTIONS,
-} from "~/server/gateway/guardrailEvaluation.service";
 import { traceProjectFor } from "~/server/gateway/scopeResolver";
 import {
   hashVirtualKeySecret,
@@ -1289,7 +1289,8 @@ secured.access(gatewayPolicy()).post("/realtime-sessions", async (c) => {
         error: {
           type: "bad_request",
           code: "invalid_reservation",
-          message: "a session reservation names the session, its tenancy, its key and its vendor",
+          message:
+            "a session reservation names the session, its tenancy, its key and its vendor",
         },
       },
       400,
@@ -1312,7 +1313,8 @@ secured.access(gatewayPolicy()).post("/realtime-sessions", async (c) => {
         error: {
           type: "rate_limited",
           code: "realtime_session_limit",
-          message: "this virtual key already holds the most realtime voice sessions it may keep open at once",
+          message:
+            "this virtual key already holds the most realtime voice sessions it may keep open at once",
           open: result.open,
           limit: result.limit,
         },
@@ -1339,7 +1341,8 @@ secured
           error: {
             type: "bad_request",
             code: "invalid_session_patch",
-            message: "project_id is required, with a vendor_conversation_id or a terminal status",
+            message:
+              "project_id is required, with a vendor_conversation_id or a terminal status",
           },
         },
         400,
@@ -1399,7 +1402,8 @@ secured
           error: {
             type: "bad_request",
             code: "invalid_usage_report",
-            message: "project_id and a usage object of integer quantities are required",
+            message:
+              "project_id and a usage object of integer quantities are required",
           },
         },
         400,

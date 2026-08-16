@@ -126,12 +126,7 @@ export const virtualKeyConfigSchema = z.object({
    */
   realtime: z
     .object({
-      maxOpenSessions: z
-        .number()
-        .int()
-        .positive()
-        .nullable()
-        .default(null),
+      maxOpenSessions: z.number().int().positive().nullable().default(null),
     })
     .default({ maxOpenSessions: null }),
   metadata: z

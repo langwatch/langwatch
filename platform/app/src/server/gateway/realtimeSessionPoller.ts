@@ -73,7 +73,7 @@ async function credentialFor(
     where: { id: modelProviderId },
     select: { provider: true, customKeys: true },
   });
-  if (!provider || provider.provider !== "elevenlabs") return null;
+  if (provider?.provider !== "elevenlabs") return null;
   const keys = decryptCustomKeys(provider.customKeys);
   const apiKey = keys.ELEVENLABS_API_KEY;
   if (typeof apiKey !== "string" || apiKey.length === 0) return null;
@@ -131,7 +131,8 @@ async function reconcile(session: GatewayRealtimeSession): Promise<boolean> {
       sessionId: session.id,
       projectId: session.projectId,
       status: "EXPIRED",
-      reason: "the vendor has no conversation for this session, so the credential was never used",
+      reason:
+        "the vendor has no conversation for this session, so the credential was never used",
     });
     return false;
   }

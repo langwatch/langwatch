@@ -108,9 +108,7 @@ async function ensureProvider(params: {
       organizationId: params.organizationId,
       customKeys: encrypt(JSON.stringify(params.keys)),
       scopes: {
-        create: [
-          { scopeType: "ORGANIZATION", scopeId: params.organizationId },
-        ],
+        create: [{ scopeType: "ORGANIZATION", scopeId: params.organizationId }],
       },
     },
   });
@@ -191,7 +189,9 @@ async function main() {
       : [];
     await prisma.routingPolicy.update({
       where: { id: existingPolicy.id },
-      data: { modelProviderIds: Array.from(new Set([...prior, ...providerIds])) },
+      data: {
+        modelProviderIds: Array.from(new Set([...prior, ...providerIds])),
+      },
     });
   } else {
     await prisma.routingPolicy.create({

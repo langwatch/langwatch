@@ -57,6 +57,7 @@ import { app as bugReportsApp } from "./routes/bug-reports";
 import { app as collectorApp } from "./routes/collector";
 import { app as cronApp } from "./routes/cron";
 import { app as datasetGenerateApp } from "./routes/dataset-generate";
+import { app as elevenLabsApp } from "./routes/elevenlabs";
 import { app as evaluationsLegacyApp } from "./routes/evaluations-legacy";
 import {
   app as experimentsV3App,
@@ -64,7 +65,6 @@ import {
 } from "./routes/experiments-v3";
 import { app as gatewayInternalApp } from "./routes/gateway-internal";
 import { app as gatewayOpenApiApp } from "./routes/gateway-openapi";
-import { app as elevenLabsApp } from "./routes/elevenlabs";
 import { app as githubApp } from "./routes/github";
 import { app as healthApp } from "./routes/health";
 import { app as healthChecksApp } from "./routes/health-checks";

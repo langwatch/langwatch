@@ -13,10 +13,10 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import { Prisma } from "~/generated/prisma/client";
 import type {
   GatewayRealtimeSession,
   GatewayRealtimeSessionStatus,
+  Prisma,
 } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
@@ -94,12 +94,20 @@ export async function reserveRealtimeSession(
       // would otherwise sit OPEN forever and ratchet the key down one slot
       // at a time, which is the failure an OpenAI socket makes likely: it
       // never signals that it closed.
-      await expireStaleRealtimeSessions({ virtualKeyId: input.virtualKeyId, tx });
+      await expireStaleRealtimeSessions({
+        virtualKeyId: input.virtualKeyId,
+        tx,
+      });
       const open = await tx.gatewayRealtimeSession.count({
         where: { virtualKeyId: input.virtualKeyId, status: "OPEN" },
       });
       if (open >= limit) {
-        return { ok: false as const, reason: "session_limit" as const, open, limit };
+        return {
+          ok: false as const,
+          reason: "session_limit" as const,
+          open,
+          limit,
+        };
       }
     }
 
@@ -141,7 +149,11 @@ export async function releaseRealtimeSession(params: {
   reason: string;
 }): Promise<boolean> {
   const updated = await prisma.gatewayRealtimeSession.updateMany({
-    where: { id: params.sessionId, projectId: params.projectId, status: "OPEN" },
+    where: {
+      id: params.sessionId,
+      projectId: params.projectId,
+      status: "OPEN",
+    },
     data: {
       status: params.status,
       closedAt: new Date(),
@@ -304,7 +316,9 @@ export async function expireStaleRealtimeSessions(params: {
     where: {
       ...(params.virtualKeyId ? { virtualKeyId: params.virtualKeyId } : {}),
       status: "OPEN",
-      mintedAt: { lt: new Date(now.getTime() - REALTIME_OPEN_SESSION_WINDOW_MS) },
+      mintedAt: {
+        lt: new Date(now.getTime() - REALTIME_OPEN_SESSION_WINDOW_MS),
+      },
     },
     data: {
       status: "EXPIRED",
@@ -320,7 +334,9 @@ async function sendConfirmSpend(data: Record<string, unknown>): Promise<void> {
   const pipeline = getApp().eventSourcing?.getPipeline(
     GATEWAY_SPEND_PIPELINE_NAME as never,
   ) as unknown as
-    | { commands: { confirmSpend?: { send: (d: unknown) => Promise<unknown> } } }
+    | {
+        commands: { confirmSpend?: { send: (d: unknown) => Promise<unknown> } };
+      }
     | undefined;
   const send = pipeline?.commands?.confirmSpend?.send;
   if (!send) {
