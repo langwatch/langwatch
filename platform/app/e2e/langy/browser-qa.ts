@@ -107,7 +107,7 @@ export async function browserQA(
   try {
     const context = await getSharedContext();
     page = await context.newPage();
-    // Org-scoped pages (e.g. AI Gateway's /settings/gateway/**) are absolute
+    // Org-scoped pages (e.g. AI Gateway's /gateway/**) are absolute
     // — a leading "/settings" (or any leading "/" the caller wants taken
     // literally) skips the project-slug prefix. Project-scoped pages don't
     // start with "/", e.g. "/prompts".

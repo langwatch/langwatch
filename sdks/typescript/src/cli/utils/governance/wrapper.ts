@@ -225,7 +225,7 @@ export async function preflightWrapper(
 					`The gateway isn't enabled for \`${tool}\` in your organization.\n` +
 					`An admin needs to publish a ${tool} coding-assistant tile in the\n` +
 					`AI Tools catalog (with the gateway path enabled):\n` +
-					`  ${cp}/settings/governance/tool-catalog\n` +
+					`  ${cp}/governance/tool-catalog\n` +
 					renderContactFooter(adminEmail),
 			};
 		}

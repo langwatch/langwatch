@@ -465,7 +465,7 @@ describe("preflightWrapper", () => {
 			});
 			expect(r.ok).toBe(false);
 			expect(r.message).toContain("isn't enabled for `codex`");
-			expect(r.message).toContain("/settings/governance/tool-catalog");
+			expect(r.message).toContain("/governance/tool-catalog");
 			// Structural (not transient) so a pinned gateway choice is forgotten.
 			expect(r.retryable).toBeFalsy();
 		});
