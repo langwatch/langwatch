@@ -103,6 +103,68 @@ type BundleConfig struct {
 	// RoutingModeNone by the control plane AND at wire decode, so a drifted
 	// control plane cannot silently re-arm fallback on a no-fallback key).
 	RoutingMode string
+
+	// RoutingExcludedProviders and AccessExcludedProviders are ModelProvider
+	// rows a request could resolve to but that are absent from Credentials,
+	// split by WHY, so a request-time block can name the reason instead of
+	// failing opaque (contract §4.2). Routing: reachable from the key's scope
+	// and inside its provider access, but dropped by the routing policy.
+	// Access: reachable from scope but outside providers_allowed. A provider in
+	// neither list with no credential is not reachable from the key's scope.
+	RoutingExcludedProviders []ExcludedModelProvider
+	AccessExcludedProviders  []ExcludedModelProvider
+
+	// RoutingPolicyName is the display name of the key's routing policy, used
+	// only to name the routing-exclusion reason. Empty when the key is not on a
+	// routing policy.
+	RoutingPolicyName string
+}
+
+// ExcludedModelProvider is a ModelProvider row the control plane dropped from a
+// key's dispatch chain, paired with its provider kind. The kind is carried, not
+// just the row id, because a request resolves to a provider KIND and an
+// excluded row is absent from Credentials, so its kind is not otherwise
+// knowable at the gateway.
+type ExcludedModelProvider struct {
+	// ID is the ModelProvider row id, in the same id space as Credentials and
+	// ProvidersAllowed.
+	ID string
+	// ProviderID is the provider kind (openai, anthropic, ...), the axis a
+	// resolved request is matched on.
+	ProviderID ProviderID
+}
+
+// ProviderBlockReason names why a provider a request resolved to is not in the
+// dispatch chain, so a block can say which of the key's own settings removed it.
+type ProviderBlockReason int
+
+const (
+	// ProviderBlockNone means nothing the control plane reported excludes this
+	// provider kind; the chain simply carries no credential for it (the
+	// provider is not reachable from the key's scope).
+	ProviderBlockNone ProviderBlockReason = iota
+	// ProviderBlockRouting means the key's routing policy dropped this provider.
+	ProviderBlockRouting
+	// ProviderBlockAccess means the key's provider access (allowlist) dropped it.
+	ProviderBlockAccess
+)
+
+// BlockedProviderReason reports why a resolved provider kind has no dispatchable
+// credential on this key. Routing takes precedence over access: a provider the
+// policy dropped is named by the policy even if the allowlist would also drop a
+// different row of the same kind.
+func (c BundleConfig) BlockedProviderReason(kind ProviderID) ProviderBlockReason {
+	for _, e := range c.RoutingExcludedProviders {
+		if e.ProviderID == kind {
+			return ProviderBlockRouting
+		}
+	}
+	for _, e := range c.AccessExcludedProviders {
+		if e.ProviderID == kind {
+			return ProviderBlockAccess
+		}
+	}
+	return ProviderBlockNone
 }
 
 // ConfigFetchResult is one answer from the control plane's virtual-key config

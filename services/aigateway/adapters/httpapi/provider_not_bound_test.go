@@ -65,11 +65,11 @@ func TestChat_UnknownProviderPrefixReturnsNotBoundEnvelope(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &env), "body: %s", rec.Body.String())
 	assert.Equal(t, string(domain.ErrProviderNotBound), env.Error.Code)
-	// Naming the provider is what separates this from the opaque errors it
-	// replaces; a hint that does not say which slot is missing would leave
-	// the caller exactly where they started.
+	// Naming the provider AND why it is unavailable is what separates this
+	// from the opaque errors it replaces: a caller must learn both which
+	// provider was refused and that it is not reachable from the key's scope.
 	assert.Contains(t, rec.Body.String(), "bedrock")
-	assert.Contains(t, rec.Body.String(), "virtual key")
+	assert.Contains(t, rec.Body.String(), "not reachable from this key's scope")
 }
 
 // @scenario "A provider-native route refuses a key with no provider that speaks it"
