@@ -49,17 +49,21 @@ const ROUTE_PATTERNS = [
   // wins → resolves to `/settings/[[...path]]` → push leaves `path`
   // unresolved → URL bounces to `/settings/` (caught on /settings/audit-log
   // Filter-by-Action input during γ post-dogfood UI bug-bash, then again on
-  // /settings/gateway/usage date presets and its key-filter chip).
+  // /gateway/usage date presets and its key-filter chip).
   "/settings/audit-log",
-  "/settings/gateway",
-  "/settings/gateway/virtual-keys",
-  "/settings/gateway/virtual-keys/:id",
-  "/settings/gateway/budgets",
-  "/settings/gateway/budgets/:id",
-  "/settings/gateway/usage",
-  "/settings/gateway/cache-rules",
-  "/settings/gateway/guardrails",
   "/settings/*",
+  // Top-level product routes — must precede the "/:project/*" patterns so
+  // they never resolve as project pages.
+  "/gateway",
+  "/gateway/virtual-keys",
+  "/gateway/virtual-keys/:id",
+  "/gateway/budgets",
+  "/gateway/budgets/:id",
+  "/gateway/usage",
+  "/gateway/cache-rules",
+  "/gateway/guardrails",
+  "/gateway/billing-events",
+  "/gateway/webhooks",
   // Personal-scope governance routes — must precede the "/:project/*" patterns
   // so the auto-detection in components/useWorkspaceCurrent doesn't classify
   // /me as a project page (which collapses the WorkspaceSwitcher to project

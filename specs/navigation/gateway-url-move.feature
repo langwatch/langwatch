@@ -32,9 +32,9 @@ Feature: Gateway and Governance URLs move to the top level
     And the old address is not kept in the browser history
 
   @integration
-  Scenario: The bare old gateway address lands on the gateway
+  Scenario: The bare old gateway address lands on the virtual keys list
     When I cold-load "/settings/gateway"
-    Then I land on "/gateway"
+    Then I land on "/gateway/virtual-keys"
 
   @integration
   Scenario: An old governance deep link lands on the same page at its new address

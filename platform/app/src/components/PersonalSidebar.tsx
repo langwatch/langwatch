@@ -50,10 +50,7 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
   const isConfigureActive = router.pathname.startsWith("/me/configure");
   const isSessionsActive = router.pathname.startsWith("/me/sessions");
   const isPullRequestsActive = router.pathname.startsWith("/me/pull-requests");
-  const isOrgSettingsActive =
-    router.pathname === "/settings" ||
-    (router.pathname.startsWith("/settings") &&
-      !router.pathname.startsWith("/settings/gateway"));
+  const isOrgSettingsActive = router.pathname.startsWith("/settings");
 
   const session = useRequiredSession();
   const { organizations, hasPermission } = useOrganizationTeamProject({

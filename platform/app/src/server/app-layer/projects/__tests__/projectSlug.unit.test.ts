@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  RESERVED_TOP_LEVEL_SLUGS,
   assertProjectSlugAllowed,
   mintProjectSlug,
+  RESERVED_TOP_LEVEL_SLUGS,
 } from "../projectSlug";
 
 describe("mintProjectSlug", () => {

@@ -3,7 +3,7 @@
  *
  * The Usage page's date-range presets and key-filter chip rebuild their URL
  * with `router.push({ pathname: router.pathname, query })`. When the compat
- * router had no literal route pattern for /settings/gateway/usage, the
+ * router had no literal route pattern for /gateway/usage, the
  * /settings wildcard resolved the pathname to `/settings/[[...path]]`, the
  * placeholder collapsed to nothing, and every click bounced the browser to
  * the bare settings root (`/settings/?vk=...&days=...`).
@@ -125,12 +125,12 @@ describe("Gateway usage page filter routing", () => {
   /** @scenario "Changing the window or clearing the key filter keeps the browser on the usage page" */
   it("stays on the usage route when a date-range preset is clicked", async () => {
     const user = userEvent.setup();
-    renderUsagePage("/settings/gateway/usage?vk=vk_canary&days=mtd");
+    renderUsagePage("/gateway/usage?vk=vk_canary&days=mtd");
 
     await user.click(screen.getByRole("button", { name: "Last 7 days" }));
 
     expect(screen.getByTestId("probe-pathname")).toHaveTextContent(
-      "/settings/gateway/usage",
+      "/gateway/usage",
     );
     const search = new URLSearchParams(
       screen.getByTestId("probe-search").textContent ?? "",
@@ -142,7 +142,7 @@ describe("Gateway usage page filter routing", () => {
   /** @scenario "Changing the window or clearing the key filter keeps the browser on the usage page" */
   it("stays on the usage route when the key filter chip is dismissed", async () => {
     const user = userEvent.setup();
-    renderUsagePage("/settings/gateway/usage?vk=vk_canary&days=30");
+    renderUsagePage("/gateway/usage?vk=vk_canary&days=30");
 
     expect(screen.getByTestId("usage-key-filter")).toHaveTextContent(
       "Canary Gateway Healthcheck",
@@ -150,7 +150,7 @@ describe("Gateway usage page filter routing", () => {
     await user.click(screen.getByRole("button", { name: "Clear key filter" }));
 
     expect(screen.getByTestId("probe-pathname")).toHaveTextContent(
-      "/settings/gateway/usage",
+      "/gateway/usage",
     );
     const search = new URLSearchParams(
       screen.getByTestId("probe-search").textContent ?? "",

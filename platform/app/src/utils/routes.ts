@@ -221,36 +221,36 @@ export const projectRoutes = {
     title: "Evaluators",
   },
   gateway: {
-    path: "/settings/gateway",
+    path: "/gateway",
     title: "AI Gateway",
   },
   gateway_virtual_keys: {
-    path: "/settings/gateway/virtual-keys",
+    path: "/gateway/virtual-keys",
     title: "Virtual Keys",
     parent: "gateway",
   },
   gateway_virtual_key_detail: {
-    path: "/settings/gateway/virtual-keys/[id]",
+    path: "/gateway/virtual-keys/[id]",
     title: "Virtual Key",
     parent: "gateway_virtual_keys",
   },
   gateway_budgets: {
-    path: "/settings/gateway/budgets",
+    path: "/gateway/budgets",
     title: "Budgets",
     parent: "gateway",
   },
   gateway_budget_detail: {
-    path: "/settings/gateway/budgets/[id]",
+    path: "/gateway/budgets/[id]",
     title: "Budget",
     parent: "gateway_budgets",
   },
   gateway_usage: {
-    path: "/settings/gateway/usage",
+    path: "/gateway/usage",
     title: "Usage",
     parent: "gateway",
   },
   gateway_cache_rules: {
-    path: "/settings/gateway/cache-rules",
+    path: "/gateway/cache-rules",
     title: "Cache Rules",
     parent: "gateway",
   },

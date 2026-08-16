@@ -54,7 +54,7 @@ import { formatTimeAgo } from "~/utils/formatTimeAgo";
 
 /** Deep link from a key's spend to its Usage view over the same window. */
 function usageHrefForKey(virtualKeyId: string): string {
-  return `/settings/gateway/usage?vk=${virtualKeyId}&days=mtd`;
+  return `/gateway/usage?vk=${virtualKeyId}&days=mtd`;
 }
 
 type ScopeEntry = {
@@ -366,7 +366,7 @@ function VirtualKeysPage() {
                             _hover={{ bg: "bg.subtle" }}
                             onClick={() =>
                               void router.push(
-                                `/settings/gateway/virtual-keys/${vk.id}`,
+                                `/gateway/virtual-keys/${vk.id}`,
                               )
                             }
                           >
@@ -374,7 +374,7 @@ function VirtualKeysPage() {
                               <VStack align="start" gap={1}>
                                 <HStack gap={2} align="center">
                                   <Link
-                                    href={`/settings/gateway/virtual-keys/${vk.id}`}
+                                    href={`/gateway/virtual-keys/${vk.id}`}
                                     fontWeight="medium"
                                   >
                                     {vk.name}
@@ -551,7 +551,7 @@ function VirtualKeysPage() {
                                       value="details"
                                       onClick={() =>
                                         void router.push(
-                                          `/settings/gateway/virtual-keys/${vk.id}`,
+                                          `/gateway/virtual-keys/${vk.id}`,
                                         )
                                       }
                                     >

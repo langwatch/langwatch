@@ -38,8 +38,8 @@ export default function AiGatewayLayout({
       navigationItems={[
         {
           label: "Virtual Keys",
-          href: "/settings/gateway/virtual-keys",
-          includePath: "/settings/gateway/virtual-keys",
+          href: "/gateway/virtual-keys",
+          includePath: "/gateway/virtual-keys",
           icon: <KeyRound size={14} />,
         },
         {
@@ -52,38 +52,38 @@ export default function AiGatewayLayout({
         },
         {
           label: "Budgets",
-          href: "/settings/gateway/budgets",
-          includePath: "/settings/gateway/budgets",
+          href: "/gateway/budgets",
+          includePath: "/gateway/budgets",
           icon: <Gauge size={14} />,
         },
         {
           label: "Cache Rules",
-          href: "/settings/gateway/cache-rules",
-          includePath: "/settings/gateway/cache-rules",
+          href: "/gateway/cache-rules",
+          includePath: "/gateway/cache-rules",
           icon: <Zap size={14} />,
         },
         {
           label: "Guardrails",
-          href: "/settings/gateway/guardrails",
-          includePath: "/settings/gateway/guardrails",
+          href: "/gateway/guardrails",
+          includePath: "/gateway/guardrails",
           icon: <Shield size={14} />,
         },
         {
           label: "Usage",
-          href: "/settings/gateway/usage",
-          includePath: "/settings/gateway/usage",
+          href: "/gateway/usage",
+          includePath: "/gateway/usage",
           icon: <LineChart size={14} />,
         },
         {
           label: "Billing Events",
-          href: "/settings/gateway/billing-events",
-          includePath: "/settings/gateway/billing-events",
+          href: "/gateway/billing-events",
+          includePath: "/gateway/billing-events",
           icon: <ReceiptText size={14} />,
         },
         {
           label: "Webhooks",
-          href: "/settings/gateway/webhooks",
-          includePath: "/settings/gateway/webhooks",
+          href: "/gateway/webhooks",
+          includePath: "/gateway/webhooks",
           icon: <Webhook size={14} />,
         },
         {

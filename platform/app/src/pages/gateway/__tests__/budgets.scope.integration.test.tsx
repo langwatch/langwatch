@@ -215,7 +215,7 @@ describe("budgets list scope column", () => {
     const link = within(row).getByRole("link", { name: /Scenario CI/ });
     expect(link).toHaveAttribute(
       "href",
-      "/settings/gateway/virtual-keys/vk-lw-01KYC6G",
+      "/gateway/virtual-keys/vk-lw-01KYC6G",
     );
     expect(within(row).queryByText(/vk-lw-01KYC6G…/)).not.toBeInTheDocument();
   });

@@ -11,6 +11,7 @@ import {
 } from "react-router";
 import { PageErrorFallback } from "~/components/ui/PageErrorFallback";
 import { InnerProviders } from "./AppProviders";
+import { legacyRedirectRoutes } from "./legacyRedirects";
 import NotFoundOrErrorPage from "./pages/_not-found";
 import { reloadOnChunkError } from "./utils/chunkReload";
 
@@ -322,52 +323,54 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/cli/auth")),
       },
 
-      // AI Gateway — org-scoped admin pages live under /settings/gateway/**
-      // alongside model-providers, routing-policies, audit-log etc. Every
-      // gateway resource (VirtualKey / GatewayBudget / ModelProvider) is
-      // org-keyed by the schema, so the chrome reflects that. Kept OUT of the
-      // project layout route below — these are /settings/* routes, not
-      // /:project/* routes, so Langy must not mount on them.
+      // AI Gateway — org-scoped admin pages live under /gateway/** at the top
+      // level, like /governance. Every gateway resource (VirtualKey /
+      // GatewayBudget / ModelProvider) is org-keyed by the schema, so the
+      // chrome reflects that. Kept OUT of the project layout route below —
+      // these are not /:project/* routes, so Langy must not mount on them.
+      // The static /gateway segment always wins over the /:project catch-all,
+      // and project slug minting refuses reserved top-level names.
       {
-        path: "/settings/gateway",
-        ...page(() => import("./pages/settings/gateway/index")),
+        path: "/gateway",
+        ...page(() => import("./pages/gateway/index")),
       },
       {
-        path: "/settings/gateway/virtual-keys",
-        ...page(() => import("./pages/settings/gateway/virtual-keys")),
+        path: "/gateway/virtual-keys",
+        ...page(() => import("./pages/gateway/virtual-keys")),
       },
       {
-        path: "/settings/gateway/virtual-keys/:id",
-        ...page(() => import("./pages/settings/gateway/virtual-keys/[id]")),
+        path: "/gateway/virtual-keys/:id",
+        ...page(() => import("./pages/gateway/virtual-keys/[id]")),
       },
       {
-        path: "/settings/gateway/budgets",
-        ...page(() => import("./pages/settings/gateway/budgets")),
+        path: "/gateway/budgets",
+        ...page(() => import("./pages/gateway/budgets")),
       },
       {
-        path: "/settings/gateway/budgets/:id",
-        ...page(() => import("./pages/settings/gateway/budgets/[id]")),
+        path: "/gateway/budgets/:id",
+        ...page(() => import("./pages/gateway/budgets/[id]")),
       },
       {
-        path: "/settings/gateway/usage",
-        ...page(() => import("./pages/settings/gateway/usage")),
+        path: "/gateway/usage",
+        ...page(() => import("./pages/gateway/usage")),
       },
       {
-        path: "/settings/gateway/cache-rules",
-        ...page(() => import("./pages/settings/gateway/cache-rules")),
+        path: "/gateway/cache-rules",
+        ...page(() => import("./pages/gateway/cache-rules")),
       },
       {
-        path: "/settings/gateway/guardrails",
-        ...page(() => import("./pages/settings/gateway/guardrails")),
+        path: "/gateway/guardrails",
+        ...page(() => import("./pages/gateway/guardrails")),
       },
       {
-        path: "/settings/gateway/billing-events",
-        ...page(() => import("./pages/settings/gateway/billing-events")),
+        path: "/gateway/billing-events",
+        ...page(() => import("./pages/gateway/billing-events")),
       },
       {
-        path: "/settings/gateway/webhooks",
-        ...page(() => import("./pages/settings/gateway/webhooks")),
+        path: "/gateway/webhooks",
+        ...page(() => import("./pages/gateway/webhooks")),
       },
+      ...legacyRedirectRoutes,
     ],
   },
 
