@@ -2855,8 +2855,9 @@ curl "$LANGWATCH_GATEWAY_URL/v1/convai/conversation/get-signed-url?agent_id=agen
   -H "xi-api-key: $LANGWATCH_VIRTUAL_KEY"
 ```
 
-The path and the header are ElevenLabs' own, so an ElevenLabs SDK reaches the
-gateway by base URL alone. The answer is the vendor's, with one added key:
+The path and the header are ElevenLabs' own, so a client that already speaks
+to ElevenLabs changes its base URL and its key, and nothing else. The answer
+is the vendor's, with one added key:
 
 ```json
 {
