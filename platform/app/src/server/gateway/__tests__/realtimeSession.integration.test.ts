@@ -10,13 +10,38 @@
  * Spec: specs/ai-gateway/realtime-sessions.feature
  */
 import { nanoid } from "nanoid";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { prisma } from "~/server/db";
 import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
+/**
+ * The gateway spend pipeline is stubbed so a confirmation can be asserted on
+ * its own. What the pipeline then does with it (rate, fold, debit every
+ * budget the key is under) is the spend spine's own tested behaviour, and
+ * this file's subject is the session record that produces the event.
+ */
+const sentConfirmations = vi.hoisted(() => [] as Record<string, unknown>[]);
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({
+    eventSourcing: {
+      getPipeline: () => ({
+        commands: {
+          confirmSpend: {
+            send: (data: Record<string, unknown>) => {
+              sentConfirmations.push(data);
+              return Promise.resolve();
+            },
+          },
+        },
+      }),
+    },
+  }),
+}));
+
 import {
+  closeAndConfirmRealtimeSession,
   correlateRealtimeSession,
   expireStaleRealtimeSessions,
   matchRealtimeSession,
@@ -108,9 +133,82 @@ describe("given a virtual key that brokers realtime voice sessions", () => {
     await prisma.gatewayRealtimeSession.deleteMany({
       where: { organizationId: ORG_ID },
     });
+    sentConfirmations.length = 0;
   });
 
-  it("admits up to the cap and refuses the mint past it", async () => {
+  /** @scenario A post-call report closes the session and confirms its spend */
+  it("closes the session and confirms its spend from the report", async () => {
+    const vk = await keyWithCap(`vk-confirm-${nanoid(6)}`, null);
+    const sessionId = `c-${nanoid(6)}`;
+    await reserveRealtimeSession(reservation(vk, sessionId));
+    const session = await prisma.gatewayRealtimeSession.findUniqueOrThrow({
+      where: { id: sessionId },
+    });
+
+    await closeAndConfirmRealtimeSession({
+      session,
+      // The vendor prices a conversation by duration and reports whole
+      // seconds; every quantity on the spend wire is an integer, so the one
+      // conversion to milliseconds happens at this seam.
+      usage: { audio_ms: 3000 },
+      vendorCostRaw: { call_duration_secs: 3, cost: 24 },
+      durationMs: 3000,
+      reason: "post-call report",
+    });
+
+    const closed = await prisma.gatewayRealtimeSession.findUniqueOrThrow({
+      where: { id: sessionId },
+    });
+    expect(closed.status).toBe("CLOSED");
+    expect(closed.closeReason).toBe("post-call report");
+    expect(closed.vendorCostRaw).toEqual({ call_duration_secs: 3, cost: 24 });
+
+    expect(sentConfirmations).toHaveLength(1);
+    expect(sentConfirmations[0]).toMatchObject({
+      gateway_request_id: sessionId,
+      tenantId: PROJECT_ID,
+      model: "convai",
+      model_provider_id: PROVIDER_ID,
+      usage: expect.objectContaining({ audio_ms: 3000 }),
+    });
+    // The vendor's own figure is kept for reconciliation and never billed
+    // from: two systems pricing the same call is how they disagree about it.
+    expect(sentConfirmations[0]!.cost_nano_usd).toBeGreaterThan(0);
+  });
+
+  /** @scenario A report arriving after the session closed still confirms it */
+  it("still confirms a session the expiry sweep already closed", async () => {
+    const vk = await keyWithCap(`vk-late-${nanoid(6)}`, null);
+    const sessionId = `l-${nanoid(6)}`;
+    await reserveRealtimeSession(reservation(vk, sessionId));
+    await releaseRealtimeSession({
+      sessionId,
+      projectId: PROJECT_ID,
+      status: "EXPIRED",
+      reason: "no vendor report arrived within the longest possible call",
+    });
+    const session = await prisma.gatewayRealtimeSession.findUniqueOrThrow({
+      where: { id: sessionId },
+    });
+
+    await closeAndConfirmRealtimeSession({
+      session,
+      usage: { audio_ms: 5000 },
+      durationMs: 5000,
+      reason: "post-call report",
+    });
+
+    // Returning early here would drop the charge for a call that really
+    // happened, just because a sweep got there first.
+    expect(sentConfirmations).toHaveLength(1);
+    expect(
+      (await prisma.gatewayRealtimeSession.findUniqueOrThrow({ where: { id: sessionId } }))
+        .status,
+    ).toBe("CLOSED");
+  });
+
+  /** @scenario A mint past the cap is refused and books nothing */
+  it("refuses the mint past the cap and books nothing", async () => {
     const vk = await keyWithCap(`vk-cap-${nanoid(6)}`, 1);
 
     expect(await reserveRealtimeSession(reservation(vk, `s1-${nanoid(6)}`))).toEqual({
@@ -129,6 +227,7 @@ describe("given a virtual key that brokers realtime voice sessions", () => {
     ).toBe(1);
   });
 
+  /** @scenario Closing a session frees its slot */
   it("frees the slot when the session closes", async () => {
     const vk = await keyWithCap(`vk-free-${nanoid(6)}`, 1);
     const first = `s1-${nanoid(6)}`;
@@ -146,6 +245,7 @@ describe("given a virtual key that brokers realtime voice sessions", () => {
     });
   });
 
+  /** @scenario Two mints racing on one key cannot both take the last slot */
   it("lets exactly one of two simultaneous mints take the last slot", async () => {
     const vk = await keyWithCap(`vk-race-${nanoid(6)}`, 1);
 
@@ -159,6 +259,7 @@ describe("given a virtual key that brokers realtime voice sessions", () => {
     expect(outcomes.filter((o) => !o.ok)).toHaveLength(1);
   });
 
+  /** @scenario A session that outlived the longest possible call stops holding a slot */
   it("does not count a session older than the longest possible call", async () => {
     const vk = await keyWithCap(`vk-stale-${nanoid(6)}`, 1);
     const stale = `stale-${nanoid(6)}`;
@@ -190,6 +291,7 @@ describe("given a virtual key that brokers realtime voice sessions", () => {
     }
   });
 
+  /** @scenario The conversation id recorded at the mint is the join key */
   it("matches a vendor report by the conversation id recorded at the mint", async () => {
     const vk = await keyWithCap(`vk-match-${nanoid(6)}`, null);
     const sessionId = `m-${nanoid(6)}`;
@@ -225,6 +327,7 @@ describe("given a virtual key that brokers realtime voice sessions", () => {
     expect(matched?.id).toBe(sessionId);
   });
 
+  /** @scenario Two candidate sessions is a miss, not a guess */
   it("refuses to guess when two sessions are open in the same window", async () => {
     const vk = await keyWithCap(`vk-two-${nanoid(6)}`, null);
     await reserveRealtimeSession(reservation(vk, `x-${nanoid(6)}`));
@@ -240,6 +343,7 @@ describe("given a virtual key that brokers realtime voice sessions", () => {
     expect(matched).toBeNull();
   });
 
+  /** @scenario A report never matches another organization's session */
   it("never matches a report to another organization's session", async () => {
     const vk = await keyWithCap(`vk-tenant-${nanoid(6)}`, null);
     const sessionId = `t-${nanoid(6)}`;

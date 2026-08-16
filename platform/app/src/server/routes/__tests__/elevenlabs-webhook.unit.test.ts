@@ -50,6 +50,7 @@ describe("given an ElevenLabs post-call delivery", () => {
     ).toBe(false);
   });
 
+  /** @scenario A delivery signed with the wrong secret is refused */
   it("refuses a delivery signed with another secret", () => {
     expect(
       verifyElevenLabsSignature({
@@ -61,6 +62,7 @@ describe("given an ElevenLabs post-call delivery", () => {
     ).toBe(false);
   });
 
+  /** @scenario A replayed delivery outside the signature tolerance is refused */
   it("refuses a captured delivery replayed later", () => {
     // The timestamp is inside the signed payload, so it cannot be moved
     // without breaking the signature; bounding it is what stops the replay.

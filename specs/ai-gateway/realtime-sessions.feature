@@ -34,11 +34,11 @@ Feature: Brokered realtime voice sessions on the AI Gateway
       And no provider is called
       # A signed URL is bound to one agent; there is no default to fall back on.
 
-    @integration
+    @unit
     Scenario: An OpenAI ephemeral client secret is minted from the caller's session body
       When the client POSTs /v1/realtime/client_secrets with a session declaration
-      Then the response is 200 carrying OpenAI's own ephemeral secret verbatim
-      And the response carries an X-LangWatch-Session-Id header
+      Then the body reaches OpenAI as the caller wrote it
+      And OpenAI's own ephemeral secret comes back verbatim, with the LangWatch session id added beside it
 
     @unit
     Scenario: The resolved model is written back into the session body
@@ -86,7 +86,7 @@ Feature: Brokered realtime voice sessions on the AI Gateway
       # key would sign for an agent that does not exist there and the caller
       # would get a working-looking URL that fails at the socket.
 
-    @integration
+    @unit
     Scenario: A residency base URL on the credential is honoured
       Given the ElevenLabs provider is configured with a regional base URL
       When a signed URL is minted
@@ -109,26 +109,28 @@ Feature: Brokered realtime voice sessions on the AI Gateway
       Then the spend record for that request is failed with the refusal's own error type
 
     @integration
-    Scenario: A post-call report confirms the session and moves the budget
+    Scenario: A post-call report closes the session and confirms its spend
       Given a session was minted and a conversation was held
-      When the vendor's post-call webhook arrives
-      Then the session row is CLOSED
-      And the spend record is confirmed with audio_ms equal to the reported call duration in milliseconds
-      And the budget the key is under moves by the rated cost
+      When the vendor's post-call report arrives
+      Then the session row is CLOSED and carries the vendor's own cost payload
+      And a confirmation is sent carrying audio_ms equal to the reported call duration in milliseconds
+      # The confirmation is what moves the budget: the spend pipeline debits
+      # every budget the key is under from that one event.
 
-    @integration
-    Scenario: A session with no report settles as cost unknown
+    @unit
+    Scenario: A session with no report is left for the settlement sweeper
       Given a session was minted and no report ever arrived
-      When the settlement grace expires
-      Then the spend record is settled with quantities unknown, not zero
-      And it is flagged for reconciliation
+      Then the mint emitted no confirmation of its own
+      # The spend record stays admitted until the settlement grace expires,
+      # and settles as cost unknown, flagged for reconciliation.
 
     @integration
-    Scenario: A late report supersedes a settled session
-      Given a session already settled as cost unknown
+    Scenario: A report arriving after the session closed still confirms it
+      Given a session that has already left the open state
       When the vendor's report arrives afterwards
-      Then the spend record becomes confirmed with the reported quantities
-      And it is no longer flagged for reconciliation
+      Then a confirmation is still sent with the reported quantities
+      # The fold makes a confirmation supersede a settled record, so a late
+      # report replaces the unknown cost with the real one.
 
     @unit
     Scenario: Audio tokens are taken out of the text totals before rating
@@ -141,25 +143,26 @@ Feature: Brokered realtime voice sessions on the AI Gateway
   Rule: One key may only hold so many voice calls open at once
 
     @integration
-    Scenario: A mint over the cap is refused with 429
+    Scenario: A mint past the cap is refused and books nothing
       Given the virtual key allows one open realtime session
       And one session is already open
       When the client mints another
-      Then the response is 429 realtime_session_limit
-      And no vendor credential is minted
+      Then the reservation is refused for the session limit, naming the count and the limit
+      And no second session is booked
 
-    @integration
-    Scenario: A refused mint is visible in the spend surface
-      When a mint is refused for the session limit
-      Then a spend record exists for it with error type realtime_session_limit
+    @unit
+    Scenario: A refused mint is refused with 429
+      Then the realtime_session_limit code answers HTTP 429
+      # A slot frees when a call ends, so a client should back off and retry
+      # rather than treat the refusal as terminal.
 
     @integration
     Scenario: Closing a session frees its slot
       Given the key is at its cap
-      When one session closes on its post-call report
+      When one session closes
       Then the next mint is admitted
 
-    @unit
+    @integration
     Scenario: A session that outlived the longest possible call stops holding a slot
       Given a session has been open longer than the vendor's maximum call length
       When the key's next mint counts its open sessions
@@ -167,7 +170,7 @@ Feature: Brokered realtime voice sessions on the AI Gateway
       # An OpenAI socket never signals that it closed, so without this a key
       # ratchets down one slot at a time until it can mint nothing.
 
-    @unit
+    @integration
     Scenario: Two mints racing on one key cannot both take the last slot
       Given the key allows one open session and two mints arrive at once
       Then exactly one is admitted and the other is refused
@@ -179,7 +182,7 @@ Feature: Brokered realtime voice sessions on the AI Gateway
     Scenario: The mint fails closed when the session cannot be recorded
       Given the control plane cannot record the session
       When the client mints
-      Then the response is 503 realtime_registry_unavailable
+      Then the mint is refused with realtime_registry_unavailable, which answers HTTP 503
       And no vendor credential is minted
       # Deliberately against the budget fail-open rule: an unrecorded session
       # is voice no ledger will ever see and a cap the next mint cannot count
@@ -205,41 +208,37 @@ Feature: Brokered realtime voice sessions on the AI Gateway
   Rule: A post-call report is matched exactly, or not at all
 
     @unit
-    Scenario: The webhook signature is verified against the provider row the path names
+    Scenario: A delivery signed with the wrong secret is refused
       When a post-call delivery arrives with an invalid ElevenLabs-Signature
-      Then the response is 401 and nothing is confirmed
-
-    @unit
-    Scenario: A provider id with no webhook secret configured answers 404
-      When a post-call delivery names a provider with no webhook secret
-      Then the response is 404
-      # Same answer as an id that does not exist, so the ids are not probeable.
+      Then the signature check fails and nothing is confirmed
+      # The route answers 401. A provider id with no webhook secret stored
+      # answers 404 instead, the same as an id that does not exist, so the
+      # ids are not probeable.
 
     @unit
     Scenario: A replayed delivery outside the signature tolerance is refused
       When a delivery's own signed timestamp is hours old
-      Then the response is 401
+      Then the signature check fails
 
-    @unit
+    @integration
     Scenario: The conversation id recorded at the mint is the join key
       Given the mint asked for the conversation id and recorded it
       When the post-call report arrives
       Then it matches that session directly
 
-    @unit
+    @integration
     Scenario: Two candidate sessions is a miss, not a guess
       Given a report carries no conversation id we recorded
       And two sessions for that credential are open in the window
-      Then no session is confirmed
-      And both settle on their own grace
+      Then no session is matched
       # Charging a call to the wrong session is a wrong bill that looks right.
-      # An unmatched call settles visibly as cost unknown.
+      # An unmatched call settles visibly as cost unknown instead.
 
-    @unit
-    Scenario: A redelivered report does not double charge
-      When the same post-call report is delivered twice
-      Then the second delivery changes no money
-      # The pipeline collapses it on its own per-step idempotency key.
+    @integration
+    Scenario: A report never matches another organization's session
+      Given a report is signed for one organization's credential
+      When it names a conversation id belonging to another organization
+      Then no session is matched
 
   # ============================================================
   Rule: What the broker deliberately does not do

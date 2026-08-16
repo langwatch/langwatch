@@ -2,6 +2,7 @@ package providers
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -65,6 +66,7 @@ func TestElevenLabsMintAsksForTheConversationIdAndReadsItBack(t *testing.T) {
 	assert.Contains(t, string(resp.Body), `"session_id":"req_abc"`)
 }
 
+// @scenario "A residency base URL on the credential is honoured"
 func TestElevenLabsMintHonoursAResidencyBaseURL(t *testing.T) {
 	t.Parallel()
 
@@ -166,6 +168,56 @@ func TestOpenAIMintClampsTheSessionLifetime(t *testing.T) {
 	assert.Contains(t, string(resp.Body), `"session_id":"req_abc"`)
 	assert.Empty(t, resp.RealtimeConversationID,
 		"no conversation exists until the socket opens, and it opens without us")
+}
+
+// @scenario "An OpenAI ephemeral client secret is minted from the caller's session body"
+func TestOpenAIMintForwardsTheCallersSessionBodyAndTheVendorsAnswer(t *testing.T) {
+	t.Parallel()
+
+	var sent []byte
+	var gotAuth, gotPath string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth, gotPath = r.Header.Get("Authorization"), r.URL.Path
+		sent, _ = io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"value":"ek_secret","expires_at":1786873895,` +
+			`"session":{"type":"realtime","model":"gpt-realtime","voice":"verse"}}`))
+	}))
+	defer server.Close()
+
+	// The caller's own declaration: instructions, tools and turn detection
+	// are theirs and must reach OpenAI untouched.
+	body := []byte(`{"session":{"type":"realtime","model":"gpt-realtime",` +
+		`"instructions":"be brief","audio":{"output":{"voice":"verse"}}}}`)
+	req := &domain.Request{
+		Type: domain.RequestTypeRealtimeSession,
+		Body: body,
+		RealtimeSession: &domain.RealtimeSessionRequest{
+			Vendor:    domain.RealtimeVendorOpenAI,
+			SessionID: "req_abc",
+		},
+	}
+	cred := domain.Credential{
+		ID:         "openai_1",
+		ProviderID: domain.ProviderOpenAI,
+		APIKey:     "sk-x",
+		Extra:      map[string]string{"base_url": server.URL},
+	}
+
+	resp, err := realtimeRouter(server).dispatchRealtimeSession(context.Background(), req, cred)
+	require.NoError(t, err)
+
+	assert.Equal(t, "/v1/realtime/client_secrets", gotPath, "OpenAI's own mint path")
+	assert.Equal(t, "Bearer sk-x", gotAuth, "the customer's stored key, never the virtual key")
+	assert.JSONEq(t, string(body), string(sent),
+		"the session declaration reaches the vendor as the caller wrote it")
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Contains(t, string(resp.Body), `"value":"ek_secret"`,
+		"the vendor's ephemeral secret comes back verbatim")
+	assert.Contains(t, string(resp.Body), `"voice":"verse"`)
+	assert.Contains(t, string(resp.Body), `"session_id":"req_abc"`,
+		"with the LangWatch session id added beside it")
 }
 
 func TestOpenAIMintLeavesAnUnstatedExpiryAlone(t *testing.T) {
