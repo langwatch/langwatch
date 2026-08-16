@@ -65,6 +65,17 @@ on a new drawer — the URL form gives you:
    { editingId })`. The hook handles URL serialization, push vs
    replace, and the navigation stack for back-button behavior.
 
+## From inside a drawer: no second drawer
+
+Only one drawer mounts at a time, so `openDrawer` from inside a drawer
+REPLACES the current one, and unmounting wipes drawer-local draft state
+(the automation drawer resets its store on unmount, for example).
+Direct-mounting another drawer component with `useState`/`useDisclosure`
+is the same banned pattern in a different coat, and it stacks two
+`Drawer.Root`s visually. A sub-flow needed mid-drawer (create a dataset,
+create a queue) is built inline in the current drawer:
+`features/automations/providers/dataset/client.tsx` is the reference.
+
 ## Non-serializable props (rare)
 
 If a drawer genuinely needs an in-memory payload that can't be

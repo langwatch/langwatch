@@ -1,10 +1,15 @@
-import { Text, useDisclosure, VStack } from "@chakra-ui/react";
+import { Button, Field, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import type { DatasetActionParams } from "@langwatch/automations/providers/dataset";
 import type { SavedTriggerRow } from "@langwatch/automations/providers/types";
 import { Database } from "lucide-react";
-import { useEffect } from "react";
-import { AddOrEditDatasetDrawer } from "~/components/AddOrEditDatasetDrawer";
+import { useEffect, useState } from "react";
+import { DATASET_DEFAULT_COLUMNS } from "~/components/AddOrEditDatasetDrawer";
 import { DatasetSelector } from "~/components/datasets/DatasetSelector";
+import {
+  describeError,
+  readHandledError,
+  showErrorToast,
+} from "~/features/errors";
 import type { Dataset } from "~/generated/prisma/client";
 import {
   type DatasetColumns,
@@ -130,6 +135,89 @@ function toActionParams(slice: DatasetSlice): DatasetActionParams {
   };
 }
 
+/**
+ * Creates a dataset without leaving the automation drawer.
+ *
+ * Drawers are URL-routed singletons: opening the dataset drawer would unmount
+ * this one and wipe the automation draft, and mounting a drawer component
+ * directly is the same pattern in another coat
+ * (dev/docs/best_practices/drawers.md). The new dataset takes the default
+ * trace columns; the dataset page edits them afterwards.
+ */
+function InlineDatasetCreate({
+  projectId,
+  onCreated,
+  onCancel,
+}: {
+  projectId: string;
+  onCreated: (created: { datasetId: string }) => void;
+  onCancel: () => void;
+}) {
+  const upsertDataset = api.dataset.upsert.useMutation();
+  const [name, setName] = useState("");
+  const [nameError, setNameError] = useState<string | null>(null);
+
+  const create = () => {
+    const trimmed = name.trim();
+    if (trimmed.length === 0) return;
+    setNameError(null);
+    upsertDataset.mutate(
+      { projectId, name: trimmed, columnTypes: DATASET_DEFAULT_COLUMNS },
+      {
+        onSuccess: (created) => onCreated({ datasetId: created.id }),
+        onError: (error) => {
+          // A taken name belongs under the field the user is looking at,
+          // not in a toast.
+          if (readHandledError(error)?.code === "dataset_name_taken") {
+            setNameError(describeError({ error }));
+            return;
+          }
+          showErrorToast({
+            error,
+            fallbackTitle: "Couldn't create the dataset",
+          });
+        },
+      },
+    );
+  };
+
+  return (
+    <VStack align="stretch" gap={2}>
+      <Field.Root invalid={!!nameError}>
+        <Input
+          size="sm"
+          autoFocus
+          placeholder="New dataset name"
+          value={name}
+          onChange={(event) => {
+            setName(event.target.value);
+            setNameError(null);
+          }}
+          onKeyDown={(event) => {
+            if (event.key !== "Enter") return;
+            event.preventDefault();
+            create();
+          }}
+        />
+        {nameError && <Field.ErrorText>{nameError}</Field.ErrorText>}
+      </Field.Root>
+      <HStack justify="flex-end" gap={2}>
+        <Button size="sm" variant="ghost" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button
+          size="sm"
+          disabled={name.trim().length === 0}
+          loading={upsertDataset.isPending}
+          onClick={create}
+        >
+          Create dataset
+        </Button>
+      </HStack>
+    </VStack>
+  );
+}
+
 function DatasetConfigForm({
   slice,
   onChange,
@@ -139,7 +227,7 @@ function DatasetConfigForm({
     { projectId: ctx.projectId },
     { enabled: !!ctx.projectId, refetchOnWindowFocus: false },
   );
-  const createDataset = useDisclosure();
+  const [isCreating, setIsCreating] = useState(false);
 
   // Picking a dataset derives a default column mapping from that dataset's
   // columns and stores it on the slice, so the saved trigger carries a
@@ -178,28 +266,27 @@ function DatasetConfigForm({
         localStorageDatasetId={slice.datasetId}
         errors={{}}
         setValue={(_field: string, value: string) => selectDataset(value)}
-        onCreateNew={createDataset.onOpen}
+        onCreateNew={() => setIsCreating(true)}
       />
       <Text color="fg.muted" textStyle="xs">
         Columns map to the matching trace fields automatically; refine the
         mapping from the dataset view after creating.
       </Text>
-      {/* A project with no dataset yet has nothing to pick, so the automation
-          cannot be finished without creating one from here. The new dataset's
-          own columns drive the mapping, the same as picking an existing one. */}
-      <AddOrEditDatasetDrawer
-        open={createDataset.open}
-        onClose={createDataset.onClose}
-        onSuccess={({ datasetId, columnTypes }) => {
-          createDataset.onClose();
-          void datasets.refetch();
-          onChange({
-            ...slice,
-            datasetId,
-            mapping: deriveMappingFromColumns(columnTypes),
-          });
-        }}
-      />
+      {isCreating && (
+        <InlineDatasetCreate
+          projectId={ctx.projectId}
+          onCancel={() => setIsCreating(false)}
+          onCreated={({ datasetId }) => {
+            void datasets.refetch();
+            setIsCreating(false);
+            onChange({
+              ...slice,
+              datasetId,
+              mapping: deriveMappingFromColumns(DATASET_DEFAULT_COLUMNS),
+            });
+          }}
+        />
+      )}
     </VStack>
   );
 }
