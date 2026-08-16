@@ -12,7 +12,7 @@ import type { FrontendFeatureFlag } from "~/server/featureFlag/frontendFeatureFl
  * The product registry: the platform is four products plus Settings, and
  * every navigation-v2 surface (product switcher, icon rail, sidebars,
  * command bar entries, landing memory) reads this one declaration.
- * Pure data — icons are component references, never JSX, so server-safe
+ * Pure data: icons are component references, never JSX, so server-safe
  * logic can import it too.
  *
  * Settings is deliberately NOT a product here: it has no switcher entry,
@@ -99,7 +99,7 @@ export function productById(id: ProductId): ProductDefinition {
  * Which product a browser address belongs to, or null for everything that
  * is not a product page (settings, ops, auth, onboarding, the root).
  * Landing memory writes through this, so a null keeps the previous
- * product remembered — visiting Settings never becomes "where I was".
+ * product remembered; visiting Settings never becomes "where I was".
  */
 export function productFromPathname(pathname: string): ProductId | null {
   if (pathname === "/me" || pathname.startsWith("/me/")) return "me";

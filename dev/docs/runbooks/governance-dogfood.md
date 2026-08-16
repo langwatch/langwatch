@@ -135,7 +135,7 @@ All three: zero acceptance of forged value, zero "rejectedSpans" — silent clam
 ### 7. Admin drill-in
 
 **Surfaces:**
-- `/governance/routing-policies` (NOT `/governance/routing-policies` — that 404s; GovernanceLayout sub-nav links to flat path)
+- `/governance/routing-policies`
 - `/[project]/governance/*` — birdeye, audit log, anomalies, recent activity
 - Budget management, virtual key management
 

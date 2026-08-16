@@ -25,7 +25,7 @@ Feature: Bird's-eye governance dashboard v2 — graphs, Top-N framing, click-thr
 
   This is a v2 over the same `/governance` page (canonical Overview;
   the legacy `/settings/governance` address redirects there per
-  specs/navigation/gateway-url-move.feature) — the v1
+  specs/navigation/gateway-url-move.feature); the v1
   shape continues to ship as a regression invariant for orgs that
   haven't seeded multi-team data yet.
 
@@ -157,7 +157,7 @@ Feature: Bird's-eye governance dashboard v2 — graphs, Top-N framing, click-thr
     And below the table there is a "View all teams →" link
     And the link points to a route that lists every team with full
       sort + filter + pagination affordances (route lives at
-      "/governance/teams" or similar — see Axis 4)
+      "/governance/teams" or similar, see Axis 4)
 
   @bdd @ui @birds-eye-v2 @top-n
   Scenario: SpendByUser section is explicitly framed as "Top 10 by spend"

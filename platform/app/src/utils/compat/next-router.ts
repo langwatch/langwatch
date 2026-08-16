@@ -48,7 +48,7 @@ const ROUTE_PATTERNS = [
   // /gateway/usage date presets and its key-filter chip).
   "/settings/audit-log",
   "/settings/*",
-  // Top-level product routes — must precede the "/:project/*" patterns so
+  // Top-level product routes must precede the "/:project/*" patterns so
   // they never resolve as project pages.
   "/gateway",
   "/gateway/virtual-keys",

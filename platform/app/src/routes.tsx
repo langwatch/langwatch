@@ -321,10 +321,10 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/cli/auth")),
       },
 
-      // AI Gateway — org-scoped admin pages live under /gateway/** at the top
+      // AI Gateway: org-scoped admin pages live under /gateway/** at the top
       // level, like /governance. Every gateway resource (VirtualKey /
       // GatewayBudget / ModelProvider) is org-keyed by the schema, so the
-      // chrome reflects that. Kept OUT of the project layout route below —
+      // chrome reflects that. Kept OUT of the project layout route below:
       // these are not /:project/* routes, so Langy must not mount on them.
       // The static /gateway segment always wins over the /:project catch-all,
       // and project slug minting refuses reserved top-level names.

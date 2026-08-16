@@ -14,7 +14,7 @@ const DEFAULT_MODE: NavigationMode = "legacy";
 /**
  * Which navigation shell this device renders: the current chrome
  * (legacy), the product-switcher top bar, or the icon rail. Purely a
- * per-device preference — localStorage only, never synced to the account —
+ * per-device preference (localStorage only, never synced to the account),
  * so it lives in its own zustand store the same way the graphics-quality
  * override does. The release_ui_navigation_v2_enabled flag decides whether
  * a non-legacy value takes effect; the preference itself survives the flag

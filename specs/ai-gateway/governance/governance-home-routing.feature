@@ -1,6 +1,6 @@
 Feature: Governance home — route, nav promotion, persona detection
   The governance product surface lives at top-level `/governance` (a
-  daily-use org-scoped home) — NOT under Settings. The whole family
+  daily-use org-scoped home), NOT under Settings. The whole family
   lives there: `/governance/ingestion-sources*`, `/governance/anomaly-rules`,
   `/governance/routing-policies`, `/governance/tool-catalog`,
   `/governance/departments`. The legacy `/settings/governance*` and

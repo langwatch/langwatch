@@ -1,4 +1,4 @@
-Feature: AI Tools Portal — Admin catalog editor at /governance/tool-catalog
+Feature: AI Tools Portal - Admin catalog editor at /governance/tool-catalog
   As an org admin curating which AI tools my team can see on /me
   I want a catalog editor with sections per tile type, drag-to-reorder,
   add/edit drawer, and per-team scoping

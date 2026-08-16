@@ -41,7 +41,7 @@ export const noOrgBouncerRoutes = [
   // must still reach /governance/* to set up sources, rules, routing
   // policies. Bouncing them to /onboarding/welcome is wrong: they ALREADY
   // have an org, they just haven't created a project yet (and may never
-  // need to — governance is org-scoped).
+  // need to; governance is org-scoped).
   "/governance",
   "/governance/ingestion-sources",
   "/governance/ingestion-sources/[id]",

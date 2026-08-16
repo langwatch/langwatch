@@ -4,7 +4,7 @@ import { SectionNavigationLayout } from "~/components/ui/layouts/SectionNavigati
 import { gatewayNavItems } from "~/features/navigation/sectionNavItems";
 
 /**
- * Layout for `/gateway/*` — mirrors GovernanceLayout pattern:
+ * Layout for `/gateway/*`. Mirrors the GovernanceLayout pattern:
  * single-link parent in the main sidebar, full Virtual Keys / Budgets /
  * Providers / Cache Rules / Usage sub-nav rendered inside the page as a
  * thin left column. Each gateway page wraps with this layout instead of

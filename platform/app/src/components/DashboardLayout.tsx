@@ -385,7 +385,7 @@ export type DashboardLayoutProps = {
  * navigation mode (specs/navigation/navigation-modes.feature): legacy
  * renders the current chrome synchronously, and a device on a v2 mode
  * shows the loading screen until the flag answers so the old chrome
- * never flashes. Public pages never consult the mode — they carry no
+ * never flashes. Public pages never consult the mode; they carry no
  * session to resolve a flag against.
  */
 export const DashboardLayout = (dashboardProps: DashboardLayoutProps) => {

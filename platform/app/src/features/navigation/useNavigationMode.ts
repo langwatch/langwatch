@@ -15,7 +15,7 @@ export type NavigationModeResolution =
  *
  * - Stored mode `legacy` (the default, including garbage in storage)
  *   resolves synchronously. The flag query never runs, so the current
- *   chrome renders with zero extra requests — the fast path every
+ *   chrome renders with zero extra requests, the fast path every
  *   flag-off customer takes.
  * - A stored v2 mode stays `loading` until the organization and the
  *   release_ui_navigation_v2_enabled flag resolve, so the old chrome
