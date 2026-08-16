@@ -122,6 +122,36 @@ func TestConfigWireProvidersAllowedAndRoutingMode(t *testing.T) {
 	})
 }
 
+// The gateway is told, per provider it will not dispatch to, WHY: dropped by
+// the routing policy, or outside the key's provider access. The kind rides the
+// wire (not just the row id) because a request resolves to a provider kind and
+// these rows are absent from providers[]. This pins the {id, type} decode and
+// the block-reason classification so a rename cannot leave the gateway unable
+// to name the reason.
+func TestConfigWireProviderExclusions(t *testing.T) {
+	body := []byte(`{
+		"routing_excluded_providers": [{"id": "mp_anthropic", "type": "anthropic"}],
+		"access_excluded_providers": [{"id": "mp_gemini", "type": "google_gemini"}],
+		"routing_policy_name": "Cheap models"
+	}`)
+	var wire configWire
+	require.NoError(t, json.Unmarshal(body, &wire))
+	cfg := wire.toDomain()
+
+	require.Len(t, cfg.RoutingExcludedProviders, 1)
+	assert.Equal(t, "mp_anthropic", cfg.RoutingExcludedProviders[0].ID)
+	assert.Equal(t, domain.ProviderAnthropic, cfg.RoutingExcludedProviders[0].ProviderID)
+
+	require.Len(t, cfg.AccessExcludedProviders, 1)
+	// google_gemini normalizes to the canonical gemini kind, same as a credential.
+	assert.Equal(t, domain.ProviderGemini, cfg.AccessExcludedProviders[0].ProviderID)
+
+	assert.Equal(t, "Cheap models", cfg.RoutingPolicyName)
+	assert.Equal(t, domain.ProviderBlockRouting, cfg.BlockedProviderReason(domain.ProviderAnthropic))
+	assert.Equal(t, domain.ProviderBlockAccess, cfg.BlockedProviderReason(domain.ProviderGemini))
+	assert.Equal(t, domain.ProviderBlockNone, cfg.BlockedProviderReason(domain.ProviderOpenAI))
+}
+
 // The other half of the bundle contract lives in the control plane's
 // materializer module. Reading it here keeps a TypeScript-side rename from
 // silently stripping the provider filter (or the routing mode) off the
@@ -135,6 +165,9 @@ func TestControlPlaneMaterialiserEmitsTheBudgetContract(t *testing.T) {
 		`principal_id`,
 		`providers_allowed: config.providersAllowed`,
 		`routing_mode: routingModeToWire(vk.routingMode)`,
+		`routing_excluded_providers: routingExcluded.map(providerExclusionWire)`,
+		`access_excluded_providers: accessExcluded.map(providerExclusionWire)`,
+		`routing_policy_name: vk.routingPolicy?.name ?? null`,
 	} {
 		if !strings.Contains(src, needle) {
 			t.Errorf("config.materialiser.ts no longer emits %q: the bundle contract has drifted", needle)

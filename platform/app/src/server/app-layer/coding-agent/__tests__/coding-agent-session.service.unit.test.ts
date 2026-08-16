@@ -74,6 +74,7 @@ function emptyState() {
     repositoryOwner: null,
     repositoryName: null,
     gitBranch: null,
+    gitBranches: [] as string[],
     gitWorktree: null,
     title: null,
     modelCalls: 0,

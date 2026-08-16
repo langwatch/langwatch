@@ -1,6 +1,6 @@
 ---
 title: Optimizing Embeddings
-description: Learn how to optimize embedding models for better retrieval in RAG systems—covering model selection, dimensionality, and domain-specific tuning.
+description: Embedding model tuning for better retrieval in RAG systems, covering model selection, dimensionality, and domain-specific tuning.
 keywords:
   [
     RAG embeddings,
@@ -22,7 +22,7 @@ Imagine you’re building a dating app. Two users fill in their bios:
 
 From a linguistic standpoint, these statements are opposites. But from a recommendation perspective, there’s a case to be made that they belong together. Both are expressing strong food preferences. Both might be ‘foodies’ which is why they mentioned their preferences.
 
-The point here is subtle, but important: semantic similarity is not the same as task relevance. That’s why fine-tuning your embedding model, even on a small number of labeled pairs, can make a noticeable difference. I’ve often seen teams improve their recall by 10-15% by fine-tuning their embedding models with just a couple hundred examples.
+Semantic similarity is not the same as task relevance. That’s why fine-tuning your embedding model, even on a small number of labeled pairs, can make a noticeable difference. I’ve often seen teams improve their recall by 10-15% by fine-tuning their embedding models with just a couple hundred examples.
 
 ## Requirements
 
@@ -234,7 +234,7 @@ Created collection with 27 documents.
 
 ## Parametrizing our Retrieval Pipeline
 
-The key to running quick experiments is to parametrize the retrieval pipeline. This makes it easy to swap different retrieval methods as your RAG system evolves. Let's start by defining the metrics we want to track.
+The key to running quick experiments is to parametrize the retrieval pipeline. This lets you swap different retrieval methods as your RAG system evolves. Let's start by defining the metrics we want to track.
 
 **Recall** measures how many of the total relevant items we managed to find. If there are 20 relevant documents in your dataset but you only retrieve 10 of them, that's 50% recall.
 
@@ -288,7 +288,7 @@ evals_transactions = transactions[int(0.8 * len(transactions)) :]
 datasets = [("train", train_transactions), ("evals", evals_transactions)]
 ```
 
-Now we can set up our parametrized retrieval pipeline. I'll vary the number of retrieved documents to see how it affects recall and MRR. Note that you can easily vary other parameters (like the embedding models or rerankers) as well with this parametrized pipeline.
+Now we can set up our parametrized retrieval pipeline. I'll vary the number of retrieved documents to see how it affects recall and MRR. Note that you can vary other parameters (like the embedding models or rerankers) as well with this parametrized pipeline.
 
 ```python
 def run_evaluation(collections=None, transactions=None, k_values=[1, 3, 5]):
@@ -375,7 +375,7 @@ Moving on, we’ll fine-tune a small open-source embedding model using just 256 
 
 One big reason to fine-tune open-source models is cost. After training, you can run them on your own hardware without worrying about per-query charges. If you’re handling a lot of traffic, this saves a lot of money fast.
 
-We’ll be using sentence-transformers, it’s easy to train, plays nicely with Hugging Face, and has plenty of community examples if you get stuck. Let's first transform our data in the format that sentence-transformer expects it.
+We’ll be using sentence-transformers, it plays nicely with Hugging Face, and has plenty of community examples if you get stuck. Let's first transform our data in the format that sentence-transformer expects it.
 
 ```python
 from sentence_transformers import InputExample, losses

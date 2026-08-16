@@ -1,19 +1,14 @@
-import { DashboardLayout } from "~/components/DashboardLayout";
-import { ReplayWizardContent } from "~/components/ops/projections";
-import { OpsPageShell } from "~/components/ops/shared/OpsPageShell";
-import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { useEffect } from "react";
+import { useRouter } from "~/utils/compat/next-router";
 
+/**
+ * Projection replay is a drawer on the event-sourcing page now; old links
+ * follow. Per-run progress keeps its page at /ops/projections/:runId.
+ */
 export default function OpsProjectionsPage() {
-  return (
-    <OpsPageShell>
-      <DashboardLayout>
-        <PageLayout.Header>
-          <PageLayout.Heading>Projection Replay</PageLayout.Heading>
-        </PageLayout.Header>
-        <PageLayout.Container>
-          <ReplayWizardContent />
-        </PageLayout.Container>
-      </DashboardLayout>
-    </OpsPageShell>
-  );
+  const router = useRouter();
+  useEffect(() => {
+    void router.replace("/ops/event-sourcing?drawer.open=opsReplay");
+  }, [router]);
+  return null;
 }

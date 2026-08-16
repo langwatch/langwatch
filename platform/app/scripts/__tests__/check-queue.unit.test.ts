@@ -108,6 +108,11 @@ function startRun(tag: string, options: RunOptions = {}): Run {
     CHECK_QUEUE_DIR: queueDir,
     CHECK_SLOTS: "1",
     CHECK_QUEUE_POLL_MS: "25",
+    // These tests pin the JS queue. Without this, a developer machine with
+    // haven installed would delegate every run to `haven slot run` and the
+    // suite would be testing haven instead (see the delegation tests below,
+    // which exercise that path deliberately).
+    CHECK_QUEUE_IMPL: "js",
     ...options.env,
   })) {
     if (value !== undefined) env[key] = value;
@@ -410,7 +415,12 @@ describe("check queue", () => {
         process.execPath,
         [QUEUE_SCRIPT, "node", fakeCommand, logFile, "after-malformed", "0"],
         {
-          env: { ...process.env, CHECK_QUEUE_DIR: queueDir, CHECK_SLOTS: "2" },
+          env: {
+            ...process.env,
+            CHECK_QUEUE_DIR: queueDir,
+            CHECK_SLOTS: "2",
+            CHECK_QUEUE_IMPL: "js",
+          },
           encoding: "utf8",
         },
       );
@@ -436,6 +446,7 @@ describe("check queue", () => {
             ...process.env,
             CHECK_QUEUE_DIR: path.join(readOnly, "queue"),
             CHECK_SLOTS: "1",
+            CHECK_QUEUE_IMPL: "js",
           },
           encoding: "utf8",
         },
@@ -496,6 +507,61 @@ describe("check queue", () => {
       );
       await Promise.all(runs.map((run) => run.done));
       expect(maxOverlap(readEvents())).toBe(2);
+    });
+  });
+
+  describe("when haven is installed", () => {
+    /** A stand-in haven binary that records its argv and exits. */
+    function fakeHaven(exitCode: number): { bin: string; argvFile: string } {
+      const argvFile = path.join(scratch, "haven-argv.json");
+      const bin = path.join(scratch, "haven");
+      writeFileSync(
+        bin,
+        `#!/bin/sh\nprintf '%s\\n' "$@" > ${JSON.stringify(argvFile)}\nexit ${exitCode}\n`,
+        { encoding: "utf8", mode: 0o755 },
+      );
+      return { bin, argvFile };
+    }
+
+    /** @scenario "With haven installed the queue runs inside haven" */
+    it("hands the run to `haven slot run` and passes its exit code through", async () => {
+      const { bin, argvFile } = fakeHaven(7);
+      const result = await startRun("delegated", {
+        env: { CHECK_QUEUE_IMPL: undefined, HAVEN_BIN: bin },
+      }).done;
+
+      expect(result.code).toBe(7);
+      const argv = readFileSync(argvFile, "utf8").trim().split("\n");
+      expect(argv.slice(0, 2)).toEqual(["slot", "run"]);
+      expect(argv).toContain("--");
+      // The command reaches haven verbatim, after the `--`.
+      expect(argv[argv.indexOf("--") + 1]).toBe("node");
+    });
+
+    /** @scenario "Without haven the JavaScript queue still gates" */
+    it("falls back to the JS queue when the haven binary does not exist", async () => {
+      const result = await startRun("fallback", {
+        env: {
+          CHECK_QUEUE_IMPL: undefined,
+          HAVEN_BIN: path.join(scratch, "no-such-haven"),
+        },
+      }).done;
+
+      expect(result.code).toBe(0);
+      // The run went through the JS queue: it executed the command (the log
+      // has its events) rather than dying on the missing binary.
+      expect(readEvents().map((e) => e.event)).toEqual(["start", "end"]);
+    });
+
+    /** @scenario "The operator can force the JavaScript queue" */
+    it("never delegates when CHECK_QUEUE_IMPL is js", async () => {
+      const { bin, argvFile } = fakeHaven(7);
+      const result = await startRun("forced-js", {
+        env: { CHECK_QUEUE_IMPL: "js", HAVEN_BIN: bin },
+      }).done;
+
+      expect(result.code).toBe(0);
+      expect(() => readFileSync(argvFile, "utf8")).toThrow();
     });
   });
 });

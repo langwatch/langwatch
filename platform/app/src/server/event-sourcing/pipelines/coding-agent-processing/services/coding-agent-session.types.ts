@@ -88,6 +88,10 @@ export interface CodingAgentSessionData {
    *   - branch is LAST-WRITE-WINS. A session that starts on the default branch
    *     and cuts a feature branch mid-run belongs to the branch it ended on,
    *     which is the one its pull request comes from.
+   *   - `gitBranches` is the bounded first-seen set of EVERY branch reported,
+   *     the whole history the scalar above keeps only the present tense of. A
+   *     session that lands one change and moves on drove both branches, and
+   *     both of their pull requests.
    *   - title is LAST-NON-EMPTY-WINS, like every other regenerated label.
    *
    * Degradation, stated: agents with no companion emitter carry nulls here.
@@ -97,6 +101,7 @@ export interface CodingAgentSessionData {
   repositoryOwner: string | null;
   repositoryName: string | null;
   gitBranch: string | null;
+  gitBranches: string[];
   gitWorktree: string | null;
   title: string | null;
 

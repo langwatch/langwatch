@@ -756,6 +756,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{projectId}/analytics/query/clickhouse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run governed analytics SQL
+         * @description Executes one read-only ClickHouse SELECT over the governed analytics datasets and returns typed columns, rows, execution statistics, truncation state and diagnostics. The query runs as a restricted database identity scoped to the authenticated project. Diagnostics are advisory and never reject a query. An empty diagnostics list means no known issue was detected. It is not proof that the answer is the one you meant.
+         */
+        post: operations["postApiV1ProjectsByProjectIdAnalyticsQueryClickhouse"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/analytics/schema": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Discover the governed analytics schema
+         * @description Lists the governed analytics datasets this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join keys, partition-pruning time column, freshness and a runnable example query.
+         */
+        get: operations["getApiV1ProjectsByProjectIdAnalyticsSchema"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/coding-agent/sessions/{sessionId}/events": {
         parameters: {
             query?: never;
@@ -3391,7 +3431,7 @@ export interface paths {
         head?: never;
         /**
          * Update a webhook endpoint
-         * @description Update a webhook endpoint's url, event subscriptions, or status (`active` re-enables, `disabled` pauses; re-enabling does not re-send the gap, replay covers it)
+         * @description Update a webhook endpoint's address, event subscriptions, or status (`active` re-enables, `disabled` pauses; re-enabling does not re-send the gap, replay covers it). `destination_kind` cannot change: batches already planned against the old transport are in flight, so a move means a new endpoint alongside this one until it has drained.
          */
         patch: operations["patchApiWebhooksV1EndpointsById"];
         trace?: never;
@@ -4934,6 +4974,198 @@ export interface operations {
                         }[];
                         previousPeriod: {
                             [key: string]: unknown;
+                        }[];
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    postApiV1ProjectsByProjectIdAnalyticsQueryClickhouse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    sql: string;
+                    parameters?: {
+                        [key: string]: string | number | boolean | null;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description The query ran, and the result is scoped to the caller's project */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        columns: {
+                            name: string;
+                            type: string;
+                        }[];
+                        rows: {
+                            [key: string]: unknown;
+                        }[];
+                        statistics: {
+                            elapsedMs: number;
+                            rowsRead: number;
+                            bytesRead: number;
+                            rowsReturned: number;
+                        };
+                        truncated: boolean;
+                        diagnostics: {
+                            /** @enum {string} */
+                            code: "RESULT_TRUNCATED" | "POSSIBLE_FANOUT" | "UNBOUNDED_TIME_RANGE" | "MISSING_TIME_BUCKETS" | "INCOMPLETE_COMPARISON_PERIOD";
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                        }[];
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    getApiV1ProjectsByProjectIdAnalyticsSchema: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The governed schema, scoped to the caller's permissions */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        database: string;
+                        datasets: {
+                            name: string;
+                            description: string;
+                            grain: string;
+                            joinKeys: string[];
+                            timeColumn: string;
+                            freshness: string;
+                            columns: {
+                                name: string;
+                                type: string;
+                                description: string;
+                                /** @enum {string|null} */
+                                unit: "ms" | "USD" | "tokens" | "tokens/s" | null;
+                                gates: ("input" | "output" | "costs")[];
+                                available: boolean;
+                            }[];
+                            exampleSql: string;
                         }[];
                     };
                 };
@@ -9223,26 +9455,10 @@ export interface operations {
                         };
                         /**
                          * @default {
-                         *       "on": [
-                         *         "5xx",
-                         *         "timeout",
-                         *         "rate_limit_exceeded"
-                         *       ],
-                         *       "timeoutMs": 30000,
                          *       "maxAttempts": 3
                          *     }
                          */
                         fallback?: {
-                            /**
-                             * @default [
-                             *       "5xx",
-                             *       "timeout",
-                             *       "rate_limit_exceeded"
-                             *     ]
-                             */
-                            on?: ("5xx" | "timeout" | "rate_limit_exceeded" | "network_error" | "circuit_breaker")[];
-                            /** @default 30000 */
-                            timeoutMs?: number;
                             /** @default 3 */
                             maxAttempts?: number;
                         };
@@ -9649,26 +9865,10 @@ export interface operations {
                         };
                         /**
                          * @default {
-                         *       "on": [
-                         *         "5xx",
-                         *         "timeout",
-                         *         "rate_limit_exceeded"
-                         *       ],
-                         *       "timeoutMs": 30000,
                          *       "maxAttempts": 3
                          *     }
                          */
                         fallback?: {
-                            /**
-                             * @default [
-                             *       "5xx",
-                             *       "timeout",
-                             *       "rate_limit_exceeded"
-                             *     ]
-                             */
-                            on?: ("5xx" | "timeout" | "rate_limit_exceeded" | "network_error" | "circuit_breaker")[];
-                            /** @default 30000 */
-                            timeoutMs?: number;
                             /** @default 3 */
                             maxAttempts?: number;
                         };
@@ -20195,6 +20395,11 @@ export interface operations {
                         situation: string;
                         criteria: string[];
                         labels: string[];
+                        parameters: {
+                            name: string;
+                            description?: string;
+                            defaultValue?: string | number | boolean;
+                        }[];
                         /** Format: uri */
                         platformUrl: string;
                     }[];
@@ -20266,6 +20471,12 @@ export interface operations {
                     criteria?: string[];
                     /** @default [] */
                     labels?: string[];
+                    /** @description The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME. */
+                    parameters?: {
+                        name: string;
+                        description?: string;
+                        defaultValue?: string | number | boolean;
+                    }[];
                 };
             };
         };
@@ -20282,6 +20493,11 @@ export interface operations {
                         situation: string;
                         criteria: string[];
                         labels: string[];
+                        parameters: {
+                            name: string;
+                            description?: string;
+                            defaultValue?: string | number | boolean;
+                        }[];
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -20360,6 +20576,11 @@ export interface operations {
                         situation: string;
                         criteria: string[];
                         labels: string[];
+                        parameters: {
+                            name: string;
+                            description?: string;
+                            defaultValue?: string | number | boolean;
+                        }[];
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -20443,6 +20664,12 @@ export interface operations {
                     situation?: string;
                     criteria?: string[];
                     labels?: string[];
+                    /** @description The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME. */
+                    parameters?: {
+                        name: string;
+                        description?: string;
+                        defaultValue?: string | number | boolean;
+                    }[];
                 };
             };
         };
@@ -20459,6 +20686,11 @@ export interface operations {
                         situation: string;
                         criteria: string[];
                         labels: string[];
+                        parameters: {
+                            name: string;
+                            description?: string;
+                            defaultValue?: string | number | boolean;
+                        }[];
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -22292,6 +22524,10 @@ export interface operations {
             content: {
                 "application/json": {
                     idempotencyKey?: string;
+                    /** @description Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name. */
+                    parameters?: {
+                        [key: string]: string | number | boolean;
+                    };
                 };
             };
         };
@@ -23819,7 +24055,20 @@ export interface operations {
                     "application/json": {
                         data: {
                             id: string;
-                            url: string;
+                            /** @enum {string} */
+                            destination_kind: "http" | "sqs";
+                            url: string | null;
+                            sqs: {
+                                queue_url: string;
+                                region: string;
+                                account_id: string;
+                                queue_name: string;
+                                /** @enum {string} */
+                                credential_mode: "assume_role" | "static" | "ambient";
+                                role_arn: string | null;
+                                external_id: string | null;
+                                access_key_id: string | null;
+                            } | null;
                             enabled_events: string[];
                             /** @enum {string} */
                             status: "active" | "disabled";
@@ -23932,7 +24181,16 @@ export interface operations {
         requestBody?: {
             content: {
                 "application/json": {
-                    url: string;
+                    /** @enum {string} */
+                    destination_kind?: "http" | "sqs";
+                    url?: string;
+                    sqs?: {
+                        queue_url: string;
+                        role_arn?: string;
+                        external_id?: string;
+                        access_key_id?: string;
+                        secret_access_key?: string;
+                    };
                     enabled_events: string[];
                     max_batch_size?: number;
                     max_batch_delay_ms?: number;
@@ -23952,7 +24210,20 @@ export interface operations {
                     "application/json": {
                         data: {
                             id: string;
-                            url: string;
+                            /** @enum {string} */
+                            destination_kind: "http" | "sqs";
+                            url: string | null;
+                            sqs: {
+                                queue_url: string;
+                                region: string;
+                                account_id: string;
+                                queue_name: string;
+                                /** @enum {string} */
+                                credential_mode: "assume_role" | "static" | "ambient";
+                                role_arn: string | null;
+                                external_id: string | null;
+                                access_key_id: string | null;
+                            } | null;
                             enabled_events: string[];
                             /** @enum {string} */
                             status: "active" | "disabled";
@@ -24093,7 +24364,20 @@ export interface operations {
                     "application/json": {
                         data: {
                             id: string;
-                            url: string;
+                            /** @enum {string} */
+                            destination_kind: "http" | "sqs";
+                            url: string | null;
+                            sqs: {
+                                queue_url: string;
+                                region: string;
+                                account_id: string;
+                                queue_name: string;
+                                /** @enum {string} */
+                                credential_mode: "assume_role" | "static" | "ambient";
+                                role_arn: string | null;
+                                external_id: string | null;
+                                access_key_id: string | null;
+                            } | null;
                             enabled_events: string[];
                             /** @enum {string} */
                             status: "active" | "disabled";
@@ -24352,7 +24636,16 @@ export interface operations {
         requestBody?: {
             content: {
                 "application/json": {
+                    /** @enum {string} */
+                    destination_kind?: "http" | "sqs";
                     url?: string;
+                    sqs?: {
+                        queue_url?: string;
+                        role_arn?: string;
+                        external_id?: string;
+                        access_key_id?: string;
+                        secret_access_key?: string;
+                    };
                     enabled_events?: string[];
                     /** @enum {string} */
                     status?: "active" | "disabled";
@@ -24372,7 +24665,20 @@ export interface operations {
                     "application/json": {
                         data: {
                             id: string;
-                            url: string;
+                            /** @enum {string} */
+                            destination_kind: "http" | "sqs";
+                            url: string | null;
+                            sqs: {
+                                queue_url: string;
+                                region: string;
+                                account_id: string;
+                                queue_name: string;
+                                /** @enum {string} */
+                                credential_mode: "assume_role" | "static" | "ambient";
+                                role_arn: string | null;
+                                external_id: string | null;
+                                access_key_id: string | null;
+                            } | null;
                             enabled_events: string[];
                             /** @enum {string} */
                             status: "active" | "disabled";
@@ -24512,7 +24818,20 @@ export interface operations {
                     "application/json": {
                         data: {
                             id: string;
-                            url: string;
+                            /** @enum {string} */
+                            destination_kind: "http" | "sqs";
+                            url: string | null;
+                            sqs: {
+                                queue_url: string;
+                                region: string;
+                                account_id: string;
+                                queue_name: string;
+                                /** @enum {string} */
+                                credential_mode: "assume_role" | "static" | "ambient";
+                                role_arn: string | null;
+                                external_id: string | null;
+                                access_key_id: string | null;
+                            } | null;
                             enabled_events: string[];
                             /** @enum {string} */
                             status: "active" | "disabled";

@@ -28,7 +28,13 @@ export type LLMModelPricing = {
   inputCacheWrite1hPerToken?: number;
   imageCostPerToken?: number;
   imageOutputCostPerToken?: number;
+  // Audio token rates. `audioCostPerToken` is the INPUT side, the only one
+  // the upstream catalog carries; `audioOutputCostPerToken` is the output
+  // side, hand-curated in llmModels.overlay.json and otherwise derived at
+  // load time for OpenAI's audio families, which price it at twice the
+  // input rate.
   audioCostPerToken?: number;
+  audioOutputCostPerToken?: number;
   internalReasoningCostPerToken?: number;
   webSearchCostPerQuery?: number;
   // Audio pricing: TTS models bill per input character synthesized,

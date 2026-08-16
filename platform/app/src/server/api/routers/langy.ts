@@ -22,6 +22,7 @@ import {
   type LangyTurnContext,
   langyTurnContextSchema,
 } from "~/server/app-layer/langy/langyTurnContext.schema";
+import { abortableDelay } from "~/server/app-layer/langy/streaming/awaitTurnSettlement";
 import {
   createLangyTokenBuffer,
   type LangyStreamEntry,
@@ -216,25 +217,6 @@ async function canWatchTurn({
     userId,
   });
   return !!conv;
-}
-
-/**
- * Sleep for `ms`, resolving early to `false` when the signal aborts — so a
- * watcher loop unblocks promptly the moment its follow() ends — otherwise `true`.
- */
-function abortableDelay(ms: number, signal: AbortSignal): Promise<boolean> {
-  if (signal.aborted) return Promise.resolve(false);
-  return new Promise<boolean>((resolve) => {
-    const onAbort = () => {
-      clearTimeout(timer);
-      resolve(false);
-    };
-    const timer = setTimeout(() => {
-      signal.removeEventListener("abort", onAbort);
-      resolve(true);
-    }, ms);
-    signal.addEventListener("abort", onAbort, { once: true });
-  });
 }
 
 /** How often the settlement watcher consults the durable fold + heartbeat. */

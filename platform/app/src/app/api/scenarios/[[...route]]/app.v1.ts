@@ -8,6 +8,11 @@ import { requires, type SecuredApp } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { prisma } from "~/server/db";
 import { ScenarioNotFoundError } from "~/server/scenarios/errors";
+import {
+  parseScenarioParameterDefinitions,
+  scenarioParameterDefinitionSchema,
+  scenarioParameterDefinitionsSchema,
+} from "~/server/scenarios/parameters";
 import { ScenarioService } from "~/server/scenarios/scenario.service";
 import type { AuthMiddlewareVariables } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
@@ -23,17 +28,24 @@ const scenarioResponseSchema = z.object({
   situation: z.string(),
   criteria: z.array(z.string()),
   labels: z.array(z.string()),
+  parameters: z.array(scenarioParameterDefinitionSchema),
 });
 
 const scenarioResponseWithPlatformUrlSchema = scenarioResponseSchema.extend({
   platformUrl: z.string().url(),
 });
 
+const parametersDescription =
+  "The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME.";
+
 const createScenarioSchema = z.object({
   name: z.string().min(1, "name is required"),
   situation: z.string(),
   criteria: z.array(z.string()).optional().default([]),
   labels: z.array(z.string()).optional().default([]),
+  parameters: scenarioParameterDefinitionsSchema
+    .optional()
+    .describe(parametersDescription),
 });
 
 const updateScenarioSchema = z.object({
@@ -41,6 +53,9 @@ const updateScenarioSchema = z.object({
   situation: z.string().optional(),
   criteria: z.array(z.string()).optional(),
   labels: z.array(z.string()).optional(),
+  parameters: scenarioParameterDefinitionsSchema
+    .optional()
+    .describe(parametersDescription),
 });
 
 function toScenarioResponse(scenario: Scenario) {
@@ -50,10 +65,22 @@ function toScenarioResponse(scenario: Scenario) {
     situation: scenario.situation,
     criteria: scenario.criteria,
     labels: scenario.labels,
+    parameters: parseScenarioParameterDefinitions(scenario.parameters),
   };
 }
 
 export function registerScenarioRoutes(
+  secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
+): void {
+  registerListScenariosRoute(secured);
+  registerGetScenarioRoute(secured);
+  registerCreateScenarioRoute(secured);
+  registerUpdateScenarioRoute(secured);
+  registerDeleteScenarioRoute(secured);
+}
+
+/** List every scenario in the project. */
+function registerListScenariosRoute(
   secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
 ): void {
   secured.access(requires("scenarios:view")).get(
@@ -90,7 +117,12 @@ export function registerScenarioRoutes(
       );
     },
   );
+}
 
+/** Read one scenario by id. */
+function registerGetScenarioRoute(
+  secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
+): void {
   secured.access(requires("scenarios:view")).get(
     "/:id",
     describeRoute({
@@ -147,6 +179,12 @@ export function registerScenarioRoutes(
   // to honour, which is how an assistant scoped to exactly "read and create"
   // ended up unable to create anything. A viewer is unaffected: they keep the
   // read routes and are declined the write, as before.
+}
+
+/** Create a scenario. */
+function registerCreateScenarioRoute(
+  secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
+): void {
   secured.access(requires("scenarios:create")).post(
     "/",
     describeRoute({
@@ -177,6 +215,7 @@ export function registerScenarioRoutes(
         situation: body.situation,
         criteria: body.criteria,
         labels: body.labels,
+        ...(body.parameters !== undefined && { parameters: body.parameters }),
       });
 
       return c.json(
@@ -194,6 +233,12 @@ export function registerScenarioRoutes(
 
   // `:update` for the same reason as `:create` above — `:manage` still implies
   // it, so no existing caller changes.
+}
+
+/** Update a scenario in place. */
+function registerUpdateScenarioRoute(
+  secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
+): void {
   secured.access(requires("scenarios:update")).put(
     "/:id",
     describeRoute({
@@ -238,6 +283,7 @@ export function registerScenarioRoutes(
         ...(body.situation !== undefined && { situation: body.situation }),
         ...(body.criteria !== undefined && { criteria: body.criteria }),
         ...(body.labels !== undefined && { labels: body.labels }),
+        ...(body.parameters !== undefined && { parameters: body.parameters }),
       });
 
       return c.json({
@@ -254,6 +300,12 @@ export function registerScenarioRoutes(
   // refined because access issued at that grain was being refused; nothing is
   // asking to destroy scenarios at a finer grain, and the destructive verb is
   // the wrong place to widen who qualifies.
+}
+
+/** Archive a scenario. */
+function registerDeleteScenarioRoute(
+  secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
+): void {
   secured.access(requires("scenarios:manage")).delete(
     "/:id",
     describeRoute({

@@ -51,14 +51,53 @@ const occurredAtMs = z
   .min(Date.UTC(2020, 0, 1))
   .max(Date.UTC(2100, 0, 1));
 
+/**
+ * Every quantity a provider bills by, one named integer field each.
+ *
+ * Named rather than a generic map: a map kills the `sumIf` rollups, loses the
+ * per-field default, and turns a typo into a silently unpriced quantity. Every
+ * field defaults to zero, so a payload a previous gateway build wrote parses
+ * with the quantities it never knew about reading as none.
+ *
+ * `input_audio_tokens` and `output_audio_tokens` are DISJOINT from
+ * `input_tokens` and `output_tokens`: the gateway takes them out of the
+ * provider's totals before emitting, because audio tokens price several times
+ * higher and charging both would double the audio portion.
+ * `reasoning_tokens` is the exception and stays a subset of `output_tokens`,
+ * reported for display and never priced.
+ *
+ * `audio_ms` is whole milliseconds. Money is integer nano-USD and quantities
+ * are integers with it; the one division by 1000 happens at the rating seam.
+ */
 export const spendUsageSchema = z.object({
   input_tokens: z.number().int().min(0).default(0),
   output_tokens: z.number().int().min(0).default(0),
   cache_read_input_tokens: z.number().int().min(0).default(0),
   cache_creation_input_tokens: z.number().int().min(0).default(0),
+  cache_creation_1h_tokens: z.number().int().min(0).default(0),
   reasoning_tokens: z.number().int().min(0).default(0),
+  input_audio_tokens: z.number().int().min(0).default(0),
+  output_audio_tokens: z.number().int().min(0).default(0),
+  /** Characters synthesized, what TTS is priced by. */
+  input_chars: z.number().int().min(0).default(0),
+  /** Audio duration in whole milliseconds. */
+  audio_ms: z.number().int().min(0).default(0),
 });
 export type SpendUsage = z.infer<typeof spendUsageSchema>;
+
+/** Every quantity at zero: what a request that measured nothing carries. */
+export const EMPTY_SPEND_USAGE: SpendUsage = {
+  input_tokens: 0,
+  output_tokens: 0,
+  cache_read_input_tokens: 0,
+  cache_creation_input_tokens: 0,
+  cache_creation_1h_tokens: 0,
+  reasoning_tokens: 0,
+  input_audio_tokens: 0,
+  output_audio_tokens: 0,
+  input_chars: 0,
+  audio_ms: 0,
+};
 
 export const admitSpendWireSchema = z.object({
   gateway_request_id: boundedId,
@@ -140,13 +179,7 @@ export const failSpendWireSchema = z.object({
     http_status: z.number().int().min(0).max(599).default(0),
   }),
   /** Partial usage when the failure happened after tokens were consumed. */
-  usage: spendUsageSchema.default({
-    input_tokens: 0,
-    output_tokens: 0,
-    cache_read_input_tokens: 0,
-    cache_creation_input_tokens: 0,
-    reasoning_tokens: 0,
-  }),
+  usage: spendUsageSchema.default(EMPTY_SPEND_USAGE),
   duration_ms: z.number().int().min(0).default(0),
 });
 

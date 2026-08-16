@@ -8,15 +8,15 @@ sidebarTitle: Anthropic Compliance
 
 `claude_compliance` polls Anthropic's compliance API with a workspace API key. Today the source can be created and the workspace API key is persisted server-side, but the cron worker that calls Anthropic hasn't shipped, events do not flow yet.
 
-This page documents the configuration contract so admins can pre-stage workspace keys; the matching adapter is on the [roadmap](/ai-governance/ingestion-sources/index#adapter-roadmap).
+The configuration contract below lets admins pre-stage workspace keys; the matching adapter is on the [roadmap](/ai-governance/ingestion-sources/index#adapter-roadmap).
 
 ## Currently implemented
 
-- **CRUD:** the source can be created via the admin composer at `/settings/governance/ingestion-sources` and via `api.ingestionSources.create`. It will appear in `langwatch ingest list` with status `awaiting_first_event`.
+- **CRUD:** the source can be created via the admin composer at `/settings/governance/ingestion-sources` and via `api.ingestionSources.create`. It appears in `langwatch ingest list` with status `awaiting_first_event`.
 - **Receiver:** none. There is no `/api/ingest/claude-compliance/:id` endpoint and the OTLP, webhook receivers reject `claude_compliance` sources with `400 wrong_endpoint`.
 - **Poller:** none.
 - **Normaliser:** none.
-- **Status flip:** the source will stay `awaiting_first_event` indefinitely until the poller ships.
+- **Status flip:** the source stays `awaiting_first_event` indefinitely until the poller ships.
 
 ## What the admin configures upstream
 

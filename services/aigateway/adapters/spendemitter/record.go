@@ -14,6 +14,8 @@ package spendemitter
 
 import (
 	"encoding/json"
+	"log/slog"
+	"math"
 
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
@@ -34,15 +36,34 @@ type Record struct {
 	PodSeq  uint64          `json:"pod_seq"`
 }
 
-// UsagePayload is the token-class breakdown carried by confirm and fail
-// payloads. Token counts only: rating happens in the pipeline, so cost
+// UsagePayload is the billable-quantity breakdown carried by confirm and
+// fail payloads. Quantities only: rating happens in the pipeline, so cost
 // never travels on this wire.
+//
+// Every quantity a provider bills by belongs here, not only token classes.
+// A character-priced or second-priced call whose quantities stop at this
+// struct is rated at zero and debits nothing.
+//
+// InputAudioTokens and OutputAudioTokens are DISJOINT from InputTokens and
+// OutputTokens (domain.Usage.SplitAudioTokens makes them so), because they
+// price at their own, much higher, rate. CacheReadTokens and
+// CacheCreationTokens are disjoint from InputTokens for the same reason
+// (domain.Usage.BillableInputTokens takes them out), and the customer span
+// states the identical split. ReasoningTokens is the one exception: it stays
+// a subset of OutputTokens, is reported for display, and is never priced.
 type UsagePayload struct {
-	InputTokens         int `json:"input_tokens"`
-	OutputTokens        int `json:"output_tokens"`
-	CacheReadTokens     int `json:"cache_read_input_tokens"`
-	CacheCreationTokens int `json:"cache_creation_input_tokens"`
-	ReasoningTokens     int `json:"reasoning_tokens"`
+	InputTokens           int `json:"input_tokens"`
+	OutputTokens          int `json:"output_tokens"`
+	CacheReadTokens       int `json:"cache_read_input_tokens"`
+	CacheCreationTokens   int `json:"cache_creation_input_tokens"`
+	CacheCreation1hTokens int `json:"cache_creation_1h_tokens"`
+	ReasoningTokens       int `json:"reasoning_tokens"`
+	InputAudioTokens      int `json:"input_audio_tokens"`
+	OutputAudioTokens     int `json:"output_audio_tokens"`
+	InputChars            int `json:"input_chars"`
+	// Audio duration in whole MILLISECONDS. Every quantity on this wire is
+	// an integer, and the rating seam divides by 1000 once.
+	AudioMS int `json:"audio_ms"`
 }
 
 // AdmittedPayload records that a request entered the gateway: identity and
@@ -103,15 +124,40 @@ type ErrorPayload struct {
 	HTTPStatus int    `json:"http_status"`
 }
 
-// usageFromDomain maps the gateway's measured usage onto the wire payload.
-// reasoning is passed separately because domain.Usage does not carry a
-// reasoning-token count today.
-func usageFromDomain(u domain.Usage, reasoning int) UsagePayload {
+// usageFromDomain maps every measured quantity onto the wire payload.
+func usageFromDomain(u domain.Usage) UsagePayload {
 	return UsagePayload{
-		InputTokens:         u.PromptTokens,
-		OutputTokens:        u.CompletionTokens,
-		CacheReadTokens:     u.CacheReadTokens,
-		CacheCreationTokens: u.CacheCreationTokens,
-		ReasoningTokens:     reasoning,
+		InputTokens:           u.BillableInputTokens(),
+		OutputTokens:          u.CompletionTokens,
+		CacheReadTokens:       u.CacheReadTokens,
+		CacheCreationTokens:   u.CacheCreationTokens,
+		CacheCreation1hTokens: u.CacheCreation1hTokens,
+		ReasoningTokens:       u.ReasoningTokens,
+		InputAudioTokens:      u.InputAudioTokens,
+		OutputAudioTokens:     u.OutputAudioTokens,
+		InputChars:            u.InputChars,
+		AudioMS:               audioMillis(u.AudioSeconds),
 	}
+}
+
+// maxAudioSeconds bounds a single call's audio duration. A day of audio in
+// one request is a corrupt measure, and at the highest per-second rate in
+// the catalog it would rate a five-figure charge.
+const maxAudioSeconds = 24 * 60 * 60
+
+// audioMillis converts a measured duration to whole milliseconds, rounding
+// half up. Anything that is not a plausible duration becomes zero and is
+// logged: an unrateable quantity is a missing charge, which shows up in the
+// spend surface, while a garbage one is a wrong charge, which does not.
+func audioMillis(seconds float64) int {
+	if seconds == 0 {
+		return 0
+	}
+	if math.IsNaN(seconds) || math.IsInf(seconds, 0) ||
+		seconds < 0 || seconds > maxAudioSeconds {
+		slog.Warn("spend emitter dropped an implausible audio duration",
+			"audio_seconds", seconds)
+		return 0
+	}
+	return int(math.Round(seconds * 1000))
 }

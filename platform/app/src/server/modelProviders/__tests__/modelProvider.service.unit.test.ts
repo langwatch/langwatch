@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { KEY_CHECK, MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
+import { MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
+import { isSecretCredentialField } from "../../../utils/modelProviderHelpers";
 import { mergeStoredCustomKeys } from "../credentialMerge";
 
 /**
@@ -7,14 +8,16 @@ import { mergeStoredCustomKeys } from "../credentialMerge";
  * These test the pure transformation functions and business rules.
  */
 
-// Test the key masking logic (extracted for testing)
+// Mirrors ModelProviderService.maskRowCustomKeys. It calls the real
+// classifier rather than restating the rule, so a change to what counts as a
+// secret reaches these expectations instead of passing against a stale copy.
 function maskApiKeys(
   customKeys: Record<string, unknown>,
 ): Record<string, unknown> {
   return Object.fromEntries(
     Object.entries(customKeys).map(([key, value]) => [
       key,
-      KEY_CHECK.some((k) => key.includes(k)) ? MASKED_KEY_PLACEHOLDER : value,
+      isSecretCredentialField(key) ? MASKED_KEY_PLACEHOLDER : value,
     ]),
   );
 }
@@ -49,12 +52,25 @@ function shouldKeepModelProvider(
 describe("ModelProviderService business logic", () => {
   describe("mergeStoredCustomKeys", () => {
     describe("given a row with nothing worth keeping", () => {
-      it("returns an empty bag when the write carries no credentials", () => {
+      it("drops visible configuration when the write carries no credentials", () => {
+        // A base URL is shown back, so a write that omits it is stating the
+        // configuration in full and the stored value goes.
         const result = mergeStoredCustomKeys({
           incoming: null,
-          stored: { existing: "value" },
+          stored: { OPENAI_BASE_URL: "https://old-url.com" },
         });
         expect(result).toEqual({});
+      });
+
+      it("keeps a stored secret the write never names", () => {
+        // The other half of the same rule. A secret is masked on read, so no
+        // caller can resend one it did not type, and omitting it cannot mean
+        // "delete it".
+        const result = mergeStoredCustomKeys({
+          incoming: null,
+          stored: { CODEX_ACCESS_TOKEN: "stored-token" },
+        });
+        expect(result).toEqual({ CODEX_ACCESS_TOKEN: "stored-token" });
       });
 
       it("returns the write untouched when the row is empty", () => {
@@ -192,7 +208,7 @@ describe("ModelProviderService business logic", () => {
 
   describe("maskApiKeys", () => {
     /** @scenario API key masking when editing existing provider */
-    it("masks fields containing KEY", () => {
+    it("masks the API key and leaves the base URL visible", () => {
       const customKeys = {
         OPENAI_API_KEY: "sk-actual-key",
         OPENAI_BASE_URL: "https://api.openai.com",
@@ -218,18 +234,32 @@ describe("ModelProviderService business logic", () => {
       expect(result.AWS_REGION_NAME).toBe("us-east-1");
     });
 
-    it("does not mask GOOGLE_APPLICATION_CREDENTIALS", () => {
+    it("masks the Vertex AI service account document", () => {
       const customKeys = {
         GOOGLE_APPLICATION_CREDENTIALS: "/path/to/credentials.json",
       };
 
       const result = maskApiKeys(customKeys);
 
-      // GOOGLE_APPLICATION_CREDENTIALS contains "CREDENTIALS" not "KEY"
-      // so it should be masked based on KEY_CHECK patterns
       expect(result.GOOGLE_APPLICATION_CREDENTIALS).toBe(
         MASKED_KEY_PLACEHOLDER,
       );
+    });
+
+    it("masks an OAuth token set whose fields are not named as keys", () => {
+      const customKeys = {
+        CODEX_ACCESS_TOKEN: "token-value",
+        CODEX_REFRESH_TOKEN: "refresh-value",
+        CODEX_ID_TOKEN: "id-value",
+        CODEX_EMAIL: "person@example.com",
+        CODEX_PLAN: "pro",
+      };
+
+      const result = maskApiKeys(customKeys);
+
+      for (const field of Object.keys(customKeys)) {
+        expect(result[field]).toBe(MASKED_KEY_PLACEHOLDER);
+      }
     });
 
     it("handles empty object", () => {

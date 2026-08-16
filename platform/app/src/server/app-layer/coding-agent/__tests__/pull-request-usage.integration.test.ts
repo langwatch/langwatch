@@ -286,6 +286,7 @@ beforeAll(async () => {
         prCreatedAt: new Date(Date.now() - 5 * HOUR),
         prClosedAt: null,
         prMergedAt: null,
+        prUpdatedAt: new Date(Date.now() - 5 * HOUR),
       },
     ],
   });
@@ -407,7 +408,7 @@ const query = () => ({
 
 describe("pull request usage", () => {
   describe("given mapped pull requests with sessions attached across their lifetimes", () => {
-    /** @scenario "The page rolls up sessions, tokens and cost per pull request" */
+    /** @scenario "The page rolls up tokens and cost per pull request" */
     it("reports the sessions count, tokens and assistant cost over the whole lifetime", async () => {
       const usage = await service.getPullRequestUsage({
         ...query(),
@@ -512,7 +513,7 @@ describe("pull request usage", () => {
   });
 
   describe("given a session whose remote was reported with the host's own casing", () => {
-    /** @scenario "The page rolls up sessions, tokens and cost per pull request" */
+    /** @scenario "The page rolls up tokens and cost per pull request" */
     it("rolls it up all the same", async () => {
       const usage = await service.getPullRequestUsage({
         ...query(),

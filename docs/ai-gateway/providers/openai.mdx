@@ -4,7 +4,7 @@ description: Configure OpenAI as a provider behind the LangWatch AI Gateway.
 sidebarTitle: OpenAI
 ---
 
-OpenAI is the most straightforward provider to bind to the gateway. Any valid OpenAI API key in your LangWatch Model Providers table can be referenced by a virtual key and consumed via `/v1/chat/completions`, `/v1/embeddings`, `/v1/responses`, `/v1/images/generations`, `/v1/audio/transcriptions`, and `/v1/audio/speech`.
+OpenAI needs only an API key to bind to the gateway. Any valid OpenAI API key in your LangWatch Model Providers table can be referenced by a virtual key and consumed via `/v1/chat/completions`, `/v1/embeddings`, `/v1/responses`, `/v1/images/generations`, `/v1/audio/transcriptions`, and `/v1/audio/speech`.
 
 ## Configure the provider credential
 
@@ -42,7 +42,7 @@ Per-VK overrides available on the binding:
 
 ## Caching
 
-OpenAI automatically caches prompt prefixes ≥ 1024 tokens in most GPT-4, GPT-5, o-series models. There's no `cache_control` block to preserve, OpenAI just handles it. The gateway forwards requests untouched in `mode=respect`, so cache hits are observed naturally.
+OpenAI automatically caches prompt prefixes ≥ 1024 tokens. Support varies by model within the GPT-4, GPT-5, and o-series families. There's no `cache_control` block to preserve, OpenAI handles it upstream. The gateway forwards requests untouched in `mode=respect`, so cache hits are observed naturally.
 
 The `usage.prompt_tokens_details.cached_tokens` field in the response is populated on cache hits and mirrored into the trace as `gen_ai.usage.cache_read.input_tokens` (OTel GenAI semconv). OpenAI has no write-to-cache dimension, so `gen_ai.usage.cache_creation.input_tokens` is unset.
 
@@ -54,4 +54,4 @@ Reasoning models return a `reasoning_tokens` count in `usage.completion_tokens_d
 
 - **Responses API vs Chat Completions API**: the two have slightly different payload shapes. The gateway proxies whichever endpoint the client hits; it does not translate between them. Codex users should see [Codex CLI](/ai-gateway/cli/codex) for guidance on `wire_api` config.
 - **Organization header on egress**: if the VK doesn't set a custom Organization, the upstream OpenAI request uses the ModelProvider's default.
-- **Rate-limit responses (429)**: OpenAI's 429 includes a `Retry-After` header the gateway surfaces to the client when there is no fallback, or uses as a signal to trigger fallback if `fallback.on` includes `rate_limit`.
+- **Rate-limit responses (429)**: a 429 moves to the next credential in the VK's [fallback chain](/ai-gateway/providers/fallback-chains). When the chain is used up, or the VK has no chain, the gateway sends OpenAI's `Retry-After` header to the client as is.

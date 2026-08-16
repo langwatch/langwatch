@@ -35,7 +35,7 @@ If anything fails or confuses you while following this skill (broken commands, d
 langwatch trace search --limit 25 --start-date "$(date -u -Iseconds -d '7 days ago')" --format json
 ```
 
-(Widen or narrow the window as needed — the CLI accepts ISO strings for `--start-date`.)
+(Widen or narrow the window as needed. The CLI accepts ISO strings for `--start-date`.)
 
 For each trace, ask:
 

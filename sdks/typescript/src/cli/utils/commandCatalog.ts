@@ -70,8 +70,7 @@ export const PLUMBING_COMMANDS: ReadonlySet<string> = new Set([
   // control-plane relay to intercept and move the user's browser — it fetches
   // no platform data and returns no result of its own.
   "navigate",
-  "init-shell",
-  "request-increase",
+  "instrument",
   // Local status + documentation fetchers.
   "status",
   "docs",

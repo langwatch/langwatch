@@ -364,3 +364,41 @@ func TestProviderSlotToCredential_GeminiAgentPlatform(t *testing.T) {
 		assert.Empty(t, cred.Extra["project_id"])
 	})
 }
+
+// The older side of a half-done deploy still sends "on" and "timeout_ms".
+// Neither was ever read, so ignoring them has to be a decode-time non-event:
+// the key keeps the attempt budget its operator configured, and the request is
+// served. Refusing the payload instead would take traffic down for the window
+// where the two sides disagree.
+//
+// @scenario "A key keeps serving while a deploy is half done"
+func TestConfigWire_RetiredFallbackKeysStillDecode(t *testing.T) {
+	payload := []byte(`{
+		"routing_mode": "fallback_all",
+		"fallback": {
+			"on": ["5xx", "timeout", "rate_limit_exceeded"],
+			"chain": ["pc_openai", "pc_anthropic"],
+			"timeout_ms": 30000,
+			"max_attempts": 3
+		}
+	}`)
+
+	var wire configWire
+	require.NoError(t, json.Unmarshal(payload, &wire))
+
+	cfg := wire.toDomain()
+	assert.Equal(t, 3, cfg.Fallback.MaxAttempts)
+	assert.Equal(t, []string{"pc_openai", "pc_anthropic"}, wire.Fallback.Chain)
+}
+
+// A control plane that has already dropped the keys is the other direction of
+// the same deploy, and must decode identically.
+func TestConfigWire_FallbackWithoutRetiredKeysDecodes(t *testing.T) {
+	payload := []byte(`{"routing_mode":"fallback_all","fallback":{"chain":["pc_openai"],"max_attempts":2}}`)
+
+	var wire configWire
+	require.NoError(t, json.Unmarshal(payload, &wire))
+
+	cfg := wire.toDomain()
+	assert.Equal(t, 2, cfg.Fallback.MaxAttempts)
+}

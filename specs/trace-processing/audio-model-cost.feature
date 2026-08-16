@@ -41,10 +41,31 @@ Feature: Audio model cost computation
 
     @unit
     Scenario: gpt-4o-transcribe bills at its own audio rate, not gpt-4o's chat rate
-      Given a transcription call on gpt-4o-transcribe that also reports token usage
+      Given a transcription call on gpt-4o-transcribe that reports audio and output tokens
       When its trace is processed
-      Then the cost comes from the transcribe model's per-second rate
+      Then the cost comes from the transcribe model's own token rates
       And none of it comes from gpt-4o's chat token rates
+
+    @unit
+    Scenario: the duration-priced transcribe model bills by the second
+      Given a transcription call on a model that reports a duration and no tokens
+      When its trace is processed
+      Then the cost equals the seconds times the model's per-second rate
+
+    @unit
+    Scenario: each transcribe model matches its own rate, not a shorter neighbour's
+      Given transcribe model ids that start with one another
+      When each one is priced
+      Then every id lands on the rate published for that model
+
+  Rule: Audio tokens are priced apart from text tokens
+
+    @unit
+    Scenario: an audio turn costs the audio rate on the trace, not the text rate
+      Given a span reporting audio tokens beside its text token totals
+      When its trace is processed
+      Then each bucket is priced at its own rate
+      And the same tokens priced flat at the text rate cost less
 
   Rule: Audio models stay out of chat and embedding pickers
 

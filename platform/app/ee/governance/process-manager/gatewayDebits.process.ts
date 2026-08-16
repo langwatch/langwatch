@@ -115,7 +115,12 @@ export const writeGatewayDebitsSchema = z.object({
       output_tokens: z.number().int().min(0),
       cache_read_input_tokens: z.number().int().min(0),
       cache_creation_input_tokens: z.number().int().min(0),
+      cache_creation_1h_tokens: z.number().int().min(0).default(0),
       reasoning_tokens: z.number().int().min(0),
+      input_audio_tokens: z.number().int().min(0).default(0),
+      output_audio_tokens: z.number().int().min(0).default(0),
+      input_chars: z.number().int().min(0).default(0),
+      audio_ms: z.number().int().min(0).default(0),
     })
     .nullable(),
   /** The price the outcome event carried, in integer nano-USD. */
@@ -195,12 +200,20 @@ function buildDebitRows(
   budgets: ResolvedBudget[],
   providerKey: string | null,
 ): BudgetDebitRow[] {
+  // The ledger stores money and the four token classes its panels display;
+  // the quantities the spend record gained do not travel here, because
+  // AmountNanoUSD already carries what they priced to.
   const usage = payload.usage ?? {
     input_tokens: 0,
     output_tokens: 0,
     cache_read_input_tokens: 0,
     cache_creation_input_tokens: 0,
+    cache_creation_1h_tokens: 0,
     reasoning_tokens: 0,
+    input_audio_tokens: 0,
+    output_audio_tokens: 0,
+    input_chars: 0,
+    audio_ms: 0,
   };
   // The outcome was priced once, as an integer. It stays one all the way to
   // the ledger: dividing by 1e9 to six decimals here rounded every debit to
@@ -387,12 +400,20 @@ function movedNothing(outcome: SpendOutcome): boolean {
   if (outcome.data.cost_nano_usd !== 0) return false;
   const usage = outcome.data.usage;
   if (!usage) return true;
+  // Every quantity, not only the token classes: a character-priced call that
+  // rated at zero because its model has no rate still burned 4000 characters,
+  // and dropping it here would hide it from the budget's activity panel.
   return (
     usage.input_tokens === 0 &&
     usage.output_tokens === 0 &&
     usage.cache_read_input_tokens === 0 &&
     usage.cache_creation_input_tokens === 0 &&
-    usage.reasoning_tokens === 0
+    usage.cache_creation_1h_tokens === 0 &&
+    usage.reasoning_tokens === 0 &&
+    usage.input_audio_tokens === 0 &&
+    usage.output_audio_tokens === 0 &&
+    usage.input_chars === 0 &&
+    usage.audio_ms === 0
   );
 }
 

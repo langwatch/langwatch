@@ -124,6 +124,63 @@ Feature: Billing spend events, one durable record per gateway request
       And no cost field exists anywhere in it
 
     @unit
+    Scenario: The confirm command carries every billable quantity, not only token classes
+      Given a request a provider bills by characters, seconds, or audio tokens
+      When the gateway confirms it
+      Then the payload carries that quantity beside the token classes
+      And audio tokens are stated apart from the text totals they came out of
+      And a text-only request carries the same token counts it always did
+
+    # A provider reports one prompt total that already holds the tokens it
+    # served from its cache. The rating seam prices the cache buckets on top of
+    # the input bucket, so a total shipped whole charges every cached token
+    # twice: once at the input rate and once at its own. On a model whose cache
+    # read costs a tenth of its input, that is eleven times the published rate.
+    # The customer span already states the split; the spend record has to state
+    # the same one or a trace and its bill disagree.
+
+    @unit
+    Scenario: The confirm command states the cached tokens apart from the input it charges at the input rate
+      Given a request whose prompt was mostly served from the provider's cache
+      When the gateway confirms it
+      Then the input token count is the non-cached remainder
+      And the cache-read and cache-write counts travel beside it
+      And a request with no cache activity carries the full prompt as input
+      And the count matches the one the customer span reports
+
+    @unit
+    Scenario: A quantity added to the vocabulary defaults on records written before it
+      Given a confirmation recorded before a quantity existed
+      When it is read back
+      Then the missing quantity reads as zero
+      And the record parses instead of failing
+
+  Rule: A request the catalog cannot price says so
+
+    A zero charge on a request that burned something is a catalog fault, and
+    it looks exactly like a free request on the record. Rating is the only
+    place both faults are visible: the model has no entry at all, or it has
+    an entry that prices none of the quantities the request reported.
+
+    @unit
+    Scenario: A rule that prices none of the reported quantities is reported
+      Given a model whose rate covers a quantity the request did not carry
+      When the request rates at zero
+      Then the model, the rate identity and the quantities it did carry are stated
+
+    @unit
+    Scenario: A model with no entry at all is reported
+      Given a model the catalog does not carry
+      When the request rates at zero
+      Then the miss is stated once, not twice
+
+    @unit
+    Scenario: A request that measured nothing is not a fault
+      Given a request that reported no quantity of any kind
+      When it rates at zero
+      Then nothing is reported, because zero is the right answer
+
+    @unit
     Scenario: The failed payload keeps the full error taxonomy
       When a fail command is serialized
       Then the error class and http status ride verbatim

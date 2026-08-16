@@ -56,8 +56,9 @@ One name per command, one meaning per flag, no aliases (ADR-064). The daily
 surface is six verbs; `db` and `clean` are the only destructive nouns.
 
 ```text
-haven            the hub: every stack + actions on the selected one (agents/pipes
-                 get the plain status report)
+haven            the hub: the whole machine — stacks, worktrees, RAM by owner,
+                 the daemon's reaping — with actions on the selected row
+                 (agents/pipes get the plain status report)
 haven up         start or reconcile this worktree's stack — in a terminal it
                  runs in the BACKGROUND under an attached log view: ←/→/tab/digits
                  switch between "all" and per-service logs, q detaches (the stack
@@ -103,6 +104,11 @@ haven switch     print a worktree's dir by name; with `eval "$(haven shell-init)
                  it becomes a real cd, tab-completed
 haven shell-init emit that shell function + completion
 haven hmr        AI-gated HMR: `on [--ttl 30s]` defers Vite reloads, `off` resumes
+haven slot       run any command under the machine-wide check slot:
+                 `slot run [--label <l>] -- <cmd> [args…]` waits for a slot,
+                 runs with stdio passed through, releases; `slot explain`
+                 prints the resolved limit. check-queue.mjs delegates every
+                 whole-repo check here when haven is installed
 haven typecheck  pnpm typecheck under a machine-wide RAM slot
 haven upgrade    reinstall the haven binary from this checkout
 haven help       exhaustive, copy-pasteable reference
@@ -128,13 +134,28 @@ size-capped files whether the stack runs attached or detached — so `haven
 logs` works from any terminal, filters by plain argument, and still reads
 after a crash or a `down`.
 
-**The hub.** Bare `haven` opens the interactive fleet view:
-every stack with its liveness, branch, service health, and RAM footprint.
-Actions run on the selected stack — enter/`g` opens its git view (and returns
-to the hub on quit), `d` shuts it down keeping its databases, and `x` destroys
-the worktree entirely: stack stopped, ClickHouse + Postgres databases dropped,
-directory deleted, confirmed by typing the stack's name. The primary checkout
-and the worktree haven runs from can never be destroyed.
+**The hub.** Bare `haven` opens the interactive machine view. The header is
+the machine's real memory picture from one process listing, every process
+attributed once: each stack charged its whole process **tree** (supervised
+children lead their own process groups, so a group sum sees only the ~20MB
+launcher), the shared servers (ClickHouse, Postgres, Redis, the container VM),
+the coding agents and dev tooling beside them, and everything that is not dev
+work as its own colour in the chart — with the daemon's pressure level when it
+is not green. Below it, every stack (liveness, branch, service health, RAM);
+idle worktrees stay collapsed behind `t` while stacks run and show by default
+otherwise. Actions run on the selected row — enter/`g` opens its git view (and
+returns to the hub on quit), `o` opens the stack's app, `r` restarts it, `d`
+shuts it down keeping its databases, and `x` destroys the worktree entirely:
+stack stopped, ClickHouse + Postgres databases dropped, directory deleted,
+confirmed by typing the name. The primary checkout and the worktree haven runs
+from can never be destroyed. One-key handoffs: `c` opens the interactive
+cleanup picker and returns, `w` opens the machine's web dashboard, and `m`
+toggles the monitor panel — the shared servers' footprints plus the daemon's
+recent reaping (stacks, test containers, governed processes, idle databases),
+newest first, from the persisted event record. The web dashboard
+(`langwatch.localhost`) shows the same machine: the memory chart, the stack
+cards (their own services only — the shared servers are stated once), the idle
+worktrees, and the reaping feed.
 
 **Seeding.** `haven db seed` reseeds in place — an idempotent upsert that can
 only add or refresh, never discard — and `haven db reset` is the destructive
@@ -239,7 +260,34 @@ registry, and dashboard stay the same.
   no zero-copy). The server lifecycle is automatic; `haven db url clickhouse`
   prints this stack's URL, `haven db reset` gives it a fresh database, and the
   daemon prunes databases whose worktree hasn't been up for `HAVEN_DB_TTL`
-  (default 14 days).
+  (default 4 days). `LANGWATCH_HAVEN_CH_STOP_IDLE=1` additionally stops the
+  server once no stack is running (opt-in: native-mode tests and
+  `haven db url clickhouse` reach it with no stack up) — the next `up`
+  restarts it over the same data in seconds.
+- **tsgo can never take the machine down.** The daemon watches every tsgo
+  process on the machine — however it was spawned — and reclaims runaways: a
+  whole-tree run past `HAVEN_TSGO_RUN_MAX_RSS_MB` (default 12 GiB), a language
+  server past `HAVEN_TSGO_LSP_MAX_RSS_MB` (default 4 GiB) or idle past
+  `HAVEN_TSGO_LSP_IDLE_TTL` (default 45m), and — over
+  `HAVEN_TSGO_TOTAL_BUDGET_MB` (default two thirds of RAM, never below the
+  per-run ceiling) — the youngest run
+  until the rest fits. The check queue also sets `GOMEMLIMIT` on the runs it
+  spawns so the common case degrades to "slower", not "10 GiB resident". The
+  same watch observes gopls, biome, vitest workers, node, bun and claude
+  agents (never touched — observed only) and ships every class's footprint to
+  the local Grafana as `haven_proc_*` metrics. See
+  `dev/docs/adr/095-haven-tsgo-governor.md`.
+- **Leaked test containers are reaped.** An interrupted integration-test run
+  leaves its Testcontainers (a stray ClickHouse, a Redis) running in the shared
+  VM forever — the library's own reaper (Ryuk) dies with the run, and reused
+  containers are skipped by it entirely. The daemon removes
+  Testcontainers-labelled containers: terminally stopped ones (exited or dead)
+  older than `HAVEN_TESTCONTAINER_TTL` (default 10m; 0 disables the sweep),
+  every other state only past the greater of that and `HAVEN_TESTCONTAINER_RUNNING_TTL`
+  (default 2h) since a running (or paused, or mid-restart) container may still
+  be serving a live run whatever its age. Ryuk itself is never touched, and the
+  sweep never boots the VM just to clean it. See
+  `specs/setup/haven-testcontainer-reaper.feature`.
 - **Always migrate + seed, fully static identity.** Every `up` migrates *and*
   seeds idempotently. Nothing about the local dev identity is ever randomly
   generated — the same admin login, org/team/project/user IDs, and API

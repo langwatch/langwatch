@@ -43,6 +43,28 @@ export const fallbackName = (profile: Record<string, any>): string => {
 };
 
 /**
+ * True when an Auth0 `sub` identifies a user who authenticated through a SAML
+ * connection. Auth0 encodes the connection strategy as the first
+ * pipe-delimited segment of `sub` (`{strategy}|{connection}|{id}`); SAML
+ * users arrive as `samlp|…`. The trailing pipe is part of the prefix so a
+ * hypothetical `samlpx` strategy never matches, and the prefix cannot be
+ * forged from other connection types — a database user_id of `samlp|x`
+ * yields the sub `auth0|samlp|x`.
+ *
+ * Used to mark SAML sign-ins as email-verified (ADR-096): Auth0 reports
+ * `email_verified: false` for every SAML connection with no way to change
+ * it, which would block BetterAuth from linking the sign-in to an existing
+ * user. Trust boundary: this assumes every SAML connection in the Auth0
+ * tenant maps `email` from an attribute the IdP controls — an operator who
+ * points a SAML connection at an IdP with user-editable emails or open
+ * registration re-opens the account-linking hole this flag closes.
+ *
+ * Exported for unit testing.
+ */
+export const isSamlSub = (sub: unknown): boolean =>
+  typeof sub === "string" && sub.startsWith("samlp|");
+
+/**
  * Subset of env needed to select and configure a `socialProviders` entry.
  */
 type SocialProviderEnv = Pick<
@@ -401,6 +423,12 @@ export const buildGenericOAuthConfigs = (
         name: fallbackName(profile),
         email: profile.email,
         image: profile.picture,
+        // SAML sign-ins count as verified: the email was asserted by the
+        // organization's own IdP, but Auth0 reports `email_verified: false`
+        // for every SAML connection, which would stop BetterAuth from
+        // linking to an existing user (ADR-096). Non-SAML profiles get no
+        // `emailVerified` key so the claim-derived value flows through.
+        ...(isSamlSub(profile.sub) ? { emailVerified: true } : {}),
       }),
     });
   }

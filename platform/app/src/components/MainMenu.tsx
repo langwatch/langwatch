@@ -2,12 +2,12 @@ import { Box, VStack } from "@chakra-ui/react";
 import {
   Activity,
   Anvil,
-  CalendarClock,
-  Database,
-  Film,
   Flag,
+  GitPullRequest,
   History,
   Shield,
+  SquareTerminal,
+  Workflow,
 } from "lucide-react";
 import React, { useState } from "react";
 import type { Project } from "~/generated/prisma/client";
@@ -21,6 +21,10 @@ import { featureIcons } from "../utils/featureIcons";
 import { projectRoutes } from "../utils/routes";
 import { useTableView } from "./messages/HeaderButtons";
 import { CollapsibleMenuGroup } from "./sidebar/CollapsibleMenuGroup";
+import {
+  CODING_AGENT_LINK_WINDOW_DAYS,
+  withinDays,
+} from "./sidebar/codingAgentActivity";
 import { GovernSection } from "./sidebar/GovernSection";
 import {
   isExperimentsActivePath,
@@ -45,7 +49,7 @@ export const MainMenu = React.memo(function MainMenu({
   isCompact = false,
 }: MainMenuProps) {
   const router = useRouter();
-  const { project, hasPermission, isPublicRoute } =
+  const { project, organization, hasPermission, isPublicRoute } =
     useOrganizationTeamProject();
   const [isHovered, setIsHovered] = useState(false);
 
@@ -53,6 +57,35 @@ export const MainMenu = React.memo(function MainMenu({
     { projectId: project?.id ?? "" },
     { enabled: !!project?.id },
   );
+
+  // Coding-agent destinations are grown by the project rather than configured.
+  // Each one needs its own recent signal, so a project that records sessions
+  // but has no pull request linked yet gets Sessions alone, and both go away
+  // again once their signal falls out of the window.
+  const { enabled: codingAgentPagesEnabled } = useFeatureFlag(
+    "release_ui_ai_governance_enabled",
+    {
+      organizationId: organization?.id,
+      enabled: !!organization?.id,
+    },
+  );
+  const canSeeCodingAgentActivity =
+    codingAgentPagesEnabled && hasPermission("traces:view");
+  const now = new Date();
+  const showSessionsLink =
+    canSeeCodingAgentActivity &&
+    withinDays({
+      at: project?.lastCodingAgentSessionAt,
+      days: CODING_AGENT_LINK_WINDOW_DAYS,
+      now,
+    });
+  const showPullRequestsLink =
+    canSeeCodingAgentActivity &&
+    withinDays({
+      at: project?.lastCodingAgentPullRequestAt,
+      days: CODING_AGENT_LINK_WINDOW_DAYS,
+      now,
+    });
 
   // In compact mode, show expanded view on hover
   const showExpanded = !isCompact || isHovered;
@@ -158,6 +191,26 @@ export const MainMenu = React.memo(function MainMenu({
                 isActive={isOnlineEvaluationsActivePath(router.pathname)}
                 showLabel={showExpanded}
               />
+              {showSessionsLink && (
+                <PageMenuLink
+                  path={projectRoutes.coding_agent_sessions.path}
+                  icon={SquareTerminal}
+                  label={projectRoutes.coding_agent_sessions.title}
+                  project={project}
+                  isActive={router.pathname === "/[project]/sessions"}
+                  showLabel={showExpanded}
+                />
+              )}
+              {showPullRequestsLink && (
+                <PageMenuLink
+                  path={projectRoutes.coding_agent_pull_requests.path}
+                  icon={GitPullRequest}
+                  label={projectRoutes.coding_agent_pull_requests.title}
+                  project={project}
+                  isActive={router.pathname === "/[project]/pull-requests"}
+                  showLabel={showExpanded}
+                />
+              )}
             </SidebarSection>
 
             <SidebarSection
@@ -379,10 +432,13 @@ const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
         showLabel={showExpanded}
       />
       <SideMenuLink
-        icon={Film}
-        label="Projection Replay"
-        href="/ops/projections"
-        isActive={router.pathname.startsWith("/ops/projections")}
+        icon={Workflow}
+        label="Event Sourcing"
+        href="/ops/event-sourcing"
+        isActive={
+          router.pathname.startsWith("/ops/event-sourcing") ||
+          router.pathname.startsWith("/ops/projections")
+        }
         showLabel={showExpanded}
       />
       <SideMenuLink
@@ -397,20 +453,6 @@ const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
         label="Deja View"
         href="/ops/dejaview"
         isActive={router.pathname.startsWith("/ops/dejaview")}
-        showLabel={showExpanded}
-      />
-      <SideMenuLink
-        icon={CalendarClock}
-        label="Scheduler"
-        href="/ops/scheduler"
-        isActive={router.pathname.startsWith("/ops/scheduler")}
-        showLabel={showExpanded}
-      />
-      <SideMenuLink
-        icon={Database}
-        label="Payload store"
-        href="/ops/blobs"
-        isActive={router.pathname.startsWith("/ops/blobs")}
         showLabel={showExpanded}
       />
       <SideMenuLink

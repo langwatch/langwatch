@@ -6,18 +6,23 @@
  * capturing request/response details with sanitized auth credentials.
  */
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import type * as SsrfProtectionModule from "~/utils/ssrfProtection";
+import type { Field } from "~/optimization_studio/types/dsl";
+import type { StudioClientEvent } from "~/optimization_studio/types/events";
 import { getTestUser } from "../../../../utils/testUtils";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+import { engineRepliesWith } from "./agentTestEngine";
 
-// Partially mock ssrfSafeFetch to bypass SSRF validation in tests, keeping the
-// real module's other exports (e.g. createSSRFValidator, evaluated at module
-// load by unrelated code the appRouter transitively imports).
-const mockSsrfSafeFetch = vi.fn();
-vi.mock("~/utils/ssrfProtection", async (importOriginal) => ({
-  ...(await importOriginal<typeof SsrfProtectionModule>()),
-  ssrfSafeFetch: (...args: unknown[]) => mockSsrfSafeFetch(...args),
+// The request itself is the workflow engine's now, so the engine is what these
+// tests stand in for. What is being tested is the trace the app writes around
+// it.
+const mockPostEvent = vi.fn();
+vi.mock("~/app/api/workflows/post_event/post-event", () => ({
+  studioBackendPostEvent: (args: unknown) => mockPostEvent(args),
+}));
+
+vi.mock("~/optimization_studio/server/addEnvs", () => ({
+  addEnvs: (event: unknown) => Promise.resolve(event),
 }));
 
 // Mock getApp().traces.recordSpan to capture the OTLP span the route records.
@@ -153,15 +158,36 @@ describe("HTTP Proxy Tracing", () => {
     vi.clearAllMocks();
   });
 
+  const engineReplies = engineRepliesWith(mockPostEvent);
+
   function mockSuccessResponse(
     body: Record<string, unknown> = { result: "success" },
   ) {
-    mockSsrfSafeFetch.mockResolvedValue(
-      new Response(JSON.stringify(body), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      }),
+    engineReplies({
+      status: "success",
+      outputs: { output: body },
+      timestamps: { started_at: 1_000, finished_at: 1_100 },
+      http: {
+        status_code: 200,
+        status_text: "OK",
+        response_headers: { "content-type": "application/json" },
+        rendered_body: "{}",
+      },
+    });
+  }
+
+  /** The headers the router put on the node it dispatched. */
+  function dispatchedHeaders(): Record<string, string> {
+    const event = mockPostEvent.mock.calls[0]?.[0]
+      ?.message as StudioClientEvent;
+    if (event?.type !== "execute_component") throw new Error("no dispatch");
+    const node = event.payload.workflow.nodes.find(
+      (candidate) => candidate.id === event.payload.node_id,
     );
+    const headers = node?.data.parameters?.find(
+      (parameter: Field) => parameter.identifier === "headers",
+    )?.value;
+    return (headers ?? {}) as Record<string, string>;
   }
 
   describe("when agentId is provided", () => {
@@ -175,7 +201,7 @@ describe("HTTP Proxy Tracing", () => {
         agentId: "agent-123",
         url: "https://api.example.com/test",
         method: "POST",
-        body: "{}",
+        bodyTemplate: "{}",
       });
 
       expect(mockScheduleTrace).toHaveBeenCalledOnce();
@@ -191,7 +217,7 @@ describe("HTTP Proxy Tracing", () => {
         agentId: "agent-123",
         url: "https://api.example.com/test",
         method: "POST",
-        body: "{}",
+        bodyTemplate: "{}",
       });
 
       expect(getTraceJob().customMetadata.agent_id).toBe("agent-123");
@@ -206,7 +232,7 @@ describe("HTTP Proxy Tracing", () => {
         agentId: "agent-123",
         url: "https://api.example.com/test",
         method: "POST",
-        body: "{}",
+        bodyTemplate: "{}",
       });
 
       expect(getTraceJob().projectId).toBe(projectId);
@@ -221,7 +247,7 @@ describe("HTTP Proxy Tracing", () => {
         agentId: "agent-123",
         url: "https://api.example.com/test",
         method: "POST",
-        body: "{}",
+        bodyTemplate: "{}",
       });
 
       expect(getTraceJob().reservedTraceMetadata.user_id).toBe(userId);
@@ -236,7 +262,7 @@ describe("HTTP Proxy Tracing", () => {
         agentId: "agent-123",
         url: "https://api.example.com/test",
         method: "POST",
-        body: "{}",
+        bodyTemplate: "{}",
       });
 
       const output = parseOutputValue(getTraceJob().spans[0]!);
@@ -252,7 +278,7 @@ describe("HTTP Proxy Tracing", () => {
         agentId: "agent-123",
         url: "https://api.example.com/test",
         method: "POST",
-        body: "{}",
+        bodyTemplate: "{}",
       });
 
       const span = getTraceJob().spans[0]!;
@@ -270,7 +296,7 @@ describe("HTTP Proxy Tracing", () => {
         agentId: "agent-123",
         url: "https://api.example.com/test",
         method: "POST",
-        body: "{}",
+        bodyTemplate: "{}",
       });
 
       const output = parseOutputValue(getTraceJob().spans[0]!);
@@ -279,22 +305,18 @@ describe("HTTP Proxy Tracing", () => {
 
     /** @scenario Trace captures extracted output */
     it("captures extracted output when output path configured", async () => {
-      mockSsrfSafeFetch.mockResolvedValue(
-        new Response(
-          JSON.stringify({ data: { nested: { value: "extracted text" } } }),
-          {
-            status: 200,
-            headers: { "content-type": "application/json" },
-          },
-        ),
-      );
+      engineReplies({
+        status: "success",
+        outputs: { output: "extracted text" },
+        http: { status_code: 200 },
+      });
 
       await caller.httpProxy.execute({
         projectId,
         agentId: "agent-123",
         url: "https://api.example.com/test",
         method: "POST",
-        body: "{}",
+        bodyTemplate: "{}",
         outputPath: "$.data.nested.value",
       });
 
@@ -310,15 +332,12 @@ describe("HTTP Proxy Tracing", () => {
         agentId: "agent-123",
         url: "https://api.example.com/test",
         method: "POST",
-        body: "{}",
+        bodyTemplate: "{}",
       });
 
-      const [, fetchOptions] = mockSsrfSafeFetch.mock.calls[0] as [
-        string,
-        RequestInit,
-      ];
-      const headers = fetchOptions.headers as Record<string, string>;
-      expect(headers.traceparent).toMatch(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/);
+      expect(dispatchedHeaders().traceparent).toMatch(
+        /^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/,
+      );
     });
 
     it("uses same trace ID in traceparent header and submitted trace", async () => {
@@ -329,16 +348,10 @@ describe("HTTP Proxy Tracing", () => {
         agentId: "agent-123",
         url: "https://api.example.com/test",
         method: "POST",
-        body: "{}",
+        bodyTemplate: "{}",
       });
 
-      const [, fetchOptions] = mockSsrfSafeFetch.mock.calls[0] as [
-        string,
-        RequestInit,
-      ];
-      const traceparent = (fetchOptions.headers as Record<string, string>)
-        .traceparent!;
-      const traceIdFromHeader = traceparent.split("-")[1];
+      const traceIdFromHeader = dispatchedHeaders().traceparent!.split("-")[1];
       expect(getTraceJob().traceId).toBe(traceIdFromHeader);
     });
   });
@@ -346,20 +359,20 @@ describe("HTTP Proxy Tracing", () => {
   describe("when endpoint returns an error", () => {
     /** @scenario Trace captures HTTP error responses */
     it("captures the error response in the trace", async () => {
-      mockSsrfSafeFetch.mockResolvedValue(
-        new Response(JSON.stringify({ error: "Not found" }), {
-          status: 404,
-          statusText: "Not Found",
-          headers: { "content-type": "application/json" },
-        }),
-      );
+      engineReplies({
+        status: "error",
+        error: "httpblock: upstream returned 404",
+        error_type: "upstream_http_error",
+        upstream_status: 404,
+        http: { status_code: 404, status_text: "Not Found" },
+      });
 
       await caller.httpProxy.execute({
         projectId,
         agentId: "agent-123",
         url: "https://api.example.com/test",
         method: "POST",
-        body: "{}",
+        bodyTemplate: "{}",
       });
 
       const span = getTraceJob().spans[0]!;
@@ -371,14 +384,18 @@ describe("HTTP Proxy Tracing", () => {
   describe("when endpoint is unreachable", () => {
     /** @scenario Trace captures connection failures */
     it("captures the connection error in the trace", async () => {
-      mockSsrfSafeFetch.mockRejectedValue(new Error("ECONNREFUSED"));
+      engineReplies({
+        status: "error",
+        error: "httpblock: dial tcp 10.0.0.9:80: ECONNREFUSED",
+        error_type: "http_error",
+      });
 
       await caller.httpProxy.execute({
         projectId,
         agentId: "agent-123",
         url: "https://api.example.com/test",
         method: "POST",
-        body: "{}",
+        bodyTemplate: "{}",
       });
 
       expect(mockScheduleTrace).toHaveBeenCalledOnce();
@@ -387,20 +404,68 @@ describe("HTTP Proxy Tracing", () => {
     });
   });
 
-  describe("when request body is invalid JSON", () => {
-    it("creates a trace with the parse error", async () => {
+  describe("when the engine cannot be reached", () => {
+    it("creates a trace with the dispatch failure", async () => {
+      mockPostEvent.mockRejectedValue(new Error("engine unreachable"));
+
       await caller.httpProxy.execute({
         projectId,
         agentId: "agent-123",
         url: "https://api.example.com/test",
         method: "POST",
-        body: "{invalid json",
+        bodyTemplate: "{}",
       });
 
       expect(mockScheduleTrace).toHaveBeenCalledOnce();
       const span = getTraceJob().spans[0]!;
       expect(span.error?.has_error).toBe(true);
-      expect(span.error?.message).toBe("Invalid JSON in request body");
+      expect(span.error?.message).toBe("Request failed");
+    });
+  });
+
+  describe("when a credential is configured as a plain header", () => {
+    // The Auth tab is not the only way an author attaches a token, and a trace
+    // is a durable place for one to end up.
+    it("redacts credential-shaped header values, keeping their names", async () => {
+      mockSuccessResponse();
+
+      await caller.httpProxy.execute({
+        projectId,
+        agentId: "agent-123",
+        url: "https://api.example.com/test",
+        method: "POST",
+        headers: [
+          { key: "X-API-Key", value: "sk-live-must-not-be-stored" },
+          { key: "X-Session-Token", value: "also-a-credential" },
+          { key: "X-Authorization", value: "another-credential" },
+          { key: "X-Auth", value: "a-short-credential" },
+          { key: "Cookie", value: "session=abc123" },
+          { key: "X-Api-Version", value: "2026-08-01" },
+          { key: "X-Idempotency-Key", value: "req-42" },
+        ],
+        bodyTemplate: "{}",
+      });
+
+      const inputValue = getTraceJob().spans[0]!.input?.value as Record<
+        string,
+        unknown
+      >;
+      const headers = inputValue.headers as Record<string, string>;
+      for (const name of [
+        "X-API-Key",
+        "X-Session-Token",
+        "X-Authorization",
+        "X-Auth",
+        "Cookie",
+      ]) {
+        expect(headers[name]).toBe("[REDACTED]");
+      }
+      // Not everything with "key" or "api" in the name is a secret, and a trace
+      // that hides the version an author sent is a trace that cannot debug it.
+      expect(headers["X-Api-Version"]).toBe("2026-08-01");
+      expect(headers["X-Idempotency-Key"]).toBe("req-42");
+      expect(JSON.stringify(getTraceJob())).not.toContain("sk-live");
+      expect(JSON.stringify(getTraceJob())).not.toContain("credential");
     });
   });
 
@@ -416,7 +481,7 @@ describe("HTTP Proxy Tracing", () => {
         url: "https://api.example.com/test",
         method: "POST",
         auth: { type: "bearer", token: "super-secret-token" },
-        body: "{}",
+        bodyTemplate: "{}",
       });
 
       const inputValue = getTraceJob().spans[0]!.input?.value as Record<
@@ -441,10 +506,10 @@ describe("HTTP Proxy Tracing", () => {
         method: "POST",
         auth: {
           type: "api_key",
-          headerName: "X-API-Key",
-          apiKeyValue: "secret-api-key-value",
+          header: "X-API-Key",
+          value: "secret-api-key-value",
         },
-        body: "{}",
+        bodyTemplate: "{}",
       });
 
       const inputValue = getTraceJob().spans[0]!.input?.value as Record<
@@ -471,7 +536,7 @@ describe("HTTP Proxy Tracing", () => {
           username: "admin-user",
           password: "super-password",
         },
-        body: "{}",
+        bodyTemplate: "{}",
       });
 
       const inputValue = getTraceJob().spans[0]!.input?.value as Record<
@@ -491,7 +556,7 @@ describe("HTTP Proxy Tracing", () => {
         projectId,
         url: "https://api.example.com/test",
         method: "POST",
-        body: "{}",
+        bodyTemplate: "{}",
       });
 
       expect(mockScheduleTrace).not.toHaveBeenCalled();
@@ -504,15 +569,10 @@ describe("HTTP Proxy Tracing", () => {
         projectId,
         url: "https://api.example.com/test",
         method: "POST",
-        body: "{}",
+        bodyTemplate: "{}",
       });
 
-      const [, fetchOptions] = mockSsrfSafeFetch.mock.calls[0] as [
-        string,
-        RequestInit,
-      ];
-      const headers = fetchOptions.headers as Record<string, string>;
-      expect(headers.traceparent).toBeUndefined();
+      expect(dispatchedHeaders().traceparent).toBeUndefined();
     });
   });
 });

@@ -38,6 +38,23 @@ type SSRFOptions struct {
 	//
 	// Cloud metadata is refused regardless of this setting.
 	StrictPublicOnly bool
+	// AllowLocal permits the private, loopback and link-local destinations
+	// that are otherwise refused. It is what BLOCK_LOCAL_HTTP_CALLS=false
+	// means for this service, and it is the whole reason an on-prem install
+	// can point a workflow at a service on its own network.
+	//
+	// Spelled as the permission rather than the prohibition so the zero value
+	// keeps refusing. The variable it comes from is named the other way round,
+	// so a field named for the prohibition would make an SSRFOptions{} that
+	// nobody filled in — a test, a new call site, a struct grown a field
+	// since — silently mean "reach anywhere on the private network". A
+	// security default is worth an inversion at the one place that resolves
+	// it (cmd/root.go, from the operator's variable).
+	//
+	// StrictPublicOnly still wins: it exists to say "globally routable only",
+	// and a private address is not globally routable. Cloud metadata is
+	// refused either way.
+	AllowLocal bool
 	// Logger receives egress refusals and strict-mode previews. nil is
 	// safe and discards them.
 	Logger *zap.Logger
@@ -182,10 +199,22 @@ func hostPolicy(host string, opts SSRFOptions) (allow, deny bool) {
 			return true, false
 		}
 	}
-	if _, ok := blockedHosts[host]; ok {
+	// The loopback aliases are a shortcut for the IP-level check below, taken
+	// before DNS so the common case answers without a lookup. When local
+	// destinations are permitted they are no longer a shortcut to anything —
+	// let the name resolve and let ipBlocked decide, so "localhost" and
+	// "127.0.0.1" get the same answer as every other private address.
+	if _, ok := blockedHosts[host]; ok && !allowsLocal(opts) {
 		return false, true
 	}
 	return false, false
+}
+
+// allowsLocal reports whether this policy permits the private/loopback set.
+// Strict egress overrides the permission: it means globally routable only,
+// and none of these addresses are globally routable.
+func allowsLocal(opts SSRFOptions) bool {
+	return opts.AllowLocal && !opts.StrictPublicOnly
 }
 
 // ipBlocked is the unified IP-level deny check, classifying against the shared
@@ -197,7 +226,11 @@ func hostPolicy(host string, opts SSRFOptions) (allow, deny bool) {
 //     WireServer (168.63.129.16), which the pre-pkg/ssrf check missed — a
 //     genuine hole, closed for everyone, with no legitimate traffic behind it.
 //   - Private, loopback, link-local and unspecified addresses are refused
-//     either way. This is the historical deny set; nothing changes.
+//     unless the deployment permits them (AllowLocal, i.e.
+//     BLOCK_LOCAL_HTTP_CALLS=false). An on-prem install whose agents live on
+//     its own network is the normal case for that, and refusing it here while
+//     the rest of the product allowed it was a difference customers hit as
+//     "it passes the test button and fails the run".
 //   - Every other non-globally-routable address (CGNAT, reserved, multicast,
 //     NAT64, 6to4, benchmarking, documentation) is refused only under
 //     StrictPublicOnly. See that field for why it is opt-in.
@@ -236,12 +269,15 @@ func ipBlocked(ip net.IP, opts SSRFOptions, host string) bool {
 	}
 
 	if legacyBlocked(addr) {
+		if allowsLocal(opts) {
+			return false
+		}
 		opts.logger().Warn("ssrf_refused",
 			zap.String("host", host),
 			zap.String("address", addr.String()),
 			zap.String("range", ssrf.Describe(addr)),
 			zap.String("reason", "private_address"),
-			zap.String("hint", "to reach this host on purpose, add it to ALLOWED_PROXY_HOSTS"),
+			zap.String("hint", "this deployment blocks local destinations; add this host to ALLOWED_PROXY_HOSTS to reach it, or set BLOCK_LOCAL_HTTP_CALLS=false to permit them all"),
 		)
 		return true
 	}

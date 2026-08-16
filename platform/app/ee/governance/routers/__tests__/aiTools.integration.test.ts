@@ -1334,7 +1334,6 @@ describe("aiToolsRouter integration", () => {
           },
           name: `Drawer Default ${nanoid(4)}`,
           modelProviderIds: [],
-          strategy: "priority",
           isDefault: true,
           createdById: adminUserId,
           updatedById: adminUserId,

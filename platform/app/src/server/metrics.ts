@@ -929,8 +929,32 @@ export const incrementEsProcessOutboxTotal = ({
 }: {
   processName: string;
   intentType: string;
-  status: "dispatched" | "retried" | "dead";
+  /**
+   * `fenced`: an acknowledgement matched zero rows because the lease lapsed
+   * mid-delivery and another dispatcher superseded it — the effect may have
+   * run more than once. `released`: a leased message was returned to the pool
+   * un-attempted because its batch ran out of lease budget. Both should sit
+   * at zero in a healthy fleet; a sustained fenced rate is the direct
+   * signature of the issue #7016 redelivery loop.
+   */
+  status: "dispatched" | "retried" | "dead" | "fenced" | "released";
 }) => esProcessOutboxTotal.labels(processName, intentType, status).inc();
+
+// A drain that never settled and was abandoned by the worker's watchdog.
+// Each count is one process manager on one pod whose outbox loop would have
+// been wedged until the next rollout before the watchdog existed.
+register.removeSingleMetric("es_process_outbox_stuck_drains_total");
+const esProcessOutboxStuckDrains = new Counter({
+  name: "es_process_outbox_stuck_drains_total",
+  help: "Process-manager outbox drains abandoned after not settling within the stuck-drain threshold",
+  labelNames: ["process_name"] as const,
+});
+
+export const incrementEsProcessOutboxStuckDrains = ({
+  processName,
+}: {
+  processName: string;
+}) => esProcessOutboxStuckDrains.labels(processName).inc();
 
 register.removeSingleMetric("es_process_outbox_duration_milliseconds");
 const esProcessOutboxDuration = new Histogram({

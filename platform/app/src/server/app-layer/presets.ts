@@ -11,6 +11,7 @@ import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.cl
 import { createLogger } from "@langwatch/observability";
 import { RedisConnectionService } from "@langwatch/redis-client";
 import { env } from "~/env.mjs";
+import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
 import { ClickHouseAnalyticsService } from "~/server/analytics/clickhouse/clickhouse-analytics.service";
 import { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
 import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
@@ -39,6 +40,7 @@ import {
 import { closeClickHouseClient } from "~/server/clickhouse/client";
 import { prisma as globalPrisma } from "~/server/db";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
+import { bindProcessFleetMetricsSource } from "~/server/event-sourcing/process-manager/metrics";
 import { BillableEventsMeterClickHouseRepository } from "~/server/event-sourcing/projections/global/repositories/billable-events.clickhouse.repository";
 import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
 import { FilterService } from "~/server/filters/filter.service";
@@ -150,6 +152,7 @@ import { LangEvalsHttpClient } from "./clients/langevals/langevals.http.client";
 import { TiktokenClient } from "./clients/tokenizer/tiktoken.client";
 import { NullTokenizerClient } from "./clients/tokenizer/tokenizer.client";
 import { CodingAgentSessionService } from "./coding-agent/coding-agent-session.service";
+import { CodingAgentSessionsListService } from "./coding-agent/coding-agent-sessions-list.service";
 import { PullRequestUsageService } from "./coding-agent/pull-request-usage.service";
 import { CodingAgentSessionClickHouseRepository } from "./coding-agent/repositories/coding-agent-session.clickhouse.repository";
 import { NullCodingAgentSessionRepository } from "./coding-agent/repositories/coding-agent-session.repository";
@@ -232,19 +235,32 @@ import { MonitorService } from "./monitors/monitor.service";
 import { PrismaMonitorRepository } from "./monitors/repositories/monitor.prisma.repository";
 import { BlobStoreService } from "./ops/blob-store.service";
 import { EventExplorerService } from "./ops/event-explorer.service";
-import { ManagerExplorerService } from "./ops/manager-explorer.service";
+import {
+  ManagerExplorerService,
+  OVERDUE_PENDING_MS,
+  OVERDUE_WAKE_MS,
+} from "./ops/manager-explorer.service";
 import { getOpsMetricsCollector } from "./ops/metrics-collector";
+import {
+  NullProcessAuditSink,
+  ProcessAuditRepository,
+} from "./ops/process-audit.repository";
 import { QueueService } from "./ops/queue.service";
 import { ReplayService } from "./ops/replay.service";
 import { BlobStoreRedisRepository } from "./ops/repositories/blob-store.redis.repository";
 import { NullBlobStoreRepository } from "./ops/repositories/blob-store.repository";
 import { EventExplorerClickHouseRepository } from "./ops/repositories/event-explorer.clickhouse.repository";
 import { NullEventExplorerRepository } from "./ops/repositories/event-explorer.repository";
+import { ProcessOpsPrismaRepository } from "./ops/repositories/process-ops.prisma.repository";
+import { NullProcessOpsRepository } from "./ops/repositories/process-ops.repository";
 import { QueueRedisRepository } from "./ops/repositories/queue.redis.repository";
 import { NullQueueRepository } from "./ops/repositories/queue.repository";
 import { ReplayRedisRepository } from "./ops/repositories/replay.redis.repository";
 import { NullReplayRepository } from "./ops/repositories/replay.repository";
+import { SchedulerAuditRepository } from "./ops/scheduler-audit.repository";
 import { SchedulerOpsService } from "./ops/scheduler-ops.service";
+import { SnapshotRedisRepository } from "./ops/snapshot/snapshot.repository";
+import { getOpsSnapshotReader } from "./ops/snapshot/snapshot-reader";
 import { OrganizationService } from "./organizations/organization.service";
 import { PrismaOrganizationRepository } from "./organizations/repositories/organization.prisma.repository";
 import { NullOrganizationRepository } from "./organizations/repositories/organization.repository";
@@ -303,6 +319,7 @@ import { TraceListClickHouseRepository } from "./traces/repositories/trace-list.
 import { NullTraceListRepository } from "./traces/repositories/trace-list.repository";
 import { TraceSummaryClickHouseRepository } from "./traces/repositories/trace-summary.clickhouse.repository";
 import { NullTraceSummaryRepository } from "./traces/repositories/trace-summary.repository";
+import { NullGithubPullRequestLookup } from "./traces/session-groups.pull-request-link";
 import { SessionGroupsService } from "./traces/session-groups.service";
 import { createSpanDedupeService } from "./traces/span-dedupe.service";
 import { SpanStorageService } from "./traces/span-storage.service";
@@ -1046,13 +1063,25 @@ export function initializeDefaultApp(options?: {
             loadReportCharts: ({ projectId, source, from, to }) =>
               loadReportCharts({
                 deps: {
+                  // Both reads are scoped to builder charts: a scheduled
+                  // report renders each one through `getTimeseries`, which
+                  // needs the series a builder payload carries and a saved
+                  // workbench chart's definition does not have.
                   loadCustomGraph: ({ projectId, customGraphId }) =>
                     prisma.customGraph.findFirst({
-                      where: { id: customGraphId, projectId },
+                      where: {
+                        id: customGraphId,
+                        projectId,
+                        kind: BUILDER_CHART_KIND,
+                      },
                     }),
                   loadDashboardGraphs: ({ projectId, dashboardId }) =>
                     prisma.customGraph.findMany({
-                      where: { dashboardId, projectId },
+                      where: {
+                        dashboardId,
+                        projectId,
+                        kind: BUILDER_CHART_KIND,
+                      },
                       orderBy: [{ gridRow: "asc" }, { gridColumn: "asc" }],
                     }),
                   getTimeseries: (input) =>
@@ -1108,7 +1137,7 @@ export function initializeDefaultApp(options?: {
     "recheckDueBranches",
   );
   const pruneStaleBranchLinkage = new Deferred<
-    () => Promise<{ branchChecks: number; pullRequests: number }>
+    () => Promise<{ branchChecks: number }>
   >("pruneStaleBranchLinkage");
 
   const registry = new PipelineRegistry({
@@ -1392,6 +1421,8 @@ export function initializeDefaultApp(options?: {
         })
       ).map((project) => project.id),
     sessions: codingAgentSessions,
+    touchCodingAgentPullRequestSeen: (params) =>
+      projects.touchCodingAgentPullRequestSeen(params),
   });
   requestBranchMapping.resolve((params) =>
     githubPullRequestMapping!.requestBranchMapping(params),
@@ -1425,6 +1456,21 @@ export function initializeDefaultApp(options?: {
     // receiver and this rollup resolve bundled-ness the same way.
     isSourceNonBillable: resolveSourceNonBillable,
   });
+
+  // The Sessions screen's read: the same session service, plus the mapping
+  // lookup the sessions lens joins with, so both surfaces answer "which pull
+  // request" from one place.
+  const codingAgentSessionsList = traced(
+    new CodingAgentSessionsListService({
+      sessions: codingAgentSessions,
+      pullRequests: {
+        findForBranches: (args) =>
+          githubPullRequestsRepository.findAllByBranchKeys(args),
+      },
+      resolveOrganizationId,
+    }),
+    "CodingAgentSessionsListService",
+  );
 
   const sessionGroups = traced(
     new SessionGroupsService({
@@ -1467,6 +1513,18 @@ export function initializeDefaultApp(options?: {
       },
     });
   }
+  // BEFORE the Redis closeable, deliberately: stopping the writer hands the
+  // snapshot lease back, and a released lease is the difference between the
+  // fleet electing a new writer immediately and going without one for the
+  // remainder of the lease window — the rolling-deploy case. Once Redis is
+  // disconnected the release can no longer be issued at all.
+  gracefulCloseables.push({
+    name: "ops-snapshot",
+    close: async () => {
+      await ops.metricsCollector?.stop();
+      ops.snapshotReader?.stop();
+    },
+  });
   if (redis) {
     gracefulCloseables.push({
       name: "redis",
@@ -1518,6 +1576,9 @@ export function initializeDefaultApp(options?: {
   const replayRepo = redis
     ? new ReplayRedisRepository(redis)
     : new NullReplayRepository();
+  // One snapshot store shared by this pod's writer and its reader: the writer
+  // publishes only while it holds the lease, the reader always reads.
+  const snapshotRepo = redis ? new SnapshotRedisRepository(redis) : null;
   const sharedCh = getSharedClickHouseClient();
   const eventExplorerRepo = sharedCh
     ? new EventExplorerClickHouseRepository(sharedCh)
@@ -1525,11 +1586,38 @@ export function initializeDefaultApp(options?: {
 
   const ops = {
     queues: new QueueService(queueRepo),
-    scheduler: new SchedulerOpsService(
-      new PrismaScheduledJobRepository(prisma),
-    ),
+    scheduler: new SchedulerOpsService({
+      repo: new PrismaScheduledJobRepository(prisma),
+      audit: new SchedulerAuditRepository(prisma),
+      // Best-effort poke so a manual run fires now rather than within one poll
+      // backstop. Latency only: the loop picks the row up either way.
+      wake: redis ? () => void SchedulerService.publishWake(redis) : null,
+      resolveProjectNames: async (projectIds) => {
+        const projects = await prisma.project.findMany({
+          where: { id: { in: projectIds } },
+          select: { id: true, name: true },
+        });
+        return new Map(projects.map((p) => [p.id, p.name]));
+      },
+    }),
     eventExplorer: new EventExplorerService(eventExplorerRepo),
-    managerExplorer: new ManagerExplorerService(repositories.processStore),
+    managerExplorer: (() => {
+      const fleet = new ProcessOpsPrismaRepository(prisma);
+      // The pm_* gauges read the same counts the fleet table shows, on
+      // scrape, so alerting watches what the operator would see.
+      bindProcessFleetMetricsSource(() =>
+        fleet.countByProcessName({
+          now: Date.now(),
+          overdueWakeMs: OVERDUE_WAKE_MS,
+          overduePendingMs: OVERDUE_PENDING_MS,
+        }),
+      );
+      return new ManagerExplorerService({
+        store: repositories.processStore,
+        fleet,
+        audit: new ProcessAuditRepository(prisma),
+      });
+    })(),
     replay: new ReplayService(replayRepo),
     blobStore: new BlobStoreService(
       redis
@@ -1537,8 +1625,10 @@ export function initializeDefaultApp(options?: {
         : new NullBlobStoreRepository(),
     ),
     metricsCollector: redis
-      ? getOpsMetricsCollector({ redis, queueRepo })
+      ? getOpsMetricsCollector({ redis, queueRepo, snapshotRepo })
       : null,
+    snapshotReader:
+      redis && snapshotRepo ? getOpsSnapshotReader(snapshotRepo) : null,
   };
 
   return initializeApp({
@@ -1610,6 +1700,7 @@ export function initializeDefaultApp(options?: {
     billableEvents: billableEventsRepository,
     codingAgents: {
       sessions: codingAgentSessions,
+      sessionsList: codingAgentSessionsList,
       pullRequestUsage: traced(pullRequestUsage, "PullRequestUsageService"),
     },
     github: {
@@ -1754,6 +1845,11 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     // No enterprise policy in the test app: everything reads as billed, the
     // conservative answer for a cost.
     isSourceNonBillable: async () => false,
+  });
+  const testCodingAgentSessionsList = new CodingAgentSessionsListService({
+    sessions: testCodingAgentSessions,
+    pullRequests: new NullGithubPullRequestLookup(),
+    resolveOrganizationId: async () => undefined,
   });
   return new App({
     config,
@@ -1928,6 +2024,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     billableEvents: undefined,
     codingAgents: {
       sessions: testCodingAgentSessions,
+      sessionsList: testCodingAgentSessionsList,
       pullRequestUsage: testPullRequestUsage,
     },
     github: {
@@ -2023,14 +2120,21 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     usageLimits: UsageLimitService.createNull(),
     ops: {
       queues: new QueueService(new NullQueueRepository()),
-      scheduler: new SchedulerOpsService(new NullScheduledJobRepository()),
+      scheduler: new SchedulerOpsService({
+        repo: new NullScheduledJobRepository(),
+      }),
       eventExplorer: new EventExplorerService(
         new NullEventExplorerRepository(),
       ),
-      managerExplorer: new ManagerExplorerService(new InMemoryProcessStore()),
+      managerExplorer: new ManagerExplorerService({
+        store: new InMemoryProcessStore(),
+        fleet: new NullProcessOpsRepository(),
+        audit: new NullProcessAuditSink(),
+      }),
       replay: new ReplayService(new NullReplayRepository()),
       blobStore: new BlobStoreService(new NullBlobStoreRepository()),
       metricsCollector: null,
+      snapshotReader: null,
     },
     commands: {
       traces: {
