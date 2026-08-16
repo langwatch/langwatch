@@ -32,6 +32,43 @@ export interface SettingsBackTarget {
   href: string;
 }
 
+function readCapturedPath(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return sessionStorage.getItem(RETURN_KEY);
+  } catch {
+    // storage may be disabled
+    return null;
+  }
+}
+
+function targetFromCapturedPath(): SettingsBackTarget | null {
+  const captured = readCapturedPath();
+  if (!captured) return null;
+  const product = productFromPathname(captured);
+  if (!product) return null;
+  return { label: `Back to ${productById(product).label}`, href: captured };
+}
+
+function targetFromRememberedProduct({
+  rememberedProduct,
+  reachableProducts,
+  projectSlug,
+}: {
+  rememberedProduct: ProductId | null;
+  reachableProducts: readonly ProductId[];
+  projectSlug: string | null;
+}): SettingsBackTarget | null {
+  if (!rememberedProduct) return null;
+  if (!reachableProducts.includes(rememberedProduct)) return null;
+  const home = productById(rememberedProduct).homeHref({ projectSlug });
+  if (!home) return null;
+  return {
+    label: `Back to ${productById(rememberedProduct).label}`,
+    href: home,
+  };
+}
+
 export function resolveSettingsBackTarget({
   rememberedProduct,
   reachableProducts,
@@ -41,32 +78,12 @@ export function resolveSettingsBackTarget({
   reachableProducts: readonly ProductId[];
   projectSlug: string | null;
 }): SettingsBackTarget {
-  if (typeof window !== "undefined") {
-    try {
-      const captured = sessionStorage.getItem(RETURN_KEY);
-      if (captured) {
-        const product = productFromPathname(captured);
-        if (product) {
-          return {
-            label: `Back to ${productById(product).label}`,
-            href: captured,
-          };
-        }
-      }
-    } catch {
-      // storage may be disabled
-    }
-  }
-
-  if (rememberedProduct && reachableProducts.includes(rememberedProduct)) {
-    const home = productById(rememberedProduct).homeHref({ projectSlug });
-    if (home) {
-      return {
-        label: `Back to ${productById(rememberedProduct).label}`,
-        href: home,
-      };
-    }
-  }
-
-  return { label: "Back", href: "/" };
+  return (
+    targetFromCapturedPath() ??
+    targetFromRememberedProduct({
+      rememberedProduct,
+      reachableProducts,
+      projectSlug,
+    }) ?? { label: "Back", href: "/" }
+  );
 }
