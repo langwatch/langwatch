@@ -1,6 +1,6 @@
 import chalk from "chalk";
 
-import { mintIngestionKey } from "@/cli/utils/governance/cli-api";
+import { resolveLiveIngestionKey } from "@/cli/utils/governance/telemetry-refresh";
 import {
   type ClaudePluginEnsureAction,
   ensureLangwatchClaudePlugin,
@@ -151,29 +151,34 @@ async function runInstall(
   tool: SupportedTool,
   options: InstallOptions,
 ): Promise<InstallReport> {
-  // Mint a fresh personal ingest key (sk-lw-*) for this tool's
-  // source_type. The plaintext key is only ever visible at mint
-  // time, so re-running the install command always leaves the user
-  // with a working key written straight into the export block. The
-  // SupportedTool slug doubles as the source_type the mint route
-  // expects (claude_code / codex / gemini / opencode).
-  const { token, prefix, endpoint } = await mintIngestionKey(cfg, tool);
+  // Resolve the personal ingest key (`ik-lw-` shape) for this tool's
+  // source_type with the wrappers' reuse-first rules: the cached key is
+  // used while the platform confirms it live; a revoked or missing one
+  // mints fresh. The SupportedTool slug doubles as the source_type the
+  // mint route expects (claude_code / codex / gemini / opencode).
+  const { token, prefix, endpoint, minted } = await resolveLiveIngestionKey({
+    cfg,
+    sourceType: tool,
+  });
   const envBlock = buildEnvBlock(tool, endpoint, token);
 
-  // Minting revokes the tool's previous key, so the config cache is now stale
-  // and everything reading it (the wrapper's reuse path, the session-context
-  // hook's fallback target) would authenticate with a dead key. Best-effort:
-  // a config we cannot write is not a reason to fail an install that worked.
-  try {
-    saveConfig({
-      ...cfg,
-      default_personal_ingest_keys: {
-        ...(cfg.default_personal_ingest_keys ?? {}),
-        [tool]: { secret: token, prefix },
-      },
-    });
-  } catch {
-    // The env block above is still valid; only the cache went unwritten.
+  // A fresh mint revokes the tool's previous key, so the config cache is now
+  // stale and everything reading it (the wrapper's reuse path, the
+  // session-context hook's fallback target) would authenticate with a dead
+  // key. Best-effort: a config we cannot write is not a reason to fail an
+  // install that worked.
+  if (minted) {
+    try {
+      saveConfig({
+        ...cfg,
+        default_personal_ingest_keys: {
+          ...(cfg.default_personal_ingest_keys ?? {}),
+          [tool]: { secret: token },
+        },
+      });
+    } catch {
+      // The env block above is still valid; only the cache went unwritten.
+    }
   }
 
   const report: InstallReport = {
@@ -181,7 +186,7 @@ async function runInstall(
     source_type: tool,
     endpoint,
     ingestion_token: token,
-    token_prefix: prefix,
+    token_prefix: prefix ?? token.slice(0, 12),
     env_block: envBlock,
   };
 

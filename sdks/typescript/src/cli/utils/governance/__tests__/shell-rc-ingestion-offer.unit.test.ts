@@ -5,8 +5,9 @@
  *   - `claude` writes to `~/.claude/settings.json`'s top-level `env`
  *     block (native Claude Code env loader; doesn't leak vars into
  *     unrelated shell children)
- *   - `codex` writes the Authorization header into its native `[otel]`
- *     block in `~/.codex/config.toml` (same no-leak property)
+ *   - `codex` never prompts here: wrapper-mode's per-run [otel] write
+ *     already persists the Authorization header inline, so the offer
+ *     only asserts the turn harvest
  *   - any other tool without an app-scoped target (cursor, gemini,
  *     opencode) falls back to appending a marker-bracketed export block
  *     to the detected shell rc file
@@ -303,116 +304,86 @@ describe("maybeOfferIngestionShellRcPersist", () => {
     });
   });
 
-  describe("when the tool is `codex` (native ~/.codex/config.toml target)", () => {
+  describe("when the tool is `codex` (header persisted by the wrapper itself)", () => {
     function codexConfigPath(): string {
       return path.join(tmpHome, ".codex", "config.toml");
     }
 
-    describe("and the user answers 'y'", () => {
-      it("writes the Authorization header into config.toml's [otel] block", async () => {
-        answers.push("y");
+    /** @scenario "The wrapper's [otel] write carries the Authorization header, so codex needs no persist prompt" */
+    it("never prompts and never writes the exports here", async () => {
+      // No answer queued: a fired prompt would read "" and rewrite files.
+      const { maybeOfferIngestionShellRcPersist } = await import(
+        "../shell-rc.js"
+      );
+      await maybeOfferIngestionShellRcPersist({
+        cfg: cfg(),
+        tool: "codex",
+        vars: otelVars,
+      });
+      expect(lastPrompts).toHaveLength(0);
+      expect(saveConfigMock).not.toHaveBeenCalled();
+      // wrapper-mode owns the [otel] block (endpoint + header) on every
+      // ingestion run; this offer only asserts the turn harvest below.
+      const toml = fs.readFileSync(codexConfigPath(), "utf8");
+      expect(toml).not.toContain("[otel.trace_exporter.otlp-http]");
+      // Neither the shell rc nor the Claude Code settings file is touched.
+      expect(fs.existsSync(path.join(tmpHome, ".zshrc"))).toBe(false);
+      expect(fs.existsSync(claudeSettingsPath())).toBe(false);
+    });
+
+    it("asks codex to record each turn's conversation as it completes", async () => {
+      const { maybeOfferIngestionShellRcPersist } = await import(
+        "../shell-rc.js"
+      );
+      await maybeOfferIngestionShellRcPersist({
+        cfg: cfg(),
+        tool: "codex",
+        vars: otelVars,
+      });
+      expect(fs.readFileSync(codexConfigPath(), "utf8")).toContain(
+        NOTIFY_MARKER,
+      );
+    });
+
+    describe("and the offer runs twice", () => {
+      it("leaves exactly one harvest hook behind", async () => {
         const { maybeOfferIngestionShellRcPersist } = await import(
           "../shell-rc.js"
         );
-        await maybeOfferIngestionShellRcPersist({
-          cfg: cfg(),
-          tool: "codex",
-          vars: otelVars,
-        });
+        const run = () =>
+          maybeOfferIngestionShellRcPersist({
+            cfg: cfg(),
+            tool: "codex",
+            vars: otelVars,
+          });
+        await run();
+        await run();
         const toml = fs.readFileSync(codexConfigPath(), "utf8");
-        expect(toml).toContain("[otel.trace_exporter.otlp-http]");
-        expect(toml).toContain(
-          `headers = { "Authorization" = "Bearer sk-lw-token" }`,
-        );
-        // codex does not append /v1/traces itself, so the block spells it out.
-        expect(toml).toContain(
-          `endpoint = "http://app.example.com/api/otel/v1/traces"`,
-        );
-        // Neither the shell rc nor the Claude Code settings file is touched.
-        expect(fs.existsSync(path.join(tmpHome, ".zshrc"))).toBe(false);
-        expect(fs.existsSync(claudeSettingsPath())).toBe(false);
-      });
-
-      it("names ~/.codex/config.toml in the prompt, not the shell rc", async () => {
-        answers.push("y");
-        const { maybeOfferIngestionShellRcPersist } = await import(
-          "../shell-rc.js"
-        );
-        await maybeOfferIngestionShellRcPersist({
-          cfg: cfg(),
-          tool: "codex",
-          vars: otelVars,
-        });
-        expect(lastPrompts).toHaveLength(1);
-        expect(lastPrompts[0]).toContain("~/.codex/config.toml");
-        expect(lastPrompts[0]).not.toContain(".zshrc");
-      });
-
-      it("asks codex to record each turn's conversation as it completes", async () => {
-        answers.push("y");
-        const { maybeOfferIngestionShellRcPersist } = await import(
-          "../shell-rc.js"
-        );
-        await maybeOfferIngestionShellRcPersist({
-          cfg: cfg(),
-          tool: "codex",
-          vars: otelVars,
-        });
-        expect(fs.readFileSync(codexConfigPath(), "utf8")).toContain(
-          NOTIFY_MARKER,
+        expect((toml.match(/langwatch codex notify begin/g) ?? []).length).toBe(
+          1,
         );
       });
     });
 
-    describe("and the question is put to the user", () => {
-      /** @scenario "Consent names the program that will run after every turn" */
-      it("names the program that runs after every turn before defaulting to yes", async () => {
-        answers.push("y");
+    describe("and the configuration binds a turn-completion program that cannot be moved", () => {
+      /** @scenario "A configuration the harvest cannot be merged into says so" */
+      it("tells the user the conversation will not be recorded", async () => {
+        const configFile = codexConfigPath();
+        fs.mkdirSync(path.dirname(configFile), { recursive: true });
+        // Two top-level assignments: moving one aside still leaves the other,
+        // and a duplicate key stops codex from starting at all.
+        fs.writeFileSync(configFile, 'notify = ["/one"]\nnotify = ["/two"]\n');
         const { maybeOfferIngestionShellRcPersist } = await import(
           "../shell-rc.js"
         );
+
         await maybeOfferIngestionShellRcPersist({
           cfg: cfg(),
           tool: "codex",
           vars: otelVars,
         });
-        expect(lastPrompts).toHaveLength(1);
-        expect(lastPrompts[0]).toContain("after every completed turn");
-        expect(lastPrompts[0]).toContain("langwatch ingest codex");
-        // The default is yes, so it has to say all of this first.
-        expect(lastPrompts[0]!.indexOf("after every completed turn")).
-          toBeLessThan(lastPrompts[0]!.indexOf("[Y/n/never]"));
-      });
 
-      it("says nothing about displacing a program the user does not have", async () => {
-        answers.push("y");
-        const { maybeOfferIngestionShellRcPersist } = await import(
-          "../shell-rc.js"
-        );
-        await maybeOfferIngestionShellRcPersist({
-          cfg: cfg(),
-          tool: "codex",
-          vars: otelVars,
-        });
-        expect(lastPrompts[0]).not.toContain("started by this one");
-      });
-    });
-
-    describe("and the user answers 'never'", () => {
-      it("persists shell_rc_preference='skip' and leaves config.toml untouched", async () => {
-        answers.push("never");
-        const { maybeOfferIngestionShellRcPersist } = await import(
-          "../shell-rc.js"
-        );
-        const c = cfg();
-        await maybeOfferIngestionShellRcPersist({
-          cfg: c,
-          tool: "codex",
-          vars: otelVars,
-        });
-        expect(c.shell_rc_preference).toBe("skip");
-        expect(saveConfigMock).toHaveBeenCalledTimes(1);
-        expect(fs.existsSync(codexConfigPath())).toBe(false);
+        expect(logged()).toContain("will not be recorded");
       });
     });
 
@@ -468,111 +439,6 @@ describe("maybeOfferIngestionShellRcPersist", () => {
       });
     });
 
-    describe("and the offer runs a second time", () => {
-      it("leaves exactly one harvest hook behind", async () => {
-        const { maybeOfferIngestionShellRcPersist } = await import(
-          "../shell-rc.js"
-        );
-        const run = () =>
-          maybeOfferIngestionShellRcPersist({
-            cfg: cfg(),
-            tool: "codex",
-            vars: otelVars,
-          });
-        answers.push("y");
-        await run();
-        await run();
-        const toml = fs.readFileSync(codexConfigPath(), "utf8");
-        expect((toml.match(/langwatch codex notify begin/g) ?? []).length).toBe(
-          1,
-        );
-      });
-    });
-
-    describe("and the user has a turn-completion program of their own", () => {
-      /** @scenario "Consent says an existing turn-completion program will be started by ours" */
-      it("says their program will be started by ours before defaulting to yes", async () => {
-        const configFile = codexConfigPath();
-        fs.mkdirSync(path.dirname(configFile), { recursive: true });
-        fs.writeFileSync(configFile, 'notify = ["/usr/bin/say", "done"]\n');
-        answers.push("y");
-        const { maybeOfferIngestionShellRcPersist } = await import(
-          "../shell-rc.js"
-        );
-        await maybeOfferIngestionShellRcPersist({
-          cfg: cfg(),
-          tool: "codex",
-          vars: otelVars,
-        });
-        expect(lastPrompts[0]).toContain("started by this one");
-      });
-    });
-
-    describe("and the configuration binds a turn-completion program that cannot be moved", () => {
-      /** @scenario "A configuration the harvest cannot be merged into says so" */
-      it("tells the user the conversation will not be recorded", async () => {
-        const configFile = codexConfigPath();
-        fs.mkdirSync(path.dirname(configFile), { recursive: true });
-        // Two top-level assignments: moving one aside still leaves the other,
-        // and a duplicate key stops codex from starting at all.
-        fs.writeFileSync(
-          configFile,
-          'notify = ["/one"]\nnotify = ["/two"]\n',
-        );
-        answers.push("y");
-        const { maybeOfferIngestionShellRcPersist } = await import(
-          "../shell-rc.js"
-        );
-
-        await maybeOfferIngestionShellRcPersist({
-          cfg: cfg(),
-          tool: "codex",
-          vars: otelVars,
-        });
-
-        expect(logged()).toContain("will not be recorded");
-        // The exports still landed: only content recovery is blocked.
-        expect(fs.readFileSync(configFile, "utf8")).toContain(
-          `headers = { "Authorization" = "Bearer sk-lw-token" }`,
-        );
-      });
-    });
-
-    describe("and config.toml has the endpoint-only block (no header yet)", () => {
-      it("still offers and installs the header without doubling the block", async () => {
-        const configFile = codexConfigPath();
-        fs.mkdirSync(path.dirname(configFile), { recursive: true });
-        // The wrapper's unconditional setup write: endpoint, no header.
-        fs.writeFileSync(
-          configFile,
-          [
-            "# >>> langwatch otel begin >>>",
-            "[otel]",
-            `environment = "langwatch"`,
-            "",
-            "[otel.trace_exporter.otlp-http]",
-            `endpoint = "http://app.example.com/api/otel/v1/traces"`,
-            `protocol = "json"`,
-            "# <<< langwatch otel end <<<",
-            "",
-          ].join("\n"),
-        );
-        answers.push("y");
-        const { maybeOfferIngestionShellRcPersist } = await import(
-          "../shell-rc.js"
-        );
-        await maybeOfferIngestionShellRcPersist({
-          cfg: cfg(),
-          tool: "codex",
-          vars: otelVars,
-        });
-        const toml = fs.readFileSync(configFile, "utf8");
-        expect(toml).toContain(
-          `headers = { "Authorization" = "Bearer sk-lw-token" }`,
-        );
-        expect((toml.match(/langwatch otel begin/g) ?? []).length).toBe(1);
-      });
-    });
   });
 
   describe("when the tool is `opencode` (scoped shell function, no global export)", () => {

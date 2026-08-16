@@ -93,7 +93,18 @@ describe("governance config persistence", () => {
         secret: "vk-lw-01HZX9N4TESTULIDTESTULID00",
         prefix: "vk-lw-01HZX9N",
       },
-      last_request_increase_url: "http://app.example/me/budget/request?signed=abc",
+      tool_mode: { claude: "ingestion" as const },
+      default_personal_ingest_keys: {
+        codex: { secret: "ik-lw-cache00000000000_secret" },
+      },
+      tool_project_keys: {
+        codex: {
+          secret: "ik-lw-pin0000000000000_secret",
+          project_id: "proj_1",
+          project_slug: "acme-app",
+          endpoint: "https://lw.acme.dev",
+        },
+      },
     };
     saveConfig(original);
 

@@ -144,13 +144,14 @@ describe("the real command tree", () => {
       ["navigate open", "signal command: prints the resource id, no data payload"],
       ["docs", "prints fetched markdown verbatim"],
       ["scenario-docs", "prints fetched markdown verbatim"],
-      ["init-shell", "emits shell script for eval"],
 
       // Interactive / credential flows: prompts, not documents.
       ["login", "interactive credential flow"],
       ["logout", "interactive credential flow"],
       ["whoami", "interactive credential flow"],
-      ["request-increase", "interactive support flow"],
+      // Local machine setup: writes telemetry wiring files, prints progress
+      // prose, returns no platform result document.
+      ["instrument", "local setup flow: writes telemetry wiring files"],
       ["help", "renders help text"],
 
       // Own their key/value or `--json` output, predating the contract.

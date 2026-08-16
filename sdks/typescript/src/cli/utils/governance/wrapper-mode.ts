@@ -9,10 +9,11 @@
  *     envForTool(). Gateway captures I/O server-side; no OTel
  *     emission from the child.
  *   - Path B (ingestion): no VK (Claude Max-style subscription,
- *     user explicitly opted in) -> mint (or reuse a cached) personal
- *     ingest key (sk-lw-*) for this tool, write the [otel] activation
- *     block to ~/.codex/config.toml (codex only), return the OTel
- *     exporter env block for the child.
+ *     user explicitly opted in) -> resolve the tool's ingest credential
+ *     (a project pin when one exists, else the cached or freshly minted
+ *     personal `ik-lw-` key), write the [otel] activation block to
+ *     ~/.codex/config.toml (codex only), return the OTel exporter env
+ *     block for the child.
  *
  * The two modes are mutually exclusive per the no-double-trace
  * rule - gateway capture + OTel emission of the same call would
@@ -35,9 +36,10 @@ import { setOpencodeOpenTelemetryFlag } from "@/cli/utils/opencode-config-flag";
 
 import { claudeProjectSettingsTarget } from "./app-settings";
 import { lwTag } from "./brand";
-import { GovernanceCliError } from "./cli-api";
+import { GovernanceCliError, issuePersonalVirtualKey } from "./cli-api";
 import type { GovernanceConfig } from "./config";
 import { saveConfig } from "./config";
+import { deviceLabelForThisMachine } from "./device-label";
 import { warnIfGeminiOAuthSelected } from "./gemini-settings-preflight";
 import { buildOtelEnvBlock, SOURCE_TYPE_BY_TOOL } from "./otel-env-block";
 import { resolvePlatformToolPolicy } from "./platform-tool-policy";
@@ -48,8 +50,9 @@ import {
 	refreshClaudeUserTelemetryEnv,
 	refreshScopedShellFunctions,
 	removeClaudeProjectTelemetryPin,
-	resolveLiveIngestionKey,
+	resolveIngestionCredential,
 } from "./telemetry-refresh";
+import { envForTool } from "./tool-env";
 import { clearVscodeTerminalOtelEnv } from "./vscode-settings";
 
 export type WrapperMode = "gateway" | "ingestion";
@@ -139,6 +142,12 @@ export interface WrapperModeResult {
 	/** True when the wrapper minted a fresh ingest key (vs reused a cached one). */
 	newKeyMinted?: boolean;
 	/**
+	 * Ingestion mode only: set when the tool is pinned to a team project
+	 * (`tool_project_keys`), so the wrapper can say where telemetry goes.
+	 * `label` is the project slug when known.
+	 */
+	projectScope?: { label?: string };
+	/**
 	 * Path B (ingestion) only: the OTLP base endpoint (`.../api/otel`) and the
 	 * ingest key. The wrapper uses these AFTER the child exits to POST codex's
 	 * recovered turn input/output (from the rollout transcript) onto codex's own
@@ -197,6 +206,11 @@ export async function resolveWrapperMode(
 ): Promise<WrapperModeResult> {
 	const persistedMode = cfg.tool_mode?.[tool];
 	const hasVk = !!cfg.default_personal_vk?.secret;
+	// A project pin (written by `--project` / `langwatch instrument`) means
+	// this tool's telemetry goes to a team project over direct OTLP. It wins
+	// over a remembered tool_mode: the pin is the later, more specific
+	// choice. An explicit forcedMode (flag / prompt answer) still wins.
+	const hasProjectPin = !!cfg.tool_project_keys?.[tool]?.secret;
 	// Prefer the per-(org, tool) policy the CLI cached at login
 	// (cfg.tool_policies, from the control plane's PlatformToolPolicyService).
 	// An offline / legacy CLI with no cached map falls back to the hardcoded
@@ -231,13 +245,15 @@ export async function resolveWrapperMode(
 	//     (never minting an ingestion key the admin disabled)
 	let mode: WrapperMode =
 		forcedMode ??
-		(persistedMode === "gateway"
-			? "gateway"
-			: persistedMode === "ingestion"
-				? "ingestion"
-				: hasVk
-					? "gateway"
-					: "ingestion");
+		(hasProjectPin
+			? "ingestion"
+			: persistedMode === "gateway"
+				? "gateway"
+				: persistedMode === "ingestion"
+					? "ingestion"
+					: hasVk
+						? "gateway"
+						: "ingestion");
 
 	// Symmetric fall-back: when the resolved mode is disabled but the
 	// OTHER mode is allowed, swap into it rather than throwing. Lets
@@ -271,22 +287,58 @@ export async function resolveWrapperMode(
 			}
 		}
 	}
-	if (mode === "ingestion" && !policy.allowOtelDirect) {
+	if (mode === "ingestion" && !policy.allowOtelDirect && !hasProjectPin) {
 		mode = "gateway";
 		notice = `${lwTag()} direct OTLP ingestion is disabled for ${tool} by your org admin; routing through the gateway instead.${copilotSeatBypassSuffix(tool)}`;
 	}
+	// A project-pinned tool never silently reroutes onto the gateway: that
+	// would move telemetry (and billing) from the pinned team project to the
+	// personal path. The mint guard below turns this into a clear error.
 
 	if (mode === "gateway") {
 		// Structural guard: a tool with no gateway env shape (envForTool has
 		// no case for it — `code` is the current example) must fail loudly
 		// here, not launch with empty vars and no capture, no explanation.
-		// Reachable via a hand-edited config or a future policy row whose
-		// allowVk defaults true.
-		if (Object.keys(gatewayVars).length === 0) {
+		// Probed with a placeholder VK because envForTool also returns empty
+		// when no VK is stored yet, and that case is handled by the lazy
+		// issue below, not by this guard.
+		const probe = envForTool(
+			{ ...cfg, default_personal_vk: { secret: "vk-lw-probe" } },
+			tool,
+		);
+		if (Object.keys(probe.vars).length === 0) {
 			throw new GovernanceCliError(
 				501,
 				"gateway_unsupported",
 				`The gateway path isn't implemented for '${tool}'. Run it with --tool-mode=otlp to use direct OTLP ingestion instead.`,
+			);
+		}
+		// Lazy personal VK: login no longer auto-issues one, so the first
+		// run that actually takes the gateway path asks the control plane
+		// for it here. The secret is returned exactly once and persisted;
+		// later runs reuse it. Subscription-only users never reach this.
+		let effectiveGatewayVars = gatewayVars;
+		let effectiveGatewayClears = gatewayClears;
+		if (!cfg.default_personal_vk?.secret) {
+			const issued = await issuePersonalVirtualKey(cfg, {
+				deviceLabel: deviceLabelForThisMachine(),
+			});
+			cfg.default_personal_vk = {
+				id: issued.id,
+				secret: issued.secret,
+				prefix: issued.prefix,
+			};
+			try {
+				saveConfig(cfg);
+			} catch {
+				// The in-memory key still serves this run; an unsaved config
+				// means the next gateway run issues again.
+			}
+			const refreshed = envForTool(cfg, tool);
+			effectiveGatewayVars = refreshed.vars;
+			effectiveGatewayClears = refreshed.clears ?? gatewayClears;
+			process.stderr.write(
+				`${lwTag()} issued your personal virtual key for the gateway path.\n`,
 			);
 		}
 		if (tool === "gemini") {
@@ -324,8 +376,8 @@ export async function resolveWrapperMode(
 			});
 			return {
 				mode,
-				vars: gatewayVars,
-				clears: gatewayClears,
+				vars: effectiveGatewayVars,
+				clears: effectiveGatewayClears,
 				codexConfigPath: gw.path,
 				codexProfilePath: gw.profilePath,
 				extraArgs: ["--profile", gw.profile],
@@ -334,8 +386,8 @@ export async function resolveWrapperMode(
 		}
 		return {
 			mode,
-			vars: gatewayVars,
-			clears: gatewayClears,
+			vars: effectiveGatewayVars,
+			clears: effectiveGatewayClears,
 			notice,
 			claudeProjectPin,
 		};
@@ -367,16 +419,14 @@ export async function resolveWrapperMode(
 		);
 	}
 
-	// Reuse a cached personal ingest key (sk-lw-*) for this source when the
-	// platform confirms it is still live; otherwise mint a fresh one. The
-	// mint route returns the plaintext key once, so we persist it to the
-	// per-tool cache below and read it back on subsequent invocations
-	// rather than re-minting. Liveness rules live in resolveLiveIngestionKey
-	// (shared with the login-time wiring refresh).
-	const { token, prefix, endpoint, minted } = await resolveLiveIngestionKey({
-		cfg,
-		sourceType,
-	});
+	// Resolve the ingest credential: the project pin when the tool carries
+	// one (used verbatim, no server call), else the cached personal
+	// `ik-lw-` key when the platform confirms it is still live, else a
+	// fresh personal mint. The mint route returns the plaintext key once,
+	// so it is persisted to the per-tool cache below and read back on
+	// later invocations rather than re-minted.
+	const { token, endpoint, minted, scope, projectLabel } =
+		await resolveIngestionCredential({ cfg, tool, sourceType });
 
 	const vars = buildOtelEnvBlock(tool, endpoint, token);
 
@@ -477,11 +527,20 @@ export async function resolveWrapperMode(
 		// OTel SDKs in Node/Python/Go do. Spell the trace-signal suffix
 		// out here so the POST lands on the real handler. codex only
 		// emits traces today (no logs/metrics), so one suffix suffices.
-		const result = writeCodexOtelBlock({
-			endpoint: codexTraceEndpoint(endpoint),
-			ingestionToken: token,
-			environment: cfg.organization?.slug ?? "langwatch",
-		});
+		//
+		// The Authorization header is persisted inline: config.toml is the
+		// only wiring codex reads on a plain (unwrapped) run, and it is a
+		// 0600 marker-managed file, so a plain `codex` captures exactly like
+		// a plain `claude` does through its settings files. `langwatch
+		// logout` removes the block.
+		const result = writeCodexOtelBlock(
+			{
+				endpoint: codexTraceEndpoint(endpoint),
+				ingestionToken: token,
+				environment: cfg.organization?.slug ?? "langwatch",
+			},
+			{ persistAuthHeader: true },
+		);
 		codexConfigPath = result.path;
 	}
 
@@ -511,7 +570,7 @@ export async function resolveWrapperMode(
 	if (minted) {
 		next.default_personal_ingest_keys = {
 			...(cfg.default_personal_ingest_keys ?? {}),
-			[sourceType]: { secret: token, prefix },
+			[sourceType]: { secret: token },
 		};
 	}
 	if (forcedMode === undefined || minted) {
@@ -528,6 +587,7 @@ export async function resolveWrapperMode(
 		clears: ingestionClears(tool),
 		codexConfigPath,
 		newKeyMinted: minted,
+		projectScope: scope === "project" ? { label: projectLabel } : undefined,
 		notice,
 		endpoint,
 		ingestionToken: token,

@@ -137,6 +137,29 @@ describe("refreshTelemetryWiringForLogin", () => {
 			});
 		});
 
+		describe("when a tool is pinned to a project", () => {
+			/** @scenario "A project-pinned tool is not re-pointed by a new login" */
+			it("leaves that tool's wiring alone and re-points the rest", async () => {
+				const cfg = baseCfg({
+					tool_project_keys: { codex: { secret: "sk-lw-project-pin" } },
+				});
+
+				const result = await refreshTelemetryWiringForLogin(cfg);
+
+				// codex keeps its wiring: the pin is deliberate scope, not stale
+				// personal wiring, so the stale endpoint stays and no codex key
+				// is minted.
+				expect(codexOtelBlockEndpoint()).toBe(`${STALE_ENDPOINT}/v1/traces`);
+				expect(
+					vi.mocked(cliApi.mintIngestionKey).mock.calls.map((c) => c[1]),
+				).not.toContain("codex");
+				// The unpinned tools are still refreshed.
+				expect(result.labels.some((l) => l.includes("claude"))).toBe(true);
+				expect(result.labels.some((l) => l.includes("gemini"))).toBe(true);
+				expect(result.labels.some((l) => l.includes("codex"))).toBe(false);
+			});
+		});
+
 		describe("when the org policy forbids direct OTLP for a tool", () => {
 			it("leaves that tool's wiring alone and mints nothing for it", async () => {
 				const cfg = baseCfg({

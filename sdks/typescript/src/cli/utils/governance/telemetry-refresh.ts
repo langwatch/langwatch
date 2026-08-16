@@ -174,6 +174,19 @@ export async function resolveLiveIngestionKey({
 	const cached = cfg.default_personal_ingest_keys?.[sourceType];
 	if (cached?.secret) {
 		const cachedLookupId = extractLookupIdFromToken(cached.secret);
+		if (cachedLookupId === undefined) {
+			// Not a personal `ik-lw-` token: the user placed this credential
+			// here by hand (a project `sk-lw-` key, a legacy shape). It cannot
+			// be matched against the personal key listing, so probing it would
+			// always read "revoked" and re-mint over the user's explicit
+			// choice. Pinned: use as-is, never probe, never overwrite.
+			return {
+				token: cached.secret,
+				prefix: cached.prefix,
+				endpoint: otlpEndpointFor(cfg.control_plane_url),
+				minted: false,
+			};
+		}
 		let cacheIsLive = true; // assume live; falsified when server confirms otherwise
 		try {
 			const liveKeys = await listIngestionKeys(cfg);
@@ -210,6 +223,52 @@ export async function resolveLiveIngestionKey({
 		endpoint: r.endpoint,
 		minted: true,
 	};
+}
+
+export interface IngestionCredentialResolution extends IngestionKeyResolution {
+	/** Where the credential is scoped: the personal workspace or a pinned project. */
+	scope: "personal" | "project";
+	/** Slug (preferred) or id of the pinned project; unset for pasted keys. */
+	projectLabel?: string;
+}
+
+/**
+ * Resolve the ingest credential for a tool: the project pin when one
+ * exists (`tool_project_keys[tool]`, written by `--project` / `instrument`),
+ * else the personal path via `resolveLiveIngestionKey`.
+ *
+ * A pinned credential is used verbatim with no server round trip: it may
+ * belong to a project the device session cannot list (or the device may
+ * have no session at all), and revocation surfaces on the ingest side.
+ * Re-running `langwatch instrument <tool> --project ...` replaces it.
+ */
+export async function resolveIngestionCredential({
+	cfg,
+	tool,
+	sourceType,
+	allowOfflineFallback = true,
+}: {
+	cfg: GovernanceConfig;
+	tool: string;
+	sourceType: string;
+	allowOfflineFallback?: boolean;
+}): Promise<IngestionCredentialResolution> {
+	const pinned = cfg.tool_project_keys?.[tool];
+	if (pinned?.secret) {
+		return {
+			token: pinned.secret,
+			endpoint: otlpEndpointFor(pinned.endpoint ?? cfg.control_plane_url),
+			minted: false,
+			scope: "project",
+			projectLabel: pinned.project_slug ?? pinned.project_id,
+		};
+	}
+	const personal = await resolveLiveIngestionKey({
+		cfg,
+		sourceType,
+		allowOfflineFallback,
+	});
+	return { ...personal, scope: "personal" };
 }
 
 /**
@@ -505,6 +564,11 @@ export async function refreshTelemetryWiringForLogin(
 
 	for (const [tool, sourceType] of Object.entries(SOURCE_TYPE_BY_TOOL)) {
 		try {
+			if (cfg.tool_project_keys?.[tool]?.secret) {
+				// Project-pinned wiring is deliberate scope, not stale personal
+				// wiring; a new login never re-points it at the personal path.
+				continue;
+			}
 			if (!toolWiringNeedsLoginRefresh(tool, expectedEndpoint)) continue;
 			if (!resolvePlatformToolPolicy(tool, cfg.tool_policies).allowOtelDirect) {
 				// The new org forbids direct OTLP for this tool; the wrapper
@@ -523,7 +587,7 @@ export async function refreshTelemetryWiringForLogin(
 			if (key.minted) {
 				cfg.default_personal_ingest_keys = {
 					...(cfg.default_personal_ingest_keys ?? {}),
-					[sourceType]: { secret: key.token, prefix: key.prefix },
+					[sourceType]: { secret: key.token },
 				};
 				mintedAny = true;
 			}
