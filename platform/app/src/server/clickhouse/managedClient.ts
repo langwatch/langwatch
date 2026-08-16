@@ -1,15 +1,30 @@
-import { createClient } from "@clickhouse/client";
+import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import { VendorClientResilience } from "@langwatch/clickhouse-client";
 import { createLogger } from "@langwatch/observability";
-import {
-  createResilientClickHouseClient,
-  type ResilientClickHouseClient,
-} from "~/server/app-layer/clients/clickhouse/resilient-client";
+import { detectColdScan } from "~/server/app-layer/clients/clickhouse/cold-scan-detector";
+import { translateClickHouseQueryError } from "~/server/app-layer/clients/clickhouse/translate-query-error";
+import { queryWindowed } from "~/server/app-layer/clients/clickhouse/windowed-read";
+import { CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS } from "~/server/event-sourcing/services/errorHandling";
 import { ClickHouseLogger } from "./clickhouseLogger";
 import { getClickHouseMaxOpenConnections } from "./connectionPool";
+import {
+  incrementClickHouseQueryCount,
+  observeClickHouseQueryDuration,
+} from "./metrics";
 import { wrapWithDefaultSettings } from "./safeClickhouseClient";
 import { withStatementLimit } from "./statementLimit";
 
 const logger = createLogger("langwatch:clickhouse:managed-client");
+
+/**
+ * A resilient ClickHouse client: a {@link ClickHouseClient} whose `query`/`insert`
+ * carry retry + error translation, plus {@link queryWindowed} for the
+ * partition-pruning-window-with-fallback read pattern. Repositories resolve one
+ * of these and call `queryWindowed` without a cast.
+ */
+export type ResilientClickHouseClient = ClickHouseClient & {
+  queryWindowed: typeof queryWindowed;
+};
 
 /**
  * The metrics label for the shared instance. A constant because it is written
@@ -32,6 +47,57 @@ export const SHARED_INSTANCE = "shared";
  * nothing.
  */
 export const CLICKHOUSE_REQUEST_TIMEOUT_MS = 30_000;
+
+/**
+ * The resilience policy in `@langwatch/clickhouse-client`, given everything the
+ * package leaves to its host: where metrics and log lines go, how a raised read
+ * error becomes a typed `HandledError` with remediation, which queries count as
+ * cold scans (the table list is this schema's knowledge, pinned to the
+ * migrations by `cold-scan-detector.coverage.unit.test.ts`), and the
+ * transient-message list — still owned by
+ * `event-sourcing/services/errorHandling.ts`, which keeps this layer and the
+ * outer group-queue classifier reading the same list forever.
+ */
+export function createResilientClickHouseClient({
+  client,
+  cluster = "shared",
+  maxRetries = 3,
+  baseDelayMs = 500,
+  maxDelayMs = 10_000,
+}: {
+  client: ClickHouseClient;
+  /**
+   * Which ClickHouse this client talks to, stamped on every failure line.
+   * Defaults to "shared" because that is what a caller naming nothing has.
+   */
+  cluster?: string;
+  maxRetries?: number;
+  baseDelayMs?: number;
+  maxDelayMs?: number;
+}): ResilientClickHouseClient {
+  const resilience = new VendorClientResilience({
+    cluster,
+    maxRetries,
+    baseDelayMs,
+    maxDelayMs,
+    transientMessageFragments: CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS,
+    metrics: {
+      observeDuration: observeClickHouseQueryDuration,
+      incrementCount: incrementClickHouseQueryCount,
+    },
+    noticeLogger: createLogger("langwatch:clickhouse:resilient"),
+    outcomeLogger: createLogger("langwatch:clickhouse:query"),
+    translateQueryError: translateClickHouseQueryError,
+    detectColdScan,
+  });
+
+  const wrapper = resilience.wrap(client) as ResilientClickHouseClient;
+  // Orchestration only — the caller's `run` closure issues each attempt through
+  // this same wrapper's `query`, so retry + error translation apply per windowed
+  // attempt. Assigned by reference to preserve the generic signature.
+  wrapper.queryWindowed = queryWindowed;
+  return wrapper;
+}
 
 /**
  * The only place in the platform that builds a ClickHouse client.

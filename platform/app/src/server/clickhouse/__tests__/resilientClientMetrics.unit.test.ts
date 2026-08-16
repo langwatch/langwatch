@@ -5,15 +5,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mockObserveQueryDuration = vi.fn();
 const mockIncrementQueryCount = vi.fn();
 
-vi.mock("~/server/clickhouse/metrics", () => ({
-  observeClickHouseQueryDuration: (...args: any[]) =>
-    mockObserveQueryDuration(...args),
-  incrementClickHouseQueryCount: (...args: any[]) =>
-    mockIncrementQueryCount(...args),
-}));
+vi.mock("~/server/clickhouse/metrics", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("~/server/clickhouse/metrics")>();
+  return {
+    ...actual,
+    observeClickHouseQueryDuration: (...args: any[]) =>
+      mockObserveQueryDuration(...args),
+    incrementClickHouseQueryCount: (...args: any[]) =>
+      mockIncrementQueryCount(...args),
+  };
+});
 
 // Must import after mock setup
-import { createResilientClickHouseClient } from "../resilient-client";
+import { createResilientClickHouseClient } from "../managedClient";
 
 describe("createResilientClickHouseClient()", () => {
   let mockClient: ClickHouseClient;

@@ -86,10 +86,11 @@ export interface RunWithRetryOptions
 /**
  * Retry any operation under this package's policy.
  *
- * The loop lives here rather than in the middleware so a caller that is not
- * yet on the pipeline - the app's `ResilientClickHouseClient`, which wraps the
- * vendor client's own `query`/`insert` - can share one implementation instead
- * of keeping a second copy that drifts.
+ * The loop lives here rather than in the client class so callers that are not
+ * on the {@link ClickHouseQueryClient} port - `VendorClientResilience`, which
+ * wraps the vendor client's own `query`/`insert`, and any host retrying
+ * non-statement work - share one implementation instead of keeping a second
+ * copy that drifts.
  */
 export async function runWithRetry<T>(
   fn: () => Promise<T>,

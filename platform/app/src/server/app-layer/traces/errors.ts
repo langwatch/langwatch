@@ -1,5 +1,5 @@
-// Wired at the resilient ClickHouse client (`app-layer/clients/clickhouse/
-// resilient-client.ts`), which translates raw driver errors into these typed
+// Wired at the resilient ClickHouse client assembly (`server/clickhouse/
+// managedClient.ts`), which translates raw driver errors into these typed
 // errors after retries are exhausted.
 //
 // Tips/docs links come from the central registry (`../error-remediation`) —
