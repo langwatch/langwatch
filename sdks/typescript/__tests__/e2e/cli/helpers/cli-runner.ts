@@ -4,6 +4,9 @@ import * as path from "path";
 
 const CLI_PATH = path.join(__dirname, "../../../../dist/cli/index.js");
 
+/** The errors a write raises when the reader on the pipe is already gone. */
+const CLOSED_PIPE_CODES = new Set(["EPIPE", "ERR_STREAM_DESTROYED"]);
+
 export interface CliResult {
 	success: boolean;
 	output: string;
@@ -31,7 +34,6 @@ export class CliRunner {
 		const logFileName = "cli-test-run.log";
 		this.logPath = path.join(config.cwd, logFileName);
 		this.log("=== CLI Runner initialized ===");
-		// process.chdir(config.testDir);
 	}
 
 	/**
@@ -86,11 +88,15 @@ export class CliRunner {
 	 * @param timeout Optional timeout in milliseconds (default: 10000)
 	 * @returns Promise<CliResult>
 	 */
-	runInteractive(
-		command: string,
-		inputs: string[] = [],
-		timeout?: number,
-	): Promise<CliResult> {
+	runInteractive({
+		command,
+		inputs = [],
+		timeout,
+	}: {
+		command: string;
+		inputs?: string[];
+		timeout?: number;
+	}): Promise<CliResult> {
 		const actualTimeout = timeout ?? this.config.timeout ?? 10000;
 
 		this.log(`$ ${command} (interactive with inputs: [${inputs.join(", ")}])`);
@@ -149,8 +155,12 @@ export class CliRunner {
 			// vitest reports it as an unhandled error that fails the whole run.
 			// Ask the stream whether it can still take a write, and let a pipe that
 			// closes mid-write end the input quietly.
-			child.stdin.on("error", () => {
-				// The command already exited; the remaining inputs have no reader.
+			child.stdin.on("error", (error: NodeJS.ErrnoException) => {
+				// A pipe that closes between the check and the write is the
+				// expected race. Any other error is a real fault, so it joins
+				// the output the assertions read.
+				if (CLOSED_PIPE_CODES.has(error.code ?? "")) return;
+				errorOutput += `stdin error: ${error.message}\n`;
 			});
 			const canWriteStdin = () =>
 				!child.killed && child.stdin.writable && !child.stdin.destroyed;
