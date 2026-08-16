@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { FrontendFeatureFlag } from "~/server/featureFlag/frontendFeatureFlags";
@@ -36,7 +37,7 @@ export function useReachableProducts(): {
     release_ui_ai_governance_enabled: governanceFlag.enabled,
   };
 
-  const reachableProducts = PRODUCTS.filter((product) =>
+  const reachableIds = PRODUCTS.filter((product) =>
     product.gates.every((gate) => {
       if (gate.flag !== undefined && !flagValues[gate.flag]) return false;
       if (gate.permission !== undefined && !hasPermission(gate.permission)) {
@@ -45,6 +46,15 @@ export function useReachableProducts(): {
       return true;
     }),
   ).map((product) => product.id);
+
+  // A stable identity for a stable answer: consumers put this list in
+  // effect dependencies (the "/" landing), so a fresh array every render
+  // would re-fire those effects into a render loop.
+  const reachableKey = reachableIds.join(",");
+  const reachableProducts = useMemo(
+    () => (reachableKey === "" ? [] : (reachableKey.split(",") as ProductId[])),
+    [reachableKey],
+  );
 
   return {
     reachableProducts,
