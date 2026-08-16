@@ -84,7 +84,10 @@ function SidebarBottomBlock({
           icon={featureIcons.settings.icon}
           label="Settings"
           href="/settings"
-          isActive={isPathUnder(router.pathname, "/settings")}
+          isActive={isPathUnder({
+            pathname: router.pathname,
+            base: "/settings",
+          })}
           showLabel={showExpanded}
         />
       )}

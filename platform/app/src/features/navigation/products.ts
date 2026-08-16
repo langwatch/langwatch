@@ -101,7 +101,13 @@ export function productById(id: ProductId): ProductDefinition {
  * "metadata" as the Me product and "settings-team" as Settings, because a
  * project slug is a top-level address and those names are not reserved.
  */
-export function isPathUnder(pathname: string, base: string): boolean {
+export function isPathUnder({
+  pathname,
+  base,
+}: {
+  pathname: string;
+  base: string;
+}): boolean {
   return pathname === base || pathname.startsWith(`${base}/`);
 }
 
@@ -112,9 +118,9 @@ export function isPathUnder(pathname: string, base: string): boolean {
  * product remembered; visiting Settings never becomes "where I was".
  */
 export function productFromPathname(pathname: string): ProductId | null {
-  if (isPathUnder(pathname, "/me")) return "me";
-  if (isPathUnder(pathname, "/gateway")) return "gateway";
-  if (isPathUnder(pathname, "/governance")) return "governance";
+  if (isPathUnder({ pathname, base: "/me" })) return "me";
+  if (isPathUnder({ pathname, base: "/gateway" })) return "gateway";
+  if (isPathUnder({ pathname, base: "/governance" })) return "governance";
   const nonProductPrefixes = [
     "/settings",
     "/ops",
@@ -131,7 +137,7 @@ export function productFromPathname(pathname: string): ProductId | null {
   ];
   if (
     pathname === "/" ||
-    nonProductPrefixes.some((prefix) => isPathUnder(pathname, prefix))
+    nonProductPrefixes.some((prefix) => isPathUnder({ pathname, base: prefix }))
   ) {
     return null;
   }

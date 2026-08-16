@@ -32,10 +32,12 @@ export function resolveShellRoute({
   isOrgScope: boolean;
   isOnOwnPersonalProject: boolean;
 }): ShellRoute {
-  const isSettingsRoute = isPathUnder(pathname, "/settings");
+  const isSettingsRoute = isPathUnder({ pathname, base: "/settings" });
   const isPersonalScopeRoute =
     !isSettingsRoute &&
-    (isPersonalScope || isPathUnder(pathname, "/me") || isOnOwnPersonalProject);
+    (isPersonalScope ||
+      isPathUnder({ pathname, base: "/me" }) ||
+      isOnOwnPersonalProject);
   const activeProductId = isSettingsRoute
     ? null
     : ((isPersonalScopeRoute ? "me" : productFromPathname(pathname)) ??
