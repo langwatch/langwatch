@@ -61,41 +61,18 @@ export const MainMenuSections = function MainMenuSections({
   shouldIncludeGovernSection?: boolean;
 }) {
   const router = useRouter();
-  const { project, organization, hasPermission } = useOrganizationTeamProject();
-
+  const { project, hasPermission } = useOrganizationTeamProject();
   const pendingItemsCount = api.annotation.getPendingItemsCount.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project?.id },
   );
+  const codingAgentLinks = useCodingAgentLinks();
 
-  // Coding-agent destinations are grown by the project rather than configured.
-  // Each one needs its own recent signal, so a project that records sessions
-  // but has no pull request linked yet gets Sessions alone, and both go away
-  // again once their signal falls out of the window.
-  const { enabled: codingAgentPagesEnabled } = useFeatureFlag(
-    "release_ui_ai_governance_enabled",
-    {
-      organizationId: organization?.id,
-      enabled: !!organization?.id,
-    },
-  );
-  const canSeeCodingAgentActivity =
-    codingAgentPagesEnabled && hasPermission("traces:view");
-  const now = new Date();
-  const showSessionsLink =
-    canSeeCodingAgentActivity &&
-    withinDays({
-      at: project?.lastCodingAgentSessionAt,
-      days: CODING_AGENT_LINK_WINDOW_DAYS,
-      now,
-    });
-  const showPullRequestsLink =
-    canSeeCodingAgentActivity &&
-    withinDays({
-      at: project?.lastCodingAgentPullRequestAt,
-      days: CODING_AGENT_LINK_WINDOW_DAYS,
-      now,
-    });
+  const sectionProps = {
+    showExpanded,
+    project,
+    pathname: router.pathname,
+  };
 
   return (
     <>
@@ -111,187 +88,15 @@ export const MainMenuSections = function MainMenuSections({
         showLabel={showExpanded}
       />
 
-      <SidebarSection
-        id="observe"
-        label="Observe"
-        showExpanded={showExpanded}
-        projectId={project?.id}
-      >
-        <PageMenuLink
-          path={projectRoutes.analytics.path}
-          icon={featureIcons.analytics.icon}
-          label={projectRoutes.analytics.title}
-          project={project}
-          isActive={router.pathname.includes("/analytics")}
-          showLabel={showExpanded}
-        />
-        <PageMenuLink
-          path={projectRoutes.traces_v2.path}
-          icon={featureIcons.traces_v2.icon}
-          label={projectRoutes.traces_v2.title}
-          project={project}
-          isActive={router.pathname.includes("/traces")}
-          showLabel={showExpanded}
-        />
-        <PageMenuLink
-          path={projectRoutes.messages.path}
-          icon={featureIcons.traces.icon}
-          label={projectRoutes.messages.title}
-          project={project}
-          isActive={router.pathname.includes("/messages")}
-          showLabel={showExpanded}
-          legacy
-        />
-        <PageMenuLink
-          path={projectRoutes.online_evaluations.path}
-          icon={featureIcons.online_evaluations.icon}
-          label="Online Evals"
-          project={project}
-          isActive={isOnlineEvaluationsActivePath(router.pathname)}
-          showLabel={showExpanded}
-        />
-        {showSessionsLink && (
-          <PageMenuLink
-            path={projectRoutes.coding_agent_sessions.path}
-            icon={SquareTerminal}
-            label={projectRoutes.coding_agent_sessions.title}
-            project={project}
-            isActive={router.pathname === "/[project]/sessions"}
-            showLabel={showExpanded}
-          />
-        )}
-        {showPullRequestsLink && (
-          <PageMenuLink
-            path={projectRoutes.coding_agent_pull_requests.path}
-            icon={GitPullRequest}
-            label={projectRoutes.coding_agent_pull_requests.title}
-            project={project}
-            isActive={router.pathname === "/[project]/pull-requests"}
-            showLabel={showExpanded}
-          />
-        )}
-      </SidebarSection>
-
-      <SidebarSection
-        id="test"
-        label="Test"
-        showExpanded={showExpanded}
-        projectId={project?.id}
-      >
-        <CollapsibleMenuGroup
-          icon={featureIcons.simulations.icon}
-          label={projectRoutes.simulations.title}
-          project={project}
-          showLabel={showExpanded}
-          children={[
-            {
-              icon: featureIcons.scenarios.icon,
-              label: projectRoutes.scenarios.title,
-              ...projectScopedDestination({
-                path: projectRoutes.scenarios.path,
-                label: projectRoutes.scenarios.title,
-                project,
-              }),
-              isActive: router.pathname.includes("/simulations/scenarios"),
-            },
-            {
-              icon: featureIcons.simulation_runs.icon,
-              label: projectRoutes.simulation_runs.title,
-              ...projectScopedDestination({
-                path: projectRoutes.simulation_runs.path,
-                label: projectRoutes.simulation_runs.title,
-                project,
-              }),
-              isActive:
-                router.pathname.includes("/simulations") &&
-                !router.pathname.includes("/simulations/scenarios"),
-            },
-          ]}
-        />
-
-        <PageMenuLink
-          path={projectRoutes.experiments.path}
-          icon={featureIcons.experiments.icon}
-          label={projectRoutes.experiments.title}
-          project={project}
-          isActive={isExperimentsActivePath(router.pathname)}
-          showLabel={showExpanded}
-        />
-
-        <PageMenuLink
-          path={projectRoutes.annotations.path}
-          icon={featureIcons.annotations.icon}
-          label={projectRoutes.annotations.title}
-          project={project}
-          badgeNumber={pendingItemsCount.data}
-          isActive={router.pathname.includes("/annotations")}
-          showLabel={showExpanded}
-        />
-      </SidebarSection>
-
-      <SidebarSection
-        id="library"
-        label="Build"
-        showExpanded={showExpanded}
-        defaultExpanded={false}
-        projectId={project?.id}
-      >
-        <PageMenuLink
-          path={projectRoutes.prompts.path}
-          icon={featureIcons.prompts.icon}
-          label={projectRoutes.prompts.title}
-          project={project}
-          isActive={router.pathname.includes("/prompts")}
-          showLabel={showExpanded}
-        />
-
-        <PageMenuLink
-          path={projectRoutes.agents.path}
-          icon={featureIcons.agents.icon}
-          label={projectRoutes.agents.title}
-          project={project}
-          isActive={router.pathname.includes("/agents")}
-          showLabel={showExpanded}
-        />
-
-        <PageMenuLink
-          path={projectRoutes.workflows.path}
-          icon={featureIcons.workflows.icon}
-          label={projectRoutes.workflows.title}
-          project={project}
-          isActive={router.pathname.includes("/workflows")}
-          showLabel={showExpanded}
-        />
-
-        <PageMenuLink
-          path={projectRoutes.evaluators.path}
-          icon={featureIcons.evaluators.icon}
-          label={projectRoutes.evaluators.title}
-          project={project}
-          isActive={router.pathname.includes("/evaluators")}
-          showLabel={showExpanded}
-        />
-
-        <PageMenuLink
-          path={projectRoutes.datasets.path}
-          icon={featureIcons.datasets.icon}
-          label={projectRoutes.datasets.title}
-          project={project}
-          isActive={router.pathname.includes("/datasets")}
-          showLabel={showExpanded}
-        />
-
-        {hasPermission("triggers:view") && (
-          <PageMenuLink
-            path={projectRoutes.automations.path}
-            icon={featureIcons.automations.icon}
-            label={projectRoutes.automations.title}
-            project={project}
-            isActive={router.pathname.includes("/automations")}
-            showLabel={showExpanded}
-          />
-        )}
-      </SidebarSection>
+      <ObserveSection {...sectionProps} codingAgentLinks={codingAgentLinks} />
+      <TestSection
+        {...sectionProps}
+        pendingAnnotationCount={pendingItemsCount.data}
+      />
+      <BuildSection
+        {...sectionProps}
+        canSeeAutomations={hasPermission("triggers:view")}
+      />
 
       {shouldIncludeGovernSection && (
         <GovernSection showExpanded={showExpanded} />
@@ -301,6 +106,265 @@ export const MainMenuSections = function MainMenuSections({
     </>
   );
 };
+
+/** The props every project section needs to render its links. */
+interface ProjectSectionProps {
+  showExpanded: boolean;
+  project: ReturnType<typeof useOrganizationTeamProject>["project"];
+  pathname: string;
+}
+
+interface CodingAgentLinks {
+  shouldShowSessions: boolean;
+  shouldShowPullRequests: boolean;
+}
+
+/**
+ * Coding-agent destinations are grown by the project rather than
+ * configured. Each one needs its own recent signal, so a project that
+ * records sessions but has no pull request linked yet gets Sessions
+ * alone, and both go away again once their signal falls out of the
+ * window.
+ */
+function useCodingAgentLinks(): CodingAgentLinks {
+  const { project, organization, hasPermission } = useOrganizationTeamProject();
+  const { enabled: codingAgentPagesEnabled } = useFeatureFlag(
+    "release_ui_ai_governance_enabled",
+    {
+      organizationId: organization?.id,
+      enabled: !!organization?.id,
+    },
+  );
+  const canSeeCodingAgentActivity =
+    codingAgentPagesEnabled && hasPermission("traces:view");
+  const now = new Date();
+
+  return {
+    shouldShowSessions:
+      canSeeCodingAgentActivity &&
+      withinDays({
+        at: project?.lastCodingAgentSessionAt,
+        days: CODING_AGENT_LINK_WINDOW_DAYS,
+        now,
+      }),
+    shouldShowPullRequests:
+      canSeeCodingAgentActivity &&
+      withinDays({
+        at: project?.lastCodingAgentPullRequestAt,
+        days: CODING_AGENT_LINK_WINDOW_DAYS,
+        now,
+      }),
+  };
+}
+
+function ObserveSection({
+  showExpanded,
+  project,
+  pathname,
+  codingAgentLinks,
+}: ProjectSectionProps & { codingAgentLinks: CodingAgentLinks }) {
+  return (
+    <SidebarSection
+      id="observe"
+      label="Observe"
+      showExpanded={showExpanded}
+      projectId={project?.id}
+    >
+      <PageMenuLink
+        path={projectRoutes.analytics.path}
+        icon={featureIcons.analytics.icon}
+        label={projectRoutes.analytics.title}
+        project={project}
+        isActive={pathname.includes("/analytics")}
+        showLabel={showExpanded}
+      />
+      <PageMenuLink
+        path={projectRoutes.traces_v2.path}
+        icon={featureIcons.traces_v2.icon}
+        label={projectRoutes.traces_v2.title}
+        project={project}
+        isActive={pathname.includes("/traces")}
+        showLabel={showExpanded}
+      />
+      <PageMenuLink
+        path={projectRoutes.messages.path}
+        icon={featureIcons.traces.icon}
+        label={projectRoutes.messages.title}
+        project={project}
+        isActive={pathname.includes("/messages")}
+        showLabel={showExpanded}
+        legacy
+      />
+      <PageMenuLink
+        path={projectRoutes.online_evaluations.path}
+        icon={featureIcons.online_evaluations.icon}
+        label="Online Evals"
+        project={project}
+        isActive={isOnlineEvaluationsActivePath(pathname)}
+        showLabel={showExpanded}
+      />
+      {codingAgentLinks.shouldShowSessions && (
+        <PageMenuLink
+          path={projectRoutes.coding_agent_sessions.path}
+          icon={SquareTerminal}
+          label={projectRoutes.coding_agent_sessions.title}
+          project={project}
+          isActive={pathname === "/[project]/sessions"}
+          showLabel={showExpanded}
+        />
+      )}
+      {codingAgentLinks.shouldShowPullRequests && (
+        <PageMenuLink
+          path={projectRoutes.coding_agent_pull_requests.path}
+          icon={GitPullRequest}
+          label={projectRoutes.coding_agent_pull_requests.title}
+          project={project}
+          isActive={pathname === "/[project]/pull-requests"}
+          showLabel={showExpanded}
+        />
+      )}
+    </SidebarSection>
+  );
+}
+
+function TestSection({
+  showExpanded,
+  project,
+  pathname,
+  pendingAnnotationCount,
+}: ProjectSectionProps & { pendingAnnotationCount: number | undefined }) {
+  return (
+    <SidebarSection
+      id="test"
+      label="Test"
+      showExpanded={showExpanded}
+      projectId={project?.id}
+    >
+      <CollapsibleMenuGroup
+        icon={featureIcons.simulations.icon}
+        label={projectRoutes.simulations.title}
+        project={project}
+        showLabel={showExpanded}
+        children={[
+          {
+            icon: featureIcons.scenarios.icon,
+            label: projectRoutes.scenarios.title,
+            ...projectScopedDestination({
+              path: projectRoutes.scenarios.path,
+              label: projectRoutes.scenarios.title,
+              project,
+            }),
+            isActive: pathname.includes("/simulations/scenarios"),
+          },
+          {
+            icon: featureIcons.simulation_runs.icon,
+            label: projectRoutes.simulation_runs.title,
+            ...projectScopedDestination({
+              path: projectRoutes.simulation_runs.path,
+              label: projectRoutes.simulation_runs.title,
+              project,
+            }),
+            isActive:
+              pathname.includes("/simulations") &&
+              !pathname.includes("/simulations/scenarios"),
+          },
+        ]}
+      />
+
+      <PageMenuLink
+        path={projectRoutes.experiments.path}
+        icon={featureIcons.experiments.icon}
+        label={projectRoutes.experiments.title}
+        project={project}
+        isActive={isExperimentsActivePath(pathname)}
+        showLabel={showExpanded}
+      />
+
+      <PageMenuLink
+        path={projectRoutes.annotations.path}
+        icon={featureIcons.annotations.icon}
+        label={projectRoutes.annotations.title}
+        project={project}
+        badgeNumber={pendingAnnotationCount}
+        isActive={pathname.includes("/annotations")}
+        showLabel={showExpanded}
+      />
+    </SidebarSection>
+  );
+}
+
+function BuildSection({
+  showExpanded,
+  project,
+  pathname,
+  canSeeAutomations,
+}: ProjectSectionProps & { canSeeAutomations: boolean }) {
+  return (
+    <SidebarSection
+      id="library"
+      label="Build"
+      showExpanded={showExpanded}
+      defaultExpanded={false}
+      projectId={project?.id}
+    >
+      <PageMenuLink
+        path={projectRoutes.prompts.path}
+        icon={featureIcons.prompts.icon}
+        label={projectRoutes.prompts.title}
+        project={project}
+        isActive={pathname.includes("/prompts")}
+        showLabel={showExpanded}
+      />
+
+      <PageMenuLink
+        path={projectRoutes.agents.path}
+        icon={featureIcons.agents.icon}
+        label={projectRoutes.agents.title}
+        project={project}
+        isActive={pathname.includes("/agents")}
+        showLabel={showExpanded}
+      />
+
+      <PageMenuLink
+        path={projectRoutes.workflows.path}
+        icon={featureIcons.workflows.icon}
+        label={projectRoutes.workflows.title}
+        project={project}
+        isActive={pathname.includes("/workflows")}
+        showLabel={showExpanded}
+      />
+
+      <PageMenuLink
+        path={projectRoutes.evaluators.path}
+        icon={featureIcons.evaluators.icon}
+        label={projectRoutes.evaluators.title}
+        project={project}
+        isActive={pathname.includes("/evaluators")}
+        showLabel={showExpanded}
+      />
+
+      <PageMenuLink
+        path={projectRoutes.datasets.path}
+        icon={featureIcons.datasets.icon}
+        label={projectRoutes.datasets.title}
+        project={project}
+        isActive={pathname.includes("/datasets")}
+        showLabel={showExpanded}
+      />
+
+      {canSeeAutomations && (
+        <PageMenuLink
+          path={projectRoutes.automations.path}
+          icon={featureIcons.automations.icon}
+          label={projectRoutes.automations.title}
+          project={project}
+          isActive={pathname.includes("/automations")}
+          showLabel={showExpanded}
+        />
+      )}
+    </SidebarSection>
+  );
+}
 
 export const MainMenu = React.memo(function MainMenu({
   isCompact = false,
