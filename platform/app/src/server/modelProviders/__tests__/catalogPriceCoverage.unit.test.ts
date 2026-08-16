@@ -102,14 +102,10 @@ const BILLING_UNITS: Record<string, "token" | "character" | "second"> = {
  * Unit mismatches with a fix already in flight, each with where it is fixed.
  *
  * A line here is a promise to remove it. The honesty test below fails once
- * the entry is corrected, so the baseline cannot outlive the defect.
+ * the entry is corrected, so the baseline cannot outlive the defect. Empty
+ * is the goal state: every audio model prices a unit it can report.
  */
-const KNOWN_UNIT_MISMATCH: Record<string, string> = {
-  "openai/gpt-4o-transcribe":
-    "Prices per second while the transcription response reports tokens and no duration, so it rates zero on every call. Corrected to token pricing on langwatch#7021.",
-  "openai/gpt-4o-mini-transcribe":
-    "Same per-second-versus-token mismatch, corrected on the same pull request.",
-};
+const KNOWN_UNIT_MISMATCH: Record<string, string> = {};
 
 const catalogEntries = Object.entries(llmModels.models);
 
