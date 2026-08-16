@@ -644,6 +644,25 @@ describe("parseProjectScopeFlags", () => {
     });
   });
 
+  describe("given --project is followed by another option", () => {
+    it("leaves --personal to be parsed, so the scope conflict still surfaces", () => {
+      const out = parseProjectScopeFlags(["--project", "--personal"]);
+      expect(out.project).toBeUndefined();
+      expect(out.personal).toBe(true);
+      expect(out.args).toEqual([]);
+    });
+
+    it("leaves a later wrapper flag on the args instead of consuming it", () => {
+      const out = parseProjectScopeFlags([
+        "--project",
+        "--tool-mode",
+        "gateway",
+      ]);
+      expect(out.project).toBeUndefined();
+      expect(out.args).toEqual(["--tool-mode", "gateway"]);
+    });
+  });
+
   describe("given --personal in the args", () => {
     it("strips it and reports the personal reset", () => {
       const out = parseProjectScopeFlags(["--personal", "-p", "hi"]);

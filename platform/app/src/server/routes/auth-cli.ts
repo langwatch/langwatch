@@ -31,7 +31,10 @@ import { ActivityMonitorService } from "@ee/governance/services/activity-monitor
 import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
 import { AiToolEntryService } from "@ee/governance/services/aiToolEntry.service";
 import { CliBootstrapService } from "@ee/governance/services/cliBootstrap.service";
-import { IngestionKeyService } from "@ee/governance/services/ingestionKey.service";
+import {
+  IngestionKeyService,
+  PersonalWorkspaceMissingError,
+} from "@ee/governance/services/ingestionKey.service";
 import { IngestionTemplateService } from "@ee/governance/services/ingestionTemplate.service";
 import {
   NoEligibleProvidersError,
@@ -1927,20 +1930,14 @@ const mintIngestionKeySchema = z.object({
    * for the caller's personal project.
    */
   project: z.string().min(1).optional(),
-  /** Machine this key is for, shown as provenance on the API-keys page. */
-  device_label: z.string().min(1).optional(),
+  /**
+   * Machine this key is for, shown as provenance on the API-keys page. Capped
+   * like every other device label the CLI sends, and sanitized before it
+   * reaches the key name.
+   */
+  device_label: z.string().min(1).max(128).optional(),
 });
 
-/**
- * The named-project branch of the ingestion-key mint.
- *
- * `projectRef` is read as an id first, then as a slug, and both lookups are
- * confined to the caller's organization: a project in another tenant reports
- * the same `project_not_found` as one that does not exist, so the response
- * never says which ids are real elsewhere. Membership alone does not
- * authorize the mint, the caller needs `traces:create` on the project itself,
- * which is exactly the permission the minted key carries.
- */
 /**
  * Resolve a project the CLI named, as an id first and a slug second, inside
  * one organization. Returns null when nothing matches, which every caller
@@ -1973,6 +1970,16 @@ async function findProjectInOrg({
   );
 }
 
+/**
+ * The named-project branch of the ingestion-key mint.
+ *
+ * `projectRef` is read as an id first, then as a slug, and both lookups are
+ * confined to the caller's organization: a project in another tenant reports
+ * the same `project_not_found` as one that does not exist, so the response
+ * never says which ids are real elsewhere. Membership alone does not
+ * authorize the mint, the caller needs `traces:create` on the project itself,
+ * which is exactly the permission the minted key carries.
+ */
 async function mintProjectIngestionKey(
   c: Context,
   {
@@ -2045,11 +2052,15 @@ async function mintProjectIngestionKey(
       organizationId: tokenRecord.organization_id,
       projectId: project.id,
       sourceType,
-      createdByDeviceLabel:
+      // The label lands inside the key's display name, so it goes through the
+      // same reduction a virtual-key label does rather than reaching the name
+      // as free-form text.
+      createdByDeviceLabel: sanitizeDeviceLabel(
         deviceLabel ??
-        tokenRecord.client_info?.device_label ??
-        tokenRecord.client_info?.hostname ??
-        null,
+          tokenRecord.client_info?.device_label ??
+          tokenRecord.client_info?.hostname ??
+          undefined,
+      ),
     });
     return c.json(
       {
@@ -2091,6 +2102,11 @@ secured
         401,
       );
     }
+    // This mints a credential, so an offboarded caller's pre-removal token
+    // must not reach it, the same boundary /virtual-key holds.
+    const denied = await ensureActiveOrgMemberOr403(c, tokenRecord);
+    if (denied) return denied;
+
     const parsed = mintIngestionKeySchema.safeParse(await c.req.json());
     if (!parsed.success) {
       return c.json(
@@ -2107,8 +2123,16 @@ secured
     // stale cache, an old CLI, or a hand-written request reaches here without
     // ever consulting the policy. Only source types a wrapped tool stamps are
     // governed; anything else has no per-tool policy to apply.
-    const policedSlug =
-      PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE[parsed.data.source_type];
+    //
+    // `Object.hasOwn` and not a plain lookup: the key is request-controlled,
+    // so `"toString"` would otherwise resolve an inherited function, pass a
+    // truthy check, and index the policy map with nothing.
+    const policedSlug = Object.hasOwn(
+      PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE,
+      parsed.data.source_type,
+    )
+      ? PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE[parsed.data.source_type]
+      : undefined;
     if (policedSlug) {
       const policy = await AiToolEntryService.create(prisma).resolveToolPolicy({
         organizationId: tokenRecord.organization_id,
@@ -2183,15 +2207,31 @@ async function mintPersonalIngestionKey(
       201,
     );
   } catch (err) {
-    // No personal project for the caller yet: surface as a precondition so
-    // the CLI can prompt the user to finish workspace setup.
+    // Only the missing workspace is a precondition the caller can fix, so it
+    // is the only failure that reports as one. Everything else is a server
+    // fault: it gets logged and a fixed message, the way the project branch
+    // does, rather than a prompt the user cannot act on and an internal error
+    // string on the wire.
+    if (err instanceof PersonalWorkspaceMissingError) {
+      return c.json(
+        {
+          error: "precondition_failed",
+          error_description:
+            "Sign in to a personal workspace before issuing an ingestion key.",
+        },
+        412,
+      );
+    }
+    logger.error(
+      { err, userId: tokenRecord.user_id, sourceType },
+      "[auth-cli] personal ingestion-key mint failed",
+    );
     return c.json(
       {
-        error: "precondition_failed",
-        error_description:
-          err instanceof Error ? err.message : "Could not mint ingestion key",
+        error: "server_error",
+        error_description: "Could not mint an ingestion key",
       },
-      412,
+      500,
     );
   }
 }

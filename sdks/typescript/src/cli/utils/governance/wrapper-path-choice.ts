@@ -136,7 +136,11 @@ export function parseProjectScopeFlags(args: string[]): ParsedProjectScope {
     const arg = args[i]!;
     if (arg === "--project") {
       const value = args[i + 1];
-      if (value !== undefined) {
+      // A following option is a missing value, not the project name. Reading
+      // `--project --personal` as a project called "--personal" swallows the
+      // second flag, so the scope conflict never surfaces and the pin is
+      // attempted against a name no project can have.
+      if (value !== undefined && !value.startsWith("-")) {
         project = value;
         i++;
       }

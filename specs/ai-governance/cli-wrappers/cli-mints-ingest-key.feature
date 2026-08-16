@@ -105,7 +105,13 @@ Feature: CLI Wrappers — `langwatch <tool>` mints and uses an ingestion key (Pa
       Then the wrapper resolves ingestion mode with the pinned secret
       And no personal key is minted or probed
       And the run reports where the telemetry goes
-      # A pinned tool must also never silently reroute onto the gateway:
-      # when the org policy disables direct OTLP the run fails with
-      # otel_direct_disabled instead of moving the project's telemetry
-      # (and billing) to the personal gateway path.
+
+    @unit @cli-wrappers @ingest-key @project-pin
+    Scenario: A pinned tool fails rather than rerouting onto the gateway
+      Given codex is pinned to a team project
+      And the organization turned direct OTLP off for codex
+      When the user runs `langwatch codex`
+      Then the run fails with otel_direct_disabled
+      And no personal key is minted
+      # Rerouting silently would move the project's telemetry, and its
+      # billing, onto the personal gateway path.

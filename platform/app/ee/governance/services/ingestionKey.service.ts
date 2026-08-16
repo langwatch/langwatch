@@ -21,6 +21,20 @@ interface IngestionKeyMintParams {
   createdByDeviceLabel?: string | null;
 }
 
+/**
+ * The caller has no personal workspace yet, so there is no project for a
+ * personal key to reach. Named so a caller can answer "finish your workspace
+ * setup" for this one cause and keep every other failure a real error.
+ */
+export class PersonalWorkspaceMissingError extends Error {
+  constructor() {
+    super(
+      "No personal project for caller. Sign in to a personal workspace before issuing an ingestion key.",
+    );
+    this.name = "PersonalWorkspaceMissingError";
+  }
+}
+
 /** The plaintext token, returned exactly once, plus its identifiers. */
 export interface IssuedIngestionKey {
   token: string;
@@ -208,9 +222,7 @@ export class IngestionKeyService {
       organizationId,
     });
     if (!workspace) {
-      throw new Error(
-        "No personal project for caller. Sign in to a personal workspace before issuing an ingestion key.",
-      );
+      throw new PersonalWorkspaceMissingError();
     }
 
     return this.ensureForProject({

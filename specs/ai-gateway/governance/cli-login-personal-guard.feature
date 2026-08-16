@@ -6,11 +6,13 @@ Feature: CLI login never lands a user on a personal project
   wrong for shared / team work. Two backend guards make this impossible, paired with
   the CLI-side default-to-project behavior:
 
-    1. The device-session (AI-tools) login provisions a personal workspace + personal
-       virtual key. That is a governance-plane feature. Governance ships enabled by
-       default (ADR-038 Decision 7), so the approval works out of the box on a fresh
-       installation; for an organization whose governance flag has been switched off
-       it must be refused, with a message pointing at project login.
+    1. The device-session (AI-tools) login provisions a personal workspace. It mints
+       no personal virtual key: the CLI issues one on its first gateway call, so an
+       approval never creates a credential. That is a governance-plane feature.
+       Governance ships enabled by default (ADR-038 Decision 7), so the approval works
+       out of the box on a fresh installation; for an organization whose governance
+       flag has been switched off it must be refused, with a message pointing at
+       project login.
     2. The project-login (project_api_key) flow targets a project the user chose
        DELIBERATELY. The hazard was silent AUTO-selection of a personal project, so:
        the browser picker lists the caller's personal project as an explicit,
@@ -54,6 +56,8 @@ Feature: CLI login never lands a user on a personal project
       And a pending device code with credential_type "device_session"
       When the user approves it
       Then the response is 200
+      And no personal virtual key is minted, on this path as on every other
+      successful approval
 
   Rule: project login targets a deliberately chosen project; another user's personal project is never one
 

@@ -57,6 +57,9 @@ export class PrismaProjectRepository implements ProjectRepository {
     await this.prisma.project.updateMany({
       where: {
         id: projectId,
+        // An archived project shows no rail links, so a late fold must not
+        // stamp activity that would make one look current again.
+        archivedAt: null,
         OR: [
           { lastCodingAgentSessionAt: null },
           { lastCodingAgentSessionAt: { lte: staleBefore } },
@@ -74,6 +77,7 @@ export class PrismaProjectRepository implements ProjectRepository {
     await this.prisma.project.updateMany({
       where: {
         id: projectId,
+        archivedAt: null,
         OR: [
           { lastCodingAgentPullRequestAt: null },
           { lastCodingAgentPullRequestAt: { lte: staleBefore } },

@@ -32,16 +32,19 @@ Feature: AI Gateway — Personal Virtual Keys (principalUserId orthogonality)
       | principalUserId  | leo@acme.test                  |
       | organizationId   | acme                           |
       | VirtualKeyScope  | [{ORGANIZATION, "acme"}]       |
-      | name             | "Personal — leo@acme.test"     |
+      | name             | "default"                      |
     And the secret is returned to the CLI in the mint response
     And the secret is shown exactly once; subsequent calls return only the displayPrefix
+    # The first ask takes the organization default key, which carries the fixed
+    # "default" name. A device label only names the per-machine keys the next
+    # scenario covers.
 
   Scenario: A second machine gets a key of its own rather than the first machine's
     Given "leo@acme.test" already has the default personal VK "vk_leo_v1"
     When his second machine asks `POST /api/auth/cli/virtual-key` for a key
     Then "vk_leo_v1" is left untouched, since its secret is stored hashed and
     cannot be handed out twice
-    And a further personal VK is issued, named after the second machine
+    And a further personal VK is issued, named `device-<label>` after the second machine
     And the second machine's local config writes that key's secret as
     `default_personal_vk.secret`
 

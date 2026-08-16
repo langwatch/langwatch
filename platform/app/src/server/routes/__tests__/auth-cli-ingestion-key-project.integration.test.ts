@@ -45,8 +45,12 @@ const OTHER_ORG_PROJECT_SLUG = `other-co-api-${suffix}`;
 // permission resolves false for them.
 const ADMIN_ID = `usr-ikp-admin-${suffix}`;
 const VIEWER_ID = `usr-ikp-viewer-${suffix}`;
+// Offboarded mid-session: a member at token-issue time, no membership row by
+// the time the token is presented.
+const LEAVER_ID = `usr-ikp-leaver-${suffix}`;
 const ADMIN_TOKEN = `lw_at_${"a".repeat(43)}-ikp-${suffix}`;
 const VIEWER_TOKEN = `lw_at_${"v".repeat(43)}-ikp-${suffix}`;
+const LEAVER_TOKEN = `lw_at_${"l".repeat(43)}-ikp-${suffix}`;
 
 let redisConnection: Redis | null = null;
 
@@ -111,6 +115,13 @@ describe("POST /api/auth/cli/governance/ingestion-key with a named project", () 
         name: "IKP Viewer",
       },
     });
+    await prisma.user.create({
+      data: {
+        id: LEAVER_ID,
+        email: `ikp-leaver-${suffix}@example.com`,
+        name: "IKP Leaver",
+      },
+    });
     await prisma.organizationUser.create({
       data: { organizationId: ORG_ID, userId: ADMIN_ID, role: "ADMIN" },
     });
@@ -173,6 +184,7 @@ describe("POST /api/auth/cli/governance/ingestion-key with a named project", () 
     for (const [token, userId] of [
       [ADMIN_TOKEN, ADMIN_ID],
       [VIEWER_TOKEN, VIEWER_ID],
+      [LEAVER_TOKEN, LEAVER_ID],
     ] as const) {
       await redis.set(
         `lwcli:access:${token}`,
@@ -192,6 +204,7 @@ describe("POST /api/auth/cli/governance/ingestion-key with a named project", () 
     if (redisConnection) {
       await redisConnection.del(`lwcli:access:${ADMIN_TOKEN}`);
       await redisConnection.del(`lwcli:access:${VIEWER_TOKEN}`);
+      await redisConnection.del(`lwcli:access:${LEAVER_TOKEN}`);
     }
     const orgs = [ORG_ID, OTHER_ORG_ID];
     await prisma.aiToolEntry.deleteMany({
@@ -218,11 +231,11 @@ describe("POST /api/auth/cli/governance/ingestion-key with a named project", () 
       where: { organizationId: { in: orgs } },
     });
     await prisma.user.deleteMany({
-      where: { id: { in: [ADMIN_ID, VIEWER_ID] } },
+      where: { id: { in: [ADMIN_ID, VIEWER_ID, LEAVER_ID] } },
     });
     await prisma.organization.deleteMany({ where: { id: { in: orgs } } });
     await resetApp();
-    await stopTestContainers().catch(() => {});
+    await stopTestContainers();
   }, 60_000);
 
   describe("given a caller who can write traces into the project", () => {
@@ -376,6 +389,44 @@ describe("POST /api/auth/cli/governance/ingestion-key with a named project", () 
         expect(status).toBe(412);
         expect(json.error).toBe("precondition_failed");
       });
+    });
+  });
+
+  describe("given the caller left the organization after the token was issued", () => {
+    it("refuses to mint on a pre-removal token", async () => {
+      await prisma.organizationUser.create({
+        data: { organizationId: ORG_ID, userId: LEAVER_ID, role: "MEMBER" },
+      });
+      await prisma.organizationUser.delete({
+        where: {
+          userId_organizationId: {
+            userId: LEAVER_ID,
+            organizationId: ORG_ID,
+          },
+        },
+      });
+      const before = await liveIngestKeyCount(PROJECT_ID);
+
+      const { status, json } = await mintIngestionKey(LEAVER_TOKEN, {
+        source_type: "claude_code",
+        project: PROJECT_ID,
+      });
+
+      expect(status).toBe(403);
+      expect(json.token).toBeUndefined();
+      expect(await liveIngestKeyCount(PROJECT_ID)).toBe(before);
+    });
+  });
+
+  describe("given a source type that names an inherited object property", () => {
+    it("treats it as ungoverned rather than failing the request", async () => {
+      const { status, json } = await mintIngestionKey(ADMIN_TOKEN, {
+        source_type: "toString",
+        project: PROJECT_ID,
+      });
+
+      expect(status).toBe(201);
+      expect(json.token).toEqual(expect.stringMatching(/^ik-lw-/));
     });
   });
 

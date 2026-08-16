@@ -405,7 +405,12 @@ export class GithubPullRequestMappingService {
         fromMs,
         toMs,
       });
-      this.collectBranchTargets({ organizationId, sessions, targets });
+      this.collectBranchTargets({
+        organizationId,
+        projectId,
+        sessions,
+        targets,
+      });
     }
 
     await this.mapAllWithConcurrency([...targets.values()]);
@@ -448,16 +453,22 @@ export class GithubPullRequestMappingService {
    */
   private collectBranchTargets({
     organizationId,
+    projectId,
     sessions,
     targets,
   }: {
     organizationId: string;
+    projectId: string;
     sessions: BackfillSessionRow[];
     targets: Map<string, BranchMappingTarget>;
   }): void {
     for (const session of sessions) {
       if (targets.size >= BACKFILL_BRANCH_CAP) break;
-      const target = this.targetFromSession({ organizationId, session });
+      const target = this.targetFromSession({
+        organizationId,
+        projectId,
+        session,
+      });
       if (!target) continue;
       const key = [
         target.repositoryHost,
@@ -471,9 +482,11 @@ export class GithubPullRequestMappingService {
 
   private targetFromSession({
     organizationId,
+    projectId,
     session,
   }: {
     organizationId: string;
+    projectId: string;
     session: BackfillSessionRow;
   }): BranchMappingTarget | null {
     if (!isMappableGithubHost(session.repositoryHost)) return null;
@@ -493,6 +506,13 @@ export class GithubPullRequestMappingService {
       // An operator connecting GitHub is asking for these branches, as plainly
       // as a fold does.
       origin: "demand",
+      // The backfill reads one project's sessions at a time, so it knows which
+      // project ran this branch and a found pull request is recorded against
+      // it. Without this the Pull requests destination stays hidden until the
+      // next live fold, which is exactly the moment the connection is supposed
+      // to pay off. Two projects on one branch dedupe to the first that
+      // claimed it, which attributes better than attributing to none.
+      originProjectId: projectId,
     };
   }
 

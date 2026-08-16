@@ -622,6 +622,53 @@ describe("branch pull-request mapping", () => {
         "feat/backfill-b",
       ]);
     });
+
+    it("records the pull requests it finds on the project whose sessions it read", async () => {
+      const sessionRepository = new CodingAgentSessionClickHouseRepository(
+        async () => ch,
+      );
+      await sessionRepository.upsert(
+        codingAgentSessionRow({
+          tenantId: projectId,
+          sessionId: `${tag}-feat/backfill-attributed`,
+          startedAtMs: Date.now() - 2 * 24 * 60 * 60 * 1000,
+          repositoryHost: "github.com",
+          repositoryOwner: `acme-${tag}`,
+          repositoryName: "widgets",
+          gitBranch: "feat/backfill-attributed",
+        }),
+      );
+
+      const touchCodingAgentPullRequestSeen = vi
+        .fn()
+        .mockResolvedValue(undefined);
+      const { installations } = servicesWith({
+        listPullRequestsForHead: vi
+          .fn()
+          .mockResolvedValue([apiPullRequest({ number: 103 })]),
+        touchCodingAgentPullRequestSeen,
+      });
+      await seedInstallation();
+
+      await installations.recordInstallation({
+        installationId: INSTALLATION_ID,
+        organizationId,
+      });
+
+      // Connecting GitHub is the moment the destination is supposed to
+      // appear, so the backfill has to attribute what it finds rather than
+      // leaving the project waiting for the next live fold.
+      await vi.waitFor(
+        () => {
+          expect(
+            touchCodingAgentPullRequestSeen.mock.calls.map(
+              (call) => (call[0] as { projectId: string }).projectId,
+            ),
+          ).toContain(projectId);
+        },
+        { timeout: 15_000, interval: 250 },
+      );
+    });
   });
 
   describe("given a repository on a host the connection cannot answer for", () => {

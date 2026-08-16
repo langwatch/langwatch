@@ -1,6 +1,7 @@
 import chalk from "chalk";
 
-import { resolveLiveIngestionKey } from "@/cli/utils/governance/telemetry-refresh";
+import { TOOL_BY_SOURCE_TYPE } from "@/cli/utils/governance/otel-env-block";
+import { resolveIngestionCredential } from "@/cli/utils/governance/telemetry-refresh";
 import {
   type ClaudePluginEnsureAction,
   ensureLangwatchClaudePlugin,
@@ -76,6 +77,10 @@ interface InstallReport {
   endpoint: string;
   ingestion_token: string;
   token_prefix: string;
+  /** Where the telemetry lands: a pinned team project, or the personal one. */
+  scope: "project" | "personal";
+  /** The pinned project's slug or id, when the scope is a project. */
+  destination_project?: string;
   codex_config_action?: "created" | "updated" | "unchanged";
   codex_config_path?: string;
   /**
@@ -151,15 +156,20 @@ async function runInstall(
   tool: SupportedTool,
   options: InstallOptions,
 ): Promise<InstallReport> {
-  // Resolve the personal ingest key (`ik-lw-` shape) for this tool's
-  // source_type with the wrappers' reuse-first rules: the cached key is
-  // used while the platform confirms it live; a revoked or missing one
-  // mints fresh. The SupportedTool slug doubles as the source_type the
-  // mint route expects (claude_code / codex / gemini / opencode).
-  const { token, prefix, endpoint, minted } = await resolveLiveIngestionKey({
-    cfg,
-    sourceType: tool,
-  });
+  // Resolve the ingest key (`ik-lw-` shape) for this tool the same way the
+  // wrappers do, so a tool pinned to a team project keeps that scope instead
+  // of having a personal key written over it. Without the pin it falls back
+  // to the personal key with the reuse-first rules: the cached key is used
+  // while the platform confirms it live; a revoked or missing one mints
+  // fresh. The SupportedTool slug doubles as the source_type the mint route
+  // expects (claude_code / codex / gemini / opencode); the config keys the
+  // pin by CLI tool slug, so read that back off the source type.
+  const { token, prefix, endpoint, minted, scope, projectLabel } =
+    await resolveIngestionCredential({
+      cfg,
+      tool: TOOL_BY_SOURCE_TYPE[tool] ?? tool,
+      sourceType: tool,
+    });
   const envBlock = buildEnvBlock(tool, endpoint, token);
 
   // A fresh mint revokes the tool's previous key, so the config cache is now
@@ -173,7 +183,7 @@ async function runInstall(
         ...cfg,
         default_personal_ingest_keys: {
           ...(cfg.default_personal_ingest_keys ?? {}),
-          [tool]: { secret: token },
+          [tool]: { secret: token, prefix },
         },
       });
     } catch {

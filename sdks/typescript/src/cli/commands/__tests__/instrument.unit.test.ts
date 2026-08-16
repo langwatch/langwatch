@@ -81,6 +81,7 @@ beforeEach(() => {
   asMock(installTelemetryWiring).mockReturnValue({
     labels: ["~/.codex/config.toml"],
     warnings: [],
+    requiredFailures: [],
   });
   stderrSpy = vi.spyOn(process.stderr, "write").mockReturnValue(true);
   stdoutSpy = vi.spyOn(process.stdout, "write").mockReturnValue(true);
@@ -96,6 +97,25 @@ afterEach(() => {
 });
 
 describe("instrumentCommand", () => {
+  describe("given a companion write the wiring depends on failed", () => {
+    it("fails instead of reporting a wired tool", async () => {
+      asMock(installTelemetryWiring).mockReturnValue({
+        labels: [],
+        warnings: [],
+        requiredFailures: ["could not enable opencode's OpenTelemetry flag"],
+      });
+
+      await expect(instrumentCommand("opencode", {})).rejects.toThrow(
+        ExitError,
+      );
+
+      expect(writtenTo(stderrSpy)).toContain(
+        "could not enable opencode's OpenTelemetry flag",
+      );
+      expect(writtenTo(stdoutSpy)).not.toContain("runs now send telemetry to");
+    });
+  });
+
   describe("given a tool with no ingestion path", () => {
     it("fails with the supported list", async () => {
       await expect(instrumentCommand("cursor", {})).rejects.toThrow(ExitError);
@@ -105,11 +125,15 @@ describe("instrumentCommand", () => {
   });
 
   describe("given more than one scope flag", () => {
+    /** @scenario "Two scope flags at once are refused rather than one winning silently" */
     it("refuses --project together with --key", async () => {
       await expect(
         instrumentCommand("codex", { project: "acme-app", key: "sk-lw-x" }),
       ).rejects.toThrow(ExitError);
       expect(writtenTo(stderrSpy)).toContain("only one of");
+      expect(pinToolToProject).not.toHaveBeenCalled();
+      expect(pinToolToKey).not.toHaveBeenCalled();
+      expect(installTelemetryWiring).not.toHaveBeenCalled();
     });
   });
 
@@ -203,6 +227,30 @@ describe("instrumentCommand", () => {
         key: "sk-lw-from-env",
         endpoint: undefined,
       });
+    });
+  });
+
+  describe("given LANGWATCH_INGEST_KEY is still exported from an earlier setup", () => {
+    beforeEach(() => {
+      process.env.LANGWATCH_INGEST_KEY = "sk-lw-left-over";
+    });
+
+    it("lets --project win instead of reading the environment as a scope flag", async () => {
+      asMock(pinToolToProject).mockResolvedValue({ label: "acme-app" });
+
+      await instrumentCommand("codex", { project: "acme-app" });
+
+      expect(pinToolToProject).toHaveBeenCalled();
+      expect(pinToolToKey).not.toHaveBeenCalled();
+    });
+
+    it("lets --personal win the same way", async () => {
+      asMock(clearToolProjectPin).mockReturnValue(true);
+
+      await instrumentCommand("codex", { personal: true });
+
+      expect(clearToolProjectPin).toHaveBeenCalled();
+      expect(pinToolToKey).not.toHaveBeenCalled();
     });
   });
 
@@ -319,6 +367,7 @@ describe("instrumentCommand", () => {
       asMock(installTelemetryWiring).mockReturnValue({
         labels: [],
         warnings: ["could not write ~/.zshrc: EACCES"],
+        requiredFailures: [],
       });
 
       await expect(instrumentCommand("codex", {})).rejects.toThrow(ExitError);

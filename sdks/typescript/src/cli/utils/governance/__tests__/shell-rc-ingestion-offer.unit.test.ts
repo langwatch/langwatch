@@ -345,7 +345,7 @@ describe("maybeOfferIngestionShellRcPersist", () => {
       );
     });
 
-    describe("and the offer runs twice", () => {
+    describe("when the offer runs twice", () => {
       it("leaves exactly one harvest hook behind", async () => {
         const { maybeOfferIngestionShellRcPersist } = await import(
           "../shell-rc.js"
@@ -365,7 +365,7 @@ describe("maybeOfferIngestionShellRcPersist", () => {
       });
     });
 
-    describe("and the configuration binds a turn-completion program that cannot be moved", () => {
+    describe("given the configuration binds a turn-completion program that cannot be moved", () => {
       /** @scenario "A configuration the harvest cannot be merged into says so" */
       it("tells the user the conversation will not be recorded", async () => {
         const configFile = codexConfigPath();

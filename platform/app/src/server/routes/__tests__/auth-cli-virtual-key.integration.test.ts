@@ -165,7 +165,7 @@ describe("POST /api/auth/cli/virtual-key", () => {
     await prisma.user.deleteMany({ where: { id: { in: [USER_A, USER_B] } } });
     await prisma.organization.deleteMany({ where: { id: { in: orgs } } });
     await resetApp();
-    await stopTestContainers().catch(() => {});
+    await stopTestContainers();
   }, 60_000);
 
   describe("given no Bearer token", () => {

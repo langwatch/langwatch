@@ -1014,6 +1014,7 @@ describe("resolveWrapperMode with a project pin", () => {
 		});
 
 		describe("when the org policy disables direct OTLP for the tool", () => {
+			/** @scenario "A pinned tool fails rather than rerouting onto the gateway" */
 			it("throws otel_direct_disabled instead of silently rerouting to the gateway", async () => {
 				const { resolveWrapperMode } = await import("../wrapper-mode.js");
 				const cfg = baseCfg({

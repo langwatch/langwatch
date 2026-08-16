@@ -82,7 +82,9 @@ export interface GovernanceConfig {
   /**
    * Per-tool project scope. Written by `langwatch instrument <tool>
    * --project/--key` and `langwatch <tool> --project`; removed by
-   * `--personal`. While an entry exists the tool's telemetry wiring uses
+   * `--personal`, and by `langwatch logout`, which drops the whole config
+   * file along with the wiring it describes. While an entry exists the
+   * tool's telemetry wiring uses
    * this ingest key and endpoint, and the personal ingest-key path for
    * the tool is not consulted or rewritten. `project_id` / `project_slug`
    * are absent when the key was pasted (`--key`) rather than minted.
@@ -253,6 +255,19 @@ export function loadConfig(): GovernanceConfig {
       !isCanonicalVkSecret(cfg.default_personal_vk.secret)
     ) {
       delete cfg.default_personal_vk;
+    }
+    // Same reasoning for a hand-edited project pin. `secret` is the one
+    // required field on the entry, and the doc above invites people to paste
+    // keys here, so an entry that carries a project name and no secret is a
+    // realistic edit. Kept, it would hand `Bearer undefined` to every reader
+    // that trusts the type; dropped, the tool falls back to the personal path
+    // and `instrument --project` writes a working pin again.
+    if (cfg.tool_project_keys) {
+      cfg.tool_project_keys = Object.fromEntries(
+        Object.entries(cfg.tool_project_keys).filter(
+          ([, pin]) => typeof pin?.secret === "string" && pin.secret !== "",
+        ),
+      );
     }
     return cfg;
   } catch (err) {

@@ -26,8 +26,7 @@ Feature: `langwatch instrument <tool>` writes telemetry wiring without launching
     --personal             clear a project pin and rewire the personal path.
 
   The wrapper flags `langwatch <tool> --project <p>` / `--personal` reuse
-  the same pinning before launching the tool. `langwatch logout` removes
-  every wiring target this command writes.
+  the same pinning before launching the tool.
 
   Background:
     Given the langwatch CLI is installed
@@ -58,6 +57,15 @@ Feature: `langwatch instrument <tool>` writes telemetry wiring without launching
       And the wiring is rewritten with the personal ingest key
 
     @unit @cli-wrappers @instrument
+    Scenario: Two scope flags at once are refused rather than one winning silently
+      Given a signed-in session
+      When the user runs `langwatch instrument codex --project acme-app --key <ingest-key>`
+      Then the command fails naming both flags
+      And nothing is pinned and no wiring is written
+      # A leftover $LANGWATCH_INGEST_KEY in the shell is a default, not a
+      # flag, so it never counts as one of the two.
+
+    @unit @cli-wrappers @instrument
     Scenario: Instrumenting without login and without a key fails with guidance
       Given a machine with no `langwatch login` session and no pin
       When the user runs `langwatch instrument codex`
@@ -86,6 +94,17 @@ Feature: `langwatch instrument <tool>` writes telemetry wiring without launching
       When a CLI asks the control plane for a claude ingestion key
       Then the request is refused
       And the project gains no ingestion key
+
+  Rule: logout removes everything this command wrote
+
+    @unit @cli-wrappers @instrument
+    Scenario: Logout removes the wiring and the project pin together
+      Given claude, codex and gemini are instrumented, codex against a team
+        project
+      When the user runs `langwatch logout`
+      Then every wiring target this command wrote is removed
+      And the project pin goes with the config file, so no device keeps
+        shipping telemetry to the team project under the pasted credential
 
   Rule: the wiring targets are shared with the wrappers
 

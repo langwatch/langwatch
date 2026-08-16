@@ -11,7 +11,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
-import { createCodingAgentSessionSeenReactor } from "../../../event-sourcing/pipelines/coding-agent-processing/reactors/codingAgentSessionSeen.reactor";
+import { createCodingAgentSessionSeenTouch } from "../../../event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSessionSeen.touch";
 import {
   CODING_AGENT_ACTIVITY_TOUCH_MS,
   ProjectService,
@@ -22,6 +22,7 @@ const tag = nanoid(8);
 
 let organizationId: string;
 let projectId: string;
+let archivedProjectId: string;
 
 const projects = new ProjectService(new PrismaProjectRepository(prisma));
 
@@ -62,6 +63,18 @@ beforeAll(async () => {
     },
   });
   projectId = project.id;
+  const archivedProject = await prisma.project.create({
+    data: {
+      name: `ca-activity-archived-${tag}`,
+      slug: `ca-activity-archived-${tag}`,
+      apiKey: `ca-activity-archived-${tag}`,
+      teamId: team.id,
+      language: "typescript",
+      framework: "other",
+      archivedAt: new Date("2026-08-01T00:00:00.000Z"),
+    },
+  });
+  archivedProjectId = archivedProject.id;
 });
 
 beforeEach(async () => {
@@ -130,19 +143,14 @@ describe("project coding-agent activity", () => {
   describe("when a coding-agent session folds", () => {
     /** @scenario "A folded coding-agent session records the project's activity" */
     it("records the activity on the project the session folded under", async () => {
-      const reactor = createCodingAgentSessionSeenReactor({
+      // The stamp the fold store fires after a commit — the same wiring
+      // pipelineRegistry installs on CodingAgentSessionStore.
+      const touch = createCodingAgentSessionSeenTouch({
         touchCodingAgentSessionSeen: (params) =>
           projects.touchCodingAgentSessionSeen(params),
       });
 
-      await reactor.handle(
-        {} as never,
-        {
-          tenantId: projectId,
-          aggregateId: "session-1",
-          foldState: {},
-        } as never,
-      );
+      await touch([projectId]);
 
       const { lastCodingAgentSessionAt, lastCodingAgentPullRequestAt } =
         await readActivity();
@@ -188,6 +196,31 @@ describe("project coding-agent activity", () => {
           at: new Date(),
         }),
       ).resolves.toBeUndefined();
+    });
+  });
+
+  describe("given the project was archived", () => {
+    it("leaves both columns alone, so no destination comes back", async () => {
+      await projects.touchCodingAgentSessionSeen({
+        projectId: archivedProjectId,
+        at: new Date("2026-08-16T10:00:00.000Z"),
+      });
+      await projects.touchCodingAgentPullRequestSeen({
+        projectId: archivedProjectId,
+        at: new Date("2026-08-16T10:00:00.000Z"),
+      });
+
+      const archived = await prisma.project.findUniqueOrThrow({
+        where: { id: archivedProjectId },
+        select: {
+          lastCodingAgentSessionAt: true,
+          lastCodingAgentPullRequestAt: true,
+        },
+      });
+      expect(archived).toEqual({
+        lastCodingAgentSessionAt: null,
+        lastCodingAgentPullRequestAt: null,
+      });
     });
   });
 });

@@ -125,7 +125,7 @@ describe("project coding-agent pages", () => {
     });
   });
 
-  describe("while the workspace is still resolving", () => {
+  describe("given the workspace is still resolving", () => {
     beforeEach(() => {
       state.project = undefined;
       state.isLoading = true;

@@ -116,6 +116,32 @@ describe("governance config persistence", () => {
     expect(isLoggedIn(loaded)).toBe(true);
   });
 
+  describe("when a hand-edited project pin carries no secret", () => {
+    it("drops that entry and keeps the pins that do", () => {
+      fs.writeFileSync(
+        p,
+        JSON.stringify({
+          gateway_url: "http://gw.example",
+          control_plane_url: "http://app.example",
+          access_token: "at_x",
+          tool_project_keys: {
+            codex: { project_slug: "acme-app" },
+            claude: { secret: "ik-lw-pin0000000000000_secret" },
+          },
+        }),
+      );
+
+      const loaded = loadConfig();
+
+      // Kept, the codex entry would hand `Bearer undefined` to every reader
+      // that trusts the declared type.
+      expect(loaded.tool_project_keys?.codex).toBeUndefined();
+      expect(loaded.tool_project_keys?.claude?.secret).toBe(
+        "ik-lw-pin0000000000000_secret",
+      );
+    });
+  });
+
   describe("when a stored personal VK secret is in a legacy format", () => {
     it("drops the stale default_personal_vk block on load", () => {
       // Legacy `lw_vk_live_` secrets predate the canonical `vk-lw-` format

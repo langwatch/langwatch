@@ -149,8 +149,9 @@ describe("the real command tree", () => {
       ["login", "interactive credential flow"],
       ["logout", "interactive credential flow"],
       ["whoami", "interactive credential flow"],
-      // Local machine setup: writes telemetry wiring files, prints progress
-      // prose, returns no platform result document.
+      // The output contract covers commands that return a platform document.
+      // This one reports what it wrote to the local machine, so there is no
+      // document for `--json` to carry.
       ["instrument", "local setup flow: writes telemetry wiring files"],
       ["help", "renders help text"],
 

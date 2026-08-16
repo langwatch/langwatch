@@ -18,7 +18,6 @@
 import * as os from "node:os";
 
 import {
-	codexTraceEndpoint,
 	displayCodexConfigPath,
 	writeCodexOtelBlock,
 } from "../codex-config-toml";
@@ -37,6 +36,7 @@ import {
 	buildScopedToolFunction,
 	detectShell,
 	persistBlockToRc,
+	removeBlockFromRc,
 	tildify,
 	rcPath,
 	toolMarkers,
@@ -47,6 +47,13 @@ export interface WiringInstallResult {
 	labels: string[];
 	/** Set when a target could not be written (unsupported shell, fs error). */
 	warnings: string[];
+	/**
+	 * Set when a companion write the wiring depends on failed. Unlike a
+	 * warning, this means the install did not do what it says: the caller
+	 * must report a failure rather than a wired tool. Anything already
+	 * written that would be unsafe on its own is undone before this is set.
+	 */
+	requiredFailures: string[];
 }
 
 /**
@@ -69,6 +76,7 @@ export function installTelemetryWiring({
 	const vars = buildOtelEnvBlock(tool, endpoint, token);
 	const labels: string[] = [];
 	const warnings: string[] = [];
+	const requiredFailures: string[] = [];
 
 	if (tool === "claude") {
 		const target = appSettingsTargetFor("claude");
@@ -94,14 +102,14 @@ export function installTelemetryWiring({
 				// The env is the wiring that matters; the seam is best-effort.
 			}
 		}
-		return { labels, warnings };
+		return { labels, warnings, requiredFailures };
 	}
 
 	if (tool === "codex") {
 		try {
 			writeCodexOtelBlock(
 				{
-					endpoint: codexTraceEndpoint(endpoint),
+					baseEndpoint: endpoint,
 					ingestionToken: token,
 					environment: cfg.organization?.slug ?? "langwatch",
 				},
@@ -114,7 +122,7 @@ export function installTelemetryWiring({
 			);
 		}
 		assertCodexTurnHarvest();
-		return { labels, warnings };
+		return { labels, warnings, requiredFailures };
 	}
 
 	// Every remaining tool persists as a scoped shell function so the OTel
@@ -124,7 +132,7 @@ export function installTelemetryWiring({
 		warnings.push(
 			`unsupported shell (${process.env.SHELL ?? "unknown"}): no rc file to write the scoped ${tool} function to.`,
 		);
-		return { labels, warnings };
+		return { labels, warnings, requiredFailures };
 	}
 	try {
 		persistBlockToRc(
@@ -140,11 +148,13 @@ export function installTelemetryWiring({
 	}
 	if (tool === "opencode") {
 		// opencode only emits spans when `experimental.openTelemetry` is on
-		// in its own config; the env vars alone are accepted and ignored.
+		// in its own config; the env vars alone are accepted and ignored, so
+		// reporting a wired tool here would be reporting a tool that sends
+		// nothing.
 		try {
 			setOpencodeOpenTelemetryFlag();
 		} catch (err) {
-			warnings.push(
+			requiredFailures.push(
 				`could not enable opencode's OpenTelemetry flag: ${(err as Error).message}`,
 			);
 		}
@@ -162,11 +172,17 @@ export function installTelemetryWiring({
 					keys: Object.keys(vars),
 				});
 			} catch (err) {
-				warnings.push(
-					`could not apply the VS Code terminal telemetry clear: ${(err as Error).message}`,
+				// The scoped function puts the bearer where a long-lived editor's
+				// integrated terminals inherit it, and the clear is what keeps it
+				// out of them. With the clear unwritten the function is unsafe, so
+				// it comes back out and the install reports a failure.
+				removeBlockFromRc(shell, toolMarkers(tool));
+				labels.length = 0;
+				requiredFailures.push(
+					`could not apply the VS Code terminal telemetry clear, so the scoped \`code\` function was removed again: ${(err as Error).message}`,
 				);
 			}
 		}
 	}
-	return { labels, warnings };
+	return { labels, warnings, requiredFailures };
 }

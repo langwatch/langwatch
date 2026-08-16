@@ -55,15 +55,21 @@ export async function instrumentCommand(
 		);
 	}
 
-	const key = options.key ?? process.env[KEY_ENV_VAR] ?? undefined;
-	const picked = [
+	const explicitScopes = [
 		options.project ? "--project" : null,
-		key ? "--key" : null,
+		options.key ? "--key" : null,
 		options.personal ? "--personal" : null,
-	].filter(Boolean);
-	if (picked.length > 1) {
-		fail(`pass only one of ${picked.join(", ")}.`);
+	].filter((flag): flag is string => flag !== null);
+	if (explicitScopes.length > 1) {
+		fail(`pass only one of ${explicitScopes.join(", ")}.`);
 	}
+	// The environment key is a default, never a choice. A shell that still
+	// exports it from an earlier setup would otherwise make `--project` and
+	// `--personal` read as a conflict with a flag the user never passed.
+	const key =
+		options.key ??
+		(explicitScopes.length === 0 ? process.env[KEY_ENV_VAR] : undefined) ??
+		undefined;
 	if (options.endpoint && !key) {
 		fail(
 			"--endpoint only applies together with --key; logged-in scopes use the endpoint you logged into.",
@@ -84,8 +90,8 @@ export async function instrumentCommand(
 	}
 
 	if (options.personal) {
-		const cleared = clearToolProjectPin({ cfg, tool });
-		if (cleared) {
+		const wasProjectPinCleared = clearToolProjectPin({ cfg, tool });
+		if (wasProjectPinCleared) {
 			process.stdout.write(
 				`${lwTag()} cleared the project pin for ${tool}.\n`,
 			);
@@ -129,7 +135,7 @@ export async function instrumentCommand(
 		// the wrapper does so later runs reuse it.
 		cfg.default_personal_ingest_keys = {
 			...(cfg.default_personal_ingest_keys ?? {}),
-			[sourceType]: { secret: credential.token },
+			[sourceType]: { secret: credential.token, prefix: credential.prefix },
 		};
 		try {
 			saveConfig(cfg);
@@ -147,6 +153,15 @@ export async function instrumentCommand(
 
 	for (const warning of result.warnings) {
 		process.stderr.write(`${lwTag()} ${warning}\n`);
+	}
+	// A companion write the wiring depends on failed, so the tool is not
+	// wired even where a file was written. Reporting success here would tell
+	// the user telemetry is flowing when it is not.
+	if (result.requiredFailures.length > 0) {
+		for (const failure of result.requiredFailures.slice(0, -1)) {
+			process.stderr.write(`${lwTag()} ${failure}\n`);
+		}
+		fail(result.requiredFailures[result.requiredFailures.length - 1]!);
 	}
 	if (result.labels.length === 0) {
 		fail(`no wiring target was written for ${tool}.`);
