@@ -46,7 +46,14 @@ export interface OutboxMessageRecord extends NewOutboxMessage {
   /** The inbox identity that produced this intent; null for wake commits. */
   sourceEventId: string | null;
   status: OutboxMessageStatus;
-  /** Completed delivery attempts so far. */
+  /**
+   * Delivery attempts STARTED so far — incremented at lease time, not at
+   * acknowledgement. Counting starts instead of conclusions is what lets a
+   * message whose lease keeps lapsing (handler never acknowledges) cross
+   * `maxAttempts` and retire, instead of redelivering as attempt 1 forever.
+   * A message released un-attempted by `releaseLease` hands its increment
+   * back.
+   */
   attempts: number;
   /** Epoch ms before which the message must not be leased. */
   nextAttemptAt: number;
@@ -123,7 +130,8 @@ export interface ProcessStore {
 
   /**
    * Lease pending, due messages for exclusive dispatch until
-   * `now + leaseDurationMs`.
+   * `now + leaseDurationMs`. Leasing increments `attempts` — the returned
+   * records carry the attempt number of the delivery that is about to start.
    */
   leaseDueMessages(params: {
     now: number;
@@ -139,11 +147,17 @@ export interface ProcessStore {
     processNames?: readonly string[];
   }): Promise<LeasedOutboxMessageRecord[]>;
 
+  /**
+   * `applied: false` means the update matched no row: the lease lapsed and
+   * a newer token superseded this one. Callers must surface that — a fenced
+   * acknowledgement means the effect may have run more than once and the
+   * message is still pending under someone else's lease.
+   */
   markDispatched(params: {
     identity: OutboxMessageIdentity;
     leaseToken: string;
     now: number;
-  }): Promise<void>;
+  }): Promise<{ applied: boolean }>;
 
   /** Record a failed attempt; `dead: true` retires the message permanently. */
   markFailed(params: {
@@ -152,7 +166,20 @@ export interface ProcessStore {
     now: number;
     nextAttemptAt: number;
     dead: boolean;
-  }): Promise<void>;
+  }): Promise<{ applied: boolean }>;
+
+  /**
+   * Return a leased message to the pool WITHOUT running it: clears the lease
+   * and hands back the attempt the lease charged, leaving the row
+   * immediately due. For batch tails whose lease budget ran out before their
+   * delivery started — releasing instead of dispatching is what keeps a slow
+   * batch from ever running past its own lease.
+   */
+  releaseLease(params: {
+    identity: OutboxMessageIdentity;
+    leaseToken: string;
+    now: number;
+  }): Promise<{ applied: boolean }>;
 
   /** Processes whose nextWakeAt is due, with the revision to guard against staleness. */
   findDueWakes(params: {
