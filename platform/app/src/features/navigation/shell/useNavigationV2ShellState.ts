@@ -68,21 +68,20 @@ export function useNavigationV2ShellState({
   const { data: session } = useRequiredSession();
 
   const bypassProjectGating = personalScope || orgScope;
-  const {
-    isLoading,
-    organization,
-    organizations,
-    team,
-    project,
-    hasPermission,
-  } = useOrganizationTeamProject({
+  const workspace = useOrganizationTeamProject({
     redirectToOnboarding: !bypassProjectGating,
     redirectToProjectOnboarding: !bypassProjectGating,
   });
   const publicEnv = usePublicEnv();
   const langyDockInset = useLangyDockInset();
 
-  useShellIdentity({ session, organization, hasPermission });
+  useShellIdentity({
+    session,
+    organization: workspace.organization,
+    hasPermission: workspace.hasPermission,
+  });
+
+  const { isLoading, team, project } = workspace;
 
   if (typeof router.query.project === "string" && !isLoading && !project) {
     return { status: "not-found" };
@@ -96,29 +95,49 @@ export function useNavigationV2ShellState({
       !!team?.isPersonal && team.ownerUserId === session?.user?.id,
   });
 
-  if (
-    !session ||
-    isShellDataPending({
-      isLoading,
-      hasOrganizations: !!organization && !!organizations,
-      hasPrimaryIntent: !!organization?.primaryIntent,
-      hasTeamAndProject: !!team && !!project,
-      route,
-    })
-  ) {
+  if (!session || isShellDataPending({ workspace, route })) {
     return { status: "loading" };
   }
 
-  return {
-    status: "ready",
+  return toReadyState({
     user: session.user,
     project,
-    currentRoute: findCurrentRoute(router.pathname),
-    activeProductId: route.activeProductId,
-    isSettingsRoute: route.isSettingsRoute,
+    route,
+    pathname: router.pathname,
     isDevelopment: publicEnv.data?.NODE_ENV === "development",
     isCompactSidebar: isSmallScreen === true,
-    showPresenceMenuItem: router.pathname.startsWith("/[project]/traces"),
+    langyDockInset,
+  });
+}
+
+/** Everything the shell draws, assembled once the data is ready. */
+function toReadyState({
+  user,
+  project,
+  route,
+  pathname,
+  isDevelopment,
+  isCompactSidebar,
+  langyDockInset,
+}: {
+  user: SessionUser;
+  project: OrganizationTeamProject["project"];
+  route: ShellRoute;
+  pathname: string;
+  isDevelopment: boolean;
+  isCompactSidebar: boolean;
+  langyDockInset: number;
+}): NavigationV2ShellReadyState {
+  return {
+    status: "ready",
+    user,
+    project,
+    currentRoute: findCurrentRoute(pathname),
+    activeProductId: route.activeProductId,
+    isSettingsRoute: route.isSettingsRoute,
+    isDevelopment,
+    isCompactSidebar,
+    showPresenceMenuItem: pathname.startsWith("/[project]/traces"),
     langyDockInset,
   };
 }
@@ -173,23 +192,20 @@ function useLangyDockInset(): number {
  * needs no project, so each scope waits only for its own parts.
  */
 function isShellDataPending({
-  isLoading,
-  hasOrganizations,
-  hasPrimaryIntent,
-  hasTeamAndProject,
+  workspace,
   route,
 }: {
-  isLoading: boolean;
-  hasOrganizations: boolean;
-  hasPrimaryIntent: boolean;
-  hasTeamAndProject: boolean;
+  workspace: OrganizationTeamProject;
   route: ShellRoute;
 }): boolean {
+  const { isLoading, organization, organizations, team, project } = workspace;
   if (isLoading) return true;
-  if (!route.isPersonalScopeRoute && !hasOrganizations) return true;
+  if (!route.isPersonalScopeRoute && !(organization && organizations)) {
+    return true;
+  }
   if (route.isPersonalScopeRoute || route.isOrgScopeRoute) return false;
-  if (hasPrimaryIntent) return false;
-  return !hasTeamAndProject;
+  if (organization?.primaryIntent) return false;
+  return !team || !project;
 }
 
 interface ShellRoute {
