@@ -4,7 +4,7 @@
 #   platform/app/prisma/schema.prisma                                                                              (Project.lastCodingAgentSessionAt / lastCodingAgentPullRequestAt)
 #   platform/app/src/server/app-layer/projects/project.service.ts                                                  (the throttled touch methods)
 #   platform/app/src/server/app-layer/projects/repositories/project.prisma.repository.ts                           (the staleness-guarded write)
-#   platform/app/src/server/event-sourcing/pipelines/coding-agent-processing/reactors/codingAgentSessionSeen.reactor.ts (the fold trigger)
+#   platform/app/src/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSessionSeen.touch.ts (the fold-commit stamp)
 #   platform/app/src/server/app-layer/github/github-pull-request-mapping.service.ts                                (the pull-request trigger)
 #   platform/app/src/components/sidebar/codingAgentActivity.ts                                                     (the recency rule)
 #   platform/app/src/components/MainMenu.tsx                                                                       (the two destinations)
@@ -130,6 +130,12 @@ Rule: A pull request found for a project's own session records it on that projec
     Given a project whose folded session asked about its branch
     When the organization's GitHub connection answers with no pull request
     Then the project records nothing about pull requests
+
+  @integration
+  Scenario: Connecting GitHub records the backfilled pull requests on their projects
+    Given a project whose recorded sessions name their branches
+    When the organization connects GitHub and the backfill finds a pull request for one of those branches
+    Then the project records that a pull request was seen
 
   @integration
   Scenario: A pull request announced over the webhook records nothing on any project

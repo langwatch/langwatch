@@ -59,37 +59,72 @@ export function createCodingAgentSessionSeenTouch(
 
   return async (tenantIds: Iterable<string>): Promise<void> => {
     const at = now();
-
     if (heldUntil.size >= WINDOW_MAP_SWEEP_THRESHOLD) {
-      for (const [key, until] of heldUntil) {
-        if (until <= at) heldUntil.delete(key);
-      }
+      sweepExpiredHolds({ heldUntil, at });
     }
-
-    const due: string[] = [];
-    for (const tenantId of new Set(tenantIds)) {
-      if ((heldUntil.get(tenantId) ?? 0) > at) continue;
-      heldUntil.set(tenantId, at + CODING_AGENT_SESSION_SEEN_WINDOW_MS);
-      due.push(tenantId);
-    }
-
+    const due = claimDueProjects({ heldUntil, tenantIds, at });
     await Promise.all(
-      due.map(async (projectId) => {
-        try {
-          await deps.touchCodingAgentSessionSeen({
-            projectId,
-            at: new Date(at),
-          });
-        } catch (error) {
-          // Release the hold so the NEXT commit retries, instead of the
-          // failure quietly extending into a full window of silence.
-          heldUntil.delete(projectId);
-          logger.warn(
-            { error, tenantId: projectId },
-            "recording the project's coding-agent session activity failed, non-fatal, the next fold retries it",
-          );
-        }
-      }),
+      due.map((projectId) => touchProject({ deps, heldUntil, projectId, at })),
     );
   };
+}
+
+function sweepExpiredHolds({
+  heldUntil,
+  at,
+}: {
+  heldUntil: Map<string, number>;
+  at: number;
+}): void {
+  for (const [key, until] of heldUntil) {
+    if (until <= at) heldUntil.delete(key);
+  }
+}
+
+/** Claim a fresh window for every project not already inside one. */
+function claimDueProjects({
+  heldUntil,
+  tenantIds,
+  at,
+}: {
+  heldUntil: Map<string, number>;
+  tenantIds: Iterable<string>;
+  at: number;
+}): string[] {
+  const due: string[] = [];
+  for (const tenantId of new Set(tenantIds)) {
+    if ((heldUntil.get(tenantId) ?? 0) > at) continue;
+    heldUntil.set(tenantId, at + CODING_AGENT_SESSION_SEEN_WINDOW_MS);
+    due.push(tenantId);
+  }
+  return due;
+}
+
+async function touchProject({
+  deps,
+  heldUntil,
+  projectId,
+  at,
+}: {
+  deps: CodingAgentSessionSeenTouchDeps;
+  heldUntil: Map<string, number>;
+  projectId: string;
+  at: number;
+}): Promise<void> {
+  const holdSetTo = at + CODING_AGENT_SESSION_SEEN_WINDOW_MS;
+  try {
+    await deps.touchCodingAgentSessionSeen({ projectId, at: new Date(at) });
+  } catch (error) {
+    // Release the hold so the NEXT commit retries, instead of the failure
+    // quietly extending into a full window of silence — but only the hold
+    // THIS call placed. A slow write failing after its window has expired
+    // must not drop the hold a newer call already took.
+    if (heldUntil.get(projectId) === holdSetTo) {
+      heldUntil.delete(projectId);
+    }
+    logger.warn(
+      { error, tenantId: projectId },
+      "recording the project's coding-agent session activity failed, non-fatal, the next fold retries it",
+    );
+  }
 }

@@ -101,12 +101,12 @@ import { createBlobMaintenancePipeline } from "./pipelines/blob-maintenance/pipe
 import { createCodingAgentProcessingPipeline } from "./pipelines/coding-agent-processing/pipeline";
 import type { CodingAgentSessionState } from "./pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
 import { CodingAgentSessionStore } from "./pipelines/coding-agent-processing/projections/codingAgentSession.store";
+import { createCodingAgentSessionSeenTouch } from "./pipelines/coding-agent-processing/projections/codingAgentSessionSeen.touch";
 import {
   CodingAgentSessionEventsAppendStore,
   CodingAgentTraceSessionAppendStore,
   SessionMetricSeriesAppendStore,
 } from "./pipelines/coding-agent-processing/projections/stores";
-import { createCodingAgentSessionSeenReactor } from "./pipelines/coding-agent-processing/reactors/codingAgentSessionSeen.reactor";
 import {
   createPullRequestMappingReactor,
   type PullRequestMappingReactorDeps,
@@ -886,9 +886,14 @@ export class PipelineRegistry {
         // coding_agent_sessions (store.get() → findBySessionId → decode row).
         // The delivery path never reads event_log. Same wiring as trace_summaries.
         codingAgentSessionStore: this.cached<CodingAgentSessionState>(
-          new CodingAgentSessionStore(
-            this.deps.repositories.codingAgentSession,
-          ),
+          new CodingAgentSessionStore(this.deps.repositories.codingAgentSession, {
+            // The Sessions-destination stamp, inline at the commit seam with
+            // its own per-process window — a read-model write, not a reactor.
+            onSessionsStored: createCodingAgentSessionSeenTouch({
+              touchCodingAgentSessionSeen: (params) =>
+                this.deps.projects.touchCodingAgentSessionSeen(params),
+            }),
+          }),
           "coding_agent_sessions",
         ),
         codingAgentTraceSessionAppendStore:
@@ -909,14 +914,6 @@ export class PipelineRegistry {
               ),
             }
           : {}),
-        // Unconditional, unlike the mapping reactor above: recording that a
-        // session ran needs only the project store, which every app has, and
-        // an instance with no GitHub connection still shows the project's
-        // Sessions destination.
-        sessionSeenReactor: createCodingAgentSessionSeenReactor({
-          touchCodingAgentSessionSeen: (params) =>
-            this.deps.projects.touchCodingAgentSessionSeen(params),
-        }),
       }),
     );
   }

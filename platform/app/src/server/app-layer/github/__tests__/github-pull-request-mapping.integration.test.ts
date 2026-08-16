@@ -623,6 +623,7 @@ describe("branch pull-request mapping", () => {
       ]);
     });
 
+    /** @scenario "Connecting GitHub records the backfilled pull requests on their projects" */
     it("records the pull requests it finds on the project whose sessions it read", async () => {
       const sessionRepository = new CodingAgentSessionClickHouseRepository(
         async () => ch,

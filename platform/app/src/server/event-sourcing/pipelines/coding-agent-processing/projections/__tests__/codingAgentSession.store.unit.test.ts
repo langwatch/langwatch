@@ -179,6 +179,63 @@ describe("CodingAgentSessionStore durable dedup", () => {
     });
   });
 
+  describe("given the store carries the sessions-stored hook", () => {
+    describe("when a fold step commits", () => {
+      it("reports the committed tenant after the durable write", async () => {
+        const repo = new FakeRepo();
+        const seen: string[][] = [];
+        const store = new CodingAgentSessionStore(repo, {
+          onSessionsStored: async (tenantIds) => {
+            // The row must be durable before the project is stamped.
+            expect(repo.upsertCalls).toHaveLength(1);
+            seen.push(tenantIds);
+          },
+        });
+
+        await store.store(makeState(), context());
+        await Promise.resolve();
+
+        expect(seen).toEqual([[String(tenantId)]]);
+      });
+    });
+
+    describe("when a batch commits several sessions of one project", () => {
+      it("reports the tenant once, not once per session", async () => {
+        const repo = new FakeRepo();
+        const seen: string[][] = [];
+        const store = new CodingAgentSessionStore(repo, {
+          onSessionsStored: async (tenantIds) => {
+            seen.push(tenantIds);
+          },
+        });
+
+        await store.storeBatch([
+          { state: makeState(), context: context() },
+          {
+            state: makeState(),
+            context: context({ aggregateId: "session-2" }),
+          },
+        ]);
+        await Promise.resolve();
+
+        expect(seen).toEqual([[String(tenantId)]]);
+      });
+    });
+
+    describe("when the hook rejects anyway", () => {
+      // The touch helper never rejects by contract; this pins that a
+      // misbehaving hook still cannot fail the committed fold write.
+      it("does not fail the store call", async () => {
+        const repo = new FakeRepo();
+        const store = new CodingAgentSessionStore(repo, {
+          onSessionsStored: () => Promise.reject(new Error("boom")),
+        });
+
+        await expect(store.store(makeState(), context())).resolves.toBeUndefined();
+      });
+    });
+  });
+
   describe("given the read-back store holds a committed session", () => {
     describe("when the fold reads the state with its watermark", () => {
       /** @scenario a redelivered batch after a committed write does not double-count */
