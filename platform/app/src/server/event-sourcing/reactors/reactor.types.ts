@@ -6,7 +6,7 @@ import type { DeduplicationConfig } from "../queues/queue.types";
 /**
  * INTERNAL dispatch-plane context for a subscriber registration's handle
  * function. Authoring code uses `TriggerContext` via `.withSubscriber` /
- * `.withProcessManager` (ADR-095); this shape is what the router and queue
+ * `.withProcessManager` (ADR-098); this shape is what the router and queue
  * pass beneath that sugar.
  */
 export interface ReactorContext<FoldState = unknown> {

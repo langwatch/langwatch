@@ -65,7 +65,7 @@ Document **important technical and architectural decisions** — context, trade-
 | [085](./085-governed-chart-runtime-without-eval.md)               | The governed chart runtime runs without `eval` — ahead-of-time schema validator, interpreted expressions, injected data   | Accepted                      |
 | [092](./092-unified-authorization-engine.md)                      | Unified authorization engine — one registry, one resolver, every principal                  | Proposed                                          |
 | [094](./094-simulation-execution-on-process-manager-substrate.md) | Simulation execution on the process-manager substrate — durable execute/cancel intents, stall & cancel-grace watchdogs | Accepted |
-| [095](./095-post-event-work-subscribers-and-process-managers.md) | Post-event work is subscribers and process managers — the reactor vocabulary is retired | Accepted |
+| [098](./098-post-event-work-subscribers-and-process-managers.md) | Post-event work is subscribers and process managers — the reactor vocabulary is retired | Accepted |
 
 ## When to Write an ADR
 

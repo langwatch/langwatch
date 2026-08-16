@@ -1,4 +1,4 @@
-# Supersedes reactors.feature. See dev/docs/adr/095-post-event-work-subscribers-and-process-managers.md:
+# Supersedes reactors.feature. See dev/docs/adr/098-post-event-work-subscribers-and-process-managers.md:
 # post-event work is subscribers (best-effort) and process managers
 # (stake-sensitive); the reactor vocabulary is retired. The shouldReact
 # contract from ADR-026 carries over as the subscriber `when` guard.
