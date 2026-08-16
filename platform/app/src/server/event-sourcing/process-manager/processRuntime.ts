@@ -7,6 +7,7 @@ import {
 } from "../pipeline/processManagerDefinition";
 import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types";
 import {
+  DEFAULT_LEASE_DURATION_MS,
   type IntentHandler,
   OutboxDispatcherService,
 } from "./outbox/outboxDispatcherService";
@@ -23,6 +24,20 @@ import {
 } from "./wake/processWakeWorker";
 
 const defaultLogger = createLogger("langwatch:event-sourcing:process-runtime");
+
+const STUCK_DRAIN_LEASE_MULTIPLE = 5;
+const STUCK_DRAIN_FLOOR_MS = 300_000;
+
+/**
+ * Far above any legitimate drain (a full batch of slow deliveries fits in one
+ * lease), so only a never-settling delivery trips it.
+ */
+function stuckDrainTimeoutMs(leaseDurationMs: number | undefined): number {
+  return Math.max(
+    STUCK_DRAIN_LEASE_MULTIPLE * (leaseDurationMs ?? DEFAULT_LEASE_DURATION_MS),
+    STUCK_DRAIN_FLOOR_MS,
+  );
+}
 
 export const SCHEDULED_SINGLETON_PROJECT_ID = "__global__" as const;
 const SCHEDULE_ARM_EVENT_TYPE = "__schedule_arm" as const;
@@ -239,7 +254,9 @@ export class ProcessRuntime {
     const outboxWorker = new ProcessOutboxWorker({
       dispatcher,
       logger: this.logger,
+      name: config.name,
       batchSize: config.outbox?.batchSize,
+      stuckDrainTimeoutMs: stuckDrainTimeoutMs(config.outbox?.leaseDurationMs),
     });
     const registered = { definition, manager, outboxWorker };
     this.managers.set(config.name, registered);

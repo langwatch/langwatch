@@ -272,4 +272,59 @@ describe("resolveEligible", () => {
       ).toEqual([]);
     });
   });
+
+  describe("when providers live at different scope tiers", () => {
+    const mixedTierProviders: OrgModelProvider[] = [
+      {
+        id: "mp-org-z",
+        name: "Zeta Org",
+        provider: "openai",
+        enabled: true,
+        scopes: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+        models: [],
+      },
+      {
+        id: "mp-org-a",
+        name: "Alpha Org",
+        provider: "openai",
+        enabled: true,
+        scopes: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+        models: [],
+      },
+      {
+        id: "mp-team",
+        name: "Mid Team",
+        provider: "openai",
+        enabled: true,
+        scopes: [{ scopeType: "TEAM", scopeId: TEAM_ID }],
+        models: [],
+      },
+      {
+        id: "mp-proj",
+        name: "Proj",
+        provider: "openai",
+        enabled: true,
+        scopes: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }],
+        models: [],
+      },
+    ];
+
+    /** @scenario Provider access lists organization scope before team before project */
+    it("lists organization first, then team, then project, by name within a scope", () => {
+      const rows = resolveEligible(keyAtProject, mixedTierProviders, hierarchy);
+
+      expect(rows.map((r) => r.label)).toEqual([
+        "Alpha Org",
+        "Zeta Org",
+        "Mid Team",
+        "Proj",
+      ]);
+      expect(rows.map((r) => r.definedAt.scopeType)).toEqual([
+        "ORGANIZATION",
+        "ORGANIZATION",
+        "TEAM",
+        "PROJECT",
+      ]);
+    });
+  });
 });

@@ -387,9 +387,9 @@ describe("given the new-virtual-key drawer", () => {
       renderDrawer();
 
       await userEvent.click(screen.getByTestId("vk-providers-all"));
-      // Unticking All starts from everything selected; narrowing is one
-      // uncheck away.
-      await userEvent.click(screen.getByTestId("vk-provider-mp-anthropic"));
+      // Unchecking "All providers" clears the selection; pick one provider to
+      // narrow the key to exactly it.
+      await userEvent.click(screen.getByTestId("vk-provider-mp-openai"));
       await userEvent.type(screen.getByPlaceholderText("e.g. codex-prod"), "k");
       await submit();
 
@@ -403,9 +403,9 @@ describe("given the new-virtual-key drawer", () => {
     it("refuses to save and says why", async () => {
       renderDrawer();
 
+      // Unchecking "All providers" clears the selection, so no provider is
+      // picked and the drawer refuses the save.
       await userEvent.click(screen.getByTestId("vk-providers-all"));
-      await userEvent.click(screen.getByTestId("vk-provider-mp-openai"));
-      await userEvent.click(screen.getByTestId("vk-provider-mp-anthropic"));
       await userEvent.type(screen.getByPlaceholderText("e.g. codex-prod"), "k");
 
       expect(screen.getByTestId("vk-providers-invalid").textContent).toContain(

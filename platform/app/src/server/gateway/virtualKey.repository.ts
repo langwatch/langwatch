@@ -27,6 +27,7 @@ import { keysetAfter } from "./wirePagination";
  */
 export const ROUTING_POLICY_SELECT = {
   id: true,
+  name: true,
   modelAliases: true,
   defaultModel: true,
   policyRules: true,
@@ -41,6 +42,7 @@ export type VirtualKeyWithScopes = VirtualKey & {
   } | null;
   routingPolicy?: {
     id: string;
+    name: string;
     modelAliases: Prisma.JsonValue;
     defaultModel: string | null;
     policyRules: Prisma.JsonValue;

@@ -40,7 +40,7 @@ import {
 } from "./resourceMetadata";
 import {
   decideTraceDestination,
-  eligibleModelProvidersForVk,
+  scopeReachableModelProvidersForVk,
   type TraceDestinationInput,
 } from "./scopeResolver";
 import {
@@ -1019,10 +1019,13 @@ export class VirtualKeyService {
   }
 
   /**
-   * An explicit provider allowlist may only name providers the key can
-   * actually reach through its scope graph. Without this a key could be
-   * saved pointing at another team's provider row and the mistake would
-   * only surface as an unexplained "model not available" at dispatch.
+   * An explicit provider allowlist may only name providers the key can reach
+   * through its SCOPE graph. It is validated against the scope-reachable set,
+   * not the routing-policy-narrowed dispatch set: a provider the scope reaches
+   * but the key's routing policy omits is still a valid allowlist entry,
+   * because the policy blocks it at dispatch, not at save. Blocking the save
+   * too would be over-strict. A provider the scope does not reach at all still
+   * fails here, so a key can never point at another team's provider row.
    */
   private async assertProvidersAllowedReachable(
     vk: VirtualKeyWithScopes,
@@ -1030,9 +1033,13 @@ export class VirtualKeyService {
     tx: Prisma.TransactionClient,
   ): Promise<void> {
     if (!providersAllowed) return;
-    const eligible = await eligibleModelProvidersForVk(this.prisma, vk, tx);
-    const eligibleIds = new Set(eligible.map((mp) => mp.id));
-    const unreachable = providersAllowed.filter((id) => !eligibleIds.has(id));
+    const reachable = await scopeReachableModelProvidersForVk(
+      this.prisma,
+      vk,
+      tx,
+    );
+    const reachableIds = new Set(reachable.map((mp) => mp.id));
+    const unreachable = providersAllowed.filter((id) => !reachableIds.has(id));
     if (unreachable.length > 0) {
       throw new TRPCError({
         code: "BAD_REQUEST",
