@@ -268,6 +268,7 @@ describe("createManagementService", () => {
    * reach the verb helpers without going through the check these pin.
    */
   describe("given a family added after the webhooks pilot", () => {
+    /** @scenario A new family may not register a resource-REST route */
     it("refuses a resource-REST route", () => {
       const { service: svc, guard } = createManagementService({
         name: "toy-rest-newcomer",
@@ -314,6 +315,7 @@ describe("createManagementService", () => {
       ).toThrow(/organization, role-bindings, roles, scim-tokens/);
     });
 
+    /** @scenario A new family may register an RPC operation */
     it("admits an RPC operation", () => {
       const { service: svc, guard } = createManagementService({
         name: "toy-rpc-newcomer",
@@ -335,6 +337,125 @@ describe("createManagementService", () => {
           })
           .build(),
       ).not.toThrow();
+    });
+  });
+
+  /**
+   * The success status is a property of the endpoint, fixed when it is
+   * registered. `packages/api` pins the framework rule directly; these pin it
+   * through the factory every management endpoint is actually built with, and
+   * are what binds the scenarios — `check-feature-parity` does not glob
+   * `packages/**`, so coverage that lives only there enforces nothing.
+   */
+  describe("given an endpoint's success status", () => {
+    const family = (name: string) =>
+      createManagementService({
+        name,
+        basePath: `/api/${name}`,
+        feature: "MANAGEMENT_API",
+      });
+
+    /** @scenario An output schema that accepts both a value and nothing is refused */
+    it("refuses an output schema accepting undefined as well as a value", () => {
+      const { service: svc, guard } = family("toy-optional-output");
+
+      expect(() =>
+        svc
+          .version(MANAGEMENT_API_VERSION, (v) => {
+            v.rpc(
+              "/things.get",
+              {
+                ...guard("organization:manage"),
+                output: z.object({ ok: z.boolean() }).optional(),
+                status: 201,
+              },
+              async () => undefined,
+            );
+          })
+          .build(),
+      ).toThrow(/204 when undefined, 201 otherwise/);
+    });
+
+    /** @scenario An endpoint that never sends a body always answers 204 */
+    it("answers 204 with an empty body when none is declared", async () => {
+      const { service: svc, guard } = family("toy-no-body");
+      const app = svc
+        .version(MANAGEMENT_API_VERSION, (v) => {
+          v.rpc(
+            "/things.purge",
+            { ...guard("organization:manage"), output: z.void() },
+            async () => undefined,
+          );
+        })
+        .build();
+
+      const response = await app.request("/api/toy-no-body/things.purge", {
+        method: "POST",
+      });
+
+      expect(response.status).toBe(204);
+      expect(await response.text()).toBe("");
+    });
+
+    /** @scenario An endpoint that declares a body always answers its declared status */
+    it("answers the declared status with the body, and fails when the body is missing", async () => {
+      const { service: svc, guard } = family("toy-created");
+      const app = svc
+        .version(MANAGEMENT_API_VERSION, (v) => {
+          v.rpc(
+            "/things.create",
+            {
+              ...guard("organization:manage"),
+              output: z.object({ id: z.string() }),
+              status: 201,
+            },
+            async () => ({ id: "a" }),
+          );
+          v.rpc(
+            "/things.createBroken",
+            {
+              ...guard("organization:manage"),
+              output: z.object({ id: z.string() }),
+              status: 201,
+            },
+            // The cast is the point: a handler that sends nothing where a
+            // body is declared.
+            async () => undefined as unknown as { id: string },
+          );
+        })
+        .build();
+
+      const created = await app.request("/api/toy-created/things.create", {
+        method: "POST",
+      });
+      expect(created.status).toBe(201);
+      expect(await created.json()).toEqual({ id: "a" });
+
+      const broken = await app.request("/api/toy-created/things.createBroken", {
+        method: "POST",
+      });
+      expect(broken.status).toBe(500);
+    });
+
+    /** @scenario An undeclared payload never reaches the wire */
+    it("sends no body for an endpoint that declared no output schema", async () => {
+      const { service: svc, guard } = family("toy-undeclared");
+      const app = svc
+        .version(MANAGEMENT_API_VERSION, (v) => {
+          v.rpc(
+            "/things.leak",
+            { ...guard("organization:manage") },
+            (async () => ({ leaked: "secret" })) as never,
+          );
+        })
+        .build();
+
+      const response = await app.request("/api/toy-undeclared/things.leak", {
+        method: "POST",
+      });
+
+      expect(response.status).toBe(204);
+      expect(await response.text()).toBe("");
     });
   });
 });
