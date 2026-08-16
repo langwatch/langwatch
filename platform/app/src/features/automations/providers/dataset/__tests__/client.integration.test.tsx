@@ -6,13 +6,14 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { refetchMock, mutateMock, readHandledErrorMock, showErrorToastMock } =
-  vi.hoisted(() => ({
+const { refetchMock, openDrawerMock, goBackMock, keepDraftMock } = vi.hoisted(
+  () => ({
     refetchMock: vi.fn(),
-    mutateMock: vi.fn(),
-    readHandledErrorMock: vi.fn(),
-    showErrorToastMock: vi.fn(),
-  }));
+    openDrawerMock: vi.fn(),
+    goBackMock: vi.fn(),
+    keepDraftMock: vi.fn(),
+  }),
+);
 
 vi.mock("~/utils/api", () => ({
   api: {
@@ -25,17 +26,16 @@ vi.mock("~/utils/api", () => ({
           refetch: refetchMock,
         }),
       },
-      upsert: {
-        useMutation: () => ({ mutate: mutateMock, isPending: false }),
-      },
     },
   },
 }));
 
-vi.mock("~/features/errors", () => ({
-  readHandledError: readHandledErrorMock,
-  describeError: () => "A dataset with this name already exists.",
-  showErrorToast: showErrorToastMock,
+vi.mock("~/hooks/useDrawer", () => ({
+  useDrawer: () => ({ openDrawer: openDrawerMock, goBack: goBackMock }),
+}));
+
+vi.mock("../../../state/subFlow", () => ({
+  keepDraftForSubFlow: keepDraftMock,
 }));
 
 const { default: client } = await import("../client");
@@ -46,11 +46,14 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-const renderForm = (onChange = vi.fn()) => {
+const renderForm = ({
+  onChange = vi.fn(),
+  datasetId = "",
+}: { onChange?: ReturnType<typeof vi.fn>; datasetId?: string } = {}) => {
   render(
     <ConfigForm
-      slice={client.initialSlice()}
-      onChange={onChange}
+      slice={{ ...client.initialSlice(), datasetId }}
+      onChange={onChange as never}
       ctx={{ projectId: "project-1" } as never}
     />,
     { wrapper: Wrapper },
@@ -58,9 +61,26 @@ const renderForm = (onChange = vi.fn()) => {
   return onChange;
 };
 
-const openCreateForm = async () => {
+/** The props the section hands the dataset drawer when it navigates. */
+const datasetDrawerProps = () => {
+  const [drawer, props] = openDrawerMock.mock.calls.at(-1) as [
+    string,
+    {
+      onSuccess: (created: {
+        datasetId: string;
+        name: string;
+        columnTypes: { name: string; type: string }[];
+      }) => void;
+      onClose: () => void;
+    },
+  ];
+  expect(drawer).toBe("addOrEditDataset");
+  return props;
+};
+
+const chooseCreate = async () => {
   await userEvent.click(screen.getByRole("button", { name: /create new/i }));
-  return screen.getByPlaceholderText("New dataset name");
+  return datasetDrawerProps();
 };
 
 describe("dataset automation configuration", () => {
@@ -71,50 +91,32 @@ describe("dataset automation configuration", () => {
 
   describe("given the project has no dataset yet", () => {
     /** @scenario "Creating a dataset from the automation is offered and works" */
-    it("opens the inline creation form in the current drawer, never a second drawer", async () => {
+    it("navigates to the dataset drawer and keeps the automation draft", async () => {
       renderForm();
 
-      expect(
-        screen.queryByPlaceholderText("New dataset name"),
-      ).not.toBeInTheDocument();
+      await chooseCreate();
 
-      await openCreateForm();
-
-      expect(
-        screen.getByPlaceholderText("New dataset name"),
-      ).toBeInTheDocument();
-      // Drawers are URL-routed singletons; the sub-flow must not mount one.
-      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      // The push unmounts this drawer, so the draft has to be spared the
+      // reset a real close performs.
+      expect(keepDraftMock).toHaveBeenCalled();
+      expect(openDrawerMock).toHaveBeenCalledTimes(1);
     });
 
     /** @scenario "Creating a dataset from the automation is offered and works" */
-    it("creates the dataset and selects it with a derived column mapping", async () => {
-      mutateMock.mockImplementation(
-        (
-          _input: unknown,
-          callbacks: { onSuccess: (created: { id: string }) => void },
-        ) => {
-          callbacks.onSuccess({ id: "dataset-1" });
-        },
-      );
+    it("selects the created dataset with a derived mapping and returns", async () => {
       const onChange = renderForm();
 
-      const nameInput = await openCreateForm();
-      await userEvent.type(nameInput, "Support traces");
-      await userEvent.click(
-        screen.getByRole("button", { name: /create dataset/i }),
-      );
+      const props = await chooseCreate();
+      props.onSuccess({
+        datasetId: "dataset-1",
+        name: "Support traces",
+        columnTypes: [
+          { name: "trace_id", type: "string" },
+          { name: "output", type: "string" },
+        ],
+      });
+      props.onClose();
 
-      expect(mutateMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          projectId: "project-1",
-          name: "Support traces",
-          columnTypes: expect.arrayContaining([
-            expect.objectContaining({ name: "trace_id" }),
-          ]),
-        }),
-        expect.anything(),
-      );
       expect(refetchMock).toHaveBeenCalled();
       expect(onChange).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -122,33 +124,47 @@ describe("dataset automation configuration", () => {
           mapping: expect.objectContaining({
             mapping: expect.objectContaining({
               trace_id: expect.objectContaining({ source: "trace_id" }),
-              input: expect.objectContaining({ source: "input" }),
               output: expect.objectContaining({ source: "output" }),
             }),
           }),
         }),
       );
+      expect(goBackMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("given the automation already points at a dataset", () => {
+    /** @scenario "Leaving the dataset drawer without creating keeps the dataset already chosen" */
+    it("puts the earlier dataset back when nothing was created", async () => {
+      const onChange = renderForm({ datasetId: "dataset-existing" });
+
+      const props = await chooseCreate();
+      props.onClose();
+
+      expect(onChange).toHaveBeenCalledWith(
+        expect.objectContaining({ datasetId: "dataset-existing" }),
+      );
+      expect(goBackMock).toHaveBeenCalledTimes(1);
     });
 
-    it("shows a taken name under the field instead of a toast", async () => {
-      readHandledErrorMock.mockReturnValue({ code: "dataset_name_taken" });
-      mutateMock.mockImplementation(
-        (_input: unknown, callbacks: { onError: (error: unknown) => void }) => {
-          callbacks.onError(new Error("dataset_name_taken"));
-        },
-      );
-      renderForm();
+    it("leaves the created dataset in place instead of restoring", async () => {
+      const onChange = renderForm({ datasetId: "dataset-existing" });
 
-      const nameInput = await openCreateForm();
-      await userEvent.type(nameInput, "Support traces");
-      await userEvent.click(
-        screen.getByRole("button", { name: /create dataset/i }),
-      );
+      const props = await chooseCreate();
+      props.onSuccess({
+        datasetId: "dataset-new",
+        name: "New",
+        columnTypes: [{ name: "input", type: "string" }],
+      });
+      props.onClose();
 
-      expect(
-        screen.getByText("A dataset with this name already exists."),
-      ).toBeInTheDocument();
-      expect(showErrorToastMock).not.toHaveBeenCalled();
+      // The picker clears its selection on the way out, so the earlier id
+      // appears only if the close path wrongly restores it.
+      const datasetIds = onChange.mock.calls.map(
+        (call) => (call[0] as { datasetId: string }).datasetId,
+      );
+      expect(datasetIds.at(-1)).toBe("dataset-new");
+      expect(datasetIds).not.toContain("dataset-existing");
     });
   });
 });

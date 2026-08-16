@@ -169,17 +169,29 @@ Feature: Staged automation authoring drawer
       And no template section is shown
 
     # A project with no dataset has nothing to select, so the create
-    # affordance is the only way out of the section. The sub-flow stays in
-    # this drawer: a second drawer would replace this one and discard the
-    # automation draft.
+    # affordance is the only way out of the section. Creation is the dataset
+    # drawer's job, so the section hands over to it and comes back.
     @integration
     Scenario: Creating a dataset from the automation is offered and works
       Given the user is configuring an add-to-dataset action
       And the project has no dataset yet
       When the user chooses to create a dataset
-      Then the dataset creation form opens inside the automation drawer
-      And no second drawer replaces the automation drawer
+      Then the dataset drawer opens
       And the created dataset becomes the automation's target
+      And the automation drawer is back with its draft intact
+
+    # The picker clears its selection when it hands over, so an ending
+    # without a created dataset has to put the earlier target back: without
+    # it the author opens the dataset drawer, changes their mind, and
+    # silently loses the dataset the automation already pointed at.
+    @integration
+    Scenario: Leaving the dataset drawer without creating keeps the dataset already chosen
+      Given the user is configuring an add-to-dataset action
+      And the user has chosen a dataset
+      When the user chooses to create a dataset
+      And the user closes the dataset drawer without creating one
+      Then the dataset chosen before is still the automation's target
+      And the automation drawer is back
 
   Rule: The Slack channel list never claims to be complete when it isn't
 

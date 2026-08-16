@@ -93,6 +93,7 @@ import {
   useDraft,
   useSection,
 } from "./state/selectors";
+import { consumeDraftKeptForSubFlow } from "./state/subFlow";
 
 /**
  * Headlines naming the template the server rejected.
@@ -275,8 +276,17 @@ export function AutomationDrawer({
   const pushAttempt = useAutomationStore((s) => s.pushTestAttempt);
   const testHistory = useAutomationStore((s) => s.testHistory);
 
-  // Wipe the singleton store on unmount — next open is a fresh slate.
-  useEffect(() => () => reset(), [reset]);
+  // Wipe the singleton store on unmount — next open is a fresh slate. A
+  // sub-flow (creating a dataset) unmounts this drawer the same way closing
+  // it does, so the draft is kept when the drawer announced it is coming
+  // back through goBack.
+  useEffect(
+    () => () => {
+      if (consumeDraftKeptForSubFlow()) return;
+      reset();
+    },
+    [reset],
+  );
 
   // Baseline the close-guard diffs against: the hydrated row on edit, the
   // traces-prefilled (or empty) draft on create. Set once the relevant
