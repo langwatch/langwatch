@@ -214,7 +214,7 @@ describe("trigger settlement process", () => {
         // The runtime builds the intent factories with the process key, and
         // that prefix is what separates two automations whose page bodies are
         // byte-identical.
-        const pageKeysOf = (triggerId: string) => {
+        const pageKeysOf = ({ triggerId }: { triggerId: string }) => {
           const context = {
             key: triggerId,
             projectId: "project-1",
@@ -240,10 +240,10 @@ describe("trigger settlement process", () => {
 
         const pageBody = `persist:${digestBatchKey(["trace-1@30000-0"])}`;
 
-        expect(pageKeysOf("trigger-1")).toEqual([
+        expect(pageKeysOf({ triggerId: "trigger-1" })).toEqual([
           `process:trigger-1:${pageBody}`,
         ]);
-        expect(pageKeysOf("trigger-2")).toEqual([
+        expect(pageKeysOf({ triggerId: "trigger-2" })).toEqual([
           `process:trigger-2:${pageBody}`,
         ]);
       });
