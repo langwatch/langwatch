@@ -116,6 +116,11 @@ export const UNPUBLISHED = [
     why: "inbound Auth0 provisioning webhook, addressed by Auth0 and no one else",
   },
   {
+    match: "/api/elevenlabs/webhook",
+    category: "internal",
+    why: "inbound ElevenLabs post-call webhook; the schema is the vendor's and the signature check against the provider row's own secret makes ElevenLabs the only valid caller. A customer does configure this URL in their workspace, and its shape is documented for that at docs/ai-gateway/api/realtime.mdx, but it is not an operation anyone calls from our API",
+  },
+  {
     match: "/api/github",
     category: "internal",
     why: "the GitHub App install redirect, setup callback and webhook. The redirect runs on a browser session from our own settings page, and the other two are addressed by GitHub, so an API-key caller can reach none of them",
