@@ -8,7 +8,7 @@
  */
 
 import { renderHook } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
@@ -18,13 +18,20 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
+const useFeatureFlagMock = vi.fn(() => ({ enabled: true, isLoading: false }));
+
 vi.mock("~/hooks/useFeatureFlag", () => ({
-  useFeatureFlag: () => ({ enabled: true, isLoading: false }),
+  useFeatureFlag: (...args: unknown[]) =>
+    (useFeatureFlagMock as unknown as (...a: unknown[]) => unknown)(...args),
 }));
 
 import { useReachableProducts } from "../useReachableProducts";
 
 describe("useReachableProducts", () => {
+  beforeEach(() => {
+    useFeatureFlagMock.mockClear();
+  });
+
   describe("when nothing changes between renders", () => {
     it("returns the same array identity", () => {
       const { result, rerender } = renderHook(() => useReachableProducts());
@@ -34,6 +41,23 @@ describe("useReachableProducts", () => {
 
       expect(result.current.reachableProducts).toBe(first);
       expect(first).toEqual(["me", "llm-ops", "gateway", "governance"]);
+    });
+  });
+
+  describe("when the caller is in legacy mode", () => {
+    /** @scenario "Legacy mode runs no navigation-v2 queries" */
+    it("keeps the product flag queries disabled", () => {
+      const { result } = renderHook(() =>
+        useReachableProducts({ enabled: false }),
+      );
+
+      expect(result.current.reachableProducts).toEqual([]);
+      expect(result.current.isLoading).toBe(false);
+      for (const call of useFeatureFlagMock.mock.calls) {
+        expect(
+          (call as unknown as [string, { enabled: boolean }])[1].enabled,
+        ).toBe(false);
+      }
     });
   });
 });

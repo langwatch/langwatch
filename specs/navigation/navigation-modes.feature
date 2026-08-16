@@ -79,3 +79,10 @@ Feature: Navigation modes behind one flag
     Then the sidebar, the workspace switcher and the page body render as today
     And the avatar menu shows its current items
     And the avatar menu has no "Navigation" entry
+
+  @integration
+  Scenario: Legacy mode runs no navigation-v2 queries
+    Given my device is on the old navigation
+    When I open the home page
+    Then no product reachability check runs
+    And the home page picks my landing page the way it does today

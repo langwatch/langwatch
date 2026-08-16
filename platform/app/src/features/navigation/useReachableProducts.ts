@@ -9,8 +9,16 @@ import { PRODUCTS, type ProductId } from "./products";
  * in the registry evaluated against the live flags and permissions.
  * `isLoading` covers the flag round-trips so landing decisions can wait
  * instead of resolving against a half-evaluated list.
+ *
+ * The product registry belongs to the new navigation modes, so a caller
+ * that also runs in legacy mode passes `enabled: false` there. The flag
+ * queries then never run and the legacy path keeps its request count.
  */
-export function useReachableProducts(): {
+export function useReachableProducts({
+  enabled = true,
+}: {
+  enabled?: boolean;
+} = {}): {
   reachableProducts: ProductId[];
   isLoading: boolean;
 } {
@@ -23,13 +31,14 @@ export function useReachableProducts(): {
     redirectToProjectOnboarding: false,
   });
 
+  const isQueryEnabled = enabled && !!organization?.id;
   const gatewayFlag = useFeatureFlag("release_ui_ai_gateway_menu_enabled", {
     organizationId: organization?.id,
-    enabled: !!organization?.id,
+    enabled: isQueryEnabled,
   });
   const governanceFlag = useFeatureFlag("release_ui_ai_governance_enabled", {
     organizationId: organization?.id,
-    enabled: !!organization?.id,
+    enabled: isQueryEnabled,
   });
 
   const flagValues: Partial<Record<FrontendFeatureFlag, boolean>> = {
@@ -37,15 +46,20 @@ export function useReachableProducts(): {
     release_ui_ai_governance_enabled: governanceFlag.enabled,
   };
 
-  const reachableIds = PRODUCTS.filter((product) =>
-    product.gates.every((gate) => {
-      if (gate.flag !== undefined && !flagValues[gate.flag]) return false;
-      if (gate.permission !== undefined && !hasPermission(gate.permission)) {
-        return false;
-      }
-      return true;
-    }),
-  ).map((product) => product.id);
+  const reachableIds = enabled
+    ? PRODUCTS.filter((product) =>
+        product.gates.every((gate) => {
+          if (gate.flag !== undefined && !flagValues[gate.flag]) return false;
+          if (
+            gate.permission !== undefined &&
+            !hasPermission(gate.permission)
+          ) {
+            return false;
+          }
+          return true;
+        }),
+      ).map((product) => product.id)
+    : [];
 
   // A stable identity for a stable answer: consumers put this list in
   // effect dependencies (the "/" landing), so a fresh array every render
@@ -58,9 +72,10 @@ export function useReachableProducts(): {
 
   return {
     reachableProducts,
-    isLoading:
-      isOrganizationLoading ||
-      gatewayFlag.isLoading ||
-      governanceFlag.isLoading,
+    isLoading: enabled
+      ? isOrganizationLoading ||
+        gatewayFlag.isLoading ||
+        governanceFlag.isLoading
+      : false,
   };
 }
