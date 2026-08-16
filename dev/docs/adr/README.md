@@ -63,6 +63,7 @@ Document **important technical and architectural decisions** — context, trade-
 | [083](./083-governed-sql-diagnostics-read-the-single-parse.md)    | Governed SQL diagnostics read the validator's single parse, never a second one               | Accepted                                          |
 | [084](./084-governed-sql-postgres-mapping-tenant-predicate.md)    | PostgreSQL-resident data is reached through an approved view, a policed engine table, and a view-carried tenant predicate | Accepted                      |
 | [085](./085-governed-chart-runtime-without-eval.md)               | The governed chart runtime runs without `eval` — ahead-of-time schema validator, interpreted expressions, injected data   | Accepted                      |
+| [092](./092-unified-authorization-engine.md)                      | Unified authorization engine — one registry, one resolver, every principal                  | Proposed                                          |
 | [094](./094-simulation-execution-on-process-manager-substrate.md) | Simulation execution on the process-manager substrate — durable execute/cancel intents, stall & cancel-grace watchdogs | Accepted |
 
 ## When to Write an ADR

@@ -21,6 +21,8 @@ COPY platform/app/package.json ./platform/app/
 COPY packages/redaction/package.json ./packages/redaction/
 COPY packages/ssrf/package.json ./packages/ssrf/
 COPY packages/api/package.json ./packages/api/
+COPY packages/authz/package.json ./packages/authz/
+COPY packages/authz-server/package.json ./packages/authz-server/
 COPY packages/automations/package.json ./packages/automations/
 COPY packages/observability/package.json ./packages/observability/
 COPY packages/react-rum/package.json ./packages/react-rum/
