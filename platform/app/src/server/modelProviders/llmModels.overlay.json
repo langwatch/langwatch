@@ -393,8 +393,31 @@
 			"defaultParameters": null,
 			"modality": "text+audio->text+audio",
 			"mode": "chat",
-			"description": "A cost-efficient version of GPT Audio. Text input and output are priced by the fields above. Audio input is priced by audioCostPerToken. The audio output rate is twice the audio input rate; the cost layer cannot price audio tokens yet, and langwatch#7021 adds both the audio-token pricing and the derivation that produces the output rate from the input rate. Rates verified 2026-08-15 on https://developers.openai.com/api/docs/pricing, which lists audio input $10.00 and audio output $20.00 per million for this model. Note the per-model page at /api/docs/models/gpt-audio-mini carries the text rates only, so the pricing page is the source for the audio side. This entry exists because one upstream source reports the audio input rate as the text rate, which billed audio at a sixteenth of the published price. The other source carries the correct rate. Retire this entry once the wrong source is corrected; the weekly price audit reports the disagreement until then.",
+			"description": "A cost-efficient version of GPT Audio. Text input and output are priced by the fields above. Audio input is priced by audioCostPerToken, and the cost layer derives the audio output rate as twice the audio input rate. Rates verified 2026-08-15 on https://developers.openai.com/api/docs/pricing, which lists audio input $10.00 and audio output $20.00 per million for this model. Note the per-model page at /api/docs/models/gpt-audio-mini carries the text rates only, so the pricing page is the source for the audio side. This entry exists because one upstream source reports the audio input rate as the text rate, which billed audio at a sixteenth of the published price. The other source carries the correct rate. Retire this entry once the wrong source is corrected; the weekly price audit reports the disagreement until then.",
 			"supportsImageInput": false,
+			"supportsAudioInput": true,
+			"supportsImageOutput": false,
+			"supportsAudioOutput": true
+		},
+		"openai/gpt-realtime-2": {
+			"id": "openai/gpt-realtime-2",
+			"name": "OpenAI: GPT Realtime 2",
+			"provider": "openai",
+			"pricing": {
+				"inputCostPerToken": 4e-6,
+				"outputCostPerToken": 2.4e-5,
+				"inputCacheReadPerToken": 4e-7,
+				"audioCostPerToken": 3.2e-5,
+				"audioOutputCostPerToken": 6.4e-5
+			},
+			"contextLength": 0,
+			"maxCompletionTokens": null,
+			"supportedParameters": [],
+			"defaultParameters": null,
+			"modality": "audio->audio",
+			"mode": "audio",
+			"description": "OpenAI's realtime speech model, second generation. Text input $4.00, text output $24.00, audio input $32.00 and audio output $64.00 per million tokens, with cached input at $0.40 (https://developers.openai.com/api/docs/models/gpt-realtime-2, verified 2026-08-16). This entry exists for the text output rate only: the price registry the sync imports from carries $16.00 there, which is the previous generation's rate and a third under what the provider charges. Every other rate here matches that registry. Retire this entry once the registry is corrected; the weekly price audit reports the disagreement until then.",
+			"supportsImageInput": true,
 			"supportsAudioInput": true,
 			"supportsImageOutput": false,
 			"supportsAudioOutput": true
