@@ -115,7 +115,22 @@ Feature: Gateway audio endpoints, OpenAI-compatible TTS and STT for OpenAI and E
     Given a virtual key over its budget, or over its rate limit
     When the client calls either audio endpoint
     Then the request is blocked with the same error the chat endpoint emits
-    And an allowed call's spend is recorded against the same budget
+
+  @integration
+  Scenario: A character-priced call debits the budget it was admitted under
+    Given a virtual key with a budget and a character-priced speech model
+    When the client synthesizes speech through the gateway
+    Then the call's character count reaches the spend record
+    And the budget moves by the characters times the model's per-character rate
+    # A quantity that stops before the spend wire rates at zero, so a
+    # call that cost real money debits nothing at all.
+
+  @integration
+  Scenario: A duration-priced transcription debits the budget it was admitted under
+    Given a virtual key with a budget and a second-priced transcription model
+    When the client transcribes audio through the gateway
+    Then the audio duration reaches the spend record
+    And the budget moves by the duration times the model's per-second rate
 
   @integration
   Scenario: Upstream provider errors pass through transparently
@@ -139,6 +154,14 @@ Feature: Gateway audio endpoints, OpenAI-compatible TTS and STT for OpenAI and E
     When a transcription request completes
     Then a gateway span is exported with the resolved model
     And the span carries the audio duration (or the provider's token usage when reported) as the measure STT is priced by
+
+  @integration
+  Scenario: A span states its audio tokens apart from its text tokens
+    Given a model that answers in audio tokens and prices them above text
+    When the call completes
+    Then the span carries the audio token counts under their own attributes
+    And the text token attributes exclude them, as the cache counts already are
+    And the trace cost equals the cost the budget was charged
 
   # ============================================================
   # Group: Dogfood (proven with the Scenario voice harness)

@@ -1,5 +1,5 @@
 {
-	"_comment": "Hand-curated model entries for direct-API providers that the upstream model-catalog source does not carry (Voyage AI's direct API today, others later). Merged into llmModels at module load \u2014 see loadModelCatalog.ts. The base llmModels.json is regenerated periodically and overwriting hand-added entries would silently drop these providers; the overlay file is never touched by the regen task. Add entries here when integrating a provider whose models aren't reachable via the upstream catalog. Audio entries here are the ones litellm's price registry cannot serve correctly: models it lacks (ElevenLabs flash/turbo), models it prices without audio units (gpt-4o-mini-tts, the gpt-4o transcribe pair), and models where its rate lags a provider price change (eleven_multilingual_v2 still carries the pre-cut rate upstream). Entries litellm carries correctly (tts-1, tts-1-hd, whisper-1, scribe_v1) were retired from the overlay and flow in via the weekly sync.",
+	"_comment": "Hand-curated model entries for direct-API providers that the upstream model-catalog source does not carry (Voyage AI's direct API today, others later). Merged into llmModels at module load \u2014 see loadModelCatalog.ts. The base llmModels.json is regenerated periodically and overwriting hand-added entries would silently drop these providers; the overlay file is never touched by the regen task. Add entries here when integrating a provider whose models aren't reachable via the upstream catalog. Audio entries here are the ones litellm's price registry cannot serve correctly: models it lacks (ElevenLabs flash/turbo, gpt-transcribe), models it prices without audio units (gpt-4o-mini-tts, the gpt-4o transcribe pair), and models where its rate lags a provider price change (eleven_multilingual_v2 still carries the pre-cut rate upstream). An overlay entry only takes effect when the base catalog has no key of the same name, because the merge lets the base win on collision. Entries litellm carries correctly (tts-1, tts-1-hd, whisper-1, scribe_v1) were retired from the overlay and flow in via the weekly sync.",
 	"models": {
 		"voyage/voyage-3.5": {
 			"id": "voyage/voyage-3.5",
@@ -127,9 +127,9 @@
 			"name": "OpenAI: GPT-4o Transcribe",
 			"provider": "openai",
 			"pricing": {
-				"inputCostPerToken": 0,
-				"outputCostPerToken": 0,
-				"inputCostPerSecond": 0.0001
+				"inputCostPerToken": 2.5e-6,
+				"outputCostPerToken": 1e-5,
+				"audioCostPerToken": 2.5e-6
 			},
 			"contextLength": 0,
 			"maxCompletionTokens": null,
@@ -137,7 +137,7 @@
 			"defaultParameters": null,
 			"modality": "audio->text",
 			"mode": "audio",
-			"description": "OpenAI speech-to-text on the GPT-4o engine. Priced per second of audio ($0.006 per minute). An explicit entry so it stops prefix-matching gpt-4o's text-token rates.",
+			"description": "OpenAI speech-to-text on the GPT-4o engine. Billed per token, $2.50 per million audio input tokens and $10.00 per million output tokens (https://developers.openai.com/api/docs/models/gpt-4o-transcribe, verified 2026-08-15). The $0.006-per-minute figure OpenAI publishes next to it is an estimate derived from those token rates, not a second billing basis, so this entry carries no per-second rate: the response reports tokens and no duration, and pricing both would charge the same audio twice. The audio rate matches the text input rate today; it is stated so the audio split prices correctly if OpenAI ever separates them. gpt-4o-transcribe-diarize prefix-matches this entry and carries the same published rates.",
 			"supportsImageInput": false,
 			"supportsAudioInput": true,
 			"supportsImageOutput": false,
@@ -148,9 +148,9 @@
 			"name": "OpenAI: GPT-4o mini Transcribe",
 			"provider": "openai",
 			"pricing": {
-				"inputCostPerToken": 0,
-				"outputCostPerToken": 0,
-				"inputCostPerSecond": 5e-5
+				"inputCostPerToken": 1.25e-6,
+				"outputCostPerToken": 5e-6,
+				"audioCostPerToken": 1.25e-6
 			},
 			"contextLength": 0,
 			"maxCompletionTokens": null,
@@ -158,7 +158,70 @@
 			"defaultParameters": null,
 			"modality": "audio->text",
 			"mode": "audio",
-			"description": "OpenAI speech-to-text on the GPT-4o mini engine. Priced per second of audio ($0.003 per minute). An explicit entry so it stops prefix-matching gpt-4o-mini's text-token rates.",
+			"description": "OpenAI speech-to-text on the GPT-4o mini engine. Billed per token, $1.25 per million audio input tokens and $5.00 per million output tokens (https://developers.openai.com/api/docs/models/gpt-4o-mini-transcribe, verified 2026-08-15). Same reasoning as gpt-4o-transcribe: the published $0.003 per minute is an estimate, the response reports tokens, so there is no per-second rate here.",
+			"supportsImageInput": false,
+			"supportsAudioInput": true,
+			"supportsImageOutput": false,
+			"supportsAudioOutput": false
+		},
+		"openai/gpt-transcribe": {
+			"id": "openai/gpt-transcribe",
+			"name": "OpenAI: GPT Transcribe",
+			"provider": "openai",
+			"pricing": {
+				"inputCostPerToken": 0,
+				"outputCostPerToken": 0,
+				"inputCostPerSecond": 7.5e-5
+			},
+			"contextLength": 0,
+			"maxCompletionTokens": null,
+			"supportedParameters": [],
+			"defaultParameters": null,
+			"modality": "audio->text",
+			"mode": "audio",
+			"description": "OpenAI's duration-priced speech-to-text model, $0.0045 per minute (https://developers.openai.com/api/docs/models/gpt-transcribe, verified 2026-08-15), which is $7.5e-5 per second. Unlike the gpt-4o transcribe pair it reports usage as a duration and OpenAI publishes no token rate for it, so seconds are the only basis. It routes through the gateway today and had no catalog entry at all, so every call billed zero.",
+			"supportsImageInput": false,
+			"supportsAudioInput": true,
+			"supportsImageOutput": false,
+			"supportsAudioOutput": false
+		},
+		"openai/gpt-realtime-translate": {
+			"id": "openai/gpt-realtime-translate",
+			"name": "OpenAI: GPT Realtime Translate",
+			"provider": "openai",
+			"pricing": {
+				"inputCostPerToken": 0,
+				"outputCostPerToken": 0,
+				"inputCostPerSecond": 5.666666666666667e-4
+			},
+			"contextLength": 0,
+			"maxCompletionTokens": null,
+			"supportedParameters": [],
+			"defaultParameters": null,
+			"modality": "audio->audio",
+			"mode": "audio",
+			"description": "Live translation, priced by duration at $0.034 per minute (https://developers.openai.com/api/docs/pricing, verified 2026-08-15). Its own entry because the prefix-anchored match sent it to gpt-realtime, whose $32-per-million audio token rate has nothing to do with a per-minute live model. The gateway serves no realtime socket today, so this entry is a guard against the wrong rate rather than a rate in use.",
+			"supportsImageInput": false,
+			"supportsAudioInput": true,
+			"supportsImageOutput": false,
+			"supportsAudioOutput": true
+		},
+		"openai/gpt-live-transcribe": {
+			"id": "openai/gpt-live-transcribe",
+			"name": "OpenAI: GPT Live Transcribe",
+			"provider": "openai",
+			"pricing": {
+				"inputCostPerToken": 0,
+				"outputCostPerToken": 0,
+				"inputCostPerSecond": 2.8333333333333335e-4
+			},
+			"contextLength": 0,
+			"maxCompletionTokens": null,
+			"supportedParameters": [],
+			"defaultParameters": null,
+			"modality": "audio->text",
+			"mode": "audio",
+			"description": "Live transcription, priced by duration at $0.017 per minute (https://developers.openai.com/api/docs/pricing, verified 2026-08-15). It matched nothing in the catalog before. Its sibling gpt-realtime-whisper already carries the same rate in the base catalog. The gateway serves no realtime socket today.",
 			"supportsImageInput": false,
 			"supportsAudioInput": true,
 			"supportsImageOutput": false,
@@ -224,6 +287,73 @@
 			"description": "ElevenLabs' low-latency multilingual speech synthesis. Priced per input character ($0.05 per 1k characters).",
 			"supportsImageInput": false,
 			"supportsAudioInput": false,
+			"supportsImageOutput": false,
+			"supportsAudioOutput": true
+		},
+		"openai/gpt-realtime": {
+			"id": "openai/gpt-realtime",
+			"name": "OpenAI: GPT Realtime",
+			"provider": "openai",
+			"pricing": {
+				"inputCostPerToken": 4e-6,
+				"outputCostPerToken": 1.6e-5,
+				"inputCacheReadPerToken": 4e-7,
+				"audioCostPerToken": 3.2e-5,
+				"audioOutputCostPerToken": 6.4e-5
+			},
+			"contextLength": 32000,
+			"maxCompletionTokens": 4096,
+			"supportedParameters": [],
+			"defaultParameters": null,
+			"modality": "audio+text->audio+text",
+			"mode": "chat",
+			"description": "OpenAI's speech-to-speech realtime model. Audio tokens cost eight times text tokens ($32 against $4 per million in, $64 against $16 out), so the audio split has to be priced apart. Rates from https://developers.openai.com/api/docs/pricing (verified 2026-08-14). The cached-token rate here is the text one; a cached audio token is $0.40 per million on this model, the same figure.",
+			"supportsImageInput": false,
+			"supportsAudioInput": true,
+			"supportsImageOutput": false,
+			"supportsAudioOutput": true
+		},
+		"openai/gpt-realtime-mini": {
+			"id": "openai/gpt-realtime-mini",
+			"name": "OpenAI: GPT Realtime mini",
+			"provider": "openai",
+			"pricing": {
+				"inputCostPerToken": 6e-7,
+				"outputCostPerToken": 2.4e-6,
+				"inputCacheReadPerToken": 6e-8,
+				"audioCostPerToken": 1e-5,
+				"audioOutputCostPerToken": 2e-5
+			},
+			"contextLength": 32000,
+			"maxCompletionTokens": 4096,
+			"supportedParameters": [],
+			"defaultParameters": null,
+			"modality": "audio+text->audio+text",
+			"mode": "chat",
+			"description": "The smaller speech-to-speech realtime model. Its own entry because the prefix-anchored match would otherwise price it at the full gpt-realtime rate, roughly three times higher on audio. Rates from https://developers.openai.com/api/docs/pricing (verified 2026-08-14). The cached-token rate here is the text one ($0.06 per million); a cached audio token is $0.30 per million.",
+			"supportsImageInput": false,
+			"supportsAudioInput": true,
+			"supportsImageOutput": false,
+			"supportsAudioOutput": true
+		},
+		"elevenlabs/convai": {
+			"id": "elevenlabs/convai",
+			"name": "ElevenLabs: Conversational AI",
+			"provider": "elevenlabs",
+			"pricing": {
+				"inputCostPerToken": 0,
+				"outputCostPerToken": 0,
+				"inputCostPerSecond": 0.0013333333333333333
+			},
+			"contextLength": 0,
+			"maxCompletionTokens": null,
+			"supportedParameters": [],
+			"defaultParameters": null,
+			"modality": "audio->audio",
+			"mode": "audio",
+			"description": "ElevenLabs conversational agents, priced by conversation duration at $0.08 per minute (https://elevenlabs.io/pricing/api, verified 2026-08-14). The figure is per second, $0.08 divided by 60. LLM cost is not included in it.",
+			"supportsImageInput": false,
+			"supportsAudioInput": true,
 			"supportsImageOutput": false,
 			"supportsAudioOutput": true
 		},
