@@ -310,12 +310,28 @@ describe("overlay precedence", () => {
             matched?.model,
             `${id} exists only in the overlay and the cost registry resolved it to ${matched?.model ?? "nothing"}, so the overlay is not reaching billing`,
           ).toBe(id);
+          // Resolving to the right id is not the same as carrying the right
+          // rates: a rule can take the overlay's name and stale numbers.
+          expect(
+            matched?.inputCostPerToken,
+            `${id} resolved to its own rule but not at the overlay's input rate`,
+          ).toBe(overlayModels[id]?.pricing.inputCostPerToken ?? 0);
+          expect(
+            matched?.outputCostPerToken,
+            `${id} resolved to its own rule but not at the overlay's output rate`,
+          ).toBe(overlayModels[id]?.pricing.outputCostPerToken ?? 0);
         }
       });
     });
 
     describe("when the overlay overrides a generated entry", () => {
       it("bills the overlay's rate, not the generated one", () => {
+        // Note on reach: today's only override, gpt-audio-mini, corrects
+        // `audioCostPerToken`, and the cost registry does not carry that
+        // field, so the token-rate assertions below cannot tell the two
+        // sources apart for it. Precedence itself is caught by the
+        // catalog-level test above. These bite the moment an override
+        // corrects a token rate, which is the common case.
         const costs = getStaticModelCosts();
         for (const id of overlayOverriddenModelIds) {
           if (isPricedElsewhere(id)) continue;
@@ -326,7 +342,11 @@ describe("overlay precedence", () => {
           expect(
             matched?.inputCostPerToken,
             `${id} bills the generated input rate rather than the overlay's`,
-          ).toBe(overlayModels[id]?.pricing.inputCostPerToken);
+          ).toBe(overlayModels[id]?.pricing.inputCostPerToken ?? 0);
+          expect(
+            matched?.outputCostPerToken,
+            `${id} bills the generated output rate rather than the overlay's`,
+          ).toBe(overlayModels[id]?.pricing.outputCostPerToken ?? 0);
         }
       });
     });
