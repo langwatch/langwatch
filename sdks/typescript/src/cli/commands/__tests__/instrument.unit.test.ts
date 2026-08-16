@@ -122,6 +122,41 @@ describe("instrumentCommand", () => {
     });
   });
 
+  describe("given an organization that turned direct OTLP off for the tool", () => {
+    beforeEach(() => {
+      cfg.tool_policies = { codex: { allowVk: true, allowOtelDirect: false } };
+    });
+
+    /** @scenario "A tool whose organization forbids direct OTLP is not instrumented" */
+    it("refuses before minting a project key or writing any wiring", async () => {
+      await expect(
+        instrumentCommand("codex", { project: "acme-app" }),
+      ).rejects.toThrow(ExitError);
+
+      expect(writtenTo(stderrSpy)).toContain(
+        "does not allow codex to send telemetry directly",
+      );
+      expect(pinToolToProject).not.toHaveBeenCalled();
+      expect(telemetryRefreshMod.resolveIngestionCredential).not.toHaveBeenCalled();
+      expect(installTelemetryWiring).not.toHaveBeenCalled();
+    });
+
+    it("refuses --personal too, leaving the existing pin in place", async () => {
+      await expect(
+        instrumentCommand("codex", { personal: true }),
+      ).rejects.toThrow(ExitError);
+
+      expect(clearToolProjectPin).not.toHaveBeenCalled();
+      expect(installTelemetryWiring).not.toHaveBeenCalled();
+    });
+
+    it("leaves a tool the policy still allows instrumentable", async () => {
+      await instrumentCommand("claude", {});
+
+      expect(installTelemetryWiring).toHaveBeenCalled();
+    });
+  });
+
   describe("given --key on a machine that never logged in", () => {
     /** @scenario "A pasted key instruments a machine that never logs in" */
     it("pins the tool to the key and installs the wiring without login", async () => {

@@ -65,6 +65,28 @@ Feature: `langwatch instrument <tool>` writes telemetry wiring without launching
       And the message names both ways forward: `langwatch login --device`
         for the personal scope, or --key with a project ingest key
 
+  Rule: the per-tool direct-OTLP policy governs this command too
+
+    Every target this command writes is the direct-OTLP path, so the same
+    `allowOtelDirect` policy the wrapper gates on applies here. The CLI
+    checks first for the message, and the mint route enforces it, so an
+    old CLI, a stale cached policy, or a hand-written request cannot wire
+    a tool the organization turned off.
+
+    @unit @cli-wrappers @instrument
+    Scenario: A tool whose organization forbids direct OTLP is not instrumented
+      Given the organization turned direct OTLP off for codex
+      When the user runs `langwatch instrument codex --project acme-app`
+      Then the command fails naming the gateway path as the way forward
+      And no key is minted, no pin is written, and no wiring file is touched
+
+    @integration @cli-wrappers @instrument
+    Scenario: A tool whose organization forbids direct OTLP mints no ingestion key
+      Given the organization turned direct OTLP off for claude
+      When a CLI asks the control plane for a claude ingestion key
+      Then the request is refused
+      And the project gains no ingestion key
+
   Rule: the wiring targets are shared with the wrappers
 
     @unit @cli-wrappers @instrument

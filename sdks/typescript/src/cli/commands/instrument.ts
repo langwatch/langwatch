@@ -22,6 +22,7 @@ import { lwTag } from "../utils/governance/brand";
 import { isLoggedIn, loadConfig, saveConfig } from "../utils/governance/config";
 import { installTelemetryWiring } from "../utils/governance/instrument-wiring";
 import { SOURCE_TYPE_BY_TOOL } from "../utils/governance/otel-env-block";
+import { resolvePlatformToolPolicy } from "../utils/governance/platform-tool-policy";
 import {
 	clearToolProjectPin,
 	pinToolToKey,
@@ -70,6 +71,17 @@ export async function instrumentCommand(
 	}
 
 	const cfg = loadConfig();
+
+	// Every wiring target this command writes is the direct-OTLP path, the
+	// one `allowOtelDirect` governs, so the same gate the wrapper applies
+	// before it installs that path applies here. It runs before any mint,
+	// pin, or file write, so a refused tool leaves the machine untouched.
+	// The mint route re-checks server-side: this one is for the message.
+	if (!resolvePlatformToolPolicy(tool, cfg.tool_policies).allowOtelDirect) {
+		fail(
+			`your organization does not allow ${tool} to send telemetry directly. Run \`langwatch ${tool}\` instead, which routes through the gateway.`,
+		);
+	}
 
 	if (options.personal) {
 		const cleared = clearToolProjectPin({ cfg, tool });

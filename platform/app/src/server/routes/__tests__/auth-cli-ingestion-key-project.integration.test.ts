@@ -194,6 +194,9 @@ describe("POST /api/auth/cli/governance/ingestion-key with a named project", () 
       await redisConnection.del(`lwcli:access:${VIEWER_TOKEN}`);
     }
     const orgs = [ORG_ID, OTHER_ORG_ID];
+    await prisma.aiToolEntry.deleteMany({
+      where: { organizationId: { in: orgs } },
+    });
     // RoleBindings reference ApiKeys, so they go first.
     await prisma.roleBinding.deleteMany({
       where: { organizationId: { in: orgs } },
@@ -372,6 +375,69 @@ describe("POST /api/auth/cli/governance/ingestion-key with a named project", () 
 
         expect(status).toBe(412);
         expect(json.error).toBe("precondition_failed");
+      });
+    });
+  });
+
+  describe("given the organization turned direct OTLP off for the tool", () => {
+    const TILE_ID = `tile-ikp-${suffix}`;
+
+    beforeAll(async () => {
+      await prisma.aiToolEntry.create({
+        data: {
+          id: TILE_ID,
+          organizationId: ORG_ID,
+          scope: "organization",
+          scopeId: ORG_ID,
+          type: "coding_assistant",
+          displayName: "Claude Code",
+          slug: `claude-code-${suffix}`,
+          config: { assistantKind: "claude_code", allowOtelDirect: false },
+        },
+      });
+    });
+
+    afterAll(async () => {
+      await prisma.aiToolEntry.deleteMany({
+        where: { id: TILE_ID, organizationId: ORG_ID },
+      });
+    });
+
+    describe("when the CLI asks for a key anyway", () => {
+      /** @scenario "A tool whose organization forbids direct OTLP mints no ingestion key" */
+      it("refuses the project branch and mints nothing", async () => {
+        const before = await liveIngestKeyCount(PROJECT_ID);
+
+        const { status, json } = await mintIngestionKey(ADMIN_TOKEN, {
+          source_type: "claude_code",
+          project: PROJECT_ID,
+        });
+
+        expect(status).toBe(403);
+        expect(json.error).toBe("direct_otel_not_allowed");
+        expect(json.token).toBeUndefined();
+        expect(await liveIngestKeyCount(PROJECT_ID)).toBe(before);
+      });
+
+      it("refuses the personal branch on the same policy", async () => {
+        const { status, json } = await mintIngestionKey(ADMIN_TOKEN, {
+          source_type: "claude_code",
+        });
+
+        expect(status).toBe(403);
+        expect(json.error).toBe("direct_otel_not_allowed");
+      });
+    });
+
+    describe("when the CLI asks for a tool the tile does not govern", () => {
+      it("still mints, because the policy is per tool", async () => {
+        const { status, json } = await mintIngestionKey(ADMIN_TOKEN, {
+          source_type: "codex",
+          project: PROJECT_ID,
+        });
+
+        expect(status).toBe(201);
+        expect(json.token).toEqual(expect.stringMatching(/^ik-lw-/));
       });
     });
   });

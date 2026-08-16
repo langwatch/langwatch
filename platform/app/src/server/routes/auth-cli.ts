@@ -29,6 +29,7 @@
 import { randomBytes } from "node:crypto";
 import { ActivityMonitorService } from "@ee/governance/services/activity-monitor/activityMonitor.service";
 import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
+import { AiToolEntryService } from "@ee/governance/services/aiToolEntry.service";
 import { CliBootstrapService } from "@ee/governance/services/cliBootstrap.service";
 import { IngestionKeyService } from "@ee/governance/services/ingestionKey.service";
 import { IngestionTemplateService } from "@ee/governance/services/ingestionTemplate.service";
@@ -39,6 +40,7 @@ import {
   RoutingPolicyHasNoProvidersError,
 } from "@ee/governance/services/personalVirtualKey.service";
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
+import { PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE } from "@ee/governance/services/platformToolPolicy.service";
 import { GovernanceSetupStateService } from "@ee/governance/services/setupState.service";
 import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
@@ -1912,6 +1914,11 @@ secured
 //     on the project. Returns { token, prefix, endpoint, project }.
 //
 // `endpoint` is `${baseUrl}/api/otel` on both branches.
+//
+// Both branches refuse with 403 `direct_otel_not_allowed` when the caller's
+// organization turned the direct-OTLP path off for the tool behind
+// `source_type`. That is the only place the policy is enforced rather than
+// advertised, so a CLI that skipped its own gate still meets it.
 // ---------------------------------------------------------------------------
 const mintIngestionKeySchema = z.object({
   source_type: z.string().min(1),
@@ -2094,6 +2101,31 @@ secured
         400,
       );
     }
+    // An ingestion key exists to carry the direct-OTLP path, so a tool whose
+    // policy forbids that path gets no key, whatever the caller asks for. The
+    // CLI gates first for the message; this is the enforcement, because a
+    // stale cache, an old CLI, or a hand-written request reaches here without
+    // ever consulting the policy. Only source types a wrapped tool stamps are
+    // governed; anything else has no per-tool policy to apply.
+    const policedSlug =
+      PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE[parsed.data.source_type];
+    if (policedSlug) {
+      const policy = await AiToolEntryService.create(prisma).resolveToolPolicy({
+        organizationId: tokenRecord.organization_id,
+        userId: tokenRecord.user_id,
+        slug: policedSlug,
+      });
+      if (!policy.allowOtelDirect) {
+        return c.json(
+          {
+            error: "direct_otel_not_allowed",
+            error_description: `Your organization does not allow ${policedSlug} to send telemetry directly. Run \`langwatch ${policedSlug}\`, which routes through the gateway.`,
+          },
+          403,
+        );
+      }
+    }
+
     const service = IngestionKeyService.create(prisma);
 
     if (parsed.data.project) {
