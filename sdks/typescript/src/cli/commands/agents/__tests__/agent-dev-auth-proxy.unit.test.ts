@@ -1,11 +1,14 @@
 import * as http from "node:http";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type { MockInstance } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { startAuthProxy } from "../dev/auth-proxy";
 import { DEV_SECRET_HEADER } from "../dev/write-back";
 
 describe("startAuthProxy()", () => {
   let target: http.Server;
   let targetPort: number;
+  let errorLog: string[];
+  let consoleError: MockInstance;
   let received: {
     path?: string;
     secretHeader?: string | string[];
@@ -27,9 +30,20 @@ describe("startAuthProxy()", () => {
       target.listen(0, "127.0.0.1", resolve),
     );
     targetPort = (target.address() as { port: number }).port;
+
+    // The proxy reports upstream failures to the terminal. Capturing them
+    // keeps the suite output clean and lets a test assert the detail landed
+    // there rather than in the response.
+    errorLog = [];
+    consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation((...args: unknown[]) => {
+        errorLog.push(args.map(String).join(" "));
+      });
   });
 
   afterEach(async () => {
+    consoleError.mockRestore();
     await new Promise<void>((resolve) => target.close(() => resolve()));
   });
 
@@ -128,11 +142,46 @@ describe("startAuthProxy()", () => {
       });
       expect(response.status).toBe(502);
       const body = (await response.json()) as { error: string };
-      expect(body.error).toContain("did not answer within");
+      expect(body.error).toBe("Could not reach the local agent behind this tunnel.");
+      // The timeout detail belongs on the terminal, not in a body that
+      // travels back through the public tunnel.
+      expect(errorLog.join("\n")).toContain("did not answer within");
 
       await proxy.close();
       silent.closeAllConnections();
       await new Promise<void>((resolve) => silent.close(() => resolve()));
+    });
+  });
+
+  describe("when the local URL carries basic-auth credentials", () => {
+    it("keeps them out of the response the caller receives", async () => {
+      // A port that nothing listens on, so the upstream call fails at connect.
+      const probe = http.createServer();
+      await new Promise<void>((resolve) =>
+        probe.listen(0, "127.0.0.1", resolve),
+      );
+      const closedPort = (probe.address() as { port: number }).port;
+      await new Promise<void>((resolve) => probe.close(() => resolve()));
+
+      const proxy = await startAuthProxy({
+        targetUrl: `http://tunneluser:hunter2@127.0.0.1:${closedPort}/agent/chat`,
+        secret: "session-secret",
+      });
+
+      const response = await fetch(proxy.url, {
+        method: "POST",
+        headers: { [DEV_SECRET_HEADER]: "session-secret" },
+      });
+
+      expect(response.status).toBe(502);
+      const raw = await response.text();
+      expect(raw).not.toContain("hunter2");
+      expect(raw).not.toContain("tunneluser");
+      expect(JSON.parse(raw)).toEqual({
+        error: "Could not reach the local agent behind this tunnel.",
+      });
+
+      await proxy.close();
     });
   });
 

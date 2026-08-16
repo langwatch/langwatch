@@ -7,6 +7,7 @@
 import * as crypto from "node:crypto";
 import * as http from "node:http";
 import * as https from "node:https";
+import chalk from "chalk";
 import { DEV_SECRET_HEADER } from "./write-back";
 
 /**
@@ -170,6 +171,15 @@ function forwardToUpstream({
     );
   });
   upstream.on("error", (error) => {
+    // The detail goes to the terminal, where the developer who owns the URL
+    // is watching. It must not go in the response: that body travels back
+    // through the public tunnel to the caller, and the local URL can carry
+    // basic-auth credentials (http://user:password@127.0.0.1:3000).
+    console.error(
+      chalk.red(
+        `Could not reach the local agent at ${targetUrl}: ${error.message}`,
+      ),
+    );
     if (res.headersSent) {
       // The upstream died mid-response. Appending an error body here would
       // corrupt a response the client is already parsing; ending the socket
@@ -180,7 +190,7 @@ function forwardToUpstream({
     res.writeHead(502, { "Content-Type": "application/json" });
     res.end(
       JSON.stringify({
-        error: `Could not reach the local agent at ${targetUrl}: ${error.message}`,
+        error: "Could not reach the local agent behind this tunnel.",
       }),
     );
   });
