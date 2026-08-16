@@ -288,6 +288,7 @@ export const APP_ERROR_CODES = [
   // `ValidationError` (and `ValidationError.fromZodError`, which the tRPC
   // boundary uses to promote input ZodErrors onto the handled channel).
   "validation_error",
+  "virtual_key_expiry_in_past",
   "virtual_key_not_found",
   // The webhook platform names its two endpoint failures itself, in
   // `~/app/api/webhooks/[[...route]]/error-handler`, rather than deriving

@@ -381,3 +381,50 @@ Feature: AI Gateway virtual key creation
     # The old implicit default was fallback-across-everything. Existing keys
     # are pinned to it so nothing changes under a customer; only new keys
     # get the safer default.
+
+  # ============================================================================
+  # When the key stops working
+  #
+  # A key handed to a contractor, a demo, or a test run has a natural end
+  # date, and the way that ends today is that somebody remembers to revoke
+  # it. The drawer asks for the date instead. "Never" stays the default,
+  # because most keys are not temporary and a form that expires things by
+  # accident is worse than one that never does.
+  # ============================================================================
+
+  @integration
+  Scenario: The drawer offers an expiration and defaults to never
+    When I choose to create a key
+    Then the expiration choice reads "Never"
+    And the key it creates has no expiration date
+
+  @integration
+  Scenario: Picking a period states the date the key stops working
+    When I pick an expiration of 7 days
+    Then the drawer shows me the resolved date in words
+    And the created key carries that date
+    # A period is easy to pick and impossible to check. The date is what
+    # the reader has to be able to repeat back.
+
+  @integration
+  Scenario: A custom date expires the key at the end of that day
+    When I pick a custom expiration date
+    Then the key works for the whole of that day and stops after it
+    # Picking "the 20th" and losing the key at midnight of the 19th is the
+    # single most common way a date field surprises somebody.
+
+  @integration
+  Scenario: An expiration date in the past is refused
+    When I try to create a key that expired before it was made
+    Then the key is refused, naming the expiration field
+    And the refusal tells me to pick a date in the future
+
+  @integration
+  Scenario: The expiration date is published on the key
+    Given a key created with an expiration date
+    When the key is read over the API
+    Then it carries the expiration date
+    And its status is still "active"
+    # Expiry is a date, not a status value: adding an "expired" status to
+    # the wire enum would break every client that switches on the three it
+    # already knows, for a fact each of them can read off the date.

@@ -52,6 +52,88 @@ describe("tracesHrefForKey", () => {
   });
 });
 
+describe("tracesHrefForKey over a stated window", () => {
+  describe("when the caller names one of the explorer's own presets", () => {
+    const href = tracesHrefForKey({
+      projectSlug: "acme-inc",
+      virtualKeyId: "vk_01HTEST",
+      window: { presetId: "24h" },
+    });
+    const parsed = parseFragment(href.slice(href.indexOf("#")));
+
+    it("opens on that preset instead of the default thirty days", () => {
+      expect(parsed?.overrides.preset).toBe("24h");
+    });
+  });
+
+  describe("when the period has no preset to name", () => {
+    const href = tracesHrefForKey({
+      projectSlug: "acme-inc",
+      virtualKeyId: "vk_01HTEST",
+      window: { fromMs: 1714435200000, toMs: 1715040000000 },
+    });
+    const parsed = parseFragment(href.slice(href.indexOf("#")));
+
+    it("carries the exact instants, and no preset to override them", () => {
+      expect(parsed?.overrides.timeFrom).toBe(1714435200000);
+      expect(parsed?.overrides.timeTo).toBe(1715040000000);
+      expect(parsed?.overrides.preset).toBeUndefined();
+    });
+  });
+});
+
+describe("tracesHrefForKey narrowed to one model", () => {
+  const href = tracesHrefForKey({
+    projectSlug: "acme-inc",
+    virtualKeyId: "vk_01HTEST",
+    model: "anthropic/claude-sonnet-4-5",
+  });
+  const parsed = parseFragment(href.slice(href.indexOf("#")));
+
+  it("joins the two clauses with an explicit AND", () => {
+    expect(parsed?.overrides.query).toBe(
+      'trace.attribute.langwatch.virtual_key_id:"vk_01HTEST" AND model:"anthropic/claude-sonnet-4-5"',
+    );
+  });
+
+  it("leaves a model that needs no quoting unquoted", () => {
+    const bare = tracesHrefForKey({
+      projectSlug: "acme-inc",
+      virtualKeyId: "vk_01HTEST",
+      model: "gpt-5-mini",
+    });
+    expect(parseFragment(bare.slice(bare.indexOf("#")))?.overrides.query).toBe(
+      'trace.attribute.langwatch.virtual_key_id:"vk_01HTEST" AND model:gpt-5-mini',
+    );
+  });
+
+  describe("when the query language reads the two clauses back", () => {
+    const translated = translateFilterToClickHouse(
+      parsed?.overrides.query ?? "",
+      "project_test",
+      { from: 1714435200000, to: 1715040000000 },
+    );
+
+    it("filters on the key and the model together", () => {
+      expect(translated).not.toBeNull();
+      const params = Object.values(translated!.params);
+      expect(params).toContain("vk_01HTEST");
+      expect(params).toContain("anthropic/claude-sonnet-4-5");
+    });
+  });
+
+  it("omits the model clause when no model is picked", () => {
+    const unfiltered = tracesHrefForKey({
+      projectSlug: "acme-inc",
+      virtualKeyId: "vk_01HTEST",
+      model: null,
+    });
+    expect(
+      parseFragment(unfiltered.slice(unfiltered.indexOf("#")))?.overrides.query,
+    ).toBe('trace.attribute.langwatch.virtual_key_id:"vk_01HTEST"');
+  });
+});
+
 describe("resolveTracesHrefForKey", () => {
   const teams = [{ projects: [{ id: "project-web-app", slug: "web-app" }] }];
 

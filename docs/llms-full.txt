@@ -1926,6 +1926,7 @@ Errors (like successes) always carry:
 | `invalid_api_key` | `401` | The `Authorization: Bearer …`, `x-api-key`, `api-key` header is missing, malformed, or points to a non-existent virtual key. |
 | `virtual_key_revoked` | `403` | The VK exists but has been revoked. Terminal: revocation is one-way. |
 | `virtual_key_disabled` | `403` | The VK exists but is currently disabled, the **reversible** stop: an administrator can re-enable it and the same secret works again. Distinct from `virtual_key_revoked` so tenant tooling can branch on which one it is. |
+| `virtual_key_expired` | `403` | The VK carries an expiration date and that date has passed. The key material is intact and its status is still `active`, so extending `expires_at` puts it back in service without minting a new secret. |
 | `model_not_allowed` | `403` | The VK has a `models_allowed` allowlist and the requested model is not in it, **or** the model matched a `policy_rules.models` deny regex (or fell outside its allow regex). Also used when the model/alias doesn't resolve to any configured provider. |
 | `permission_denied` | `403` | The principal lacks the RBAC permission required for the endpoint. |
 | `budget_exceeded` | `402` | Any hard-cap budget scope that applies to this request is over its limit. `message` names the scope, and `error.meta` is machine-readable: `budget_id`, `budget_scope` (lowercase: `organization`, `team`, `project`, `virtual_key`, `principal`, `group`, `attributed_user`), `budget_window`, and `budget_provider` when a provider-filtered budget emptied the candidate chain. `budget_scope` distinguishes "this end user's cap" (`attributed_user`) from the tenant cap (`virtual_key`). See [Budgets → the breach catalog](/ai-gateway/budgets#breaches-warnings-and-budget-events). |
@@ -2283,6 +2284,7 @@ Body (only `name` is required):
   "scopes": [{ "scope_type": "project", "scope_id": "proj_01HZ..." }],
   "routing_mode": "none",
   "routing_policy_id": null,
+  "expires_at": "2026-09-01T00:00:00.000Z",
   "budget": { "limit_usd": "25", "window": "month", "on_breach": "block" },
   "config": { "providersAllowed": ["mp_openai..."] }
 }
@@ -2294,6 +2296,7 @@ Body (only `name` is required):
 - `trace_project_archived` says the project the key traces into has been deleted. The key goes on sending its traces there, so the data stays whole and reappears if the project is restored, and traffic is never refused for it. Point the key somewhere else if that is not what you want.
 - `budget` creates a budget atomically with the key and manages exactly that row on later updates: the key can never exist without the cap you asked for. Windows: `day`, `week`, `month`.
 - `routing_mode` is one of `none` (default: no silent failover), `fallback_all`, or `policy` (requires `routing_policy_id`).
+- `expires_at` is when the key stops serving. Omit it and the key never expires. A date already in the past is refused with `virtual_key_expiry_in_past`. After the date, requests are refused with `virtual_key_expired` while `status` stays `active`, so read `expires_at` rather than the status to tell an expired key apart.
 
 Response `201`:
 
@@ -2338,12 +2341,13 @@ Body (all fields optional):
   "scopes": [{ "scope_type": "team", "scope_id": "team_..." }],
   "trace_project_id": "proj_01HZ...", // or null to re-resolve it
   "routing_mode": "fallback_all",
+  "expires_at": "2026-10-01T00:00:00.000Z", // or null so it never expires
   "budget": { "limit_usd": "50", "window": "month" },
   "config": { /* partial, merges with existing */ }
 }
 ```
 
-`scopes` replaces the whole visibility set and requires `virtualKeys:manage` at every NEW scope, and does not move where the key's traces and spend land. `trace_project_id` does: omitting it leaves the destination alone, a value moves it, and explicit `null` re-resolves it under the create-time rules rather than clearing it. `budget: null` archives the key's own cap (spend history is retained); omitting `budget` leaves it alone.
+`scopes` replaces the whole visibility set and requires `virtualKeys:manage` at every NEW scope, and does not move where the key's traces and spend land. `trace_project_id` does: omitting it leaves the destination alone, a value moves it, and explicit `null` re-resolves it under the create-time rules rather than clearing it. `budget: null` archives the key's own cap (spend history is retained); omitting `budget` leaves it alone. `expires_at` follows the same three-way rule: omitted leaves the date alone, `null` clears it, and a date moves it. An expired key accepts this patch like any other, which is how it goes back into service without a new secret.
 
 ### Rotate, disable, enable, revoke
 
@@ -13596,6 +13600,17 @@ Disabling a VK stops it without destroying anything: requests on the key are rej
 - Each transition emits a webhook event (`gateway.virtual_key.disabled`, `gateway.virtual_key.enabled`) alongside `created` and `revoked`, so a provisioning backend can mirror key state without polling. See [Webhooks](/features/webhooks#family-gateway).
 
 If you find yourself scheduling a revoke "in case the customer comes back", you want disable.
+
+## Expiration: the stop nobody presses
+
+A VK can carry an expiration date. Requests presented after it are rejected with the distinct `virtual_key_expired` error (`403`). Use it for keys with a known end date: a contractor, a demo, a load test.
+
+- Set it in the create drawer (Never, 1 day, 7 days, 30 days, 6 months, 1 year, or a date you pick) or with `expires_at` on the API. A custom date runs to the end of that day, UTC.
+- The key stays `active` past the date. Expiry is read from `expires_at` on every resolve, so extending the date puts the key straight back in service with the same secret. The edit drawer and `PATCH` both change it, and `null` clears it.
+- Expiry takes effect on the next resolve. A gateway JWT already minted runs out on its own clock, so a key can serve for up to 15 minutes past its date.
+- Nothing else changes: budgets, scopes, configuration and rotation grace are untouched, and disable, enable, rotate and revoke behave exactly as they always did.
+
+The virtual keys list badges a key past its date as **expired**, and the key detail page states the date and how long is left.
 
 ## Revocation
 

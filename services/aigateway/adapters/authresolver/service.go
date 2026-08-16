@@ -296,7 +296,14 @@ func classifyRefreshError(err error) refreshErrorClass {
 	if err == nil {
 		return classNone
 	}
-	if errors.Is(err, domain.ErrInvalidAPIKey) || errors.Is(err, domain.ErrKeyRevoked) {
+	// Every refusal the control plane makes about the key itself belongs
+	// here. A disabled or expired key served stale would keep working for
+	// the length of the stale window, which is the one thing an operator
+	// pressing Disable, and a date passing, both have to stop at once.
+	if errors.Is(err, domain.ErrInvalidAPIKey) ||
+		errors.Is(err, domain.ErrKeyRevoked) ||
+		errors.Is(err, domain.ErrKeyDisabled) ||
+		errors.Is(err, domain.ErrKeyExpired) {
 		return classAuthRejection
 	}
 	return classTransportFailure

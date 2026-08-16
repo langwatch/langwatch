@@ -1836,6 +1836,13 @@ const presentations = {
     describe: () =>
       "An administrator can re-enable it; the key itself is unchanged.",
   },
+  virtual_key_expired: {
+    // Distinct from revoked on purpose: the key material is intact, so the
+    // cheap fix is a new date rather than a new secret in every client.
+    title: "This key has expired",
+    describe: () =>
+      "Extend its expiration date in settings, or create a new key.",
+  },
   rate_limited: {
     title: "Too many requests",
     describe: () => "Slow down for a moment, then try again.",
@@ -1971,6 +1978,13 @@ const presentations = {
     title: "Virtual key not found",
     describe: () =>
       "It may have been deleted, or it isn't shared with you. Reload to see the keys you can open.",
+  },
+  virtual_key_expiry_in_past: {
+    // Says what to do rather than what was wrong: the date is still in the
+    // field, so the only useful sentence is the one that gets it saved.
+    title: "That expiration date has already passed",
+    describe: () =>
+      "Pick a date in the future, or choose Never so the key does not expire.",
   },
   gateway_budget_not_found: {
     title: "Budget not found",

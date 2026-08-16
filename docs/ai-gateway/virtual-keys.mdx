@@ -130,6 +130,17 @@ Disabling a VK stops it without destroying anything: requests on the key are rej
 
 If you find yourself scheduling a revoke "in case the customer comes back", you want disable.
 
+## Expiration: the stop nobody presses
+
+A VK can carry an expiration date. Requests presented after it are rejected with the distinct `virtual_key_expired` error (`403`). Use it for keys with a known end date: a contractor, a demo, a load test.
+
+- Set it in the create drawer (Never, 1 day, 7 days, 30 days, 6 months, 1 year, or a date you pick) or with `expires_at` on the API. A custom date runs to the end of that day, UTC.
+- The key stays `active` past the date. Expiry is read from `expires_at` on every resolve, so extending the date puts the key straight back in service with the same secret. The edit drawer and `PATCH` both change it, and `null` clears it.
+- Expiry takes effect on the next resolve. A gateway JWT already minted runs out on its own clock, so a key can serve for up to 15 minutes past its date.
+- Nothing else changes: budgets, scopes, configuration and rotation grace are untouched, and disable, enable, rotate and revoke behave exactly as they always did.
+
+The virtual keys list badges a key past its date as **expired**, and the key detail page states the date and how long is left.
+
 ## Revocation
 
 Revocation immediately invalidates the secret. There is **no grace period** on revoke, and it is one-way: re-activating means minting a new key. Revoking also archives the key's own budgets and discards any rotation grace.

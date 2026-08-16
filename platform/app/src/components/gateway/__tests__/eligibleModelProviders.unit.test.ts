@@ -207,4 +207,69 @@ describe("resolveEligible", () => {
       expect(resolveEligible(keyAtProject, [noSignal], hierarchy)).toEqual([]);
     });
   });
+
+  describe("when the key carries a provider allowlist", () => {
+    const secondProvider: OrgModelProvider = {
+      id: "mp-project",
+      name: "Team Anthropic",
+      provider: "anthropic",
+      enabled: true,
+      scopes: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }],
+      models: ["claude-sonnet-4-5"],
+    };
+
+    /** @scenario "The provider panel shows what the key may use, not what its scope reaches" */
+    it("narrows the answer to the providers the key may hold", () => {
+      expect(
+        resolveEligible(
+          keyAtProject,
+          [orgProvider, secondProvider],
+          hierarchy,
+          ["mp-project"],
+        ).map((p) => p.id),
+      ).toEqual(["mp-project"]);
+    });
+
+    it("answers with everything in scope when the list is absent or empty", () => {
+      const everything = ["mp-org", "mp-project"];
+      expect(
+        resolveEligible(keyAtProject, [orgProvider, secondProvider], hierarchy)
+          .map((p) => p.id)
+          .sort(),
+      ).toEqual(everything);
+      expect(
+        resolveEligible(
+          keyAtProject,
+          [orgProvider, secondProvider],
+          hierarchy,
+          null,
+        )
+          .map((p) => p.id)
+          .sort(),
+      ).toEqual(everything);
+      expect(
+        resolveEligible(
+          keyAtProject,
+          [orgProvider, secondProvider],
+          hierarchy,
+          [],
+        )
+          .map((p) => p.id)
+          .sort(),
+      ).toEqual(everything);
+    });
+
+    it("never widens the answer past what the scopes reach", () => {
+      // A provider named by the key but out of its scope stays out: the
+      // allowlist narrows, it does not grant.
+      expect(
+        resolveEligible(
+          [{ scopeType: "TEAM" as const, scopeId: TEAM_ID }],
+          [orgProvider, secondProvider],
+          hierarchy,
+          ["mp-project"],
+        ),
+      ).toEqual([]);
+    });
+  });
 });

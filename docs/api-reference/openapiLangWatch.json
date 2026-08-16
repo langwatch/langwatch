@@ -17145,6 +17145,13 @@
                               "string",
                               "null"
                             ]
+                          },
+                          "expires_at": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended."
                           }
                         },
                         "required": [
@@ -17167,7 +17174,8 @@
                           "created_at",
                           "updated_at",
                           "last_used_at",
-                          "revoked_at"
+                          "revoked_at",
+                          "expires_at"
                         ]
                       }
                     },
@@ -17548,6 +17556,13 @@
                             "string",
                             "null"
                           ]
+                        },
+                        "expires_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended."
                         }
                       },
                       "required": [
@@ -17570,7 +17585,8 @@
                         "created_at",
                         "updated_at",
                         "last_used_at",
-                        "revoked_at"
+                        "revoked_at",
+                        "expires_at"
                       ]
                     },
                     "secret": {
@@ -17889,6 +17905,10 @@
                       "fallback_all",
                       "policy"
                     ]
+                  },
+                  "expires_at": {
+                    "type": "string",
+                    "description": "When the key stops serving. Omit it and the key never expires. A date that has already passed is refused with `virtual_key_expiry_in_past`, rather than writing a key that is dead on arrival."
                   },
                   "budget": {
                     "type": [
@@ -18243,6 +18263,13 @@
                             "string",
                             "null"
                           ]
+                        },
+                        "expires_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended."
                         }
                       },
                       "required": [
@@ -18265,7 +18292,8 @@
                         "created_at",
                         "updated_at",
                         "last_used_at",
-                        "revoked_at"
+                        "revoked_at",
+                        "expires_at"
                       ]
                     }
                   },
@@ -18650,6 +18678,13 @@
                             "string",
                             "null"
                           ]
+                        },
+                        "expires_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended."
                         }
                       },
                       "required": [
@@ -18672,7 +18707,8 @@
                         "created_at",
                         "updated_at",
                         "last_used_at",
-                        "revoked_at"
+                        "revoked_at",
+                        "expires_at"
                       ]
                     }
                   },
@@ -18938,6 +18974,13 @@
                       "fallback_all",
                       "policy"
                     ]
+                  },
+                  "expires_at": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "When the key stops serving. Omit it and the stored date stays where it is; null clears it, so the key never expires; a date moves it. A key whose date has already passed accepts this edit like any other, which is how an expired key is put back in service without minting a new secret. A date in the past is refused with `virtual_key_expiry_in_past`."
                   },
                   "budget": {
                     "type": [
@@ -19637,6 +19680,13 @@
                             "string",
                             "null"
                           ]
+                        },
+                        "expires_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended."
                         }
                       },
                       "required": [
@@ -19659,7 +19709,8 @@
                         "created_at",
                         "updated_at",
                         "last_used_at",
-                        "revoked_at"
+                        "revoked_at",
+                        "expires_at"
                       ]
                     },
                     "secret": {
@@ -20007,6 +20058,13 @@
                             "string",
                             "null"
                           ]
+                        },
+                        "expires_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended."
                         }
                       },
                       "required": [
@@ -20029,7 +20087,8 @@
                         "created_at",
                         "updated_at",
                         "last_used_at",
-                        "revoked_at"
+                        "revoked_at",
+                        "expires_at"
                       ]
                     }
                   },
@@ -20390,6 +20449,13 @@
                             "string",
                             "null"
                           ]
+                        },
+                        "expires_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended."
                         }
                       },
                       "required": [
@@ -20412,7 +20478,8 @@
                         "created_at",
                         "updated_at",
                         "last_used_at",
-                        "revoked_at"
+                        "revoked_at",
+                        "expires_at"
                       ]
                     }
                   },
@@ -20756,6 +20823,13 @@
                             "string",
                             "null"
                           ]
+                        },
+                        "expires_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended."
                         }
                       },
                       "required": [
@@ -20778,7 +20852,8 @@
                         "created_at",
                         "updated_at",
                         "last_used_at",
-                        "revoked_at"
+                        "revoked_at",
+                        "expires_at"
                       ]
                     }
                   },

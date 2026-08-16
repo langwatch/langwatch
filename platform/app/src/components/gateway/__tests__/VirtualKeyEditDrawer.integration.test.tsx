@@ -366,4 +366,71 @@ describe("given the edit drawer for an existing key", () => {
       expect(screen.queryByTestId("vk-view-traces")).toBeNull();
     });
   });
+
+  describe("when the key carries an expiration date", () => {
+    /** @scenario "The edit drawer round-trips the stored date" */
+    it("shows the stored day and sends the same instant back untouched", async () => {
+      renderDrawer({ expiresAt: "2030-08-20T09:15:00.000Z" });
+
+      await waitFor(() =>
+        expect(
+          (screen.getByTestId("vk-expiration-preset") as HTMLSelectElement)
+            .value,
+        ).toBe("custom"),
+      );
+      expect(
+        (screen.getByTestId("vk-expiration-date") as HTMLInputElement).value,
+      ).toBe("2030-08-20");
+
+      await save();
+      // Untouched means untouched: re-resolving the day would silently
+      // push the key's last minutes to the end of that day.
+      expect((lastUpdateInput().expiresAt as Date).toISOString()).toBe(
+        "2030-08-20T09:15:00.000Z",
+      );
+    });
+
+    it("clears the date when the choice moves back to Never", async () => {
+      renderDrawer({ expiresAt: "2030-08-20T09:15:00.000Z" });
+
+      await waitFor(() =>
+        expect(screen.getByTestId("vk-expiration-preset")).toBeTruthy(),
+      );
+      await userEvent.selectOptions(
+        screen.getByTestId("vk-expiration-preset"),
+        "",
+      );
+      await save();
+      expect(lastUpdateInput().expiresAt).toBeNull();
+    });
+
+    it("moves the date when a new day is typed", async () => {
+      renderDrawer({ expiresAt: "2030-08-20T09:15:00.000Z" });
+
+      const dateInput = await waitFor(() =>
+        screen.getByTestId("vk-expiration-date"),
+      );
+      await userEvent.clear(dateInput);
+      await userEvent.type(dateInput, "2030-09-01");
+      await save();
+      expect((lastUpdateInput().expiresAt as Date).toISOString()).toBe(
+        "2030-09-01T23:59:59.999Z",
+      );
+    });
+  });
+
+  describe("when the key never expires", () => {
+    it("reads back as Never and keeps sending no date", async () => {
+      renderDrawer({ expiresAt: null });
+
+      await waitFor(() =>
+        expect(
+          (screen.getByTestId("vk-expiration-preset") as HTMLSelectElement)
+            .value,
+        ).toBe(""),
+      );
+      await save();
+      expect(lastUpdateInput().expiresAt).toBeNull();
+    });
+  });
 });

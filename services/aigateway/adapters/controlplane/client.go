@@ -123,12 +123,19 @@ func (c *Client) ResolveKey(ctx context.Context, rawKey string) (*domain.Bundle,
 	case resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusUnauthorized:
 		return nil, herr.New(ctx, domain.ErrInvalidAPIKey, nil)
 	case resp.StatusCode == http.StatusForbidden:
-		// The control plane distinguishes the reversible disable from the
-		// one-way revoke in its error code; forward the distinction so a
-		// disabled tenant is not told its credential is gone for good.
+		// The control plane distinguishes the reversible disable and the
+		// self-serve expiry from the one-way revoke in its error code;
+		// forward the distinction so neither tenant is told its credential
+		// is gone for good. An unrecognized 403 still reads as revoked,
+		// which is the safe answer for a gateway older than the code.
 		if strings.Contains(string(respBody), "virtual_key_disabled") {
 			return nil, herr.New(ctx, domain.ErrKeyDisabled, herr.M{
 				"message": "This key is disabled. An administrator can re-enable it; the key material is unchanged.",
+			})
+		}
+		if strings.Contains(string(respBody), "virtual_key_expired") {
+			return nil, herr.New(ctx, domain.ErrKeyExpired, herr.M{
+				"message": "This key has expired. Extend its expiration date, or create a new key.",
 			})
 		}
 		return nil, herr.New(ctx, domain.ErrKeyRevoked, nil)

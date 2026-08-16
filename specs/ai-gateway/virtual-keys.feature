@@ -178,6 +178,55 @@ Feature: AI Gateway — Virtual Keys
     When I look at the actions for "prod-key"
     Then "View traces" is not offered
 
+  @integration
+  Scenario: Every place that shows a key's usage links to the traces behind it
+    Given virtual key "prod-key" files its traces into the project "web-app"
+    And I am a member of the team that holds "web-app"
+    When I open the key's detail page
+    Then the header offers "View traces"
+    And the usage block offers "View all traces"
+    # A number with no way to reach the requests behind it ends the
+    # investigation where it started.
+
+  @integration
+  Scenario: The traces link carries the window the reader is looking at
+    Given I am reading the Usage page filtered to one key
+    When I switch the period and follow "View all traces"
+    Then the Trace Explorer opens over the same period
+    # Landing on a 30-day list after reading a 24-hour chart makes the two
+    # numbers disagree for a reason nobody can see.
+
+  @integration
+  Scenario: Periods the Trace Explorer has no preset for travel as exact bounds
+    Given I am reading the Usage page over 90 days, or over this month
+    When I follow "View all traces"
+    Then the Trace Explorer opens over the same start and end instants
+    # The Explorer has no 90-day preset, and its "this month" starts in the
+    # reader's own timezone while the Usage page's starts in UTC. Exact
+    # bounds are the only way the two agree.
+
+  @integration
+  Scenario: A key with nowhere to send its traces offers no trace links
+    Given virtual key "legacy-key" has no trace destination
+    When I open its detail page and the Usage page filtered to it
+    Then no "View traces" or "View all traces" button is offered
+
+  @integration
+  Scenario: Picking a model narrows the recent activity to that model
+    Given a key that served two models in the last 30 days
+    When I click one model in Spend by model
+    Then Recent activity lists only that model's requests
+    And the totals, the chart and the model list stay as they were
+    And "View all traces" now carries the model too
+    # The model row is a legend as well as a filter. Narrowing it with the
+    # table would leave the reader with one chip and no way back.
+
+  @integration
+  Scenario: Clicking the picked model again clears the filter
+    Given I picked a model in Spend by model
+    When I click the same model again
+    Then Recent activity lists every model again
+
   # ============================================================================
   # Create-drawer capability preview (Lane B iter 23) — minimum-viable
   # creation surface with a read-only preview of advanced settings.
@@ -484,3 +533,81 @@ Feature: AI Gateway — Virtual Keys
     Then the response is 204 No Content with header "X-LangWatch-Revision: 100"
     When a user rotates a virtual key while the long-poll is open
     Then the endpoint returns 200 with a change event and the new revision
+
+  # ============================================================================
+  # Expiry on screen
+  #
+  # Expiry is derived from a date, so every surface has to derive it the
+  # same way. The status enum on the wire stays the three it has always
+  # been, and "Expired" is what the reader sees when the date has passed.
+  # ============================================================================
+
+  @integration
+  Scenario: A key past its expiration date is badged Expired
+    Given virtual key "temp-key" is active and its expiration date has passed
+    When I open the virtual keys list
+    Then its status badge reads "expired"
+    And a key with a date still ahead is badged "active"
+
+  @integration
+  Scenario: The detail page states when the key expires
+    Given virtual key "temp-key" expires in 4 days
+    When I open its detail page
+    Then the Identity section shows the exact date and how long is left
+    And a key with no expiration date reads "Never"
+
+  @integration
+  Scenario: An expired key can still be edited so the date can be extended
+    Given virtual key "temp-key" is past its expiration date
+    When I open its detail page
+    Then Edit, Rotate, Disable and Revoke are all still offered
+    # The whole point of a date over a status is that the fix is an edit.
+
+  @integration
+  Scenario: The edit drawer round-trips the stored date
+    Given virtual key "temp-key" expires on a stored date
+    When I open the edit drawer
+    Then the expiration shows that date
+    And saving without touching it leaves the date alone
+
+  @integration
+  Scenario: A disabled key is listed with the active keys and keeps its actions
+    Given virtual key "paused-key" is disabled
+    When I open the virtual keys list
+    Then it appears in the Active tab, badged "disabled"
+    And its actions offer Details, View traces and Revoke
+    And Edit and Rotate are offered only for keys that are active
+    # A disabled key used to appear in neither tab and carry no actions, so
+    # the only way to reach it was a link somebody had kept.
+
+  # ============================================================================
+  # Scope and routing, told truthfully
+  # ============================================================================
+
+  @integration
+  Scenario: The routing policy is named and links to itself
+    Given virtual key "prod-key" is pinned to routing policy "eu-only"
+    When I open its detail page
+    Then the routing policy reads "eu-only" and opens the policy when clicked
+    And a reader who cannot see routing policies still sees its identifier
+    # An identifier alone is a fact the reader has to go and look up
+    # somewhere else, and most of them do not.
+
+  @integration
+  Scenario: The provider panel shows what the key may use, not what its scope reaches
+    Given virtual key "prod-key" is scoped to a project with three providers
+    And the key allows only one of them
+    When I open its detail page
+    Then the allowed providers panel lists that one provider
+    And the sentence above it counts one provider
+    # The panel used to list every provider the scope reached, which
+    # overstated the key for every key with an allowlist.
+
+  @integration
+  Scenario: A provider the routing policy leaves out is marked as such
+    Given virtual key "prod-key" allows a provider its routing policy does not name
+    When I open its detail page
+    Then that provider is tagged "Not in routing policy"
+    # The allowlist says what the key may hold; the policy decides what
+    # dispatch actually tries. A provider in one and not the other is worth
+    # seeing before a request fails over to nothing.

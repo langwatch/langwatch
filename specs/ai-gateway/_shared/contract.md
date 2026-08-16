@@ -601,7 +601,9 @@ All errors OpenAI-compatible:
 | `type` | HTTP | When |
 |---|---|---|
 | `invalid_api_key` | 401 | Unknown, malformed, or non-existent VK |
-| `virtual_key_revoked` | 403 | VK exists but is revoked |
+| `virtual_key_revoked` | 403 | VK exists but is revoked. Terminal: revocation is one-way |
+| `virtual_key_disabled` | 403 | VK exists but is disabled, the reversible stop. An administrator re-enables it and the same secret works again |
+| `virtual_key_expired` | 403 | VK exists, is ACTIVE, and its `expires_at` has passed. The key material is intact: extending the date puts it straight back in service |
 | `model_not_allowed` | 403 | VK has `models_allowed` glob allowlist and requested model is not in it, **or** matched `policy_rules.models` deny regex (or fell outside its allow regex); also when no alias/explicit form resolves to a configured provider |
 | `permission_denied` | 403 | Principal lacks RBAC permission for endpoint |
 | `budget_exceeded` | 402 | Any hard-cap budget scope is over limit |
