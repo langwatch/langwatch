@@ -81,23 +81,26 @@ describe("given an ElevenLabs post-call delivery", () => {
     ).toBe(false);
   });
 
-  it("refuses a malformed or absent header", () => {
-    for (const header of [
-      undefined,
-      "",
-      "v0=deadbeef",
-      `t=${now}`,
-      "t=notanumber,v0=deadbeef",
-    ]) {
-      expect(
-        verifyElevenLabsSignature({
-          rawBody: BODY,
-          header,
-          secret: SECRET,
-          nowSeconds: now,
-        }),
-      ).toBe(false);
-    }
+  // Labelled cases rather than a loop, so a failure names the input that
+  // broke instead of one line number covering five of them.
+  it.each([
+    { label: "no header at all", header: undefined },
+    { label: "an empty header", header: "" },
+    { label: "a signature with no timestamp", header: "v0=deadbeef" },
+    { label: "a timestamp with no signature", header: `t=${now}` },
+    {
+      label: "a non-numeric timestamp",
+      header: "t=notanumber,v0=deadbeef",
+    },
+  ])("refuses $label", ({ header }) => {
+    expect(
+      verifyElevenLabsSignature({
+        rawBody: BODY,
+        header,
+        secret: SECRET,
+        nowSeconds: now,
+      }),
+    ).toBe(false);
   });
 
   it("refuses every delivery when no secret is stored", () => {

@@ -20,8 +20,11 @@ import { createLogger } from "@langwatch/observability";
 import type { GatewayRealtimeSession } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 import { decryptCustomKeys } from "~/server/modelProviders/customKeys";
+import { isElevenLabsHost } from "~/server/modelProviders/registry";
+import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 import {
   closeAndConfirmRealtimeSession,
+  expireStaleRealtimeSessions,
   releaseRealtimeSession,
 } from "./realtimeSession.service";
 
@@ -78,11 +81,20 @@ async function credentialFor(
   const apiKey = keys.ELEVENLABS_API_KEY;
   if (typeof apiKey !== "string" || apiKey.length === 0) return null;
   const configured = keys.ELEVENLABS_BASE_URL;
-  const baseUrl =
-    typeof configured === "string" && configured.length > 0
-      ? configured.replace(/\/$/, "")
-      : DEFAULT_BASE_URL;
-  return { apiKey, baseUrl };
+  if (typeof configured === "string" && configured.length > 0) {
+    // Checked again on read, not only on write. A row stored before the
+    // registry constrained this field would otherwise send the customer's
+    // key to whatever host it names.
+    if (!isElevenLabsHost(configured)) {
+      logger.warn(
+        { modelProviderId },
+        "an ElevenLabs credential names a base URL outside elevenlabs.io; reconciling against the default host instead",
+      );
+      return { apiKey, baseUrl: DEFAULT_BASE_URL };
+    }
+    return { apiKey, baseUrl: configured.replace(/\/$/, "") };
+  }
+  return { apiKey, baseUrl: DEFAULT_BASE_URL };
 }
 
 /**
@@ -98,11 +110,17 @@ async function readConversation(params: {
   baseUrl: string;
   conversationId: string;
 }): Promise<{ report?: ConversationReport; notFound: boolean }> {
-  const response = await fetch(
+  // ssrfSafeFetch, not fetch: the base URL comes from a customer-configured
+  // credential, and this request carries that customer's xi-api-key. A plain
+  // fetch would follow a redirect and hand the key to whatever host answered.
+  const response = await ssrfSafeFetch(
     `${params.baseUrl}/v1/convai/conversations/${encodeURIComponent(params.conversationId)}`,
     {
       headers: { "xi-api-key": params.apiKey },
       signal: AbortSignal.timeout(VENDOR_CALL_TIMEOUT_MS),
+      followRedirects: false,
+      headersTimeoutMs: VENDOR_CALL_TIMEOUT_MS,
+      bodyTimeoutMs: VENDOR_CALL_TIMEOUT_MS,
     },
   );
   if (response.status === 404) return { notFound: true };
@@ -138,13 +156,25 @@ async function reconcile(session: GatewayRealtimeSession): Promise<boolean> {
   }
   if (!report || !isTerminal(report.status)) return false;
 
-  const durationSecs = Math.max(
-    0,
-    Math.round(report.metadata?.call_duration_secs ?? 0),
-  );
+  // A terminal conversation with no duration is not a free call. Confirming
+  // zero would write a confirmed spend record the fold never downgrades, so
+  // no later report could correct it. Leaving the session open lets the next
+  // tick retry, and the expiry sweep or the spend grace owns the outcome.
+  const reportedSecs = report.metadata?.call_duration_secs;
+  if (typeof reportedSecs !== "number" || !Number.isFinite(reportedSecs)) {
+    logger.warn(
+      { sessionId: session.id, status: report.status },
+      "the vendor reported a finished conversation with no duration; leaving the session open",
+    );
+    return false;
+  }
+
+  const durationSecs = Math.max(0, Math.round(reportedSecs));
   await closeAndConfirmRealtimeSession({
     session,
     usage: { audio_ms: durationSecs * 1000 },
+    // Evidence only. `cost_fiat` is the money field, `cost` is credits;
+    // nothing here prices from either, because the session bills on duration.
     vendorCostRaw: report.metadata ?? null,
     durationMs: durationSecs * 1000,
     reason: "reconciled by poll",
@@ -155,7 +185,14 @@ async function reconcile(session: GatewayRealtimeSession): Promise<boolean> {
 /** One reconciliation pass. Exported so a test can drive it directly. */
 export async function pollOpenRealtimeSessions(
   now = new Date(),
-): Promise<{ examined: number; confirmed: number }> {
+): Promise<{ examined: number; confirmed: number; expired: number }> {
+  // The unscoped sweep. reserveRealtimeSession expires a key's stale rows
+  // under its own lock, but only for a key that has a cap, and only when that
+  // key mints again. A key with no cap, or one whose customer stopped calling,
+  // would otherwise leave OPEN rows behind forever: rows the OpenAI arm has no
+  // other closing path for, since its socket never signals that it ended.
+  const expired = await expireStaleRealtimeSessions({ now });
+
   const sessions = await prisma.gatewayRealtimeSession.findMany({
     where: {
       vendor: "elevenlabs",
@@ -178,7 +215,7 @@ export async function pollOpenRealtimeSessions(
       );
     }
   }
-  return { examined: sessions.length, confirmed };
+  return { examined: sessions.length, confirmed, expired };
 }
 
 /**
@@ -188,13 +225,29 @@ export async function pollOpenRealtimeSessions(
  */
 export function startRealtimeSessionPoller(): RealtimeSessionPollerHandle {
   let stopped = false;
+  let running = false;
   let timer: NodeJS.Timeout | undefined;
 
   const tick = async () => {
     if (stopped) return;
+    // setInterval does not wait for an async callback. A tick reads up to
+    // MAX_SESSIONS_PER_TICK conversations one after another, each bounded by
+    // VENDOR_CALL_TIMEOUT_MS, so a slow vendor makes one tick outlast the
+    // interval several times over and ticks pile up on the same rows. Spend
+    // confirmation is idempotent, so that would not double charge; it would
+    // multiply calls against a vendor already struggling, which is the wrong
+    // answer to that signal.
+    if (running) {
+      logger.warn(
+        {},
+        "the previous realtime reconciliation tick is still running; skipping this one",
+      );
+      return;
+    }
+    running = true;
     try {
       const result = await pollOpenRealtimeSessions();
-      if (result.examined > 0) {
+      if (result.examined > 0 || result.expired > 0) {
         logger.info(result, "realtime voice session reconciliation tick");
       }
     } catch (error) {
@@ -202,6 +255,8 @@ export function startRealtimeSessionPoller(): RealtimeSessionPollerHandle {
         { error },
         "realtime voice session reconciliation tick failed (will retry)",
       );
+    } finally {
+      running = false;
     }
   };
 

@@ -259,6 +259,36 @@ export const getRegistryMetadata = () => ({
   modelCount: llmModels.modelCount,
 });
 
+/** The one domain an ElevenLabs base URL may point at. */
+export const ELEVENLABS_HOST_SUFFIX = "elevenlabs.io";
+
+/**
+ * Answers whether a configured ElevenLabs base URL is one of the vendor's own
+ * hosts.
+ *
+ * The suffix rather than a fixed list of residency hosts: ElevenLabs adds
+ * regions, and a customer on a new one should not have to wait for a release.
+ * The `.` in the suffix test is what stops `notelevenlabs.io` matching.
+ *
+ * Empty, null and undefined pass, because the field is optional and the
+ * default host applies when it is unset.
+ */
+export function isElevenLabsHost(value: string | null | undefined): boolean {
+  if (value === null || value === undefined || value.trim() === "") return true;
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "https:") return false;
+  const host = url.hostname.toLowerCase();
+  return (
+    host === ELEVENLABS_HOST_SUFFIX ||
+    host.endsWith(`.${ELEVENLABS_HOST_SUFFIX}`)
+  );
+}
+
 // ============================================================================
 // Provider Definitions
 // ============================================================================
@@ -451,7 +481,19 @@ export const modelProviders = {
       // The regional API host. ElevenLabs publishes residency endpoints, and
       // a session minted against the default host is signed in the wrong
       // region for a customer who chose one.
-      ELEVENLABS_BASE_URL: z.string().nullable().optional(),
+      //
+      // Restricted to ElevenLabs' own domain. The mint and the reconciler
+      // both send the customer's xi-api-key to this host, and the gateway's
+      // endpoint policy only refuses private addresses, so without this any
+      // public host would be a place to have the key delivered.
+      ELEVENLABS_BASE_URL: z
+        .string()
+        .nullable()
+        .optional()
+        .refine(isElevenLabsHost, {
+          message:
+            "must be an https URL on elevenlabs.io, for example https://api.elevenlabs.io or a residency host such as https://api.eu.residency.elevenlabs.io",
+        }),
     }),
     optionalKeys: ["ELEVENLABS_WEBHOOK_SECRET", "ELEVENLABS_BASE_URL"],
     enabledSince: new Date("2026-07-25"),

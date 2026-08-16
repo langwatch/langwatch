@@ -9,6 +9,7 @@
  *
  * Spec: specs/ai-gateway/realtime-sessions.feature
  */
+import { createHmac } from "crypto";
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -50,6 +51,11 @@ vi.mock("~/server/app-layer/app", () => ({
 }));
 
 import {
+  ELEVENLABS_WEBHOOK_SECRET_KEY,
+  app as elevenLabsApp,
+} from "~/server/routes/elevenlabs";
+import { encrypt } from "~/utils/encryption";
+import {
   closeAndConfirmRealtimeSession,
   correlateRealtimeSession,
   expireStaleRealtimeSessions,
@@ -65,6 +71,9 @@ const TEAM_ID = `team-rt-${suffix}`;
 const PROJECT_ID = `project-rt-${suffix}`;
 const USER_ID = `user-rt-${suffix}`;
 const PROVIDER_ID = `mp-rt-${suffix}`;
+/** A real ElevenLabs provider row, so the webhook route can verify against it. */
+const WEBHOOK_PROVIDER_ID = `mp-wh-${suffix}`;
+const WEBHOOK_SECRET = "wsec_integration";
 
 /** A key with a cap of `max`, or no cap when it is null. */
 async function keyWithCap(id: string, max: number | null): Promise<string> {
@@ -124,6 +133,24 @@ describe("given a virtual key that brokers realtime voice sessions", () => {
     await prisma.user.create({
       data: { id: USER_ID, email: `${USER_ID}@acme.test`, name: USER_ID },
     });
+    await prisma.modelProvider.create({
+      data: {
+        id: WEBHOOK_PROVIDER_ID,
+        organizationId: ORG_ID,
+        name: "ElevenLabs",
+        provider: "elevenlabs",
+        enabled: true,
+        customKeys: encrypt(
+          JSON.stringify({
+            ELEVENLABS_API_KEY: "xi-test",
+            [ELEVENLABS_WEBHOOK_SECRET_KEY]: WEBHOOK_SECRET,
+          }),
+        ),
+        scopes: {
+          create: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+        },
+      },
+    });
   });
 
   afterAll(async () => {
@@ -131,6 +158,9 @@ describe("given a virtual key that brokers realtime voice sessions", () => {
       where: { organizationId: ORG_ID },
     });
     await prisma.virtualKey.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.modelProvider.deleteMany({
+      where: { organizationId: ORG_ID },
+    });
     await prisma.project.deleteMany({ where: { teamId: TEAM_ID } });
     await prisma.team.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.organization.deleteMany({ where: { id: ORG_ID } });
@@ -417,5 +447,131 @@ describe("given a virtual key that brokers realtime voice sessions", () => {
       (await prisma.gatewayRealtimeSession.findUnique({ where: { id: fresh } }))
         ?.status,
     ).toBe("OPEN");
+  });
+
+  describe("and the vendor delivers a post-call webhook", () => {
+    /** A signed delivery to the webhook route for our provider row. */
+    async function deliver(payload: unknown): Promise<Response> {
+      const body = JSON.stringify(payload);
+      const ts = String(Math.floor(Date.now() / 1000));
+      const mac = createHmac("sha256", WEBHOOK_SECRET)
+        .update(`${ts}.${body}`)
+        .digest("hex");
+      return elevenLabsApp.request(
+        `/api/elevenlabs/webhook/${WEBHOOK_PROVIDER_ID}`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "elevenlabs-signature": `t=${ts},v0=${mac}`,
+          },
+          body,
+        },
+      );
+    }
+
+    /** @scenario A non-transcription post-call event closes nothing */
+    it("ignores a post_call_audio delivery for an open session", async () => {
+      const vk = await keyWithCap(`vk-audio-${nanoid(6)}`, null);
+      const sessionId = `sess-audio-${nanoid(6)}`;
+      await reserveRealtimeSession({
+        ...reservation(vk, sessionId),
+        modelProviderId: WEBHOOK_PROVIDER_ID,
+      });
+      await correlateRealtimeSession({
+        sessionId,
+        projectId: PROJECT_ID,
+        vendorConversationId: "conv_audio",
+      });
+
+      // The audio event names the same conversation and carries no metadata.
+      // Acting on it would confirm the call at zero, permanently: the fold
+      // never downgrades a confirmation.
+      const response = await deliver({
+        type: "post_call_audio",
+        data: { conversation_id: "conv_audio", full_audio: "<base64>" },
+      });
+
+      expect(response.status).toBe(200);
+      expect(sentConfirmations).toHaveLength(0);
+      expect(
+        (
+          await prisma.gatewayRealtimeSession.findUnique({
+            where: { id: sessionId },
+          })
+        )?.status,
+      ).toBe("OPEN");
+    });
+
+    /** @scenario A transcription report with no duration confirms nothing */
+    it("leaves the session open when the report carries no duration", async () => {
+      const vk = await keyWithCap(`vk-nodur-${nanoid(6)}`, null);
+      const sessionId = `sess-nodur-${nanoid(6)}`;
+      await reserveRealtimeSession({
+        ...reservation(vk, sessionId),
+        modelProviderId: WEBHOOK_PROVIDER_ID,
+      });
+      await correlateRealtimeSession({
+        sessionId,
+        projectId: PROJECT_ID,
+        vendorConversationId: "conv_nodur",
+      });
+
+      const response = await deliver({
+        type: "post_call_transcription",
+        data: {
+          conversation_id: "conv_nodur",
+          metadata: { start_time_unix_secs: 1_780_000_000 },
+        },
+      });
+
+      expect(response.status).toBe(200);
+      expect(sentConfirmations).toHaveLength(0);
+      expect(
+        (
+          await prisma.gatewayRealtimeSession.findUnique({
+            where: { id: sessionId },
+          })
+        )?.status,
+      ).toBe("OPEN");
+    });
+
+    /** @scenario A transcription report confirms the session it names */
+    it("confirms the session when the report carries a duration", async () => {
+      const vk = await keyWithCap(`vk-dur-${nanoid(6)}`, null);
+      const sessionId = `sess-dur-${nanoid(6)}`;
+      await reserveRealtimeSession({
+        ...reservation(vk, sessionId),
+        modelProviderId: WEBHOOK_PROVIDER_ID,
+      });
+      await correlateRealtimeSession({
+        sessionId,
+        projectId: PROJECT_ID,
+        vendorConversationId: "conv_dur",
+      });
+
+      const response = await deliver({
+        type: "post_call_transcription",
+        data: {
+          conversation_id: "conv_dur",
+          metadata: {
+            call_duration_secs: 3,
+            cost: 24,
+            cost_fiat: 0.004442603806761652,
+          },
+        },
+      });
+
+      expect(response.status).toBe(200);
+      expect(sentConfirmations).toHaveLength(1);
+      expect(sentConfirmations[0]?.usage).toMatchObject({ audio_ms: 3000 });
+      expect(
+        (
+          await prisma.gatewayRealtimeSession.findUnique({
+            where: { id: sessionId },
+          })
+        )?.status,
+      ).toBe("CLOSED");
+    });
   });
 });

@@ -13,16 +13,25 @@
  * walk over every configured provider, and an id that names no configured
  * webhook answers 404 so the ids cannot be probed.
  *
- * Every delivery is acknowledged. A retry does not fix a payload this
- * instance cannot act on, and an unmatched call is not lost: its spend record
- * settles as cost-unknown at the grace, visibly, and a later delivery still
- * supersedes the settled row.
+ * Every delivery this handler can parse is acknowledged, and that is not
+ * politeness. ElevenLabs never retries a failed delivery, by design for HIPAA,
+ * and it disables a webhook after ten consecutive failures. So a non-2xx
+ * answer loses that call's billing data permanently, and ten of them stop
+ * delivery for every tenant on the endpoint.
+ *
+ * That is why this webhook is an optimisation and not the billing path. The
+ * reconciler in realtimeSessionPoller.ts asks the vendor for the same numbers
+ * on a schedule, so a lost or rejected delivery costs latency rather than
+ * money, and a webhook that was never registered at all still bills correctly.
+ * An unmatched call is not lost either: its spend record settles as
+ * cost-unknown at the grace, visibly, and a later report supersedes it.
  *
  * Spec: specs/ai-gateway/realtime-sessions.feature.
  */
 
 import { createLogger } from "@langwatch/observability";
 import { createHmac, timingSafeEqual } from "crypto";
+import type { Context } from "hono";
 import { z } from "zod";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
 import { prisma } from "~/server/db";
@@ -56,6 +65,16 @@ export const ELEVENLABS_WEBHOOK_SECRET_KEY = "ELEVENLABS_WEBHOOK_SECRET";
 const SIGNATURE_TOLERANCE_SECONDS = 30 * 60;
 
 /**
+ * The one event type this handler acts on.
+ *
+ * A workspace can enable other post-call events in its ElevenLabs dashboard.
+ * `post_call_audio` and `call_initiation_failure` both carry a
+ * `data.conversation_id` for the same conversation and no `data.metadata`, so
+ * without this check they match the open session and close it at zero.
+ */
+const BILLABLE_EVENT_TYPE = "post_call_transcription";
+
+/**
  * The fields this handler reads. Everything else in the payload, including
  * the transcript and the analysis, is deliberately not read: the platform
  * bills a call, it does not store what was said on it.
@@ -71,7 +90,13 @@ const postCallSchema = z.object({
         .object({
           start_time_unix_secs: z.number().optional(),
           call_duration_secs: z.number().optional(),
+          // `cost` is ElevenLabs credits and `cost_fiat` is money. A
+          // three-second call reports cost 24 and cost_fiat 0.0044, so
+          // reading the wrong one is off by three orders of magnitude.
+          // Both are kept as evidence; neither is what the session bills
+          // on, which is duration.
           cost: z.number().optional(),
+          cost_fiat: z.number().optional(),
         })
         .passthrough()
         .optional(),
@@ -166,9 +191,11 @@ function echoedSessionId(
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function handleElevenLabsWebhook(c: any): Promise<Response> {
-  const modelProviderId = c.req.param("modelProviderId");
+async function handleElevenLabsWebhook(c: Context): Promise<Response> {
+  // Typed as optional because the generic Context does not know this route's
+  // parameters. An empty id resolves no provider, so it answers 404 with the
+  // rest of them.
+  const modelProviderId = c.req.param("modelProviderId") ?? "";
   const configured = await webhookSecretFor(modelProviderId);
   if (!configured) {
     // 404 rather than 401: an id with no webhook configured must look the
@@ -197,6 +224,14 @@ async function handleElevenLabsWebhook(c: any): Promise<Response> {
     return c.json({ error: "Invalid payload" }, { status: 400 });
   }
 
+  // Acknowledged, not refused. ElevenLabs does not retry, and it disables a
+  // webhook after ten consecutive failures, so answering non-2xx to an event
+  // this handler does not act on would eventually stop delivery of the one it
+  // does act on, for every tenant sharing the endpoint.
+  if (payload.type && payload.type !== BILLABLE_EVENT_TYPE) {
+    return c.json({ received: true });
+  }
+
   try {
     await applyPostCallReport({
       payload,
@@ -219,6 +254,23 @@ async function applyPostCallReport(params: {
   organizationId: string;
 }): Promise<void> {
   const data = params.payload.data;
+
+  // No duration means no quantity to confirm. Coercing an absent one to zero
+  // would send a confirmed spend record of zero, and the fold never downgrades
+  // a confirmation, so no later report could correct it. Returning here leaves
+  // the admission to settle as cost-unknown on its grace, which is visible.
+  const reportedSecs = data?.metadata?.call_duration_secs;
+  if (typeof reportedSecs !== "number" || !Number.isFinite(reportedSecs)) {
+    logger.warn(
+      {
+        modelProviderId: params.modelProviderId,
+        conversationId: data?.conversation_id,
+      },
+      "an ElevenLabs post-call report carried no call duration; its session settles as cost-unknown",
+    );
+    return;
+  }
+
   const startedAtSecs = data?.metadata?.start_time_unix_secs;
   const session = await matchRealtimeSession({
     vendor: "elevenlabs",
@@ -233,13 +285,14 @@ async function applyPostCallReport(params: {
   // The vendor prices a conversation by duration, so duration is the
   // quantity. It arrives in whole seconds and every quantity on the spend
   // wire is an integer, so it becomes milliseconds here, once.
-  const durationSecs = Math.max(
-    0,
-    Math.round(data?.metadata?.call_duration_secs ?? 0),
-  );
+  const durationSecs = Math.max(0, Math.round(reportedSecs));
   await closeAndConfirmRealtimeSession({
     session,
     usage: { audio_ms: durationSecs * 1000 },
+    // The whole metadata block, kept as the vendor's own record of the call.
+    // Nothing prices from it: the session bills on duration at the catalog
+    // rate. If a comparison against the vendor's figure is ever added, the
+    // money field is `cost_fiat`. `cost` is ElevenLabs credits.
     vendorCostRaw: data?.metadata ?? null,
     durationMs: durationSecs * 1000,
     reason: "post-call report",

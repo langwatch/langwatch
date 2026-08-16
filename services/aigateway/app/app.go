@@ -152,7 +152,7 @@ func (discardMetrics) RecordCacheOutcome(_ domain.Usage)                  {}
 func (discardMetrics) RecordCacheRuleHit(_, _ string)                     {}
 func (discardMetrics) RecordBudgetBlock(_ string)                         {}
 func (discardMetrics) RecordRealtimeMint(_, _ string)                     {}
-func (discardMetrics) RecordRealtimeSessionLimitBlock()                  {}
+func (discardMetrics) RecordRealtimeSessionLimitBlock()                   {}
 func (discardMetrics) RecordRealtimeRegistryError(_ string)               {}
 func (discardMetrics) SetRequestLabels(_ context.Context, _, _ string)    {}
 func (discardMetrics) ModelLabel(_ domain.BundleConfig, model string) string {

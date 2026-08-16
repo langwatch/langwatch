@@ -16,8 +16,15 @@
  *   pnpm tsx scripts/dogfood/realtime/seed-realtime-vk.ts --email you@example.com
  *   pnpm tsx scripts/dogfood/realtime/seed-realtime-vk.ts --email … --max-open-sessions 1
  *
- * Idempotent: provider rows are matched by organization and provider, the
- * default policy is updated in place, and the budget is matched by name.
+ * Steps 1 and 2 are idempotent: provider rows are matched by organization and
+ * provider, and the default policy is updated in place.
+ *
+ * Steps 3 and 4 are NOT. `PersonalVirtualKeyService.issue()` mints a new key
+ * every run, because the plaintext secret exists only at mint and an existing
+ * key cannot be printed again, and each run's budget is scoped to that new
+ * key. So every run leaves behind one more key and one more blocking budget.
+ * Delete the keys from a previous run before re-seeding, or the organization
+ * accumulates them.
  *
  * Refuses to run against a non-local DATABASE_URL unless --allow-remote-db is
  * passed: provider keys and the default policy are organization-wide records.
@@ -36,7 +43,7 @@ interface Args {
   allowRemoteDb: boolean;
 }
 
-function parseArgs(argv: string[]): Args {
+function parseArgs({ argv }: { argv: string[] }): Args {
   let email = "";
   let org = "";
   let maxOpenSessions: number | null = null;
@@ -58,7 +65,11 @@ function parseArgs(argv: string[]): Args {
 
 const LOCAL_DB_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 
-function assertLocalDatabase(allowRemoteDb: boolean): void {
+function assertLocalDatabase({
+  allowRemoteDb,
+}: {
+  allowRemoteDb: boolean;
+}): void {
   if (allowRemoteDb) return;
   let host = "";
   try {
@@ -119,8 +130,8 @@ async function ensureProvider(params: {
 }
 
 async function main() {
-  const args = parseArgs(process.argv.slice(2));
-  assertLocalDatabase(args.allowRemoteDb);
+  const args = parseArgs({ argv: process.argv.slice(2) });
+  assertLocalDatabase({ allowRemoteDb: args.allowRemoteDb });
 
   const user = await prisma.user.findFirst({ where: { email: args.email } });
   if (!user) throw new Error(`no user with email ${args.email}, sign up first`);

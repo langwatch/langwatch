@@ -21,6 +21,7 @@ import type {
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import {
+  type ConfirmSpendCommandData,
   EMPTY_SPEND_USAGE,
   type SpendUsage,
 } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/commands";
@@ -274,7 +275,11 @@ export async function closeAndConfirmRealtimeSession(params: {
   });
 
   const closed = await prisma.gatewayRealtimeSession.updateMany({
-    where: { id: params.session.id, status: { in: ["OPEN", "EXPIRED"] } },
+    where: {
+      id: params.session.id,
+      projectId: params.session.projectId,
+      status: { in: ["OPEN", "EXPIRED"] },
+    },
     data: {
       status: "CLOSED",
       closedAt: occurredAt,
@@ -290,6 +295,48 @@ export async function closeAndConfirmRealtimeSession(params: {
       "a realtime report arrived for a session that was already closed",
     );
   }
+}
+
+/**
+ * Closes one session with the usage a client read off its own socket.
+ *
+ * A second report on a session that is already CLOSED is a no-op that still
+ * answers success. The gateway posts this from a customer's client, so a
+ * retry or a replay is ordinary traffic, and confirming again would write a
+ * second confirmation against one admission with a duration recomputed from
+ * the mint, which grows on every replay.
+ *
+ * An EXPIRED session still confirms: the sweeper only decided the row was not
+ * holding a cap slot, and a real report arriving afterwards is the truth
+ * about what the call used.
+ */
+export async function reportRealtimeSessionUsage(params: {
+  sessionId: string;
+  projectId: string;
+  usage: Partial<SpendUsage>;
+  now?: Date;
+}): Promise<"closed" | "already_closed" | "not_found"> {
+  const session = await prisma.gatewayRealtimeSession.findFirst({
+    where: { id: params.sessionId, projectId: params.projectId },
+  });
+  if (!session) return "not_found";
+  if (session.status === "CLOSED" || session.status === "FAILED") {
+    logger.info(
+      { sessionId: session.id, status: session.status },
+      "a realtime usage report arrived for a session that is no longer open",
+    );
+    return "already_closed";
+  }
+
+  const now = params.now ?? new Date();
+  await closeAndConfirmRealtimeSession({
+    session,
+    usage: params.usage,
+    occurredAt: now,
+    reason: "usage reported by the client",
+    durationMs: Math.max(0, now.getTime() - session.mintedAt.getTime()),
+  });
+  return "closed";
 }
 
 /**
@@ -329,13 +376,24 @@ export async function expireStaleRealtimeSessions(params: {
   return count;
 }
 
-/** Hands a confirmation to the gateway spend pipeline. */
-async function sendConfirmSpend(data: Record<string, unknown>): Promise<void> {
+/**
+ * Hands a confirmation to the gateway spend pipeline.
+ *
+ * Typed with the pipeline's own command data so a field renamed on the spend
+ * wire fails this file at compile time. The pipeline registry is keyed by a
+ * union this module is not part of, so reaching it needs a cast; the cast
+ * stops at the lookup and the payload keeps its real type.
+ */
+async function sendConfirmSpend(data: ConfirmSpendCommandData): Promise<void> {
   const pipeline = getApp().eventSourcing?.getPipeline(
     GATEWAY_SPEND_PIPELINE_NAME as never,
-  ) as unknown as
+  ) as
     | {
-        commands: { confirmSpend?: { send: (d: unknown) => Promise<unknown> } };
+        commands: {
+          confirmSpend?: {
+            send: (d: ConfirmSpendCommandData) => Promise<unknown>;
+          };
+        };
       }
     | undefined;
   const send = pipeline?.commands?.confirmSpend?.send;

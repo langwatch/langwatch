@@ -48,9 +48,9 @@ import {
   GUARDRAIL_WIRE_DIRECTIONS,
 } from "~/server/gateway/guardrailEvaluation.service";
 import {
-  closeAndConfirmRealtimeSession,
   correlateRealtimeSession,
   releaseRealtimeSession,
+  reportRealtimeSessionUsage,
   reserveRealtimeSession,
 } from "~/server/gateway/realtimeSession.service";
 import { traceProjectFor } from "~/server/gateway/scopeResolver";
@@ -1258,12 +1258,22 @@ const reserveRealtimeSessionSchema = z.object({
   model: z.string().min(1).max(512),
 });
 
-const patchRealtimeSessionSchema = z.object({
-  project_id: z.string().min(1).max(256),
-  vendor_conversation_id: z.string().max(256).optional(),
-  status: z.enum(["FAILED", "EXPIRED"]).optional(),
-  reason: z.string().max(256).optional(),
-});
+/**
+ * A patch has to change something. Both fields are optional on their own, so
+ * the refinement is what enforces the rule the 400 message states: without it
+ * a body carrying only `project_id` parses, applies nothing, and answers 404
+ * as though the session were missing.
+ */
+const patchRealtimeSessionSchema = z
+  .object({
+    project_id: z.string().min(1).max(256),
+    vendor_conversation_id: z.string().min(1).max(256).optional(),
+    status: z.enum(["FAILED", "EXPIRED"]).optional(),
+    reason: z.string().max(256).optional(),
+  })
+  .refine((body) => Boolean(body.vendor_conversation_id ?? body.status), {
+    message: "a vendor_conversation_id or a terminal status is required",
+  });
 
 const reportRealtimeUsageSchema = z.object({
   project_id: z.string().min(1).max(256),
@@ -1410,10 +1420,12 @@ secured
       );
     }
     const sessionId = c.req.param("session_id");
-    const session = await prisma.gatewayRealtimeSession.findFirst({
-      where: { id: sessionId, projectId: parsed.data.project_id },
+    const outcome = await reportRealtimeSessionUsage({
+      sessionId,
+      projectId: parsed.data.project_id,
+      usage: parsed.data.usage,
     });
-    if (!session) {
+    if (outcome === "not_found") {
       return c.json(
         {
           error: {
@@ -1425,12 +1437,6 @@ secured
         404,
       );
     }
-    await closeAndConfirmRealtimeSession({
-      session,
-      usage: parsed.data.usage,
-      reason: "usage reported by the client",
-      durationMs: Date.now() - session.mintedAt.getTime(),
-    });
     return c.json({ session_id: sessionId, status: "CLOSED" });
   });
 

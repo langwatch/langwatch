@@ -67,6 +67,22 @@ gateway reads that report in two ways, and either one is enough:
 A session neither of them closes settles as cost unknown and is flagged for
 reconciliation, and a report arriving later still replaces that record.
 
+<Note>
+The reconciler exists because of how ElevenLabs treats webhook delivery.
+ElevenLabs does not retry a failed delivery, by design for HIPAA, and it
+disables a webhook after 10 consecutive failures. One rejected delivery would
+therefore lose that call's billing data for good, and ten in a row would stop
+delivery for every session on that webhook. The reconciler asks the vendor for
+the same numbers on its own schedule, so a lost delivery costs a couple of
+minutes rather than a charge, and a workspace whose single webhook slot is
+already used for something else still bills correctly.
+</Note>
+
+Only the `post_call_transcription` event is acted on. If you enable
+`post_call_audio` or `call_initiation_failure` on the same webhook, LangWatch
+acknowledges them and does nothing: they name the conversation but carry no
+duration, and a call confirmed at zero cannot be corrected afterwards.
+
 ## OpenAI Realtime
 
 Mint an ephemeral client secret.
@@ -84,19 +100,33 @@ OpenAI as you wrote it, with two edits: the model is resolved through the
 key's aliases and allowlist, and `expires_after.seconds` is held inside the
 range OpenAI accepts, 10 seconds to 2 hours.
 
-Open the socket with the returned secret as a bearer token:
+Open the socket with the returned secret. Which form you use depends on where
+the code runs, because a browser `WebSocket` takes only a URL and a
+subprotocol list and cannot set request headers.
+
+From a server, with the `ws` package (or any Node websocket client that
+accepts headers):
 
 ```js
+import WebSocket from "ws";
+
 const ws = new WebSocket("wss://api.openai.com/v1/realtime?model=gpt-realtime", {
   headers: { Authorization: `Bearer ${clientSecret.value}` },
 });
 ```
 
-Verified against the live API on 2026-08-16: a server-side websocket
-authenticates with the ephemeral secret in the `Authorization` header, and
-also through the browser subprotocol form
-`["realtime", "openai-insecure-api-key.<secret>"]`. The older
-`openai-beta.realtime-v1` subprotocol is refused by OpenAI itself.
+From a browser, as a subprotocol:
+
+```js
+const ws = new WebSocket("wss://api.openai.com/v1/realtime?model=gpt-realtime", [
+  "realtime",
+  `openai-insecure-api-key.${clientSecret.value}`,
+]);
+```
+
+Both were run against the live API on 2026-08-16 and both reached
+`session.created`. The older `openai-beta.realtime-v1` subprotocol is refused
+by OpenAI itself with "The Realtime Beta API is no longer supported".
 
 ### Closing the session
 

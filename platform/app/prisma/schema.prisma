@@ -3988,7 +3988,11 @@ model GatewayRealtimeSession {
 
   // The cap count: open sessions for one key inside the window.
   @@index([virtualKeyId, status, mintedAt])
-  // The webhook lookup: one vendor conversation inside one tenant.
+  // The webhook lookup. Unique per vendor across the whole table, not per
+  // tenant: a vendor's conversation id is unique in the vendor's own system,
+  // so two tenants presenting the same one is a bug rather than a collision
+  // to tolerate. Tenant isolation on the read path is matchRealtimeSession's
+  // organizationId filter, not this key.
   @@unique([vendor, vendorConversationId])
   // The fallback match, and the expiry sweep.
   @@index([projectId, status, mintedAt])

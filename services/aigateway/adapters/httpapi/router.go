@@ -544,7 +544,7 @@ func elevenLabsSignedURLHandler(deps RouterDeps) http.HandlerFunc {
 			}))
 			return
 		}
-		// Marshalled rather than concatenated: agent_id is a raw query
+		// Marshaled rather than concatenated: agent_id is a raw query
 		// parameter, and strconv.Quote emits Go escapes such as \x01 for a
 		// control byte, which is not JSON. Every stage downstream parses
 		// this body.

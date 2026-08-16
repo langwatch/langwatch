@@ -227,6 +227,31 @@ Feature: Brokered realtime voice sessions on the AI Gateway
       Then it matches that session directly
 
     @integration
+    Scenario: A transcription report confirms the session it names
+      Given an open session whose conversation id the mint recorded
+      When a signed post_call_transcription report arrives carrying its duration
+      Then the session is CLOSED and its spend is confirmed from that duration
+
+    @integration
+    Scenario: A non-transcription post-call event closes nothing
+      Given an open session whose conversation id the mint recorded
+      When a signed post_call_audio delivery arrives for the same conversation
+      Then the delivery is acknowledged and the session stays OPEN
+      # A workspace can enable the audio and call-initiation events too. They
+      # name the conversation and carry no metadata, so acting on one would
+      # confirm a real call at zero, and the fold never downgrades a
+      # confirmation. Acknowledged rather than refused because ElevenLabs
+      # never retries and disables a webhook after ten failures.
+
+    @integration
+    Scenario: A transcription report with no duration confirms nothing
+      Given an open session whose conversation id the mint recorded
+      When a signed report arrives with no call_duration_secs
+      Then the delivery is acknowledged and the session stays OPEN
+      # Zero is a price, absence is not. The session settles as cost-unknown
+      # on its grace, which is visible, and a later report supersedes it.
+
+    @integration
     Scenario: Two candidate sessions is a miss, not a guess
       Given a report carries no conversation id we recorded
       And two sessions for that credential are open in the window

@@ -96,6 +96,23 @@ type VirtualKeyEditDrawerProps = {
 
 const MANAGED_WINDOWS: ReadonlySet<string> = new Set(["DAY", "WEEK", "MONTH"]);
 
+/**
+ * Whether the typed open-session cap is something other than blank or a whole
+ * number of 1 or more.
+ *
+ * The whole string is read, not a prefix of it. `Number.parseInt` accepts
+ * "1.9" as 1 and "12voice" as 12, so a typo would silently save a cap the
+ * operator did not choose, and a cap is the thing that refuses a customer's
+ * calls. Zero is refused too: an operator who means "no voice" removes the
+ * provider, and a saved 0 would look like a mistake either way.
+ */
+function maxOpenSessionsInvalid(value: string): boolean {
+  const trimmed = value.trim();
+  if (trimmed === "") return false;
+  const parsed = Number(trimmed);
+  return !Number.isInteger(parsed) || parsed < 1;
+}
+
 export function VirtualKeyEditDrawer({
   organizationId,
   vk,
@@ -257,6 +274,9 @@ export function VirtualKeyEditDrawer({
     if (!name) return "Name is required.";
     const budgetReason = budgetInvalidReason(budget);
     if (budgetReason) return budgetReason;
+    if (maxOpenSessionsInvalid(maxOpenSessions)) {
+      return "Max open sessions must be a whole number of 1 or more, or blank for unlimited.";
+    }
     // Until providers resolve, an explicit selection cannot be told
     // apart from an empty one, and submitting would filter the picked
     // ids against an empty eligible set and persist an empty allowlist.
@@ -308,8 +328,8 @@ export function VirtualKeyEditDrawer({
             rpd: rpd ? Number.parseInt(rpd, 10) : null,
           },
           realtime: {
-            maxOpenSessions: maxOpenSessions
-              ? Number.parseInt(maxOpenSessions, 10)
+            maxOpenSessions: maxOpenSessions.trim()
+              ? Number(maxOpenSessions.trim())
               : null,
           },
           metadata: {
