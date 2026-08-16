@@ -1,5 +1,5 @@
 {
-	"_comment": "Hand-curated model entries for direct-API providers that the upstream model-catalog source does not carry (Voyage AI's direct API today, others later). Merged into llmModels at module load \u2014 see loadModelCatalog.ts. The base llmModels.json is regenerated periodically and overwriting hand-added entries would silently drop these providers; the overlay file is never touched by the regen task. Add entries here when integrating a provider whose models aren't reachable via the upstream catalog. Audio entries here are the ones litellm's price registry cannot serve correctly: models it lacks (ElevenLabs flash/turbo, gpt-transcribe), models it prices without audio units (gpt-4o-mini-tts, the gpt-4o transcribe pair), and models where its rate lags a provider price change (eleven_multilingual_v2 still carries the pre-cut rate upstream). An overlay entry only takes effect when the base catalog has no key of the same name, because the merge lets the base win on collision. Entries litellm carries correctly (tts-1, tts-1-hd, whisper-1, scribe_v1) were retired from the overlay and flow in via the weekly sync.",
+	"_comment": "Hand-curated model entries for direct-API providers that the upstream model-catalog source does not carry (Voyage AI's direct API today, others later). Merged into llmModels at module load — see loadModelCatalog.ts. The base llmModels.json is regenerated periodically and overwriting hand-added entries would silently drop these providers; the overlay file is never touched by the regen task. Add entries here when integrating a provider whose models aren't reachable via the upstream catalog. Audio entries here are the ones litellm's price registry cannot serve correctly: models it lacks (ElevenLabs flash/turbo, gpt-transcribe), models it prices without audio units (gpt-4o-mini-tts, the gpt-4o transcribe pair), and models where its rate lags a provider price change (eleven_multilingual_v2 still carries the pre-cut rate upstream). An overlay entry only takes effect when the base catalog has no key of the same name, because the merge lets the base win on collision. Entries litellm carries correctly (tts-1, tts-1-hd, whisper-1, scribe_v1) were retired from the overlay and flow in via the weekly sync.",
 	"models": {
 		"voyage/voyage-3.5": {
 			"id": "voyage/voyage-3.5",
@@ -192,7 +192,7 @@
 			"pricing": {
 				"inputCostPerToken": 0,
 				"outputCostPerToken": 0,
-				"inputCostPerSecond": 5.666666666666667e-4
+				"inputCostPerSecond": 0.0005666666666666667
 			},
 			"contextLength": 0,
 			"maxCompletionTokens": null,
@@ -213,7 +213,7 @@
 			"pricing": {
 				"inputCostPerToken": 0,
 				"outputCostPerToken": 0,
-				"inputCostPerSecond": 2.8333333333333335e-4
+				"inputCostPerSecond": 0.00028333333333333335
 			},
 			"contextLength": 0,
 			"maxCompletionTokens": null,
@@ -393,11 +393,142 @@
 			"defaultParameters": null,
 			"modality": "text+audio->text+audio",
 			"mode": "chat",
-			"description": "A cost-efficient version of GPT Audio. Text input and output are priced by the fields above. Audio input is priced by audioCostPerToken. The audio output rate is twice the audio input rate; the cost layer cannot price audio tokens yet, and langwatch#7021 adds both the audio-token pricing and the derivation that produces the output rate from the input rate. Rates verified 2026-08-15 on https://developers.openai.com/api/docs/pricing, which lists audio input $10.00 and audio output $20.00 per million for this model. Note the per-model page at /api/docs/models/gpt-audio-mini carries the text rates only, so the pricing page is the source for the audio side. This entry exists because one upstream source reports the audio input rate as the text rate, which billed audio at a sixteenth of the published price. The other source carries the correct rate. Retire this entry once the wrong source is corrected; the weekly price audit reports the disagreement until then.",
+			"description": "A cost-efficient version of GPT Audio. Text input and output are priced by the fields above. Audio input is priced by audioCostPerToken, and the cost layer derives the audio output rate as twice the audio input rate. Rates verified 2026-08-15 on https://developers.openai.com/api/docs/pricing, which lists audio input $10.00 and audio output $20.00 per million for this model. Note the per-model page at /api/docs/models/gpt-audio-mini carries the text rates only, so the pricing page is the source for the audio side. This entry exists because one upstream source reports the audio input rate as the text rate, which billed audio at a sixteenth of the published price. The other source carries the correct rate. Retire this entry once the wrong source is corrected; the weekly price audit reports the disagreement until then.",
 			"supportsImageInput": false,
 			"supportsAudioInput": true,
 			"supportsImageOutput": false,
 			"supportsAudioOutput": true
+		},
+		"openai/gpt-realtime-2": {
+			"id": "openai/gpt-realtime-2",
+			"name": "OpenAI: GPT Realtime 2",
+			"provider": "openai",
+			"pricing": {
+				"inputCostPerToken": 4e-6,
+				"outputCostPerToken": 2.4e-5,
+				"inputCacheReadPerToken": 4e-7,
+				"audioCostPerToken": 3.2e-5,
+				"audioOutputCostPerToken": 6.4e-5
+			},
+			"contextLength": 0,
+			"maxCompletionTokens": null,
+			"supportedParameters": [],
+			"defaultParameters": null,
+			"modality": "audio->audio",
+			"mode": "audio",
+			"description": "OpenAI's realtime speech model, second generation. Text input $4.00, text output $24.00, audio input $32.00 and audio output $64.00 per million tokens, with cached input at $0.40 (https://developers.openai.com/api/docs/models/gpt-realtime-2, verified 2026-08-16). This entry exists for the text output rate only: the price registry the sync imports from carries $16.00 there, which is the previous generation's rate and a third under what the provider charges. Every other rate here matches that registry. Retire this entry once the registry is corrected; the weekly price audit reports the disagreement until then.",
+			"supportsImageInput": true,
+			"supportsAudioInput": true,
+			"supportsImageOutput": false,
+			"supportsAudioOutput": true
+		},
+		"openai/o3-deep-research": {
+			"id": "openai/o3-deep-research",
+			"name": "OpenAI: o3 Deep Research",
+			"provider": "openai",
+			"pricing": {
+				"inputCostPerToken": 1e-5,
+				"outputCostPerToken": 4e-5,
+				"inputCacheReadPerToken": 2.5e-6,
+				"webSearchCostPerQuery": 0.01
+			},
+			"contextLength": 200000,
+			"maxCompletionTokens": 100000,
+			"supportedParameters": [],
+			"defaultParameters": null,
+			"modality": "text+image+file->text",
+			"mode": "chat",
+			"description": "Delisted from the model catalog source on 2026-08-16 while still live. Input $10.00 and output $40.00 per million, cached input $2.50 (https://developers.openai.com/api/docs/models/o3-deep-research, verified 2026-08-16, not marked deprecated). Without this entry it prefix-matches openai/o3 and bills 80 percent under.",
+			"supportsImageInput": true,
+			"supportsAudioInput": false,
+			"supportsImageOutput": false,
+			"supportsAudioOutput": false
+		},
+		"openai/o4-mini-deep-research": {
+			"id": "openai/o4-mini-deep-research",
+			"name": "OpenAI: o4 Mini Deep Research",
+			"provider": "openai",
+			"pricing": {
+				"inputCostPerToken": 2e-6,
+				"outputCostPerToken": 8e-6,
+				"inputCacheReadPerToken": 5e-7,
+				"webSearchCostPerQuery": 0.01
+			},
+			"contextLength": 200000,
+			"maxCompletionTokens": 100000,
+			"supportedParameters": [],
+			"defaultParameters": null,
+			"modality": "text+image+file->text",
+			"mode": "chat",
+			"description": "Delisted from the model catalog source on 2026-08-16. The second price source still carries $2.00 input and $8.00 output per million, matching what this catalog held before the delisting. Without this entry it prefix-matches openai/o4-mini and bills 45 percent under.",
+			"supportsImageInput": true,
+			"supportsAudioInput": false,
+			"supportsImageOutput": false,
+			"supportsAudioOutput": false
+		},
+		"openai/gpt-5.3-chat": {
+			"id": "openai/gpt-5.3-chat",
+			"name": "OpenAI: GPT-5.3 Chat",
+			"provider": "openai",
+			"pricing": {
+				"inputCostPerToken": 1.75e-6,
+				"outputCostPerToken": 1.4e-5,
+				"inputCacheReadPerToken": 1.75e-7,
+				"webSearchCostPerQuery": 0.01
+			},
+			"contextLength": 128000,
+			"maxCompletionTokens": 16384,
+			"supportedParameters": [],
+			"defaultParameters": null,
+			"modality": "text+image+file->text",
+			"mode": "chat",
+			"description": "Delisted from the model catalog source on 2026-08-16. The second price source still carries $1.75 input and $14.00 output per million, matching what this catalog held before. Without this entry it prefix-matches openai/gpt-5 and bills 29 percent under.",
+			"supportsImageInput": true,
+			"supportsAudioInput": false,
+			"supportsImageOutput": false,
+			"supportsAudioOutput": false
+		},
+		"mistralai/devstral-2512": {
+			"id": "mistralai/devstral-2512",
+			"name": "Mistral: Devstral 2 2512",
+			"provider": "mistralai",
+			"pricing": {
+				"inputCostPerToken": 4e-7,
+				"outputCostPerToken": 2e-6,
+				"inputCacheReadPerToken": 4e-8
+			},
+			"contextLength": 262144,
+			"maxCompletionTokens": null,
+			"supportedParameters": [],
+			"defaultParameters": null,
+			"modality": "text+file->text",
+			"mode": "chat",
+			"description": "Delisted from the model catalog source on 2026-08-16. The second price source still carries $0.40 input and $2.00 output per million, matching what this catalog held before. Without this entry no rule matches it at all and it bills zero.",
+			"supportsImageInput": false,
+			"supportsAudioInput": false,
+			"supportsImageOutput": false,
+			"supportsAudioOutput": false
+		},
+		"poolside/laguna-m.1": {
+			"id": "poolside/laguna-m.1",
+			"name": "Poolside: Laguna M.1",
+			"provider": "poolside",
+			"pricing": {
+				"inputCostPerToken": 2e-7,
+				"outputCostPerToken": 4e-7,
+				"inputCacheReadPerToken": 1e-7
+			},
+			"contextLength": 262144,
+			"maxCompletionTokens": 32768,
+			"supportedParameters": [],
+			"defaultParameters": null,
+			"modality": "text->text",
+			"mode": "chat",
+			"description": "Delisted from the model catalog source on 2026-08-16 and absent from the second source, so these are the rates this catalog itself carried on 2026-07-27, kept so the model bills something rather than zero. No source can confirm them now. Retire this entry once the model is known to be gone, or correct it once a source carries it again.",
+			"supportsImageInput": false,
+			"supportsAudioInput": false,
+			"supportsImageOutput": false,
+			"supportsAudioOutput": false
 		}
 	}
 }
