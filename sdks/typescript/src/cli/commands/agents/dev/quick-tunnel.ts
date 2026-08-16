@@ -48,8 +48,8 @@ export interface TunnelHandle {
   ): unknown;
 }
 
-/** Verifies a freshly downloaded binary against the pinned release digest. */
-function verifyDownloadedBinary(binPath: string): void {
+/** Verifies the binary about to run against the pinned release digest. */
+function verifyBinary(binPath: string): void {
   const expected = CLOUDFLARED_SHA256[`${process.platform}-${process.arch}`];
   if (!expected) return;
   const actual = crypto
@@ -57,9 +57,11 @@ function verifyDownloadedBinary(binPath: string): void {
     .update(fs.readFileSync(binPath))
     .digest("hex");
   if (actual !== expected) {
+    // Removing it makes the next run download the pinned release, so the
+    // advice below resolves the mismatch instead of repeating it.
     fs.rmSync(binPath, { force: true });
     throw new Error(
-      `The downloaded cloudflared binary does not match the pinned ${CLOUDFLARED_RELEASE} checksum. Refusing to run it. Try again, or bring your own tunnel with --tunnel-url.`,
+      `The cloudflared binary does not match the pinned ${CLOUDFLARED_RELEASE} checksum. Refusing to run it. It has been removed, so running the command again downloads the pinned release. You can also bring your own tunnel with --tunnel-url.`,
     );
   }
 }
@@ -88,8 +90,13 @@ export async function startQuickTunnel({
       ),
     );
     await cloudflared.install(cloudflared.bin, CLOUDFLARED_RELEASE);
-    verifyDownloadedBinary(cloudflared.bin);
   }
+
+  // Every run, not only the run that downloaded: a binary already on disk
+  // comes from an earlier release, another tool, or a tampered cache, and
+  // executing it unverified would break the checksum guarantee this path
+  // advertises.
+  verifyBinary(cloudflared.bin);
 
   const tunnel = cloudflared.Tunnel.quick(localUrl);
   const url = await new Promise<string>((resolve, reject) => {

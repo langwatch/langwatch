@@ -28,7 +28,6 @@ function readHeaderRows(config: Record<string, unknown>): HeaderRow[] {
   );
 }
 
-/** Header rows with any dev-secret row removed (case-insensitive on the key). */
 function withoutDevSecretHeader(rows: HeaderRow[]): HeaderRow[] {
   return rows.filter(
     (row) => row.key.toLowerCase() !== DEV_SECRET_HEADER.toLowerCase(),

@@ -1,7 +1,26 @@
 import { EventEmitter } from "node:events";
 import * as os from "node:os";
 import * as path from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+// The tunnel path verifies the binary it is about to run on every start, and
+// the mock below points at the node executable. Pinning the arch to one the
+// digest table does not list makes verification a no-op, so these tests
+// exercise the session flow rather than the checksum. The checksum has its
+// own coverage in quick-tunnel's digest table.
+const realArch = process.arch;
+beforeAll(() => {
+  Object.defineProperty(process, "arch", {
+    value: "unlisted-arch",
+    configurable: true,
+  });
+});
+afterAll(() => {
+  Object.defineProperty(process, "arch", {
+    value: realArch,
+    configurable: true,
+  });
+});
 
 vi.mock("@/client-sdk/services/agents/agents-api.service", async (importOriginal) => {
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
