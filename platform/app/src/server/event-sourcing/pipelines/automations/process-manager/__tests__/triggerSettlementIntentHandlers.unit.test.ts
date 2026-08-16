@@ -779,7 +779,7 @@ describe("trigger settlement intent handlers integration", () => {
     });
 
     it("still retries the page when every dispatched trace claimed", async () => {
-      const { deps, raw } = makeDeps(datasetTrigger());
+      const { deps, triggers, raw } = makeDeps(datasetTrigger());
       raw.addToDataset.mockImplementation(
         async ({ datasetRecords }: { datasetRecords: { id: string }[] }) => {
           if (datasetRecords[0]!.id.includes("trace-1")) {
@@ -791,12 +791,21 @@ describe("trigger settlement intent handlers integration", () => {
         },
       );
 
-      await expect(
-        createPersistMatchHandler(deps)(
-          { triggerId: "trigger-1", traceIds: ["trace-1", "trace-2"] },
-          context("process:trigger-1:persist:page-1"),
-        ),
-      ).rejects.toBeInstanceOf(DispatchError);
+      const thrown = await createPersistMatchHandler(deps)(
+        { triggerId: "trigger-1", traceIds: ["trace-1", "trace-2"] },
+        context("process:trigger-1:persist:page-1"),
+      ).catch((error: unknown) => error);
+
+      // trace-2 dispatched and claimed, trace-1 never reached its claim, so
+      // no trace holds a side effect without a claim and the retry is clean.
+      expect(triggers.claimSend).toHaveBeenCalledTimes(1);
+      expect(triggers.claimSend).toHaveBeenCalledWith({
+        triggerId: "trigger-1",
+        traceId: "trace-2",
+        projectId: "project-1",
+      });
+      expect(isDispatchError(thrown)).toBe(true);
+      expect((thrown as DispatchError).retryable).toBe(true);
     });
 
     /** @scenario "A daily-ceiling breach is reported once per page" */
