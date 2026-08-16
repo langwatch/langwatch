@@ -7,6 +7,7 @@ import { generateApiKey } from "~/server/utils/apiKeyGenerator";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { slugify } from "~/utils/slugify";
+import { mintProjectSlug } from "./projectSlug";
 import type {
   PaginatedResult,
   PresenceConfig,
@@ -244,10 +245,7 @@ export class ProjectService {
 
     const projectNanoId = nanoid();
     const projectId = `project_${projectNanoId}`;
-    const slug =
-      slugify(params.name, { lower: true, strict: true }) +
-      "-" +
-      projectNanoId.substring(0, 6);
+    const slug = mintProjectSlug({ name: params.name, projectNanoId });
 
     const existing = await this.repo.findBySlugInTeam({ slug, teamId });
     if (existing) {

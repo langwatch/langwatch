@@ -22,6 +22,7 @@ import { KSUID_RESOURCES } from "~/utils/constants";
 import { encrypt } from "~/utils/encryption";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { slugify } from "~/utils/slugify";
+import { mintProjectSlug } from "~/server/app-layer/projects/projectSlug";
 import { generateApiKey } from "../../utils/apiKeyGenerator";
 import {
   checkOrganizationPermission,
@@ -122,10 +123,7 @@ export const projectRouter = createTRPCRouter({
 
       const projectNanoId = nanoid();
       const projectId = `project_${projectNanoId}`;
-      const slug =
-        slugify(input.name, { lower: true, strict: true }) +
-        "-" +
-        projectNanoId.substring(0, 6);
+      const slug = mintProjectSlug({ name: input.name, projectNanoId });
 
       const existingProject = await prisma.project.findFirst({
         where: {
