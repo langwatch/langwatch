@@ -217,6 +217,16 @@ Feature: Codex conversation capture without the LangWatch wrapper
     Then the prompt is shown once, with its text, and the text-less event stays only where nothing was recovered
 
   @unit
+  Scenario: A redacted prompt with no recovered turn behind it is kept
+    Given a codex trace whose rollout recovery reached one of its two prompts
+    When the session transcript is derived
+    Then the recovered prompt is shown with its text, and the other prompt is
+      still shown as its redacted event, because that event is the only record
+      the prompt happened
+    # The two are told apart by the character count: codex reports the real
+    # length on the redacted event, so it matches the turn it belongs to.
+
+  @unit
   Scenario: A prompt full of unclosed tags is read without stalling the server
     Given a recovered codex turn whose prompt pastes tens of thousands of unclosed tags
     When the session transcript is derived

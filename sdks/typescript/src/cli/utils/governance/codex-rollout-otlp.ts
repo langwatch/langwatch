@@ -265,10 +265,13 @@ export async function findRecentRollouts(
 }
 
 /** Read + parse every in-window rollout: one flat turn list, one meta per session. */
-async function readRollouts(
-  sinceMs: number,
-  sessionsRoot: string,
-): Promise<{ turns: CodexTurnIO[]; metas: CodexRolloutMeta[] }> {
+async function readRollouts({
+  sinceMs,
+  sessionsRoot,
+}: {
+  sinceMs: number;
+  sessionsRoot: string;
+}): Promise<{ turns: CodexTurnIO[]; metas: CodexRolloutMeta[] }> {
   const files = await findRecentRollouts(sinceMs, sessionsRoot);
   const turns: CodexTurnIO[] = [];
   const metas: CodexRolloutMeta[] = [];
@@ -412,8 +415,15 @@ export async function postCodexSessionContext(args: {
   }
   if (!response.ok) return false;
   // Written only after the server took it, so a failed POST retries on the
-  // next turn instead of assuming the context landed.
-  writeFingerprint({ stateFile, fingerprint, now: () => nowMs });
+  // next turn instead of assuming the context landed. A state-dir that cannot
+  // be written costs a re-POST next turn and nothing else, so it must not
+  // reject: the caller awaits this before it posts the turn spans, and losing
+  // the conversation over a bookkeeping write would be the worse trade.
+  try {
+    writeFingerprint({ stateFile, fingerprint, now: () => nowMs });
+  } catch {
+    // Deliberately swallowed; the context record already landed.
+  }
   return true;
 }
 
@@ -443,10 +453,10 @@ export async function harvestAndEmitCodexIO(args: {
     stateDir,
     fetchImpl,
   } = args;
-  const { turns, metas } = await readRollouts(
+  const { turns, metas } = await readRollouts({
     sinceMs,
-    sessionsRoot ?? defaultCodexSessionsRoot(),
-  );
+    sessionsRoot: sessionsRoot ?? defaultCodexSessionsRoot(),
+  });
   for (const meta of metas) {
     await postCodexSessionContext({
       meta,
@@ -485,7 +495,10 @@ export function createCodexIOStreamer(args: {
   const emitted = new Set<string>();
   return {
     async harvest(nowMs: number): Promise<number> {
-      const { turns, metas } = await readRollouts(args.sinceMs, root);
+      const { turns, metas } = await readRollouts({
+        sinceMs: args.sinceMs,
+        sessionsRoot: root,
+      });
       // The fingerprint state dedups across ticks (and across the notify
       // seam), so re-offering every in-window session each tick posts once.
       for (const meta of metas) {

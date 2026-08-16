@@ -79,7 +79,11 @@ const sessionMeta = (git?: Record<string, unknown>) => ({
 	},
 });
 
-/** A fetch double that records the OTLP bodies (and URLs) it was handed. */
+/**
+ * URLs are kept beside the bodies because the harvest posts to two endpoints,
+ * spans to `/v1/traces` and the session context to `/v1/logs`, and several
+ * tests assert which signal a payload went to rather than only its content.
+ */
 function recordingFetch() {
 	const bodies: any[] = [];
 	const urls: string[] = [];
@@ -369,6 +373,37 @@ describe("harvestCodexThread", () => {
 
 				expect(urls.filter((u) => u === "https://e/v1/logs")).toHaveLength(1);
 				expect(urls.filter((u) => u === "https://e/v1/traces")).toHaveLength(2);
+			});
+
+			/** @scenario "A state directory that cannot be written still lets the conversation through" */
+			it("still posts the turn spans when the fingerprint cannot be stored", async () => {
+				writeRollout(THREAD, [
+					sessionMeta(GIT),
+					taskStarted(TRACE),
+					userMessage("hi"),
+					agentFinal("hello"),
+				]);
+				// A file where the state directory should be: every mkdir under it
+				// fails with ENOTDIR, which is what makes writeFingerprint throw.
+				const blocked = join(stateDir, "not-a-directory");
+				writeFileSync(blocked, "");
+				const { urls, impl } = recordingFetch();
+
+				await harvestCodexThread({
+					threadId: THREAD,
+					nowMs: 1785654950000,
+					endpoint: "https://e/v1/traces",
+					logsEndpoint: "https://e/v1/logs",
+					token: "sk-lw-test",
+					sessionsRoot: root,
+					stateDir: join(blocked, "state"),
+					fetchImpl: impl,
+				});
+
+				// The context landed and the conversation went with it; only the
+				// bookkeeping write was lost, which costs one re-POST next turn.
+				expect(urls).toContain("https://e/v1/logs");
+				expect(urls).toContain("https://e/v1/traces");
 			});
 		});
 	});

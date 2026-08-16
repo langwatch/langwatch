@@ -1389,6 +1389,49 @@ describe("given a codex trace whose recovered conversation and prompt event desc
       expect(prompts[0]).toMatchObject({ text: "[REDACTED]", chars: 34 });
     });
   });
+
+  describe("when the rollout recovered only one turn of two", () => {
+    /** @scenario "A redacted prompt with no recovered turn behind it is kept" */
+    it("keeps the stub of the turn it did not recover", () => {
+      const transcript = buildCodingAgentTranscript({
+        spans: [
+          recoveredCodexTurn({
+            atMs: 1_000,
+            messages: [
+              { role: "system", content: "You are codex." },
+              { role: "user", content: "echo papaya and tell me the output" },
+            ],
+            output: "It printed papaya.",
+          }),
+        ],
+        logs: [
+          redactedPromptEvent(),
+          // A second turn, of a different length, whose conversation never
+          // made it back. Suppressing it on a trace-wide flag would erase the
+          // only record that this prompt happened.
+          log(
+            {
+              "event.name": "codex.user_prompt",
+              prompt: "[REDACTED]",
+              prompt_length: "11",
+              "conversation.id": "conv-1",
+            },
+            2_042,
+          ),
+        ],
+      });
+
+      const prompts = transcript.entries.filter(
+        (entry) => entry.kind === "user_prompt",
+      );
+      expect(prompts).toHaveLength(2);
+      expect(prompts.map((entry) => entry.text)).toEqual([
+        "echo papaya and tell me the output",
+        "[REDACTED]",
+      ]);
+      expect(prompts[1]).toMatchObject({ chars: 11 });
+    });
+  });
 });
 
 describe("given a prompt pasting tens of thousands of unclosed tags", () => {

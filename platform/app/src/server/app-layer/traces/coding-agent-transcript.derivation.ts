@@ -191,20 +191,36 @@ export function buildCodingAgentTranscript({
   const fromLogs = collectLogEntries(logs, fromSpans.claimedToolCalls);
 
   // Prompts recovered from a content span carry the user's words verbatim, so
-  // a withheld-text prompt EVENT on the same trace (codex substitutes the
-  // literal redaction sentinel for the words) is the same prompt again with
-  // less in it. Only the withheld stubs defer: an agent that puts the text on
-  // the event has no span twin, and a trace with no recovered conversation
-  // keeps its stubs — they are the only record a prompt happened at all.
-  const hasRecoveredPrompts = fromSpans.entries.some(
-    (entry) => entry.kind === "user_prompt",
-  );
-  const logEntries = hasRecoveredPrompts
-    ? fromLogs.entries.filter(
-        (entry) =>
-          !(entry.kind === "user_prompt" && isWithheldPromptText(entry.text)),
-      )
-    : fromLogs.entries;
+  // a withheld-text prompt EVENT for the SAME turn (codex substitutes the
+  // literal redaction sentinel for the words) is that prompt again with less
+  // in it. Only the withheld stubs defer: an agent that puts the text on the
+  // event has no span twin.
+  //
+  // The join is the character count, not a trace-wide flag: codex reports the
+  // real length on `prompt_length` even while it withholds the words, and a
+  // recovered prompt measures the text it carries, so equal counts identify
+  // the same turn. Matched one-to-one, so a multi-turn trace whose rollout
+  // recovery covered only some turns keeps the stubs of the turns it missed —
+  // for those, the stub is the only record the prompt happened at all. A stub
+  // that matches nothing survives, which is the safe direction: the worst case
+  // is one prompt rendered twice, against losing a turn entirely.
+  const unmatchedRecoveredPrompts = new Map<number, number>();
+  for (const entry of fromSpans.entries) {
+    if (entry.kind !== "user_prompt") continue;
+    unmatchedRecoveredPrompts.set(
+      entry.chars,
+      (unmatchedRecoveredPrompts.get(entry.chars) ?? 0) + 1,
+    );
+  }
+  const logEntries = fromLogs.entries.filter((entry) => {
+    if (entry.kind !== "user_prompt" || !isWithheldPromptText(entry.text)) {
+      return true;
+    }
+    const recovered = unmatchedRecoveredPrompts.get(entry.chars) ?? 0;
+    if (recovered === 0) return true;
+    unmatchedRecoveredPrompts.set(entry.chars, recovered - 1);
+    return false;
+  });
 
   const entries = [...fromSpans.entries, ...logEntries];
 

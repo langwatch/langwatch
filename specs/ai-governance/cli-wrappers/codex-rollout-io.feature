@@ -144,6 +144,14 @@ Feature: Codex Path B recovers the full request body from the rollout transcript
       Then no second session-context record posts while the context is unchanged
 
     @unit
+    Scenario: A state directory that cannot be written still lets the conversation through
+      Given a device whose langwatch state directory cannot be written
+      When the completed turn is harvested
+      Then the conversation and the session-context record both post
+      # The stored fingerprint only saves a re-POST on the next turn, so
+      # losing it must never cost the conversation.
+
+    @unit
     Scenario: A session outside any repository posts its conversation and no context
       Given a rollout whose session_meta names no remote
       When the completed turn is harvested
