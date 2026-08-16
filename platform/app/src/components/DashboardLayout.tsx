@@ -29,7 +29,7 @@ import { useRouter } from "~/utils/compat/next-router";
 import { ImpersonationBanner } from "../../ee/admin/ImpersonationBanner";
 import { CommandBarTrigger } from "../features/command-bar";
 import { productFromPathname } from "../features/navigation/products";
-import { ProductSwitcherShell } from "../features/navigation/shell/ProductSwitcherShell";
+import { NavigationV2Shell } from "../features/navigation/shell/NavigationV2Shell";
 import { useNavigationMode } from "../features/navigation/useNavigationMode";
 import { useDrawer } from "../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
@@ -407,9 +407,7 @@ const ModeResolvedDashboardLayout = (dashboardProps: DashboardLayoutProps) => {
   if (productFromPathname(router.pathname) === null) {
     return <LegacyDashboardLayout {...dashboardProps} />;
   }
-  // The icon-rail shell lands in a follow-up step of the navigation-v2
-  // work; until it mounts here, that mode renders the switcher shell.
-  return <ProductSwitcherShell {...dashboardProps} />;
+  return <NavigationV2Shell mode={resolution.mode} {...dashboardProps} />;
 };
 
 export const LegacyDashboardLayout = ({

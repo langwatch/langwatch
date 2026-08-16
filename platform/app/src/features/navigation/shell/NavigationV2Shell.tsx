@@ -27,23 +27,29 @@ import { useRouter } from "~/utils/compat/next-router";
 import { findCurrentRoute } from "~/utils/routes";
 import { ImpersonationBanner } from "../../../../ee/admin/ImpersonationBanner";
 import { productFromPathname } from "../products";
+import { ICON_RAIL_WIDTH, IconRail } from "./IconRail";
 import { OrganizationSelect } from "./OrganizationSelect";
 import { ProductScopeControl } from "./ProductScopeControl";
 import { ProductSidebar } from "./ProductSidebar";
 import { ProductSwitcherMenu } from "./ProductSwitcherMenu";
 
 /**
- * The product-switcher navigation shell: the top bar carries the product
- * dropdown, the organization and the product-native scope; the sidebar
- * holds only the active product's pages. Mounted by DashboardLayout when
- * the device mode resolves to "product-switcher" on a product route.
- * The sidebar never auto-hides in this shell; small screens keep the
- * responsive collapse the legacy chrome has.
+ * The navigation-v2 shell, one component for both new modes. The top
+ * bar carries the organization and the product-native scope; the
+ * sidebar holds only the active product's pages. In "product-switcher"
+ * the product lives in a top-bar dropdown next to the logo; in
+ * "icon-rail" a full-height rail on the left carries the logo and one
+ * tile per product, and the dropdown disappears. Mounted by
+ * DashboardLayout when the device mode resolves to a new mode on a
+ * product route. The sidebar never auto-hides in these shells; small
+ * screens keep the responsive collapse the legacy chrome has.
  *
  * Specs: specs/navigation/product-switcher-navigation.feature,
+ *        specs/navigation/icon-rail-navigation.feature,
  *        specs/navigation/product-sidebars.feature
  */
-export const ProductSwitcherShell = ({
+export const NavigationV2Shell = ({
+  mode,
   children,
   personalScope = false,
   orgScope = false,
@@ -53,7 +59,7 @@ export const ProductSwitcherShell = ({
   compactMenu: _compactMenu,
   publicPage: _publicPage,
   ...props
-}: DashboardLayoutProps) => {
+}: DashboardLayoutProps & { mode: "product-switcher" | "icon-rail" }) => {
   const isSmallScreen = useBreakpointValue(
     { base: true, lg: false },
     { fallback: "lg" },
@@ -139,8 +145,12 @@ export const ProductSwitcherShell = ({
 
   const user = session.user;
   const currentRoute = findCurrentRoute(router.pathname);
+  const isIconRail = mode === "icon-rail";
   const isCompactSidebar = isSmallScreen === true;
   const menuWidth = isCompactSidebar ? MENU_WIDTH_COMPACT : MENU_WIDTH_EXPANDED;
+  const contentInsetWidth = isIconRail
+    ? `${menuWidth} - ${ICON_RAIL_WIDTH}`
+    : menuWidth;
   const showPresenceMenuItem = router.pathname.startsWith("/[project]/traces");
 
   return (
@@ -149,6 +159,8 @@ export const ProductSwitcherShell = ({
       minHeight="100vh"
       background="bg.page"
       overflowX={["auto", "auto", "hidden"]}
+      display="flex"
+      alignItems="stretch"
     >
       <Head>
         <title>
@@ -163,109 +175,123 @@ export const ProductSwitcherShell = ({
         </title>
       </Head>
 
-      <HStack
-        position="relative"
-        width="full"
-        height={`${APP_HEADER_HEIGHT}px`}
-        paddingX={4}
-        paddingY={3}
-        background="bg.page"
-        justifyContent="space-between"
-        gap={4}
-        overflow="hidden"
-      >
-        {(user?.impersonator || publicEnv.data?.NODE_ENV === "development") && (
-          <Box
-            position="absolute"
-            top={-5}
-            right="-100px"
-            bottom={0}
-            w="400px"
-            background={user?.impersonator ? "blue.300" : "orange.300"}
-            filter="blur(40px)"
-            pointerEvents="none"
-          ></Box>
-        )}
-
-        <HStack gap={3} flex={1} alignItems="center" minWidth={0}>
-          <Link href="/" display="flex" alignItems="center">
-            <LogoIcon width={25 * 0.7} height={32 * 0.7} />
-          </Link>
-          <ProductSwitcherMenu activeProductId={activeProductId} />
-          <OrganizationSelect activeProductId={activeProductId} />
-          <ProductScopeControl activeProductId={activeProductId} />
-        </HStack>
-
-        <HStack gap={2} justifyContent="flex-end" overflow="hidden">
-          {publicEnv.data?.NODE_ENV === "development" && (
-            <Text
-              fontSize="11px"
-              fontWeight="bold"
-              color="white"
-              backgroundColor="blackAlpha.600"
-              border="1px solid"
-              borderColor="whiteAlpha.300"
-              borderRadius="full"
-              height="32px"
-              paddingX={3}
-              display="flex"
-              alignItems="center"
-              letterSpacing="wider"
-            >
-              DEV
-            </Text>
-          )}
-          {user && <ImpersonationBanner user={user} />}
-          {project && <CommandBarTrigger />}
-          <AppHeaderUserMenu showPresenceMenuItem={showPresenceMenuItem} />
-        </HStack>
-      </HStack>
-
-      <HStack
-        width="full"
-        alignItems="stretch"
-        gap={0}
-        minHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
-      >
-        <ProductSidebar
+      {isIconRail && (
+        <IconRail
           activeProductId={activeProductId}
-          isCompact={isCompactSidebar}
+          isSettingsActive={router.pathname.startsWith("/settings")}
         />
+      )}
 
-        <Box
+      <Box flex={1} minWidth={0}>
+        <HStack
+          position="relative"
           width="full"
-          height="full"
+          height={`${APP_HEADER_HEIGHT}px`}
+          paddingX={4}
+          paddingY={3}
           background="bg.page"
-          minHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
-          maxHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
-          maxWidth={`calc(100vw - ${menuWidth})`}
-          paddingRight={`${langyDockInset}px`}
-          transition={`padding-right ${LANGY_TRANSITION}`}
+          justifyContent="space-between"
+          gap={4}
+          overflow="hidden"
         >
+          {(user?.impersonator ||
+            publicEnv.data?.NODE_ENV === "development") && (
+            <Box
+              position="absolute"
+              top={-5}
+              right="-100px"
+              bottom={0}
+              w="400px"
+              background={user?.impersonator ? "blue.300" : "orange.300"}
+              filter="blur(40px)"
+              pointerEvents="none"
+            ></Box>
+          )}
+
+          <HStack gap={3} flex={1} alignItems="center" minWidth={0}>
+            {!isIconRail && (
+              <>
+                <Link href="/" display="flex" alignItems="center">
+                  <LogoIcon width={25 * 0.7} height={32 * 0.7} />
+                </Link>
+                <ProductSwitcherMenu activeProductId={activeProductId} />
+              </>
+            )}
+            <OrganizationSelect activeProductId={activeProductId} />
+            <ProductScopeControl activeProductId={activeProductId} />
+          </HStack>
+
+          <HStack gap={2} justifyContent="flex-end" overflow="hidden">
+            {publicEnv.data?.NODE_ENV === "development" && (
+              <Text
+                fontSize="11px"
+                fontWeight="bold"
+                color="white"
+                backgroundColor="blackAlpha.600"
+                border="1px solid"
+                borderColor="whiteAlpha.300"
+                borderRadius="full"
+                height="32px"
+                paddingX={3}
+                display="flex"
+                alignItems="center"
+                letterSpacing="wider"
+              >
+                DEV
+              </Text>
+            )}
+            {user && <ImpersonationBanner user={user} />}
+            {project && <CommandBarTrigger />}
+            <AppHeaderUserMenu showPresenceMenuItem={showPresenceMenuItem} />
+          </HStack>
+        </HStack>
+
+        <HStack
+          width="full"
+          alignItems="stretch"
+          gap={0}
+          minHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
+        >
+          <ProductSidebar
+            activeProductId={activeProductId}
+            isCompact={isCompactSidebar}
+          />
+
           <Box
             width="full"
             height="full"
-            background="bg.surface"
-            borderTopLeftRadius="xl"
-            borderTopWidth="1px"
-            borderLeftWidth="1px"
-            borderStyle="solid"
-            borderColor="border.muted"
-            borderTopRightRadius={langyDockInset > 0 ? "xl" : 0}
-            borderRightWidth={langyDockInset > 0 ? "1px" : 0}
-            _dark={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07)" }}
-            overflow="auto"
-            display="flex"
+            background="bg.page"
             minHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
             maxHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
-            position="relative"
+            maxWidth={`calc(100vw - ${contentInsetWidth})`}
+            paddingRight={`${langyDockInset}px`}
+            transition={`padding-right ${LANGY_TRANSITION}`}
           >
-            <DashboardPageBody personalScope={personalScope} {...props}>
-              {children}
-            </DashboardPageBody>
+            <Box
+              width="full"
+              height="full"
+              background="bg.surface"
+              borderTopLeftRadius="xl"
+              borderTopWidth="1px"
+              borderLeftWidth="1px"
+              borderStyle="solid"
+              borderColor="border.muted"
+              borderTopRightRadius={langyDockInset > 0 ? "xl" : 0}
+              borderRightWidth={langyDockInset > 0 ? "1px" : 0}
+              _dark={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07)" }}
+              overflow="auto"
+              display="flex"
+              minHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
+              maxHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
+              position="relative"
+            >
+              <DashboardPageBody personalScope={personalScope} {...props}>
+                {children}
+              </DashboardPageBody>
+            </Box>
           </Box>
-        </Box>
-      </HStack>
+        </HStack>
+      </Box>
     </Box>
   );
 };
