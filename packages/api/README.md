@@ -285,7 +285,7 @@ Three rules, all load-bearing:
 
 The grammar is asserted at registration, so a bad name fails the build rather than review:
 
-```
+```text
 ^/[a-z][a-zA-Z0-9]*(\.[a-z][a-zA-Z0-9]*)+$   →  /endpoints.rollSecret   ✓
                                                 /endpoints/:id          ✗
                                                 /endpoints.Roll_Secret  ✗

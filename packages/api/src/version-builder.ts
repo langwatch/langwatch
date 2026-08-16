@@ -101,7 +101,7 @@ export class VersionBuilder<TApp> {
     handler: Handler<TApp, TConfig>,
   ): void {
     assertRpcPath(path);
-    assertRpcConfig(path, config);
+    assertRpcConfig({ path, config });
     this._register("post", path, config, handler);
   }
 
@@ -125,7 +125,7 @@ export class VersionBuilder<TApp> {
     handler: Handler<TApp, TConfig>,
   ): void {
     assertEndpointPath(path);
-    assertStatusInvariant(method, path, config);
+    assertStatusInvariant({ method, path, config });
     this._endpoints.push({
       method,
       path,
@@ -163,7 +163,13 @@ function assertRpcPath(path: string): void {
  * `params` schema could never match, and a `query` schema would smuggle
  * arguments back into the URL that the operation name is supposed to own.
  */
-function assertRpcConfig(path: string, config: EndpointConfig): void {
+function assertRpcConfig({
+  path,
+  config,
+}: {
+  path: string;
+  config: EndpointConfig;
+}): void {
   const offending = (["params", "query"] as const).filter(
     (key) => config[key] !== undefined,
   );
@@ -186,14 +192,22 @@ function assertRpcConfig(path: string, config: EndpointConfig): void {
  * one. An `output` schema that accepts `undefined` is what makes that
  * reachable, so it is refused at registration.
  *
- * The two honest shapes remain: declare a required `output` and always answer
- * `status ?? 200`, or declare no `output` and always answer `status ?? 204`.
+ * The honest shapes remain: declare a required `output` and always answer
+ * `status ?? 200`; declare `z.void()` and always answer `status ?? 204`; or
+ * declare no `output` at all, where `Handler` requires the handler to build
+ * its own `Response` and that response owns its status outright. This rule
+ * governs value-returning handlers — a hand-built `Response` is the framework's
+ * deliberate opt-out and always has been.
  */
-function assertStatusInvariant(
-  method: HttpMethod,
-  path: string,
-  config: EndpointConfig,
-): void {
+function assertStatusInvariant({
+  method,
+  path,
+  config,
+}: {
+  method: HttpMethod;
+  path: string;
+  config: EndpointConfig;
+}): void {
   // No schema, or one whose only accepted value is `undefined`: the endpoint
   // has no body and always answers `status ?? 204`.
   if (!config.output || isNoBodySchema(config.output)) return;

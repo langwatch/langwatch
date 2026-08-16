@@ -12,23 +12,31 @@ export function serializeEndpointResult({
   config: EndpointConfig;
   result: unknown;
 }): Response {
+  // A handler that builds its own `Response` owns it completely — status,
+  // body and all. This is the framework's deliberate opt-out, and it already
+  // bypassed output validation long before the status rule below existed; a
+  // redirect, a file stream and a hand-built error all need it. So the
+  // invariant that follows governs VALUE-returning handlers. It is not a
+  // guarantee about every byte an endpoint can emit, and `Handler` in
+  // `types.ts` in fact requires a `Response` when no `output` is declared,
+  // which makes the next branch unreachable from typed code.
   if (result instanceof Response) {
     return result;
   }
 
-  // The success status is fixed at registration, not read off the handler's
-  // return value. `assertStatusInvariant` refuses an `output` schema that
-  // accepts undefined, so a declared body is always present and an endpoint
-  // without one never has a body to send. Choosing here is what previously let
-  // a single operation answer 200 on one request and 204 on the next.
+  // The success status of a value-returning handler is fixed at registration
+  // rather than read off what it returned. `assertStatusInvariant` refuses an
+  // `output` schema that accepts undefined, so a declared body is always
+  // present. Choosing here is what previously let one operation answer 200 on
+  // the request that found something and 204 on the one that did not.
   //
   // It also cost the declared status its meaning: the old undefined branch
   // used `config.status ?? 204`, so an endpoint declaring `status: 201` with an
   // optional output answered 201 with an empty body — a created response whose
   // own schema promised a representation.
-  // No declared body: the endpoint has none to send, whatever the handler
-  // happened to return. Reading the return value here is what let an
-  // undeclared, unvalidated payload reach the wire.
+  //
+  // Reached only by an untyped caller, or a return type that drifted behind an
+  // `any`: no declared body means no body.
   if (!config.output) {
     return c.body(null, config.status ?? 204);
   }
