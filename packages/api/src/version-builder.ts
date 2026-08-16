@@ -94,9 +94,16 @@ export class VersionBuilder<TApp> {
    * `input` is present, so a bodyless POST and a `{}` POST both succeed.
    * Declaring `input: z.object({}).optional()` instead would reinstate the
    * parse and reject the bodyless call.
+   *
+   * Both rules are stated twice, one line apart so they cannot drift: `RpcPath`
+   * and `RpcConfig` reject a bad registration in the editor, `assertRpcPath`
+   * and `assertRpcConfig` reject it at startup. The asserts are not redundant —
+   * types are erased, so they are what still holds for a JavaScript caller, for
+   * a config widened to `EndpointConfig` on its way through a helper, and for
+   * anything that reached this method behind an `any`.
    */
-  rpc<TConfig extends EndpointConfig>(
-    path: string,
+  rpc<TPath extends string, TConfig extends RpcConfig>(
+    path: TPath & RpcPath<TPath>,
     config: TConfig,
     handler: Handler<TApp, TConfig>,
   ): void {
@@ -134,6 +141,86 @@ export class VersionBuilder<TApp> {
     });
   }
 }
+
+// ---------------------------------------------------------------------------
+// The RPC grammar, at the type level
+// ---------------------------------------------------------------------------
+//
+// The same two rules the asserts below enforce, expressed so the compiler
+// rejects the registration before it ever runs. Sitting next to the regex is
+// the point: one rule, two statements, and a change to either that forgets the
+// other fails `rpc-types.unit.test.ts`.
+
+type LowerAlpha =
+  | "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m"
+  | "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z";
+
+type Digit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9";
+
+type AlphaNum = LowerAlpha | Uppercase<LowerAlpha> | Digit;
+
+/** True when every character of `S` is `[A-Za-z0-9]`. `""` is vacuously true. */
+type IsAlphaNum<S extends string> = S extends ""
+  ? true
+  : S extends `${infer Head}${infer Rest}`
+    ? Head extends AlphaNum
+      ? IsAlphaNum<Rest>
+      : false
+    : false;
+
+/** True for one lower-camelCase segment: a lowercase letter then `[A-Za-z0-9]*`. */
+type IsSegment<S extends string> = S extends `${infer Head}${infer Rest}`
+  ? Head extends LowerAlpha
+    ? IsAlphaNum<Rest>
+    : false
+  : false;
+
+/** True for `<segment>(.<segment>)*` — the tail, so zero further dots is fine. */
+type IsDottedTail<S extends string> = S extends `${infer Head}.${infer Rest}`
+  ? IsSegment<Head> extends true
+    ? IsDottedTail<Rest>
+    : false
+  : IsSegment<S>;
+
+/** True for `/<segment>(.<segment>)+`. The `${string}.${string}` test is what requires the dot. */
+type IsRpcPath<S extends string> = S extends `/${infer Name}`
+  ? Name extends `${string}.${string}`
+    ? IsDottedTail<Name>
+    : false
+  : false;
+
+/**
+ * Carries the rule into the compiler's message. TypeScript prints the alias
+ * name rather than expanding it, so a bad name reports as
+ * `not assignable to parameter of type '"/getEndpoints" &
+ * RpcPathMustBeDottedLowerCamelCase'` — which names what was wrong, where the
+ * bare `never` an intersection of two string literals would collapse to says
+ * only that something is.
+ */
+interface RpcPathMustBeDottedLowerCamelCase {
+  readonly __rpcPath: 'a dotted <resource>.<verb> name, e.g. "/endpoints.rollSecret"';
+}
+
+/**
+ * Resolves to `unknown` for a legal name — so `TPath & RpcPath<TPath>` is just
+ * `TPath`, and `TPath` still infers from the naked member — and to a shape no
+ * string satisfies for an illegal one.
+ */
+export type RpcPath<TPath extends string> = IsRpcPath<TPath> extends true
+  ? unknown
+  : RpcPathMustBeDottedLowerCamelCase;
+
+/**
+ * An endpoint config with `params` and `query` closed off. Declaring either is
+ * a type error rather than an excess-property one, because the keys exist here
+ * as `never`: the message points at the key the author wrote.
+ */
+export type RpcConfig = EndpointConfig & {
+  /** Not available on an RPC: a dotted name has no `:param` to bind. Use `input`. */
+  params?: never;
+  /** Not available on an RPC: arguments travel in the JSON body. Use `input`. */
+  query?: never;
+};
 
 /**
  * `<resource>.<verb>`, lower camelCase on both sides, at least one dot, no path

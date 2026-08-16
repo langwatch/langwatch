@@ -283,13 +283,22 @@ Three rules, all load-bearing:
 - **An RPC with no required arguments declares no `input`**, and its handler ignores the body. The pipeline only installs the json validator when `input` is present, so a bodyless POST and a `{}` POST both succeed. Writing `input: z.object({}).optional()` instead reinstates the parse and rejects the bodyless call.
 - **Reads are POST too.** Uniform method is the point; it also forecloses HTTP caching, which is acceptable for an API-key-only management surface and would not be on a high-volume read surface.
 
-The grammar is asserted at registration, so a bad name fails the build rather than review:
+Both rules are checked twice — in the editor by the types on `v.rpc`, and at startup by `assertRpcPath` / `assertRpcConfig`:
 
 ```text
 ^/[a-z][a-zA-Z0-9]*(\.[a-z][a-zA-Z0-9]*)+$   →  /endpoints.rollSecret   ✓
                                                 /endpoints/:id          ✗
                                                 /endpoints.Roll_Secret  ✗
 ```
+
+```ts
+v.rpc("/endpoints.rollSecret", { input, output }, handler);        // ✓
+v.rpc("/endpoints", { output }, handler);                          // ✗ not assignable to
+                                                                   //   '"/endpoints" & RpcPathMustBeDottedLowerCamelCase'
+v.rpc("/endpoints.get", { params: idSchema, output }, handler);    // ✗ Type '...' is not assignable to type 'never'
+```
+
+The asserts are not redundant with the types. Types are erased, so they are what still holds for a JavaScript caller, for a config widened to `EndpointConfig` on its way through a helper, and for anything that arrived behind an `any`. `rpc-types.unit.test.ts` drives both statements from one table of names, so a change to either that forgets the other fails there.
 
 Versioning, forward-copying and withdrawal need no special handling: endpoint identity is `` `${method}:${path}` ``, so `post:/endpoints.create` is unique and `v.withdraw("post", "/endpoints.create")` works unmodified.
 

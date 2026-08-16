@@ -172,11 +172,22 @@ describe("v.rpc", () => {
   });
 
   describe("given a name that breaks the RPC grammar", () => {
+    /**
+     * The name arrives as a `string`, so the type guard on `v.rpc` cannot judge
+     * it and the cast is what lets the call compile. That is the case under
+     * test: these assertions are about `assertRpcPath`, the backstop that still
+     * holds for a JavaScript caller or a name that lost its literal type on the
+     * way in. `rpc-types.unit.test.ts` covers the compile-time half.
+     */
     function register(path: string): () => void {
       return () =>
         void createService({ name: "things", basePath: "/api/things" })
           .version("2026-08-07", (v) => {
-            v.rpc(path, { output: z.string() }, async () => "x");
+            (v.rpc as (p: string, c: unknown, h: unknown) => void)(
+              path,
+              { output: z.string() },
+              async () => "x",
+            );
           })
           .build();
     }
