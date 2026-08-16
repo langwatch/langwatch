@@ -153,6 +153,7 @@ export async function handleFailedJobResult(
     error,
     name: scenario?.name,
     description: scenario?.situation,
+    target: jobData.target,
   });
 }
 

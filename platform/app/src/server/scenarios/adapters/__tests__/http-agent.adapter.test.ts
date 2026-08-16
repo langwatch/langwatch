@@ -66,6 +66,12 @@ const mockInjectTraceContextHeaders = vi.mocked(injectTraceContextHeaders);
 describe("HttpAgentAdapter", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // clearAllMocks keeps implementations, so pin the no-active-context
+    // default here; tests that need a trace context override it themselves.
+    mockInjectTraceContextHeaders.mockImplementation(({ headers }) => ({
+      headers,
+      traceId: undefined,
+    }));
   });
 
   describe("when agent is not found", () => {
@@ -653,8 +659,18 @@ describe("HttpAgentAdapter", () => {
     });
   });
 
-  describe("trace context injection", () => {
-    it("calls injectTraceContextHeaders in buildRequestHeaders", async () => {
+  describe("trace context propagation", () => {
+    const TRACE_ID = "0af7651916cd43dd8448eb211c80319c";
+    const TRACEPARENT = `00-${TRACE_ID}-b7ad6b7169203331-01`;
+
+    const injectTraceContext = () => {
+      mockInjectTraceContextHeaders.mockImplementation(({ headers }) => {
+        headers.traceparent = TRACEPARENT;
+        return { headers, traceId: TRACE_ID };
+      });
+    };
+
+    const setupMockFetch = async () => {
       const { ssrfSafeFetch } = await import("~/utils/ssrfProtection");
       const mockFetch = vi.mocked(ssrfSafeFetch);
       mockFetch.mockResolvedValue(
@@ -662,62 +678,87 @@ describe("HttpAgentAdapter", () => {
           headers: { "content-type": "application/json" },
         }),
       );
+      return mockFetch;
+    };
 
+    const sentHeaders = (
+      mockFetch: Awaited<ReturnType<typeof setupMockFetch>>,
+    ): Record<string, string> =>
+      mockFetch.mock.calls[0]?.[1]?.headers as Record<string, string>;
+
+    it("sends the injected traceparent header on the request", async () => {
+      const mockFetch = await setupMockFetch();
+      injectTraceContext();
       const agent = createHttpAgent();
-      const repository = createMockAgentRepository(agent);
       const adapter = new HttpAgentAdapter({
         agentId: "agent-123",
         projectId: "project-123",
-        agentRepository: repository,
+        agentRepository: createMockAgentRepository(agent),
       });
 
       await adapter.call(
         createAgentInput([{ role: "user", content: "Hello" }]),
       );
 
-      expect(mockInjectTraceContextHeaders).toHaveBeenCalledWith({
-        headers: expect.objectContaining({
-          "Content-Type": "application/json",
-        }),
-      });
+      expect(sentHeaders(mockFetch).traceparent).toBe(TRACEPARENT);
     });
 
-    describe("when custom headers are configured", () => {
-      it("preserves custom headers alongside trace context injection", async () => {
-        const { ssrfSafeFetch } = await import("~/utils/ssrfProtection");
-        const mockFetch = vi.mocked(ssrfSafeFetch);
-        mockFetch.mockResolvedValue(
-          new Response(JSON.stringify({ result: "ok" }), {
-            headers: { "content-type": "application/json" },
-          }),
-        );
+    it("preserves custom headers alongside the propagation headers", async () => {
+      const mockFetch = await setupMockFetch();
+      injectTraceContext();
+      const agent = createHttpAgent({
+        headers: [{ key: "X-Custom", value: "custom-value" }],
+      });
+      const adapter = new HttpAgentAdapter({
+        agentId: "agent-123",
+        projectId: "project-123",
+        agentRepository: createMockAgentRepository(agent),
+      });
 
+      await adapter.call(
+        createAgentInput([{ role: "user", content: "Hello" }]),
+      );
+
+      const headers = sentHeaders(mockFetch);
+      expect(headers["X-Custom"]).toBe("custom-value");
+      expect(headers.traceparent).toBe(TRACEPARENT);
+    });
+
+    describe("when the target configures its own traceparent header", () => {
+      /** @scenario "The automatic traceparent does not replace one the target configured" */
+      it("keeps the configured value, whatever its casing", async () => {
+        const mockFetch = await setupMockFetch();
+        injectTraceContext();
         const agent = createHttpAgent({
-          headers: [{ key: "X-Custom", value: "custom-value" }],
+          headers: [
+            {
+              key: "Traceparent",
+              value: "00-{{ traceId }}-0000000000000001-01",
+            },
+          ],
         });
-        const repository = createMockAgentRepository(agent);
         const adapter = new HttpAgentAdapter({
           agentId: "agent-123",
           projectId: "project-123",
-          agentRepository: repository,
+          agentRepository: createMockAgentRepository(agent),
         });
 
         await adapter.call(
           createAgentInput([{ role: "user", content: "Hello" }]),
         );
 
-        expect(mockInjectTraceContextHeaders).toHaveBeenCalledWith({
-          headers: expect.objectContaining({
-            "Content-Type": "application/json",
-            "X-Custom": "custom-value",
-          }),
-        });
+        const headers = sentHeaders(mockFetch);
+        expect(headers.Traceparent).toBe(`00-${TRACE_ID}-0000000000000001-01`);
+        expect(headers.traceparent).toBeUndefined();
       });
     });
   });
 
-  describe("trace ID capture", () => {
-    it("exposes captured trace ID after a request", async () => {
+  describe("header value templating", () => {
+    const TRACE_ID = "0af7651916cd43dd8448eb211c80319c";
+    const TRACEPARENT = `00-${TRACE_ID}-b7ad6b7169203331-01`;
+
+    const setupMockFetch = async () => {
       const { ssrfSafeFetch } = await import("~/utils/ssrfProtection");
       const mockFetch = vi.mocked(ssrfSafeFetch);
       mockFetch.mockResolvedValue(
@@ -725,35 +766,112 @@ describe("HttpAgentAdapter", () => {
           headers: { "content-type": "application/json" },
         }),
       );
+      return mockFetch;
+    };
 
-      mockInjectTraceContextHeaders.mockImplementation(({ headers }) => ({
-        headers,
-        traceId: "captured_trace_id_abc",
-      }));
-
-      const agent = createHttpAgent();
-      const repository = createMockAgentRepository(agent);
+    it("renders {{ threadId }} in a header value", async () => {
+      const mockFetch = await setupMockFetch();
+      const agent = createHttpAgent({
+        headers: [{ key: "X-Thread", value: "{{ threadId }}" }],
+      });
       const adapter = new HttpAgentAdapter({
         agentId: "agent-123",
         projectId: "project-123",
-        agentRepository: repository,
+        agentRepository: createMockAgentRepository(agent),
+      });
+
+      await adapter.call(
+        createAgentInput([{ role: "user", content: "Hello" }], {
+          threadId: "thread-42",
+        }),
+      );
+
+      const headers = mockFetch.mock.calls[0]?.[1]?.headers as Record<
+        string,
+        string
+      >;
+      expect(headers["X-Thread"]).toBe("thread-42");
+    });
+
+    /** @scenario "A header value renders the turn's trace id and traceparent" */
+    it("renders the turn's trace id and traceparent in header values", async () => {
+      const mockFetch = await setupMockFetch();
+      mockInjectTraceContextHeaders.mockImplementation(({ headers }) => {
+        headers.traceparent = TRACEPARENT;
+        return { headers, traceId: TRACE_ID };
+      });
+      const agent = createHttpAgent({
+        headers: [
+          { key: "X-Trace-Id", value: "{{ traceId }}" },
+          { key: "X-Parent", value: "{{ traceparent }}" },
+        ],
+      });
+      const adapter = new HttpAgentAdapter({
+        agentId: "agent-123",
+        projectId: "project-123",
+        agentRepository: createMockAgentRepository(agent),
       });
 
       await adapter.call(
         createAgentInput([{ role: "user", content: "Hello" }]),
       );
 
-      expect(adapter.getTraceId()).toBe("captured_trace_id_abc");
+      const headers = mockFetch.mock.calls[0]?.[1]?.headers as Record<
+        string,
+        string
+      >;
+      expect(headers["X-Trace-Id"]).toBe(TRACE_ID);
+      expect(headers["X-Parent"]).toBe(TRACEPARENT);
     });
 
-    it("returns undefined when no trace ID was captured", () => {
+    it("keeps a secret reference in a header value exactly as written", async () => {
+      // This adapter resolves no project secrets: the reference must reach
+      // the wire verbatim rather than rendering to an empty string.
+      const mockFetch = await setupMockFetch();
+      const agent = createHttpAgent({
+        headers: [{ key: "X-Key", value: "{{ secrets.AGENT_TOKEN }}" }],
+      });
       const adapter = new HttpAgentAdapter({
         agentId: "agent-123",
         projectId: "project-123",
-        agentRepository: createMockAgentRepository(),
+        agentRepository: createMockAgentRepository(agent),
       });
 
-      expect(adapter.getTraceId()).toBeUndefined();
+      await adapter.call(
+        createAgentInput([{ role: "user", content: "Hello" }]),
+      );
+
+      const headers = mockFetch.mock.calls[0]?.[1]?.headers as Record<
+        string,
+        string
+      >;
+      expect(headers["X-Key"]).toBe("{{ secrets.AGENT_TOKEN }}");
+    });
+
+    describe("when a header template is malformed", () => {
+      /** @scenario "A failing header template names the header it came from" */
+      it("rejects naming the header key and the headers field", async () => {
+        await setupMockFetch();
+        const agent = createHttpAgent({
+          headers: [{ key: "X-Broken", value: "{% if %}" }],
+        });
+        const adapter = new HttpAgentAdapter({
+          agentId: "agent-123",
+          projectId: "project-123",
+          agentRepository: createMockAgentRepository(agent),
+        });
+
+        await expect(
+          adapter.call(createAgentInput([{ role: "user", content: "Hi" }])),
+        ).rejects.toThrow(TemplateRenderError);
+
+        await expect(
+          adapter.call(createAgentInput([{ role: "user", content: "Hi" }])),
+        ).rejects.toMatchObject({
+          field: "headers",
+          message: expect.stringContaining('header "X-Broken"'),
+        });
+      });
     });
   });
 

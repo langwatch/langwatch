@@ -9,12 +9,40 @@ import {
 } from "@langwatch/handled-error";
 
 import type { AppErrorCode } from "~/features/errors/logic/codes";
+import { remediation } from "~/server/app-layer/error-remediation";
 import type { ScenarioContentField } from "./execution/scenario-content-template";
 
 export class ScenarioNotFoundError extends Error {
   constructor(message = "Scenario not found") {
     super(message);
     this.name = "ScenarioNotFoundError";
+  }
+}
+
+/**
+ * A run's target agent points at a `langwatch agent dev` tunnel that no
+ * longer answers: the developer's session ended without restoring the URL.
+ *
+ * `fault` is explicit despite the 5xx: the dead tunnel is on the customer's
+ * machine, so this is an expected, customer-fixable state, not an incident on
+ * our side. The scenario failure handler projects this error into the run's
+ * stored error envelope so the drawer names the failure instead of showing a
+ * generic connection error.
+ */
+export class AgentDevTunnelUnreachableError extends HandledError {
+  declare readonly code: "agent_dev_tunnel_unreachable";
+
+  constructor() {
+    super(
+      "agent_dev_tunnel_unreachable",
+      "The agent points at a local development tunnel that is no longer responding.",
+      {
+        httpStatus: 502,
+        fault: "customer",
+        ...remediation("agent_dev_tunnel_unreachable"),
+      },
+    );
+    this.name = "AgentDevTunnelUnreachableError";
   }
 }
 

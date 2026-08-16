@@ -35,6 +35,13 @@ export const ScenarioInfraErrorCode = {
   ExecutionTimeout: "scenario_execution_timeout",
   /** The runner process itself couldn't boot (a broken build or deployment). */
   RunnerUnavailable: "scenario_runner_unavailable",
+  /**
+   * The target agent points at a `langwatch agent dev` tunnel whose session
+   * seems to have ended. Same code as the app-level handled error
+   * (`AgentDevTunnelUnreachableError`) so the two surfaces name the failure
+   * identically.
+   */
+  AgentDevTunnelUnreachable: "agent_dev_tunnel_unreachable",
   /** Anything else that failed at the infrastructure level. */
   Infra: "scenario_infra_error",
 } as const;
@@ -227,6 +234,40 @@ function summarize(raw: string): string | undefined {
   return `${collapsed.slice(0, MAX_GENERIC_MESSAGE_LENGTH - 1).trimEnd()}…`;
 }
 
+/** Markers of a connection that failed outright (refused / DNS / reset / undici fetch). */
+const NETWORK_UNREACHABLE_NEEDLES = [
+  "ECONNREFUSED",
+  "ENOTFOUND",
+  "EAI_AGAIN",
+  "ECONNRESET",
+  "fetch failed",
+  "network error",
+] as const;
+
+/**
+ * What a Cloudflare quick tunnel returns once its local `cloudflared` process
+ * has ended: the edge still resolves the hostname but answers HTTP 530 with
+ * Cloudflare's "error code: 1033" (tunnel error) body.
+ */
+const TUNNEL_GONE_NEEDLES = ["HTTP 530", "error code: 1033"] as const;
+
+/**
+ * True when a raw run failure is transport-level: the connection itself
+ * failed (or the tunnel edge reported its origin gone) rather than the target
+ * rejecting the request. This is the gate for naming a failure a dead dev
+ * tunnel: the caller supplies the "target has a devTunnel" fact, this module
+ * supplies the "the failure looks like the tunnel is gone" half.
+ */
+export function isTransportLevelScenarioFailure(
+  raw: string | undefined,
+): boolean {
+  const text = (raw ?? "").trim();
+  if (text.length === 0) return false;
+  return [...NETWORK_UNREACHABLE_NEEDLES, ...TUNNEL_GONE_NEEDLES].some(
+    (needle) => contains(text, needle),
+  );
+}
+
 interface ClassificationRule {
   /** Any one of these appearing in the raw error selects this rule. */
   needles: string[];
@@ -378,14 +419,7 @@ const CLASSIFICATION_RULES: ClassificationRule[] = [
   },
   {
     // Network unreachable (connection refused / DNS / reset / undici fetch).
-    needles: [
-      "ECONNREFUSED",
-      "ENOTFOUND",
-      "EAI_AGAIN",
-      "ECONNRESET",
-      "fetch failed",
-      "network error",
-    ],
+    needles: [...NETWORK_UNREACHABLE_NEEDLES],
     build: () => ({
       code: ScenarioInfraErrorCode.PlatformUnreachable,
       message: "Couldn't reach the endpoint while running the simulation.",
@@ -530,6 +564,8 @@ export function scenarioErrorTitle(code: ScenarioInfraErrorCode): string {
       return "Simulation timed out";
     case ScenarioInfraErrorCode.RunnerUnavailable:
       return "Simulation runner unavailable";
+    case ScenarioInfraErrorCode.AgentDevTunnelUnreachable:
+      return "Local tunnel not responding";
     case ScenarioInfraErrorCode.Infra:
       return "Simulation failed";
     default: {

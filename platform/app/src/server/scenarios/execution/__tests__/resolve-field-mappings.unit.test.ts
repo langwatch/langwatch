@@ -15,6 +15,7 @@ const makeAgentInput = (overrides: Partial<AgentInput> = {}): AgentInput => ({
   messages: [{ role: "user", content: "Hello world" }],
   newMessages: [{ role: "user", content: "Hello world" }],
   requestedRole: AgentRole.AGENT,
+  propagationHeaders: {},
   scenarioState: {} as AgentInput["scenarioState"],
   scenarioConfig: {} as AgentInput["scenarioConfig"],
   ...overrides,

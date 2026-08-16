@@ -372,6 +372,13 @@ const presentations = {
     describe: () => "We've been notified. Try running it again in a moment.",
   },
 
+  // ---- agent dev tunnel ----
+  agent_dev_tunnel_unreachable: {
+    title: "The agent's local tunnel is not responding",
+    describe: () =>
+      "This agent points at a local development tunnel that seems to have ended. Run `langwatch agent dev` again on the machine that started it, or restore the agent's URL in its settings.",
+  },
+
   // ---- agent-submitted reports ----
   agent_report_rate_limited: {
     // The reader here is usually a coding agent's operator on the CLI or MCP,
