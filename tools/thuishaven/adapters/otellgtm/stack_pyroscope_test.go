@@ -28,6 +28,28 @@ func TestRunArgsPublishesTheProfilingPort(t *testing.T) {
 	}
 }
 
+// LW_OBS_PYROSCOPE_PORT=0 reads as "off" everywhere else: profilingUnready
+// skips its probe and the worktree overlay names no endpoint. Docker does not
+// read it that way — `127.0.0.1:0:4040` means "choose a host port for me", so
+// publishing it regardless would leave the profiler reachable on a port nothing
+// was told about while haven reported profiling disabled.
+//
+// @scenario "The observability stack exposes its profiling endpoint"
+func TestRunArgsPublishesNoProfilingPortWhenDisabled(t *testing.T) {
+	endpoints := domain.DefaultObservabilityEndpoints()
+	endpoints.PyroscopePort = 0
+	args := New(nil, t.TempDir(), "", endpoints, domain.DefaultObservabilityLimits(8<<30, 4)).runArgs(nil)
+
+	for i, arg := range args {
+		if arg != "-p" || i+1 >= len(args) {
+			continue
+		}
+		if strings.HasSuffix(args[i+1], ":4040") {
+			t.Errorf("a disabled profiler must publish no port, got %q", args[i+1])
+		}
+	}
+}
+
 // Anonymous access to this Grafana is Admin and Pyroscope has no auth at all, so
 // the profiling port is bound to loopback for the same reason as every other
 // port the stack publishes: on 0.0.0.0 it is the whole machine's business.

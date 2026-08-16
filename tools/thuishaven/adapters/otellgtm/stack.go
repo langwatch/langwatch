@@ -192,7 +192,6 @@ func (s *Stack) runArgs(configMounts []string) []string {
 		"-p", fmt.Sprintf("127.0.0.1:%d:4317", s.endpoints.OTLPGRPCPort),
 		"-p", fmt.Sprintf("127.0.0.1:%d:4318", s.endpoints.OTLPHTTPPort),
 		"-p", fmt.Sprintf("127.0.0.1:%d:3000", s.endpoints.GrafanaPort),
-		"-p", fmt.Sprintf("127.0.0.1:%d:4040", s.endpoints.PyroscopePort),
 
 		"--memory", fmt.Sprintf("%dm", l.MemoryMB),
 		// Equal to --memory: no swap, so the ceiling is a real ceiling instead of a
@@ -216,6 +215,17 @@ func (s *Stack) runArgs(configMounts []string) []string {
 
 		"-e", "PROMETHEUS_EXTRA_ARGS=" + l.PrometheusExtraArgs(),
 	}
+
+	// Zero is the off switch everywhere else that reads this port: the readiness
+	// probe skips, and the worktree overlay names no endpoint. Publishing it
+	// anyway would hand Docker `127.0.0.1:0:4040`, which does not mean "no
+	// mapping" — it means "pick a host port for me". The profiler would end up
+	// reachable on a port nothing was told about, while haven reported profiling
+	// as disabled.
+	if s.endpoints.PyroscopePort != 0 {
+		args = append(args, "-p", fmt.Sprintf("127.0.0.1:%d:4040", s.endpoints.PyroscopePort))
+	}
+
 	args = append(args, configMounts...)
 	return append(args, s.image)
 }
