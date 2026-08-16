@@ -32,6 +32,12 @@
         "promptFile": "scenarios.docs.txt"
       },
       {
+        "title": "Connect my agent to LangWatch simulations",
+        "skill": "langwatch/skills/connect-agent",
+        "slashCommand": "/connect-agent",
+        "promptFile": "connect-agent.docs.txt"
+      },
+      {
         "title": "Version my prompts with LangWatch",
         "skill": "langwatch/skills/prompts",
         "slashCommand": "/prompts",
