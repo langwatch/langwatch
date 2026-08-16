@@ -116,9 +116,11 @@ export interface PersistPage {
  * byte-identical page keys — the sort is what guarantees it regardless of
  * pending-map insertion order.
  */
-export function pagePersistMatches(
-  matches: Array<{ traceId: string; settleWindowBucket: string }>,
-): PersistPage[] {
+export function pagePersistMatches({
+  matches,
+}: {
+  matches: Array<{ traceId: string; settleWindowBucket: string }>;
+}): PersistPage[] {
   // Byte order, not localeCompare: the page key must never depend on the
   // process locale or ICU version.
   const sorted = [...matches].sort((left, right) =>
@@ -167,7 +169,7 @@ export function drainDue(state: SettlementState, at: number) {
       key,
       traceIds: traceIds.sort(),
     })),
-    persistPages: pagePersistMatches(settledMatches),
+    persistPages: pagePersistMatches({ matches: settledMatches }),
     nextBoundary: nextWakeFrom(nextState),
   };
 }

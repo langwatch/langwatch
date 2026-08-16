@@ -96,12 +96,12 @@ export function createAutomationsPipeline(deps: AutomationsPipelineDeps) {
             intents:
               flushed.length > 0
                 ? [
-                    ...pagePersistMatches(
-                      flushedPersist.map(({ traceId, match }) => ({
+                    ...pagePersistMatches({
+                      matches: flushedPersist.map(({ traceId, match }) => ({
                         traceId,
                         settleWindowBucket: match.settleWindowBucket,
                       })),
-                    ).map((page) =>
+                    }).map((page) =>
                       ctx.intents.persistMatch(`persist:${page.pageKey}`, {
                         triggerId: ctx.key,
                         traceIds: page.traceIds,

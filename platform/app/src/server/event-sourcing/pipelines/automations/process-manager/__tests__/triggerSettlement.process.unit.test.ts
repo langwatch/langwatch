@@ -112,14 +112,16 @@ describe("trigger settlement process", () => {
           }),
         );
 
-        const pages = pagePersistMatches(matches);
+        const pages = pagePersistMatches({ matches });
 
         expect(pages).toHaveLength(2);
         expect(pages[0]!.traceIds).toHaveLength(PERSIST_PAGE_MAX);
         expect(pages[1]!.traceIds).toHaveLength(3);
         expect(pages[0]!.pageKey).not.toBe(pages[1]!.pageKey);
         // Insertion order does not leak into the keys.
-        expect(pagePersistMatches([...matches].reverse())).toEqual(pages);
+        expect(pagePersistMatches({ matches: [...matches].reverse() })).toEqual(
+          pages,
+        );
       });
 
       it("keeps the next future boundary durable", () => {
