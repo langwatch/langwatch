@@ -17,28 +17,37 @@ import { useReachableProducts } from "./useReachableProducts";
 interface ResolvedHome {
   destination: string | null;
   isOverride: boolean;
-  intentPinned: boolean;
+  isIntentPinned: boolean;
   governanceUiEnabled: boolean;
   isReady: boolean;
   hasError: boolean;
 }
 
-/** The home-resolver query, flattened so the pickers read plain values. */
+/**
+ * The home-resolver query, flattened so the pickers read plain values.
+ *
+ * The procedure answers `PersonaResolution` with every field set, so the
+ * only absent value is `undefined` while the query is still pending. The
+ * parameter says exactly that: an answer means the fields are there, and
+ * `isReady` therefore means resolved, never "resolved to nothing".
+ */
 function toResolvedHome(query: {
-  data?: {
-    destination?: string | null;
-    isOverride?: boolean;
-    intentPinned?: boolean;
-    governanceUiEnabled?: boolean;
-  } | null;
+  data:
+    | {
+        destination: string;
+        isOverride: boolean;
+        intentPinned: boolean;
+        governanceUiEnabled: boolean;
+      }
+    | undefined;
   isError: boolean;
 }): ResolvedHome {
   return {
     destination: query.data?.destination ?? null,
     isOverride: query.data?.isOverride ?? false,
-    intentPinned: query.data?.intentPinned ?? false,
+    isIntentPinned: query.data?.intentPinned ?? false,
     governanceUiEnabled: query.data?.governanceUiEnabled ?? false,
-    isReady: !!query.data,
+    isReady: query.data !== undefined,
     hasError: query.isError,
   };
 }
@@ -108,7 +117,7 @@ function personaHomeDestination({
   return resolveHomeDestination({
     resolverDestination: resolved.destination,
     isOverride: resolved.isOverride,
-    intentPinned: resolved.intentPinned,
+    intentPinned: resolved.isIntentPinned,
     governanceUiEnabled: resolved.governanceUiEnabled,
     lastVisitedHomeKind,
     lastProjectSlug: projectHomeSlug,

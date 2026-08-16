@@ -15,7 +15,7 @@ import type { NavigationV2ShellReadyState } from "./useNavigationV2ShellState";
 interface ShellTopBarProps {
   state: NavigationV2ShellReadyState;
   /** The icon rail carries the logo and the product tiles instead. */
-  showProductCluster: boolean;
+  shouldShowProductCluster: boolean;
 }
 
 /**
@@ -24,7 +24,10 @@ interface ShellTopBarProps {
  * "product-switcher" the logo and the product dropdown lead the left
  * side; in "icon-rail" the rail carries them and they are hidden here.
  */
-export function ShellTopBar({ state, showProductCluster }: ShellTopBarProps) {
+export function ShellTopBar({
+  state,
+  shouldShowProductCluster,
+}: ShellTopBarProps) {
   const { user, project, activeProductId, isDevelopment } = state;
 
   return (
@@ -53,7 +56,7 @@ export function ShellTopBar({ state, showProductCluster }: ShellTopBarProps) {
       )}
 
       <HStack gap={3} flex={1} alignItems="center" minWidth={0}>
-        {showProductCluster && (
+        {shouldShowProductCluster && (
           <ProductCluster activeProductId={activeProductId} />
         )}
         <OrganizationSelect activeProductId={activeProductId} />

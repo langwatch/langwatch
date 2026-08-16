@@ -51,11 +51,11 @@ export type NavigationV2ShellState =
  *        specs/navigation/icon-rail-navigation.feature
  */
 export function useNavigationV2ShellState({
-  personalScope,
-  orgScope,
+  isPersonalScope,
+  isOrgScope,
 }: {
-  personalScope: boolean;
-  orgScope: boolean;
+  isPersonalScope: boolean;
+  isOrgScope: boolean;
 }): NavigationV2ShellState {
   const isSmallScreen = useBreakpointValue(
     { base: true, lg: false },
@@ -67,7 +67,7 @@ export function useNavigationV2ShellState({
 
   const { data: session } = useRequiredSession();
 
-  const bypassProjectGating = personalScope || orgScope;
+  const bypassProjectGating = isPersonalScope || isOrgScope;
   const workspace = useOrganizationTeamProject({
     redirectToOnboarding: !bypassProjectGating,
     redirectToProjectOnboarding: !bypassProjectGating,
@@ -89,8 +89,8 @@ export function useNavigationV2ShellState({
 
   const route = resolveShellRoute({
     pathname: router.pathname,
-    personalScope,
-    orgScope,
+    isPersonalScope,
+    isOrgScope,
     isOnOwnPersonalProject:
       !!team?.isPersonal && team.ownerUserId === session?.user?.id,
   });
@@ -222,25 +222,25 @@ interface ShellRoute {
  */
 function resolveShellRoute({
   pathname,
-  personalScope,
-  orgScope,
+  isPersonalScope,
+  isOrgScope,
   isOnOwnPersonalProject,
 }: {
   pathname: string;
-  personalScope: boolean;
-  orgScope: boolean;
+  isPersonalScope: boolean;
+  isOrgScope: boolean;
   isOnOwnPersonalProject: boolean;
 }): ShellRoute {
   const isSettingsRoute = pathname.startsWith("/settings");
   const isPersonalScopeRoute =
     !isSettingsRoute &&
-    (personalScope || pathname.startsWith("/me") || isOnOwnPersonalProject);
+    (isPersonalScope || pathname.startsWith("/me") || isOnOwnPersonalProject);
   const activeProductId = isSettingsRoute
     ? null
     : ((isPersonalScopeRoute ? "me" : productFromPathname(pathname)) ??
       "llm-ops");
   const isOrgScopeRoute =
-    orgScope ||
+    isOrgScope ||
     isSettingsRoute ||
     activeProductId === "gateway" ||
     activeProductId === "governance";
