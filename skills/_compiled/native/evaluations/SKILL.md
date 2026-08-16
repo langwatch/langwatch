@@ -17,9 +17,9 @@ Classify the user's intent:
 | Batch test a dataset, compare prompts or models, benchmark, create a CI quality gate | `experiments`        |
 | Score live traces or threads, monitor production quality, create a guardrail         | `online-evaluations` |
 
-If the request remains ambiguous after inspecting context — a bare "make me an eval" that names neither a dataset nor live traffic — do not create anything yet. This choice picks what gets tested, so it is the user's to make, not a default's. Ask it as a question card and stop; the answer arrives as the next message.
+If the request remains ambiguous after inspecting context (a bare "make me an eval" that names neither a dataset nor live traffic), do not create anything yet. This choice picks what gets tested, so it is the user's to make, not a default's. Ask it as a question card and stop; the answer arrives as the next message.
 
-Where `langy-card` blocks render, ask it as a `choices` block — the only sanctioned question format — last in the reply:
+Where `langy-card` blocks render, ask it as a `choices` block (the only sanctioned question format) last in the reply:
 
 ````markdown
 ```langy-card
@@ -37,7 +37,7 @@ Where `langy-card` blocks render, ask it as a `choices` block — the only sanct
 
 Neither option names an existing entity, so neither carries a `ref`. Without that channel, ask the same question as one short line of prose.
 
-A rejected field value is not this kind of choice. If a create later fails with a `validation_error` whose reason names the field and an `expected` list, correct that exact field from the list and retry once — never turn a fixable slug into a question for the user.
+A rejected field value is not this kind of choice. If a create later fails with a `validation_error` whose reason names the field and an `expected` list, correct that exact field from the list and retry once. Never turn a fixable slug into a question for the user.
 
 Then hand off:
 

@@ -15,6 +15,7 @@
 import type { AgentInput } from "@langwatch/scenario";
 import { Liquid } from "liquidjs";
 import type { FieldMapping } from "../field-mapping";
+import type { RunParameterValues } from "../parameters";
 import { resolveFieldMappings, sourceFieldOf } from "./resolve-field-mappings";
 
 /**
@@ -107,6 +108,11 @@ bodyLiquid.registerFilter("raw", { handler: identity, raw: true });
  *     structured content is JSON-stringified and wrapped in `RawJson` so
  *     `{"input": {{input}}}` keeps injecting it as a raw object/array.
  *
+ * The run's resolved parameters are bound as `params`, so a url or body reads
+ * `{{ params.account_tier }}`. It sits between the base names and the mappings
+ * on purpose: it can never take `input`, `messages` or `threadId` away from a
+ * template, and a data mapping a customer already named `params` still wins.
+ *
  * Scalar values stay plain strings; `bodyLiquid` JSON-string-escapes them on
  * interpolation. `scenarioMappings` output is merged last and overrides base
  * keys, preserving each mapping's raw-vs-scalar treatment.
@@ -114,9 +120,11 @@ bodyLiquid.registerFilter("raw", { handler: identity, raw: true });
 export function buildTemplateContext({
   input,
   scenarioMappings,
+  parameters,
 }: {
   input: AgentInput;
   scenarioMappings?: Record<string, FieldMapping>;
+  parameters?: RunParameterValues;
 }): Record<string, unknown> {
   const lastUserMessage = input.messages.findLast((m) => m.role === "user");
   const inputIsStructured =
@@ -149,7 +157,7 @@ export function buildTemplateContext({
     }
   }
 
-  return { ...base, ...mapped };
+  return { ...base, params: parameters ?? {}, ...mapped };
 }
 
 export function renderUrlTemplate({

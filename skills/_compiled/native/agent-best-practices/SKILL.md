@@ -54,7 +54,7 @@ Fix the easiest, highest-impact gaps first:
 - No tests at all: create initial scenario tests (see the `scenarios` skill)
 - Generic datasets: generate domain-specific ones (see the `datasets` skill)
 
-Deliver working results. Show the user what improved. This is the a-ha moment.
+Deliver working results. Show the user what improved.
 
 ## Phase 3: Guide Deeper
 

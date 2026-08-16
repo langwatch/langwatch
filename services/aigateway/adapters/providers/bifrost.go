@@ -1655,11 +1655,19 @@ func extractUsage(resp *bfschemas.BifrostChatResponse) domain.Usage {
 		CompletionTokens: resp.Usage.CompletionTokens,
 		TotalTokens:      resp.Usage.TotalTokens,
 	}
+	var split domain.AudioTokenSplit
 	if d := resp.Usage.PromptTokensDetails; d != nil {
 		u.CacheReadTokens = d.CachedReadTokens
 		u.CacheCreationTokens = d.CachedWriteTokens
+		split.InputAudio = d.AudioTokens
+		split.InputText = d.TextTokens
 	}
-	return u
+	if d := resp.Usage.CompletionTokensDetails; d != nil {
+		u.ReasoningTokens = d.ReasoningTokens
+		split.OutputAudio = d.AudioTokens
+		split.OutputText = d.TextTokens
+	}
+	return u.SplitAudioTokens(split)
 }
 
 // extractResponsesUsage maps the Responses-API usage block onto the
@@ -1675,11 +1683,19 @@ func extractResponsesUsage(resp *bfschemas.BifrostResponsesResponse) domain.Usag
 		CompletionTokens: resp.Usage.OutputTokens,
 		TotalTokens:      resp.Usage.TotalTokens,
 	}
+	var split domain.AudioTokenSplit
 	if d := resp.Usage.InputTokensDetails; d != nil {
 		u.CacheReadTokens = d.CachedReadTokens
 		u.CacheCreationTokens = d.CachedWriteTokens
+		split.InputAudio = d.AudioTokens
+		split.InputText = d.TextTokens
 	}
-	return u
+	if d := resp.Usage.OutputTokensDetails; d != nil {
+		u.ReasoningTokens = d.ReasoningTokens
+		split.OutputAudio = d.AudioTokens
+		split.OutputText = d.TextTokens
+	}
+	return u.SplitAudioTokens(split)
 }
 
 // extractEmbeddingUsage maps Bifrost's embedding usage block. Embedding
@@ -1812,6 +1828,19 @@ func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
 				if u.CacheCreation1hTokens > 0 {
 					it.usage.CacheCreation1hTokens = u.CacheCreation1hTokens
 				}
+				// Audio tokens merge on the same rule. A chunk that
+				// reports none must not clear a count an earlier chunk
+				// already carried, or a streamed audio turn prices at the
+				// text rate.
+				if u.InputAudioTokens > 0 {
+					it.usage.InputAudioTokens = u.InputAudioTokens
+				}
+				if u.OutputAudioTokens > 0 {
+					it.usage.OutputAudioTokens = u.OutputAudioTokens
+				}
+				if u.ReasoningTokens > 0 {
+					it.usage.ReasoningTokens = u.ReasoningTokens
+				}
 				// Prefer the parser's reported total when non-zero —
 				// Gemini's `totalTokenCount` can exceed prompt+completion
 				// (reasoning / thinking tokens). Anthropic doesn't report
@@ -1856,7 +1885,14 @@ func parseGeminiPassthroughUsage(body []byte) (domain.Usage, bool) {
 		return domain.Usage{}, false
 	}
 	prompt := int(usage.Get("promptTokenCount").Int())
-	completion := int(usage.Get("candidatesTokenCount").Int())
+	// Gemini reports its thinking tokens OUTSIDE candidatesTokenCount
+	// (totalTokenCount = promptTokenCount + candidatesTokenCount +
+	// thoughtsTokenCount), unlike OpenAI, whose completion total already
+	// contains them. Google bills thoughts at the output rate, so the
+	// completion total has to carry them or every thinking call under-bills:
+	// a 47-token answer with 196 thinking tokens billed for 47.
+	thoughts := int(usage.Get("thoughtsTokenCount").Int())
+	completion := int(usage.Get("candidatesTokenCount").Int()) + thoughts
 	total := int(usage.Get("totalTokenCount").Int())
 	if prompt == 0 && completion == 0 && total == 0 {
 		return domain.Usage{}, false
@@ -1872,6 +1908,8 @@ func parseGeminiPassthroughUsage(body []byte) (domain.Usage, bool) {
 		CompletionTokens: completion,
 		TotalTokens:      total,
 		CacheReadTokens:  int(usage.Get("cachedContentTokenCount").Int()),
+		// The reported subset of the completion total, never priced on its own.
+		ReasoningTokens: thoughts,
 	}, true
 }
 

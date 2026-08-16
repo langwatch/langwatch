@@ -191,6 +191,7 @@ export const useOrganizationTeamProject = (
         // (no `as` cast) makes the compiler flag any new required column, so a
         // future field can never silently ship unset here. See ADR-057.
         apiKey: "",
+        governedSqlKey: "",
         teamId: "",
         kind: "application",
         firstMessage: true,
@@ -214,6 +215,11 @@ export const useOrganizationTeamProject = (
         // this is inert either way; null keeps it inert AND safe.
         langyEgressAllowlist: null,
         departmentId: null,
+        // A share viewer gets no project rail, and these two columns exist only
+        // to grow destinations on it. `null` reads as "no coding-agent signal",
+        // which is both inert and true of the view a share token opens.
+        lastCodingAgentSessionAt: null,
+        lastCodingAgentPullRequestAt: null,
       }
     : undefined;
 

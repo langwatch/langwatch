@@ -84,6 +84,9 @@ export function createExecuteRunHandler(
       setId: payload.scenarioSetId,
       ...(payload.name !== undefined ? { scenarioName: payload.name } : {}),
       target: payload.target,
+      ...(payload.parameters !== undefined
+        ? { parameters: payload.parameters }
+        : {}),
     });
     logger.info(
       { scenarioRunId: payload.scenarioRunId },

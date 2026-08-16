@@ -347,6 +347,7 @@ export class PrismaProcessStore implements ProcessStore {
         UPDATE "ProcessManagerOutbox" AS outbox
         SET "leasedUntil" = ${leasedUntil},
             "leaseToken" = CAST(${leaseBatchToken} AS TEXT) || ':' || outbox."id",
+            "attempts" = outbox."attempts" + 1,
             "updatedAt" = ${now}
         FROM candidates
         WHERE outbox."id" = candidates."id"
@@ -360,8 +361,8 @@ export class PrismaProcessStore implements ProcessStore {
     identity: OutboxMessageIdentity;
     leaseToken: string;
     now: number;
-  }): Promise<void> {
-    await this.prisma.processManagerOutbox.updateMany({
+  }): Promise<{ applied: boolean }> {
+    const result = await this.prisma.processManagerOutbox.updateMany({
       where: {
         ...params.identity,
         leaseToken: params.leaseToken,
@@ -369,13 +370,13 @@ export class PrismaProcessStore implements ProcessStore {
       },
       data: {
         status: "dispatched",
-        attempts: { increment: 1 },
         leasedUntil: null,
         leaseToken: null,
         dispatchedAt: asDate(params.now),
         updatedAt: asDate(params.now),
       },
     });
+    return { applied: result.count === 1 };
   }
 
   async markFailed(params: {
@@ -384,8 +385,8 @@ export class PrismaProcessStore implements ProcessStore {
     now: number;
     nextAttemptAt: number;
     dead: boolean;
-  }): Promise<void> {
-    await this.prisma.processManagerOutbox.updateMany({
+  }): Promise<{ applied: boolean }> {
+    const result = await this.prisma.processManagerOutbox.updateMany({
       where: {
         ...params.identity,
         leaseToken: params.leaseToken,
@@ -393,13 +394,36 @@ export class PrismaProcessStore implements ProcessStore {
       },
       data: {
         status: params.dead ? "dead" : "pending",
-        attempts: { increment: 1 },
         nextAttemptAt: asDate(params.nextAttemptAt),
         leasedUntil: null,
         leaseToken: null,
         updatedAt: asDate(params.now),
       },
     });
+    return { applied: result.count === 1 };
+  }
+
+  async releaseLease(params: {
+    identity: OutboxMessageIdentity;
+    leaseToken: string;
+    now: number;
+  }): Promise<{ applied: boolean }> {
+    const result = await this.prisma.processManagerOutbox.updateMany({
+      where: {
+        ...params.identity,
+        leaseToken: params.leaseToken,
+        status: "pending",
+      },
+      data: {
+        // The decrement hands back the attempt the lease charged: the
+        // delivery never started, so it must not burn retirement budget.
+        attempts: { decrement: 1 },
+        leasedUntil: null,
+        leaseToken: null,
+        updatedAt: asDate(params.now),
+      },
+    });
+    return { applied: result.count === 1 };
   }
 
   async findDueWakes(params: {

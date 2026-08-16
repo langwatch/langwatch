@@ -3,6 +3,7 @@ import type {
   ProcessHandlerContext,
   WakeHandler,
 } from "~/server/event-sourcing/pipeline/processManagerDefinition";
+import { runParameterValuesSchema } from "~/server/scenarios/parameters";
 import { STALL_THRESHOLD_MS } from "~/server/scenarios/scenario.constants";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 
@@ -44,10 +45,12 @@ const finishUnexecutableKey = (scenarioRunId: string) =>
  * the identities/enums/timestamps view the process is allowed to persist.
  *
  * Everything else is dropped here, before the runtime builds the envelope —
- * messages, results, verdict reasoning, criteria text, message content,
- * metadata. The process manager persists this payload verbatim into inbox
- * and outbox rows, so anything this function keeps becomes durable. It keeps
- * nothing that is conversation content.
+ * messages, results, verdict reasoning, criteria text, message content, and
+ * all of `metadata` except the run's resolved parameter values. The process
+ * manager persists this payload verbatim into inbox and outbox rows, so
+ * anything this function keeps becomes durable. It keeps nothing that is
+ * conversation content: the parameter values are customer-chosen run
+ * configuration, already durable on the queued event itself.
  *
  * Reads the finished event's `status` only, so it compiles whether or not
  * the enriched finished-event fields have landed yet.
@@ -66,6 +69,23 @@ export function buildSimulationRunEventView(
   const parsedTarget =
     simulationRunProcessEventViewSchema.shape.target.safeParse(data.target);
   const target = parsedTarget.success ? parsedTarget.data : null;
+  // The queued event is the only place the run's resolved parameter values
+  // cross into execution: the pool job is otherwise built from ids, which do
+  // not carry them. A shape this version cannot read is dropped rather than
+  // failing the run — all or nothing, because half a record would run the
+  // scenario against a value the caller never chose — and a run without
+  // parameters is the behaviour every run had before them.
+  const metadata =
+    typeof data.metadata === "object" && data.metadata !== null
+      ? (data.metadata as Record<string, unknown>)
+      : undefined;
+  const parsedParameters = runParameterValuesSchema.safeParse(
+    metadata?.parameters,
+  );
+  const parameters =
+    parsedParameters.success && Object.keys(parsedParameters.data).length > 0
+      ? parsedParameters.data
+      : null;
   return {
     eventType: event.type,
     occurredAt: event.occurredAt,
@@ -75,6 +95,7 @@ export function buildSimulationRunEventView(
     scenarioSetId: str(data.scenarioSetId),
     name: str(data.name),
     target,
+    parameters,
   };
 }
 
@@ -193,6 +214,7 @@ export const handleRunQueued: EventHandler<
         scenarioSetId: view.scenarioSetId,
         ...(view.name !== null ? { name: view.name } : {}),
         target: view.target,
+        ...(view.parameters !== null ? { parameters: view.parameters } : {}),
       }),
     ],
   };

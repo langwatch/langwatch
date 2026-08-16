@@ -160,18 +160,6 @@ Feature: Codex conversation capture without the LangWatch wrapper
     Then the harvest hook is installed without asking the user anything
 
   @unit
-  Scenario: Consent names the program that will run after every turn
-    Given a user being asked to keep codex capture on
-    When the question is put to them
-    Then it says a program runs after every completed turn, before they answer
-
-  @unit
-  Scenario: Consent says an existing turn-completion program will be started by ours
-    Given a user whose codex configuration already runs a program of their own after each turn
-    When the question is put to them
-    Then it says their program will be started by ours, before they answer
-
-  @unit
   Scenario: A configuration the harvest cannot be merged into says so
     Given a codex configuration binding a turn-completion program that cannot be moved
     When capture is enabled

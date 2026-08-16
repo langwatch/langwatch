@@ -4,7 +4,7 @@ description: Integrate LangWatch with existing OpenTelemetry setups to enhance t
 keywords: OpenTelemetry, OTel, auto-instrumentation, OpenAI, Celery, HTTP clients, databases, ORMs, LangWatch, Python
 ---
 
-The LangWatch Python SDK is built entirely on top of the robust [OpenTelemetry (OTel)](https://opentelemetry.io/) standard. This means seamless integration with existing OTel setups and interoperability with the wider OTel ecosystem.
+The LangWatch Python SDK is built entirely on top of the [OpenTelemetry (OTel)](https://opentelemetry.io/) standard. It integrates with existing OTel setups and interoperates with the wider OTel ecosystem.
 
 ## LangWatch Spans are OpenTelemetry Spans
 
@@ -13,13 +13,13 @@ It's important to understand that LangWatch traces and spans **are** standard Op
 This foundation provides several benefits:
 - **Interoperability:** Traces generated with LangWatch can be sent to any OTel-compatible backend (Jaeger, Tempo, Datadog, etc.) alongside your other application traces.
 - **Familiar API:** If you're already familiar with OpenTelemetry concepts and APIs, working with LangWatch's manual instrumentation will feel natural.
-- **Leverage Existing Setup:** LangWatch integrates smoothly with your existing OTel `TracerProvider` and instrumentation.
+- **Reuse Existing Setup:** LangWatch integrates with your existing OTel `TracerProvider` and instrumentation.
 
-Perhaps the most significant advantage is that **LangWatch seamlessly integrates with the vast ecosystem of standard OpenTelemetry auto-instrumentation libraries.** This means you can easily combine LangWatch's LLM-specific observability with insights from other parts of your application stack. For example, if you use `opentelemetry-instrumentation-celery`, traces initiated by LangWatch for an LLM task can automatically include spans generated within your Celery workers, giving you a complete end-to-end view of the request, including background processing, without any extra configuration.
+**LangWatch also works with the standard OpenTelemetry auto-instrumentation libraries.** You can combine LangWatch's LLM-specific observability with insights from other parts of your application stack. For example, if you use `opentelemetry-instrumentation-celery`, traces initiated by LangWatch for an LLM task can automatically include spans generated within your Celery workers, giving you a complete end-to-end view of the request, including background processing, without any extra configuration.
 
-## Leverage the OpenTelemetry Ecosystem: Auto-Instrumentation
+## Use the OpenTelemetry Ecosystem: Auto-Instrumentation
 
-One of the most powerful benefits of LangWatch's OpenTelemetry foundation is its **automatic compatibility with the extensive ecosystem of OpenTelemetry auto-instrumentation libraries.**
+The OpenTelemetry foundation gives LangWatch **automatic compatibility with the ecosystem of OpenTelemetry auto-instrumentation libraries.**
 
 When you use standard OTel auto-instrumentation for libraries like web frameworks, databases, or task queues alongside LangWatch, you gain **complete end-to-end visibility** into your LLM application's requests. Because LangWatch and these auto-instrumentors use the same underlying OpenTelemetry tracing system and context propagation mechanisms, spans generated across different parts of your application are automatically linked together into a single, unified trace.
 
@@ -37,7 +37,7 @@ Here are common scenarios where combining LangWatch with OTel auto-instrumentati
 
 *   **Databases & ORMs (SQLAlchemy, Psycopg2, Django ORM):** Using libraries like `opentelemetry-instrumentation-sqlalchemy`, any database queries executed during your LLM processing (e.g., for RAG retrieval, user data lookup, logging results) will appear as spans within the relevant LangWatch trace, pinpointing database interaction time and specific queries.
 
-To enable this, simply ensure you have installed and configured the relevant OpenTelemetry auto-instrumentation libraries according to their documentation, typically involving an installation (`pip install opentelemetry-instrumentation-<library>`) and sometimes an initialization step (like `CeleryInstrumentor().instrument()`). As long as they use the same (or the global) `TracerProvider` that LangWatch is configured with, the integration is automatic.
+To enable this, install and configure the relevant OpenTelemetry auto-instrumentation libraries according to their documentation, typically involving an installation (`pip install opentelemetry-instrumentation-<library>`) and sometimes an initialization step (like `CeleryInstrumentor().instrument()`). As long as they use the same (or the global) `TracerProvider` that LangWatch is configured with, the integration is automatic.
 
 #### Example: Combining LangWatch, RAG, OpenAI, and Celery
 
@@ -359,7 +359,7 @@ If `langwatch.setup()` detects an existing *global* `TracerProvider` (one set vi
 
 This warning exists because replacing a globally configured provider can sometimes break assumptions made by other parts of your application or libraries. However, in many cases, **attaching** the LangWatch exporter to the existing global provider is exactly the desired behavior.
 
-If you are intentionally running LangWatch alongside an existing global OpenTelemetry setup and want LangWatch to simply add its exporter to that setup, you can silence this warning by setting:
+If you are intentionally running LangWatch alongside an existing global OpenTelemetry setup and want LangWatch to add its exporter to that setup, you can silence this warning by setting:
 
 ```python
 langwatch.setup(

@@ -68,7 +68,7 @@ The worker has exactly three ways out:
     Langy clones the installed repo inside the worker, drafts the change, and opens a bot-authored pull request. The clone lives only in the worker's home and is wiped when the worker is reaped.
   </Step>
   <Step title="Your CI runs the tests it wrote">
-    The Scenario tests Langy wrote run in your CI on that PR. The PR card returns with the result, so the receipts are the diff plus the check status.
+    The Scenario tests Langy wrote run in your CI on that PR. The PR card returns with the result, so you see the diff and the check status together.
   </Step>
   <Step title="A human reviews and merges">
     You read the PR and merge it. Langy never merges its own PR.

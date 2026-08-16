@@ -185,6 +185,72 @@ describe("codingAgentLogFactsDispatch", () => {
     });
   });
 
+  describe("when a codex record arrives without its session id", () => {
+    /** @scenario "a codex record outside any session does not mint a session" */
+    it("declines the contribution instead of keying it on the trace", async () => {
+      const { subscriber, dispatched } = makeSubscriber();
+
+      // The live shape: codex's `log_only` scope reports an auth-refresh
+      // api_request outside any conversation — no `conversation.id`, only
+      // a trace. Keying it on the trace minted an all-zero session row.
+      await subscriber.handle(
+        canonicalLogEvent({
+          scopeName: "codex_otel.log_only",
+          attributes: {
+            "event.name": "codex.api_request",
+            attempt: "1",
+            duration_ms: "742",
+            success: "true",
+          },
+          correlationTraceId: WIRE_TRACE,
+          correlationSource: "wire",
+        }),
+        context,
+      );
+
+      expect(dispatched).toHaveLength(0);
+    });
+
+    it("still contributes when the codex record carries its conversation id", async () => {
+      const { subscriber, dispatched } = makeSubscriber();
+
+      await subscriber.handle(
+        canonicalLogEvent({
+          scopeName: "codex_exec",
+          attributes: {
+            "event.name": "codex.user_prompt",
+            "conversation.id": "01a00987-1926-7d31-a000-000000000001",
+            prompt_length: 153,
+          },
+        }),
+        context,
+      );
+
+      expect(dispatched).toHaveLength(1);
+      expect(dispatched[0]!.sessionId).toBe(
+        "01a00987-1926-7d31-a000-000000000001",
+      );
+      expect(dispatched[0]!.sessionKeySource).toBe("provider");
+    });
+
+    it("keeps the trace fallback for an agent that does not stamp every event", async () => {
+      const { subscriber, dispatched } = makeSubscriber();
+
+      await subscriber.handle(
+        canonicalLogEvent({
+          attributes: { "event.name": "claude_code.api_request", cost_usd: 1 },
+          correlationTraceId: WIRE_TRACE,
+          correlationSource: "wire",
+        }),
+        context,
+      );
+
+      expect(dispatched).toHaveLength(1);
+      expect(dispatched[0]!.sessionId).toBe(WIRE_TRACE);
+      expect(dispatched[0]!.sessionKeySource).toBe("trace_fallback");
+    });
+  });
+
   describe("when an ordinary application log passes by", () => {
     it("is ignored without dispatching", async () => {
       const { subscriber, dispatched } = makeSubscriber();

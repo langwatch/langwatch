@@ -3,15 +3,19 @@
  * @unit
  *
  * The tenure rule, exhaustively: a session attaches to the first pull request
- * on its branch whose life had not ended when the session started.
+ * on its branch whose life had not ended when the session started, and a
+ * session that drove several branches is asked once per branch.
  *
  * @see specs/coding-agent/pull-request-linkage.feature
+ * @see specs/coding-agent/session-git-context.feature
  */
 import { describe, expect, it } from "vitest";
 import {
   type AssignablePullRequest,
   type AssignableSession,
+  assignDrivingSessionsToPullRequests,
   assignSessionsToPullRequests,
+  branchesOf,
 } from "../pull-request-assignment";
 
 const HOUR = 60 * 60 * 1000;
@@ -260,6 +264,158 @@ describe("assignSessionsToPullRequests", () => {
       });
 
       expect(assignments.size).toBe(0);
+    });
+  });
+});
+
+describe("assignDrivingSessionsToPullRequests", () => {
+  describe("given a session that landed one branch and moved to another", () => {
+    it("counts it toward the pull request of the branch it left", () => {
+      const assignments = assignDrivingSessionsToPullRequests({
+        sessions: [
+          {
+            sessionId: "moved",
+            startedAtMs: base,
+            headBranches: ["feat/first", "feat/second"],
+          },
+        ],
+        pullRequests: [pullRequest({ prNumber: 7, headBranch: "feat/first" })],
+      });
+
+      expect(assignments.get("moved")).toBe(7);
+    });
+  });
+
+  describe("given a session driving two branches that each have a live pull request", () => {
+    /** @scenario "A session that drove two pull requests counts toward only one of them" */
+    it("counts it toward the one it opened first and toward the other not at all", () => {
+      const assignments = assignDrivingSessionsToPullRequests({
+        sessions: [
+          {
+            sessionId: "both",
+            startedAtMs: base,
+            headBranches: ["feat/second", "feat/first"],
+          },
+        ],
+        pullRequests: [
+          pullRequest({
+            prNumber: 21,
+            headBranch: "feat/second",
+            prCreatedAtMs: base + 2 * HOUR,
+          }),
+          pullRequest({
+            prNumber: 9,
+            headBranch: "feat/first",
+            prCreatedAtMs: base + HOUR,
+          }),
+        ],
+      });
+
+      expect(assignments.get("both")).toBe(9);
+      expect([...assignments.values()]).toEqual([9]);
+    });
+
+    it("answers the same however the branches arrived", () => {
+      const pullRequests = [
+        pullRequest({
+          prNumber: 9,
+          headBranch: "feat/first",
+          prCreatedAtMs: base + HOUR,
+        }),
+        pullRequest({
+          prNumber: 21,
+          headBranch: "feat/second",
+          prCreatedAtMs: base + 2 * HOUR,
+        }),
+      ];
+      const forward = assignDrivingSessionsToPullRequests({
+        sessions: [
+          {
+            sessionId: "s",
+            startedAtMs: base,
+            headBranches: ["feat/first", "feat/second"],
+          },
+        ],
+        pullRequests,
+      });
+      const reversed = assignDrivingSessionsToPullRequests({
+        sessions: [
+          {
+            sessionId: "s",
+            startedAtMs: base,
+            headBranches: ["feat/second", "feat/first"],
+          },
+        ],
+        pullRequests,
+      });
+
+      expect(forward.get("s")).toBe(9);
+      expect(reversed.get("s")).toBe(9);
+    });
+  });
+
+  describe("given a session whose earlier branch's pull request closed before it started", () => {
+    it("skips that one and takes the branch still live for it", () => {
+      const assignments = assignDrivingSessionsToPullRequests({
+        sessions: [
+          {
+            sessionId: "later",
+            startedAtMs: base + 5 * HOUR,
+            headBranches: ["feat/first", "feat/second"],
+          },
+        ],
+        pullRequests: [
+          pullRequest({
+            prNumber: 9,
+            headBranch: "feat/first",
+            prCreatedAtMs: base,
+            prClosedAtMs: base + HOUR,
+            prMergedAtMs: base + HOUR,
+          }),
+          pullRequest({
+            prNumber: 21,
+            headBranch: "feat/second",
+            prCreatedAtMs: base + 4 * HOUR,
+          }),
+        ],
+      });
+
+      expect(assignments.get("later")).toBe(21);
+    });
+  });
+
+  describe("given a session with no branches at all", () => {
+    it("assigns nothing", () => {
+      const assignments = assignDrivingSessionsToPullRequests({
+        sessions: [{ sessionId: "bare", startedAtMs: base, headBranches: [] }],
+        pullRequests: [pullRequest({ prNumber: 7 })],
+      });
+
+      expect(assignments.size).toBe(0);
+    });
+  });
+});
+
+describe("branchesOf", () => {
+  describe("given a row folded before the branch set existed", () => {
+    /** @scenario "A session row from before the branch set column falls back to its one branch" */
+    it("falls back to the one branch it does carry", () => {
+      expect(branchesOf({ gitBranch: "feat/only", gitBranches: [] })).toEqual([
+        "feat/only",
+      ]);
+      // A row that names no branch at all drove none, and says so.
+      expect(branchesOf({ gitBranch: "", gitBranches: [] })).toEqual([]);
+    });
+  });
+
+  describe("given a row that recorded the whole set", () => {
+    it("answers every branch, first seen first", () => {
+      expect(
+        branchesOf({
+          gitBranch: "feat/second",
+          gitBranches: ["feat/first", "feat/second"],
+        }),
+      ).toEqual(["feat/first", "feat/second"]);
     });
   });
 });

@@ -47,7 +47,19 @@ function carriesReadBackColumns(row: CodingAgentSessionRow): boolean {
 export class CodingAgentSessionStore
   implements FoldProjectionStore<CodingAgentSessionState>
 {
-  constructor(private readonly repo: CodingAgentSessionRepository) {}
+  constructor(
+    private readonly repo: CodingAgentSessionRepository,
+    private readonly hooks: {
+      /**
+       * Called after a commit with the distinct tenants whose sessions were
+       * stored — the seam the project's Sessions-destination stamp rides
+       * (`createCodingAgentSessionSeenTouch`). Fire-and-forget: the callback
+       * owns its own errors and throttling, and the committed row must never
+       * wait on it.
+       */
+      onSessionsStored?: (tenantIds: string[]) => Promise<void>;
+    } = {},
+  ) {}
 
   async store(
     state: CodingAgentSessionState,
@@ -59,6 +71,7 @@ export class CodingAgentSessionStore
       entry.retentionDays,
       entry.appliedEventIds,
     );
+    this.reportSessionsStored([String(context.tenantId)]);
   }
 
   async storeBatch(
@@ -72,8 +85,12 @@ export class CodingAgentSessionStore
     );
     if (rows.length === 0) return;
 
+    const tenantIds = [
+      ...new Set(entries.map(({ context }) => String(context.tenantId))),
+    ];
     if (this.repo.upsertBatch) {
       await this.repo.upsertBatch(rows);
+      this.reportSessionsStored(tenantIds);
       return;
     }
     await Promise.all(
@@ -81,6 +98,17 @@ export class CodingAgentSessionStore
         this.repo.upsert(row, retentionDays, appliedEventIds),
       ),
     );
+    this.reportSessionsStored(tenantIds);
+  }
+
+  /**
+   * Fire-and-forget by contract: the callback logs and swallows its own
+   * failures (`createCodingAgentSessionSeenTouch`), and the committed row must
+   * never wait on it — but a hook that rejects anyway must surface as nothing
+   * worse than a dropped stamp, not as an unhandled rejection in the worker.
+   */
+  private reportSessionsStored(tenantIds: string[]): void {
+    void this.hooks.onSessionsStored?.(tenantIds).catch(() => undefined);
   }
 
   private toRow(

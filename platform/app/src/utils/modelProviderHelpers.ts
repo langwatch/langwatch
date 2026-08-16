@@ -1,4 +1,4 @@
-import { KEY_CHECK, MASKED_KEY_PLACEHOLDER } from "./constants";
+import { MASKED_KEY_PLACEHOLDER, PUBLIC_CREDENTIAL_FIELDS } from "./constants";
 
 /** Extracts provider key from model string (e.g., "openai/gpt-4" -> "openai") */
 export function getProviderFromModel(model: string): string {
@@ -26,9 +26,16 @@ export function getSchemaShape(schema: unknown): Record<string, unknown> {
   return {};
 }
 
-/** Whether a credential key holds a secret (drives password masking). */
-export function isApiKeyField(key: string): boolean {
-  return KEY_CHECK.some((k) => key.includes(k));
+/**
+ * Whether a credential field holds a secret. Drives password masking in the
+ * form, redaction on every read path, and which fields a partial write keeps.
+ *
+ * The answer defaults to yes: a field is public only when
+ * `PUBLIC_CREDENTIAL_FIELDS` names it, so a provider that adds a credential
+ * is covered before anyone remembers to classify it.
+ */
+export function isSecretCredentialField(key: string): boolean {
+  return !PUBLIC_CREDENTIAL_FIELDS.has(key);
 }
 
 /**
@@ -229,7 +236,7 @@ export function buildCustomKeyState(
     const storedValue = storedKeys[key];
     if (typeof storedValue === "string") {
       result[key] = storedValue;
-    } else if (isUsingEnvVars && isApiKeyField(key)) {
+    } else if (isUsingEnvVars && isSecretCredentialField(key)) {
       // Provider is enabled via env vars - show MASKED for API key fields
       result[key] = MASKED_KEY_PLACEHOLDER;
     } else {
@@ -252,7 +259,7 @@ export function hasUserEnteredNewApiKey(
 ): boolean {
   return Object.entries(customKeys).some(
     ([key, value]) =>
-      isApiKeyField(key) &&
+      isSecretCredentialField(key) &&
       value &&
       value.trim() !== "" &&
       value !== MASKED_KEY_PLACEHOLDER,
@@ -291,7 +298,7 @@ export function hasUserModifiedNonApiKeyFields(
 ): boolean {
   return Object.entries(customKeys).some(
     ([key, value]) =>
-      !isApiKeyField(key) &&
+      !isSecretCredentialField(key) &&
       credentialFieldChanged({ value, storedValue: initialKeys[key] }),
   );
 }

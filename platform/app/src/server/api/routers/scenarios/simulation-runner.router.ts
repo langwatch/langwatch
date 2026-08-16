@@ -6,6 +6,7 @@ import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import {
@@ -13,7 +14,13 @@ import {
   prefetchScenarioData,
 } from "~/server/scenarios/execution/data-prefetcher";
 import { getOnPlatformSetId } from "~/server/scenarios/internal-set-id";
+import {
+  type RunParameterValues,
+  runParameterValuesSchema,
+} from "~/server/scenarios/parameters";
+import { resolveRunParameters } from "~/server/scenarios/resolve-run-parameters";
 import { generateBatchRunId } from "~/server/scenarios/scenario.ids";
+import { ScenarioService } from "~/server/scenarios/scenario.service";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { checkProjectPermission } from "../../rbac";
 import { projectSchema } from "./schemas";
@@ -38,7 +45,91 @@ const runScenarioSchema = projectSchema.extend({
   setId: z.string().optional(),
   /** Optional client-generated batch run ID for immediate placeholder feedback */
   batchRunId: z.string().optional(),
+  /**
+   * Constant values for the run. A value supplied here overrides the
+   * scenario's own default for that name.
+   */
+  parameters: runParameterValuesSchema.optional(),
 });
+
+/**
+ * Resolves what the run reads as `params.NAME`: the scenario's declared
+ * defaults, with the supplied values over the top.
+ *
+ * Runs before anything is queued, the same way a suite run does, so an unknown
+ * name, a reference with no value, or unrenderable text refuses the request
+ * rather than producing a run that fails halfway through.
+ */
+async function resolveParametersForRun({
+  prisma,
+  projectId,
+  scenarioId,
+  values,
+}: {
+  prisma: PrismaClient;
+  projectId: string;
+  scenarioId: string;
+  values?: RunParameterValues;
+}): Promise<RunParameterValues> {
+  const scenarios = await ScenarioService.create(prisma).getRunConfigByIds({
+    ids: [scenarioId],
+    projectId,
+  });
+  const resolved = await resolveRunParameters({ scenarios, values });
+  return resolved.get(scenarioId) ?? {};
+}
+
+/**
+ * Dispatches the queued command, which is what writes QUEUED state to
+ * ClickHouse before the execution job is scheduled, the same order
+ * SuiteRunService.startRun uses. The resolved parameters travel on the
+ * metadata, which is the only channel that carries them into execution.
+ */
+async function queueRun({
+  projectId,
+  scenarioId,
+  scenarioRunId,
+  batchRunId,
+  setId,
+  name,
+  target,
+  parameters,
+}: {
+  projectId: string;
+  scenarioId: string;
+  scenarioRunId: string;
+  batchRunId: string;
+  setId: string;
+  name: string;
+  target: z.infer<typeof simulationTargetSchema>;
+  parameters: RunParameterValues;
+}): Promise<void> {
+  try {
+    await getApp().simulations.queueRun({
+      tenantId: projectId,
+      scenarioRunId,
+      scenarioId,
+      batchRunId,
+      scenarioSetId: setId,
+      name,
+      ...(Object.keys(parameters).length > 0
+        ? { metadata: { parameters } }
+        : {}),
+      target: { type: target.type, referenceId: target.referenceId },
+      occurredAt: Date.now(),
+    });
+  } catch (error) {
+    logger.error(
+      { error, projectId, scenarioRunId, batchRunId },
+      "Failed to queue scenario run",
+    );
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Failed to queue scenario run",
+      cause: error,
+    });
+  }
+}
 
 /**
  * Simulation runner - executing scenarios against targets.
@@ -54,9 +145,16 @@ export const simulationRunnerRouter = createTRPCRouter({
   run: protectedProcedure
     .input(runScenarioSchema)
     .use(checkProjectPermission("scenarios:manage"))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const setId = input.setId ?? getOnPlatformSetId(input.projectId);
       const batchRunId = input.batchRunId ?? generateBatchRunId();
+
+      const parameters = await resolveParametersForRun({
+        prisma: ctx.prisma,
+        projectId: input.projectId,
+        scenarioId: input.scenarioId,
+        values: input.parameters,
+      });
 
       // Validate early - prefetch data to catch configuration errors before scheduling
       const deps = createDataPrefetcherDependencies();
@@ -66,6 +164,7 @@ export const simulationRunnerRouter = createTRPCRouter({
           scenarioId: input.scenarioId,
           setId,
           batchRunId,
+          parameters,
         },
         target: input.target,
         deps,
@@ -98,33 +197,16 @@ export const simulationRunnerRouter = createTRPCRouter({
         "Scheduling scenario execution",
       );
 
-      // Dispatch queueRun command first so QUEUED state is written to ClickHouse
-      // before the execution job is scheduled — same pattern as SuiteRunService.startRun()
-      try {
-        await getApp().simulations.queueRun({
-          tenantId: input.projectId,
-          scenarioRunId,
-          scenarioId: input.scenarioId,
-          batchRunId,
-          scenarioSetId: setId,
-          name: prefetchResult.data.scenario.name,
-          target: {
-            type: input.target.type,
-            referenceId: input.target.referenceId,
-          },
-          occurredAt: Date.now(),
-        });
-      } catch (error) {
-        logger.error(
-          { error, projectId: input.projectId, scenarioRunId, batchRunId },
-          "Failed to queue scenario run",
-        );
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to queue scenario run",
-          cause: error,
-        });
-      }
+      await queueRun({
+        projectId: input.projectId,
+        scenarioId: input.scenarioId,
+        scenarioRunId,
+        batchRunId,
+        setId,
+        name: prefetchResult.data.scenario.name,
+        target: input.target,
+        parameters,
+      });
 
       // No explicit job scheduling — the execution reactor picks up the queued
       // event via the GroupQueue and spawns the child process.

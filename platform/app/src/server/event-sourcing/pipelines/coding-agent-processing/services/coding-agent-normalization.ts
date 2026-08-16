@@ -71,8 +71,12 @@ export function detectCodingAgent({
  *     appears under both keys for the same trace, so a span and a log of one
  *     session do join.
  *   - opencode:    `session.id` everywhere.
- *   - Codex:       `conversation.id` == `thread.id` == `session.id` (its MCP span
- *     sets two of them to the same thread id).
+ *   - Codex:       `conversation.id` on every log EVENT. Its turn SPAN is the
+ *     exception the shared order cannot serve — there
+ *     `gen_ai.conversation.id` is the id of the TURN and the session rides
+ *     `thread.id` — so the codex definition carries a `sessionKeyFromSpan`
+ *     hook and span callers resolve through
+ *     {@link resolveSpanConversationKey}.
  *
  * Order matters only in that all of these are the same value when more than one
  * is present, so the first hit wins and no agent is disadvantaged.
@@ -97,6 +101,32 @@ export function resolveConversationKey(
     }
   }
   return null;
+}
+
+/**
+ * The conversation key off one SPAN's attributes: the detected agent's own
+ * `sessionKeyFromSpan` hook first, the shared candidate order otherwise.
+ * Span callers use this; log and metric callers keep
+ * {@link resolveConversationKey} — no agent's events need the override, and
+ * consulting the hook there would hand it attributes it never claimed to
+ * understand.
+ */
+export function resolveSpanConversationKey({
+  agent,
+  name,
+  attrs,
+}: {
+  agent: CodingAgent;
+  name: string;
+  attrs: Record<string, unknown>;
+}): string | null {
+  const definition = CODING_AGENT_REGISTRY.find(
+    (candidate) => candidate.id === agent,
+  );
+  return (
+    definition?.sessionKeyFromSpan?.({ name, attrs }) ??
+    resolveConversationKey(attrs)
+  );
 }
 
 /**
@@ -294,6 +324,18 @@ export const CODING_AGENT_CONTRIBUTION_KEYS: readonly string[] = [
   "spawn_mode",
   "mcp_server_scope",
   "gen_ai.request.model",
+  // The codex turn span's vocabulary (session_task.turn): the gen_ai token
+  // buckets — where `input_tokens` INCLUDES the cache buckets, unlike the
+  // disjoint claude spellings above — and codex's own non-cached count, which
+  // is the disjoint input the fold actually wants.
+  "gen_ai.response.model",
+  "gen_ai.usage.input_tokens",
+  "gen_ai.usage.output_tokens",
+  "gen_ai.usage.cache_read.input_tokens",
+  "gen_ai.usage.cache_creation.input_tokens",
+  "codex.turn.token_usage.non_cached_input_tokens",
+  // Codex's tool_result events spell the MCP server as a bare `mcp_server`.
+  "mcp_server",
   "mcp_server.name",
   "mcp_tool.name",
   "plugin.name",

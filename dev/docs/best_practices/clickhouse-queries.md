@@ -84,7 +84,7 @@ LIMIT 1
 
 | Table | Engine | Version Column | Dedup Key |
 |-------|--------|---------------|-----------|
-| `simulation_runs` | `ReplacingMergeTree(UpdatedAt)` | `UpdatedAt` | `(TenantId, ScenarioSetId, BatchRunId, ScenarioRunId)` |
+| `simulation_runs` | `ReplacingMergeTree(UpdatedAt)` | `UpdatedAt` | `(TenantId, ScenarioRunId)` |
 | `trace_summaries` | `ReplacingMergeTree(UpdatedAt)` | `UpdatedAt` | `(TenantId, TraceId)` |
 | `stored_spans` | `ReplacingMergeTree(StartTime)` | `StartTime` | `(TenantId, TraceId, SpanId)` |
 | `evaluation_runs` | `ReplacingMergeTree(UpdatedAt)` | `UpdatedAt` | `(TenantId, EvaluationId)` |
@@ -163,7 +163,7 @@ Keep both: the WHERE prunes partitions, the HAVING ensures exact filtering for t
 | `simulation_runs` | `toYearWeek(StartedAt)` |
 | `trace_summaries` | `toYearWeek(OccurredAt)` |
 | `stored_spans` | `toYearWeek(StartTime)` |
-| `evaluation_runs` | `toYearWeek(UpdatedAt)` |
+| `evaluation_runs` | `toYearWeek(ScheduledAt)` |
 
 ## TenantId is Always Required
 

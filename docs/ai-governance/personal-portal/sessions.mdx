@@ -6,7 +6,7 @@ sidebarTitle: Devices
 
 When you run `langwatch login` on a new machine, the device-flow exchange
 mints a Personal Virtual Key bound to your identity + the machine.
-**Devices** is the inventory of where those keys are currently active —
+**Devices** is the inventory of where those keys are currently active:
 who you are on which device, when each session was started, when it was
 last used, and how to revoke any device you no longer need.
 
@@ -76,11 +76,11 @@ session survives rotation without re-prompting login.
 
 Click **Revoke** on any session card. The corresponding access-token +
 refresh-token Redis keys are immediately deleted. The next CLI request
-from that device will return 401. The CLI tries to refresh once, the
-refresh is refused too because the pair was deleted, and it prints
+from that device returns 401. The CLI tries to refresh once. That
+refresh is refused too because the pair was deleted, and the CLI prints
 "Session expired, run `langwatch login --device` again".
 
-**Revoke all sessions** clears every active session in one action —
+**Revoke all sessions** clears every active session in one action,
 useful if you suspect a compromise or are leaving the company.
 
 Revoking a session does NOT revoke any virtual key the session minted
@@ -94,7 +94,7 @@ Your IT admin can cap how long any one session stays valid:
 
 - **0 (default)**: no cap. A session you keep using never expires: every
   CLI call that needs it rotates the refresh token and restarts its
-  90-day window. A session nobody touches for 90 days expires on its own.
+  90-day window. A session that is not used for 90 days expires on its own.
 - **N days**: refresh requests are rejected once `(now - issued_at) >
   N days`. The CLI prints "Your CLI session is older than your
   organization's policy. Please run `langwatch login` again."

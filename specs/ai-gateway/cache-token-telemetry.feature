@@ -144,6 +144,20 @@ Feature: AI Gateway — prompt-cache token telemetry and cache-aware cost
   # Cost: cache reads priced cheap, not as fresh input
   # ==========================================================================
 
+  # Two surfaces price the same request: the trace, from the span the gateway
+  # emits, and the budget, from the spend record it emits. Both feed the same
+  # rate table, so they can only disagree when the two records state different
+  # quantities. They did: the span took the cached tokens out of its input
+  # count and the spend record did not, so the Usage page and the budget
+  # reported different money for the same virtual key.
+
+  @bdd @cost @cache-telemetry @unit
+  Scenario: The trace and the bill price a cached request at the same number
+    Given one cached request's usage as the gateway measured it
+    When the trace surface and the spend surface each price it
+    Then both arrive at the same cost
+    And an input count that still holds the cached tokens costs more than both
+
   @bdd @cost @cache-telemetry @integration
   Scenario: Cost reflects cache pricing, not the full input price
     Given a span that read a large prompt prefix from the cache

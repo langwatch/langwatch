@@ -11,6 +11,7 @@ import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.cl
 import { createLogger } from "@langwatch/observability";
 import { RedisConnectionService } from "@langwatch/redis-client";
 import { env } from "~/env.mjs";
+import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
 import { ClickHouseAnalyticsService } from "~/server/analytics/clickhouse/clickhouse-analytics.service";
 import { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
 import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
@@ -152,6 +153,7 @@ import { LangEvalsHttpClient } from "./clients/langevals/langevals.http.client";
 import { TiktokenClient } from "./clients/tokenizer/tiktoken.client";
 import { NullTokenizerClient } from "./clients/tokenizer/tokenizer.client";
 import { CodingAgentSessionService } from "./coding-agent/coding-agent-session.service";
+import { CodingAgentSessionsListService } from "./coding-agent/coding-agent-sessions-list.service";
 import { PullRequestUsageService } from "./coding-agent/pull-request-usage.service";
 import { CodingAgentSessionClickHouseRepository } from "./coding-agent/repositories/coding-agent-session.clickhouse.repository";
 import { NullCodingAgentSessionRepository } from "./coding-agent/repositories/coding-agent-session.repository";
@@ -318,6 +320,7 @@ import { TraceListClickHouseRepository } from "./traces/repositories/trace-list.
 import { NullTraceListRepository } from "./traces/repositories/trace-list.repository";
 import { TraceSummaryClickHouseRepository } from "./traces/repositories/trace-summary.clickhouse.repository";
 import { NullTraceSummaryRepository } from "./traces/repositories/trace-summary.repository";
+import { NullGithubPullRequestLookup } from "./traces/session-groups.pull-request-link";
 import { SessionGroupsService } from "./traces/session-groups.service";
 import { createSpanDedupeService } from "./traces/span-dedupe.service";
 import { SpanStorageService } from "./traces/span-storage.service";
@@ -1075,13 +1078,25 @@ export function initializeDefaultApp(options?: {
             loadReportCharts: ({ projectId, source, from, to }) =>
               loadReportCharts({
                 deps: {
+                  // Both reads are scoped to builder charts: a scheduled
+                  // report renders each one through `getTimeseries`, which
+                  // needs the series a builder payload carries and a saved
+                  // workbench chart's definition does not have.
                   loadCustomGraph: ({ projectId, customGraphId }) =>
                     prisma.customGraph.findFirst({
-                      where: { id: customGraphId, projectId },
+                      where: {
+                        id: customGraphId,
+                        projectId,
+                        kind: BUILDER_CHART_KIND,
+                      },
                     }),
                   loadDashboardGraphs: ({ projectId, dashboardId }) =>
                     prisma.customGraph.findMany({
-                      where: { dashboardId, projectId },
+                      where: {
+                        dashboardId,
+                        projectId,
+                        kind: BUILDER_CHART_KIND,
+                      },
                       orderBy: [{ gridRow: "asc" }, { gridColumn: "asc" }],
                     }),
                   getTimeseries: (input) =>
@@ -1137,7 +1152,7 @@ export function initializeDefaultApp(options?: {
     "recheckDueBranches",
   );
   const pruneStaleBranchLinkage = new Deferred<
-    () => Promise<{ branchChecks: number; pullRequests: number }>
+    () => Promise<{ branchChecks: number }>
   >("pruneStaleBranchLinkage");
 
   const registry = new PipelineRegistry({
@@ -1421,6 +1436,8 @@ export function initializeDefaultApp(options?: {
         })
       ).map((project) => project.id),
     sessions: codingAgentSessions,
+    touchCodingAgentPullRequestSeen: (params) =>
+      projects.touchCodingAgentPullRequestSeen(params),
   });
   requestBranchMapping.resolve((params) =>
     githubPullRequestMapping!.requestBranchMapping(params),
@@ -1454,6 +1471,21 @@ export function initializeDefaultApp(options?: {
     // receiver and this rollup resolve bundled-ness the same way.
     isSourceNonBillable: resolveSourceNonBillable,
   });
+
+  // The Sessions screen's read: the same session service, plus the mapping
+  // lookup the sessions lens joins with, so both surfaces answer "which pull
+  // request" from one place.
+  const codingAgentSessionsList = traced(
+    new CodingAgentSessionsListService({
+      sessions: codingAgentSessions,
+      pullRequests: {
+        findForBranches: (args) =>
+          githubPullRequestsRepository.findAllByBranchKeys(args),
+      },
+      resolveOrganizationId,
+    }),
+    "CodingAgentSessionsListService",
+  );
 
   const sessionGroups = traced(
     new SessionGroupsService({
@@ -1672,6 +1704,7 @@ export function initializeDefaultApp(options?: {
     billableEvents: billableEventsRepository,
     codingAgents: {
       sessions: codingAgentSessions,
+      sessionsList: codingAgentSessionsList,
       pullRequestUsage: traced(pullRequestUsage, "PullRequestUsageService"),
     },
     github: {
@@ -1816,6 +1849,11 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     // No enterprise policy in the test app: everything reads as billed, the
     // conservative answer for a cost.
     isSourceNonBillable: async () => false,
+  });
+  const testCodingAgentSessionsList = new CodingAgentSessionsListService({
+    sessions: testCodingAgentSessions,
+    pullRequests: new NullGithubPullRequestLookup(),
+    resolveOrganizationId: async () => undefined,
   });
   return new App({
     config,
@@ -1987,6 +2025,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     billableEvents: undefined,
     codingAgents: {
       sessions: testCodingAgentSessions,
+      sessionsList: testCodingAgentSessionsList,
       pullRequestUsage: testPullRequestUsage,
     },
     github: {

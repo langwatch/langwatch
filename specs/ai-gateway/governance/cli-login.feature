@@ -73,7 +73,7 @@ Feature: AI Gateway Governance — CLI login (RFC 8628 device-code flow)
       | user.name                | non-empty string                            |
       | organization.id          | "acme"                                      |
       | organization.name        | non-empty string                            |
-      | default_personal_vk      | the personal VK that was auto-issued at login |
+    And the body carries no `default_personal_vk`, because login issues no virtual key
 
   @bdd @cli @device-flow @poll
   Scenario: CLI exchange returns 428 while user has not yet completed approval
@@ -117,7 +117,8 @@ Feature: AI Gateway Governance — CLI login (RFC 8628 device-code flow)
     Then the access_token is stored in "~/.langwatch/config" with 0600 perms
     And the refresh_token is stored in the OS keyring on macOS/Windows
     And on Linux without keyring, the refresh_token is stored in the same file with 0600 perms
-    And the config file records `user.email`, `organization.id`, and `default_personal_vk`
+    And the config file records `user.email` and `organization.id`
+    And the config file records no `default_personal_vk` until a tool first uses the gateway
 
   @bdd @cli @refresh
   Scenario: CLI refreshes the access token before it expires
@@ -136,6 +137,47 @@ Feature: AI Gateway Governance — CLI login (RFC 8628 device-code flow)
     And the CLI deletes the local config + keyring entry
     And the CLI prints "Session revoked — run `langwatch login` to sign in again"
     And the CLI exits non-zero
+
+  # ---------------------------------------------------------------------------
+  # Personal virtual key: issued on first gateway use
+  # ---------------------------------------------------------------------------
+  # Login proves identity and nothing more. The personal virtual key is a
+  # billable, revocable credential, so it is minted only when a tool actually
+  # resolves to gateway mode, through POST /api/auth/cli/virtual-key. Minting
+  # at login instead left one extra VirtualKey row behind on every re-login,
+  # and gave a key to users who only ever send traces.
+
+  @integration @cli @personal-keys
+  Scenario: The personal virtual key is issued on first gateway use, not at login
+    Given user "jane@acme.com" has never logged in via the CLI
+    When she completes the device-code flow successfully
+    Then no personal virtual key exists for her in organization "acme"
+    When the CLI POSTs to "/api/auth/cli/virtual-key" with her access token
+    Then the response status is 201
+    And the response body contains `id`, `secret` and `prefix`
+    And exactly one personal virtual key named "default" exists for her
+
+  @integration @cli @personal-keys
+  Scenario: A second machine asks for a key of its own
+    Given user "jane@acme.com" already holds her default personal virtual key
+    When her second machine POSTs to "/api/auth/cli/virtual-key" with `device_label`
+    Then the response status is 201
+    And a further personal virtual key is issued, named after the device label
+    And the default key keeps working
+
+  @integration @cli @personal-keys
+  Scenario: Asking for a personal virtual key with no providers configured is refused
+    Given organization "acme" has no model provider reachable by Jane
+    When the CLI POSTs to "/api/auth/cli/virtual-key" with her access token
+    Then the response status is 409
+    And the response body contains `{ "error": "no_eligible_providers" }`
+    And no personal virtual key is created
+
+  @integration @cli @personal-keys
+  Scenario: Logging in again creates no virtual keys
+    Given user "jane@acme.com" has logged in on this machine before
+    When she runs "langwatch login" again and approves the device
+    Then the number of personal virtual keys she owns does not change
 
   # ---------------------------------------------------------------------------
   # Logout

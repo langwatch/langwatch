@@ -11,8 +11,8 @@ import type {
   ConfirmSpendCommandData,
   FailSpendCommandData,
   SettleSpendCommandData,
-  SpendUsage,
 } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/commands";
+import { EMPTY_SPEND_USAGE } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/commands";
 import {
   GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
@@ -25,16 +25,12 @@ import type {
   NewOutboxMessage,
   ProcessStore,
 } from "~/server/event-sourcing/process-manager/stores/processStore.types";
+import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import type { SpendEventRow } from "~/server/gateway/spendEvents.clickhouse.repository";
 import { nanoUsdToDecimalString } from "~/server/gateway/wireMoney";
 import { pruneExpiredIdempotencyReceipts } from "~/server/webhooks/deliveryLog";
-import {
-  assertWebhookDelivered,
-  sendWebhook,
-  WEBHOOK_DELIVERY_ID_HEADER,
-  type WebhookSendResult,
-} from "~/server/webhooks/sendWebhook";
-import { allowsInsecureLocalUrls } from "~/server/webhooks/urlPolicy";
+import { webhookDestinationFor } from "~/server/webhooks/destinations";
+import type { WebhookDispatchResult } from "~/server/webhooks/destinations/types";
 import type { PlanInfo } from "../../licensing/planInfo";
 import { spendRowToEnvelope } from "../envelope";
 import { eventMatches } from "../eventRegistry";
@@ -157,12 +153,21 @@ export function isEndpointStreamKey(processKey: string): boolean {
   return processKey.startsWith("endpoint:");
 }
 
+/** Every quantity added after the first deploy carries a default: this rides
+ *  a durable outbox row, so a payload the previous build wrote is read back
+ *  by this one, and a field without a default turns that row into a
+ *  permanent parse failure instead of a delivery. */
 const spendUsagePayloadSchema = z.object({
   input_tokens: z.number().int().min(0),
   output_tokens: z.number().int().min(0),
   cache_read_input_tokens: z.number().int().min(0),
   cache_creation_input_tokens: z.number().int().min(0),
+  cache_creation_1h_tokens: z.number().int().min(0).default(0),
   reasoning_tokens: z.number().int().min(0),
+  input_audio_tokens: z.number().int().min(0).default(0),
+  output_audio_tokens: z.number().int().min(0).default(0),
+  input_chars: z.number().int().min(0).default(0),
+  audio_ms: z.number().int().min(0).default(0),
 });
 
 /** Everything the deliver executor needs to rate, build the envelope, and
@@ -240,14 +245,6 @@ export interface WebhookDeliveryProcessDeps {
   now?: () => number;
 }
 
-const EMPTY_USAGE: SpendUsage = {
-  input_tokens: 0,
-  output_tokens: 0,
-  cache_read_input_tokens: 0,
-  cache_creation_input_tokens: 0,
-  reasoning_tokens: 0,
-};
-
 /** The columns admission's attribution owns. A row whose process instance
  *  never saw an `admitted` event still needs every one of them, so each
  *  falls back to the empty value the spend log stores. */
@@ -288,7 +285,7 @@ function resolvedModel(payload: DeliverPayload, fallback: string): string {
  *  event carried, never a fresh rating and never a read of the fold's
  *  table: the log's consumers stay independent AND state the same cost. */
 export function deliverPayloadToRow(payload: DeliverPayload): SpendEventRow {
-  const usage = payload.usage ?? EMPTY_USAGE;
+  const usage = payload.usage ?? EMPTY_SPEND_USAGE;
   return {
     ...attributedColumns(payload.attribution),
     tenantId: payload.project_id,
@@ -693,44 +690,51 @@ async function runMaintenanceIfDue(
 }
 
 /**
- * POST one frozen batch through the SSRF-fenced signed sender.
+ * Hand one frozen batch to the endpoint's transport.
  *
- * A transport-level failure (DNS, SSRF block, timeout) leaves no receiver
- * status to store, so the attempt is recorded here and the error rethrown:
- * DispatchError carries the retryable classification the dispatcher acts
- * on.
+ * The transport answers with an ALREADY CLASSIFIED verdict, because the
+ * classification depends on the transport: an HTTPS receiver answers with a
+ * status code, a queue answers with a message id and no status at all. What
+ * the two share is the bytes, which are built here, once, so both transports
+ * put the same body on the wire and one signature verifier reads either.
+ *
+ * A transport-level failure (DNS, an SSRF block, a timeout) leaves nothing to
+ * classify, so the attempt is recorded here and the error rethrown:
+ * DispatchError carries the retryable flag the dispatcher acts on.
  */
-async function postWebhookBatch({
+async function dispatchWebhookBatch({
   deps,
   payload,
   context,
-  endpoint,
   startedAt,
 }: {
   deps: WebhookDeliveryProcessDeps;
   payload: SendBatchPayload;
   context: IntentContext;
-  endpoint: WebhookEndpointView;
   startedAt: number;
-}): Promise<WebhookSendResult> {
-  const secrets = await deps.endpoints.getSigningSecrets({
-    organizationId: payload.organizationId,
-    endpointId: payload.endpointId,
-  });
+}): Promise<WebhookDispatchResult> {
+  // Two reads, run together: the secrets and the destination. The liveness
+  // read above already has the row, but neither of these can be served from
+  // it — both decrypt, and decryption is the service's to do, not this
+  // executor's.
+  const [secrets, destination] = await Promise.all([
+    deps.endpoints.getSigningSecrets({
+      organizationId: payload.organizationId,
+      endpointId: payload.endpointId,
+    }),
+    deps.endpoints.getDestinationConfig({
+      organizationId: payload.organizationId,
+      endpointId: payload.endpointId,
+    }),
+  ]);
   try {
-    return await sendWebhook({
-      url: endpoint.url,
+    return await webhookDestinationFor(destination).send({
+      organizationId: payload.organizationId,
+      endpointId: payload.endpointId,
       body: JSON.stringify({ batch: payload.envelopes }),
-      triggerName: payload.endpointId,
-      contextLabel: `Webhook endpoint ${payload.endpointId}`,
-      // Endpoints are organization-scoped, so their dispatch cap buckets
-      // per organization rather than per project.
-      projectId: payload.organizationId,
-      eventId: payload.batchId,
-      dispatchIdHeader: WEBHOOK_DELIVERY_ID_HEADER,
-      signingSecrets: secrets,
+      batchId: payload.batchId,
       attempt: context.attempt,
-      allowInsecureLocal: allowsInsecureLocalUrls(),
+      signingSecrets: secrets,
     });
   } catch (error) {
     const retryable =
@@ -753,10 +757,13 @@ async function postWebhookBatch({
 }
 
 /**
- * Record the receiver's answer and classify it: 2xx acks, 5xx/429/408
- * retry along the ladder (Retry-After honored as a floor), other statuses
- * retire the batch to the dead letter immediately. The endpoint's failure
- * streak and the 72h auto-disable ride every recorded outcome.
+ * Record the transport's verdict and act on it: success acks, retryable
+ * ladders (Retry-After honored as a floor), terminal retires the batch to
+ * the dead letter immediately. The endpoint's failure streak and the 72h
+ * auto-disable ride every recorded outcome.
+ *
+ * The verdict is the transport's, not re-derived here. A status code is only
+ * one transport's way of expressing it, and a queue has none.
  */
 async function recordWebhookBatchOutcome({
   deps,
@@ -768,7 +775,7 @@ async function recordWebhookBatchOutcome({
   deps: WebhookDeliveryProcessDeps;
   payload: SendBatchPayload;
   context: IntentContext;
-  result: WebhookSendResult;
+  result: WebhookDispatchResult;
   latencyMs: number;
 }): Promise<void> {
   const attempt = {
@@ -777,10 +784,10 @@ async function recordWebhookBatchOutcome({
     dispatchId: payload.batchId,
     attempt: context.attempt,
     eventCount: payload.envelopes.length,
-    responseStatus: result.status,
+    ...(result.status !== null ? { responseStatus: result.status } : {}),
     latencyMs,
   };
-  if (result.status >= 200 && result.status < 300) {
+  if (result.verdict === "success") {
     await deps.endpoints.recordDeliveryAttempt({
       ...attempt,
       outcome: "success",
@@ -788,30 +795,37 @@ async function recordWebhookBatchOutcome({
     return;
   }
 
-  const retryable =
-    result.status >= 500 || result.status === 429 || result.status === 408;
+  // A transport may return a failure verdict with nothing to say. One reason
+  // stands in for both the log row and the throw, so a delivery-log reader
+  // never sees a failed attempt with a blank reason column.
+  const reason = result.error ?? "delivery failed";
   await deps.endpoints.recordDeliveryAttempt({
     ...attempt,
-    outcome: retryable ? "retryable" : "terminal",
-    error: `HTTP ${result.status}`,
+    outcome: result.verdict,
+    error: reason,
     response: {
-      body: result.body.slice(0, 1000),
+      body: result.body,
       ...(result.retryAfterMs !== undefined
         ? { retryAfterMs: result.retryAfterMs }
         : {}),
     },
   });
-  // Throws DispatchError with the same classification just recorded; the
-  // dispatcher ladders retryables and dead-letters terminals immediately.
-  assertWebhookDelivered({
-    result,
-    triggerName: payload.endpointId,
+  // The same classification just recorded, as the throw the dispatcher acts
+  // on: it ladders retryables and dead-letters terminals immediately.
+  throw new DispatchError({
+    message: `Webhook endpoint ${payload.endpointId}: ${reason}`,
+    retryable: result.verdict === "retryable",
+    // Honor the receiver's backpressure on a retryable verdict (ADR-040 §5);
+    // the queue folds it into its backoff as a floor.
+    ...(result.verdict === "retryable" && result.retryAfterMs !== undefined
+      ? { retryAfterMs: result.retryAfterMs }
+      : {}),
   });
 }
 
 /**
- * Level 2: deliver one frozen batch to one endpoint through the
- * SSRF-fenced signed sender and record what the receiver answered.
+ * Level 2: deliver one frozen batch to one endpoint through whichever
+ * transport it named, and record what came back.
  */
 export function runWebhookSendBatch(deps: WebhookDeliveryProcessDeps) {
   return async (
@@ -819,7 +833,7 @@ export function runWebhookSendBatch(deps: WebhookDeliveryProcessDeps) {
     context: IntentContext,
   ): Promise<void> => {
     // The service's deliverable read owns the liveness predicate. A deleted
-    // or disabled endpoint drains its queue without POSTing: the spend
+    // or disabled endpoint drains its queue without delivering: the spend
     // record keeps the events, re-enable plus replay covers the gap.
     const endpoint = await deps.endpoints.getDeliverable({
       organizationId: payload.organizationId,
@@ -834,11 +848,10 @@ export function runWebhookSendBatch(deps: WebhookDeliveryProcessDeps) {
     }
 
     const startedAt = (deps.now ?? Date.now)();
-    const result = await postWebhookBatch({
+    const result = await dispatchWebhookBatch({
       deps,
       payload,
       context,
-      endpoint,
       startedAt,
     });
     await recordWebhookBatchOutcome({

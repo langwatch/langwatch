@@ -87,6 +87,26 @@ describe("createExecuteRunHandler", () => {
       });
     });
 
+    it("forwards the run's parameters onto the pool job", async () => {
+      const submit = vi.fn();
+      const run = createExecuteRunHandler(
+        makeDeps({ getPool: () => ({ submit }) }),
+      );
+
+      await run(
+        makeExecutePayload({
+          parameters: { account_tier: "platinum", seats: 12 },
+        }),
+        makeContext(),
+      );
+
+      expect(submit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          parameters: { account_tier: "platinum", seats: 12 },
+        }),
+      );
+    });
+
     it("omits scenarioName when the intent carries no name", async () => {
       const submit = vi.fn();
       const run = createExecuteRunHandler(

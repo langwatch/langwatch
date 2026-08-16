@@ -337,6 +337,74 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
     });
   });
 
+  describe("when the queued event records the run's parameters", () => {
+    // The queued event is the only place a run's resolved parameter values
+    // cross into execution. Miss this hop and the whole feature is a silent
+    // no-op: the values are recorded, the run looks right, and the target
+    // under test never sees one.
+    function executeIntentFor(metadata?: Record<string, unknown>) {
+      const evolution = evolveEvent(
+        initialState,
+        makeEvent({
+          type: SIMULATION_RUN_EVENT_TYPES.QUEUED,
+          occurredAt: 10_000,
+          data: queuedData(metadata ? { metadata } : {}),
+        }),
+      );
+      const payload = evolution.intents[0]?.payload as
+        | Record<string, unknown>
+        | undefined;
+      return { evolution, payload };
+    }
+
+    /** @scenario "Resolved parameter values are recorded on the run and shown in the run detail drawer" */
+    it("forwards them onto the execute intent", () => {
+      const { evolution, payload } = executeIntentFor({
+        langwatch: { targetReferenceId: "agent_1" },
+        parameters: { account_tier: "platinum", seats: 12, trial: false },
+      });
+
+      expect(evolution.intents).toHaveLength(1);
+      expect(payload?.parameters).toEqual({
+        account_tier: "platinum",
+        seats: 12,
+        trial: false,
+      });
+    });
+
+    it("emits the intent without any when the queued event records none", () => {
+      const withOtherMetadata = executeIntentFor({
+        langwatch: { targetReferenceId: "agent_1" },
+      });
+      const withNoMetadata = executeIntentFor();
+
+      expect(withOtherMetadata.payload).not.toHaveProperty("parameters");
+      expect(withNoMetadata.payload).not.toHaveProperty("parameters");
+    });
+
+    it("runs the scenario without them when the recorded shape is unreadable", () => {
+      const { evolution, payload } = executeIntentFor({
+        parameters: { "not a name": "value" },
+      });
+
+      expect(evolution.intents).toHaveLength(1);
+      expect(payload).not.toHaveProperty("parameters");
+    });
+
+    it("drops the whole record when only one name is unreadable", () => {
+      // All or nothing on purpose. Half a record is the worse failure: the run
+      // would go ahead against a value the caller never chose, and read as an
+      // agent that answered the wrong question. Nothing at all surfaces as the
+      // missing-value error the scenario's own text raises.
+      const { evolution, payload } = executeIntentFor({
+        parameters: { region: "eu-central", "not a name": "value" },
+      });
+
+      expect(evolution.intents).toHaveLength(1);
+      expect(payload).not.toHaveProperty("parameters");
+    });
+  });
+
   describe("when activity arrives for a live run", () => {
     const activityTypes = [
       SIMULATION_RUN_EVENT_TYPES.STARTED,
@@ -808,6 +876,7 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
         scenarioSetId: null,
         name: null,
         target: null,
+        parameters: null,
       });
     });
 

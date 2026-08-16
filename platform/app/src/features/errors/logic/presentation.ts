@@ -60,6 +60,36 @@ const str = (
   return typeof value === "string" && value.length > 0 ? value : fallback;
 };
 
+/**
+ * Reads a list of short identifiers out of `meta` without trusting it.
+ *
+ * Bounded on both axes because the sentence these end up in is read by a
+ * person: a long list stops being copy and becomes a dump, and a single
+ * oversized entry would push the rest off the screen.
+ */
+const strList = (error: HandledErrorShape, key: string): string[] => {
+  const value = error.meta[key];
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((entry): entry is string => typeof entry === "string")
+    .filter((entry) => entry.length > 0 && entry.length <= 64)
+    .slice(0, 10);
+};
+
+/**
+ * Names the piece of a scenario a parameter failure came from, so the copy can
+ * point at it instead of asking the reader to search their own text.
+ * `meta.field` is written by the renderer as `situation` or `criteria[N]`,
+ * zero-based; criteria are numbered from one for the reader.
+ */
+const scenarioFieldLabel = (error: HandledErrorShape): string => {
+  const field = str(error, "field", "");
+  if (field === "situation") return "The situation";
+  const criterion = /^criteria\[(\d+)\]$/.exec(field);
+  if (criterion) return `Criterion ${Number(criterion[1]) + 1}`;
+  return "The scenario's text";
+};
+
 type MissingModelRequestType =
   | "chat"
   | "messages"
@@ -229,6 +259,11 @@ const presentations = {
     describe: () =>
       "Narrow the time range, add a filter, or select fewer fields.",
   },
+  query_scan_limit_exceeded: {
+    title: "This query read too much data",
+    describe: () =>
+      "Narrow the time range or add filters so the query reads less.",
+  },
   time_range_too_wide: {
     title: "Time range is too wide",
     describe: () => "Pick a shorter range and try again.",
@@ -248,6 +283,63 @@ const presentations = {
       const field = str(error, "field", "");
       return field ? `There's no field called "${field}".` : "";
     },
+  },
+  governed_sql_unparseable: {
+    title: "This query couldn't be read",
+    describe: () => "Check the SQL syntax and try again.",
+  },
+  governed_sql_not_permitted: {
+    title: "This query isn't allowed here",
+    describe: () =>
+      "This endpoint runs one read-only SELECT over the analytics datasets. Remove anything else and try again.",
+  },
+  governed_sql_parameter_missing: {
+    title: "This query is missing a value",
+    describe: () =>
+      "The query declares parameters that weren't given values. Supply one for each and try again.",
+  },
+  governed_sql_reserved_parameter_supplied: {
+    title: "The time window isn't yours to set",
+    describe: () =>
+      "period_start and period_end come from the period this page is showing. Remove them from your parameters and change the period instead.",
+  },
+  governed_sql_reserved_parameter_type: {
+    title: "The time window has to be a date and time",
+    describe: () =>
+      "Declare period_start and period_end as DateTime, for example {period_start:DateTime}, and run the query again.",
+  },
+  governed_sql_not_enabled: {
+    title: "Custom SQL isn't switched on here",
+    describe: () =>
+      "This project doesn't have the SQL workbench enabled yet. Ask your administrator to switch it on.",
+  },
+  saved_workbench_chart_already_exists: {
+    title: "That chart id is already taken",
+    describe: () =>
+      "A saved chart with this id already exists in this project. Save again with a different id, or leave the id out to have one chosen for you.",
+  },
+  saved_workbench_chart_not_found: {
+    title: "That saved chart isn't here",
+    describe: () =>
+      "It may have been deleted, or it belongs to another project. Check the list of saved charts.",
+  },
+  saved_workbench_chart_specification_refused: {
+    title: "This chart specification isn't allowed",
+    describe: () =>
+      "The specification reads something the chart policy doesn't permit. Repair the parts it names and save again.",
+  },
+  saved_workbench_chart_definition_invalid: {
+    title: "This saved chart can't be opened",
+    describe: () =>
+      "We can't read what was stored for it. Rebuild the chart in the workbench and save it again.",
+  },
+  governed_sql_unavailable: {
+    // Names the workspace administrator first: on a self-hosted deployment
+    // the reader's own operator controls whether this is provisioned, and
+    // LangWatch support cannot switch it on there.
+    title: "Analytics SQL isn't available here",
+    describe: () =>
+      "This feature isn't switched on for this workspace yet. Ask your workspace administrator to enable it, or contact support.",
   },
   clickhouse_unavailable: {
     title: "Search is temporarily unavailable",
@@ -524,6 +616,13 @@ const presentations = {
     title: "This model's provider can't be used here",
     describe: () =>
       "Pick a different default model in your project's model settings, then try again.",
+  },
+  model_default_scope_forbidden: {
+    // Same refusal shape as `model_provider_scope_forbidden`, aimed at the
+    // Default Models policies instead of the provider credentials.
+    title: "You can't change default models here",
+    describe: () =>
+      "They're managed above where you can act. Ask an admin on your team to change them.",
   },
   model_not_configured: {
     // Distinct from `no_provider_configured` (nothing connected at all) and
@@ -1115,6 +1214,44 @@ const presentations = {
         ? "This endpoint needs an organization API key, created in Settings > API Keys. The key sent belongs to a single project."
         : "Send the credential class this endpoint accepts. Organization API keys are created in Settings > API Keys.";
     },
+  },
+  // ---- scenario run parameters ----
+  scenario_parameter_unknown: {
+    // Both lists are our own names, not free text: the run dialog needs to
+    // show the rejected one so the typo is visible, and the declared ones so
+    // the customer can see what they meant to write.
+    title: "No scenario in this run has a parameter by that name",
+    describe: (error) => {
+      const unknown = strList(error, "unknownKeys");
+      const declared = strList(error, "declaredNames");
+      const rejected =
+        unknown.length > 0
+          ? `${listLabels(unknown)} ${unknown.length === 1 ? "isn't" : "aren't"} declared by any scenario in this run.`
+          : "One of the values supplied isn't declared by any scenario in this run.";
+      return declared.length > 0
+        ? `${rejected} You can set ${listLabels(declared)}.`
+        : `${rejected} None of its scenarios declare parameters.`;
+    },
+  },
+  scenario_parameter_missing: {
+    title: "This run is missing a parameter value",
+    describe: (error) => {
+      const missing = strList(error, "names");
+      const plural = missing.length > 1;
+      const subject =
+        missing.length > 0
+          ? `${listLabels(missing)} ${plural ? "have no values" : "has no value"}.`
+          : "A parameter the scenario reads has no value.";
+      const remedy = plural
+        ? "Set values for this run, or give each parameter a default on the scenario."
+        : "Set a value for this run, or give the parameter a default on the scenario.";
+      return `${subject} ${scenarioFieldLabel(error)} reads ${plural ? "them" : "it"}. ${remedy}`;
+    },
+  },
+  scenario_parameter_template_invalid: {
+    title: "This scenario's text couldn't be filled in",
+    describe: (error) =>
+      `${scenarioFieldLabel(error)} references a parameter in a way we can't read. Check it is written as params.name, then try again.`,
   },
   scenario_run_export_unauthenticated: {
     title: "Log in to export simulation runs",
@@ -1711,6 +1848,11 @@ const presentations = {
     title: "No model provider configured",
     describe: () => "Add a provider in settings to continue.",
   },
+  model_provider_not_bound: {
+    title: "That provider isn't bound to this key",
+    describe: () =>
+      "The model name asks for a provider this virtual key has no slot for. Bind that provider to the key, or drop the prefix from the model name.",
+  },
   guardrail_blocked: {
     title: "Blocked by a guardrail",
     describe: () => "This request didn't pass one of your configured policies.",
@@ -1935,12 +2077,12 @@ const presentations = {
       "It may have been archived, or the id may belong to another organization. List your endpoints to see the ones that are live.",
   },
   webhook_endpoint_invalid: {
-    // Names the three things the endpoint form can get wrong, rather than
-    // echoing the server's sentence: `meta.message` on this code can carry
-    // an internal reason, and the customer channel is not where that goes.
+    // Names what the endpoint form can get wrong, rather than echoing the
+    // server's sentence: `meta.message` on this code can carry an internal
+    // reason, and the customer channel is not where that goes.
     title: "That webhook endpoint can't be saved",
     describe: () =>
-      "Check the URL is reachable over HTTPS, that every subscribed event type is one the catalog lists, and that the delivery controls are inside their limits.",
+      "Check the address matches the destination: an HTTPS endpoint needs a URL reachable over HTTPS, and an Amazon SQS destination needs a standard queue URL plus credentials that may write to it. Then check that every subscribed event type is one the catalog lists, that the delivery controls are inside their limits, and that you are not moving an existing endpoint to another destination, which needs a new endpoint instead.",
   },
   webhook_event_not_found: {
     // Says the two things a caller can act on: the log's horizon, and that

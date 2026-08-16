@@ -66,6 +66,7 @@ const TAIL_COLUMNS = [
   "target_type",
   "target_reference_id",
   "simulation_suite_id",
+  "parameters",
   "trace_ids",
 ] as const;
 
@@ -230,8 +231,27 @@ function buildTailValues(run: ExportableRun): string[] {
     text(target.targetType),
     text(target.targetReferenceId),
     text(target.simulationSuiteId),
+    extractParameters(run.metadata),
     jsonArray(collectTraceIds(run)),
   ];
+}
+
+/**
+ * The parameter values the run resolved, as one JSON object.
+ *
+ * One column rather than one per name: which parameters exist is a property of
+ * the scenario, not of the export, so a per-name column would make the header
+ * depend on which runs happened to be in the file and stop two exports lining
+ * up. A run that resolved none leaves the cell empty.
+ */
+function extractParameters(
+  metadata: Record<string, unknown> | null | undefined,
+): string {
+  const parameters = metadata?.parameters;
+  if (parameters == null || typeof parameters !== "object") return "";
+  if (Array.isArray(parameters)) return "";
+  if (Object.keys(parameters).length === 0) return "";
+  return text(JSON.stringify(parameters));
 }
 
 /**

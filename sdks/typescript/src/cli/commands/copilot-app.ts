@@ -2,7 +2,8 @@ import chalk from "chalk";
 import * as fs from "node:fs";
 import * as os from "node:os";
 
-import { mintIngestionKey } from "@/cli/utils/governance/cli-api";
+import { saveConfig } from "@/cli/utils/governance/config";
+import { resolveLiveIngestionKey } from "@/cli/utils/governance/telemetry-refresh";
 import {
   buildCopilotAppEnv,
   findCopilotApp,
@@ -20,10 +21,11 @@ import {
  * `langwatch copilot-app connect` — provisions capture for the standalone
  * GitHub Copilot app (ADR-039 §Extension). The app is a long-running GUI,
  * not a per-invocation CLI, so it is connected once rather than wrapped:
- * mint a personal ingest key of sourceType "copilot_app", then install a
- * login agent that owns the app's launch and injects the direct-OTLP env.
- * Re-running rotates the key (server-side hard-cut) and re-points the
- * agent; `langwatch logout` tears it down.
+ * resolve a personal ingest key of sourceType "copilot_app" (reusing the
+ * cached one while the platform confirms it is live, minting otherwise),
+ * then install a login agent that owns the app's launch and injects the
+ * direct-OTLP env. Re-running re-points the agent; `langwatch logout`
+ * tears it down.
  */
 
 const SOURCE_TYPE = "copilot_app";
@@ -105,10 +107,11 @@ export async function connectCopilotApp(
     token,
     captureContent: deps.captureContent,
   });
-  // The mint above is a server-side hard-cut rotation, so a failed agent
-  // registration here would leave the freshly-rotated key with no running
-  // agent. Surface it loudly instead of printing "connected" — never claim
-  // capture is on when the service manager rejected the agent.
+  // When the resolve above minted fresh, it was a server-side hard-cut
+  // rotation, so a failed agent registration here would leave the
+  // freshly-rotated key with no running agent. Surface it loudly instead
+  // of printing "connected" — never claim capture is on when the service
+  // manager rejected the agent.
   let agentPath: string;
   try {
     agentPath = deps.install({
@@ -160,6 +163,34 @@ function currentPlatform(): AppPlatform {
   );
 }
 
+/**
+ * Resolve the copilot_app ingest key with the same reuse-first rules the
+ * wrappers follow: a cached key that the platform confirms live is used
+ * as-is, so re-running `connect` does not rotate a working key out from
+ * under an agent on another machine. A fresh mint is cached for the next
+ * run.
+ */
+async function resolveCopilotAppKey(
+  cfg: GovernanceConfig,
+  sourceType: string,
+): Promise<{ token: string; endpoint: string }> {
+  const resolved = await resolveLiveIngestionKey({ cfg, sourceType });
+  if (resolved.minted) {
+    try {
+      saveConfig({
+        ...cfg,
+        default_personal_ingest_keys: {
+          ...(cfg.default_personal_ingest_keys ?? {}),
+          [sourceType]: { secret: resolved.token },
+        },
+      });
+    } catch {
+      // The agent env below still carries the key; only the cache write failed.
+    }
+  }
+  return { token: resolved.token, endpoint: resolved.endpoint };
+}
+
 /** CLI entry point — wires the real collaborators. */
 export const copilotAppConnectCommand = async (options?: {
   tokensOnly?: boolean;
@@ -171,7 +202,7 @@ export const copilotAppConnectCommand = async (options?: {
       env: process.env,
       exists: (p) => fs.existsSync(p),
       loadConfig,
-      mint: mintIngestionKey,
+      mint: resolveCopilotAppKey,
       install: installCopilotAppAgent,
       captureContent: !options?.tokensOnly,
       info: (msg) => console.log(chalk.green(msg)),

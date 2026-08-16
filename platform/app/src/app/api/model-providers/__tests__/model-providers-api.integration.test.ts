@@ -144,6 +144,82 @@ describe("Model Providers API", () => {
         expect(bodyStr).not.toContain("sk-real-key-12345");
       });
     });
+
+    describe("given a provider stores credentials that are not named as keys", () => {
+      // The response is reachable with a project API key, which customers
+      // deploy into their own applications and CI. Nothing in it may carry a
+      // credential value, whatever the field is called. The OAuth-device
+      // provider is the case that proves it: its credential set is a group
+      // of tokens, and a rule that looked for "KEY" in the field name let
+      // every one of them through.
+      // Every value is distinctive on purpose. A short one such as a plan
+      // name matches unrelated text elsewhere in the payload (model ids
+      // ending in "-pro"), which makes the leak assertion fail for the
+      // wrong reason.
+      const SECRET_VALUES = {
+        CODEX_ACCESS_TOKEN: "access-token-value-must-not-appear",
+        CODEX_REFRESH_TOKEN: "refresh-token-value-must-not-appear",
+        CODEX_ID_TOKEN: "id-token-value-must-not-appear",
+        CODEX_ACCOUNT_ID: "account-id-must-not-appear",
+        CODEX_EMAIL: "connected-person@example.invalid",
+        CODEX_PLAN: "plan-tier-must-not-appear",
+        CODEX_TOKENS_SAVED_AT: "2026-08-14T00:00:00.000Z",
+      };
+
+      beforeEach(async () => {
+        await prisma.modelProvider.create({
+          data: {
+            name: "Codex",
+            provider: "openai_codex",
+            enabled: true,
+            organizationId: testOrganization.id,
+            customKeys: SECRET_VALUES,
+            scopes: {
+              create: [{ scopeType: "PROJECT", scopeId: testProjectId }],
+            },
+          },
+        });
+      });
+
+      /** @scenario GET /api/model-providers returns no credential value for any provider */
+      it("masks every credential field it returns", async () => {
+        const res = await helpers.api.get("/api/model-providers");
+
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.openai_codex).toBeDefined();
+
+        for (const field of Object.keys(SECRET_VALUES)) {
+          expect(
+            body.openai_codex.customKeys[field],
+            `${field} must be masked`,
+          ).toBe(MASKED_KEY_PLACEHOLDER);
+        }
+      });
+
+      it("does not leak any stored credential value anywhere in the response", async () => {
+        const res = await helpers.api.get("/api/model-providers");
+
+        const bodyStr = JSON.stringify(await res.json());
+        for (const value of Object.values(SECRET_VALUES)) {
+          expect(bodyStr, `response contains a stored value`).not.toContain(
+            value,
+          );
+        }
+      });
+
+      it("still reports which credential fields are set", async () => {
+        // The CLI and MCP callers read presence, never values. Masking must
+        // not take that away, or both report an unconfigured provider.
+        const res = await helpers.api.get("/api/model-providers");
+
+        const body = await res.json();
+        expect(Object.keys(body.openai_codex.customKeys).sort()).toEqual(
+          Object.keys(SECRET_VALUES).sort(),
+        );
+        expect(body.openai_codex.enabled).toBe(true);
+      });
+    });
   });
 
   describe("PUT /api/model-providers/:provider", () => {

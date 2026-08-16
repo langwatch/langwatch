@@ -1,0 +1,143 @@
+{
+	"$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+	"data": {
+		"name": "query_result"
+	},
+	"mark": "bar",
+	"transform": [
+		{
+			"calculate": "datum.total + 1",
+			"as": "step0"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "step1"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "step2"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "step3"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "step4"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "step5"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "step6"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "step7"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "step8"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "step9"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "step10"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "step11"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "step12"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "step13"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "step14"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "step15"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "step16"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "step17"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "step18"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "step19"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "step20"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "step21"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "step22"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "step23"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "step24"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "step25"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "step26"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "step27"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "step28"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "step29"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "step30"
+		},
+		{
+			"calculate": "datum.total + 1",
+			"as": "step31"
+		}
+	],
+	"encoding": {
+		"y": {
+			"field": "step31",
+			"type": "quantitative"
+		}
+	}
+}

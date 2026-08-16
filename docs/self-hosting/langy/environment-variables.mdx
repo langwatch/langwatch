@@ -24,7 +24,7 @@ Many `LANGY_*` names in the `packages/langy` and frontend code are exported Type
 |---|---|---|---|
 | `LANGY_INTERNAL_SECRET` | Shared bearer secret for app-to-agent auth (and the per-frame HMAC base). Lives in the app Secret and is injected into the app, the workers, and the agent pod. The chart generates it when `autogen.enabled` is on; with your own Secret, add the key yourself. | Yes | chart-generated |
 | `OPENCODE_AGENT_URL` | App-side URL of the agent pod (`http://<release>-langyagent:80`). Turns on the Langy backend when set. Wired automatically when `langyagent.chartManaged=true`. | When agent on | unset (chart-set) |
-| `ENVIRONMENT` | Deployment environment. Gates the dev-only isolation bypass and is security-load-bearing, so keep it production-like. | No | `production` |
+| `ENVIRONMENT` | Deployment environment. Gates the dev-only isolation bypass, so keep it production-like. | No | `production` |
 
 <Warning>
 `LANGY_INTERNAL_SECRET` is a shared credential between the app and the agent. Store it in a secrets manager and never commit it or log it.
@@ -41,7 +41,7 @@ Many `LANGY_*` names in the `packages/langy` and frontend code are exported Type
 
 ## Egress
 
-See [Networking and egress](/self-hosting/langy/networking-and-egress) for how these fit together and the honest limit on enforcement.
+See [Networking and egress](/self-hosting/langy/networking-and-egress) for how these fit together and the limit on enforcement.
 
 | Variable | Description | Required | Default |
 |---|---|---|---|
@@ -66,14 +66,15 @@ The mirror lane copies each turn's trace into a LangWatch project you designate,
 
 ## GitHub
 
-Set these on the control plane to enable bot-authored pull requests. If `GITHUB_LANGY_PRIVATE_KEY` is unset, the GitHub feature is silently off. See [Register the Langy GitHub App](/self-hosting/langy/github-app) for the registration walkthrough.
+Set these on the control plane to enable bot-authored pull requests and coding-agent pull request linkage. If `GITHUB_LANGY_PRIVATE_KEY` is unset, the GitHub feature is silently off. See [Register the GitHub App](/self-hosting/langy/github-app) for the registration walkthrough.
 
 | Variable | Description | Required | Default |
 |---|---|---|---|
 | `GITHUB_LANGY_APP_ID` | GitHub App id (JWT `iss`). | For GitHub | unset (feature off) |
 | `GITHUB_LANGY_PRIVATE_KEY` | App RSA private key PEM (mints install tokens). The only credential; control-plane only. Escape newlines as `\n` in a single-line value. | For GitHub | unset (feature off) |
-| `GITHUB_LANGY_WEBHOOK_SECRET` | Verifies the `X-Hub-Signature-256` on inbound webhooks. | For GitHub | unset |
-| `GITHUB_LANGY_APP_SLUG` | App slug for the install deep-link (`github.com/apps/<slug>`). | For GitHub | unset |
+| `GITHUB_LANGY_WEBHOOK_SECRET` | Verifies the `X-Hub-Signature-256` on inbound webhooks. Optional: without it the instance still connects, mints tokens and opens pull requests, but it reconciles late. Linkage then waits for the outbound recheck, and an uninstall clears only when a live read gets a 404. See [Restricted networks](/self-hosting/langy/github-app#restricted-networks). | No | unset |
+| `GITHUB_LANGY_APP_SLUG` | App slug for the install deep-link. | For GitHub | unset |
+| `GITHUB_LANGY_HOST` | The GitHub host this instance connects to. Set it to a GitHub Enterprise Server hostname (no scheme, no path) to bind the instance to that server. One instance connects to one host. | No | `github.com` |
 | `CREDENTIALS_SECRET` | Signs the GitHub install state round-trip and encrypts provider keys at rest. Already required in production, so nothing new is needed for GitHub. | Yes (prod) | none |
 
 <Warning>

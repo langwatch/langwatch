@@ -359,9 +359,43 @@ describe("runSuiteCommand()", () => {
     it("schedules the run and returns immediately", async () => {
       mockRun.mockResolvedValue(makeRunResult());
 
-      await runSuiteCommand("suite_abc123", {});
+      await runSuiteCommand({ id: "suite_abc123", options: {} });
 
-      expect(mockRun).toHaveBeenCalledWith("suite_abc123");
+      expect(mockRun).toHaveBeenCalledWith("suite_abc123", {
+        parameters: undefined,
+      });
+    });
+  });
+
+  describe("when --param pairs are given", () => {
+    it("hands the run the values those names resolve to", async () => {
+      mockRun.mockResolvedValue(makeRunResult());
+
+      await runSuiteCommand({
+        id: "suite_abc123",
+        options: {
+          param: ["account_tier=gold", "seats=12", "beta=false", "order=007"],
+        },
+      });
+
+      expect(mockRun).toHaveBeenCalledWith("suite_abc123", {
+        parameters: {
+          account_tier: "gold",
+          seats: 12,
+          beta: false,
+          order: "007",
+        },
+      });
+    });
+  });
+
+  describe("when a --param pair has no equals sign", () => {
+    it("refuses the command instead of scheduling a run", async () => {
+      await expect(
+        runSuiteCommand({ id: "suite_abc123", options: { param: ["account_tier"] } }),
+      ).rejects.toThrow(ProcessExitError);
+
+      expect(mockRun).not.toHaveBeenCalled();
     });
   });
 
@@ -370,7 +404,7 @@ describe("runSuiteCommand()", () => {
       const result = makeRunResult();
       mockRun.mockResolvedValue(result);
 
-      await runSuiteCommand("suite_abc123", { format: "json" });
+      await runSuiteCommand({ id: "suite_abc123", options: { format: "json" } });
 
       expect(console.log).toHaveBeenCalledWith(
         JSON.stringify(result, null, 2),
@@ -384,9 +418,11 @@ describe("runSuiteCommand()", () => {
         makeRunResult({ skippedArchived: { scenarios: ["old_scenario"], targets: ["old_agent"] } }),
       );
 
-      await runSuiteCommand("suite_abc123", {});
+      await runSuiteCommand({ id: "suite_abc123", options: {} });
 
-      expect(mockRun).toHaveBeenCalledWith("suite_abc123");
+      expect(mockRun).toHaveBeenCalledWith("suite_abc123", {
+        parameters: undefined,
+      });
     });
   });
 
@@ -406,7 +442,7 @@ describe("runSuiteCommand()", () => {
         .spyOn(globalThis, "fetch")
         .mockResolvedValue(new Response("{}", { status: 200 }));
 
-      await runSuiteCommand("suite_abc123", { wait: true });
+      await runSuiteCommand({ id: "suite_abc123", options: { wait: true } });
 
       expect(fetchSpy).not.toHaveBeenCalled();
     });
@@ -418,7 +454,7 @@ describe("runSuiteCommand()", () => {
         new SuitesApiError("Suite not found", "POST /api/suites/nonexistent/run"),
       );
 
-      await expect(runSuiteCommand("nonexistent", {})).rejects.toThrow(ProcessExitError);
+      await expect(runSuiteCommand({ id: "nonexistent", options: {} })).rejects.toThrow(ProcessExitError);
     });
   });
 });

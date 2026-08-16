@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import type { IntentSpec } from "~/server/event-sourcing/pipeline/processManagerDefinition";
+import { runParameterValuesSchema } from "~/server/scenarios/parameters";
 
 export const SIMULATION_RUN_EXECUTION_PROCESS_NAME =
   "simulation_run_execution" as const;
@@ -73,10 +74,11 @@ export const INITIAL_SIMULATION_RUN_EXECUTION_STATE: SimulationRunExecutionProce
   };
 
 /**
- * The execute intent payload — the identity and execution target `pool.submit`
- * needs, and nothing else; no content. It is close to `ExecutionJobData`
- * (execution-pool.ts) but not identical: the handler renames `scenarioSetId`
- * to `setId` and `name` to `scenarioName` on the way through.
+ * The execute intent payload — the identity, execution target and resolved
+ * parameter values `pool.submit` needs, and nothing else; no conversation
+ * content. It is close to `ExecutionJobData` (execution-pool.ts) but not
+ * identical: the handler renames `scenarioSetId` to `setId` and `name` to
+ * `scenarioName` on the way through.
  */
 export const executeRunIntentSchema = z.object({
   scenarioRunId: z.string(),
@@ -89,6 +91,7 @@ export const executeRunIntentSchema = z.object({
     type: z.enum(["prompt", "http", "code", "workflow"]),
     referenceId: z.string(),
   }),
+  parameters: runParameterValuesSchema.optional(),
 });
 export type ExecuteRunIntent = z.infer<typeof executeRunIntentSchema>;
 
@@ -128,6 +131,13 @@ export const simulationRunProcessEventViewSchema = z.object({
       referenceId: z.string(),
     })
     .nullable(),
+  /**
+   * The run's resolved parameter values, as recorded on the queued event —
+   * customer-chosen configuration, not conversation content. Defaulted rather
+   * than required so inbox rows persisted before parameters existed still
+   * parse instead of redelivering forever.
+   */
+  parameters: runParameterValuesSchema.nullable().default(null),
 });
 export type SimulationRunProcessEventView = z.infer<
   typeof simulationRunProcessEventViewSchema

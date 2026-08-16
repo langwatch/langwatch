@@ -15,6 +15,7 @@ import { SpanKind } from "@opentelemetry/api";
 import { randomBytes } from "crypto";
 import { getLangWatchTracer } from "langwatch";
 import { LATEST_SPEC_VERSION } from "../../../../optimization_studio/types/dsl";
+import type { RunParameterValues } from "../../parameters";
 import { resolveFieldMappings } from "../resolve-field-mappings";
 import type { CodeAgentData } from "../types";
 
@@ -60,20 +61,41 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
   private static readonly CODE_NODE_ID = "code_agent";
   private static readonly END_NODE_ID = "end";
 
-  constructor(
-    private readonly config: CodeAgentData,
-    private readonly nlpServiceUrl: string,
-    /**
-     * The LangWatch platform API key (project.apiKey), sent as
-     * workflow.api_key on the synthesized entry->code->end workflow. nlpgo
-     * forwards it verbatim as the X-Auth-Token header on its callbacks into
-     * the platform (agentblock/workflow_runner.go, evaluatorblock/executor.go,
-     * engine.go) — never an LLM provider credential, so it must not be
-     * sourced from litellm params (issue #6634).
-     */
-    private readonly projectApiKey: string,
-  ) {
+  private readonly config: CodeAgentData;
+  private readonly nlpServiceUrl: string;
+  /**
+   * The LangWatch platform API key (project.apiKey), sent as workflow.api_key
+   * on the synthesized entry->code->end workflow. nlpgo forwards it verbatim
+   * as the X-Auth-Token header on its callbacks into the platform
+   * (agentblock/workflow_runner.go, evaluatorblock/executor.go, engine.go),
+   * never an LLM provider credential, so it must not be sourced from litellm
+   * params (issue #6634).
+   */
+  private readonly projectApiKey: string;
+  /**
+   * The run's resolved parameter values, carried on the DSL as
+   * `workflow.params` beside `workflow.secrets`. The engine exposes them to
+   * the Python under test as `params.NAME`, keeping their native types: a
+   * boolean stays a boolean, a number stays a number.
+   */
+  private readonly parameters: RunParameterValues;
+
+  constructor({
+    config,
+    nlpServiceUrl,
+    projectApiKey,
+    parameters,
+  }: {
+    config: CodeAgentData;
+    nlpServiceUrl: string;
+    projectApiKey: string;
+    parameters?: RunParameterValues;
+  }) {
     super();
+    this.config = config;
+    this.nlpServiceUrl = nlpServiceUrl;
+    this.projectApiKey = projectApiKey;
+    this.parameters = parameters ?? {};
     this.name = "SerializedCodeAgentAdapter";
   }
 
@@ -124,6 +146,7 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
       version: "1.0",
       template_adapter: "default" as const,
       secrets: this.config.secrets,
+      params: this.parameters,
       nodes: [
         this.buildEntryNode(inputs),
         this.buildCodeNode(inputs, outputs),

@@ -164,6 +164,41 @@ export class ModelProviderScopeForbiddenError extends HandledError {
 }
 
 /**
+ * The caller cannot manage one of the scopes a default-models write would
+ * touch.
+ *
+ * Same shape and rationale as {@link ModelProviderScopeForbiddenError}, with
+ * its own code because the copy differs: this one is about the Default Models
+ * policies, not the provider credentials. Every default-models write path
+ * (tRPC drawer save, REST create/update/delete) routes through
+ * `assertCanWriteScope`, which raises this. A plain `Error` here used to
+ * surface as an unknown 500 and log a routine permission refusal as an
+ * incident.
+ */
+export class ModelDefaultScopeForbiddenError extends HandledError {
+  declare readonly code: "model_default_scope_forbidden";
+
+  constructor({
+    scopeType,
+    requiredPermission,
+  }: {
+    scopeType: string;
+    requiredPermission: string;
+  }) {
+    super(
+      "model_default_scope_forbidden",
+      "You don't have permission to manage default models here.",
+      {
+        meta: { scopeType, requiredPermission },
+        httpStatus: 403,
+        fault: "customer",
+      },
+    );
+    this.name = "ModelDefaultScopeForbiddenError";
+  }
+}
+
+/**
  * Too many credential checks in too short a window.
  *
  * Every check is an outbound request from our servers carrying a customer's
