@@ -782,6 +782,27 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
     });
   });
 
+  describe("when an inbox row predates the parameters field", () => {
+    it("still parses, reading the missing field as null", () => {
+      // Inbox payloads are persisted views: rows written before `parameters`
+      // existed have no such key, and handleRunQueued re-parses them on
+      // delivery. A required key here would turn every pre-upgrade row into a
+      // forever-redelivering handler.
+      const { parameters: _dropped, ...legacyRow } =
+        buildSimulationRunEventView(
+          makeEvent({
+            type: SIMULATION_RUN_EVENT_TYPES.QUEUED,
+            occurredAt: 10_000,
+            data: queuedData(),
+          }),
+        );
+
+      const parsed = simulationRunProcessEventViewSchema.parse(legacyRow);
+
+      expect(parsed.parameters).toBeNull();
+    });
+  });
+
   describe("when an event carries conversation content", () => {
     // Unique marker strings: if any of these survives into the view, the
     // process state, or an intent payload, conversation content crossed the
