@@ -36,6 +36,24 @@ export type ScopeInput = {
  * for backwards compatibility but carries no access semantics on its
  * own.
  */
+/**
+ * The legacy project-shaped predicate: "this provider type, granted to this
+ * project". Shared so the delete and the pre-delete lookup that names the
+ * rows for the gateway change feed can never drift apart.
+ */
+function byProviderInProject({
+  provider,
+  projectId,
+}: {
+  provider: string;
+  projectId: string;
+}): Prisma.ModelProviderWhereInput {
+  return {
+    provider,
+    scopes: { some: { scopeType: "PROJECT", scopeId: projectId } },
+  };
+}
+
 export class ModelProviderRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
@@ -387,17 +405,86 @@ export class ModelProviderRepository {
     });
   }
 
-  async deleteByProvider(
-    provider: string,
-    projectId: string,
-    tx?: Prisma.TransactionClient,
-  ): Promise<Prisma.BatchPayload> {
+  /**
+   * Removes the named rows that still match the provider-and-project scope.
+   *
+   * Both halves of that predicate matter, and they guard opposite races.
+   *
+   * The id list is what the caller resolved and is about to name to the
+   * gateway change feed. Without it, a row that entered the scope after the
+   * lookup would be deleted with no event to evict its cached credential.
+   *
+   * The scope predicate is re-applied because READ COMMITTED gives this
+   * statement its own snapshot. Without it, a row whose project scope was
+   * removed after the lookup would still be deleted, letting a caller remove
+   * a provider they can no longer manage.
+   *
+   * The intersection is what survives both, so the delete is never wider than
+   * either the caller's authorization or the set it can account for.
+   */
+  async deleteByIdsInProviderScope({
+    ids,
+    provider,
+    projectId,
+    tx,
+  }: {
+    ids: string[];
+    provider: string;
+    projectId: string;
+    tx?: Prisma.TransactionClient;
+  }): Promise<Prisma.BatchPayload> {
+    if (ids.length === 0) return { count: 0 };
     const client = tx ?? this.prisma;
     return client.modelProvider.deleteMany({
       where: {
-        provider,
-        scopes: { some: { scopeType: "PROJECT", scopeId: projectId } },
+        AND: [
+          { id: { in: ids } },
+          byProviderInProject({ provider, projectId }),
+        ],
       },
+    });
+  }
+
+  /**
+   * Which of the given ids are still present. The caller subtracts this from
+   * the set it tried to delete to learn exactly what went, since `deleteMany`
+   * reports a count and nothing else and the gateway change feed needs one
+   * event per provider id that actually disappeared.
+   */
+  async findSurvivingIds({
+    ids,
+    tx,
+  }: {
+    ids: string[];
+    tx?: Prisma.TransactionClient;
+  }): Promise<Set<string>> {
+    if (ids.length === 0) return new Set();
+    const client = tx ?? this.prisma;
+    const rows = await client.modelProvider.findMany({
+      where: { id: { in: ids } },
+      select: { id: true },
+    });
+    return new Set(rows.map((row) => row.id));
+  }
+
+  /**
+   * The rows the legacy provider-and-project delete contract names, resolved
+   * before the delete so the caller can both remove them and name them to the
+   * gateway change feed.
+   */
+  async findIdsByProvider({
+    provider,
+    projectId,
+    tx,
+  }: {
+    provider: string;
+    projectId: string;
+    tx?: Prisma.TransactionClient;
+  }): Promise<{ id: string; organizationId: string }[]> {
+    const client = tx ?? this.prisma;
+    return client.modelProvider.findMany({
+      where: byProviderInProject({ provider, projectId }),
+      select: { id: true, organizationId: true },
     });
   }
 

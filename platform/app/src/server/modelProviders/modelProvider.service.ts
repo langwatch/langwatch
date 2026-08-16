@@ -2,6 +2,7 @@ import { z } from "zod";
 import { env } from "~/env.mjs";
 import type { PrismaClient, Project } from "~/generated/prisma/client";
 import type { Session } from "~/server/auth";
+import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
 import { isManagedProvider } from "../../../ee/managed-providers/managedBedrockConfig";
 import { MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
 import { getSchemaShape } from "../../utils/modelProviderHelpers";
@@ -275,6 +276,16 @@ export class ModelProviderService {
   constructor(
     private readonly prisma: PrismaClient,
     private readonly repository: ModelProviderRepository,
+    /**
+     * The gateway's cache-invalidation feed. Every write that changes a
+     * stored credential has to land here: the gateway holds the decrypted
+     * key inside a per-virtual-key bundle in memory, and a
+     * `MODEL_PROVIDER_UPDATED` event is what evicts the bundles that carry
+     * this provider id so the next request resolves the new key.
+     */
+    private readonly changeEvents: ChangeEventRepository = new ChangeEventRepository(
+      prisma,
+    ),
   ) {}
 
   /**
@@ -282,7 +293,11 @@ export class ModelProviderService {
    */
   static create(prisma: PrismaClient): ModelProviderService {
     const repository = new ModelProviderRepository(prisma);
-    return new ModelProviderService(prisma, repository);
+    return new ModelProviderService(
+      prisma,
+      repository,
+      new ChangeEventRepository(prisma),
+    );
   }
 
   /**
@@ -700,6 +715,19 @@ export class ModelProviderService {
           customKeysProvided,
           tx,
         );
+
+        // A running gateway is serving the previous credential, base URL and
+        // headers from cache. Rotating a key is exactly the moment where that
+        // matters, so the eviction rides the same transaction as the write:
+        // either both land or the operator sees the write fail.
+        await this.changeEvents.append(
+          {
+            organizationId: existingProvider.organizationId,
+            kind: "MODEL_PROVIDER_UPDATED",
+            modelProviderId: existingProvider.id,
+          },
+          tx,
+        );
       } else {
         result = await this.createNew(
           {
@@ -858,10 +886,56 @@ export class ModelProviderService {
       );
     }
 
+    // A deleted credential has to leave the gateway's cache with the row.
+    // Until it does the bundle keeps dispatching through a provider the
+    // operator has removed, and there is no later write to carry the news.
     if (id) {
-      return await this.repository.delete(id);
+      return await this.prisma.$transaction(async (tx) => {
+        const deleted = await this.repository.delete(id, tx);
+        await this.changeEvents.append(
+          {
+            organizationId: deleted.organizationId,
+            kind: "MODEL_PROVIDER_UPDATED",
+            modelProviderId: deleted.id,
+          },
+          tx,
+        );
+        return deleted;
+      });
     }
-    return await this.repository.deleteByProvider(provider, projectId!);
+    return await this.prisma.$transaction(async (tx) => {
+      // Resolve the set, delete the part of it still inside the scope, then
+      // ask which rows actually went. Each statement gets its own READ
+      // COMMITTED snapshot, so neither the resolved set nor the count is a
+      // safe answer on its own: the first can name a row that left the scope
+      // before the delete, and the second says how many went without saying
+      // which. The difference is exact, and every row in it gets an event.
+      const doomed = await this.repository.findIdsByProvider({
+        provider,
+        projectId: projectId!,
+        tx,
+      });
+      const ids = doomed.map((row) => row.id);
+      const result = await this.repository.deleteByIdsInProviderScope({
+        ids,
+        provider,
+        projectId: projectId!,
+        tx,
+      });
+      const survivors = await this.repository.findSurvivingIds({ ids, tx });
+      for (const row of doomed) {
+        if (survivors.has(row.id)) continue;
+        await this.changeEvents.append(
+          {
+            organizationId: row.organizationId,
+            kind: "MODEL_PROVIDER_UPDATED",
+            modelProviderId: row.id,
+          },
+          tx,
+        );
+      }
+      return result;
+    });
   }
 
   /**

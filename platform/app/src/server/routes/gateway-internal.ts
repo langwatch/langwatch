@@ -41,6 +41,7 @@ import {
 } from "~/server/gateway/budgetResolution.service";
 import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
 import { GatewayConfigMaterialiser } from "~/server/gateway/config.materialiser";
+import { computeConfigETag } from "~/server/gateway/configETag";
 import { signGatewayJwt } from "~/server/gateway/gatewayJwt";
 import {
   GatewayGuardrailEvaluationService,
@@ -542,10 +543,10 @@ secured.access(gatewayPolicy()).get("/config/:vk_id", async (c) => {
   }
 
   const ifNoneMatch = c.req.header("If-None-Match");
-  const currentRevision = vk.revision.toString();
-  if (ifNoneMatch && ifNoneMatch === currentRevision) {
+  const currentETag = await computeConfigETag({ prisma, virtualKey: vk });
+  if (ifNoneMatch && ifNoneMatch === currentETag) {
     return c.body(null, 304, {
-      ETag: currentRevision,
+      ETag: currentETag,
       "Cache-Control": "no-store",
     });
   }
@@ -561,7 +562,7 @@ secured.access(gatewayPolicy()).get("/config/:vk_id", async (c) => {
     getApp().gateway.budgets ?? null,
   ).materialise(vk);
   return c.json(payload, 200, {
-    ETag: currentRevision,
+    ETag: currentETag,
     "Cache-Control": "no-store",
   });
 });

@@ -260,10 +260,13 @@ func (c *Client) PollChanges(ctx context.Context, organizationID, since string) 
 //
 // Conditional when ifNoneMatch is non-empty: the ETag goes back as
 // If-None-Match and a 304 is reported as NotModified rather than a config.
-// The control plane keys that ETag off the virtual key's revision, which every
-// mutation bumps (contract §4.2), so revalidating a key nobody touched costs a
-// revision lookup instead of materializing the whole bundle again. An empty
-// ifNoneMatch asks for the config outright.
+// The control plane derives that ETag from the virtual key's revision and
+// from the provider rows its config is built from (contract §4.2), so
+// revalidating a key nobody touched costs two indexed lookups instead of
+// materializing the whole bundle again. Both halves are needed: a credential
+// rotation writes the provider row and leaves the key's revision alone, and a
+// token that cannot see it would confirm a bundle carrying the replaced key.
+// An empty ifNoneMatch asks for the config outright.
 //
 // Anything other than a well-formed 200 or a 304 answering our own
 // If-None-Match is an error: a caller must never take a surprising response
