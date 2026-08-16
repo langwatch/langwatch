@@ -11,6 +11,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useAllPromptsForProject } from "../../prompts/hooks/useAllPromptsForProject";
 import { api } from "../../utils/api";
+import {
+  agentHasDevTunnel,
+  LocalTunnelBadge,
+} from "../agents/LocalTunnelBadge";
 import { isAgentTarget, useFilteredAgents } from "./useFilteredScenarioTargets";
 
 export type TargetValue = {
@@ -248,6 +252,7 @@ export function TargetSelector({
                     <Text fontSize="sm" flex={1}>
                       {agent.name}
                     </Text>
+                    {agentHasDevTunnel(agent) && <LocalTunnelBadge />}
                     {isAgentTarget(value) && value.id === agent.id && (
                       <Text color="blue.500" fontSize="sm">
                         ✓

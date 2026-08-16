@@ -71,6 +71,12 @@ const DENIED_COMMANDS = new Set([
  */
 const DENIED_COMMAND_PHRASES: readonly (readonly string[])[] = [
   ["tag", "delete"],
+  // `agent dev` / `agent tunnel` run a tunnel session until Ctrl-C: they hold
+  // signal handlers, a local proxy server and a child process, none of which
+  // survive being served from the detached daemon. Denying the bare word
+  // `agent` would take `agent list` with it, so the phrases are matched.
+  ["agent", "dev"],
+  ["agent", "tunnel"],
 ];
 
 /**

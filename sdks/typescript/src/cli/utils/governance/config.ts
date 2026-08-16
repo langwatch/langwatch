@@ -174,6 +174,13 @@ export interface GovernanceConfig {
    * field name in sync.
    */
   daemon?: "on" | "off";
+
+  /**
+   * The agent last chosen by `langwatch agent dev`, keyed by the project
+   * directory (absolute path) the command ran in, so the next run in the
+   * same folder skips the picker. `--agent` always overrides.
+   */
+  agent_dev_agents?: Record<string, string>;
 }
 
 function defaults(): GovernanceConfig {
