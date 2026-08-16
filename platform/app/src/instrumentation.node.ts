@@ -235,10 +235,24 @@ if (explicitEndpoint && isEnvTrue(process.env.OTEL_METRICS_ENABLED)) {
 // The identity is read from the OTel variables on purpose. A flame graph that
 // cannot be lined up with the trace beside it is a curiosity, and a second set
 // of name/environment variables would drift the first time someone renamed one.
+//
+// NODE_ENV is the fallback rather than the source. ENVIRONMENT is what every
+// other service in the repo reads for "which install is this", and it is what
+// our own deployment sets — but the Helm chart only emits NODE_ENV, so without
+// this a chart install would push profiles with no environment label at all and
+// nothing would fail. NODE_ENV answers a coarser question (which runtime mode,
+// so "production" in most staging installs), which is a worse label than
+// ENVIRONMENT and a much better one than none.
+//
+// Deliberately not fixed by teaching the chart to emit ENVIRONMENT: that
+// variable also feeds @langwatch/ksuid, which prefixes every generated ID with
+// it unless it reads exactly "prod". Injecting it chart-wide would silently
+// move every self-hosted install's new IDs from `local_…` to `production_…` on
+// upgrade, which is a far larger change than labelling a flame graph.
 const profiler = startProfiling({
   serverAddress: process.env.PYROSCOPE_SERVER_ADDRESS,
   appName: process.env.OTEL_SERVICE_NAME ?? "langwatch-app",
-  environment: process.env.ENVIRONMENT,
+  environment: process.env.ENVIRONMENT ?? process.env.NODE_ENV,
   resourceAttributes: process.env.OTEL_RESOURCE_ATTRIBUTES,
 });
 if (profiler) {
