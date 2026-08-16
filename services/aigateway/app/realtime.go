@@ -3,6 +3,8 @@ package app
 import (
 	"context"
 
+	"go.uber.org/zap"
+
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/app/pipeline"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
@@ -37,9 +39,24 @@ func (a *App) dispatchRealtimeSession(ctx context.Context, call *pipeline.Call) 
 	if err != nil {
 		return nil, err
 	}
+	// coreDispatch hands the chain to retry.Walk, which tolerates an empty
+	// slice. This lane takes the head of it, so it has to say what an empty
+	// chain means itself rather than panicking on the request thread.
+	if len(creds) == 0 {
+		return nil, herr.New(ctx, domain.ErrProviderNotBound, herr.M{
+			"message": "no provider credential on this key can mint a realtime voice session for the vendor this endpoint names",
+			"fault":   "customer",
+		})
+	}
 	cred := creds[0]
 
 	session := call.Request.RealtimeSession
+	if session == nil {
+		return nil, herr.New(ctx, domain.ErrInternal, herr.M{
+			"message": "a realtime session request reached dispatch without its session details",
+			"fault":   "gateway",
+		})
+	}
 	session.SessionID = call.Meta.GatewayRequestID()
 
 	reservation := domain.RealtimeReservation{
@@ -90,6 +107,7 @@ func (a *App) dispatchRealtimeSession(ctx context.Context, call *pipeline.Call) 
 // virtual key, so refusing here costs no availability the caller had.
 func (a *App) reserveRealtimeSession(ctx context.Context, reservation domain.RealtimeReservation) error {
 	if a.realtime == nil {
+		a.metrics.RecordRealtimeMint(string(reservation.Vendor), "registry_unavailable")
 		return herr.New(ctx, domain.ErrRealtimeRegistryUnavailable, herr.M{
 			"message": "realtime voice sessions are not available on this gateway: no session registry is configured",
 			"fault":   "gateway",
@@ -102,7 +120,7 @@ func (a *App) reserveRealtimeSession(ctx context.Context, reservation domain.Rea
 	outcome := "registry_unavailable"
 	if herr.IsCode(err, domain.ErrRealtimeSessionLimit) {
 		outcome = "session_limit"
-		a.metrics.RecordRealtimeSessionLimitBlock(reservation.VirtualKeyID)
+		a.metrics.RecordRealtimeSessionLimitBlock()
 	} else {
 		a.metrics.RecordRealtimeRegistryError("reserve")
 	}
@@ -124,7 +142,13 @@ func (a *App) correlateRealtimeSession(ctx context.Context, reservation domain.R
 		VendorConversationID: conversationID,
 	}); err != nil {
 		a.metrics.RecordRealtimeRegistryError("correlate")
-		a.logger.Warn("realtime session minted but its vendor conversation id was not recorded")
+		a.logger.Warn("realtime session minted but its vendor conversation id was not recorded",
+			zap.String("session_id", reservation.SessionID),
+			zap.String("project_id", reservation.ProjectID),
+			zap.String("vendor", string(reservation.Vendor)),
+			zap.String("vendor_conversation_id", conversationID),
+			zap.Error(err),
+		)
 	}
 }
 
@@ -141,7 +165,14 @@ func (a *App) releaseRealtimeSession(ctx context.Context, reservation domain.Rea
 		Reason:    reason,
 	}); err != nil {
 		a.metrics.RecordRealtimeRegistryError("release")
-		a.logger.Warn("realtime session reservation was not released after a failed mint")
+		a.logger.Warn("realtime session reservation was not released after a failed mint",
+			zap.String("session_id", reservation.SessionID),
+			zap.String("project_id", reservation.ProjectID),
+			zap.String("virtual_key_id", reservation.VirtualKeyID),
+			zap.String("vendor", string(reservation.Vendor)),
+			zap.String("reason", reason),
+			zap.Error(err),
+		)
 	}
 }
 

@@ -162,16 +162,20 @@ func (c *Client) ReportUsage(ctx context.Context, report domain.RealtimeUsageRep
 	return nil
 }
 
+// realtimePatch updates one session record. Transport failures come back as
+// ErrRealtimeRegistryUnavailable, the same code Reserve and ReportUsage
+// return, so a caller can classify a registry outage without knowing which
+// verb reached it.
 func (c *Client) realtimePatch(ctx context.Context, sessionID string, payload []byte) error {
 	path, err := url.JoinPath(realtimeSessionsPath, url.PathEscape(sessionID))
 	if err != nil {
-		return err
+		return realtimeRegistryUnavailable(ctx, 0, err)
 	}
 	status, _, err := c.realtimeCall(ctx, realtimeRequest{
 		method: http.MethodPatch, path: path, payload: payload,
 	})
 	if err != nil {
-		return err
+		return realtimeRegistryUnavailable(ctx, 0, err)
 	}
 	if status < 200 || status >= 300 {
 		return realtimeRegistryUnavailable(ctx, status, nil)

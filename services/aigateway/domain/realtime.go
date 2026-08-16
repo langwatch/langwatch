@@ -149,17 +149,31 @@ func ParseRealtimeUsage(body []byte) (Usage, error) {
 	out.PromptTokens = max(out.PromptTokens, 0)
 	out.CompletionTokens = max(out.CompletionTokens, 0)
 	out.CacheReadTokens = max(out.CacheReadTokens, 0)
-	if out.CacheReadTokens > out.PromptTokens {
-		// A cache count larger than the total it belongs to is not a split
-		// this can trust, so none of it is taken out.
-		out.CacheReadTokens = 0
-	}
-	return out.SplitAudioTokens(AudioTokenSplit{
+
+	out = out.SplitAudioTokens(AudioTokenSplit{
 		InputAudio:  int(usage.Get("input_token_details.audio_tokens").Int()),
 		InputText:   int(usage.Get("input_token_details.text_tokens").Int()),
 		OutputAudio: int(usage.Get("output_token_details.audio_tokens").Int()),
 		OutputText:  int(usage.Get("output_token_details.text_tokens").Int()),
-	}), nil
+	})
+
+	// Clamped after the split, not before. OpenAI counts cached_tokens
+	// against the whole input total, and the split then reduces PromptTokens
+	// to the text-only remainder, so a session whose cache hit is mostly
+	// audio leaves CacheReadTokens larger than the text total it is now
+	// being compared against. BillableInputTokens answers a negative
+	// remainder with the full prompt, which prices those tokens at the fresh
+	// rate and again at the cache-read rate. Dropping the count is the
+	// conservative end of that: the session bills as uncached, which is the
+	// higher of the two and never bills anything twice.
+	//
+	// Splitting the cache count into its own audio and text halves is what
+	// removes the loss rather than the double charge, and needs an audio
+	// cache price the catalog does not carry yet (langwatch/langwatch#7048).
+	if out.CacheReadTokens > out.PromptTokens {
+		out.CacheReadTokens = 0
+	}
+	return out, nil
 }
 
 var errRealtimeUsageShape = errors.New(

@@ -544,8 +544,21 @@ func elevenLabsSignedURLHandler(deps RouterDeps) http.HandlerFunc {
 			}))
 			return
 		}
-		body := []byte(`{"model":` + strconv.Quote(domain.ElevenLabsConvAIModel) +
-			`,"agent_id":` + strconv.Quote(agentID) + `}`)
+		// Marshalled rather than concatenated: agent_id is a raw query
+		// parameter, and strconv.Quote emits Go escapes such as \x01 for a
+		// control byte, which is not JSON. Every stage downstream parses
+		// this body.
+		body, err := sonic.Marshal(map[string]string{
+			"model":    domain.ElevenLabsConvAIModel,
+			"agent_id": agentID,
+		})
+		if err != nil {
+			writeError(deps.Logger, w, r.Context(), herr.New(r.Context(), domain.ErrInternal, herr.M{
+				"message": "could not build the session request body",
+				"fault":   "gateway",
+			}))
+			return
+		}
 
 		result, err := deps.App.HandleRealtimeSession(r.Context(), bundle, app.RealtimeMintDispatch{
 			Body:  body,
@@ -1349,13 +1362,16 @@ func writeUpstreamError(w http.ResponseWriter, ue *domain.UpstreamError) {
 	_, _ = w.Write(body)
 }
 
-var errorsRegistered bool
+// errorsRegisteredOnce guards a write into herr's package-level status map.
+// Every NewRouter reaches it, and the test binary builds routers from parallel
+// tests, so a plain bool here is a data race the race detector reports.
+var errorsRegisteredOnce sync.Once
 
 func registerErrorStatuses() {
-	if errorsRegistered {
-		return
-	}
-	errorsRegistered = true
+	errorsRegisteredOnce.Do(registerErrorStatusesOnce)
+}
+
+func registerErrorStatusesOnce() {
 	herr.RegisterStatus(domain.ErrInvalidAPIKey, http.StatusUnauthorized)
 	herr.RegisterStatus(domain.ErrKeyRevoked, http.StatusForbidden)
 	herr.RegisterStatus(domain.ErrKeyDisabled, http.StatusForbidden)

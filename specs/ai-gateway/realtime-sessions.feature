@@ -151,7 +151,7 @@ Feature: Brokered realtime voice sessions on the AI Gateway
       And no second session is booked
 
     @unit
-    Scenario: A refused mint is refused with 429
+    Scenario: A cap refusal answers HTTP 429
       Then the realtime_session_limit code answers HTTP 429
       # A slot frees when a call ends, so a client should back off and retry
       # rather than treat the refusal as terminal.

@@ -139,9 +139,7 @@ func TestOpenAIMintClampsTheSessionLifetime(t *testing.T) {
 
 	var sent []byte
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		buf := make([]byte, r.ContentLength)
-		_, _ = r.Body.Read(buf)
-		sent = buf
+		sent, _ = io.ReadAll(r.Body)
 		_, _ = w.Write([]byte(`{"value":"ek_x","expires_at":1}`))
 	}))
 	defer server.Close()

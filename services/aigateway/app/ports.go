@@ -96,12 +96,16 @@ type MetricsRecorder interface {
 
 	// RecordRealtimeMint counts one session-mint attempt by vendor and
 	// outcome (minted, session_limit, registry_unavailable, provider_error).
+	// A minted session is admitted, not yet billed: the vendor's later
+	// report decides what it cost.
 	RecordRealtimeMint(vendor, outcome string)
 
 	// RecordRealtimeSessionLimitBlock counts a mint the per-key open-session
 	// cap refused. Separate from the mint counter because this is the
-	// number an operator raising a customer's cap wants on its own.
-	RecordRealtimeSessionLimitBlock(virtualKeyID string)
+	// number an operator raising a customer's cap wants on its own. It takes
+	// no virtual key: keys are tenant-created and unbounded, so labeling by
+	// one would grow a time series per key.
+	RecordRealtimeSessionLimitBlock()
 
 	// RecordRealtimeRegistryError counts a failed call to the control
 	// plane's session record, by operation. A rise here means sessions are

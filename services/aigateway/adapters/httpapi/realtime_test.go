@@ -49,7 +49,7 @@ func TestEveryAcceptedAuthHeaderResolvesTheVirtualKey(t *testing.T) {
 	}
 }
 
-// @scenario "A refused mint is refused with 429"
+// @scenario "A cap refusal answers HTTP 429"
 func TestRealtimeErrorCodesCarryTheirOwnStatuses(t *testing.T) {
 	t.Parallel()
 

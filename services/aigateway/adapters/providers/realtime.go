@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/tidwall/gjson"
@@ -67,6 +68,23 @@ func newRealtimeClient(policy customerEndpointPolicy) *http.Client {
 		},
 	}
 }
+
+// fallbackRealtimeClient serves a zero-value router, which only tests build:
+// NewBifrostRouter always sets realtimeClient. Built once, because a client
+// per call is a connection pool per call.
+//
+// The policy is captured on first use. A zero-value router has no configured
+// policy to differ on, so that is the same policy every time in practice.
+var fallbackRealtimeClient = func() func(customerEndpointPolicy) *http.Client {
+	var (
+		once   sync.Once
+		client *http.Client
+	)
+	return func(policy customerEndpointPolicy) *http.Client {
+		once.Do(func() { client = newRealtimeClient(policy) })
+		return client
+	}
+}()
 
 // dispatchRealtimeSession mints one vendor session credential.
 func (r *BifrostRouter) dispatchRealtimeSession(
@@ -207,7 +225,7 @@ func (r *BifrostRouter) doRealtimeMint(
 ) (*domain.Response, error) {
 	client := r.realtimeClient
 	if client == nil {
-		client = newRealtimeClient(r.endpointPolicy)
+		client = fallbackRealtimeClient(r.endpointPolicy)
 	}
 	// The host can come from a customer-configured base URL, which is why
 	// two checks bracket this call rather than one. Dispatch vets that URL
@@ -224,11 +242,24 @@ func (r *BifrostRouter) doRealtimeMint(
 	}
 	defer func() { _ = httpResp.Body.Close() }()
 
-	raw, err := io.ReadAll(io.LimitReader(httpResp.Body, realtimeMintMaxResponseBytes))
+	// One byte past the cap, so a truncated answer is distinguishable from
+	// one that exactly fills it. Forwarding a truncated body with the
+	// vendor's 200 would hand the caller invalid JSON under a success
+	// status, and the conversation-id read would silently find nothing.
+	raw, err := io.ReadAll(io.LimitReader(httpResp.Body, realtimeMintMaxResponseBytes+1))
 	if err != nil {
 		return nil, herr.New(ctx, domain.ErrProviderError, herr.M{
 			"reason": "realtime session mint response could not be read: " + err.Error(),
 			"fault":  "provider",
+		})
+	}
+	if len(raw) > realtimeMintMaxResponseBytes {
+		return nil, herr.New(ctx, domain.ErrProviderError, herr.M{
+			"reason": fmt.Sprintf(
+				"realtime session mint response exceeded %d bytes, which is a wrong endpoint rather than a session",
+				realtimeMintMaxResponseBytes,
+			),
+			"fault": "provider",
 		})
 	}
 	return &domain.Response{
