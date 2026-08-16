@@ -156,20 +156,25 @@ async function reconcile(session: GatewayRealtimeSession): Promise<boolean> {
   }
   if (!report || !isTerminal(report.status)) return false;
 
-  // A terminal conversation with no duration is not a free call. Confirming
-  // zero would write a confirmed spend record the fold never downgrades, so
-  // no later report could correct it. Leaving the session open lets the next
-  // tick retry, and the expiry sweep or the spend grace owns the outcome.
+  // A terminal conversation with no positive duration is not a free call.
+  // Confirming zero would write a confirmed spend record the fold never
+  // downgrades, so no later report could correct it. Leaving the session open
+  // lets the next tick retry, and the expiry sweep or the spend grace owns
+  // the outcome.
   const reportedSecs = report.metadata?.call_duration_secs;
-  if (typeof reportedSecs !== "number" || !Number.isFinite(reportedSecs)) {
+  if (
+    typeof reportedSecs !== "number" ||
+    !Number.isFinite(reportedSecs) ||
+    Math.round(reportedSecs) < 1
+  ) {
     logger.warn(
       { sessionId: session.id, status: report.status },
-      "the vendor reported a finished conversation with no duration; leaving the session open",
+      "the vendor reported a finished conversation with no usable duration; leaving the session open",
     );
     return false;
   }
 
-  const durationSecs = Math.max(0, Math.round(reportedSecs));
+  const durationSecs = Math.round(reportedSecs);
   await closeAndConfirmRealtimeSession({
     session,
     usage: { audio_ms: durationSecs * 1000 },

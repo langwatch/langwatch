@@ -233,23 +233,18 @@ Feature: Brokered realtime voice sessions on the AI Gateway
       Then the session is CLOSED and its spend is confirmed from that duration
 
     @integration
-    Scenario: A non-transcription post-call event closes nothing
+    Scenario: A delivery that cannot say what the call used confirms nothing
       Given an open session whose conversation id the mint recorded
-      When a signed post_call_audio delivery arrives for the same conversation
+      When a signed delivery arrives naming that conversation
+      And it is an audio or call-initiation event, carries no type, or reports
+        no duration or one that rounds to zero
       Then the delivery is acknowledged and the session stays OPEN
-      # A workspace can enable the audio and call-initiation events too. They
-      # name the conversation and carry no metadata, so acting on one would
-      # confirm a real call at zero, and the fold never downgrades a
-      # confirmation. Acknowledged rather than refused because ElevenLabs
-      # never retries and disables a webhook after ten failures.
-
-    @integration
-    Scenario: A transcription report with no duration confirms nothing
-      Given an open session whose conversation id the mint recorded
-      When a signed report arrives with no call_duration_secs
-      Then the delivery is acknowledged and the session stays OPEN
-      # Zero is a price, absence is not. The session settles as cost-unknown
-      # on its grace, which is visible, and a later report supersedes it.
+      # Every one of these names the conversation and would have matched.
+      # Zero is a price, absence is not, and the fold never downgrades a
+      # confirmation, so a session closed at zero can never be corrected. It
+      # settles as cost-unknown on its grace instead, which is visible.
+      # Acknowledged rather than refused because a retry is not guaranteed
+      # and ten consecutive failures disable the webhook for every tenant.
 
     @integration
     Scenario: Two candidate sessions is a miss, not a guess

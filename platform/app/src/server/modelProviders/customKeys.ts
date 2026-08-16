@@ -22,23 +22,33 @@ const logger = createLogger("langwatch:modelProviders:customKeys");
 export function decryptCustomKeys(raw: unknown): Record<string, unknown> {
   if (raw === null || raw === undefined) return {};
   if (typeof raw === "object") return raw as Record<string, unknown>;
-  if (typeof raw === "string") {
-    let plaintext: string;
-    try {
-      plaintext = decrypt(raw);
-    } catch {
-      return {};
-    }
-    try {
-      return JSON.parse(plaintext) as Record<string, unknown>;
-    } catch (error) {
-      // The ciphertext length only. Never the value, and never the plaintext.
-      logger.warn(
-        { error, encryptedLength: raw.length },
-        "a model provider's custom keys decrypted to something that is not JSON; reading it as no keys",
-      );
-      return {};
-    }
+  if (typeof raw !== "string") return {};
+  return parseDecrypted(raw);
+}
+
+/** Decrypts one stored value and reads it as JSON, or answers no keys. */
+function parseDecrypted(raw: string): Record<string, unknown> {
+  let plaintext: string;
+  try {
+    plaintext = decrypt(raw);
+  } catch {
+    // decrypt logs its own failures.
+    return {};
   }
-  return {};
+  try {
+    return JSON.parse(plaintext) as Record<string, unknown>;
+  } catch (error) {
+    // The error NAME only, never the error itself. A SyntaxError from
+    // JSON.parse quotes the input it choked on, and the input here is the
+    // decrypted secret, so logging the error would write a provider key into
+    // the log line meant to warn that the key could not be read.
+    logger.warn(
+      {
+        errorName: error instanceof Error ? error.name : "unknown",
+        encryptedLength: raw.length,
+      },
+      "a model provider's custom keys decrypted to something that is not JSON; reading it as no keys",
+    );
+    return {};
+  }
 }

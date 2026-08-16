@@ -14,10 +14,10 @@
  * webhook answers 404 so the ids cannot be probed.
  *
  * Every delivery this handler can parse is acknowledged, and that is not
- * politeness. ElevenLabs never retries a failed delivery, by design for HIPAA,
- * and it disables a webhook after ten consecutive failures. So a non-2xx
- * answer loses that call's billing data permanently, and ten of them stop
- * delivery for every tenant on the endpoint.
+ * politeness. A retry is not guaranteed: ElevenLabs does not retry every
+ * failed delivery, and retries are off for HIPAA workflows. Ten consecutive
+ * failures also disable the webhook, which would stop delivery for every
+ * tenant on the endpoint.
  *
  * That is why this webhook is an optimisation and not the billing path. The
  * reconciler in realtimeSessionPoller.ts asks the vendor for the same numbers
@@ -224,11 +224,16 @@ async function handleElevenLabsWebhook(c: Context): Promise<Response> {
     return c.json({ error: "Invalid payload" }, { status: 400 });
   }
 
-  // Acknowledged, not refused. ElevenLabs does not retry, and it disables a
-  // webhook after ten consecutive failures, so answering non-2xx to an event
-  // this handler does not act on would eventually stop delivery of the one it
-  // does act on, for every tenant sharing the endpoint.
-  if (payload.type && payload.type !== BILLABLE_EVENT_TYPE) {
+  // The type must be present AND billable. An absent type is not a
+  // transcription report either: real deliveries always carry one, so a
+  // payload without it is malformed, and letting it through would match a
+  // session and settle it from fields it does not have.
+  //
+  // Acknowledged, not refused. A retry is not guaranteed, and ten consecutive
+  // failures disable the webhook, so answering non-2xx to an event this
+  // handler does not act on risks stopping delivery of the one it does act
+  // on, for every tenant sharing the endpoint.
+  if (payload.type !== BILLABLE_EVENT_TYPE) {
     return c.json({ received: true });
   }
 
@@ -255,12 +260,18 @@ async function applyPostCallReport(params: {
 }): Promise<void> {
   const data = params.payload.data;
 
-  // No duration means no quantity to confirm. Coercing an absent one to zero
-  // would send a confirmed spend record of zero, and the fold never downgrades
-  // a confirmation, so no later report could correct it. Returning here leaves
-  // the admission to settle as cost-unknown on its grace, which is visible.
+  // No positive duration means no quantity to confirm. A confirmed spend
+  // record of zero is one the fold never downgrades, so no later report could
+  // correct it. That covers an absent duration, a negative one, and one that
+  // rounds to zero: a call the vendor timed at under half a second is an
+  // anomaly worth seeing rather than a call that cost nothing. Returning here
+  // leaves the admission to settle as cost-unknown on its grace, visibly.
   const reportedSecs = data?.metadata?.call_duration_secs;
-  if (typeof reportedSecs !== "number" || !Number.isFinite(reportedSecs)) {
+  if (
+    typeof reportedSecs !== "number" ||
+    !Number.isFinite(reportedSecs) ||
+    Math.round(reportedSecs) < 1
+  ) {
     logger.warn(
       {
         modelProviderId: params.modelProviderId,
@@ -284,8 +295,9 @@ async function applyPostCallReport(params: {
 
   // The vendor prices a conversation by duration, so duration is the
   // quantity. It arrives in whole seconds and every quantity on the spend
-  // wire is an integer, so it becomes milliseconds here, once.
-  const durationSecs = Math.max(0, Math.round(reportedSecs));
+  // wire is an integer, so it becomes milliseconds here, once. The guard
+  // above already proved this rounds to 1 or more.
+  const durationSecs = Math.round(reportedSecs);
   await closeAndConfirmRealtimeSession({
     session,
     usage: { audio_ms: durationSecs * 1000 },

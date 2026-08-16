@@ -68,12 +68,15 @@ A session neither of them closes settles as cost unknown and is flagged for
 reconciliation, and a report arriving later still replaces that record.
 
 <Note>
-The reconciler exists because of how ElevenLabs treats webhook delivery.
-ElevenLabs does not retry a failed delivery, by design for HIPAA, and it
-disables a webhook after 10 consecutive failures. One rejected delivery would
-therefore lose that call's billing data for good, and ten in a row would stop
-delivery for every session on that webhook. The reconciler asks the vendor for
-the same numbers on its own schedule, so a lost delivery costs a couple of
+The reconciler exists because webhook delivery cannot be relied on as the only
+path. A retry is not guaranteed: ElevenLabs does not retry every failed
+delivery, and retries are off for HIPAA workflows. On top of that, a webhook
+is disabled after 10 consecutive failures, which would stop delivery for every
+session on it.
+
+So if the webhook were the only path, one rejected delivery would lose that
+call's billing data. It is not the only path. The reconciler asks the vendor
+for the same numbers on its own schedule, so a lost delivery costs a couple of
 minutes rather than a charge, and a workspace whose single webhook slot is
 already used for something else still bills correctly.
 </Note>
