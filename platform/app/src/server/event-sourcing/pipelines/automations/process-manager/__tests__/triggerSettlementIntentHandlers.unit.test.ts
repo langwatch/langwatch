@@ -678,7 +678,10 @@ describe("trigger settlement intent handlers integration", () => {
     it("names the failing error on the page retry record", async () => {
       const { deps, raw } = makeDeps(datasetTrigger());
       raw.addToDataset.mockRejectedValue(
-        new DispatchError({ message: "clickhouse read timed out", retryable: true }),
+        new DispatchError({
+          message: "clickhouse read timed out",
+          retryable: true,
+        }),
       );
 
       await createPersistMatchHandler(deps)(
