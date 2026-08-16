@@ -215,6 +215,11 @@ export const useOrganizationTeamProject = (
         // this is inert either way; null keeps it inert AND safe.
         langyEgressAllowlist: null,
         departmentId: null,
+        // A share viewer gets no project rail, and these two columns exist only
+        // to grow destinations on it. `null` reads as "no coding-agent signal",
+        // which is both inert and true of the view a share token opens.
+        lastCodingAgentSessionAt: null,
+        lastCodingAgentPullRequestAt: null,
       }
     : undefined;
 

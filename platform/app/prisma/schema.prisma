@@ -470,6 +470,20 @@ model Project {
   /// per-request credentials envelope. See specs/langy/langy-egress-enforcement.feature.
   langyEgressAllowlist Json?
 
+  /// When a coding-agent session was last folded for this project, and when a
+  /// pull request was last mapped for a branch one of those sessions ran on.
+  /// Both are instrumentation signals, not counters: the project sidebar shows
+  /// its Sessions and Pull requests destinations only while the matching column
+  /// is inside the recency window, so a project that never sends coding-agent
+  /// telemetry never grows the two links, and one that stops sending loses
+  /// them again. Written through the throttled touch methods on
+  /// ProjectService, which skip the write while the stored value is still
+  /// recent, so a busy project costs at most one update an hour per column.
+  /// No index: every read is by project id, which is the primary key.
+  /// See specs/coding-agent/project-menu-links.feature.
+  lastCodingAgentSessionAt     DateTime?
+  lastCodingAgentPullRequestAt DateTime?
+
   @@index([teamId])
   @@index([isPersonal])
   @@index([ownerUserId])

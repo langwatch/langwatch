@@ -93,7 +93,18 @@ describe("governance config persistence", () => {
         secret: "vk-lw-01HZX9N4TESTULIDTESTULID00",
         prefix: "vk-lw-01HZX9N",
       },
-      last_request_increase_url: "http://app.example/me/budget/request?signed=abc",
+      tool_mode: { claude: "ingestion" as const },
+      default_personal_ingest_keys: {
+        codex: { secret: "ik-lw-cache00000000000_secret" },
+      },
+      tool_project_keys: {
+        codex: {
+          secret: "ik-lw-pin0000000000000_secret",
+          project_id: "proj_1",
+          project_slug: "acme-app",
+          endpoint: "https://lw.acme.dev",
+        },
+      },
     };
     saveConfig(original);
 
@@ -103,6 +114,32 @@ describe("governance config persistence", () => {
     const loaded = loadConfig();
     expect(loaded).toEqual(expect.objectContaining(original));
     expect(isLoggedIn(loaded)).toBe(true);
+  });
+
+  describe("when a hand-edited project pin carries no secret", () => {
+    it("drops that entry and keeps the pins that do", () => {
+      fs.writeFileSync(
+        p,
+        JSON.stringify({
+          gateway_url: "http://gw.example",
+          control_plane_url: "http://app.example",
+          access_token: "at_x",
+          tool_project_keys: {
+            codex: { project_slug: "acme-app" },
+            claude: { secret: "ik-lw-pin0000000000000_secret" },
+          },
+        }),
+      );
+
+      const loaded = loadConfig();
+
+      // Kept, the codex entry would hand `Bearer undefined` to every reader
+      // that trusts the declared type.
+      expect(loaded.tool_project_keys?.codex).toBeUndefined();
+      expect(loaded.tool_project_keys?.claude?.secret).toBe(
+        "ik-lw-pin0000000000000_secret",
+      );
+    });
   });
 
   describe("when a stored personal VK secret is in a legacy format", () => {

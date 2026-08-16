@@ -9,7 +9,7 @@ LangWatch uses API keys to authenticate SDK calls, MCP connections, and API requ
 
 ## Ingestion keys vs API keys
 
-LangWatch splits credentials into two concepts, the same way Datadog separates ingest-only API keys from RBAC-scoped application keys. Both are `sk-lw-…` strings, but they carry very different power:
+LangWatch splits credentials into two concepts, the same way Datadog separates ingest-only API keys from RBAC-scoped application keys. An ingestion key is an `ik-lw-…` string and an API key is an `sk-lw-…` string, so you can tell them apart at a glance. They carry very different power:
 
 | | Ingestion key | API key |
 |---|---|---|

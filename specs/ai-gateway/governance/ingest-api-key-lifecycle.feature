@@ -64,6 +64,60 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
     # Server resolves the caller's personal project; cross-user issuance is unrepresentable.
 
   # ---------------------------------------------------------------------------
+  # Project-scoped mint from the CLI
+  # ---------------------------------------------------------------------------
+  # `POST /api/auth/cli/governance/ingestion-key` also mints into a named team
+  # project, so a repository checkout can send its coding-agent traces to the
+  # project that owns the code instead of the developer's personal workspace.
+  # The named-project mint is create-only: two machines working on the same
+  # repository each keep their own live key, and revoking one leaves the other
+  # working. Omitting `project` keeps the personal-project behaviour, which
+  # rotates in place.
+
+  @integration @ingest-api-key @issue @project-scoped
+  Scenario: The CLI mints an ingestion key for a project named by id
+    Given jane holds a device session in organization "acme"
+    And jane has traces:create on team project "checkout-api"
+    When the CLI POSTs `{ source_type: "claude_code", project: "<the project id>" }`
+    Then the response status is 201
+    And the body carries the one-time `token`, its `prefix`, the OTLP `endpoint`
+    And the body carries `project` with the resolved id, slug and name
+    And the key is bound to "checkout-api" only
+
+  @integration @ingest-api-key @issue @project-scoped
+  Scenario: The CLI mints an ingestion key for a project named by slug
+    Given jane holds a device session in organization "acme"
+    And jane has traces:create on team project "checkout-api"
+    When the CLI POSTs `{ source_type: "claude_code", project: "checkout-api" }`
+    Then the response status is 201
+    And the resolved project in the body is "checkout-api"
+
+  @integration @ingest-api-key @issue @project-scoped
+  Scenario: Minting into a project the caller cannot write to is refused
+    Given jane holds a device session in organization "acme"
+    And jane has no traces:create on team project "payments-api"
+    When the CLI POSTs `{ source_type: "claude_code", project: "payments-api" }`
+    Then the response status is 403
+    And the response body contains `{ "error": "forbidden" }`
+    And no ingestion key is created
+
+  @integration @ingest-api-key @issue @project-scoped
+  Scenario: A project in another organization is not found
+    Given jane holds a device session in organization "acme"
+    And project "other-co-api" belongs to organization "other-co"
+    When the CLI POSTs `{ source_type: "claude_code", project: "other-co-api" }`
+    Then the response status is 404
+    And the response body contains `{ "error": "project_not_found" }`
+    And nothing tells jane whether that project exists elsewhere
+
+  @integration @ingest-api-key @issue @project-scoped @create-only
+  Scenario: Two machines each keep a live key for the same project and tool
+    Given jane already minted an ingestion key for "checkout-api" and "claude_code"
+    When her second machine mints one for the same project and source type
+    Then both tokens authorize trace writes into "checkout-api"
+    And neither key is revoked by the other
+
+  # ---------------------------------------------------------------------------
   # Ingest-only RBAC — the genuinely-write-only guarantee
   # ---------------------------------------------------------------------------
 

@@ -182,17 +182,9 @@ async function main() {
   }
   console.error(`[relogin] vk=${issued.virtualKey.id}`);
 
-  await approveDeviceCode({
-    deviceCode,
-    userId: user.id,
-    organizationId,
-    personalVk: {
-      id: issued.virtualKey.id,
-      label: issued.virtualKey.name ?? "default-personal",
-      secret: issued.secret!,
-      base_url: "http://localhost:5563",
-    },
-  });
+  // A device-session approval carries no credential, so the key issued above
+  // is the one the account holds; the CLI reaches it on its first gateway call.
+  await approveDeviceCode({ deviceCode, userId: user.id, organizationId });
   console.error(
     `[relogin] approved, waiting for poll → saveConfig → shell-rc prompt`,
   );

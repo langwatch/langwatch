@@ -32,12 +32,9 @@ import * as readline from "node:readline";
 import chalk from "chalk";
 
 import {
-	codexHasNotifyBlock,
 	type CodexNotifyWriteResult,
-	codexNotifyCommand,
 	codexNotifyCommandIsEphemeral,
 	codexOtelBlockHasAuthHeader,
-	codexTraceEndpoint,
 	defaultCodexConfigPath,
 	defaultCodexNotifyCommand,
 	displayCodexConfigPath,
@@ -58,15 +55,6 @@ import {
 	removeSessionContextHooks,
 } from "./session-context-hooks";
 import { type GovernanceConfig, saveConfig } from "./config";
-import { envForTool, type ToolEnv } from "./tool-env";
-
-/**
- * Wrapped tools included in the union'd export block. copilot is
- * deliberately ABSENT: its gateway env is COPILOT_PROVIDER_* BYOK vars,
- * and a global export would force every bare `copilot` run into gateway
- * billing (off the user's Copilot seat) — ADR-039 Decision 7.
- */
-const TOOLS = ["claude", "codex", "cursor", "gemini", "opencode"] as const;
 
 /**
  * Tools whose Path B telemetry persists as a scoped shell function (no
@@ -90,7 +78,11 @@ export const SHELL_FUNCTION_TOOLS: readonly string[] = [
 const BLOCK_BEGIN = "# >>> langwatch begin >>>";
 const BLOCK_END = "# <<< langwatch end <<<";
 
-/** Markers for the global gateway export block (init-shell / legacy persist). */
+/**
+ * Markers for the legacy global gateway export block. Nothing writes this
+ * block anymore; logout still knows the markers so it can clean up blocks
+ * written by older CLI versions.
+ */
 export const GATEWAY_RC_MARKERS = { begin: BLOCK_BEGIN, end: BLOCK_END };
 
 /**
@@ -185,33 +177,6 @@ export function rcHasLangwatchBlock({
 	} catch {
 		return false;
 	}
-}
-
-/**
- * Build the export-block body (without the begin/end markers) for
- * the given shell. Iterates the 5 wrapped tools and dedups env keys
- * so a multi-provider tool (cursor / opencode) doesn't repeat
- * OPENAI_* + ANTHROPIC_*.
- */
-export function buildExportBlock(
-	cfg: GovernanceConfig,
-	shell: DetectedShell,
-): string {
-	const seen = new Set<string>();
-	const entries: Array<[string, string]> = [];
-	for (const tool of TOOLS) {
-		const env: ToolEnv = envForTool(cfg, tool);
-		for (const [k, v] of Object.entries(env.vars)) {
-			if (seen.has(k)) continue;
-			seen.add(k);
-			entries.push([k, v]);
-		}
-	}
-	const fmt =
-		shell === "fish"
-			? ([k, v]: [string, string]) => `set -gx ${k} ${quote(v)}`
-			: ([k, v]: [string, string]) => `export ${k}=${quote(v)}`;
-	return entries.map(fmt).join("\n");
 }
 
 function quote(s: string): string {
@@ -466,61 +431,15 @@ export async function maybeOfferIngestionShellRcPersist({
 		return;
 	}
 
-	// codex has a native app-scoped target too: its [otel] block in
-	// ~/.codex/config.toml takes an inline Authorization header, so the
-	// ingest token scopes to codex runs instead of leaking into every
-	// shell child via the profile rc. The wrapper already wrote the
-	// endpoint-only block during setup; persisting adds the header so a
-	// plain `codex` captures.
+	// codex needs no prompt here: the wrapper's per-run [otel] write
+	// persists the Authorization header inline in ~/.codex/config.toml
+	// (0600, marker-managed, removed by `langwatch logout`), so a plain
+	// `codex` already captures. What can still be missing on an older
+	// install is the turn harvest, the notify hook that recovers the
+	// conversation content those exports carry none of. Assert it under
+	// the same grant.
 	if (tool === "codex") {
-		const configPath = defaultCodexConfigPath();
-		if (codexOtelBlockHasAuthHeader(configPath)) {
-			// The exports are current, but the turn harvest may not be: it is what
-			// recovers the conversation those exports carry none of, and it is a
-			// separate write into the same file under the same grant. Assert it here
-			// rather than leaving content recovery off every device that persisted
-			// the header on an earlier run.
-			assertCodexTurnHarvest();
-			return;
-		}
-
-		const endpointBase = vars.OTEL_EXPORTER_OTLP_ENDPOINT;
-		const token = bearerFromHeaders(vars.OTEL_EXPORTER_OTLP_HEADERS);
-		if (!endpointBase || !token) return;
-
-		console.log();
-		const choice = await askPersistChoice({
-			target: displayCodexConfigPath(),
-			tool,
-			question: codexConsentQuestion(configPath),
-		});
-		if (choice === "skip" || choice === "no") return;
-		if (choice === "never") {
-			recordNeverChoice(cfg);
-			return;
-		}
-		try {
-			writeCodexOtelBlock(
-				{
-					endpoint: codexTraceEndpoint(endpointBase),
-					ingestionToken: token,
-					environment: cfg.organization?.slug ?? "langwatch",
-				},
-				{ persistAuthHeader: true },
-			);
-			console.log(
-				chalk.green(
-					`  ✓ Installed langwatch telemetry exports to ${displayCodexConfigPath()}`,
-				),
-			);
-			assertCodexTurnHarvest();
-		} catch (err) {
-			console.log(
-				chalk.yellow(
-					`  ! Couldn't write to ${displayCodexConfigPath()}: ${(err as Error).message}`,
-				),
-			);
-		}
+		assertCodexTurnHarvest();
 		return;
 	}
 
@@ -632,34 +551,7 @@ export function installCodexTurnHarvest(
 }
 
 /**
- * What the user is agreeing to when they keep codex capture on.
- *
- * "Keeps capturing" would understate it: this asks codex to RUN a program after
- * every completed turn, and codex allows exactly one, so a program the user
- * already set is started by ours from then on. A bare Enter is a yes, so both
- * facts are in the question rather than printed after the answer. The
- * displacement is named only when there is something to displace, since our own
- * block already accounts for one.
- */
-function codexConsentQuestion(configPath: string): string {
-	const lines = [
-		"LangWatch can keep capturing codex sessions after this one.",
-		`It saves your LangWatch connection details to ${displayCodexConfigPath()}, and asks`,
-		"codex to run `langwatch ingest codex` after every completed turn so the",
-		"conversation is recorded.",
-	];
-	if (codexNotifyCommand(configPath) && !codexHasNotifyBlock(configPath)) {
-		lines.push(
-			"Codex runs a single program after a turn, so the one you have set will be",
-			"started by this one instead of by codex.",
-		);
-	}
-	lines.push("Install it?");
-	return lines.join("\n");
-}
-
-/**
- * Assert the turn harvest for codex, which belongs to the same "yes" that
+ * Assert the turn harvest for codex, which belongs to the same wiring that
  * persisted the exports: those exports carry no conversation, and this is what
  * recovers it. Idempotent, and quiet unless it changed something.
  *
@@ -668,7 +560,7 @@ function codexConsentQuestion(configPath: string): string {
  * config shape the merge refuses, which the user can fix and would otherwise
  * never hear about.
  */
-function assertCodexTurnHarvest(): void {
+export function assertCodexTurnHarvest(): void {
 	let outcome: CodexTurnHarvestOutcome;
 	try {
 		outcome = installCodexTurnHarvest();
@@ -784,13 +676,3 @@ function recordNeverChoice(cfg: GovernanceConfig): void {
 	}
 }
 
-/**
- * Pull the bearer token out of an `OTEL_EXPORTER_OTLP_HEADERS` value
- * shaped like `Authorization=Bearer <token>`. Returns null when the
- * header is absent or malformed.
- */
-function bearerFromHeaders(headers: string | undefined): string | null {
-	if (!headers) return null;
-	const m = /Bearer\s+(\S+)/.exec(headers);
-	return m ? m[1]! : null;
-}

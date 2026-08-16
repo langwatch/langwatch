@@ -314,7 +314,10 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Tools
 
-- [Claude Code Integration Guide](https://langwatch.ai/docs/integration/tools/integrations/claude-code.md): Monitor Claude Code usage with LangWatch using OpenTelemetry traces
+- [Claude Code Integration Guide](https://langwatch.ai/docs/integration/tools/integrations/claude-code.md): Send Claude Code sessions, cost and traces to LangWatch with the LangWatch command line tool.
+- [OpenAI Codex CLI Integration Guide](https://langwatch.ai/docs/integration/tools/integrations/openai-codex.md): Send OpenAI Codex CLI sessions, cost and traces to LangWatch with the LangWatch command line tool.
+- [GitHub Copilot Integration Guide](https://langwatch.ai/docs/integration/tools/integrations/github-copilot-cli.md): Send GitHub Copilot CLI and Copilot Chat sessions, cost and traces to LangWatch with the LangWatch command line tool.
+- [opencode Integration Guide](https://langwatch.ai/docs/integration/tools/integrations/opencode.md): Send opencode sessions, cost and traces to LangWatch with the LangWatch command line tool.
 - [OpenClaw Integration](https://langwatch.ai/docs/integration/openclaw.md): Send OpenTelemetry traces from your OpenClaw agent to LangWatch for observability, cost tracking, and evaluation.
 
 ## No-Code Platforms

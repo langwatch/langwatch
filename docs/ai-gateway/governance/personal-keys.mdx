@@ -149,33 +149,27 @@ $ langwatch opencode                          # opens opencode with gateway env
 
 <Info>**Verified end-to-end in CI.** `langwatch login` + each of the five wrappers above (`claude`, `codex`, `cursor`, `gemini`, `opencode`) is exercised in the `governance-wrapper.e2e.test.ts` Node-only e2e suite (fake control-plane, fake gateway, mocked tool binaries) covering login config write, env-var injection, routing with bearer-VK, budget pre-flight (402/200/5xx), and exit-code propagation. 16 scenarios, 3-second runtime, runs on every PR. See [CLI debug → e2e coverage](/ai-governance/cli-debug#cli-wrapper-e2e-coverage) for the assertion shape per tool.</Info>
 
-### 4. Or, set it up always-on
+### 4. Or, set it up without the wrapper
 
-If typing `langwatch` every time is friction, you can have your
-shell pre-export the env vars so plain `claude`, `codex`, etc.
-already route through the gateway:
+If typing `langwatch` every time is friction, `langwatch instrument
+<tool>` writes the telemetry wiring for a tool and exits. A plain
+`claude` or `codex` run then reports to LangWatch on its own:
 
-<CodeGroup>
-
-```bash zsh / bash
-# Add to your ~/.zshrc or ~/.bashrc
-eval "$(langwatch init-shell zsh)"
+```bash
+langwatch instrument claude
+langwatch instrument codex
 ```
 
-```fish fish
-# Add to your ~/.config/fish/config.fish
-langwatch init-shell fish | source
-```
+Claude Code takes an `env` block in `~/.claude/settings.json`, Codex
+takes an `[otel]` block in `~/.codex/config.toml`, and the other tools
+take a scoped function in your shell start file, which applies to that
+tool and to nothing else. Add `--project <id-or-slug>` to send the
+telemetry to a team project, or `--key <ingest-key>` on a machine that
+never logs in. See the [Claude Code integration
+guide](/integration/tools/integrations/claude-code).
 
-```powershell PowerShell
-# Add to your $PROFILE
-langwatch init-shell powershell | Invoke-Expression
-```
-
-</CodeGroup>
-
-After re-sourcing your shell rc, `claude` (without the wrapper)
-talks to the gateway too.
+The model calls keep going wherever the tool itself points them. To
+route them through the gateway, start the tool with the wrapper.
 
 ## Your dashboard
 
@@ -206,14 +200,18 @@ $ langwatch claude
 
    Admin: platform-team@your-company.com
 
-   Need urgent access? Run:
-     langwatch request-increase
+   Need urgent access? Request an increase:
+     https://app.langwatch.ai/me/budget/request?scope=user&scope_id=user_2a1f&limit_usd=500.00&spent_usd=500.00
 ```
 
-`langwatch request-increase` opens your dashboard at the budget-request
-page (the URL carries the user / limit / spent params HMAC-signed) so
-the admin sees the request with full context and can adjust your
-budget in real time. No token re-issuance is required.
+The server builds that link and returns it with the budget response. It
+carries the blocked scope, the scope id, the limit and the spend as query
+parameters, so the budget-request page opens with the context already
+filled in and the admin can change your limit at once. On an older server
+that returns no link, the CLI prints the plain
+`https://app.langwatch.ai/me/budget/request` page instead, and the
+dashboard reads the same context from your signed-in session. No token
+re-issuance is required.
 
 Budgets reset on the period your admin configured (monthly or
 weekly).

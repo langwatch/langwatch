@@ -143,17 +143,10 @@ async function main() {
   }
   console.error(`[runner] minted personal VK id=${issued.virtualKey.id}`);
 
-  await approveDeviceCode({
-    deviceCode,
-    userId,
-    organizationId,
-    personalVk: {
-      id: issued.virtualKey.id,
-      label: issued.virtualKey.name,
-      secret: issued.secret,
-      base_url: issued.baseUrl,
-    },
-  });
+  // A device-session approval carries no credential: the CLI issues the
+  // personal virtual key itself on the first gateway call. The key minted
+  // above is what `whoami` reports below.
+  await approveDeviceCode({ deviceCode, userId, organizationId });
   console.error(`[runner] approveDeviceCode flipped to approved`);
 
   // CLI polls every ~3s; wait for it to complete.

@@ -14,10 +14,14 @@ without LangWatch ever participating in the upstream tool's authentication.
 
 You install a template, paste an **ingestion key** into your tool's OTLP exporter, and
 traces land at `/me/traces` already shaped into the canonical `gen_ai.*` form, cost,
-tokens, and model populated automatically. An ingestion key is just an
-[API key](/platform/api-keys) (`sk-lw-…`) scoped to one project with a write-only,
-ingest-only role: it can create traces and nothing else, so it's safe to spray into an
-agent's environment.
+tokens, and model populated automatically. An ingestion key is one
+[API key](/platform/api-keys) row with an `ik-lw-…` prefix, scoped to one project with a
+write-only, ingest-only role: it can create traces and nothing else. That is a much
+smaller blast radius than a full project key (`sk-lw-…`), which can read and change your
+project data, so the prefix tells you which one you are holding at a glance. An ingestion
+key is still a secret: the traces it writes carry your prompts and your tool content, and
+anyone who holds the key can write into your project. Protect it the same way you protect
+any other credential.
 
 ---
 
@@ -51,7 +55,7 @@ That's an Ingestion Template:
   admins click **Clone to customise** which calls
   `ingestionTemplates.cloneFromPlatform`, then **Edit OTTL** on the new org-authored
   row to refine the rules.
-- **User side:** an ingestion key (`sk-lw-…`) scoped to your personal project with a
+- **User side:** an ingestion key (`ik-lw-…`) scoped to your personal project with a
   write-only, ingest-only role. You paste that key into your tool's OTLP exporter; the
   tool ships, the receiver verifies the key, ceilings it to ingest-only, lands the trace
   in the key's bound project, and applies the referenced template's OTTL (empty for
@@ -96,13 +100,13 @@ gen_ai.\* canonical. Cost/tokens/model populated automatically by the receiver."
 The drawer shows:
 
 - **OTLP endpoint**: read-only, copyable.
-- **Ingestion key**: `sk-lw-…` issued one-time, with a Show/Hide toggle. Copy it
+- **Ingestion key**: `ik-lw-…` issued one-time, with a Show/Hide toggle. Copy it
   while it's visible; after you dismiss the drawer it's masked to its first
   characters.
 - **Snippet preview**: pre-wired environment variables for Claude Code:
   ```bash
   export OTEL_EXPORTER_OTLP_ENDPOINT="https://app.langwatch.ai/api/otel"
-  export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer sk-lw-<your-key>"
+  export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ik-lw-<your-key>"
   ```
   (Self-hosted: replace the host with your LangWatch base URL. The drawer always
   shows the correct endpoint for your instance.)
@@ -187,10 +191,10 @@ shape.
 
 ### Receiver resolution flow
 
-When your tool emits an OTLP payload with `Authorization: Bearer sk-lw-<key>`, the
+When your tool emits an OTLP payload with `Authorization: Bearer ik-lw-<key>`, the
 receiver:
 
-1. **Prefix-discriminates** the bearer, `sk-lw-*` → ApiKey verification path.
+1. **Prefix-discriminates** the bearer, `ik-lw-*` → ApiKey verification path.
 2. **Verifies** the key (HMAC + pepper) and resolves the `ApiKey` row, the same path
    any SDK or management key takes.
 3. **Ceilings to ingest-only.** An ingestion key carries a write-only, ingest-only role
@@ -290,7 +294,7 @@ For security reviewers evaluating the feature.
 
 ### Trust boundary
 
-- **Credential = scope.** The `sk-lw-*` ingestion key authoritatively determines which
+- **Credential = scope.** The `ik-lw-*` ingestion key authoritatively determines which
   project a trace lands in, and its write-only ingest-only role caps it to
   `traces:create`. Payload-level claims about user, team, org, project attribution are
   advisory and re-stamped post-OTTL.
@@ -369,8 +373,10 @@ SOC2, ISO27001 evidence collection.
 ### Does LangWatch see my Anthropic OAuth token?
 
 No. Claude Code holds your Anthropic OAuth session locally; LangWatch never participates
-in that flow. The only credential LangWatch holds is the ingestion key (`sk-lw-…`) we
-mint for you, which is scoped to your personal project and write-only.
+in that flow. For this path the credential LangWatch holds is the ingestion key (`ik-lw-…`)
+we mint for you, which is scoped to your personal project and write-only. Device approval
+mints no virtual key. If you later send traffic through the AI Gateway, that first call
+issues a personal virtual key (`vk-lw-…`) as well.
 
 ### What happens if I rotate the ingestion key?
 

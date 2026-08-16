@@ -1421,6 +1421,8 @@ export function initializeDefaultApp(options?: {
         })
       ).map((project) => project.id),
     sessions: codingAgentSessions,
+    touchCodingAgentPullRequestSeen: (params) =>
+      projects.touchCodingAgentPullRequestSeen(params),
   });
   requestBranchMapping.resolve((params) =>
     githubPullRequestMapping!.requestBranchMapping(params),

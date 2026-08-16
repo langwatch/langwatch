@@ -32,24 +32,12 @@ function describe(
     case "assistant_response":
       return `Assistant replied${attrs.model ? ` (${attrs.model})` : ""}`;
     case "api_request":
-      return "Model call started";
     case "api_response":
-      return "Model call completed";
-    case "api_error": {
-      const status = attrs.status_code;
-      return status === "429"
-        ? "Rate limited by the provider"
-        : `API call failed${status ? ` (${status})` : ""}`;
-    }
+    case "api_error":
     case "api_refusal":
-      return "The model refused this request";
-    // Distinct from the 429 above: that one is inferred from a failed call,
-    // this one is the agent saying so itself. The session rollup counts them
-    // apart, so the log list has to read apart too.
     case "rate_limit":
-      return "Rate limit reported by the agent";
     case "retries_exhausted":
-      return `Gave up after retrying${attrs.total_attempts ? ` (${attrs.total_attempts} attempts)` : ""}`;
+      return describeModelCallEvent({ event, attrs });
     case "tool_result":
       return `Tool ran${attrs.tool_name ? `: ${attrs.tool_name}` : ""}`;
     case "tool_decision": {
@@ -85,10 +73,51 @@ function describe(
       return `Sub-agent invoked${attrs.subagent_type ? `: ${attrs.subagent_type}` : ""}`;
     case "commit":
       return "Commit created";
+    case "turn_ttft":
+      return attrs.duration_ms
+        ? `First token after ${attrs.duration_ms} ms`
+        : "First token timing reported";
     default: {
       const exhaustive: never = event;
       return exhaustive;
     }
+  }
+}
+
+/** What became of one model call: it ran, it failed, or it was held back. */
+function describeModelCallEvent({
+  event,
+  attrs,
+}: {
+  event:
+    | "api_request"
+    | "api_response"
+    | "api_error"
+    | "api_refusal"
+    | "rate_limit"
+    | "retries_exhausted";
+  attrs: Record<string, string>;
+}): string {
+  switch (event) {
+    case "api_request":
+      return "Model call started";
+    case "api_response":
+      return "Model call completed";
+    case "api_error": {
+      const status = attrs.status_code;
+      return status === "429"
+        ? "Rate limited by the provider"
+        : `API call failed${status ? ` (${status})` : ""}`;
+    }
+    case "api_refusal":
+      return "The model refused this request";
+    // Distinct from the 429 above: that one is inferred from a failed call,
+    // this one is the agent saying so itself. The session rollup counts them
+    // apart, so the log list has to read apart too.
+    case "rate_limit":
+      return "Rate limit reported by the agent";
+    case "retries_exhausted":
+      return `Gave up after retrying${attrs.total_attempts ? ` (${attrs.total_attempts} attempts)` : ""}`;
   }
 }
 
