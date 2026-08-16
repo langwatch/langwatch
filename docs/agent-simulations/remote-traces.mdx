@@ -1,0 +1,147 @@
+---
+title: Remote Traces
+sidebarTitle: Remote traces
+keywords: langwatch, agent simulations, remote traces, traceparent, trace propagation, judge, tool calls, opentelemetry
+description: Judge scenario criteria against what your agent did, tool calls, writes and retrievals, read from its own traces rather than from its reply text.
+---
+
+# Remote Traces
+
+Remote traces are the agent's own execution traces, which the judge fetches from LangWatch before its verdict. An agent behind an HTTP endpoint returns final text; its traces carry what happened on the way there: the span tree, the tool calls with their inputs and outputs, the retrievals, the writes. The judge reads them next to the conversation, so it verifies a criterion about behavior against evidence.
+
+For example, a support agent replies "your order ships Tuesday". The reply alone cannot show whether the agent looked the order up or made the date up. The trace shows the `lookup_order` tool call and its result, and the judge scores the criterion "the agent looks up the order before answering" from that span.
+
+## One trace per conversation turn
+
+Each turn of a simulation runs as one LangWatch trace, grouped under the run's thread. On every call to an HTTP agent, the platform sends that turn's W3C `traceparent` header. When the agent's server adopts the header, the spans it produces during the turn land in the same trace, in the same project.
+
+Adoption is one change on the agent's side, and no change at all when the server runs OpenTelemetry HTTP auto-instrumentation. The snippets are in [Connect your agent](/agent-simulations/connect-your-agent#4-adopt-the-trace-context).
+
+The agent must report its traces to the same LangWatch project that runs the scenarios. Traces in another project are invisible to the judge.
+
+## Propagation surfaces
+
+| Target | How the trace context reaches your system |
+|---|---|
+| HTTP agent | The `traceparent` header, sent on every call. Always on. |
+| HTTP agent, custom header or body field | `{{ traceId }}` and `{{ traceparent }}` render in the URL, the header values and the body template, for a system that reads `X-Trace-Id: {{ traceId }}` or a body field instead of the standard header. |
+| Code agent | `params.trace_id` and `params.traceparent`, injected at call time, for the Python code to forward to whatever it calls. |
+| Workflow | `params.trace_id` and `params.traceparent`, injected at call time, readable by the workflow's nodes. |
+
+`trace_id` and `traceparent` are reserved parameter names: the injected values win over a run parameter with the same name.
+
+## What the judge sees
+
+Before its verdict on a run against an HTTP agent, the judge fetches every trace the conversation produced, one per turn, and reads:
+
+- the span tree, with timing,
+- each tool call, with its input and its output,
+- the agent's inner model calls, retrievals and writes.
+
+The fetch filters out infrastructure spans from the call plumbing itself. The judge cites spans in its reasoning, and the run detail links each turn to its trace, so you can open exactly what the judge read.
+
+## How long the verdict waits
+
+Traces arrive with ingest delay, so the verdict waits for them, bounded. The wait ends as soon as the trace is complete: every agent span's parent is present, which is how the fetch tells a fully ingested trace from one that is still arriving. The platform sizes the maximum wait from the project's own ingest speed over the last 7 days, between 10 and 120 seconds, and uses 60 seconds when the project has few recent traces.
+
+Conversation turns never wait. Mid-conversation, the judge only decides whether the conversation should continue or end; the verdict itself is a separate call, made after the conversation ends, and the wait for traces happens exactly once, right before it.
+
+## When traces do not arrive
+
+When no trace arrives inside the wait, the judge sees a collection error carrying the reason in place of the trace, and marks trace-dependent criteria **inconclusive**. It never marks them passed without the trace. Criteria about the conversation text alone still resolve normally: an agent that has not adopted trace propagation is judged this way on every run, with only its internal-behavior criteria needing the traces.
+
+When the wait ends with a trace that is still incomplete, the judge keeps every span that arrived plus the collection error. Criteria the visible spans prove still pass; criteria that need the missing spans go inconclusive.
+
+When no trace of the run ever arrived, an inconclusive verdict ends the run instead of continuing the conversation: more turns cannot produce trace evidence, so the run does not stretch to the turn cap waiting for traces that will not come.
+
+An inconclusive behavior criterion is the signal to check propagation and the project key; the [common failures](/agent-simulations/connect-your-agent#common-failures) table covers the causes.
+
+## Writing trace-aware criteria
+
+Write the criterion about the action, in your system's own vocabulary, and the judge verifies it against the spans:
+
+- The agent queried the requirements table before answering.
+- The agent retrieved the refund policy document before promising a refund.
+- The agent created exactly one support ticket.
+- The agent did not call the payments API.
+
+A criterion that names an action your traces do not record cannot be verified. Instrument the action, or reword the criterion to something the conversation itself proves.
+
+## Remote traces in code-first scenarios
+
+The Scenario SDKs fetch remote traces from LangWatch with a flag on the run or on the global configuration:
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import scenario
+
+    scenario.configure(
+        default_model="openai/gpt-5",
+        fetch_remote_traces=True,
+        trace_wait_timeout=60.0,  # seconds to wait for traces before the verdict
+    )
+    ```
+
+    `scenario.run()` also accepts both settings, for one run.
+  </Tab>
+  <Tab title="TypeScript">
+    ```typescript
+    const result = await scenario.run({
+      // ...
+      fetchRemoteTraces: true,
+      traceWaitTimeoutMs: 60_000,
+    });
+    ```
+
+    `scenario.config.js` also accepts both settings, for the whole project.
+  </Tab>
+</Tabs>
+
+When your adapter calls the agent over HTTP, spread the propagation headers onto the outgoing request, so the remote service joins each turn's trace:
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import requests
+
+    class MyAgent(scenario.AgentAdapter):
+        async def call(self, input: scenario.AgentInput) -> scenario.AgentReturnTypes:
+            response = requests.post(
+                "https://staging.example.com/chat",
+                json={"messages": input.messages},
+                headers={**input.propagation_headers},
+            )
+            return response.json()["reply"]
+    ```
+  </Tab>
+  <Tab title="TypeScript">
+    ```typescript
+    const myAgent: AgentAdapter = {
+      role: AgentRole.AGENT,
+      call: async (input) => {
+        const response = await fetch("https://staging.example.com/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...input.propagationHeaders },
+          body: JSON.stringify({ messages: input.messages }),
+        });
+        const data = await response.json();
+        return data.reply;
+      },
+    };
+    ```
+  </Tab>
+</Tabs>
+
+For the full SDK reference, see the [Scenario documentation](https://langwatch.ai/scenario/).
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Connect your agent" icon="plug" href="/agent-simulations/connect-your-agent">
+    Register your agent's HTTP endpoint and adopt the trace context
+  </Card>
+  <Card title="Local development" icon="laptop-code" href="/agent-simulations/local-development">
+    Run platform suites against the agent on your machine with a tunnel
+  </Card>
+</CardGroup>

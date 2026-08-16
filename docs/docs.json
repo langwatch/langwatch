@@ -74,6 +74,9 @@
             "group": "Agent Simulations",
             "pages": [
               "agent-simulations/introduction",
+              "agent-simulations/connect-your-agent",
+              "agent-simulations/remote-traces",
+              "agent-simulations/local-development",
               "agent-simulations/getting-started",
               "agent-simulations/scenario-parameters",
               "agent-simulations/authenticated-agents",
