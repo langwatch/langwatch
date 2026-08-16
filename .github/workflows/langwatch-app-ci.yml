@@ -309,6 +309,15 @@ jobs:
         if: matrix.shard == 1
         run: pnpm --filter @langwatch/observability run test:unit
 
+      # Same reason again. This package owns the retry classifier, the
+      # concurrency limiter and the tenant routing every ClickHouse statement
+      # passes through — and the app's own suites exercise it only through the
+      # managedClient assembly, so a regression in an unassembled path (the
+      # query client, the router) would otherwise ship untested.
+      - name: Run @langwatch/clickhouse-client unit tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/clickhouse-client run test:unit
+
       - name: Run unit tests (shard ${{ matrix.shard }}/4)
         id: unit-tests
         working-directory: platform/app

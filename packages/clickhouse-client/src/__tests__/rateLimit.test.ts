@@ -3,8 +3,8 @@ import {
   AcquireAbortedError,
   ConcurrencyLimiter,
   QueueFullError,
-} from "./rateLimit";
-import { ClickHouseQueryClient } from "./client";
+} from "../rateLimit";
+import { ClickHouseQueryClient } from "../client";
 
 /** A task whose completion the test controls. */
 const deferred = () => {

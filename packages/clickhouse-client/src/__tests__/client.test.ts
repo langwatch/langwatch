@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { ClickHouseQueryClient } from "./client";
-import type { QueryRequest } from "./query";
-import { ConcurrencyLimiter } from "./rateLimit";
-import { RetryPolicy } from "./retry";
-import { TenantGuard, TenantScopeError } from "./tenantGuard";
-import { QueryTracer } from "./tracing";
+import { ClickHouseQueryClient } from "../client";
+import type { QueryRequest } from "../query";
+import { ConcurrencyLimiter } from "../rateLimit";
+import { RetryPolicy } from "../retry";
+import { TenantGuard, TenantScopeError } from "../tenantGuard";
+import { QueryTracer } from "../tracing";
 
 /**
  * The order the client runs its policies in.

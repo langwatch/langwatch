@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import type { QueryDriver, QueryRequest } from "./query";
-import { ClickHouseQueryClient } from "./client";
+import type { QueryDriver, QueryRequest } from "../query";
+import { ClickHouseQueryClient } from "../client";
 import {
   checkTenantScope,
   TenantGuard,
   type TenantGuardOptions,
   TenantScopeError,
-} from "./tenantGuard";
+} from "../tenantGuard";
 
 const TENANT = "project_abc";
 

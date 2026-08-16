@@ -7,7 +7,7 @@ import {
   MAX_POOL_SIZE,
   poolSizingFromEnv,
   resolvePoolSize,
-} from "./pool";
+} from "../pool";
 
 describe("deriveFleetPoolCeiling", () => {
   describe("given the fleet size is unknown", () => {

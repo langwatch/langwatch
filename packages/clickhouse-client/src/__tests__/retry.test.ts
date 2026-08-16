@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { QueryRequest } from "./query";
-import { RetryPolicy, runWithRetry } from "./retry";
+import type { QueryRequest } from "../query";
+import { RetryPolicy, runWithRetry } from "../retry";
 
 const request: QueryRequest = {
   tenantId: "project_1",

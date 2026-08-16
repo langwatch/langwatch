@@ -5,7 +5,7 @@ import {
   VENDOR_CAUSE_FIELD,
   type VendorLogRecord,
   type VendorLogSink,
-} from "./logging";
+} from "../logging";
 
 const record: VendorLogRecord = {
   module: "Connection",

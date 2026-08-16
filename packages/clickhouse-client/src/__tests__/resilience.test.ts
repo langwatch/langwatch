@@ -3,7 +3,7 @@ import {
   isTransientClickHouseError,
   jitteredBackoffMs,
   retryNoticeLevel,
-} from "./resilience";
+} from "../resilience";
 
 const withCode = ({
   message,

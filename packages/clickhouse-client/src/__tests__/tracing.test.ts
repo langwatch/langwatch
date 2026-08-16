@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import type { QueryRequest } from "./query";
+import type { QueryRequest } from "../query";
 import {
   SPAN_ATTRIBUTES,
   type SpanPort,
   type TracerPort,
   QueryTracer,
-} from "./tracing";
+} from "../tracing";
 
 const recordingTracer = () => {
   const attributes: Record<string, string | number | boolean> = {};
