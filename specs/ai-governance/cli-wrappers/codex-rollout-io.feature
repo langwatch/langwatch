@@ -156,3 +156,23 @@ Feature: Codex Path B recovers the full request body from the rollout transcript
       Given a rollout whose session_meta names no remote
       When the completed turn is harvested
       Then the conversation posts and no session-context record does
+
+  Rule: the harvest names the session
+
+    Codex generates no session title and its telemetry withholds prompt text,
+    so without the harvest every codex session reads as untitled. The rollout
+    records what the user typed as user_message events; the harvest puts the
+    first typed prompt on the session-context record and the platform names
+    the session from it.
+
+    @unit
+    Scenario: The harvest names the session by the first thing the user asked
+      Given a rollout whose first user_message is a typed prompt
+      When the completed turn is harvested
+      Then the session-context record carries the prompt's first line as the session title
+
+    @unit
+    Scenario: A machine-injected first prompt does not name the session
+      Given a rollout whose first user_message is injected context in a tag
+      When the completed turn is harvested
+      Then the session-context record carries no title

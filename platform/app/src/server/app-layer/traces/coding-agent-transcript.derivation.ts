@@ -6,6 +6,7 @@ import {
   parseMcpToolName,
   resolveConversationKey,
   resolveToolName,
+  WITHHELD_PROMPT_TEXT,
 } from "~/server/event-sourcing/pipelines/coding-agent-processing/services/coding-agent-normalization";
 import { isReplyTextPart } from "./canonicalisation/extractors/_parts";
 
@@ -275,16 +276,9 @@ export function buildCodingAgentTranscript({
  */
 const LOG_REPLY_FLUSH_SLACK_MS = 2_000;
 
-/**
- * The literal codex substitutes for prompt text it withholds
- * (`log_user_prompt` off, the default). The stub still reports the real
- * length on `prompt_length`.
- */
-const CODEX_WITHHELD_PROMPT_TEXT = "[REDACTED]";
-
 /** Whether a prompt entry's text is absent or the withheld-text sentinel. */
 function isWithheldPromptText(text: string | null): boolean {
-  return text === null || text === CODEX_WITHHELD_PROMPT_TEXT;
+  return text === null || text === WITHHELD_PROMPT_TEXT;
 }
 
 /** A span-derived reply plus the call window a log duplicate would land in. */
@@ -882,7 +876,7 @@ function logToEntry({
       // A withheld prompt's chars come from prompt_length: the sentinel's own
       // length says nothing about what the user typed.
       const chars =
-        text !== null && text !== CODEX_WITHHELD_PROMPT_TEXT
+        text !== null && text !== WITHHELD_PROMPT_TEXT
           ? text.length
           : (readNumber(attrs, "prompt_length") ?? 0);
       return { kind: "user_prompt", atMs, text, chars };

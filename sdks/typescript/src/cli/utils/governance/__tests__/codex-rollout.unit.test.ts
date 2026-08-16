@@ -397,6 +397,7 @@ describe("parseCodexRollout", () => {
           cwd: "/home/dev/acme-app",
           gitBranch: "feat/pricing",
           gitRepositoryUrl: "https://github.com/acme/acme-app.git",
+          firstUserMessage: null,
         });
       });
     });
@@ -417,7 +418,31 @@ describe("parseCodexRollout", () => {
           cwd: "/w",
           gitBranch: null,
           gitRepositoryUrl: null,
+          firstUserMessage: null,
         });
+      });
+    });
+  });
+
+  describe("given user_message events recording what the user typed", () => {
+    const typed = (message: string) =>
+      ({ type: "event_msg", payload: { type: "user_message", message } });
+
+    describe("when the rollout is parsed", () => {
+      /** @scenario "The harvest names the session by the first thing the user asked" */
+      it("keeps the first typed prompt on the meta and ignores later ones", () => {
+        const { meta } = parseCodexRollout(
+          rollout(
+            { type: "session_meta", payload: { id: "019ff127-1111", cwd: "/w" } },
+            typed("fix the pricing bug"),
+            taskStarted("abc123", "t1"),
+            userMsg("fix the pricing bug"),
+            assistantMsg("done"),
+            typed("now add a test"),
+          ),
+        );
+
+        expect(meta?.firstUserMessage).toBe("fix the pricing bug");
       });
     });
   });

@@ -27,59 +27,85 @@ export const SESSION_CONTEXT_SCOPE_NAME = "langwatch.coding_agent.hook";
 /** Matches the service.name the CLI's other OTLP emitter reports. */
 const SERVICE_NAME = "langwatch-cli";
 
+/**
+ * The attribute a session's name rides on. Codex generates no title of its
+ * own, so the harvest names the session from the transcript's first typed
+ * prompt; the platform fills an empty title from it and lets an
+ * agent-generated title outrank it.
+ */
+const SESSION_TITLE_ATTR = "langwatch.session.title";
+
+/** The most of a prompt that becomes a session's name. */
+const MAX_PROMPT_TITLE_CHARS = 120;
+
+/**
+ * A session name out of a prompt's text: the first line, whitespace
+ * collapsed, capped. Null when the text is empty or opens with a tag —
+ * agents inject notifications and context as user turns wrapped in tags,
+ * and a session named `<environment_context>` names nothing.
+ */
+export function sessionTitleFromPrompt(text: string): string | null {
+	const trimmed = text.trim();
+	if (trimmed === "" || trimmed.startsWith("<")) return null;
+	const firstLine = trimmed.split(/\r?\n/, 1)[0] ?? "";
+	const collapsed = firstLine.replace(/\s+/g, " ").trim();
+	if (collapsed === "") return null;
+	return collapsed.slice(0, MAX_PROMPT_TITLE_CHARS);
+}
+
 /** INFO, from the OTel log data model severity numbers. */
 const SEVERITY_INFO = 9;
 
 /** The repository a session is working in, as its origin remote names it. */
 export interface RepositoryIdentity {
-  host: string;
-  owner: string;
-  name: string;
+	host: string;
+	owner: string;
+	name: string;
 }
 
 /** The git identity of one session at one moment. */
 export interface SessionContext {
-  repository: RepositoryIdentity;
-  /** Absent on a detached HEAD. */
-  branch?: string;
-  /** Absent unless the checkout is a linked worktree. */
-  worktree?: string;
+	repository: RepositoryIdentity;
+	/** Absent on a detached HEAD. */
+	branch?: string;
+	/** Absent unless the checkout is a linked worktree. */
+	worktree?: string;
 }
 
 /** The W3C trace context a Stop hook inherits from the live session. */
 export interface TraceContext {
-  traceId: string;
-  spanId: string;
+	traceId: string;
+	spanId: string;
 }
 
 interface OtlpAnyValue {
-  stringValue: string;
+	stringValue: string;
 }
 
 interface OtlpKeyValue {
-  key: string;
-  value: OtlpAnyValue;
+	key: string;
+	value: OtlpAnyValue;
 }
 
 interface OtlpLogRecord {
-  timeUnixNano: string;
-  severityNumber: number;
-  severityText: string;
-  eventName: string;
-  attributes: OtlpKeyValue[];
-  traceId?: string;
-  spanId?: string;
+	timeUnixNano: string;
+	severityNumber: number;
+	severityText: string;
+	eventName: string;
+	attributes: OtlpKeyValue[];
+	traceId?: string;
+	spanId?: string;
 }
 
 /** One OTLP/HTTP JSON logs request, carrying exactly one record. */
 export interface OtlpLogsPayload {
-  resourceLogs: Array<{
-    resource: { attributes: OtlpKeyValue[] };
-    scopeLogs: Array<{
-      scope: { name: string; version: string };
-      logRecords: OtlpLogRecord[];
-    }>;
-  }>;
+	resourceLogs: Array<{
+		resource: { attributes: OtlpKeyValue[] };
+		scopeLogs: Array<{
+			scope: { name: string; version: string };
+			logRecords: OtlpLogRecord[];
+		}>;
+	}>;
 }
 
 /** A URL with an explicit scheme, as opposed to the scp-like ssh shorthand. */
@@ -103,32 +129,35 @@ const ALL_ZERO = /^0+$/;
  * lives under.
  */
 export function parseGitRemoteUrl(url: string): RepositoryIdentity | null {
-  const trimmed = url.trim();
-  if (trimmed === "") return null;
+	const trimmed = url.trim();
+	if (trimmed === "") return null;
 
-  if (SCHEME.test(trimmed)) {
-    try {
-      const parsed = new URL(trimmed);
-      return identityFrom(parsed.hostname, parsed.pathname);
-    } catch {
-      return null;
-    }
-  }
+	if (SCHEME.test(trimmed)) {
+		try {
+			const parsed = new URL(trimmed);
+			return identityFrom(parsed.hostname, parsed.pathname);
+		} catch {
+			return null;
+		}
+	}
 
-  const scp = SCP_LIKE.exec(trimmed);
-  if (!scp) return null;
-  return identityFrom(scp[1]!, scp[2]!);
+	const scp = SCP_LIKE.exec(trimmed);
+	if (!scp) return null;
+	return identityFrom(scp[1]!, scp[2]!);
 }
 
-function identityFrom(host: string, rawPath: string): RepositoryIdentity | null {
-  const segments = rawPath.split("/").filter((segment) => segment !== "");
-  if (host === "" || segments.length < 2) return null;
+function identityFrom(
+	host: string,
+	rawPath: string,
+): RepositoryIdentity | null {
+	const segments = rawPath.split("/").filter((segment) => segment !== "");
+	if (host === "" || segments.length < 2) return null;
 
-  const name = segments[segments.length - 1]!.replace(/\.git$/i, "");
-  const owner = segments.slice(0, -1).join("/");
-  if (name === "" || owner === "") return null;
+	const name = segments[segments.length - 1]!.replace(/\.git$/i, "");
+	const owner = segments.slice(0, -1).join("/");
+	if (name === "" || owner === "") return null;
 
-  return { host: host.toLowerCase(), owner, name };
+	return { host: host.toLowerCase(), owner, name };
 }
 
 /**
@@ -137,11 +166,11 @@ function identityFrom(host: string, rawPath: string): RepositoryIdentity | null 
  * move to another worktree re-posts while a quiet session stays quiet.
  */
 export function sessionContextFingerprint({
-  repository,
-  branch,
-  worktree,
+	repository,
+	branch,
+	worktree,
 }: SessionContext): string {
-  return `${repository.host}/${repository.owner}/${repository.name}@${branch ?? ""}#${worktree ?? ""}`;
+	return `${repository.host}/${repository.owner}/${repository.name}@${branch ?? ""}#${worktree ?? ""}`;
 }
 
 /**
@@ -149,17 +178,19 @@ export function sessionContextFingerprint({
  * first `=` splitting the two) into a header map. A pair with no `=`, or an
  * empty key, is dropped rather than guessed at.
  */
-export function parseOtlpHeaders(raw: string | undefined): Record<string, string> {
-  const headers: Record<string, string> = {};
-  for (const pair of (raw ?? "").split(",")) {
-    const trimmed = pair.trim();
-    const separator = trimmed.indexOf("=");
-    if (separator <= 0) continue;
-    const key = trimmed.slice(0, separator).trim();
-    if (key === "") continue;
-    headers[key] = trimmed.slice(separator + 1).trim();
-  }
-  return headers;
+export function parseOtlpHeaders(
+	raw: string | undefined,
+): Record<string, string> {
+	const headers: Record<string, string> = {};
+	for (const pair of (raw ?? "").split(",")) {
+		const trimmed = pair.trim();
+		const separator = trimmed.indexOf("=");
+		if (separator <= 0) continue;
+		const key = trimmed.slice(0, separator).trim();
+		if (key === "") continue;
+		headers[key] = trimmed.slice(separator + 1).trim();
+	}
+	return headers;
 }
 
 /**
@@ -173,12 +204,12 @@ export function parseOtlpHeaders(raw: string | undefined): Record<string, string
  * that was never created.
  */
 export function parseTraceparent(raw: string | undefined): TraceContext | null {
-  const match = TRACEPARENT.exec(raw?.trim() ?? "");
-  if (!match) return null;
-  const traceId = match[1]!;
-  const spanId = match[2]!;
-  if (ALL_ZERO.test(traceId) || ALL_ZERO.test(spanId)) return null;
-  return { traceId, spanId };
+	const match = TRACEPARENT.exec(raw?.trim() ?? "");
+	if (!match) return null;
+	const traceId = match[1]!;
+	const spanId = match[2]!;
+	if (ALL_ZERO.test(traceId) || ALL_ZERO.test(spanId)) return null;
+	return { traceId, spanId };
 }
 
 /**
@@ -189,75 +220,79 @@ export function parseTraceparent(raw: string | undefined): TraceContext | null {
  * which is how the OTLP JSON encoding spells ids on the wire.
  */
 export function buildSessionContextLogPayload({
-  sessionId,
-  agent,
-  context,
-  timeUnixNano,
-  scopeVersion,
-  trace,
+	sessionId,
+	agent,
+	context,
+	timeUnixNano,
+	scopeVersion,
+	trace,
+	title,
 }: {
-  sessionId: string;
-  agent: string;
-  context: SessionContext;
-  timeUnixNano: string;
-  scopeVersion: string;
-  trace?: TraceContext | null;
+	sessionId: string;
+	agent: string;
+	context: SessionContext;
+	timeUnixNano: string;
+	scopeVersion: string;
+	trace?: TraceContext | null;
+	/** The session's name, for agents whose telemetry cannot carry one. */
+	title?: string | null;
 }): OtlpLogsPayload {
-  const attributes: OtlpKeyValue[] = [
-    attribute({ key: "event.name", value: SESSION_CONTEXT_EVENT_NAME }),
-    attribute({ key: "session.id", value: sessionId }),
-    attribute({ key: "coding_agent.name", value: agent }),
-    attribute({ key: "vcs.repository.host", value: context.repository.host }),
-    attribute({ key: "vcs.repository.owner", value: context.repository.owner }),
-    attribute({ key: "vcs.repository.name", value: context.repository.name }),
-  ];
-  if (context.branch) {
-    attributes.push(
-      attribute({ key: "vcs.ref.head.name", value: context.branch }),
-    );
-  }
-  if (context.worktree) {
-    attributes.push(
-      attribute({ key: "vcs.worktree.name", value: context.worktree }),
-    );
-  }
+	const attributes: OtlpKeyValue[] = [
+		attribute({ key: "event.name", value: SESSION_CONTEXT_EVENT_NAME }),
+		attribute({ key: "session.id", value: sessionId }),
+		attribute({ key: "coding_agent.name", value: agent }),
+		attribute({ key: "vcs.repository.host", value: context.repository.host }),
+		attribute({ key: "vcs.repository.owner", value: context.repository.owner }),
+		attribute({ key: "vcs.repository.name", value: context.repository.name }),
+	];
+	if (context.branch) {
+		attributes.push(
+			attribute({ key: "vcs.ref.head.name", value: context.branch }),
+		);
+	}
+	if (context.worktree) {
+		attributes.push(
+			attribute({ key: "vcs.worktree.name", value: context.worktree }),
+		);
+	}
+	if (title) {
+		attributes.push(attribute({ key: SESSION_TITLE_ATTR, value: title }));
+	}
 
-  return {
-    resourceLogs: [
-      {
-        resource: {
-          attributes: [
-            attribute({ key: "service.name", value: SERVICE_NAME }),
-          ],
-        },
-        scopeLogs: [
-          {
-            scope: { name: SESSION_CONTEXT_SCOPE_NAME, version: scopeVersion },
-            logRecords: [
-              {
-                timeUnixNano,
-                severityNumber: SEVERITY_INFO,
-                severityText: "INFO",
-                eventName: SESSION_CONTEXT_EVENT_NAME,
-                attributes,
-                ...(trace
-                  ? { traceId: trace.traceId, spanId: trace.spanId }
-                  : {}),
-              },
-            ],
-          },
-        ],
-      },
-    ],
-  };
+	return {
+		resourceLogs: [
+			{
+				resource: {
+					attributes: [attribute({ key: "service.name", value: SERVICE_NAME })],
+				},
+				scopeLogs: [
+					{
+						scope: { name: SESSION_CONTEXT_SCOPE_NAME, version: scopeVersion },
+						logRecords: [
+							{
+								timeUnixNano,
+								severityNumber: SEVERITY_INFO,
+								severityText: "INFO",
+								eventName: SESSION_CONTEXT_EVENT_NAME,
+								attributes,
+								...(trace
+									? { traceId: trace.traceId, spanId: trace.spanId }
+									: {}),
+							},
+						],
+					},
+				],
+			},
+		],
+	};
 }
 
 function attribute({
-  key,
-  value,
+	key,
+	value,
 }: {
-  key: string;
-  value: string;
+	key: string;
+	value: string;
 }): OtlpKeyValue {
-  return { key, value: { stringValue: value } };
+	return { key, value: { stringValue: value } };
 }

@@ -408,6 +408,82 @@ describe("harvestCodexThread", () => {
 		});
 	});
 
+	describe("given a session whose transcript records the typed prompt", () => {
+		const GIT = {
+			branch: "feat/pricing",
+			repository_url: "https://github.com/acme/acme-app.git",
+		};
+		const typedPrompt = (message: string) => ({
+			type: "event_msg",
+			payload: { type: "user_message", message },
+		});
+		let stateDir: string;
+
+		beforeEach(() => {
+			stateDir = mkdtempSync(join(tmpdir(), "lw-codex-state-"));
+		});
+
+		afterEach(() => {
+			rmSync(stateDir, { recursive: true, force: true });
+		});
+
+		const harvest = async (impl: typeof fetch) =>
+			harvestCodexThread({
+				threadId: THREAD,
+				nowMs: 1785654950000,
+				endpoint: "https://e/v1/traces",
+				logsEndpoint: "https://e/v1/logs",
+				token: "sk-lw-test",
+				sessionsRoot: root,
+				stateDir,
+				fetchImpl: impl,
+			});
+
+		const contextAttr = (bodies: any[], urls: string[], key: string) =>
+			bodies[urls.indexOf("https://e/v1/logs")].resourceLogs[0].scopeLogs[0].logRecords[0].attributes.find(
+				(a: any) => a.key === key,
+			)?.value?.stringValue;
+
+		describe("when the session is harvested", () => {
+			/** @scenario "The harvest names the session by the first thing the user asked" */
+			it("posts the prompt's first line as the session title", async () => {
+				writeRollout(THREAD, [
+					sessionMeta(GIT),
+					typedPrompt("Fix the pricing rounding bug\nStart with the invoice tests."),
+					taskStarted(TRACE),
+					userMessage("Fix the pricing rounding bug"),
+					agentFinal("done"),
+				]);
+				const { bodies, urls, impl } = recordingFetch();
+
+				await harvest(impl);
+
+				expect(contextAttr(bodies, urls, "langwatch.session.title")).toBe(
+					"Fix the pricing rounding bug",
+				);
+			});
+
+			/** @scenario "A machine-injected first prompt does not name the session" */
+			it("posts no title when the first prompt is an injected tag", async () => {
+				writeRollout(THREAD, [
+					sessionMeta(GIT),
+					typedPrompt("<environment_context>...</environment_context>"),
+					taskStarted(TRACE),
+					userMessage("hi"),
+					agentFinal("hello"),
+				]);
+				const { bodies, urls, impl } = recordingFetch();
+
+				await harvest(impl);
+
+				expect(urls).toContain("https://e/v1/logs");
+				expect(
+					contextAttr(bodies, urls, "langwatch.session.title"),
+				).toBeUndefined();
+			});
+		});
+	});
+
 	describe("given a session with no repository in its transcript", () => {
 		describe("when the session is harvested", () => {
 			/** @scenario "A session outside any repository posts its conversation and no context" */

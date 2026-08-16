@@ -27,6 +27,7 @@ import {
   parseGitRemoteUrl,
   type SessionContext,
   sessionContextFingerprint,
+  sessionTitleFromPrompt,
 } from "./session-context";
 
 /** Deterministic 16-hex span id derived from the turn's trace_id. */
@@ -393,6 +394,11 @@ export async function postCodexSessionContext(args: {
     context,
     timeUnixNano: `${nowMs}000000`,
     scopeVersion: LANGWATCH_SDK_VERSION,
+    // Codex generates no session title and withholds prompt text from its
+    // own events, so the transcript's first typed prompt names the session.
+    title: meta.firstUserMessage
+      ? sessionTitleFromPrompt(meta.firstUserMessage)
+      : null,
   });
   const doFetch = fetchImpl ?? fetch;
   const controller = new AbortController();
