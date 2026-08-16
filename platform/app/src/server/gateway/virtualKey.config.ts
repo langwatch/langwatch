@@ -122,7 +122,7 @@ export const virtualKeyConfigSchema = z.object({
    * gates, so a limit edited a minute ago applies to the next mint. Shipping
    * it on the bundle would put the limit on the config cache's clock and the
    * count on the database's, and this chain already carries one field that
-   * is materialised, sent and then dropped at decode with nothing reading it.
+   * is materialized, sent and then dropped at decode with nothing reading it.
    */
   realtime: z
     .object({

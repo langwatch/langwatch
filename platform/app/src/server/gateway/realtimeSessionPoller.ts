@@ -5,7 +5,7 @@
  * The webhook is the fast path, and it is one slot per workspace that a
  * customer may already be using for something else. Without a fallback the
  * broker would need that slot before a customer could adopt it at all, so
- * this poller makes the webhook an optimisation instead of a requirement.
+ * this poller makes the webhook an optimization instead of a requirement.
  *
  * The poll is exact, not a guess: the mint recorded the vendor's own
  * conversation id, so each open session is read back by id. A session with

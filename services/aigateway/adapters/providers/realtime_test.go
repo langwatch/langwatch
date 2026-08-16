@@ -66,8 +66,8 @@ func TestElevenLabsMintAsksForTheConversationIdAndReadsItBack(t *testing.T) {
 	assert.Contains(t, string(resp.Body), `"session_id":"req_abc"`)
 }
 
-// @scenario "A residency base URL on the credential is honoured"
-func TestElevenLabsMintHonoursAResidencyBaseURL(t *testing.T) {
+// @scenario "A residency base URL on the credential is honored"
+func TestElevenLabsMintHonorsAResidencyBaseURL(t *testing.T) {
 	t.Parallel()
 
 	var reached bool

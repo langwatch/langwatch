@@ -28,7 +28,7 @@ import {
 /**
  * The gateway spend pipeline is stubbed so a confirmation can be asserted on
  * its own. What the pipeline then does with it (rate, fold, debit every
- * budget the key is under) is the spend spine's own tested behaviour, and
+ * budget the key is under) is the spend spine's own tested behavior, and
  * this file's subject is the session record that produces the event.
  */
 const sentConfirmations = vi.hoisted(() => [] as Record<string, unknown>[]);

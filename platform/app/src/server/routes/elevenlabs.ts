@@ -90,7 +90,7 @@ const postCallSchema = z.object({
  * Verifies the `ElevenLabs-Signature: t=<unix>,v0=<hex>` header.
  *
  * The signed payload is the timestamp, a dot, then the raw request bytes, so
- * the body must be read as text and never re-serialised: a JSON round trip
+ * the body must be read as text and never re-serialized: a JSON round trip
  * reorders keys and the signature stops matching.
  */
 export function verifyElevenLabsSignature(params: {

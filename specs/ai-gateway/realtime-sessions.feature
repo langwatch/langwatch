@@ -87,7 +87,7 @@ Feature: Brokered realtime voice sessions on the AI Gateway
       # would get a working-looking URL that fails at the socket.
 
     @unit
-    Scenario: A residency base URL on the credential is honoured
+    Scenario: A residency base URL on the credential is honored
       Given the ElevenLabs provider is configured with a regional base URL
       When a signed URL is minted
       Then the mint call goes to that host

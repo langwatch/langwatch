@@ -77,7 +77,7 @@ export async function reserveRealtimeSession(
     // An advisory lock names no table and reads no row, so the raw-query
     // tenancy guard has nothing to check and is opted out of by name. The
     // lock key carries the tenancy itself: it is the project and the key
-    // together, so two projects never contend and one key's mints serialise
+    // together, so two projects never contend and one key's mints serialize
     // against each other, which is what makes the count below a cap.
     const lockKey = `${input.projectId}:${input.virtualKeyId}`;
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey})) -- @tenancy: a lock, not a read; the lock key is itself scoped to one project and key`;
