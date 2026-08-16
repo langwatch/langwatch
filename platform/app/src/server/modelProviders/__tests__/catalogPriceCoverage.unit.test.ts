@@ -24,9 +24,14 @@ import {
   matchModelCostWithFallbacks,
 } from "~/server/tracer/collector/cost";
 import { getStaticModelCosts } from "../llmModelCost";
+import * as baseRaw from "../llmModels.json";
 import * as overlayRaw from "../llmModels.overlay.json";
 import type { LLMModelEntry } from "../llmModels.types";
 import { llmModels, overlayOverriddenModelIds } from "../loadModelCatalog";
+
+const baseModels = (
+  baseRaw as unknown as { models: Record<string, LLMModelEntry> }
+).models;
 
 const overlayModels = (
   overlayRaw as unknown as { models: Record<string, LLMModelEntry> }
@@ -273,6 +278,56 @@ describe("overlay precedence", () => {
         expect(entry!.pricing.audioCostPerToken).toBe(1e-5);
         expect(entry!.pricing.inputCostPerToken).toBe(6e-7);
         expect(overlayOverriddenModelIds).toContain("openai/gpt-audio-mini");
+      });
+    });
+  });
+
+  // Everything above reads the merged catalog object. That is not the thing
+  // that bills. `getStaticModelCosts` builds the cost registry, and if it
+  // were ever pointed at the generated file instead of the merged catalog,
+  // every assertion above would still pass while billing quietly stopped
+  // honouring the overlay. These two pin the wiring itself.
+  describe("given the cost registry the runtime bills from", () => {
+    describe("when a model exists only in the overlay", () => {
+      it("still reaches the registry, at the overlay's rates", () => {
+        // gpt-5.3-chat was delisted from the generated catalog while still
+        // reachable through the gateway. It survives only because the overlay
+        // carries it. Without it the id prefix-matches openai/gpt-5 and bills
+        // 29 percent under, which is what this asserts against.
+        const overlayOnly = Object.keys(overlayModels).filter(
+          (id) => !(id in baseModels),
+        );
+        expect(
+          overlayOnly,
+          "expected at least one overlay-only model to test the wiring with",
+        ).toContain("openai/gpt-5.3-chat");
+
+        const costs = getStaticModelCosts();
+        for (const id of overlayOnly) {
+          if (isPricedElsewhere(id)) continue;
+          const matched = matchModelCostWithFallbacks(id, costs);
+          expect(
+            matched?.model,
+            `${id} exists only in the overlay and the cost registry resolved it to ${matched?.model ?? "nothing"}, so the overlay is not reaching billing`,
+          ).toBe(id);
+        }
+      });
+    });
+
+    describe("when the overlay overrides a generated entry", () => {
+      it("bills the overlay's rate, not the generated one", () => {
+        const costs = getStaticModelCosts();
+        for (const id of overlayOverriddenModelIds) {
+          if (isPricedElsewhere(id)) continue;
+          const matched = matchModelCostWithFallbacks(id, costs);
+          expect(matched?.model, `${id} did not resolve to its own rule`).toBe(
+            id,
+          );
+          expect(
+            matched?.inputCostPerToken,
+            `${id} bills the generated input rate rather than the overlay's`,
+          ).toBe(overlayModels[id]?.pricing.inputCostPerToken);
+        }
       });
     });
   });
