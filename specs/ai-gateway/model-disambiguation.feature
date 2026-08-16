@@ -227,3 +227,23 @@ Feature: AI Gateway — model disambiguation when a VK has multiple providers
       When a request names model "anthropic/gpt-4"
       Then the request is refused as model not allowed
       And the refusal names "anthropic/gpt-4" rather than the model half alone
+
+  Rule: A named vendor is a rule, and a bare model name is a hint
+
+    A model name with a provider prefix, or an alias the key owner wrote,
+    states which vendor gets the request. If the key holds no credential for
+    that vendor the request fails and says which slot is missing. It never
+    goes to a different vendor.
+
+    A bare model name states no vendor. The gateway guesses one from a short
+    prefix table, and the guess is wrong in ways that matter: a key whose
+    only credential is Azure serves "gpt-4o" from Azure, and a key whose
+    only credential is Bedrock serves "claude-sonnet-4-5" from Bedrock. So a
+    guess that matches no credential leaves the chain alone, and each
+    credential then answers for its own vendor with its own error.
+
+    @unit
+    Scenario: A bare model name whose guessed vendor is absent still uses the key
+      Given a key whose only credential is Azure
+      When a request names the bare model "gpt-4o"
+      Then the Azure credential serves it

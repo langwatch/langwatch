@@ -186,3 +186,164 @@ func TestEligibleCredentialsEmptyChainDefersToNoProviderConfigured(t *testing.T)
 		t.Errorf("expected empty chain to pass through, got %v", got)
 	}
 }
+
+// geminiPassthrough is a request on the Gemini /v1beta route, the shape
+// gemini-cli and the @google/genai SDK send.
+func geminiPassthrough() *domain.Request {
+	return &domain.Request{
+		Type:        domain.RequestTypePassthrough,
+		Model:       "gemini-2.5-flash",
+		Passthrough: domain.PassthroughRequest{Surface: domain.GeminiSurface()},
+	}
+}
+
+// @scenario "Either Google credential serves the provider-native route"
+func TestSurfaceCredentialsKeepsEveryProviderThatSpeaksTheRoute(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		creds   []domain.Credential
+		wantIDs []string
+	}{
+		{
+			name: "gemini credential serves it",
+			creds: []domain.Credential{
+				{ID: "openai_1", ProviderID: domain.ProviderOpenAI},
+				{ID: "gemini_1", ProviderID: domain.ProviderGemini},
+			},
+			wantIDs: []string{"gemini_1"},
+		},
+		{
+			// Bifrost's Vertex passthrough rewrites an inbound Google path
+			// into the project-and-location form, so a Vertex credential
+			// reaches Google for this route too. Pinning the route to Gemini
+			// alone would refuse a key that can serve the request.
+			name: "vertex credential serves it with no gemini credential present",
+			creds: []domain.Credential{
+				{ID: "openai_1", ProviderID: domain.ProviderOpenAI},
+				{ID: "vertex_1", ProviderID: domain.ProviderVertex},
+			},
+			wantIDs: []string{"vertex_1"},
+		},
+		{
+			name: "both Google credentials stay, in chain order",
+			creds: []domain.Credential{
+				{ID: "vertex_1", ProviderID: domain.ProviderVertex},
+				{ID: "elevenlabs_1", ProviderID: domain.ProviderElevenLabs},
+				{ID: "gemini_1", ProviderID: domain.ProviderGemini},
+			},
+			wantIDs: []string{"vertex_1", "gemini_1"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := surfaceCredentials(context.Background(), tc.creds, geminiPassthrough())
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			gotIDs := make([]string, len(got))
+			for i, c := range got {
+				gotIDs[i] = c.ID
+			}
+			if !equalSlices(gotIDs, tc.wantIDs) {
+				t.Errorf("got %v want %v", gotIDs, tc.wantIDs)
+			}
+		})
+	}
+}
+
+func TestSurfaceCredentialsRefusesAKeyThatCannotSpeakTheRoute(t *testing.T) {
+	t.Parallel()
+
+	// The reported defect: this chain used to survive the trim, and the
+	// Gemini-shaped body went to whichever credential came first.
+	creds := []domain.Credential{
+		{ID: "openai_1", ProviderID: domain.ProviderOpenAI},
+		{ID: "elevenlabs_1", ProviderID: domain.ProviderElevenLabs},
+	}
+	got, err := surfaceCredentials(context.Background(), creds, geminiPassthrough())
+	if !herr.IsCode(err, domain.ErrProviderNotBound) {
+		t.Fatalf("got err %v, want code %s", err, domain.ErrProviderNotBound)
+	}
+	if got != nil {
+		t.Errorf("a refusal must hand back no credentials, got %v", got)
+	}
+}
+
+// @scenario "A translated route leaves the provider choice to the model"
+func TestSurfaceCredentialsLeavesTranslatedRoutesAlone(t *testing.T) {
+	t.Parallel()
+
+	// Everything under /v1 is rewritten per provider before it leaves, so
+	// any provider can serve it and the resolved model makes the choice.
+	creds := []domain.Credential{
+		{ID: "openai_1", ProviderID: domain.ProviderOpenAI},
+		{ID: "anthropic_1", ProviderID: domain.ProviderAnthropic},
+	}
+	got, err := surfaceCredentials(context.Background(), creds,
+		&domain.Request{Type: domain.RequestTypeChat, Model: "gpt-4o"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(got) != 2 {
+		t.Errorf("a translated route must not trim the chain, got %v", got)
+	}
+}
+
+func TestSurfaceCredentialsEmptyChainDefersToNoProviderConfigured(t *testing.T) {
+	t.Parallel()
+
+	// A key with nothing configured is a different customer problem than a
+	// key missing one provider, and "bind a Google slot" is the wrong advice
+	// for it. Stay silent and let candidateChain raise no_provider_configured.
+	got, err := surfaceCredentials(context.Background(), nil, geminiPassthrough())
+	if err != nil {
+		t.Fatalf("empty chain must not hard-fail here: %v", err)
+	}
+	if len(got) != 0 {
+		t.Errorf("expected the empty chain to pass through, got %v", got)
+	}
+}
+
+// @scenario "A bare model name whose guessed vendor is absent still uses the key"
+func TestEligibleCredentialsBareNameKeepsAnotherVendorsGateway(t *testing.T) {
+	t.Parallel()
+
+	// What the fallthrough is for. "gpt-4o" reads as OpenAI, but Azure,
+	// Bedrock and Vertex all serve models under another vendor's bare name,
+	// and a key holding only one of them must keep working. Removing the
+	// fallthrough would refuse every Azure-only key that names a bare
+	// OpenAI model, which is the common way to configure one.
+	creds := []domain.Credential{{ID: "azure_1", ProviderID: domain.ProviderAzure}}
+	got, err := eligibleCredentials(context.Background(), creds,
+		&domain.ResolvedModel{ProviderID: "", ModelID: "gpt-4o", Source: domain.ModelSourceImplicit})
+	if err != nil {
+		t.Fatalf("a bare model name must not hard-fail: %v", err)
+	}
+	if len(got) != 1 || got[0].ID != "azure_1" {
+		t.Errorf("the Azure credential must still serve a bare OpenAI model name, got %v", got)
+	}
+}
+
+func TestProviderNames(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		in   []domain.ProviderID
+		want string
+	}{
+		{in: []domain.ProviderID{domain.ProviderGemini}, want: `"gemini"`},
+		{in: []domain.ProviderID{domain.ProviderGemini, domain.ProviderVertex}, want: `"gemini" or "vertex"`},
+		{
+			in:   []domain.ProviderID{domain.ProviderGemini, domain.ProviderVertex, domain.ProviderAzure},
+			want: `"gemini", "vertex" or "azure"`,
+		},
+	}
+	for _, tc := range cases {
+		if got := providerNames(tc.in); got != tc.want {
+			t.Errorf("providerNames(%v) = %s, want %s", tc.in, got, tc.want)
+		}
+	}
+}
