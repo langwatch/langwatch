@@ -258,9 +258,12 @@ vi.mock("~/components/sidebar/PresenceMenuItem", () => ({
 }));
 
 import { useNavigationModeStore } from "~/features/navigation/navigationModeStore";
-import { DashboardLayout } from "../../../components/DashboardLayout";
+import {
+  DashboardLayout,
+  type DashboardLayoutProps,
+} from "../../../components/DashboardLayout";
 
-function renderShell(props: Record<string, unknown> = {}) {
+function renderShell(props: Partial<DashboardLayoutProps> = {}) {
   return render(
     <ChakraProvider value={defaultSystem}>
       <DashboardLayout {...props}>

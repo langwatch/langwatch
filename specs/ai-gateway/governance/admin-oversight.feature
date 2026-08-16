@@ -151,7 +151,7 @@ Feature: AI Gateway Governance — Admin Oversight Dashboard
     When the dashboard renders
     Then the strip reads "No ingestion sources configured." with a CTA
       "+ Add your first source" linking to
-      "/governance/ingestion-sources/new"
+      "/governance/ingestion-sources"
 
   # ---------------------------------------------------------------------------
   # Mocked-data caveat (for v0; real-data wire-up follows D2)

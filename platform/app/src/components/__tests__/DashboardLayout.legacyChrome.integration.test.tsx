@@ -252,6 +252,7 @@ describe("legacy dashboard chrome", () => {
   });
 
   describe("when on a personal-scope route", () => {
+    /** @scenario Legacy mode keeps the personal sidebar on a personal page */
     it("renders the personal sidebar instead of the main menu", () => {
       mockPathname = "/me";
       renderLayout({ personalScope: true });
@@ -300,6 +301,20 @@ describe("navigation mode dispatcher", () => {
 
       expect(screen.getByTestId("main-menu")).toBeInTheDocument();
       expect(screen.getByTestId("page-body")).toBeInTheDocument();
+    });
+  });
+
+  describe("when the flag is on for a route the shells do not cover", () => {
+    /** @scenario Internal ops pages keep the old navigation */
+    it("renders the legacy chrome on an ops page", () => {
+      useNavigationModeStore.setState({ storedMode: "icon-rail" });
+      mockNavigationV2FlagEnabled = true;
+      mockPathname = "/ops/feature-flags";
+      renderLayout();
+
+      expect(screen.getByTestId("main-menu")).toBeInTheDocument();
+      expect(screen.getByTestId("page-body")).toBeInTheDocument();
+      expect(screen.queryByTestId("loading-screen")).not.toBeInTheDocument();
     });
   });
 });

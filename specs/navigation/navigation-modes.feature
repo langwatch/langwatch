@@ -81,6 +81,19 @@ Feature: Navigation modes behind one flag
     And the avatar menu has no "Navigation" entry
 
   @integration
+  Scenario: Legacy mode keeps the personal sidebar on a personal page
+    Given my device is on the old navigation
+    When I open my personal page
+    Then the personal sidebar renders instead of the project menu
+
+  @integration
+  Scenario: Internal ops pages keep the old navigation
+    Given the navigation flag is on for me
+    And my device is in a new navigation mode
+    When I open an internal ops page
+    Then the old chrome renders instead of a new shell
+
+  @integration
   Scenario: Legacy mode runs no navigation-v2 queries
     Given my device is on the old navigation
     When I open the home page

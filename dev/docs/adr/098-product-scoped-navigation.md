@@ -71,9 +71,9 @@ Current customers must not see any change until we decide.
    product visit, product memory outranks org intent; this is a deliberate
    deviation from ADR-038, which keeps applying unchanged to legacy mode.
 
-5. URLs move now, without the flag. /settings/gateway/* becomes /gateway/*,
-   and the governance family (/settings/governance/*,
-   /settings/routing-policies) becomes /governance/*, like /governance
+5. URLs move now, without the flag. `/settings/gateway/*` becomes
+   `/gateway/*`, and the governance family (`/settings/governance/*`,
+   `/settings/routing-policies`) becomes `/governance/*`, like `/governance`
    already is at top level. Old URLs redirect permanently through a
    component-level `Navigate replace` that preserves sub-path, query and
    hash; the address bar shows the canonical URL. Redirects are safe in
@@ -114,8 +114,8 @@ the one suppressed redirect branch only run in the new modes.
   files keep pinning legacy and get a mode note only.
 - The command bar gains gateway, governance and personal entries from the
   registry.
-- Every deep link, doc and CLI output that prints /settings/gateway/* or
-  /settings/governance/* switches to the new paths; redirects keep old
+- Every deep link, doc and CLI output that prints `/settings/gateway/*` or
+  `/settings/governance/*` switches to the new paths; redirects keep old
   links, bookmarks, emails and DB-stored pins working.
 - Project slug minting rejects reserved top-level names (gateway,
   governance, settings, me, ops and friends) as defense-in-depth; today the

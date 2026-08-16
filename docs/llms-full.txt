@@ -14648,16 +14648,15 @@ existing routes:
 
 | Surface | Purpose | Audience | Where it lives |
 |---------|---------|----------|----------------|
-| `/governance` (forthcoming top-level home) | Daily-use **org governance home**: spend, ingestion-source health, anomalies, per-user breakdown. Read-mostly. | Org admins whose org's `setupState.governanceActive` is `true` (see [Persona-based home routing](#persona-based-home-routing--the-setup-state-signal) below) | Top-level route, org-scoped. Replaces the read-mostly content currently temporarily under `/governance`. |
+| `/governance` | Daily-use **org governance home**: spend, ingestion-source health, anomalies, per-user breakdown. Read-mostly. | Org admins whose org's `setupState.governanceActive` is `true` (see [Persona-based home routing](#persona-based-home-routing--the-setup-state-signal) below) | Top-level route, org-scoped. |
 | `/me`, `/me/settings` | Daily-use **personal home**: your usage, your budget, your personal VK, your IDE setup snippet. | Any user with a personal VK | Top-level route, principal-scoped. |
 | `/[project]/...` | LLMOps daily-use, traces, evals, datasets, scenarios, workflows. | Project members | Per-project routes. **Unchanged** from current LangWatch. |
-| `/governance/ingestion-sources`, `/governance/anomaly-rules`, `/governance/routing-policies` | Admin-authoring (CRUD), create, rotate, archive sources, write rules, publish routing policies. | Org admins with `organization:manage` | Settings sub-routes, deliberately separate from daily-use surfaces. |
+| `/governance/ingestion-sources`, `/governance/anomaly-rules`, `/governance/routing-policies` | Admin-authoring (CRUD), create, rotate, archive sources, write rules, publish routing policies. | Org admins with `organization:manage` | Governance sub-routes, deliberately separate from daily-use surfaces. |
 
-This split is the answer to "why is governance overview hidden under
-Settings?", it shouldn't be. The read-mostly daily home is moving
-out to `/governance` (top-level); only the create, rotate, archive
-admin tools stay in Settings, where every other admin authoring
-tool lives.
+The whole governance product sits at the top level, not under Settings.
+The daily home is `/governance`, and the create, rotate and archive tools
+are its own sub-routes. Settings keeps the account and workspace
+administration that every product shares.
 
 ### Persona-based home routing: the setup-state signal
 
@@ -17220,12 +17219,12 @@ What the user controls about their own account lives at `/settings/authenticatio
 
 The page is per-user. There's no admin gate, every member of the org can manage their own credentials here. Admins don't manage other users' sign-in methods from this page; user-account-management is by-design self-service.
 
-Org-level SSO configuration (IdP metadata, SAML cert, SCIM provisioning) is **separate** from this page, it lives at `/governance/scim-provisioning` (admin-only) and the SSO-provider env config in your deployment's helm values, `.env`.
+Org-level SSO configuration (IdP metadata, SAML cert, SCIM provisioning) is **separate** from this page, it lives at `/settings/scim` (admin-only) and the SSO-provider env config in your deployment's helm values, `.env`.
 
 ## Where to next
 
 - **Self-service for me**: [/settings/authentication](#per-user-sign-in-methods-at-settingsauthentication) (this page) and [Devices](/ai-governance/personal-portal/sessions).
-- **Org SSO + SCIM auto-provisioning**: `/governance/scim-provisioning` (admin-only).
+- **Org SSO + SCIM auto-provisioning**: `/settings/scim` (admin-only).
 - **Role catalog**: [Roles & permissions](/ai-governance/roles-and-permissions).
 - **Audit who did what when**: [Audit log](/ai-governance/audit-log).
 
