@@ -78,8 +78,9 @@ paths = ['''platform/app/ee/licensing/__tests__/fixtures/testLicenses\.ts''']
 # generates a random key per run now instead.
 #
 # Scoped by VALUE as well as path, and matched with AND, so any other
-# high-entropy string in a workflow file is still caught. A real credential
-# cannot be this string.
+# high-entropy string in a workflow file is still caught. The value is anchored,
+# so a longer secret that merely contains the placeholder is still reported.
+# A real credential cannot be this string.
 #
 # The field is `condition`. `matchCondition` is not a name gitleaks knows, and
 # an unknown key is dropped in silence, which leaves the block as a bare `paths`
@@ -89,7 +90,7 @@ description = "Sequential-hex CREDENTIALS_SECRET placeholder once inlined in the
 targetRules = ["generic-api-key"]
 condition = "AND"
 paths = ['''\.github/workflows/langwatch-app-ci\.yml''']
-regexes = ['''(0123456789abcdef){4}''']
+regexes = ['''^(0123456789abcdef){4}$''']
 
 # The two AWS-shaped literals the secrets-gate tests plant into throwaway
 # repositories. The tests exist to prove the gate fails on a credential a pull
