@@ -64,3 +64,11 @@ Feature: Navigation modes behind one flag
   Scenario: Picking a mode persists on the device
     When I set the navigation mode to "icon-rail"
     Then the device remembers "icon-rail" for the next visit
+
+  @integration
+  Scenario: Flag off keeps the current chrome unchanged
+    Given the navigation flag is off for me
+    When I open any project page
+    Then the sidebar, the workspace switcher and the page body render as today
+    And the avatar menu shows its current items
+    And the avatar menu has no "Navigation" entry
