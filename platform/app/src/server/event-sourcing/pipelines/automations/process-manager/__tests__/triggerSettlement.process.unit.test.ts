@@ -202,6 +202,54 @@ describe("trigger settlement process", () => {
     });
   });
 
+  describe("given two automations persist the same trace in one settle window", () => {
+    describe("when both settle rounds dispatch", () => {
+      /** @scenario "Two automations that match the same trace keep separate pages" */
+      it("keys each automation's page separately in the outbox", () => {
+        const definition = automationProcessDefinition({
+          name: "triggerSettlement",
+        });
+        const evolve =
+          definition.config.handlers[TRIGGER_MATCH_RECORDED_EVENT_TYPE]!;
+        // The runtime builds the intent factories with the process key, and
+        // that prefix is what separates two automations whose page bodies are
+        // byte-identical.
+        const pageKeysOf = (triggerId: string) => {
+          const context = {
+            key: triggerId,
+            projectId: "project-1",
+            intents: buildIntentFactories(definition.config.intents, {
+              processKey: triggerId,
+            }),
+          };
+          const round = evolve(
+            initialState(),
+            match({
+              triggerId,
+              action: TriggerAction.ADD_TO_DATASET,
+              actionClass: "persist",
+            }),
+            { ...context, at: 1_000, now: 1_000 },
+          );
+          return definition.config.onWake!(round.state, {
+            ...context,
+            at: 31_000,
+            now: 31_000,
+          }).intents?.map((intent) => intent.messageKey);
+        };
+
+        const pageBody = `persist:${digestBatchKey(["trace-1@30000-0"])}`;
+
+        expect(pageKeysOf("trigger-1")).toEqual([
+          `process:trigger-1:${pageBody}`,
+        ]);
+        expect(pageKeysOf("trigger-2")).toEqual([
+          `process:trigger-2:${pageBody}`,
+        ]);
+      });
+    });
+  });
+
   describe("given more pending matches than the state bound", () => {
     describe("when another match is recorded", () => {
       it("flushes the oldest match out of pending state without discarding it", () => {

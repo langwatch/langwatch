@@ -126,11 +126,15 @@ export function createAutomationsPipeline(deps: AutomationsPipelineDeps) {
                     // EVENT time, a storm coalesces to at most one row per
                     // trigger per minute, and a redelivery of the same event
                     // produces a byte-identical key so it dedups rather than
-                    // adding a row. `ctx.key` is in the key because the outbox
-                    // uniqueness is (processName, projectId, messageKey) and
-                    // carries no processKey of its own. The payload still
-                    // carries the running total, so the storm rate is
-                    // recoverable from any single surviving row.
+                    // adding a row. The payload still carries the running
+                    // total, so the storm rate is recoverable from any single
+                    // surviving row.
+                    //
+                    // A key written here only has to be unique inside ONE
+                    // trigger: the outbox unique index is (processName,
+                    // projectId, messageKey), and the runtime prefixes every
+                    // builder-authored key with `process:<processKey>:`, so
+                    // two triggers never collide on identical bodies.
                     ctx.intents.logOverflow(
                       `overflow:${ctx.key}:${Math.floor(ctx.at / 60_000)}`,
                       {

@@ -77,6 +77,13 @@ Feature: Automation dispatch on the process-manager substrate
     Then the later round produces a distinct page message
 
   @unit
+  Scenario: Two automations that match the same trace keep separate pages
+    Given two automations on one project that add matched traces to a dataset
+    And both match the same trace in the same settle window
+    When the settled matches dispatch
+    Then each automation dispatches its own page
+
+  @unit
   Scenario: An old single-trace persist intent still dispatches after the paging change
     Given a pending persist intent written before the paging change
     When the intent dispatches
