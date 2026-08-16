@@ -104,7 +104,7 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PostApiSecretsBody | Unset = UNSET,
 ) -> Response[
     PostApiSecretsResponse201
@@ -140,7 +140,7 @@ def sync_detailed(
 
 def sync(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PostApiSecretsBody | Unset = UNSET,
 ) -> (
     PostApiSecretsResponse201
@@ -172,7 +172,7 @@ def sync(
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PostApiSecretsBody | Unset = UNSET,
 ) -> Response[
     PostApiSecretsResponse201
@@ -206,7 +206,7 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PostApiSecretsBody | Unset = UNSET,
 ) -> (
     PostApiSecretsResponse201

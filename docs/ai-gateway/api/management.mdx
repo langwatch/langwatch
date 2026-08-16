@@ -26,7 +26,7 @@ Every list on this API is cursor-paged. `limit` defaults to 50 and is capped at 
 
 ## Retrying a create safely
 
-The four creates (`/virtual-keys`, `/budgets`, `/cache-rules`, and `/api/webhooks/v1/endpoints`) accept an `Idempotency-Key` header, so a client that never learned the outcome can retry without creating a second resource:
+The four creates (`/virtual-keys`, `/budgets`, `/cache-rules`, and `/api/webhooks/endpoints.create`) accept an `Idempotency-Key` header, so a client that never learned the outcome can retry without creating a second resource:
 
 ```bash
 curl -sS https://app.langwatch.ai/api/gateway/v1/budgets \
@@ -428,9 +428,9 @@ The rule shape, the full matcher and action tables, and the evaluation order liv
 
 ## Webhooks and billing surfaces
 
-Two sibling REST families complete the platform and are documented on their own pages, because they authenticate with an **organization API key** and organization-exclusive permissions rather than the credential used above:
+Two sibling HTTP families complete the platform and are documented on their own pages, because they authenticate with an **organization API key** and organization-exclusive permissions rather than the credential used above:
 
-- `/api/webhooks/v1/*`: endpoint CRUD, secret roll, test fire, delivery log, health, and the emitted-events log. See [Webhooks](/features/webhooks).
+- `/api/webhooks/*`: endpoint management, secret roll, test fire, delivery log, health, and the emitted-events log. RPC-named — every operation is a POST to a dotted name such as `endpoints.rollSecret`, with its arguments in the body. See [Webhooks](/features/webhooks).
 - `/api/gateway/v1/spend-events`, `/spend-summaries`, `/spend-events/replay`: the billing reconciliation pull surface. See [Billing & spend events](/ai-gateway/billing-events).
 
 ## Errors

@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 /**
  * OpenAPI completeness gate for the two public REST surfaces,
- * `/api/gateway/v1` and `/api/webhooks/v1`.
+ * `/api/gateway/v1` and `/api/webhooks`.
  *
  * The generated document at `src/app/api/openapiLangWatch.json` is what an
  * external integrator reads and what client generators compile. A route whose
@@ -81,8 +81,18 @@ export const SPEC_PATH = join(
   "src/app/api/openapiLangWatch.json",
 );
 
-/** The REST surfaces published to external integrators. */
-export const GATED_PREFIXES = ["/api/gateway/v1", "/api/webhooks/v1"];
+/**
+ * The REST surfaces published to external integrators.
+ *
+ * These are matched two ways — `startsWith` against a document path, and
+ * EXACT equality against the `basePath` a source file declares
+ * ({@link gatedBasePathOf}) — so an entry has to be the basePath a family
+ * spells verbatim, not a longer prefix of its routes. `/api/webhooks` rather
+ * than `/api/webhooks/v1` since the family moved to date-based versioning: its
+ * version now lives in a path segment the router resolves, not in the
+ * basePath.
+ */
+export const GATED_PREFIXES = ["/api/gateway/v1", "/api/webhooks"];
 
 /** Trees that hold Hono route registrations for those surfaces. */
 export const HANDLER_ROOTS = [
@@ -136,15 +146,29 @@ export const EXEMPTIONS: Suppression[] = [
     rules: ["request-body"],
     why: "revocation is terminal and has no variants, so the path names everything the call needs",
   },
+  // RPC naming (ADR-094) moved which webhook operations need an exemption, and
+  // it moved them in both directions.
+  //
+  // GONE: `endpoints/{id}/roll-secret` and `endpoints/{id}/test` used to be
+  // exempt because the id lived in the path and there was nothing left to
+  // send. Both now take `{ id }` in the body and are complete on their own;
+  // keeping their exemptions would be stale on arrival, which the ratchet
+  // rejects.
+  //
+  // NEW: the two operations that genuinely take no arguments. Every RPC is a
+  // POST, so the request-body rule asks them for a body they have no field to
+  // put in it. The ADR's zero-argument rule is deliberate — declaring
+  // `input: z.object({}).optional()` to satisfy this gate would reinstate the
+  // json parse and make a bodyless POST fail.
   {
-    operation: "POST /api/webhooks/v1/endpoints/{id}/roll-secret",
+    operation: "POST /api/webhooks/endpoints.list",
     rules: ["request-body"],
-    why: "the new signing secret is generated server side and the previous secret's 24h overlap is a server rule, not a caller choice",
+    why: "lists the calling organization's endpoints, which the credential already identifies, so the operation takes no arguments; it is a POST only because every RPC is",
   },
   {
-    operation: "POST /api/webhooks/v1/endpoints/{id}/test",
+    operation: "POST /api/webhooks/eventTypes.list",
     rules: ["request-body"],
-    why: "a test fire delivers a synthetic envelope the server builds, so the caller supplies nothing beyond the endpoint id",
+    why: "serves the static event catalog, identical for every caller, so the operation takes no arguments; it is a POST only because every RPC is",
   },
 
   // The provider tombstones. Gateway provider bindings folded into

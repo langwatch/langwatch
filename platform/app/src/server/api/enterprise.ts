@@ -20,6 +20,11 @@ export const ENTERPRISE_FEATURE_ERRORS = {
   OCSF_EXPORT: "OCSF compliance export requires an Enterprise plan",
   MANAGEMENT_API: "The management API requires an Enterprise plan",
   GROUPS: "Groups require an Enterprise plan",
+  // Not "requires an Enterprise plan" like its neighbours: webhooks is gated
+  // on the `webhookEndpointsEnabled` entitlement rather than the tier, so a
+  // Pro or Custom contract that bought it is admitted. Naming the tier would
+  // send exactly those customers to buy something they already have.
+  WEBHOOKS: "Webhook endpoints are not included in this plan",
 } as const;
 
 export type EnterpriseFeature = keyof typeof ENTERPRISE_FEATURE_ERRORS;

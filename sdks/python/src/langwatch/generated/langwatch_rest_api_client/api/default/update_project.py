@@ -7,13 +7,13 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.project import Project
 from ...models.update_project_body import UpdateProjectBody
-from ...types import Response, safe_http_status
+from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
     id: str,
     *,
-    body: UpdateProjectBody,
+    body: UpdateProjectBody | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -24,7 +24,8 @@ def _get_kwargs(
         ),
     }
 
-    _kwargs["json"] = body.to_dict()
+    if not isinstance(body, Unset):
+        _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -72,7 +73,7 @@ def sync_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateProjectBody,
+    body: UpdateProjectBody | Unset = UNSET,
 ) -> Response[Any | Project]:
     """Update a project
 
@@ -80,7 +81,7 @@ def sync_detailed(
 
     Args:
         id (str):
-        body (UpdateProjectBody):
+        body (UpdateProjectBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -106,7 +107,7 @@ def sync(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateProjectBody,
+    body: UpdateProjectBody | Unset = UNSET,
 ) -> Any | Project | None:
     """Update a project
 
@@ -114,7 +115,7 @@ def sync(
 
     Args:
         id (str):
-        body (UpdateProjectBody):
+        body (UpdateProjectBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -135,7 +136,7 @@ async def asyncio_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateProjectBody,
+    body: UpdateProjectBody | Unset = UNSET,
 ) -> Response[Any | Project]:
     """Update a project
 
@@ -143,7 +144,7 @@ async def asyncio_detailed(
 
     Args:
         id (str):
-        body (UpdateProjectBody):
+        body (UpdateProjectBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -167,7 +168,7 @@ async def asyncio(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateProjectBody,
+    body: UpdateProjectBody | Unset = UNSET,
 ) -> Any | Project | None:
     """Update a project
 
@@ -175,7 +176,7 @@ async def asyncio(
 
     Args:
         id (str):
-        body (UpdateProjectBody):
+        body (UpdateProjectBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

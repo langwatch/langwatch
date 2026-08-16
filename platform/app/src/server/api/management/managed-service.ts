@@ -16,8 +16,12 @@
  * serves nothing but a 404 for unknown version segments.
  */
 import { createService, type MountedRoute } from "@langwatch/api";
+import type { MiddlewareHandler } from "hono";
 
-import { requireEnterprisePlanRest } from "~/app/api/middleware/enterprise-gate";
+import {
+  type PlanEntitlementFlag,
+  requireEnterprisePlanRest,
+} from "~/app/api/middleware/enterprise-gate";
 import { requireOrgPermissionOrThrow } from "~/app/api/middleware/org-auth";
 import type { EnterpriseFeature } from "~/server/api/enterprise";
 import type { Permission } from "~/server/api/rbac";
@@ -39,6 +43,37 @@ import { prisma } from "~/server/db";
  */
 export interface ManagementEndpointMeta {
   policy: AccessPolicy;
+}
+
+/**
+ * Marks a handler as one of the two `guard()` produces, so the mount callback
+ * can check that the chain which ENFORCES a policy is still attached to the
+ * route that DECLARES one.
+ *
+ * Without this the two halves can be separated silently: `meta.policy` is a
+ * plain property, so `{ ...guard(p), middleware: [mine] }` keeps the
+ * declaration and replaces the enforcement. The route-policy registry — and
+ * `api-endpoint-authorization.integration.test.ts`, which audits the composed
+ * router against that registry — read only the declaration, so both stay green
+ * over an endpoint that authenticates and then admits anyone.
+ */
+const GUARD_ROLE = Symbol("managementGuardRole");
+
+type GuardRole = "permission" | "plan";
+
+function tagged(
+  handler: MiddlewareHandler,
+  role: GuardRole,
+): MiddlewareHandler {
+  return Object.assign(handler, { [GUARD_ROLE]: role });
+}
+
+function rolesOf(middleware: MiddlewareHandler[]): Set<GuardRole> {
+  return new Set(
+    middleware
+      .map((handler) => (handler as { [GUARD_ROLE]?: GuardRole })[GUARD_ROLE])
+      .filter((role): role is GuardRole => role !== undefined),
+  );
 }
 
 /**
@@ -70,11 +105,17 @@ export function createManagementService({
   name,
   basePath,
   feature,
+  entitlement,
 }: {
   name: string;
   /** Spelled out at the call site so the route-coverage gate can read it. */
   basePath: string;
   feature: EnterpriseFeature;
+  /**
+   * Admit on a per-feature plan flag rather than on the Enterprise tier, for a
+   * feature that is licensable on its own. Omit for the usual tier gate.
+   */
+  entitlement?: PlanEntitlementFlag;
 }) {
   const family = familyFromBasePath(basePath);
 
@@ -85,11 +126,28 @@ export function createManagementService({
     onRouteMounted: (route) => registerMountedRoute({ route, family }),
   });
 
-  const guard = (permission: Permission) => ({
+  /**
+   * Both halves of one endpoint's contract: the policy the registry records
+   * and the chain that enforces it.
+   *
+   * `extra` exists so an endpoint that needs its own middleware — idempotency,
+   * a rate limiter — can have it WITHOUT hand-writing the spread. Passing it
+   * here is the only safe spelling. Writing
+   * `{ ...guard(p), middleware: [mine] }` at the call site replaces this array
+   * instead of extending it, which silently drops the permission check and the
+   * plan gate while `meta.policy` still reports the endpoint as guarded — so
+   * the route-policy registry, and the authorization test that reads it, stay
+   * green over an endpoint that authenticates and then admits anyone.
+   */
+  const guard = (
+    permission: Permission,
+    { extra = [] }: { extra?: MiddlewareHandler[] } = {},
+  ) => ({
     meta: { policy: requires(permission) } satisfies ManagementEndpointMeta,
     middleware: [
-      requireOrgPermissionOrThrow(permission),
-      requireEnterprisePlanRest(feature),
+      tagged(requireOrgPermissionOrThrow(permission), "permission"),
+      tagged(requireEnterprisePlanRest(feature, { entitlement }), "plan"),
+      ...extra,
     ],
   });
 
@@ -103,6 +161,54 @@ export function createManagementService({
  * (their inherited config carries the meta), and the two version-namespace
  * guards.
  */
+/**
+ * The families that predate ADR-094 and still register resource-REST routes.
+ * They keep working; the list is closed. Every family added after the webhooks
+ * pilot registers with `v.rpc("/resource.verb")` only.
+ *
+ * `@langwatch/api` still exposes `v.get` / `v.post` / `v.patch` / `v.delete`,
+ * because it is a general framework and SSE and the four families below need
+ * them. What makes RPC the only way to add a LangWatch management endpoint is
+ * this check rather than the package's surface: `createManagementService` is
+ * the single product caller of `createService`, so every management route in
+ * the app passes through here.
+ *
+ * Removing a name from this set is a port — the family's paths, SDKs, CLI and
+ * published document all move — not a configuration change.
+ */
+const REST_LEGACY_FAMILIES = new Set([
+  "organization",
+  "role-bindings",
+  "roles",
+  "scim-tokens",
+]);
+
+/**
+ * A new family may only mount RPC operations: a real POST whose last path
+ * segment is a dotted `<resource>.<verb>` name. The package asserts that
+ * grammar for anything registered through `v.rpc`; this asserts that nothing
+ * in a new family was registered any other way.
+ */
+function assertRpcOnlyOutsideLegacyFamilies({
+  route,
+  family,
+}: {
+  route: MountedRoute;
+  family: string;
+}): void {
+  if (REST_LEGACY_FAMILIES.has(family)) return;
+
+  const operation = route.path.split("/").pop() ?? "";
+  if (route.method === "post" && operation.includes(".")) return;
+
+  throw new Error(
+    `Management endpoint ${route.method.toUpperCase()} ${route.path} in ` +
+      `family "${family}" is not RPC-named. Families added after the webhooks ` +
+      `pilot register operations with v.rpc("/resource.verb") only (ADR-094); ` +
+      `the resource-REST helpers remain only for ${[...REST_LEGACY_FAMILIES].join(", ")}`,
+  );
+}
+
 function registerMountedRoute({
   route,
   family,
@@ -126,6 +232,8 @@ function registerMountedRoute({
     return;
   }
 
+  assertRpcOnlyOutsideLegacyFamilies({ route, family });
+
   const meta = route.config?.meta as ManagementEndpointMeta | undefined;
   if (!meta?.policy) {
     throw new Error(
@@ -134,6 +242,23 @@ function registerMountedRoute({
         `endpoint config`,
     );
   }
+  // A withdrawn mount answers 410 without reaching the chain, so requiring the
+  // guard handlers on it would fail the build over a route that runs nothing.
+  if (!route.withdrawn) {
+    const roles = rolesOf(route.config?.middleware ?? []);
+    const missing = (["permission", "plan"] as const).filter(
+      (role) => !roles.has(role),
+    );
+    if (missing.length > 0) {
+      throw new Error(
+        `Management endpoint ${route.method.toUpperCase()} ${route.path} ` +
+          `declares an access policy but its middleware chain is missing the ` +
+          `${missing.join(" and ")} check; pass extra middleware as ` +
+          `guard(permission, { extra }) instead of overwriting "middleware"`,
+      );
+    }
+  }
+
   registerRoutePolicy({
     method: route.method,
     path: route.path,

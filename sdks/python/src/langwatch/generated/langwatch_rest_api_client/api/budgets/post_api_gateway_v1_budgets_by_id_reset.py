@@ -109,7 +109,7 @@ def _build_response(
 def sync_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PostApiGatewayV1BudgetsByIdResetBody | Unset = UNSET,
     end_user_id: str | Unset = UNSET,
 ) -> Response[
@@ -157,7 +157,7 @@ def sync_detailed(
 def sync(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PostApiGatewayV1BudgetsByIdResetBody | Unset = UNSET,
     end_user_id: str | Unset = UNSET,
 ) -> (
@@ -201,7 +201,7 @@ def sync(
 async def asyncio_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PostApiGatewayV1BudgetsByIdResetBody | Unset = UNSET,
     end_user_id: str | Unset = UNSET,
 ) -> Response[
@@ -247,7 +247,7 @@ async def asyncio_detailed(
 async def asyncio(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PostApiGatewayV1BudgetsByIdResetBody | Unset = UNSET,
     end_user_id: str | Unset = UNSET,
 ) -> (

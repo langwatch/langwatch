@@ -34,7 +34,14 @@ class PatchApiGatewayV1VirtualKeysByIdBody:
         name (str | Unset):
         description (None | str | Unset):
         scopes (list[PatchApiGatewayV1VirtualKeysByIdBodyScopesItem] | Unset):
-        trace_project_id (None | str | Unset):
+        trace_project_id (None | str | Unset): Where the key's traces and costs land. Omit it and the destination stays
+            exactly where it is, scope edits included. A value moves it, validated the way create validates it. Explicit
+            null does not clear it: it asks for the destination to be worked out again from what the key is now, under the
+            same rules create uses. It lands on the key's single project scope when exactly one names a live project, and
+            otherwise on the organization's oldest live governance project when there are no other live projects to choose
+            from. An organization with live projects that could have been named refuses with
+            `gateway_trace_project_ambiguous`, and one with no governance project to fall back on refuses with
+            `trace_project_required`.
         routing_policy_id (None | str | Unset):
         routing_mode (PatchApiGatewayV1VirtualKeysByIdBodyRoutingMode | Unset):
         budget (None | PatchApiGatewayV1VirtualKeysByIdBodyBudgetType0 | Unset):

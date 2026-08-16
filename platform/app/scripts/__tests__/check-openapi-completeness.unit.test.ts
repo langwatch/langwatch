@@ -374,9 +374,16 @@ describe("applySuppressions", () => {
 describe("the shipped suppression lists", () => {
   it("spells every operation the way the document does", () => {
     for (const entry of [...EXEMPTIONS, ...KNOWN_GAPS]) {
+      // The gateway is date-versioned under a `/v1/` path segment; webhooks
+      // carries its version in a header and names operations `resource.verb`
+      // (ADR-094), so it has no path segment between the family and the name.
       expect(entry.operation).toMatch(
-        /^(GET|POST|PUT|PATCH|DELETE) \/api\/(gateway|webhooks)\/v1\//,
+        /^(GET|POST|PUT|PATCH|DELETE) \/api\/(gateway\/v1\/|webhooks\/[a-z])/,
       );
+      // `webhooks` alone would also admit the retired `/api/webhooks/v1/...`
+      // spellings, which now 404. A suppression entry naming one would be
+      // excusing an operation that no longer exists.
+      expect(entry.operation).not.toMatch(/\/api\/webhooks\/v1\//);
     }
   });
 
@@ -404,7 +411,7 @@ describe("gatedBasePathOf", () => {
   it("refuses a file that declares two gated basePaths", () => {
     expect(() =>
       gatedBasePathOf(
-        'basePath: "/api/gateway/v1"\nbasePath: "/api/webhooks/v1"',
+        'basePath: "/api/gateway/v1"\nbasePath: "/api/webhooks"',
         "both.ts",
       ),
     ).toThrow(/more than one gated basePath/);
@@ -432,14 +439,14 @@ describe("collectQueryReadingOperations", () => {
     write(
       "app.ts",
       [
-        'const secured = createOrgApp({ basePath: "/api/webhooks/v1" });',
+        'const secured = createOrgApp({ basePath: "/api/gateway/v1" });',
         'secured.get("/endpoints/:id/deliveries", zValidator("query", q), h);',
         'secured.get("/endpoints/:id", h);',
       ].join("\n"),
     );
 
     expect([...collectQueryReadingOperations([root])]).toEqual([
-      "GET /api/webhooks/v1/endpoints/{id}/deliveries",
+      "GET /api/gateway/v1/endpoints/{id}/deliveries",
     ]);
   });
 
@@ -459,7 +466,7 @@ describe("collectQueryReadingOperations", () => {
     write(
       "__tests__/app.integration.test.ts",
       [
-        'const secured = createOrgApp({ basePath: "/api/webhooks/v1" });',
+        'const secured = createOrgApp({ basePath: "/api/webhooks" });',
         'secured.get("/fixture", zValidator("query", q), h);',
       ].join("\n"),
     );

@@ -19,7 +19,6 @@ from langwatch.state import get_instance
 from langwatch.utils.gateway_http import (
     idempotency_headers,
     note_idempotent_replay,
-    quote_path_segment,
     raise_for_status,
     walk_cursor_pages,
 )
@@ -50,14 +49,14 @@ class WebhooksFacade:
     def list(self) -> List[Dict[str, Any]]:
         """List the organization's webhook endpoints. This route is not
         cursor-paged: one call is the whole set."""
-        response = self._http().get("/api/webhooks/v1/endpoints")
+        response = self._http().post("/api/webhooks/endpoints.list")
         raise_for_status(response, operation="list endpoints")
         return response.json()["data"]
 
     def get(self, endpoint_id: str) -> Dict[str, Any]:
         """Get one endpoint by id."""
-        response = self._http().get(
-            f"/api/webhooks/v1/endpoints/{quote_path_segment(endpoint_id)}"
+        response = self._http().post(
+            "/api/webhooks/endpoints.get", json={"id": endpoint_id}
         )
         raise_for_status(response, operation="get endpoint")
         return response.json()["data"]
@@ -94,7 +93,7 @@ class WebhooksFacade:
         if max_in_flight is not None:
             body["max_in_flight"] = max_in_flight
         response = self._http().post(
-            "/api/webhooks/v1/endpoints",
+            "/api/webhooks/endpoints.create",
             json=body,
             headers=idempotency_headers(idempotency_key),
         )
@@ -130,8 +129,8 @@ class WebhooksFacade:
             body["max_batch_delay_ms"] = max_batch_delay_ms
         if max_in_flight is not None:
             body["max_in_flight"] = max_in_flight
-        response = self._http().patch(
-            f"/api/webhooks/v1/endpoints/{quote_path_segment(endpoint_id)}", json=body
+        response = self._http().post(
+            "/api/webhooks/endpoints.update", json={"id": endpoint_id, **body}
         )
         raise_for_status(response, operation="update endpoint")
         return response.json()["data"]
@@ -141,15 +140,15 @@ class WebhooksFacade:
         read, while its delivery history stays readable. The row is archived
         rather than removed, and the response carries only an acknowledgement
         that it was, so there is nothing to hand back."""
-        response = self._http().delete(
-            f"/api/webhooks/v1/endpoints/{quote_path_segment(endpoint_id)}"
+        response = self._http().post(
+            "/api/webhooks/endpoints.archive", json={"id": endpoint_id}
         )
         raise_for_status(response, operation="archive endpoint")
 
     def roll_secret(self, endpoint_id: str) -> Dict[str, Any]:
         """Mint a new signing secret. Returned ONCE, like create."""
         response = self._http().post(
-            f"/api/webhooks/v1/endpoints/{quote_path_segment(endpoint_id)}/roll-secret"
+            "/api/webhooks/endpoints.rollSecret", json={"id": endpoint_id}
         )
         raise_for_status(response, operation="roll secret")
         return response.json()["data"]
@@ -159,7 +158,7 @@ class WebhooksFacade:
         The call succeeds whenever the test itself ran, so read ``delivered``
         for the receiver's verdict."""
         response = self._http().post(
-            f"/api/webhooks/v1/endpoints/{quote_path_segment(endpoint_id)}/test"
+            "/api/webhooks/endpoints.test", json={"id": endpoint_id}
         )
         raise_for_status(response, operation="test endpoint")
         return response.json()["data"]
@@ -175,14 +174,14 @@ class WebhooksFacade:
     ) -> Dict[str, Any]:
         """One page of delivery attempts for an endpoint, newest first, with
         the receiver's status per attempt. Returns {data, next_cursor}."""
-        params: Dict[str, Any] = {}
+        body: Dict[str, Any] = {"id": endpoint_id}
         if cursor is not None:
-            params["cursor"] = cursor
+            body["cursor"] = cursor
         if limit is not None:
-            params["limit"] = limit
-        response = self._http().get(
-            f"/api/webhooks/v1/endpoints/{quote_path_segment(endpoint_id)}/deliveries",
-            params=params,
+            body["limit"] = limit
+        response = self._http().post(
+            "/api/webhooks/endpoints.listDeliveries",
+            json=body,
         )
         raise_for_status(response, operation="list deliveries")
         return response.json()
@@ -205,8 +204,8 @@ class WebhooksFacade:
     def health(self, endpoint_id: str) -> Dict[str, Any]:
         """Send rate, success rate, failure streak, DLQ depth, and the lag
         headline: oldest undelivered age."""
-        response = self._http().get(
-            f"/api/webhooks/v1/endpoints/{quote_path_segment(endpoint_id)}/health"
+        response = self._http().post(
+            "/api/webhooks/endpoints.getHealth", json={"id": endpoint_id}
         )
         raise_for_status(response, operation="endpoint health")
         return response.json()["data"]
@@ -215,7 +214,7 @@ class WebhooksFacade:
 
     def event_types(self) -> List[Dict[str, Any]]:
         """The subscribable event catalog (type, family, emitting)."""
-        response = self._http().get("/api/webhooks/v1/event-types")
+        response = self._http().post("/api/webhooks/eventTypes.list")
         raise_for_status(response, operation="event types")
         return response.json()["data"]
 
@@ -239,14 +238,14 @@ class WebhooksFacade:
         ``type`` is a single event type, which is all the route filters on.
         An unknown type serves an empty page rather than an error, so a
         consumer can probe forward-compatibly."""
-        params: Dict[str, Any] = {"from": from_ms, "to": to_ms}
+        body: Dict[str, Any] = {"from": from_ms, "to": to_ms}
         if type is not None:
-            params["type"] = type
+            body["type"] = type
         if cursor is not None:
-            params["cursor"] = cursor
+            body["cursor"] = cursor
         if limit is not None:
-            params["limit"] = limit
-        response = self._http().get("/api/webhooks/v1/events", params=params)
+            body["limit"] = limit
+        response = self._http().post("/api/webhooks/events.list", json=body)
         raise_for_status(response, operation="events log")
         return response.json()
 
@@ -279,8 +278,8 @@ class WebhooksFacade:
         event answers not found whatever the reason, since telling never
         emitted apart from past retention would confirm another
         organization's ids."""
-        response = self._http().get(
-            f"/api/webhooks/v1/events/{quote_path_segment(event_id)}"
+        response = self._http().post(
+            "/api/webhooks/events.get", json={"id": event_id}
         )
         raise_for_status(response, operation="get event")
         return response.json()["data"]

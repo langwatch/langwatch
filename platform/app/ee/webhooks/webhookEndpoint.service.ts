@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import type { WebhookUrlProblemCode } from "@langwatch/automations/providers/webhook";
 import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
@@ -11,10 +11,15 @@ import type {
   WebhookEndpoint,
 } from "~/generated/prisma/client";
 import { pruneWebhookDeliveries } from "~/server/webhooks/deliveryLog";
+import {
+  sendWebhook,
+  WEBHOOK_DELIVERY_ID_HEADER,
+} from "~/server/webhooks/sendWebhook";
 import { WEBHOOK_PREVIOUS_SECRET_TTL_MS } from "~/server/webhooks/signature";
 import {
   allowsInsecureLocalUrls,
   inspectWebhookUrl,
+  privateIpLiteral,
 } from "~/server/webhooks/urlPolicy";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { decrypt, encrypt } from "~/utils/encryption";
@@ -56,6 +61,7 @@ function assertControlInBounds(
   if (!Number.isInteger(value) || value < bounds.min || value > bounds.max) {
     throw new WebhookEndpointValidationError(
       `${name} must be an integer between ${bounds.min} and ${bounds.max}`,
+      "delivery_controls",
     );
   }
 }
@@ -86,6 +92,77 @@ export function assertValidDeliveryControls(
   }
 }
 
+/** The delivery-log page cursor, as callers carry it. */
+export interface WebhookDeliveryCursor {
+  firedAt: Date;
+  id: string;
+}
+
+/**
+ * `getDeliveries` pages on `(firedAt desc, id desc)`, so its cursor is a pair,
+ * but a caller can only carry one opaque string. Encoding and decoding live
+ * here, next to the query whose ordering defines them: the transport used to
+ * split on `~` and rebuild a Date inline, which put the paging contract in the
+ * route and made a second caller a second implementation.
+ */
+export function encodeDeliveryCursor(cursor: WebhookDeliveryCursor): string {
+  return `${cursor.firedAt.getTime()}~${cursor.id}`;
+}
+
+/**
+ * Returns undefined for an absent cursor and throws for a malformed one — the
+ * caller cannot fix a cursor it did not mint, so a bad one is a client error
+ * rather than an empty page.
+ */
+export function decodeDeliveryCursor(
+  encoded: string | undefined,
+): WebhookDeliveryCursor | undefined {
+  if (encoded === undefined) return undefined;
+
+  const parts = encoded.split("~");
+  if (parts.length !== 2) {
+    throw new InvalidWebhookDeliveryCursorError();
+  }
+
+  const [firedAtMs, id] = parts;
+  const parsedMs = Number(firedAtMs);
+  const firedAt = new Date(parsedMs);
+  // `String(parsedMs) !== firedAtMs` is what rejects the non-canonical
+  // spellings `Number` is happy to take — " 12", "1e3", "0x0", "+12". The
+  // `getTime` check catches the in-range integer that is still not a date:
+  // anything past ±8.64e15 parses fine and then constructs an Invalid Date,
+  // which would reach the query as a NaN bound rather than a 422.
+  if (
+    !Number.isInteger(parsedMs) ||
+    String(parsedMs) !== firedAtMs ||
+    !id ||
+    Number.isNaN(firedAt.getTime())
+  ) {
+    throw new InvalidWebhookDeliveryCursorError();
+  }
+  return { firedAt, id };
+}
+
+/**
+ * A delivery-log cursor this surface did not mint. Handled rather than plain:
+ * the caller's remedy is to drop the cursor and re-walk from the first page.
+ */
+export class InvalidWebhookDeliveryCursorError extends HandledError {
+  declare readonly code: "validation_error";
+
+  constructor() {
+    super(
+      "validation_error",
+      "The delivery cursor is not one this API issued",
+      {
+        httpStatus: 422,
+        fault: "customer",
+        meta: { target: "input", fields: ["cursor"] },
+      },
+    );
+  }
+}
+
 /**
  * The endpoint as asked for cannot be saved: the URL is refused by the
  * admission policy, an event name is not in the catalog, or a delivery
@@ -95,14 +172,41 @@ export function assertValidDeliveryControls(
 export class WebhookEndpointValidationError extends HandledError {
   declare readonly code: "webhook_endpoint_invalid";
 
-  constructor(message: string) {
+  /**
+   * `reason` is what makes this refusal actionable, and it has to travel
+   * OUTSIDE the message.
+   *
+   * Six different rules answer this one code — the URL's scheme, its port,
+   * embedded credentials, a private host, the delivery-control bounds and the
+   * event selectors — and a caller has to know which one it broke
+   * to fix it. The message used to carry that, and on an API-boundary error it
+   * no longer can: the framework publishes the CODE as the message, because a
+   * HandledError's message is server copy that may name internals (ADR-045).
+   * So the discriminator goes in `meta`, which is a client contract, and the
+   * prose goes in `tips`, which is authored to be read.
+   */
+  constructor(message: string, reason?: WebhookEndpointProblem) {
     super("webhook_endpoint_invalid", message, {
       httpStatus: 400,
       fault: "customer",
+      ...(reason ? { meta: { reason } } : {}),
+      tips: [message],
     });
     this.name = "WebhookEndpointValidationError";
   }
 }
+
+/**
+ * Which rule an endpoint broke. `url_*` mirror the admission policy's own
+ * codes; `private_host` a loopback / link-local / RFC1918 destination;
+ * `delivery_controls` covers a batch-size, delay or in-flight value outside
+ * its server bound; `events` an unknown event selector.
+ */
+export type WebhookEndpointProblem =
+  | WebhookUrlProblemCode
+  | "private_host"
+  | "delivery_controls"
+  | "events";
 
 /**
  * No live endpoint in this organization has that id.
@@ -180,13 +284,26 @@ function assertValidUrl(url: string): void {
   // an endpoint that can deliver. Operator opt-in for local development and
   // internal receivers relaxes the origin here exactly as it relaxes the
   // local-address fence on the send.
-  const problem = inspectWebhookUrl({
-    url,
-    allowInsecureLocal: allowsInsecureLocalUrls(),
-  });
+  const allowInsecureLocal = allowsInsecureLocalUrls();
+  const problem = inspectWebhookUrl({ url, allowInsecureLocal });
   if (problem) {
     throw new WebhookEndpointValidationError(
       URL_PROBLEM_MESSAGES[problem.code],
+      problem.code,
+    );
+  }
+
+  // The shape check above reads scheme, host presence, port and credentials —
+  // every one of which `https://169.254.169.254/latest/meta-data` satisfies.
+  // The private-address fence lived only in `assertWebhookUrlAllowed`, which
+  // runs on the SEND, so a loopback or link-local endpoint saved happily and
+  // then failed terminally on its first delivery. Running it here is what
+  // makes the sentence above true.
+  const privateLiteral = allowInsecureLocal ? null : privateIpLiteral(url);
+  if (privateLiteral) {
+    throw new WebhookEndpointValidationError(
+      `url must not point at the private or loopback address "${privateLiteral}"`,
+      "private_host",
     );
   }
 }
@@ -195,15 +312,47 @@ function assertValidEvents(enabledEvents: string[]): void {
   if (enabledEvents.length === 0) {
     throw new WebhookEndpointValidationError(
       "enabled_events must select at least one event type",
+      "events",
     );
   }
   for (const selector of enabledEvents) {
     if (!isValidEventSelector(selector)) {
       throw new WebhookEndpointValidationError(
         `unknown event selector "${selector}"`,
+        "events",
       );
     }
   }
+}
+
+/**
+ * How much of a receiver's answer (or a transport error) a test fire keeps.
+ * The same bound applies to what is persisted and what is returned, so the
+ * delivery log and the caller never disagree about what came back.
+ */
+const TEST_FIRE_EXCERPT_LIMIT = 500;
+
+/** What a test fire records about one attempt, minus the identifiers. */
+type TestFireAttempt = {
+  outcome: "success" | "terminal";
+  responseStatus?: number;
+  error?: string;
+  response?: unknown;
+};
+
+/** The single-envelope batch a test fire sends. */
+function testFireBody(now: Date): string {
+  return JSON.stringify({
+    batch: [
+      {
+        id: `evt_test_${randomUUID()}`,
+        type: "test.ping",
+        created: now.toISOString(),
+        schema_version: "1",
+        data: { message: "LangWatch webhook test delivery" },
+      },
+    ],
+  });
 }
 
 function newSecret(): string {
@@ -317,6 +466,51 @@ export class WebhookEndpointService {
       },
     });
     return toView(updated);
+  }
+
+  /**
+   * Apply one edit to an endpoint: field changes, a status change, or both.
+   *
+   * The status half is a TRANSITION, not an assignment — `enable` and `disable`
+   * carry their own side effects (clearing the failure streak, recording the
+   * disable reason), so asking for the status an endpoint already has must do
+   * nothing rather than re-run them. That reasoning used to sit in the REST
+   * PATCH handler, which meant the transport decided when a domain transition
+   * fired and the tRPC router reached the same methods by a different route.
+   */
+  async applyEdit(params: {
+    organizationId: string;
+    endpointId: string;
+    url?: string;
+    enabledEvents?: string[];
+    maxBatchSize?: number;
+    maxBatchDelayMs?: number;
+    maxInFlight?: number;
+    status?: "ACTIVE" | "DISABLED";
+  }): Promise<WebhookEndpointView> {
+    const { status, ...fields } = params;
+    const hasFieldUpdate =
+      fields.url !== undefined ||
+      fields.enabledEvents !== undefined ||
+      fields.maxBatchSize !== undefined ||
+      fields.maxBatchDelayMs !== undefined ||
+      fields.maxInFlight !== undefined;
+
+    const endpoint = hasFieldUpdate
+      ? await this.update(fields)
+      : await this.getById(fields);
+
+    const ref = {
+      organizationId: params.organizationId,
+      endpointId: params.endpointId,
+    };
+    if (status === "DISABLED" && endpoint.status === "ACTIVE") {
+      return await this.disable(ref);
+    }
+    if (status === "ACTIVE" && endpoint.status === "DISABLED") {
+      return await this.enable(ref);
+    }
+    return endpoint;
   }
 
   /**
@@ -458,6 +652,118 @@ export class WebhookEndpointService {
         ? [decrypt(endpoint.previousSecretEncrypted as string)]
         : []),
     ];
+  }
+
+  /**
+   * Fire one signed test envelope through the real delivery path and report
+   * what the receiver said.
+   *
+   * The contract callers depend on: this RESOLVES whenever the test itself ran.
+   * A receiver that refuses, or an address that never answers, is a result
+   * (`delivered: false`), not a thrown error — so the transport answers 200 and
+   * the verdict is read from the body. Only a failure to look the endpoint up
+   * throws.
+   *
+   * The envelope, the dispatch id and the delivery-log write all live here
+   * rather than in the transport, so the test path cannot drift from real
+   * delivery the way it did when `allowInsecureLocal` was passed by the
+   * delivery worker and forgotten by the test button.
+   */
+  async sendTestFire(params: {
+    organizationId: string;
+    endpointId: string;
+    now?: Date;
+  }): Promise<{
+    delivered: boolean;
+    responseStatus: number | null;
+    responseBody?: string;
+    error?: string;
+  }> {
+    const { organizationId, endpointId } = params;
+    const now = params.now ?? new Date();
+    const endpoint = await this.requireEndpoint(params);
+    const signingSecrets = await this.getSigningSecrets(params);
+    const dispatchId = `test:${randomUUID()}`;
+    const recordAttempt = (attempt: TestFireAttempt): Promise<void> =>
+      this.recordTestFireAttempt({
+        organizationId,
+        endpointId,
+        dispatchId,
+        ...attempt,
+      });
+
+    try {
+      const result = await sendWebhook({
+        url: endpoint.url,
+        body: testFireBody(now),
+        triggerName: endpointId,
+        contextLabel: `Webhook endpoint ${endpointId} (test)`,
+        testFire: true,
+        eventId: dispatchId,
+        dispatchIdHeader: WEBHOOK_DELIVERY_ID_HEADER,
+        signingSecrets,
+        attempt: 1,
+        // The test button has to reach exactly what real delivery reaches.
+        allowInsecureLocal: allowsInsecureLocalUrls(),
+      });
+      const delivered = result.status >= 200 && result.status < 300;
+      // One bounded body, persisted and returned. Slicing twice let the
+      // delivery log keep nothing while the caller got the excerpt, so the
+      // log could not answer "what did the receiver actually say".
+      const responseBody = result.body.slice(0, TEST_FIRE_EXCERPT_LIMIT);
+      await recordAttempt({
+        outcome: delivered ? "success" : "terminal",
+        responseStatus: result.status,
+        response: { body: responseBody },
+      });
+      return { delivered, responseStatus: result.status, responseBody };
+    } catch (error) {
+      // A bounded excerpt goes to the delivery log for the operator; the
+      // returned summary is sanitized so internal dispatch wording and
+      // transport details never reach the caller verbatim.
+      //
+      // Normalize BEFORE slicing: bounding only the `Error` branch left a
+      // thrown non-Error (a rejected string, an object with a huge `toString`)
+      // to reach the log at whatever length it happened to be.
+      const message = error instanceof Error ? error.message : String(error);
+      await recordAttempt({
+        outcome: "terminal",
+        error: message.slice(0, TEST_FIRE_EXCERPT_LIMIT),
+      });
+      return {
+        delivered: false,
+        responseStatus: null,
+        error:
+          "The test delivery could not reach the receiver; see the endpoint's delivery log for details.",
+      };
+    }
+  }
+
+  /**
+   * The delivery-log write for a test fire. Separate from {@link sendTestFire}
+   * because it owns one rule the caller must not have to remember: the test
+   * ran, so a logging failure is swallowed rather than allowed to turn the
+   * documented result contract into a thrown error.
+   */
+  private async recordTestFireAttempt(
+    attempt: TestFireAttempt & {
+      organizationId: string;
+      endpointId: string;
+      dispatchId: string;
+    },
+  ): Promise<void> {
+    try {
+      await this.recordDeliveryAttempt({
+        ...attempt,
+        attempt: 1,
+        eventCount: 1,
+      });
+    } catch (logError) {
+      logger.warn(
+        { endpointId: attempt.endpointId, error: logError },
+        "test-fire delivery log write failed",
+      );
+    }
   }
 
   /**

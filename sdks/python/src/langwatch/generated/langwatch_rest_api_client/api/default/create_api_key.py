@@ -6,12 +6,12 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.create_api_key_body import CreateApiKeyBody
 from ...models.create_api_key_response_201 import CreateApiKeyResponse201
-from ...types import Response, safe_http_status
+from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
     *,
-    body: CreateApiKeyBody,
+    body: CreateApiKeyBody | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -20,7 +20,8 @@ def _get_kwargs(
         "url": "/api/api-keys",
     }
 
-    _kwargs["json"] = body.to_dict()
+    if not isinstance(body, Unset):
+        _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -71,16 +72,18 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-    body: CreateApiKeyBody,
+    body: CreateApiKeyBody | Unset = UNSET,
 ) -> Response[Any | CreateApiKeyResponse201]:
     r"""Create an API key
 
      Create a new API key. For service keys, pass keyType:\"service\". Optionally scope to specific
-    projects via projectIds (ADMIN on each). Omit projectIds for full org access. The plaintext token is
-    returned once — store it securely.
+    projects via projectIds (ADMIN on each). Omit projectIds for full org access. Pass assignedToUserId
+    to mint the key for another member, and permissionMode:\"restricted\" with a permissions list to
+    grant exactly those permissions. Minting a service key or a key for another member requires
+    organization admin rights. The plaintext token is returned once — store it securely.
 
     Args:
-        body (CreateApiKeyBody):
+        body (CreateApiKeyBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -104,16 +107,18 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-    body: CreateApiKeyBody,
+    body: CreateApiKeyBody | Unset = UNSET,
 ) -> Any | CreateApiKeyResponse201 | None:
     r"""Create an API key
 
      Create a new API key. For service keys, pass keyType:\"service\". Optionally scope to specific
-    projects via projectIds (ADMIN on each). Omit projectIds for full org access. The plaintext token is
-    returned once — store it securely.
+    projects via projectIds (ADMIN on each). Omit projectIds for full org access. Pass assignedToUserId
+    to mint the key for another member, and permissionMode:\"restricted\" with a permissions list to
+    grant exactly those permissions. Minting a service key or a key for another member requires
+    organization admin rights. The plaintext token is returned once — store it securely.
 
     Args:
-        body (CreateApiKeyBody):
+        body (CreateApiKeyBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -132,16 +137,18 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-    body: CreateApiKeyBody,
+    body: CreateApiKeyBody | Unset = UNSET,
 ) -> Response[Any | CreateApiKeyResponse201]:
     r"""Create an API key
 
      Create a new API key. For service keys, pass keyType:\"service\". Optionally scope to specific
-    projects via projectIds (ADMIN on each). Omit projectIds for full org access. The plaintext token is
-    returned once — store it securely.
+    projects via projectIds (ADMIN on each). Omit projectIds for full org access. Pass assignedToUserId
+    to mint the key for another member, and permissionMode:\"restricted\" with a permissions list to
+    grant exactly those permissions. Minting a service key or a key for another member requires
+    organization admin rights. The plaintext token is returned once — store it securely.
 
     Args:
-        body (CreateApiKeyBody):
+        body (CreateApiKeyBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -163,16 +170,18 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-    body: CreateApiKeyBody,
+    body: CreateApiKeyBody | Unset = UNSET,
 ) -> Any | CreateApiKeyResponse201 | None:
     r"""Create an API key
 
      Create a new API key. For service keys, pass keyType:\"service\". Optionally scope to specific
-    projects via projectIds (ADMIN on each). Omit projectIds for full org access. The plaintext token is
-    returned once — store it securely.
+    projects via projectIds (ADMIN on each). Omit projectIds for full org access. Pass assignedToUserId
+    to mint the key for another member, and permissionMode:\"restricted\" with a permissions list to
+    grant exactly those permissions. Minting a service key or a key for another member requires
+    organization admin rights. The plaintext token is returned once — store it securely.
 
     Args:
-        body (CreateApiKeyBody):
+        body (CreateApiKeyBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

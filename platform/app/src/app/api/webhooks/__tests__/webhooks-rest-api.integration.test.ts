@@ -16,7 +16,6 @@ import {
   verifyWebhookSignature,
   WEBHOOK_SIGNATURE_HEADER,
 } from "~/server/webhooks/signature";
-import { expectCanonicalError } from "~/test-utils/expectCanonicalError";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
 // The enterprise gate reads the org's active plan through the app layer;
@@ -47,7 +46,49 @@ vi.mock("~/server/app-layer/app", () => ({
 
 import { app } from "../[[...route]]/app";
 
-describe("Feature: Webhook endpoints REST API", () => {
+/**
+ * The error envelope `@langwatch/api` serves, which is FLAT rather than the
+ * `{ error: { ... } }` the hand-rolled family answered.
+ *
+ * `message` is the CODE, never prose: a HandledError's message is server copy
+ * that may name internals, so the framework refuses to ship it and consumers
+ * read `tips` / `docsUrl` instead. Assertions here therefore pin `code`, which
+ * is the contract, and never the wording.
+ */
+interface ApiErrorBody {
+  code: string;
+  message: string;
+  type?: string;
+  kind?: string;
+  meta?: Record<string, unknown>;
+  reasons?: Array<{
+    code: string;
+    meta?: { field?: string; message?: string };
+  }>;
+  tips?: string[];
+}
+
+async function expectApiError(
+  res: Response,
+  expected: { status: number; code: string },
+): Promise<ApiErrorBody> {
+  // biome-ignore-start lint/suspicious/noMisplacedAssertion: one refusal shape, asserted whole, for every case that produces it
+  expect(res.status).toBe(expected.status);
+  const body = (await res.json()) as ApiErrorBody;
+  expect(body.code).toBe(expected.code);
+  // `type` is the framework's mirror of `code` for the Go envelope's readers,
+  // so it must never drift from it.
+  expect(body.type).toBe(body.code);
+  // biome-ignore-end lint/suspicious/noMisplacedAssertion: end of the shared refusal assertions
+  return body;
+}
+
+/** A 422 the framework promoted from a zod failure on the request body. */
+async function expectValidationError(res: Response): Promise<ApiErrorBody> {
+  return await expectApiError(res, { status: 422, code: "validation_error" });
+}
+
+describe("Feature: Webhook endpoints management API", () => {
   const ns = `webhooks-api-${nanoid(8)}`;
 
   let organization: Organization;
@@ -59,12 +100,28 @@ describe("Feature: Webhook endpoints REST API", () => {
     "Content-Type": "application/json",
   });
 
-  /** The created range the events log requires, as query-string params. */
+  /**
+   * One RPC call. Every operation on this family is a POST to a dotted name
+   * with its arguments in the body (ADR-094), so the only things that vary
+   * per call are the name, the arguments, and the occasional extra header.
+   */
+  const rpc = (
+    operation: string,
+    args?: Record<string, unknown>,
+    extraHeaders?: Record<string, string>,
+  ) =>
+    app.request(`/api/webhooks/${operation}`, {
+      method: "POST",
+      headers: { ...headers(), ...extraHeaders },
+      ...(args !== undefined ? { body: JSON.stringify(args) } : {}),
+    });
+
+  /** The created range the events log requires, as body fields. */
   const eventsWindow = () => {
     // One clock read: two would let a backward step invert the range and turn
     // an assertion about the page into a 422 about the window.
     const now = Date.now();
-    return `from=${now - 24 * 60 * 60 * 1000}&to=${now}`;
+    return { from: now - 24 * 60 * 60 * 1000, to: now };
   };
 
   beforeAll(async () => {
@@ -132,45 +189,33 @@ describe("Feature: Webhook endpoints REST API", () => {
   });
 
   it("returns 401 without an api key", async () => {
-    const res = await app.request("/api/webhooks/v1/endpoints");
-    await expectCanonicalError(res, {
-      status: 401,
-      type: "unauthenticated",
-      code: "missing_credentials",
+    const res = await app.request("/api/webhooks/endpoints.list", {
+      method: "POST",
     });
+    await expectApiError(res, { status: 401, code: "missing_credentials" });
   });
 
-  describe("canonical error envelope", () => {
+  describe("when a request is refused", () => {
     /** @scenario An unauthenticated request answers the canonical error envelope */
     it("answers an unauthenticated request with it", async () => {
-      const res = await app.request("/api/webhooks/v1/event-types");
-      await expectCanonicalError(res, {
-        status: 401,
-        type: "unauthenticated",
-        code: "missing_credentials",
+      const res = await app.request("/api/webhooks/eventTypes.list", {
+        method: "POST",
       });
+      await expectApiError(res, { status: 401, code: "missing_credentials" });
     });
 
-    /** @scenario A request-validation failure answers the canonical error envelope at 400 */
-    it("answers a request-validation failure with it, at 400 and with the offending fields under meta", async () => {
+    /** @scenario An identifier that names nothing is refused as a validation error */
+    it("answers a request-validation failure at 422, naming the offending field", async () => {
       planHasWebhookEndpoints = true;
-      const res = await app.request("/api/webhooks/v1/endpoints", {
-        method: "POST",
-        headers: headers(),
-        body: JSON.stringify({ enabled_events: ["gateway.request.completed"] }),
+      const res = await rpc("endpoints.create", {
+        enabled_events: ["gateway.request.completed"],
       });
-      const error = await expectCanonicalError(res, {
-        status: 400,
-        type: "bad_request",
-        code: "validation_error",
-      });
-      expect(error.meta?.target).toBe("json");
-      expect(error.meta?.fields).toEqual(expect.arrayContaining(["url"]));
-      const reasons = error.meta?.reasons as Array<{
-        code: string;
-        meta?: { field?: string };
-      }>;
-      expect(reasons.map((r) => r.meta?.field)).toEqual(
+      const error = await expectValidationError(res);
+      // The framework promotes a ZodError to a ValidationError, mapping each
+      // issue to a `schema_failure` reason. The reasons are top-level on the
+      // envelope, not nested under meta as the hand-rolled family had them.
+      expect(error.reasons?.map((r) => r.code)).toContain("schema_failure");
+      expect(error.reasons?.map((r) => r.meta?.field)).toEqual(
         expect.arrayContaining(["url"]),
       );
     });
@@ -187,12 +232,9 @@ describe("Feature: Webhook endpoints REST API", () => {
           new Error('relation "WebhookEndpoint" does not exist'),
         );
       try {
-        const res = await app.request("/api/webhooks/v1/endpoints", {
-          headers: headers(),
-        });
-        const error = await expectCanonicalError(res, {
+        const res = await rpc("endpoints.list");
+        const error = await expectApiError(res, {
           status: 500,
-          type: "internal_error",
           code: "internal_error",
         });
         expect(error.message).not.toContain("WebhookEndpoint");
@@ -211,11 +253,7 @@ describe("Feature: Webhook endpoints REST API", () => {
       enabled_events: ["gateway.request.completed"],
     };
     const send = () =>
-      app.request("/api/webhooks/v1/endpoints", {
-        method: "POST",
-        headers: { ...headers(), "Idempotency-Key": key },
-        body: JSON.stringify(body),
-      });
+      rpc("endpoints.create", body, { "Idempotency-Key": key });
 
     const first = await send();
     expect(first.status).toBe(201);
@@ -242,12 +280,12 @@ describe("Feature: Webhook endpoints REST API", () => {
       }),
     ).toHaveLength(1);
 
-    const mutated = await app.request("/api/webhooks/v1/endpoints", {
-      method: "POST",
-      headers: { ...headers(), "Idempotency-Key": key },
-      body: JSON.stringify({ ...body, url: "https://example.com/hooks/other" }),
-    });
-    const error = await expectCanonicalError(mutated, {
+    const mutated = await rpc(
+      "endpoints.create",
+      { ...body, url: "https://example.com/hooks/other" },
+      { "Idempotency-Key": key },
+    );
+    const error = await expectApiError(mutated, {
       status: 409,
       code: "idempotency_error",
     });
@@ -257,13 +295,9 @@ describe("Feature: Webhook endpoints REST API", () => {
   /** @scenario The signing secret is returned only at create and roll time */
   it("creates an endpoint returning the secret once; reads never carry it", async () => {
     planHasWebhookEndpoints = true;
-    const createRes = await app.request("/api/webhooks/v1/endpoints", {
-      method: "POST",
-      headers: headers(),
-      body: JSON.stringify({
-        url: "https://example.com/hooks/billing",
-        enabled_events: ["gateway.request.completed"],
-      }),
+    const createRes = await rpc("endpoints.create", {
+      url: "https://example.com/hooks/billing",
+      enabled_events: ["gateway.request.completed"],
     });
     expect(createRes.status).toBe(201);
     const created = (await createRes.json()) as {
@@ -272,9 +306,7 @@ describe("Feature: Webhook endpoints REST API", () => {
     expect(created.data.secret).toMatch(/^whsec_/);
     expect(created.data.enabled_events).toEqual(["gateway.request.completed"]);
 
-    const listRes = await app.request("/api/webhooks/v1/endpoints", {
-      headers: headers(),
-    });
+    const listRes = await rpc("endpoints.list");
     expect(listRes.status).toBe(200);
     const listed = (await listRes.json()) as {
       data: Array<Record<string, unknown>>;
@@ -285,17 +317,11 @@ describe("Feature: Webhook endpoints REST API", () => {
       expect(row).not.toHaveProperty("secret_encrypted");
     }
 
-    const getRes = await app.request(
-      `/api/webhooks/v1/endpoints/${created.data.id}`,
-      { headers: headers() },
-    );
+    const getRes = await rpc("endpoints.get", { id: created.data.id });
     const fetched = (await getRes.json()) as { data: Record<string, unknown> };
     expect(fetched.data).not.toHaveProperty("secret");
 
-    const rollRes = await app.request(
-      `/api/webhooks/v1/endpoints/${created.data.id}/roll-secret`,
-      { method: "POST", headers: headers() },
-    );
+    const rollRes = await rpc("endpoints.rollSecret", { id: created.data.id });
     expect(rollRes.status).toBe(200);
     const rolled = (await rollRes.json()) as { data: { secret: string } };
     expect(rolled.data.secret).toMatch(/^whsec_/);
@@ -304,23 +330,24 @@ describe("Feature: Webhook endpoints REST API", () => {
 
   it("rejects out-of-bounds delivery controls with the bound in the error", async () => {
     planHasWebhookEndpoints = true;
-    const res = await app.request("/api/webhooks/v1/endpoints", {
-      method: "POST",
-      headers: headers(),
-      body: JSON.stringify({
-        url: "https://example.com/hooks/bounds",
-        enabled_events: ["gateway.request.completed"],
-        max_batch_size: 1000,
-      }),
+    const res = await rpc("endpoints.create", {
+      url: "https://example.com/hooks/bounds",
+      enabled_events: ["gateway.request.completed"],
+      max_batch_size: 1000,
     });
-    const error = await expectCanonicalError(res, {
+    const error = await expectApiError(res, {
       status: 400,
-      type: "bad_request",
+      code: "webhook_endpoint_invalid",
     });
-    expect(JSON.stringify(error)).toContain("between 1 and 100");
+    // One code answers four different rules, so the caller needs to know
+    // WHICH it broke. That used to live in the message; the framework
+    // publishes the code there now, so it travels in meta with the sentence
+    // in tips.
+    expect(error.meta?.reason).toBe("delivery_controls");
+    expect(error.tips?.join(" ")).toContain("between 1 and 100");
   });
 
-  describe("the URL admission policy is the one the sender enforces", () => {
+  describe("when a URL is submitted for admission", () => {
     // The endpoints platform used to ask only for https, so a URL the
     // automations trigger drawer refused saved fine as an endpoint. Both now
     // run the shared policy, which is the union of the two.
@@ -343,57 +370,74 @@ describe("Feature: Webhook endpoints REST API", () => {
 
     it("rejects a non-default port, which used to save and then probe it", async () => {
       planHasWebhookEndpoints = true;
-      const res = await app.request("/api/webhooks/v1/endpoints", {
-        method: "POST",
-        headers: headers(),
-        body: JSON.stringify({
-          url: "https://example.com:6379/hooks",
-          enabled_events: ["gateway.request.completed"],
-        }),
+      const res = await rpc("endpoints.create", {
+        url: "https://example.com:6379/hooks",
+        enabled_events: ["gateway.request.completed"],
       });
-      const error = await expectCanonicalError(res, {
+      const error = await expectApiError(res, {
         status: 400,
-        type: "bad_request",
+        code: "webhook_endpoint_invalid",
       });
-      expect(JSON.stringify(error)).toContain("443");
+      expect(error.meta?.reason).toBe("port");
+      expect(error.tips?.join(" ")).toContain("443");
     });
 
     it("rejects credentials in the URL", async () => {
       planHasWebhookEndpoints = true;
-      const res = await app.request("/api/webhooks/v1/endpoints", {
-        method: "POST",
-        headers: headers(),
-        body: JSON.stringify({
-          url: "https://user:pass@example.com/hooks",
-          enabled_events: ["gateway.request.completed"],
-        }),
+      const res = await rpc("endpoints.create", {
+        url: "https://user:pass@example.com/hooks",
+        enabled_events: ["gateway.request.completed"],
       });
-      const error = await expectCanonicalError(res, {
+      const error = await expectApiError(res, {
         status: 400,
-        type: "bad_request",
+        code: "webhook_endpoint_invalid",
       });
-      expect(JSON.stringify(error)).toContain("credentials");
+      expect(error.meta?.reason).toBe("credentials");
+      expect(error.tips?.join(" ")).toContain("credentials");
     });
 
     it("still rejects plain http when the escape hatch is off", async () => {
       planHasWebhookEndpoints = true;
-      const res = await app.request("/api/webhooks/v1/endpoints", {
-        method: "POST",
-        headers: headers(),
-        body: JSON.stringify({
-          url: "http://example.com/hooks",
-          enabled_events: ["gateway.request.completed"],
-        }),
+      const res = await rpc("endpoints.create", {
+        url: "http://example.com/hooks",
+        enabled_events: ["gateway.request.completed"],
       });
-      const error = await expectCanonicalError(res, {
+      const error = await expectApiError(res, {
         status: 400,
-        type: "bad_request",
+        code: "webhook_endpoint_invalid",
       });
-      expect(JSON.stringify(error)).toContain("https");
+      expect(error.meta?.reason).toBe("scheme");
+      expect(error.tips?.join(" ")).toContain("https");
+    });
+
+    /**
+     * These satisfy every rule the SHAPE check knows about — https, a host, the
+     * default port, no credentials — so they saved, and then failed terminally
+     * on the first delivery when the send path's private-address fence caught
+     * them. The fence now runs at save too. `169.254.169.254` is in the list on
+     * purpose: it is the cloud metadata address, the destination that makes
+     * this worth refusing rather than merely tidy.
+     */
+    it.each([
+      "https://127.0.0.1/hooks",
+      "https://[::1]/hooks",
+      "https://10.0.0.5/hooks",
+      "https://169.254.169.254/latest/meta-data",
+    ])("refuses the private destination %s at save time", async (url) => {
+      planHasWebhookEndpoints = true;
+      const res = await rpc("endpoints.create", {
+        url,
+        enabled_events: ["gateway.request.completed"],
+      });
+      const error = await expectApiError(res, {
+        status: 400,
+        code: "webhook_endpoint_invalid",
+      });
+      expect(error.meta?.reason).toBe("private_host");
     });
   });
 
-  describe("the test button reaches what real delivery reaches", () => {
+  describe("when the test button fires at a real receiver", () => {
     // Real delivery passed allowInsecureLocal and the test send did not, so on
     // an install running the escape hatch a local endpoint delivered fine while
     // its own test button reported the address blocked. This fires the REAL
@@ -445,23 +489,16 @@ describe("Feature: Webhook endpoints REST API", () => {
       hits = [];
       captured = [];
 
-      const createRes = await app.request("/api/webhooks/v1/endpoints", {
-        method: "POST",
-        headers: headers(),
-        body: JSON.stringify({
-          url: receiverUrl,
-          enabled_events: ["gateway.request.completed"],
-        }),
+      const createRes = await rpc("endpoints.create", {
+        url: receiverUrl,
+        enabled_events: ["gateway.request.completed"],
       });
       expect(createRes.status).toBe(201);
       const { data } = (await createRes.json()) as {
         data: { id: string; secret: string };
       };
 
-      const testRes = await app.request(
-        `/api/webhooks/v1/endpoints/${data.id}/test`,
-        { method: "POST", headers: headers() },
-      );
+      const testRes = await rpc("endpoints.test", { id: data.id });
       expect(testRes.status).toBe(200);
       const testBody = (await testRes.json()) as {
         data: { delivered: boolean; response_status: number | null };
@@ -491,89 +528,81 @@ describe("Feature: Webhook endpoints REST API", () => {
     });
   });
 
-  it("rejects unknown event selectors with a 400", async () => {
+  /**
+   * Six rules answer `webhook_endpoint_invalid`, so the status alone says
+   * almost nothing: this passed just as well when the handler returned a
+   * generic refusal that had lost the reason and the tip. What the caller
+   * needs is WHICH rule they broke, and that travels in `meta.reason`.
+   */
+  it("rejects unknown event selectors, naming the rule that refused", async () => {
     planHasWebhookEndpoints = true;
-    const res = await app.request("/api/webhooks/v1/endpoints", {
-      method: "POST",
-      headers: headers(),
-      body: JSON.stringify({
-        url: "https://example.com/hooks",
-        enabled_events: ["gateway.request.imagined"],
-      }),
+    const res = await rpc("endpoints.create", {
+      url: "https://example.com/hooks",
+      enabled_events: ["gateway.request.imagined"],
     });
-    expect(res.status).toBe(400);
+
+    const body = await expectApiError(res, {
+      status: 400,
+      code: "webhook_endpoint_invalid",
+    });
+    expect(body.meta?.reason).toBe("events");
+    expect(body.tips?.[0]).toContain("gateway.request.imagined");
   });
 
-  it("PATCH status flips enable and disable with the manual reason", async () => {
+  it("flips enable and disable through endpoints.update with the manual reason", async () => {
     planHasWebhookEndpoints = true;
-    const createRes = await app.request("/api/webhooks/v1/endpoints", {
-      method: "POST",
-      headers: headers(),
-      body: JSON.stringify({
-        url: "https://example.com/hooks/toggle",
-        enabled_events: ["gateway.*"],
-      }),
+    const createRes = await rpc("endpoints.create", {
+      url: "https://example.com/hooks/toggle",
+      enabled_events: ["gateway.*"],
     });
     const { data } = (await createRes.json()) as { data: { id: string } };
 
-    const disableRes = await app.request(
-      `/api/webhooks/v1/endpoints/${data.id}`,
-      {
-        method: "PATCH",
-        headers: headers(),
-        body: JSON.stringify({ status: "disabled" }),
-      },
-    );
+    const disableRes = await rpc("endpoints.update", {
+      id: data.id,
+      status: "disabled",
+    });
     const disabled = (await disableRes.json()) as {
       data: { status: string; disabled_reason: string };
     };
     expect(disabled.data.status).toBe("disabled");
     expect(disabled.data.disabled_reason).toBe("manual");
 
-    const enableRes = await app.request(
-      `/api/webhooks/v1/endpoints/${data.id}`,
-      {
-        method: "PATCH",
-        headers: headers(),
-        body: JSON.stringify({ status: "active" }),
-      },
-    );
+    const enableRes = await rpc("endpoints.update", {
+      id: data.id,
+      status: "active",
+    });
     const enabled = (await enableRes.json()) as { data: { status: string } };
     expect(enabled.data.status).toBe("active");
   });
 
   it("refuses the stored SCREAMING_SNAKE spelling of status", async () => {
     planHasWebhookEndpoints = true;
-    const createRes = await app.request("/api/webhooks/v1/endpoints", {
-      method: "POST",
-      headers: headers(),
-      body: JSON.stringify({
-        url: "https://example.com/hooks/casing",
-        enabled_events: ["gateway.*"],
-      }),
+    const createRes = await rpc("endpoints.create", {
+      url: "https://example.com/hooks/casing",
+      enabled_events: ["gateway.*"],
     });
     const { data } = (await createRes.json()) as { data: { id: string } };
 
-    const res = await app.request(`/api/webhooks/v1/endpoints/${data.id}`, {
-      method: "PATCH",
-      headers: headers(),
-      body: JSON.stringify({ status: "DISABLED" }),
+    const res = await rpc("endpoints.update", {
+      id: data.id,
+      status: "DISABLED",
     });
-    expect(res.status).toBe(400);
+    await expectValidationError(res);
   });
 
   /** @scenario Without the plan flag the surface refuses politely */
-  it("returns 403 with an enterprise message when the plan lacks the flag", async () => {
+  it("returns 402 enterprise_plan_required when the plan lacks the flag", async () => {
     planHasWebhookEndpoints = false;
     try {
-      const res = await app.request("/api/webhooks/v1/endpoints", {
-        headers: headers(),
+      const res = await rpc("endpoints.list");
+      const error = await expectApiError(res, {
+        status: 402,
+        code: "enterprise_plan_required",
       });
-      const error = await expectCanonicalError(res, {
-        status: 403,
-        type: "permission_denied",
-      });
-      expect(error.message).toContain("enterprise");
+      // Not the message: the framework publishes the CODE there. The words a
+      // customer reads are the remediation channel, and `meta.feature` is what
+      // a client branches on.
+      expect(error.meta?.feature).toBe("WEBHOOKS");
     } finally {
       planHasWebhookEndpoints = true;
     }
@@ -581,44 +610,28 @@ describe("Feature: Webhook endpoints REST API", () => {
 
   it("archives an endpoint and hides it from reads", async () => {
     planHasWebhookEndpoints = true;
-    const createRes = await app.request("/api/webhooks/v1/endpoints", {
-      method: "POST",
-      headers: headers(),
-      body: JSON.stringify({
-        url: "https://example.com/hooks/archive-me",
-        enabled_events: ["gateway.request.completed"],
-      }),
+    const createRes = await rpc("endpoints.create", {
+      url: "https://example.com/hooks/archive-me",
+      enabled_events: ["gateway.request.completed"],
     });
     const { data } = (await createRes.json()) as { data: { id: string } };
 
-    const deleteRes = await app.request(
-      `/api/webhooks/v1/endpoints/${data.id}`,
-      { method: "DELETE", headers: headers() },
-    );
+    const deleteRes = await rpc("endpoints.archive", { id: data.id });
     expect(deleteRes.status).toBe(200);
 
-    const getRes = await app.request(`/api/webhooks/v1/endpoints/${data.id}`, {
-      headers: headers(),
-    });
+    const getRes = await rpc("endpoints.get", { id: data.id });
     expect(getRes.status).toBe(404);
   });
 
   it("serves the health report for an endpoint", async () => {
     planHasWebhookEndpoints = true;
-    const createRes = await app.request("/api/webhooks/v1/endpoints", {
-      method: "POST",
-      headers: headers(),
-      body: JSON.stringify({
-        url: "https://example.com/hooks/health-probe",
-        enabled_events: ["gateway.request.completed"],
-      }),
+    const createRes = await rpc("endpoints.create", {
+      url: "https://example.com/hooks/health-probe",
+      enabled_events: ["gateway.request.completed"],
     });
     const { data } = (await createRes.json()) as { data: { id: string } };
 
-    const res = await app.request(
-      `/api/webhooks/v1/endpoints/${data.id}/health`,
-      { headers: headers() },
-    );
+    const res = await rpc("endpoints.getHealth", { id: data.id });
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       data: {
@@ -634,11 +647,27 @@ describe("Feature: Webhook endpoints REST API", () => {
     expect(body.data.sends_per_minute).toBe(0);
   });
 
+  // The zero-argument rule from ADR-094, end to end. `eventTypes.list` declares
+  // no `input`, so the framework installs no json validator and a POST with no
+  // body at all must succeed. Declaring `input: z.object({}).optional()` to
+  // satisfy a "POSTs take a body" instinct would reinstate the parse and 4xx
+  // exactly this call.
+  /** @scenario An operation taking no arguments accepts a call with no body */
+  it("serves an argument-free operation called with no request body", async () => {
+    planHasWebhookEndpoints = true;
+
+    const res = await app.request("/api/webhooks/eventTypes.list", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKeyToken}` },
+    });
+
+    expect(res.status).toBe(200);
+    expect((await res.json()).data.length).toBeGreaterThan(0);
+  });
+
   it("serves the event-type catalog for the subscription UI", async () => {
     planHasWebhookEndpoints = true;
-    const res = await app.request("/api/webhooks/v1/event-types", {
-      headers: headers(),
-    });
+    const res = await rpc("eventTypes.list");
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       data: Array<{ type: string; family: string; is_emitting: boolean }>;
@@ -649,16 +678,13 @@ describe("Feature: Webhook endpoints REST API", () => {
     expect(completed).toMatchObject({ family: "gateway", is_emitting: true });
   });
 
-  describe("the events log serves what it says it serves", () => {
+  describe("when the events log is queried", () => {
     /** @scenario An event id the log cannot answer for is a canonical 404 */
     it("404s for an event id that is not in this organization's log", async () => {
       planHasWebhookEndpoints = true;
-      const res = await app.request(
-        "/api/webhooks/v1/events/req_nothing_here:completed",
-        { headers: headers() },
-      );
+      const res = await rpc("events.get", { id: "req_nothing_here:completed" });
       expect(res.status).toBe(404);
-      await expectCanonicalError(res, {
+      await expectApiError(res, {
         status: 404,
         code: "webhook_event_not_found",
       });
@@ -670,10 +696,7 @@ describe("Feature: Webhook endpoints REST API", () => {
       // `admitted` rows are in-flight requests, never emitted events, so an
       // id naming one addresses nothing the log served.
       for (const id of ["no-suffix", "req_x:admitted", "req_x:invented"]) {
-        const res = await app.request(
-          `/api/webhooks/v1/events/${encodeURIComponent(id)}`,
-          { headers: headers() },
-        );
+        const res = await rpc("events.get", { id });
         expect(res.status).toBe(404);
       }
     });
@@ -688,10 +711,7 @@ describe("Feature: Webhook endpoints REST API", () => {
         "gateway.budget.breached",
         "gateway.virtual_key.created",
       ]) {
-        const res = await app.request(
-          `/api/webhooks/v1/events?type=${type}&${eventsWindow()}`,
-          { headers: headers() },
-        );
+        const res = await rpc("events.list", { type, ...eventsWindow() });
         expect(res.status).toBe(200);
         const body = (await res.json()) as {
           data: unknown[];
@@ -710,21 +730,16 @@ describe("Feature: Webhook endpoints REST API", () => {
       // filter. Half a range is refused for the same reason as none.
       const now = Date.now();
       const cases = [
-        { query: "", missing: "from" },
-        { query: `?from=${now - 60_000}`, missing: "to" },
-        { query: `?to=${now}`, missing: "from" },
+        { args: {}, missing: "from" },
+        { args: { from: now - 60_000 }, missing: "to" },
+        { args: { to: now }, missing: "from" },
       ] as const;
-      for (const { query, missing } of cases) {
-        const res = await app.request(`/api/webhooks/v1/events${query}`, {
-          headers: headers(),
-        });
-        const error = await expectCanonicalError(res, {
-          status: 400,
-          type: "bad_request",
-          code: "validation_error",
-        });
-        expect(error.meta?.target).toBe("query");
-        expect(error.meta?.fields).toEqual(expect.arrayContaining([missing]));
+      for (const { args, missing } of cases) {
+        const res = await rpc("events.list", args);
+        const error = await expectValidationError(res);
+        expect(error.reasons?.map((r) => r.meta?.field)).toEqual(
+          expect.arrayContaining([missing]),
+        );
       }
     });
 
@@ -732,18 +747,15 @@ describe("Feature: Webhook endpoints REST API", () => {
     it("refuses a window that ends before it starts", async () => {
       planHasWebhookEndpoints = true;
       const now = Date.now();
-      const res = await app.request(
-        `/api/webhooks/v1/events?from=${now}&to=${now - 60_000}`,
-        { headers: headers() },
+      const res = await rpc("events.list", { from: now, to: now - 60_000 });
+      const error = await expectValidationError(res);
+      // Without naming the rule, the case passes for a validation error about
+      // anything at all — including a field the operation does not take.
+      expect(error.reasons?.map((r) => r.meta?.message)).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining("less than or equal to"),
+        ]),
       );
-      const error = await expectCanonicalError(res, {
-        status: 400,
-        type: "bad_request",
-        code: "validation_error",
-      });
-      // Without this the case passes for a validation error about anything at
-      // all, including a body the route does not take.
-      expect(error.meta?.target).toBe("query");
     });
   });
 });

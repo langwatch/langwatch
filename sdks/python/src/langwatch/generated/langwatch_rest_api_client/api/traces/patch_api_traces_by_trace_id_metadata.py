@@ -101,7 +101,7 @@ def _build_response(
 def sync_detailed(
     trace_id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PatchApiTracesByTraceIdMetadataBody | Unset = UNSET,
 ) -> Response[
     PatchApiTracesByTraceIdMetadataResponse200
@@ -143,7 +143,7 @@ def sync_detailed(
 def sync(
     trace_id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PatchApiTracesByTraceIdMetadataBody | Unset = UNSET,
 ) -> (
     PatchApiTracesByTraceIdMetadataResponse200
@@ -181,7 +181,7 @@ def sync(
 async def asyncio_detailed(
     trace_id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PatchApiTracesByTraceIdMetadataBody | Unset = UNSET,
 ) -> Response[
     PatchApiTracesByTraceIdMetadataResponse200
@@ -221,7 +221,7 @@ async def asyncio_detailed(
 async def asyncio(
     trace_id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PatchApiTracesByTraceIdMetadataBody | Unset = UNSET,
 ) -> (
     PatchApiTracesByTraceIdMetadataResponse200

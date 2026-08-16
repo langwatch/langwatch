@@ -1875,7 +1875,7 @@ This matches what the `openai` Python and TypeScript SDKs, plus the Anthropic SD
 
 `type`, `code`, `message` and `meta` mean the same thing on both LangWatch surfaces, and a client that reads only those four works against either. The surfaces are:
 
-- The **control plane**: the management API, `/api/gateway/v1/*` and `/api/webhooks/v1/*`. You create virtual keys, budgets, cache rules and webhook endpoints here.
+- The **control plane**: the management API, `/api/gateway/v1/*` and `/api/webhooks/*`. You create virtual keys, budgets, cache rules and webhook endpoints here.
 - The **data plane**: the OpenAI-compatible chat surface the gateway serves. Your application's model calls go here.
 
 They differ in exactly two ways, both consequences of the data plane being OpenAI-wire-shaped on purpose:
@@ -2113,7 +2113,7 @@ Every list on this API is cursor-paged. `limit` defaults to 50 and is capped at 
 
 ## Retrying a create safely
 
-The four creates (`/virtual-keys`, `/budgets`, `/cache-rules`, and `/api/webhooks/v1/endpoints`) accept an `Idempotency-Key` header, so a client that never learned the outcome can retry without creating a second resource:
+The four creates (`/virtual-keys`, `/budgets`, `/cache-rules`, and `/api/webhooks/endpoints.create`) accept an `Idempotency-Key` header, so a client that never learned the outcome can retry without creating a second resource:
 
 ```bash
 curl -sS https://app.langwatch.ai/api/gateway/v1/budgets \
@@ -2515,9 +2515,9 @@ The rule shape, the full matcher and action tables, and the evaluation order liv
 
 ## Webhooks and billing surfaces
 
-Two sibling REST families complete the platform and are documented on their own pages, because they authenticate with an **organization API key** and organization-exclusive permissions rather than the credential used above:
+Two sibling HTTP families complete the platform and are documented on their own pages, because they authenticate with an **organization API key** and organization-exclusive permissions rather than the credential used above:
 
-- `/api/webhooks/v1/*`: endpoint CRUD, secret roll, test fire, delivery log, health, and the emitted-events log. See [Webhooks](/features/webhooks).
+- `/api/webhooks/*`: endpoint management, secret roll, test fire, delivery log, health, and the emitted-events log. RPC-named — every operation is a POST to a dotted name such as `endpoints.rollSecret`, with its arguments in the body. See [Webhooks](/features/webhooks).
 - `/api/gateway/v1/spend-events`, `/spend-summaries`, `/spend-events/replay`: the billing reconciliation pull surface. See [Billing & spend events](/ai-gateway/billing-events).
 
 ## Errors
@@ -5838,7 +5838,7 @@ Choices worth making deliberately:
 Your billing ledger is fed by [webhook endpoints](/features/webhooks). Register your receiver once, org-wide, subscribed to the spend stream (and the budget signals if you want them):
 
 ```bash
-curl -sS $LW/api/webhooks/v1/endpoints \
+curl -sS -X POST $LW/api/webhooks/endpoints.create \
   -H "Authorization: Bearer $LANGWATCH_ORG_API_KEY" -H "Content-Type: application/json" \
   -d '{"url": "https://billing.example.com/webhooks/langwatch",
        "enabled_events": ["gateway.request.completed", "gateway.request.settled",
@@ -10685,8 +10685,8 @@ The billing and webhook surfaces authenticate with an **organization API key** a
 
 | Endpoint | Permission |
 |---|---|
-| `POST/PATCH/DELETE /api/webhooks/v1/endpoints*`, `/roll-secret`, `/test` | `webhookEndpoints:manage` |
-| `GET /api/webhooks/v1/endpoints*`, `/deliveries`, `/health`, `/events`, `/event-types` | `webhookEndpoints:view` |
+| `POST /api/webhooks/endpoints.{create,update,archive,rollSecret,test}` | `webhookEndpoints:manage` |
+| `POST /api/webhooks/endpoints.{list,get,listDeliveries,getHealth}`, `events.{list,get}`, `eventTypes.list` | `webhookEndpoints:view` |
 | `GET /api/gateway/v1/spend-events`, `GET /api/gateway/v1/spend-summaries` | `gatewaySpend:view` |
 | `GET /api/gateway/v1/end-users/:id/spend` | `gatewaySpend:view` |
 | `POST /api/gateway/v1/spend-events/replay` | `gatewaySpend:manage` |
@@ -35853,7 +35853,7 @@ Webhook endpoints stream LangWatch events to your systems as they happen. You re
 The first consumers are billing integrations: platforms that rebill their own customers ingest [spend events](/ai-gateway/billing-events) through a webhook endpoint. The platform itself is general: every event family delivers through the same endpoints, envelopes, signatures, and retries.
 
 <Note>
-Webhook endpoints are an **Enterprise** feature (the `webhookEndpointsEnabled` plan flag). On other plans the API answers `403` and the settings page shows an upgrade state. Self-hosted enterprise licenses include it.
+Webhook endpoints are an **Enterprise** feature (the `webhookEndpointsEnabled` plan flag). Without it the API answers `402` with `error.code = "enterprise_plan_required"` and the settings page shows an upgrade state. Self-hosted enterprise licenses include it.
 </Note>
 
 ## The model
@@ -35868,27 +35868,34 @@ An endpoint belongs to your **organization** and carries:
 | Signing secret | Shown **once** at creation. Roll it to get a new one. Every delivery is signed with it. |
 | Delivery controls | `max_batch_size`, `max_batch_delay_ms`, `max_in_flight` (bounds below). |
 
-Manage endpoints under **AI Gateway > Webhooks** (`/settings/gateway/webhooks`) or over REST with an organization API key:
+Manage endpoints under **AI Gateway > Webhooks** (`/settings/gateway/webhooks`) or over the HTTP API with an organization API key:
+
+Every operation is a `POST` to a named operation, and every argument travels in
+the JSON body — including the endpoint id.
 
 ```
-POST   /api/webhooks/v1/endpoints                    webhookEndpoints:manage
-GET    /api/webhooks/v1/endpoints                    webhookEndpoints:view
-GET    /api/webhooks/v1/endpoints/:id                webhookEndpoints:view
-PATCH  /api/webhooks/v1/endpoints/:id                webhookEndpoints:manage
-DELETE /api/webhooks/v1/endpoints/:id                webhookEndpoints:manage   (archive)
-POST   /api/webhooks/v1/endpoints/:id/roll-secret    webhookEndpoints:manage
-POST   /api/webhooks/v1/endpoints/:id/test           webhookEndpoints:manage
-GET    /api/webhooks/v1/endpoints/:id/deliveries     webhookEndpoints:view
-GET    /api/webhooks/v1/endpoints/:id/health         webhookEndpoints:view
-GET    /api/webhooks/v1/event-types                  webhookEndpoints:view
-GET    /api/webhooks/v1/events                       webhookEndpoints:view
-GET    /api/webhooks/v1/events/:id                   webhookEndpoints:view
+POST /api/webhooks/endpoints.create             webhookEndpoints:manage
+POST /api/webhooks/endpoints.list               webhookEndpoints:view
+POST /api/webhooks/endpoints.get                webhookEndpoints:view
+POST /api/webhooks/endpoints.update             webhookEndpoints:manage
+POST /api/webhooks/endpoints.archive            webhookEndpoints:manage
+POST /api/webhooks/endpoints.rollSecret         webhookEndpoints:manage
+POST /api/webhooks/endpoints.test               webhookEndpoints:manage
+POST /api/webhooks/endpoints.listDeliveries     webhookEndpoints:view
+POST /api/webhooks/endpoints.getHealth          webhookEndpoints:view
+POST /api/webhooks/eventTypes.list              webhookEndpoints:view
+POST /api/webhooks/events.list                  webhookEndpoints:view
+POST /api/webhooks/events.get                   webhookEndpoints:view
 ```
+
+Pin a version by putting it in the path — `/api/webhooks/2026-08-07/endpoints.list`
+— or call `/latest/` for the newest, or the bare path above, which is the one
+the reference documents.
 
 Create an endpoint subscribed to the billing stream:
 
 ```bash
-curl -sS https://app.langwatch.ai/api/webhooks/v1/endpoints \
+curl -sS -X POST https://app.langwatch.ai/api/webhooks/endpoints.create \
   -H "Authorization: Bearer $LANGWATCH_ORG_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -35949,7 +35956,7 @@ Batches contain up to `max_batch_size` envelopes, possibly of mixed types within
 
 ## Event catalog
 
-`GET /api/webhooks/v1/event-types` returns the live catalog. Types are grouped by family (the first dotted segment), which is also what the settings UI renders as checkbox groups and what the `gateway.*` wildcard matches.
+`POST /api/webhooks/eventTypes.list` returns the live catalog. Types are grouped by family (the first dotted segment), which is also what the settings UI renders as checkbox groups and what the `gateway.*` wildcard matches.
 
 ### Family: `gateway`
 
@@ -36138,7 +36145,7 @@ After **72 hours of unbroken failures** the endpoint flips to `disabled` with `d
 To recover:
 
 1. Fix the receiver.
-2. Re-enable: `PATCH /endpoints/:id {"status": "active"}`.
+2. Re-enable: `POST /api/webhooks/endpoints.update {"id": "<endpoint id>", "status": "active"}`.
 3. Re-enabling does **not** re-send the gap. Replay it explicitly: for spend events, [`POST /api/gateway/v1/spend-events/replay`](/ai-gateway/billing-events#replay) with the gap window and this endpoint's id.
 
 ```mermaid
@@ -36164,7 +36171,7 @@ Three per-endpoint knobs, validated server-side against fixed bounds; out-of-ran
 
 ## Health and the lag number
 
-`GET /endpoints/:id/health`:
+`POST /api/webhooks/endpoints.getHealth {"id": "<endpoint id>"}`:
 
 ```json
 {
@@ -36187,7 +36194,7 @@ The headline is **`oldest_undelivered_age_ms`**: the age of the oldest envelope 
 
 ## The delivery log
 
-`GET /endpoints/:id/deliveries` lists recent attempts, newest first: the attempt number, envelope count, outcome, **your endpoint's HTTP status**, latency, and the error text when transport failed. Your receiver's responses are recorded, so debugging a rejecting endpoint starts here rather than in your own logs.
+`POST /api/webhooks/endpoints.listDeliveries {"id": "<endpoint id>"}` lists recent attempts, newest first: the attempt number, envelope count, outcome, **your endpoint's HTTP status**, latency, and the error text when transport failed. Your receiver's responses are recorded, so debugging a rejecting endpoint starts here rather than in your own logs.
 
 The list is cursor-paginated on `(fired_at, id)` at 25 rows by default (max 200), and the response carries `next_cursor` when more remain. Cursors rather than offsets because a busy endpoint writes new attempts while you page: an offset walk would show you the same row twice and skip another. Delivery log rows are retained for 30 days.
 
@@ -36195,7 +36202,7 @@ Endpoint deliveries and the [webhooks fired by your automation triggers](#signin
 
 ## Test fire
 
-`POST /endpoints/:id/test` sends one signed `test.ping` envelope through the full delivery path, including SSRF checks and signing, plus an `X-LangWatch-Test-Fire: true` header so your receiver can tell it apart. The route answers `200` whenever the test itself ran; read `data.delivered` and `data.response_status` for what your receiver did. Test fires appear in the delivery log too.
+`POST /api/webhooks/endpoints.test {"id": "<endpoint id>"}` sends one signed `test.ping` envelope through the full delivery path, including SSRF checks and signing, plus an `X-LangWatch-Test-Fire: true` header so your receiver can tell it apart. The route answers `200` whenever the test itself ran; read `data.delivered` and `data.response_status` for what your receiver did. Test fires appear in the delivery log too.
 
 ## The events log
 
@@ -36203,11 +36210,11 @@ Endpoint deliveries and the [webhooks fired by your automation triggers](#signin
 **Do not reconcile billing against this log.** It holds only the request families, it is a delivery-recovery aid rather than the money record, and it carries no retention contract. Reconcile against the spend ledger: [`spend-summaries` and `spend-events`](/ai-gateway/billing-events#reconciliation-two-grains-one-ledger), which include settled rows and keep 13 months.
 </Warning>
 
-`GET /api/webhooks/v1/events?from=&to=&type=&cursor=&limit=` is the organization's emitted-events log: cursor-paged, newest first, filterable by type. Webhooks are push over this log, never the only copy of it, so a consumer that missed deliveries can list what was emitted and recover.
+`POST /api/webhooks/events.list`, with `from`, `to` and optionally `type`, `cursor` and `limit` in the body, is the organization's emitted-events log: cursor-paged, newest first, filterable by type. Webhooks are push over this log, never the only copy of it, so a consumer that missed deliveries can list what was emitted and recover.
 
 `from` and `to` bound the `created` range in unix milliseconds and are **required**, and `from` must be less than or equal to `to`. The log reads the same 13-month spend table the reconciliation pull reads, so an unbounded listing sorts every month the organization has, cold storage included, to serve one page. A read with no range, with only one of the two bounds, or with a range that ends before it starts is rejected with the canonical `400` this surface answers every validation failure with, naming the offending parameter.
 
-`GET /api/webhooks/v1/events/{id}` reads one event back by the `id` its envelope carried. A `404` means the log cannot answer for that id, and deliberately does not say which reason applies.
+`POST /api/webhooks/events.get`, with `{ "id": "..." }`, reads one event back by the `id` its envelope carried. A `404` means the log cannot answer for that id, and deliberately does not say which reason applies.
 
 ### Which families the log holds
 
@@ -64578,7 +64585,7 @@ openapi: "PATCH /api/triggers/{id}"
 
 ---
 title: "Archive a webhook endpoint"
-openapi: "DELETE /api/webhooks/v1/endpoints/{id}"
+openapi: "POST /api/webhooks/endpoints.archive"
 ---
 
 ---
@@ -64587,7 +64594,7 @@ openapi: "DELETE /api/webhooks/v1/endpoints/{id}"
 
 ---
 title: "Create a webhook endpoint"
-openapi: "POST /api/webhooks/v1/endpoints"
+openapi: "POST /api/webhooks/endpoints.create"
 ---
 
 ---
@@ -64596,7 +64603,7 @@ openapi: "POST /api/webhooks/v1/endpoints"
 
 ---
 title: "Get a webhook endpoint"
-openapi: "GET /api/webhooks/v1/endpoints/{id}"
+openapi: "POST /api/webhooks/endpoints.get"
 ---
 
 ---
@@ -64605,7 +64612,7 @@ openapi: "GET /api/webhooks/v1/endpoints/{id}"
 
 ---
 title: "Get one emitted event"
-openapi: "GET /api/webhooks/v1/events/{id}"
+openapi: "POST /api/webhooks/events.get"
 ---
 
 ---
@@ -64614,7 +64621,7 @@ openapi: "GET /api/webhooks/v1/events/{id}"
 
 ---
 title: "List an endpoint's delivery attempts"
-openapi: "GET /api/webhooks/v1/endpoints/{id}/deliveries"
+openapi: "POST /api/webhooks/endpoints.listDeliveries"
 ---
 
 ---
@@ -64623,7 +64630,7 @@ openapi: "GET /api/webhooks/v1/endpoints/{id}/deliveries"
 
 ---
 title: "List emitted events"
-openapi: "GET /api/webhooks/v1/events"
+openapi: "POST /api/webhooks/events.list"
 ---
 
 ---
@@ -64632,7 +64639,7 @@ openapi: "GET /api/webhooks/v1/events"
 
 ---
 title: "List subscribable event types"
-openapi: "GET /api/webhooks/v1/event-types"
+openapi: "POST /api/webhooks/eventTypes.list"
 ---
 
 ---
@@ -64641,7 +64648,7 @@ openapi: "GET /api/webhooks/v1/event-types"
 
 ---
 title: "List webhook endpoints"
-openapi: "GET /api/webhooks/v1/endpoints"
+openapi: "POST /api/webhooks/endpoints.list"
 ---
 
 ---
@@ -64663,7 +64670,7 @@ Register endpoints that receive signed, retried batches of LangWatch events, and
 
 ---
 title: "Read an endpoint's delivery health"
-openapi: "GET /api/webhooks/v1/endpoints/{id}/health"
+openapi: "POST /api/webhooks/endpoints.getHealth"
 ---
 
 ---
@@ -64672,7 +64679,7 @@ openapi: "GET /api/webhooks/v1/endpoints/{id}/health"
 
 ---
 title: "Roll an endpoint's signing secret"
-openapi: "POST /api/webhooks/v1/endpoints/{id}/roll-secret"
+openapi: "POST /api/webhooks/endpoints.rollSecret"
 ---
 
 ---
@@ -64681,7 +64688,7 @@ openapi: "POST /api/webhooks/v1/endpoints/{id}/roll-secret"
 
 ---
 title: "Send a test event to an endpoint"
-openapi: "POST /api/webhooks/v1/endpoints/{id}/test"
+openapi: "POST /api/webhooks/endpoints.test"
 ---
 
 ---
@@ -64690,7 +64697,7 @@ openapi: "POST /api/webhooks/v1/endpoints/{id}/test"
 
 ---
 title: "Update a webhook endpoint"
-openapi: "PATCH /api/webhooks/v1/endpoints/{id}"
+openapi: "POST /api/webhooks/endpoints.update"
 ---
 
 ---

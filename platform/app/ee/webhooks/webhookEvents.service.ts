@@ -33,7 +33,7 @@ export interface WebhookEventsServiceDeps {
 }
 
 /**
- * The emitted-events listing behind GET /api/webhooks/v1/events: resolves
+ * The emitted-events listing behind POST /api/webhooks/events.list: resolves
  * the organization's tenant set and pages the spend records as envelopes.
  * Routes call this service; the repository stays a read detail.
  */

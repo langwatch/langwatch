@@ -3344,59 +3344,7 @@ export interface paths {
         patch: operations["patchApiTriggersById"];
         trace?: never;
     };
-    "/api/webhooks/v1/endpoints": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List webhook endpoints
-         * @description List the organization's webhook endpoints
-         */
-        get: operations["getApiWebhooksV1Endpoints"];
-        put?: never;
-        /**
-         * Create a webhook endpoint
-         * @description Create a webhook endpoint. The signing secret is returned ONCE in this response and never again; roll it to get a new one. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.
-         */
-        post: operations["postApiWebhooksV1Endpoints"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/webhooks/v1/endpoints/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get a webhook endpoint
-         * @description Get one webhook endpoint
-         */
-        get: operations["getApiWebhooksV1EndpointsById"];
-        put?: never;
-        post?: never;
-        /**
-         * Archive a webhook endpoint
-         * @description Archive a webhook endpoint
-         */
-        delete: operations["deleteApiWebhooksV1EndpointsById"];
-        options?: never;
-        head?: never;
-        /**
-         * Update a webhook endpoint
-         * @description Update a webhook endpoint's url, event subscriptions, or status (`active` re-enables, `disabled` pauses; re-enabling does not re-send the gap, replay covers it)
-         */
-        patch: operations["patchApiWebhooksV1EndpointsById"];
-        trace?: never;
-    };
-    "/api/webhooks/v1/endpoints/{id}/roll-secret": {
+    "/api/webhooks/endpoints.create": {
         parameters: {
             query?: never;
             header?: never;
@@ -3405,18 +3353,15 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * Roll an endpoint's signing secret
-         * @description Roll the endpoint's signing secret. The new secret is returned ONCE; deliveries sign with it immediately.
-         */
-        post: operations["postApiWebhooksV1EndpointsByIdRoll-secret"];
+        /** @description Create a webhook endpoint. The signing secret is returned ONCE in this response and never again; roll it to get a new one. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit. */
+        post: operations["createWebhookEndpoint"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/webhooks/v1/endpoints/{id}/test": {
+    "/api/webhooks/endpoints.list": {
         parameters: {
             query?: never;
             header?: never;
@@ -3425,111 +3370,178 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * Send a test event to an endpoint
-         * @description Send a signed test event through the full delivery path. Contract: the route answers 200 whenever the test itself ran; data.delivered says whether the receiver accepted it, so clients must read the body, not the status code.
-         */
-        post: operations["postApiWebhooksV1EndpointsByIdTest"];
+        /** @description List the organization's webhook endpoints. Archived endpoints are excluded. */
+        post: operations["listWebhookEndpoints"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/webhooks/v1/endpoints/{id}/deliveries": {
+    "/api/webhooks/endpoints.get": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /**
-         * List an endpoint's delivery attempts
-         * @description The endpoint's delivery log: every attempt with the receiver's HTTP status, latency, and error
-         */
-        get: operations["getApiWebhooksV1EndpointsByIdDeliveries"];
+        get?: never;
         put?: never;
-        post?: never;
+        /** @description Read one webhook endpoint. */
+        post: operations["getWebhookEndpoint"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/webhooks/v1/endpoints/{id}/health": {
+    "/api/webhooks/endpoints.update": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /**
-         * Read an endpoint's delivery health
-         * @description Delivery health. The headline number is oldest_undelivered_age_ms, the feed's staleness: age of the oldest envelope still buffered or retrying. Also: DLQ depth, failure streak, sends/min, success rate, and p95 latency over the last hour.
-         */
-        get: operations["getApiWebhooksV1EndpointsByIdHealth"];
+        get?: never;
         put?: never;
-        post?: never;
+        /** @description Update a webhook endpoint's url, event subscriptions, or status (`active` re-enables, `disabled` pauses; re-enabling does not re-send the gap, replay covers it). Partial: only the fields present are written. */
+        post: operations["updateWebhookEndpoint"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/webhooks/v1/event-types": {
+    "/api/webhooks/endpoints.archive": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /**
-         * List subscribable event types
-         * @description The event catalog: every subscribable type, grouped by family; types marked emitting=false are declared contracts whose producers have not shipped yet
-         */
-        get: operations["getApiWebhooksV1Event-types"];
+        get?: never;
         put?: never;
-        post?: never;
+        /** @description Archive a webhook endpoint: it disappears from every read and delivers nothing further. */
+        post: operations["archiveWebhookEndpoint"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/webhooks/v1/events": {
+    "/api/webhooks/endpoints.rollSecret": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /**
-         * List emitted events
-         * @description The organization's emitted-events log for the request families: cursor-paged, newest first, filter by type. `from` and `to` bound the created range in epoch milliseconds, are REQUIRED, and `from` must not be later than `to` — a range that ends before it starts is rejected rather than answered with an empty page. They are required because the log is a ranged read over the 13-month spend table and an unbounded walk sorts all of it on every page. Webhooks are push over this log, never the only copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page rather than an error, so a client can probe forward-compatibly.
-         */
-        get: operations["getApiWebhooksV1Events"];
+        get?: never;
         put?: never;
-        post?: never;
+        /** @description Roll the endpoint's signing secret. The new secret is returned ONCE; deliveries sign with it immediately, and the previous secret stays valid for a short window so a receiver can swap on its own schedule. */
+        post: operations["rollWebhookEndpointSecret"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/webhooks/v1/events/{id}": {
+    "/api/webhooks/endpoints.test": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /**
-         * Get one emitted event
-         * @description One emitted event by its id, as it was delivered. Serves the same families the events log serves. A 404 covers every reason the log cannot answer -- never emitted, past the retention horizon, or belonging to another organization -- because telling those apart would confirm the existence of another tenant's request ids.
-         */
-        get: operations["getApiWebhooksV1EventsById"];
+        get?: never;
         put?: never;
-        post?: never;
+        /** @description Send a signed test event through the full delivery path. Contract: this answers 200 whenever the test itself ran; `data.delivered` says whether the receiver accepted it, so clients must read the body, not the status code. */
+        post: operations["sendWebhookEndpointTest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/webhooks/endpoints.listDeliveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description The endpoint's delivery log: every attempt with the receiver's HTTP status, latency, and error. Cursor-paged, newest first. */
+        post: operations["listWebhookEndpointDeliveries"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/webhooks/endpoints.getHealth": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Delivery health. The headline number is `oldest_undelivered_age_ms`, the feed's staleness: age of the oldest envelope still buffered or retrying. Also: DLQ depth, failure streak, sends per minute, success rate, and p95 latency over the last hour. */
+        post: operations["getWebhookEndpointHealth"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/webhooks/eventTypes.list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description The event catalog: every subscribable type, grouped by family. Types marked `is_emitting: false` are declared contracts whose producers have not shipped yet. */
+        post: operations["listWebhookEventTypes"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/webhooks/events.list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description The organization's emitted-events log for the request families: cursor-paged, newest first, filter by type. `from` and `to` bound the created range in epoch milliseconds, are REQUIRED, and `from` must not be later than `to` — a range that ends before it starts is rejected rather than answered with an empty page. They are required because the log is a ranged read over the 13-month spend table and an unbounded walk sorts all of it on every page. Webhooks are push over this log, never the only copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page rather than an error, so a client can probe forward-compatibly. */
+        post: operations["listWebhookEvents"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/webhooks/events.get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description One emitted event by its id, as it was delivered. Serves the same families the events log serves. A 404 covers every reason the log cannot answer — never emitted, past the retention horizon, or belonging to another organization — because telling those apart would confirm the existence of another tenant's request ids. */
+        post: operations["getWebhookEvent"];
         delete?: never;
         options?: never;
         head?: never;
@@ -23801,7 +23813,56 @@ export interface operations {
             };
         };
     };
-    getApiWebhooksV1Endpoints: {
+    createWebhookEndpoint: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    url: string;
+                    enabled_events: string[];
+                    max_batch_size?: number;
+                    max_batch_delay_ms?: number;
+                    max_in_flight?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            id: string;
+                            url: string;
+                            enabled_events: string[];
+                            /** @enum {string} */
+                            status: "active" | "disabled";
+                            disabled_reason: string | null;
+                            disabled_at: string | null;
+                            failing_since: string | null;
+                            last_success_at: string | null;
+                            last_failure_at: string | null;
+                            max_batch_size: number;
+                            max_batch_delay_ms: number;
+                            max_in_flight: number;
+                            created_at: string;
+                            updated_at: string;
+                            secret: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    listWebhookEndpoints: {
         parameters: {
             query?: never;
             header?: never;
@@ -23810,7 +23871,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Every endpoint the organization has, archived ones excluded */
+            /** @description Success */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -23837,254 +23898,24 @@ export interface operations {
                     };
                 };
             };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
         };
     };
-    postApiWebhooksV1Endpoints: {
+    getWebhookEndpoint: {
         parameters: {
             query?: never;
-            header?: {
-                /** @description A caller-chosen key, 8 to 255 characters, that makes this create safe to retry. The first request to use a key runs normally and its response is stored for 24 hours. A later request with the same key and the same body is not executed again: it returns the stored response, marked with `X-Idempotent-Replay: true`. The same key with a different body is refused 409 `idempotency_error`, as is a retry sent while the original is still running. Only successful responses are stored, so a create that failed can simply be retried with the same key. */
-                "Idempotency-Key"?: string;
-            };
+            header?: never;
             path?: never;
             cookie?: never;
         };
         requestBody?: {
             content: {
                 "application/json": {
-                    url: string;
-                    enabled_events: string[];
-                    max_batch_size?: number;
-                    max_batch_delay_ms?: number;
-                    max_in_flight?: number;
+                    id: string;
                 };
             };
         };
         responses: {
-            /** @description The endpoint, with the signing secret this body alone carries */
-            201: {
-                headers: {
-                    /** @description Present and `true` only when this body came from a stored response rather than a fresh execution. Absent on the first use of a key, and on every request that carries no key. */
-                    "X-Idempotent-Replay"?: "true";
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        data: {
-                            id: string;
-                            url: string;
-                            enabled_events: string[];
-                            /** @enum {string} */
-                            status: "active" | "disabled";
-                            disabled_reason: string | null;
-                            disabled_at: string | null;
-                            failing_since: string | null;
-                            last_success_at: string | null;
-                            last_failure_at: string | null;
-                            max_batch_size: number;
-                            max_batch_delay_ms: number;
-                            max_in_flight: number;
-                            created_at: string;
-                            updated_at: string;
-                            secret: string;
-                        };
-                    };
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-        };
-    };
-    getApiWebhooksV1EndpointsById: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The endpoint */
+            /** @description Success */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -24111,120 +23942,75 @@ export interface operations {
                     };
                 };
             };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
+        };
+    };
+    updateWebhookEndpoint: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    id: string;
+                    url?: string;
+                    enabled_events?: string[];
+                    /** @enum {string} */
+                    status?: "active" | "disabled";
+                    max_batch_size?: number;
+                    max_batch_delay_ms?: number;
+                    max_in_flight?: number;
                 };
             };
-            /** @description Forbidden */
-            403: {
+        };
+        responses: {
+            /** @description Success */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
+                        data: {
+                            id: string;
+                            url: string;
+                            enabled_events: string[];
+                            /** @enum {string} */
+                            status: "active" | "disabled";
+                            disabled_reason: string | null;
+                            disabled_at: string | null;
+                            failing_since: string | null;
+                            last_success_at: string | null;
+                            last_failure_at: string | null;
+                            max_batch_size: number;
+                            max_batch_delay_ms: number;
+                            max_in_flight: number;
+                            created_at: string;
+                            updated_at: string;
                         };
                     };
                 };
             };
         };
     };
-    deleteApiWebhooksV1EndpointsById: {
+    archiveWebhookEndpoint: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                id: string;
-            };
+            path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": {
+                    id: string;
+                };
+            };
+        };
         responses: {
-            /** @description Archived: the endpoint is gone from every read and delivers nothing */
+            /** @description Success */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -24238,272 +24024,24 @@ export interface operations {
                     };
                 };
             };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
         };
     };
-    patchApiWebhooksV1EndpointsById: {
+    rollWebhookEndpointSecret: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                id: string;
-            };
+            path?: never;
             cookie?: never;
         };
         requestBody?: {
             content: {
                 "application/json": {
-                    url?: string;
-                    enabled_events?: string[];
-                    /** @enum {string} */
-                    status?: "active" | "disabled";
-                    max_batch_size?: number;
-                    max_batch_delay_ms?: number;
-                    max_in_flight?: number;
+                    id: string;
                 };
             };
         };
         responses: {
-            /** @description The endpoint as it now stands */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        data: {
-                            id: string;
-                            url: string;
-                            enabled_events: string[];
-                            /** @enum {string} */
-                            status: "active" | "disabled";
-                            disabled_reason: string | null;
-                            disabled_at: string | null;
-                            failing_since: string | null;
-                            last_success_at: string | null;
-                            last_failure_at: string | null;
-                            max_batch_size: number;
-                            max_batch_delay_ms: number;
-                            max_in_flight: number;
-                            created_at: string;
-                            updated_at: string;
-                        };
-                    };
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-        };
-    };
-    "postApiWebhooksV1EndpointsByIdRoll-secret": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The endpoint, with the new signing secret this body alone carries */
+            /** @description Success */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -24531,120 +24069,24 @@ export interface operations {
                     };
                 };
             };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
         };
     };
-    postApiWebhooksV1EndpointsByIdTest: {
+    sendWebhookEndpointTest: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                id: string;
-            };
+            path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": {
+                    id: string;
+                };
+            };
+        };
         responses: {
-            /** @description The test ran; `data.delivered` carries the receiver's verdict */
+            /** @description Success */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -24660,123 +24102,27 @@ export interface operations {
                     };
                 };
             };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
         };
     };
-    getApiWebhooksV1EndpointsByIdDeliveries: {
+    listWebhookEndpointDeliveries: {
         parameters: {
-            query?: {
-                cursor?: string;
-                limit?: number;
-            };
+            query?: never;
             header?: never;
-            path: {
-                id: string;
-            };
+            path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": {
+                    id: string;
+                    cursor?: string;
+                    /** @default 50 */
+                    limit?: number;
+                };
+            };
+        };
         responses: {
-            /** @description One page of delivery attempts, newest first */
+            /** @description Success */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -24800,120 +24146,24 @@ export interface operations {
                     };
                 };
             };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
         };
     };
-    getApiWebhooksV1EndpointsByIdHealth: {
+    getWebhookEndpointHealth: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                id: string;
-            };
+            path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": {
+                    id: string;
+                };
+            };
+        };
         responses: {
-            /** @description The endpoint's delivery health */
+            /** @description Success */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -24936,109 +24186,9 @@ export interface operations {
                     };
                 };
             };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
         };
     };
-    "getApiWebhooksV1Event-types": {
+    listWebhookEventTypes: {
         parameters: {
             query?: never;
             header?: never;
@@ -25047,7 +24197,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Every subscribable event type */
+            /** @description Success */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -25064,104 +24214,29 @@ export interface operations {
                     };
                 };
             };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
         };
     };
-    getApiWebhooksV1Events: {
+    listWebhookEvents: {
         parameters: {
-            query: {
-                type?: string;
-                from: number;
-                to: number;
-                cursor?: string;
-                limit?: number;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": {
+                    type?: string;
+                    from: number;
+                    to: number;
+                    cursor?: string;
+                    /** @default 50 */
+                    limit?: number;
+                };
+            };
+        };
         responses: {
-            /** @description One page of emitted-event envelopes, newest first */
+            /** @description Success */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -25182,100 +24257,24 @@ export interface operations {
                     };
                 };
             };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
         };
     };
-    getApiWebhooksV1EventsById: {
+    getWebhookEvent: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                id: string;
-            };
+            path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": {
+                    id: string;
+                };
+            };
+        };
         responses: {
-            /** @description The envelope, exactly as it was delivered */
+            /** @description Success */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -25290,106 +24289,6 @@ export interface operations {
                             data: {
                                 [key: string]: unknown;
                             };
-                        };
-                    };
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
                         };
                     };
                 };
