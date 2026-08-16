@@ -84,6 +84,27 @@ export class VersionBuilder<TApp> {
     });
   }
 
+  /**
+   * Register an RPC-named endpoint (ADR-094). Mounts as a real POST; the
+   * dotted name carries the verb, so the method never does.
+   *
+   * Every argument travels in the JSON body — there are no path params and no
+   * query string. An RPC with no required arguments declares no `input` and
+   * ignores the body: the pipeline only installs the json validator when
+   * `input` is present, so a bodyless POST and a `{}` POST both succeed.
+   * Declaring `input: z.object({}).optional()` instead would reinstate the
+   * parse and reject the bodyless call.
+   */
+  rpc<TConfig extends EndpointConfig>(
+    path: string,
+    config: TConfig,
+    handler: Handler<TApp, TConfig>,
+  ): void {
+    assertRpcPath(path);
+    assertRpcConfig(path, config);
+    this._register("post", path, config, handler);
+  }
+
   /** Withdraw an endpoint inherited from a previous version. */
   withdraw(method: HttpMethod, path: string): void {
     assertEndpointPath(path);
@@ -110,6 +131,47 @@ export class VersionBuilder<TApp> {
       config,
       handler: handler as EndpointRegistration["handler"],
     });
+  }
+}
+
+/**
+ * `<resource>.<verb>`, lower camelCase on both sides, at least one dot, no path
+ * parameters. Pinning the grammar here rather than in review is the point: a
+ * convention that lives only in a document drifts.
+ *
+ * `assertEndpointPath` still runs via `_register`, but it would pass a dotted
+ * name on its own — `endpoints.create` is not `latest`, not `preview`, and not
+ * date-shaped, so the reserved-namespace check has nothing to say about it.
+ */
+const RPC_PATH_RE = /^\/[a-z][a-zA-Z0-9]*(\.[a-z][a-zA-Z0-9]*)+$/;
+
+function assertRpcPath(path: string): void {
+  if (!RPC_PATH_RE.test(path)) {
+    throw new Error(
+      `RPC endpoint path "${path}" must be a dotted <resource>.<verb> name in ` +
+        `lower camelCase with no path parameters, e.g. "/endpoints.rollSecret"`,
+    );
+  }
+}
+
+/**
+ * The pipeline installs a validator for whichever of `params` / `query` a
+ * config declares, so "every argument travels in the body" holds only while
+ * nothing declares them. Rejecting here makes the sentence above enforceable
+ * rather than aspirational: a dotted path has no `:param` to bind, so a
+ * `params` schema could never match, and a `query` schema would smuggle
+ * arguments back into the URL that the operation name is supposed to own.
+ */
+function assertRpcConfig(path: string, config: EndpointConfig): void {
+  const offending = (["params", "query"] as const).filter(
+    (key) => config[key] !== undefined,
+  );
+
+  if (offending.length > 0) {
+    throw new Error(
+      `RPC endpoint "${path}" declares ${offending.join(" and ")}; RPC ` +
+        `arguments travel in the JSON body, so use "input" instead`,
+    );
   }
 }
 
