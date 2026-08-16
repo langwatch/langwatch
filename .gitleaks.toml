@@ -27,21 +27,26 @@ targetRules = ["generic-api-key"]
 paths = ['''platform/app/ee/billing/stripe/stripeCatalog\.json''']
 
 # Gateway test fixtures that pattern-match `generic-api-key` but are provably
-# not credentials: a sequential-hex fixture (`0123456789abcdef...`) signing the
-# vk-lifecycle, vk-expiry and spend-ingest route tests and the gateway JWT
-# suite, and the literal process key `"conversation-1"` in the process-store
-# suite.
-# Scoped to those test files and the generic rule only, so a real token
-# landing in either is still caught by every provider-specific rule.
+# not credentials: the sequential-hex fixture `0123456789abcdef0123456789abcdef`
+# that signs the vk-lifecycle, vk-expiry and spend-ingest route tests and the
+# gateway JWT suite.
+#
+# Scoped by VALUE as well as path, matched with AND, so a real token landing in
+# one of these files is still reported. The value is anchored: only the whole
+# fixture is allowed, never a string that merely starts with it.
 [[allowlists]]
 description = "Sequential-hex signing fixture in the gateway tests, not a credential"
 targetRules = ["generic-api-key"]
+condition = "AND"
 paths = [
   '''platform/app/src/server/routes/__tests__/gateway-internal\.vk-lifecycle\.integration\.test\.ts''',
   '''platform/app/src/server/routes/__tests__/gateway-internal\.vk-expiry\.integration\.test\.ts''',
   '''platform/app/src/server/routes/__tests__/gateway-internal\.spend-ingest\.integration\.test\.ts''',
+  '''platform/app/src/server/routes/__tests__/gateway-internal\.health-route\.integration\.test\.ts''',
+  '''platform/app/src/server/routes/__tests__/gateway-internal\.config-route\.integration\.test\.ts''',
   '''platform/app/src/server/gateway/__tests__/gatewayJwt\.unit\.test\.ts''',
 ]
+regexes = ['''^0123456789abcdef0123456789abcdef$''']
 
 [[allowlists]]
 description = "Literal fixture ids (conversation-1) in the process-store suite, not credentials"
@@ -75,10 +80,14 @@ paths = ['''platform/app/ee/licensing/__tests__/fixtures/testLicenses\.ts''']
 # Scoped by VALUE as well as path, and matched with AND, so any other
 # high-entropy string in a workflow file is still caught. A real credential
 # cannot be this string.
+#
+# The field is `condition`. `matchCondition` is not a name gitleaks knows, and
+# an unknown key is dropped in silence, which leaves the block as a bare `paths`
+# entry allowlisting the whole workflow file.
 [[allowlists]]
 description = "Sequential-hex CREDENTIALS_SECRET placeholder once inlined in the CI workflow"
 targetRules = ["generic-api-key"]
-matchCondition = "AND"
+condition = "AND"
 paths = ['''\.github/workflows/langwatch-app-ci\.yml''']
 regexes = ['''(0123456789abcdef){4}''']
 
@@ -90,13 +99,9 @@ regexes = ['''(0123456789abcdef){4}''']
 # cannot verify against a provider.
 #
 # Scoped by VALUE and by nothing else, so any OTHER credential — in this file
-# or any other — is still caught by every rule. Deliberately NOT scoped by path
-# with `matchCondition = "AND"`, the shape the CREDENTIALS_SECRET entry above
-# uses: gitleaks 8.30 does not narrow that way. A `paths` entry allowlists the
-# whole file, AND or no AND, and the accompanying `regexes` change nothing —
-# verified by planting a second, unrelated AWS key in this file and watching it
-# go unreported. Fixing that entry (and its comment, which claims a narrowing it
-# does not get) is tracked in #6684.
+# or any other — is still caught by every rule. The two values live in exactly
+# two places, this file and the test script that plants them, so a path scope
+# would add little: the value is the axis that matters.
 [[allowlists]]
 description = "AWS-shaped fixture credentials planted by the secrets-gate scoping tests"
 regexes = [

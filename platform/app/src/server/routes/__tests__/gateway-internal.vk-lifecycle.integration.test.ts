@@ -112,7 +112,13 @@ describe("virtual key disable and enable (real PG + internal route)", () => {
     await stopTestContainers();
   });
 
-  async function mintKey(name: string, expiresAt?: Date) {
+  async function mintKey({
+    name,
+    expiresAt,
+  }: {
+    name: string;
+    expiresAt?: Date;
+  }) {
     return service.create({
       organizationId: ORG_ID,
       name,
@@ -125,7 +131,7 @@ describe("virtual key disable and enable (real PG + internal route)", () => {
 
   /** @scenario Disable preserves everything and enable restores it exactly */
   it("keeps rotation grace and budgets across a disable and enable round trip", async () => {
-    const { virtualKey } = await mintKey("round-trip");
+    const { virtualKey } = await mintKey({ name: "round-trip" });
     await service.rotate({
       id: virtualKey.id,
       organizationId: ORG_ID,
@@ -179,7 +185,7 @@ describe("virtual key disable and enable (real PG + internal route)", () => {
 
   /** @scenario A disabled key is rejected with its own error code */
   it("rejects a disabled key's traffic with the disabled code, not a bad credential", async () => {
-    const { virtualKey, secret } = await mintKey("suspended-tenant");
+    const { virtualKey, secret } = await mintKey({ name: "suspended-tenant" });
     await service.disable({
       id: virtualKey.id,
       organizationId: ORG_ID,
@@ -195,7 +201,10 @@ describe("virtual key disable and enable (real PG + internal route)", () => {
   /** @scenario "The token ends when the key does" */
   it("ends the token at the key's expiration date and carries that date on it", async () => {
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
-    const { virtualKey, secret } = await mintKey("short-lived", expiresAt);
+    const { virtualKey, secret } = await mintKey({
+      name: "short-lived",
+      expiresAt,
+    });
     const stored = await prisma.virtualKey.findUniqueOrThrow({
       where: { id: virtualKey.id },
     });
@@ -212,7 +221,7 @@ describe("virtual key disable and enable (real PG + internal route)", () => {
 
   /** @scenario Revocation is terminal in both directions */
   it("refuses to disable or enable a revoked key", async () => {
-    const { virtualKey } = await mintKey("terminal");
+    const { virtualKey } = await mintKey({ name: "terminal" });
     await service.revoke({
       id: virtualKey.id,
       organizationId: ORG_ID,

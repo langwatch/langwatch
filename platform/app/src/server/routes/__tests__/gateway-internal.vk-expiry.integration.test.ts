@@ -111,7 +111,13 @@ describe("virtual key expiry (real PG + internal route)", () => {
     await stopTestContainers();
   });
 
-  async function mintKey(name: string, expiresAt?: Date) {
+  async function mintKey({
+    name,
+    expiresAt,
+  }: {
+    name: string;
+    expiresAt?: Date;
+  }) {
     return service.create({
       organizationId: ORG_ID,
       name: `${name}-${nanoid(6)}`,
@@ -129,7 +135,7 @@ describe("virtual key expiry (real PG + internal route)", () => {
 
   /** @scenario "An expired key is rejected with its own error code" */
   it("rejects an expired key with the expiry code, not revoked or disabled", async () => {
-    const { virtualKey, secret } = await mintKey("ran-out");
+    const { virtualKey, secret } = await mintKey({ name: "ran-out" });
     await forceExpiry(virtualKey.id, new Date(Date.now() - 60_000));
 
     expect(await resolveCode(secret)).toEqual({
@@ -140,10 +146,10 @@ describe("virtual key expiry (real PG + internal route)", () => {
 
   /** @scenario "A key whose expiration date is still ahead serves normally" */
   it("resolves a key whose date has not arrived yet", async () => {
-    const { secret } = await mintKey(
-      "still-good",
-      new Date(Date.now() + DAY_MS),
-    );
+    const { secret } = await mintKey({
+      name: "still-good",
+      expiresAt: new Date(Date.now() + DAY_MS),
+    });
 
     const res = await app.request(signedResolveKey(secret));
     expect(res.status).toBe(200);
@@ -153,7 +159,7 @@ describe("virtual key expiry (real PG + internal route)", () => {
 
   /** @scenario "Extending the date puts an expired key back in service" */
   it("serves the same secret again once the date is moved forward", async () => {
-    const { virtualKey, secret } = await mintKey("extend-me");
+    const { virtualKey, secret } = await mintKey({ name: "extend-me" });
     await forceExpiry(virtualKey.id, new Date(Date.now() - 60_000));
     expect((await resolveCode(secret)).code).toBe("virtual_key_expired");
 
@@ -169,10 +175,10 @@ describe("virtual key expiry (real PG + internal route)", () => {
 
   /** @scenario "Clearing the expiration date makes the key permanent again" */
   it("serves forever once the date is cleared", async () => {
-    const { virtualKey, secret } = await mintKey(
-      "clear-me",
-      new Date(Date.now() + DAY_MS),
-    );
+    const { virtualKey, secret } = await mintKey({
+      name: "clear-me",
+      expiresAt: new Date(Date.now() + DAY_MS),
+    });
     await forceExpiry(virtualKey.id, new Date(Date.now() - 60_000));
     expect((await resolveCode(secret)).code).toBe("virtual_key_expired");
 
@@ -192,7 +198,7 @@ describe("virtual key expiry (real PG + internal route)", () => {
 
   /** @scenario "Expiry leaves disable and revoke exactly as they were" */
   it("keeps the stored status, and reports the stored stop first", async () => {
-    const { virtualKey, secret } = await mintKey("still-active");
+    const { virtualKey, secret } = await mintKey({ name: "still-active" });
     await forceExpiry(virtualKey.id, new Date(Date.now() - 60_000));
 
     const expired = await prisma.virtualKey.findUniqueOrThrow({
