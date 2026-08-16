@@ -1248,7 +1248,7 @@ importers:
         specifier: ^5.6.2
         version: 5.6.2
       cloudflared:
-        specifier: ^0.7.1
+        specifier: 0.7.1
         version: 0.7.1
       commander:
         specifier: ^15.0.0
@@ -3217,7 +3217,7 @@ packages:
         optional: true
 
   '@langwatch/scenario@file:platform/app/vendor/langwatch-scenario-1.1.1.tgz':
-    resolution: {integrity: sha512-vF2EhJw05Qri+Lx9z37MY+BWsRHdsZx1+4lCXHcoFvPArS0O3I48e/Hq/sjWLyDyDdLYyEp90roBtUUqWLyszg==, tarball: file:platform/app/vendor/langwatch-scenario-1.1.1.tgz}
+    resolution: {integrity: sha512-tkUn7XyYV8Xi95xOfa1dq/hUoYn2+5YCXd2BZWvwwUuFAsTXMZZxwv2Fm0e2wvUzyyIo5kgW6uPt2igIjD9eAg==, tarball: file:platform/app/vendor/langwatch-scenario-1.1.1.tgz}
     version: 1.1.1
     engines: {node: '>=20', pnpm: '>=8'}
     peerDependencies:

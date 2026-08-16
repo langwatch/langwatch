@@ -119,7 +119,7 @@
     "@opentelemetry/sdk-trace-base": "^2.0.1",
     "@opentelemetry/semantic-conventions": "^1.36.0",
     "chalk": "^5.6.2",
-    "cloudflared": "^0.7.1",
+    "cloudflared": "0.7.1",
     "commander": "^15.0.0",
     "dotenv": "^17.3.1",
     "js-yaml": "^5.2.0",

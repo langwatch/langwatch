@@ -61,7 +61,20 @@ Feature: Remote-trace judging for http targets
   Scenario: The wait budget stays within its floor and ceiling
     Given a project whose measured ingest lag is very small or very large
     When the wait budget is resolved
-    Then it is never below ten seconds and never above two minutes
+    Then it is never below ten seconds and never above thirty seconds
+
+  @unit
+  Scenario: The wait budget rounds up, never down
+    Given a project whose measured ingest lag p95 is fractional
+    When the wait budget is resolved
+    Then it rounds up to whole milliseconds
+
+  @unit
+  Scenario: The judge's extra wait uses the platform cap
+    Given a scenario run against an http target
+    When the child process assembles the SDK run configuration
+    Then the wait extension is the thirty second cap, whatever the measured budget
+    And the judge can spend it once through its wait_for_traces tool
 
   @unit
   Scenario: A project with few recent traces gets the default wait budget

@@ -33461,7 +33461,7 @@ If the agent is not registered yet, [Connect your agent](/agent-simulations/conn
 | `--port <port>` | Tunnel `localhost:<port>`. |
 | `--url <url>` | Tunnel a full local URL, path included, for example `http://localhost:8010/agent/chat`. |
 | `--agent <id or name>` | Which registered HTTP agent to repoint. A picker opens when omitted. |
-| `--tunnel-url <url>` | Use a tunnel you already run, for example a named Cloudflare tunnel or ngrok, and skip provisioning one. |
+| `--tunnel-url <url>` | Use a tunnel you already run, for example a named Cloudflare tunnel or ngrok, and skip provisioning one. This also skips the session secret proxy: the command prints a notice, and your tunnel endpoint must supply its own access control. |
 | `--no-update-url` | Print the tunnel URL and change nothing on the agent. |
 | `--no-auth` | Skip the session secret protection described below. |
 
@@ -33469,7 +33469,7 @@ If the agent is not registered yet, [Connect your agent](/agent-simulations/conn
 
 A tunnel URL is public, and a local agent process usually holds real model provider keys. `langwatch agent dev` therefore mints a per-session secret, fronts your local port with a proxy that rejects any request missing the `X-LangWatch-Dev-Secret` header, and writes that header onto the agent's configuration for the session. Only the platform's scenario calls carry the secret. On exit, the command removes both the proxy and the header row.
 
-`--no-auth` turns the proxy off, for a server that already authenticates every request. The agent's own configured authentication headers pass through the tunnel unchanged either way.
+`--no-auth` turns the proxy off, for a server that already authenticates every request. A bring-your-own tunnel (`--tunnel-url`) also runs without the proxy: your tunnel forwards directly to your server, so the tunnel endpoint must supply its own access control. The agent's own configured authentication headers pass through the tunnel unchanged either way.
 
 ## While the tunnel is up
 
@@ -33693,7 +33693,9 @@ The fetch filters out infrastructure spans from the call plumbing itself. The ju
 
 ## How long the verdict waits
 
-Traces arrive with ingest delay, so the verdict waits for them, bounded. The wait ends as soon as the trace is complete: every agent span's parent is present, which is how the fetch tells a fully ingested trace from one that is still arriving. The platform sizes the maximum wait from the project's own ingest speed over the last 7 days, between 10 and 120 seconds, and uses 60 seconds when the project has few recent traces.
+Traces arrive with ingest delay, so the verdict waits for them, bounded. The wait ends as soon as the trace is complete: every agent span's parent is present, which is how the fetch tells a fully ingested trace from one that is still arriving. The platform sizes the maximum wait from the project's own ingest speed over the last 7 days, between 10 and 30 seconds, and uses 30 seconds when the project has few recent traces.
+
+When the wait ends with traces still incomplete, the judge gets one extra chance: a one-shot `wait_for_traces` tool it calls only when the missing spans are essential for the verdict. That waits up to 30 seconds more, once. After it, the judge must deliver its verdict on the evidence at hand.
 
 Conversation turns never wait. Mid-conversation, the judge only decides whether the conversation should continue or end; the verdict itself is a separate call, made after the conversation ends, and the wait for traces happens exactly once, right before it.
 
@@ -33731,7 +33733,7 @@ The Scenario SDKs fetch remote traces from LangWatch with a flag on the run or o
     scenario.configure(
         default_model="openai/gpt-5",
         fetch_remote_traces=True,
-        trace_wait_timeout=60.0,  # seconds to wait for traces before the verdict
+        trace_wait_timeout=30.0,  # seconds to wait for traces before the verdict
     )
     ```
 
@@ -33743,7 +33745,7 @@ The Scenario SDKs fetch remote traces from LangWatch with a flag on the run or o
     const result = await scenario.run({
       // ...
       fetchRemoteTraces: true,
-      traceWaitTimeoutMs: 60_000,
+      traceWaitTimeoutMs: 30_000,
     });
     ```
 

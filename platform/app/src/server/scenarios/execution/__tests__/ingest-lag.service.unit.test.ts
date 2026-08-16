@@ -66,7 +66,7 @@ describe("resolveTraceWaitTimeoutMs", () => {
       /** @scenario "The wait budget grows with the project's measured ingest lag" */
       it("returns a quarter more than the p95 plus five seconds", async () => {
         const { client } = clientReturning([
-          { P95LagMs: 40_000, SampleCount: 100 },
+          { P95LagMs: 16_000, SampleCount: 100 },
         ]);
 
         const budget = await resolveTraceWaitTimeoutMs({
@@ -74,10 +74,11 @@ describe("resolveTraceWaitTimeoutMs", () => {
           clientResolver: resolverFor(client),
         });
 
-        expect(budget).toBe(1.25 * 40_000 + 5_000);
+        expect(budget).toBe(1.25 * 16_000 + 5_000);
       });
 
-      it("rounds a fractional p95 to whole milliseconds", async () => {
+      /** @scenario "The wait budget rounds up, never down" */
+      it("rounds a fractional p95 up to whole milliseconds", async () => {
         // A fractional p95 (ClickHouse quantile interpolates) must not leak a
         // fractional budget: the SDK hands it to timer APIs that reject
         // non-integer delays.
@@ -90,14 +91,14 @@ describe("resolveTraceWaitTimeoutMs", () => {
           clientResolver: resolverFor(client),
         });
 
-        expect(budget).toBe(25_242);
+        expect(budget).toBe(25_243);
         expect(Number.isInteger(budget)).toBe(true);
       });
     });
 
     describe("when the measured p95 is very small or very large", () => {
       /** @scenario "The wait budget stays within its floor and ceiling" */
-      it("clamps to the ten second floor and the two minute ceiling", async () => {
+      it("clamps to the ten second floor and the thirty second ceiling", async () => {
         const fast = clientReturning([{ P95LagMs: 500, SampleCount: 100 }]);
         const slow = clientReturning([{ P95LagMs: 600_000, SampleCount: 100 }]);
 
@@ -111,14 +112,14 @@ describe("resolveTraceWaitTimeoutMs", () => {
         });
 
         expect(floor).toBe(10_000);
-        expect(ceiling).toBe(120_000);
+        expect(ceiling).toBe(30_000);
       });
     });
 
     describe("when ClickHouse serializes the count as a string", () => {
       it("parses it and still applies the formula", async () => {
         const { client } = clientReturning([
-          { P95LagMs: 40_000, SampleCount: "100" },
+          { P95LagMs: 16_000, SampleCount: "100" },
         ]);
 
         const budget = await resolveTraceWaitTimeoutMs({
@@ -126,14 +127,14 @@ describe("resolveTraceWaitTimeoutMs", () => {
           clientResolver: resolverFor(client),
         });
 
-        expect(budget).toBe(55_000);
+        expect(budget).toBe(25_000);
       });
     });
   });
 
   describe("given a project with fewer than twenty recent traces", () => {
     /** @scenario "A project with few recent traces gets the default wait budget" */
-    it("returns the sixty second default", async () => {
+    it("returns the thirty second default", async () => {
       const { client } = clientReturning([
         { P95LagMs: 200_000, SampleCount: 19 },
       ]);
@@ -172,7 +173,7 @@ describe("resolveTraceWaitTimeoutMs", () => {
         .mockResolvedValueOnce({
           json: vi
             .fn()
-            .mockResolvedValue([{ P95LagMs: 40_000, SampleCount: 100 }]),
+            .mockResolvedValue([{ P95LagMs: 16_000, SampleCount: 100 }]),
         });
       const client = { query } as unknown as ClickHouseClient;
       const clientResolver = resolverFor(client);
@@ -187,7 +188,7 @@ describe("resolveTraceWaitTimeoutMs", () => {
       });
 
       expect(first).toBe(DEFAULT_TRACE_WAIT_TIMEOUT_MS);
-      expect(second).toBe(55_000);
+      expect(second).toBe(25_000);
       expect(query).toHaveBeenCalledTimes(2);
     });
 
@@ -206,7 +207,7 @@ describe("resolveTraceWaitTimeoutMs", () => {
     it("serves the cached value for an hour, then measures again", async () => {
       vi.useFakeTimers();
       const { client, query } = clientReturning([
-        { P95LagMs: 40_000, SampleCount: 100 },
+        { P95LagMs: 16_000, SampleCount: 100 },
       ]);
       const clientResolver = resolverFor(client);
 
@@ -218,8 +219,8 @@ describe("resolveTraceWaitTimeoutMs", () => {
         projectId: "proj_cached",
         clientResolver,
       });
-      expect(first).toBe(55_000);
-      expect(second).toBe(55_000);
+      expect(first).toBe(25_000);
+      expect(second).toBe(25_000);
       expect(query).toHaveBeenCalledTimes(1);
 
       vi.advanceTimersByTime(61 * 60 * 1000);
@@ -232,8 +233,8 @@ describe("resolveTraceWaitTimeoutMs", () => {
     });
 
     it("caches per project", async () => {
-      const a = clientReturning([{ P95LagMs: 40_000, SampleCount: 100 }]);
-      const b = clientReturning([{ P95LagMs: 80_000, SampleCount: 100 }]);
+      const a = clientReturning([{ P95LagMs: 16_000, SampleCount: 100 }]);
+      const b = clientReturning([{ P95LagMs: 8_000, SampleCount: 100 }]);
 
       const budgetA = await resolveTraceWaitTimeoutMs({
         projectId: "proj_a",
@@ -244,15 +245,15 @@ describe("resolveTraceWaitTimeoutMs", () => {
         clientResolver: resolverFor(b.client),
       });
 
-      expect(budgetA).toBe(55_000);
-      expect(budgetB).toBe(105_000);
+      expect(budgetA).toBe(25_000);
+      expect(budgetB).toBe(15_000);
     });
   });
 
   describe("given the query executes", () => {
     it("filters by tenant first and bounds the partition column", async () => {
       const { client, query } = clientReturning([
-        { P95LagMs: 40_000, SampleCount: 100 },
+        { P95LagMs: 16_000, SampleCount: 100 },
       ]);
 
       await resolveTraceWaitTimeoutMs({

@@ -17,9 +17,22 @@
 
 import type { TargetConfig } from "./types";
 
+/**
+ * Upper bound on the verdict-time wait, and the size of the judge's one extra
+ * `wait_for_traces` wait. Production measurement (per-trace stored_spans lag,
+ * 24h window): global p95 6.6s, p99 12.4s; per-tenant p95 median 8.2s, p90
+ * 27.3s. 30 seconds covers the p90 tenant, and the judge-requested extension
+ * covers the tail once more when the missing spans are essential.
+ *
+ * Lives in this child-safe module (no ClickHouse import chain) because both
+ * the server-side budget clamp and the child's run configuration read it.
+ */
+export const TRACE_WAIT_CAP_MS = 30_000;
+
 export interface RemoteTraceRunConfig {
   fetchRemoteTraces: true;
   traceWaitTimeoutMs?: number;
+  traceWaitExtensionMs: number;
   langwatch: {
     endpoint: string;
     apiKey: string;
@@ -43,6 +56,9 @@ export function buildRemoteTraceRunConfig({
   return {
     fetchRemoteTraces: true,
     ...(traceWaitTimeoutMs !== undefined ? { traceWaitTimeoutMs } : {}),
+    // A measured budget can be as low as 10 seconds; the extension keeps the
+    // judge's one extra wait meaningful regardless of the measured value.
+    traceWaitExtensionMs: TRACE_WAIT_CAP_MS,
     langwatch: {
       endpoint: langwatchEndpoint,
       apiKey: langwatchApiKey,

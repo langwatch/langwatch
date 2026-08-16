@@ -12,7 +12,10 @@
 import fs from "fs";
 import path from "path";
 import { describe, expect, it } from "vitest";
-import { buildRemoteTraceRunConfig } from "../remote-trace-run-config";
+import {
+  buildRemoteTraceRunConfig,
+  TRACE_WAIT_CAP_MS,
+} from "../remote-trace-run-config";
 
 describe("buildRemoteTraceRunConfig", () => {
   const base = {
@@ -31,10 +34,27 @@ describe("buildRemoteTraceRunConfig", () => {
 
       expect(config).toEqual({
         fetchRemoteTraces: true,
+        traceWaitExtensionMs: TRACE_WAIT_CAP_MS,
         langwatch: {
           endpoint: "https://app.langwatch.test",
           apiKey: "sk-lw-test",
         },
+      });
+    });
+
+    describe("when the judge asks to wait for incomplete traces", () => {
+      /** @scenario "The judge's extra wait uses the platform cap" */
+      it("always passes the 30 second cap as the wait extension", () => {
+        const config = buildRemoteTraceRunConfig({
+          ...base,
+          targetType: "http",
+          traceWaitTimeoutMs: 10_000,
+        });
+
+        expect(TRACE_WAIT_CAP_MS).toBe(30_000);
+        expect(config).toMatchObject({
+          traceWaitExtensionMs: TRACE_WAIT_CAP_MS,
+        });
       });
     });
 
