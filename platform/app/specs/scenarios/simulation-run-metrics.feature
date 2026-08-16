@@ -7,9 +7,9 @@ Feature: Simulation Run Cost and Latency Metrics
 
   The trace-side reactor acts as an ECST (Event-Carried State Transfer)
   publisher: after a trace stabilises (60s of no new spans), it publishes
-  the metrics to the simulation pipeline. The simulation-side reactor on
-  RunFinished handles the reverse ordering via pull-based computation with
-  deferred retry for late traces.
+  the metrics to the simulation pipeline. The simulation-side subscriber
+  (traceMetricsSync) on RunFinished handles the reverse ordering via
+  pull-based computation with deferred retry for late traces.
 
   Metrics are stored as Maps: RoleCosts Map(String, Float64) and
   RoleLatencies Map(String, Float64) — extensible for new roles/metrics
@@ -75,17 +75,17 @@ Feature: Simulation Run Cost and Latency Metrics
     Then no computeRunMetrics command is dispatched
 
   # ---------------------------------------------------------------------------
-  # Simulation-side reactor: pull-based on RunFinished
+  # Simulation-side subscriber: pull-based on RunFinished
   # ---------------------------------------------------------------------------
 
   @integration
-  Scenario: Simulation-side reactor dispatches pull-based computation on RunFinished
+  Scenario: Simulation-side subscriber dispatches pull-based computation on RunFinished
     Given a simulation run with TraceIds ["trace-1", "trace-2"]
     And trace "trace-1" has metrics already applied via ECST
     And trace "trace-2" has no metrics yet
     When the simulation run finishes
-    Then the reactor dispatches computeRunMetrics (pull mode) for "trace-2" only
-    And skips "trace-1" because TraceMetrics already contains it
+    Then the subscriber dispatches computeRunMetrics (pull mode) for both traces
+    And re-processing "trace-1" is collapsed by idempotent metrics storage
 
   @integration
   Scenario: Pull-mode command reads trace summary and emits event
@@ -106,6 +106,12 @@ Feature: Simulation Run Cost and Latency Metrics
   # ---------------------------------------------------------------------------
   # Fold projection: metrics_computed event
   # ---------------------------------------------------------------------------
+  # The fold still accumulates per-trace metrics for the run record. In
+  # addition (ADR-094), each metrics_computed event is appended verbatim to
+  # the simulation_run_metrics ClickHouse table (ReplacingMergeTree keyed
+  # TenantId/ScenarioRunId/TraceId) by the simulationRunMetrics map
+  # projection, which makes retry re-deliveries exactly-once; cross-trace
+  # aggregation happens at read time.
 
   @unit
   Scenario: Simulation fold stores per-trace metrics and recomputes aggregates
@@ -139,7 +145,7 @@ Feature: Simulation Run Cost and Latency Metrics
   Scenario: Metrics computed regardless of arrival order — simulation first
     Given a simulation run finishes with TraceIds ["trace-abc"]
     And trace "trace-abc" has not arrived yet
-    When the RunFinished reactor dispatches computeRunMetrics (pull mode)
+    When the RunFinished subscriber dispatches computeRunMetrics (pull mode)
     Then the command schedules a deferred retry
     And when "trace-abc" eventually arrives, the retry succeeds
 

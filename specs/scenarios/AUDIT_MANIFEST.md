@@ -21,7 +21,7 @@ Tracking: https://github.com/langwatch/langwatch/issues/3458
 Concentrations:
 - `scenario-deletion.feature` — 23/25 already covered (`scenario-archive.integration.test.ts`, `ScenarioTable.integration.test.tsx`, `useScenarioSelection.integration.test.ts`).
 - `simulation-runner.feature` — most scenarios duplicated by `simulation-runner.router.unit.test.ts`, `scenario.processor.*.integration.test.ts`, `orchestrator.unit.test.ts`. The `SimulationRunnerService` class itself has since been deleted (nothing imported it); the behaviour lives in `src/server/scenarios/execution/`.
-- `internal-set-namespace.feature` & `stalled-scenario-runs.feature` — heavy DUPLICATE overlap with `internal-set-id.unit.test.ts`, `stall-detection*.test.ts`, `stalled-status-display.integration.test.ts`.
+- `internal-set-namespace.feature` — heavy DUPLICATE overlap with `internal-set-id.unit.test.ts`. (`stalled-scenario-runs.feature` was rewritten for ADR-094: read-time stall derivation and its `stall-detection*.test.ts` suites are gone, so those rows were dropped.)
 
 ## Notable individual findings
 
@@ -101,7 +101,7 @@ Concentrations:
 | specs/scenarios/simulation-runner.feature | "Prompt adapter uses prompt configuration" | DUPLICATE | Covered by adapters/__tests__/prompt-config.adapter.test.ts:51-176 (system prompt, messages, temperature, maxTokens) |
 | specs/scenarios/simulation-runner.feature | "Emit run started event" | DUPLICATE | RUN_STARTED emission tested via extensible-metadata.integration.test.ts:87-96 + scenario-event.service.integration.test.ts |
 | specs/scenarios/simulation-runner.feature | "Emit message events during conversation" | DUPLICATE | MESSAGE_SNAPSHOT emission/consumption covered by scenario-event.service.integration.test.ts:95-160 |
-| specs/scenarios/simulation-runner.feature | "Emit run finished event with results" | KEEP | RUN_FINISHED enum exists; no test directly asserts event shape on completion (only stall-detection consumes it) |
+| specs/scenarios/simulation-runner.feature | "Emit run finished event with results" | KEEP | RUN_FINISHED enum exists; no test directly asserts event shape on completion |
 | specs/scenarios/simulation-runner.feature | "Execute scenario in isolated child process via execution reactor" | DUPLICATE | Covered by scenario.processor.spawning.integration.test.ts:33-63 (spawns child, receives serialized data) |
 | specs/scenarios/simulation-runner.feature | "Child process has isolated OTEL context" | DUPLICATE | Covered by scenario.processor.otel-isolation.integration.test.ts:35-72 (sends to LANGWATCH_ENDPOINT, OTEL traces endpoint) |
 | specs/scenarios/simulation-runner.feature | "Child traces include scenario metadata" | DUPLICATE | Covered by scenario.processor.otel-isolation.integration.test.ts:74-150 (concurrent processes, distinct scenarioId, batchRunId) |
@@ -173,13 +173,7 @@ Concentrations:
 | specs/scenarios/internal-set-namespace.feature | "Display user set name for non-internal set" | DUPLICATE | Covered by SetCard.test.tsx "displays the set ID as the name" + "displays the default icon" |
 | specs/scenarios/internal-set-namespace.feature | "Pin internal set to top of list" | DUPLICATE | Covered by simulations-page.test.tsx sortScenarioSets() "pins internal set" + sorts remaining by lastRunAt |
 | specs/scenarios/internal-set-namespace.feature | "View on-platform scenarios in simulations list" | KEEP | E2E flow not covered; only unit/integration tests exist for SetCard, sort, router |
-| specs/scenarios/stalled-scenario-runs.feature | "Run without RUN_FINISHED within threshold remains IN_PROGRESS" | DUPLICATE | Covered by stall-detection.unit.test.ts "within the threshold returns IN_PROGRESS" |
-| specs/scenarios/stalled-scenario-runs.feature | "Run without RUN_FINISHED beyond threshold becomes STALLED" | DUPLICATE | Covered by stall-detection.unit.test.ts "beyond the threshold returns STALLED" (uses 35min) |
 | specs/scenarios/stalled-scenario-runs.feature | "Run at exactly the threshold boundary becomes STALLED" | UPDATE | Spec says 10min; impl is 30min (CHILD_PROCESS.TIMEOUT_MS*2). Test exists but uses STALL_THRESHOLD_MS const |
-| specs/scenarios/stalled-scenario-runs.feature | "Run with RUN_FINISHED keeps its original status regardless of age" | DUPLICATE | Covered by stall-detection.unit.test.ts "RUN_FINISHED... SUCCESS regardless of age" |
-| specs/scenarios/stalled-scenario-runs.feature | "Failed run with RUN_FINISHED is not marked as STALLED" | DUPLICATE | Covered by stall-detection.unit.test.ts "RUN_FINISHED... ERROR regardless of age" |
-| specs/scenarios/stalled-scenario-runs.feature | "Stall detection uses the last event timestamp, not just RUN_STARTED" | DUPLICATE | Covered by stall-detection.unit.test.ts "MESSAGE_SNAPSHOT... returns IN_PROGRESS" |
-| specs/scenarios/stalled-scenario-runs.feature | "Batch query marks individual stalled runs within a batch" | DUPLICATE | Covered by stall-detection-batch.unit.test.ts "marks run A SUCCESS, B STALLED, C IN_PROGRESS" |
 | specs/scenarios/stalled-scenario-runs.feature | "Stalled run displays with warning visual in status icon" | DUPLICATE | Covered by SCENARIO_RUN_STATUS_CONFIG[STALLED]={yellow,AlertTriangle} + scenario-run-status.utils.test |
 | specs/scenarios/stalled-scenario-runs.feature | "Stalled run displays warning badge in previous runs list" | DUPLICATE | Covered by stalled-status-display.integration.test.ts getStatusBadgeProps yellow + label "stalled" |
 | specs/scenarios/stalled-scenario-runs.feature | "Status display shows STALLED text in simulation console" | DUPLICATE | Covered by stalled-status-display.integration.test.ts STATUS_DISPLAY_TEXT_MAP[STALLED]="STALLED" |
@@ -212,8 +206,8 @@ Concentrations:
 | specs/scenarios/event-driven-execution-prep.feature | "Terminal statuses remain non-cancellable" | DUPLICATE | cancellation-eligibility.unit.test.ts covers SUCCESS/FAILED/ERROR/CANCELLED returning false |
 | specs/scenarios/event-driven-execution-prep.feature | "Ad-hoc run dispatches queueRun command" | DUPLICATE | simulation-runner.router.unit.test.ts:335 "dispatches queueRun command before scheduling" |
 | specs/scenarios/event-driven-execution-prep.feature | "Suite run dispatches queueRun for each scenario" | KEEP | Suite runner queueRun fan-out (3x2=6); no test for suite-level queueRun fan-out, only ad-hoc covered |
-| specs/scenarios/event-driven-execution-prep.feature | "Execution reactor fires on queued event" | KEEP | scenarioExecution.reactor.ts exists but no test file in reactors/__tests__ exercises submit-on-queued |
-| specs/scenarios/event-driven-execution-prep.feature | "Execution reactor skips already-cancelled runs" | KEEP | Logic in scenarioExecution.reactor.ts:71 (CancellationRequestedAt check); no test exists |
+| specs/scenarios/event-driven-execution-prep.feature | "Process manager dispatches execute intent on queued event" | DUPLICATE | simulationRunExecution.process.unit.test.ts "opens the process in queued phase and emits the execute intent" |
+| specs/scenarios/event-driven-execution-prep.feature | "Process manager skips already-cancelled runs" | DUPLICATE | simulationRunExecution.process.unit.test.ts "never submits to the pool when state already records a cancellation (defensive branch)" |
 | specs/scenarios/event-driven-execution-prep.feature | "Pool starts child process when capacity is available" | DUPLICATE | execution-pool.unit.test.ts "when pool has capacity \| starts the job immediately" |
 | specs/scenarios/event-driven-execution-prep.feature | "Pool buffers jobs when at capacity" | DUPLICATE | execution-pool.unit.test.ts "when pool is at capacity \| buffers the job" |
 | specs/scenarios/event-driven-execution-prep.feature | "Pool dequeues pending jobs when a slot opens" | DUPLICATE | execution-pool.unit.test.ts "when pool is at capacity \| dequeues when a slot opens" |

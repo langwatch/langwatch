@@ -158,17 +158,17 @@ export const simulationRunnerRouter = createTRPCRouter({
 
       // Validate early - prefetch data to catch configuration errors before scheduling
       const deps = createDataPrefetcherDependencies();
-      const prefetchResult = await prefetchScenarioData(
-        {
+      const prefetchResult = await prefetchScenarioData({
+        context: {
           projectId: input.projectId,
           scenarioId: input.scenarioId,
           setId,
           batchRunId,
           parameters,
         },
-        input.target,
+        target: input.target,
         deps,
-      );
+      });
 
       if (!prefetchResult.success) {
         logger.warn(

@@ -1,7 +1,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { STALL_THRESHOLD_MS } from "~/server/scenarios/scenario.constants";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
-import { STALL_THRESHOLD_MS } from "~/server/scenarios/stall-detection";
 import { SimulationClickHouseRepository } from "../repositories/simulation.clickhouse.repository";
 
 function makeRunRow(overrides: Record<string, string | null> = {}) {
@@ -484,9 +484,9 @@ describe("SimulationClickHouseRepository", () => {
       };
     }
 
-    describe("given a batch with mixed finished, stalled, and active runs", () => {
+    describe("given a batch with finished and unfinished runs", () => {
       describe("when the batch history is resolved", () => {
-        it("derives STALLED at read time for unfinished runs past the stall threshold", async () => {
+        it("reads unfinished runs as IN_PROGRESS regardless of age", async () => {
           const now = Date.now();
           const staleTs = String(now - STALL_THRESHOLD_MS - 60_000);
           const freshTs = String(now - 1_000);
@@ -502,7 +502,10 @@ describe("SimulationClickHouseRepository", () => {
                 FinishedAt: "5000",
                 UpdatedAt: "5000",
               }),
-              // Run B: unfinished, last update beyond the threshold -> STALLED
+              // Run B: unfinished, last update beyond the stall threshold —
+              // still IN_PROGRESS. Stored status is the only truth: the
+              // process-manager stall watchdog finishes quiet runs ERROR,
+              // nothing derives STALLED at read time anymore.
               makeItemRow({
                 ScenarioRunId: "run-B",
                 Status: "IN_PROGRESS",
@@ -529,13 +532,15 @@ describe("SimulationClickHouseRepository", () => {
             batch.items.map((i) => [i.scenarioRunId, i.status]),
           );
           expect(statusByRunId.get("run-A")).toBe(ScenarioRunStatus.SUCCESS);
-          expect(statusByRunId.get("run-B")).toBe(ScenarioRunStatus.STALLED);
+          expect(statusByRunId.get("run-B")).toBe(
+            ScenarioRunStatus.IN_PROGRESS,
+          );
           expect(statusByRunId.get("run-C")).toBe(
             ScenarioRunStatus.IN_PROGRESS,
           );
         });
 
-        it("derives stalledCount and subtracts it from runningCount", async () => {
+        it("reports zero stalled and keeps the stored runningCount for quiet unfinished runs", async () => {
           const now = Date.now();
           const staleTs = String(now - STALL_THRESHOLD_MS - 60_000);
           const freshTs = String(now - 1_000);
@@ -571,17 +576,15 @@ describe("SimulationClickHouseRepository", () => {
           });
 
           const batch = result.batches[0]!;
-          expect(batch.stalledCount).toBe(1);
-          expect(batch.runningCount).toBe(1);
+          expect(batch.stalledCount).toBe(0);
+          expect(batch.runningCount).toBe(2);
         });
       });
     });
 
-    describe("given more stalled items than the stored RunningCount", () => {
+    describe("given a legacy stored STALLED item and a zero RunningCount", () => {
       describe("when the batch history is resolved", () => {
         it("clamps runningCount at zero", async () => {
-          const staleTs = String(Date.now() - STALL_THRESHOLD_MS - 60_000);
-
           setQueryResults(clickhouse, [
             [{ TotalBatchCount: "1" }],
             // Stored as STALLED, so it is not counted in RunningCount…
@@ -593,14 +596,14 @@ describe("SimulationClickHouseRepository", () => {
               }),
             ],
             [
-              // …but the item is still unfinished and stale, so it re-derives
-              // STALLED at read time; RunningCount - stalledCount would go
-              // negative without the clamp.
+              // …and a finished legacy row keeps its stored STALLED status, so
+              // RunningCount - stalledCount would go negative without the
+              // clamp.
               makeItemRow({
                 ScenarioRunId: "run-B",
                 Status: "STALLED",
-                FinishedAt: null,
-                UpdatedAt: staleTs,
+                FinishedAt: "5000",
+                UpdatedAt: "5000",
               }),
             ],
           ]);
@@ -619,7 +622,7 @@ describe("SimulationClickHouseRepository", () => {
 
     describe("given a finished run whose last update is older than the threshold", () => {
       describe("when the batch history is resolved", () => {
-        it("keeps the stored terminal status instead of deriving STALLED", async () => {
+        it("keeps the stored terminal status regardless of age", async () => {
           const staleTs = String(Date.now() - STALL_THRESHOLD_MS - 60_000);
 
           setQueryResults(clickhouse, [

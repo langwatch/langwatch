@@ -540,7 +540,6 @@ const LEGACY_INERT: string[] = [
   "specs/python-sdk/experiment-print-summary.feature",
   "specs/rbac/fetch-org-role-permission-resolution.feature",
   "specs/scenarios/ai-create-modal.feature",
-  "specs/scenarios/event-driven-execution-prep.feature",
   "specs/scenarios/internal-scenario-namespace.feature",
   "specs/scenarios/internal-set-namespace.feature",
   "specs/scenarios/provider-setup-link-from-warnings.feature",
@@ -553,7 +552,6 @@ const LEGACY_INERT: string[] = [
   "specs/scenarios/scenario-editor.feature",
   "specs/scenarios/scenario-execution.feature",
   "specs/scenarios/scenario-library.feature",
-  "specs/scenarios/stalled-scenario-runs.feature",
   "specs/secrets/secrets-manager.feature",
   // Helm chart behaviour, verified by charts/langwatch/tests/e2e-overlays.sh.
   // The checker now scans that directory (DEFAULT_SHELL_TEST_ROOTS), so these

@@ -13,14 +13,8 @@ import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { getApp } from "~/server/app-layer/app";
-import {
-  ScenarioRunStatus,
-  Verdict,
-} from "~/server/scenarios/scenario-event.enums";
-import {
-  classifyScenarioInfraError,
-  encodeScenarioError,
-} from "~/server/scenarios/scenario-infra-error";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import { buildFailureResults } from "~/server/scenarios/scenario-failure-results";
 
 const tracer = getLangWatchTracer("langwatch.scenarios.failure-handler");
 const logger = createLogger("langwatch:scenarios:failure-handler");
@@ -40,32 +34,6 @@ export interface FailureEventParams {
   description?: string;
   /** When true, writes CANCELLED status instead of ERROR */
   cancelled?: boolean;
-}
-
-function buildFailureResults(params: { cancelled: boolean; error?: string }) {
-  if (params.cancelled) {
-    return {
-      verdict: Verdict.INCONCLUSIVE,
-      reasoning: "Cancelled by user",
-      metCriteria: [],
-      unmetCriteria: [],
-      error: params.error ?? "Cancelled by user",
-    };
-  }
-
-  // Turn the raw runner failure (often a multi-line child-process dump) into a
-  // handled error: a stable code + human message + actionable hint. `reasoning`
-  // keeps the plain human sentence for any consumer that reads it as text; the
-  // `error` field carries the encoded envelope so the drawer can render a clean,
-  // actionable message instead of a stack trace.
-  const handled = classifyScenarioInfraError(params.error);
-  return {
-    verdict: Verdict.FAILURE,
-    reasoning: handled.message,
-    metCriteria: [],
-    unmetCriteria: [],
-    error: encodeScenarioError(handled),
-  };
 }
 
 /**
