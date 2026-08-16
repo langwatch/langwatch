@@ -1919,9 +1919,17 @@ secured
 // `endpoint` is `${baseUrl}/api/otel` on both branches.
 //
 // Both branches refuse with 403 `direct_otel_not_allowed` when the caller's
-// organization turned the direct-OTLP path off for the tool behind
-// `source_type`. That is the only place the policy is enforced rather than
-// advertised, so a CLI that skipped its own gate still meets it.
+// organization turned the direct-OTLP path off for the tool `source_type`
+// declares. The declaration is what the policy reads, and it is caller-
+// controlled, so the check is a backstop for compliant clients (an old CLI,
+// a stale cached policy, a hand-run of the documented flow), not an
+// isolation boundary: a caller who declares another source type still
+// mints, because types outside the wrapped-tool set are a supported input
+// here (`copilot_app`, ingestion templates, SDK sources) and a minted key
+// carries only the `traces:create` the caller already holds. The receiver
+// stamps `langwatch.source` provenance from the key's stored source type,
+// so an export sent through a key minted under another tool's name stays
+// attributable to that key and the device that minted it.
 // ---------------------------------------------------------------------------
 const mintIngestionKeySchema = z.object({
   source_type: z.string().min(1),
@@ -2117,12 +2125,13 @@ secured
         400,
       );
     }
-    // An ingestion key exists to carry the direct-OTLP path, so a tool whose
-    // policy forbids that path gets no key, whatever the caller asks for. The
-    // CLI gates first for the message; this is the enforcement, because a
-    // stale cache, an old CLI, or a hand-written request reaches here without
-    // ever consulting the policy. Only source types a wrapped tool stamps are
-    // governed; anything else has no per-tool policy to apply.
+    // Apply the declared tool's direct-OTLP policy: a mint that names a tool
+    // the organization turned off is refused, which catches an old CLI, a
+    // stale cached policy, or a hand-run of the documented flow. The
+    // declaration is trusted; the route docblock states why it cannot be
+    // more than that. Only source types a wrapped tool stamps are governed;
+    // anything else has no per-tool policy to apply and must stay mintable
+    // (`copilot_app`, ingestion templates, SDK sources).
     //
     // `Object.hasOwn` and not a plain lookup: the key is request-controlled,
     // so `"toString"` would otherwise resolve an inherited function, pass a

@@ -484,10 +484,29 @@ describe("POST /api/auth/cli/governance/ingestion-key with a named project", () 
       });
     });
 
-    describe("when the CLI asks for a tool the tile does not govern", () => {
-      it("still mints, because the policy is per tool", async () => {
+    // These two pin the DECLARED-tool semantics of the policy check. The
+    // route reads the source type the request sends, so a caller can mint
+    // under another tool's policy on purpose; the route docblock states why
+    // that stays so. Making the check stronger later must flip these
+    // consciously.
+    describe("when the caller declares a tool the tile does not govern", () => {
+      /** @scenario "The mint policy reads the tool the request declares" */
+      it("mints under the declared tool's policy, not the disabled one", async () => {
         const { status, json } = await mintIngestionKey(ADMIN_TOKEN, {
           source_type: "codex",
+          project: PROJECT_ID,
+        });
+
+        expect(status).toBe(201);
+        expect(json.token).toEqual(expect.stringMatching(/^ik-lw-/));
+      });
+    });
+
+    describe("when the caller declares a source type no wrapped tool stamps", () => {
+      /** @scenario "A source type outside the wrapped-tool set mints ungoverned" */
+      it("mints, because templates and standalone apps share this route", async () => {
+        const { status, json } = await mintIngestionKey(ADMIN_TOKEN, {
+          source_type: "copilot_app",
           project: PROJECT_ID,
         });
 

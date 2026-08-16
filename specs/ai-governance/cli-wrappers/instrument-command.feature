@@ -77,9 +77,17 @@ Feature: `langwatch instrument <tool>` writes telemetry wiring without launching
 
     Every target this command writes is the direct-OTLP path, so the same
     `allowOtelDirect` policy the wrapper gates on applies here. The CLI
-    checks first for the message, and the mint route enforces it, so an
-    old CLI, a stale cached policy, or a hand-written request cannot wire
-    a tool the organization turned off.
+    checks first for the message, and the mint route repeats the check on
+    the tool the request declares, so an old CLI or a stale cached policy
+    still meets it. The declaration is what the route reads: a request
+    that declares a different tool mints under that tool's policy, and
+    source types outside the wrapped-tool set stay mintable because the
+    standalone Copilot app, ingestion templates and SDK sources mint
+    through the same route. A minted key carries only the trace-write
+    permission the caller already holds, and the receiver stamps telemetry
+    provenance from the key server-side, so a key minted under another
+    tool's name stays attributable. The policy steers compliant clients;
+    it does not isolate a caller who misdeclares the tool.
 
     @unit @cli-wrappers @instrument
     Scenario: A tool whose organization forbids direct OTLP is not instrumented
@@ -94,6 +102,18 @@ Feature: `langwatch instrument <tool>` writes telemetry wiring without launching
       When a CLI asks the control plane for a claude ingestion key
       Then the request is refused
       And the project gains no ingestion key
+
+    @integration @cli-wrappers @instrument
+    Scenario: The mint policy reads the tool the request declares
+      Given the organization turned direct OTLP off for claude
+      When a caller asks for a key and declares codex
+      Then a key is minted under codex's own policy
+
+    @integration @cli-wrappers @instrument
+    Scenario: A source type outside the wrapped-tool set mints ungoverned
+      Given the organization turned direct OTLP off for claude
+      When a caller asks for a key with a source type no wrapped tool stamps
+      Then a key is minted, because templates and standalone apps mint through the same route
 
   Rule: logout removes everything this command wrote
 
