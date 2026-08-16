@@ -45,7 +45,12 @@ export const NavigationV2Shell = ({
   publicPage: _publicPage,
   ...props
 }: DashboardLayoutProps & { mode: "product-switcher" | "icon-rail" }) => {
-  const state = useNavigationV2ShellState({ personalScope, orgScope });
+  // The layout props keep their existing names; the mapping happens once,
+  // here, so the shell internals carry the prefixed names.
+  const state = useNavigationV2ShellState({
+    isPersonalScope: personalScope,
+    isOrgScope: orgScope,
+  });
 
   if (state.status === "not-found") return <NotFoundScene />;
   if (state.status === "loading") return <LoadingScreen />;
@@ -71,7 +76,7 @@ export const NavigationV2Shell = ({
       )}
 
       <Box flex={1} minWidth={0}>
-        <ShellTopBar state={state} showProductCluster={!isIconRail} />
+        <ShellTopBar state={state} shouldShowProductCluster={!isIconRail} />
 
         <ShellContentRow state={state} isIconRail={isIconRail}>
           <DashboardPageBody personalScope={personalScope} {...props}>
@@ -124,8 +129,10 @@ function ShellContentRow({
 }) {
   const { activeProductId, isCompactSidebar, langyDockInset } = state;
   const menuWidth = isCompactSidebar ? MENU_WIDTH_COMPACT : MENU_WIDTH_EXPANDED;
+  // The rail is a sibling of this column, so its width is already gone from
+  // the space the content can use. The cap subtracts both it and the sidebar.
   const contentInsetWidth = isIconRail
-    ? `${menuWidth} - ${ICON_RAIL_WIDTH}`
+    ? `${menuWidth} + ${ICON_RAIL_WIDTH}`
     : menuWidth;
 
   return (
