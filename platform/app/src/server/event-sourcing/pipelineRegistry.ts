@@ -886,14 +886,17 @@ export class PipelineRegistry {
         // coding_agent_sessions (store.get() → findBySessionId → decode row).
         // The delivery path never reads event_log. Same wiring as trace_summaries.
         codingAgentSessionStore: this.cached<CodingAgentSessionState>(
-          new CodingAgentSessionStore(this.deps.repositories.codingAgentSession, {
-            // The Sessions-destination stamp, inline at the commit seam with
-            // its own per-process window — a read-model write, not a reactor.
-            onSessionsStored: createCodingAgentSessionSeenTouch({
-              touchCodingAgentSessionSeen: (params) =>
-                this.deps.projects.touchCodingAgentSessionSeen(params),
-            }),
-          }),
+          new CodingAgentSessionStore(
+            this.deps.repositories.codingAgentSession,
+            {
+              // The Sessions-destination stamp, inline at the commit seam with
+              // its own per-process window — a read-model write, not a reactor.
+              onSessionsStored: createCodingAgentSessionSeenTouch({
+                touchCodingAgentSessionSeen: (params) =>
+                  this.deps.projects.touchCodingAgentSessionSeen(params),
+              }),
+            },
+          ),
           "coding_agent_sessions",
         ),
         codingAgentTraceSessionAppendStore:

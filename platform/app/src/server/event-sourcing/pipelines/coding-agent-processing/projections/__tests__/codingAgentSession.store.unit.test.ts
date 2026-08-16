@@ -231,7 +231,9 @@ describe("CodingAgentSessionStore durable dedup", () => {
           onSessionsStored: () => Promise.reject(new Error("boom")),
         });
 
-        await expect(store.store(makeState(), context())).resolves.toBeUndefined();
+        await expect(
+          store.store(makeState(), context()),
+        ).resolves.toBeUndefined();
       });
     });
   });
