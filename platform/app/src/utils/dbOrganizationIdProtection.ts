@@ -349,6 +349,12 @@ export const ORG_TENANCY_EXEMPT: readonly string[] = [
   // organizationId; the evaluator's sweep is the constraint.
   "AnomalyRule",
   "AnomalyAlert",
+  // Same shape: two cross-tenant sweeps read this one. The realtime session
+  // poller reconciles every org's unreported voice calls, and the expiry
+  // pass releases cap slots the vendor never closed. Every service-layer
+  // query still names its own tenant, and the webhook lookup scopes to the
+  // organization that owns the credential the delivery was signed for.
+  "GatewayRealtimeSession",
   // Org-scoped but not yet audited for every query shape. Listed explicitly so
   // the partition test stays green while the per-model call-site audit that
   // precedes enforcement (ADR-021) is completed.

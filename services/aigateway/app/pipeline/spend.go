@@ -81,6 +81,9 @@ func Spend(emit SpendEmitter) Interceptor {
 					emit.FailSpend(outcomeFor(outcomeInput{call: call, start: start, err: classifySpendError(err)}))
 					return nil, err
 				}
+				if deferredOutcome(call.Request.Type) {
+					return resp, nil
+				}
 				emit.ConfirmSpend(outcomeFor(outcomeInput{call: call, start: start, usage: resp.Usage}))
 				return resp, nil
 			}
@@ -103,6 +106,23 @@ func Spend(emit SpendEmitter) Interceptor {
 			}
 		},
 	}
+}
+
+// deferredOutcome reports the request types whose spend record this dispatch
+// must NOT close.
+//
+// Every other type measures its own usage and confirms the moment the
+// provider answers. A realtime session mint answers in milliseconds and the
+// call it opened has not started, so confirming here would close the record
+// at zero dollars and leave the settlement sweeper nothing to settle. The
+// record stays admitted until the vendor reports the call, or until the
+// grace expires and it settles as cost-unknown.
+//
+// Only the success path defers. A mint the gateway refused or that the
+// vendor rejected still emits a failure, because a session that never opened
+// has no later report coming and an invisible record is a lost one.
+func deferredOutcome(t domain.RequestType) bool {
+	return t == domain.RequestTypeRealtimeSession
 }
 
 // traceIDFrom returns the active trace id, or empty when no span is
@@ -149,11 +169,13 @@ func ResolveEndUser(ctx context.Context, call *Call) string {
 			return ""
 		}
 		return customertracebridge.EndUserIDFromBody(call.Request.Body)
-	case domain.RequestTypePassthrough, domain.RequestTypeTranscription:
-		// Passthrough carries a provider-native body shape, and
-		// transcription is multipart form, not JSON: neither exposes the
-		// OpenAI `user` field this reads, so header-only attribution
-		// (resolved above) is all these types get.
+	case domain.RequestTypePassthrough, domain.RequestTypeTranscription,
+		domain.RequestTypeRealtimeSession:
+		// Passthrough carries a provider-native body shape, transcription is
+		// multipart form, not JSON, and a session mint declares a socket
+		// rather than a completion: none exposes the OpenAI `user` field
+		// this reads, so header-only attribution (resolved above) is all
+		// these types get.
 		return ""
 	}
 	return ""

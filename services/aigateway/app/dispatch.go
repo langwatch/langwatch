@@ -15,6 +15,13 @@ import (
 )
 
 func (a *App) coreDispatch(ctx context.Context, call *pipeline.Call) (*domain.Response, error) {
+	// A session mint is one bounded vendor REST call with no fallback walk,
+	// no retry across credentials and a control-plane booking on either side
+	// of it, so it takes its own terminal rather than threading four
+	// exceptions through this one.
+	if call.Request.Type == domain.RequestTypeRealtimeSession {
+		return a.dispatchRealtimeSession(ctx, call)
+	}
 	if err := call.MaterializeBody(); err != nil {
 		return nil, err
 	}

@@ -64,6 +64,7 @@ import {
 } from "./routes/experiments-v3";
 import { app as gatewayInternalApp } from "./routes/gateway-internal";
 import { app as gatewayOpenApiApp } from "./routes/gateway-openapi";
+import { app as elevenLabsApp } from "./routes/elevenlabs";
 import { app as githubApp } from "./routes/github";
 import { app as healthApp } from "./routes/health";
 import { app as healthChecksApp } from "./routes/health-checks";
@@ -188,6 +189,7 @@ export function createApiRouter() {
   api.route("/", langyApiApp); // /api/langy/conversations — key-authed turns
   api.route("/", langyInternalApp);
   api.route("/", langyRelayApp);
+  api.route("/", elevenLabsApp); // /api/elevenlabs/webhook/:modelProviderId
   api.route("/", githubApp);
   api.route("/", scenarioGenerateApp);
   api.route("/", scimApp);

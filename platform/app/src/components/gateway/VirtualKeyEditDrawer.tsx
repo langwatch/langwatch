@@ -77,6 +77,9 @@ type VirtualKeyDetail = {
       tpm: number | null;
       rpd: number | null;
     };
+    realtime?: {
+      maxOpenSessions: number | null;
+    };
     metadata?: {
       label?: string;
       tags?: string[];
@@ -119,6 +122,7 @@ export function VirtualKeyEditDrawer({
   const [rpm, setRpm] = useState<string>("");
   const [tpm, setTpm] = useState<string>("");
   const [rpd, setRpd] = useState<string>("");
+  const [maxOpenSessions, setMaxOpenSessions] = useState<string>("");
 
   useEffect(() => {
     if (!vk) return;
@@ -130,6 +134,9 @@ export function VirtualKeyEditDrawer({
     setRpm(vk.config.rateLimits?.rpm?.toString() ?? "");
     setTpm(vk.config.rateLimits?.tpm?.toString() ?? "");
     setRpd(vk.config.rateLimits?.rpd?.toString() ?? "");
+    setMaxOpenSessions(
+      vk.config.realtime?.maxOpenSessions?.toString() ?? "",
+    );
     const providersAllowed = vk.config.providersAllowed ?? null;
     setProviderAccess({
       allProviders: !providersAllowed || providersAllowed.length === 0,
@@ -301,6 +308,11 @@ export function VirtualKeyEditDrawer({
             rpm: rpm ? Number.parseInt(rpm, 10) : null,
             tpm: tpm ? Number.parseInt(tpm, 10) : null,
             rpd: rpd ? Number.parseInt(rpd, 10) : null,
+          },
+          realtime: {
+            maxOpenSessions: maxOpenSessions
+              ? Number.parseInt(maxOpenSessions, 10)
+              : null,
           },
           metadata: {
             tags: parseTagsCsv(tagsCsv),
@@ -526,6 +538,31 @@ export function VirtualKeyEditDrawer({
                   inputMode="numeric"
                 />
                 <Field.HelperText>Requests / day</Field.HelperText>
+              </Field.Root>
+            </HStack>
+
+            <Separator />
+            <HStack>
+              <Text fontSize="sm" fontWeight="semibold">
+                Realtime voice
+              </Text>
+              <FieldInfoTooltip
+                description="How many brokered voice sessions this key may hold open at once, blank = unlimited. The request limits above do not bound voice: one mint opens a call that bills for as long as it runs. A mint over the cap gets HTTP 429; a slot frees when the call ends."
+                docHref="/ai-gateway/api/realtime"
+              />
+            </HStack>
+            <HStack gap={4} align="flex-start">
+              <Field.Root flex={1}>
+                <Field.Label>max open sessions</Field.Label>
+                <Input
+                  value={maxOpenSessions}
+                  onChange={(e) => setMaxOpenSessions(e.target.value)}
+                  placeholder="unlimited"
+                  inputMode="numeric"
+                />
+                <Field.HelperText>
+                  Concurrent realtime voice sessions
+                </Field.HelperText>
               </Field.Root>
             </HStack>
           </VStack>

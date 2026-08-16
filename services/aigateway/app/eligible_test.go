@@ -191,9 +191,9 @@ func TestEligibleCredentialsEmptyChainDefersToNoProviderConfigured(t *testing.T)
 // gemini-cli and the @google/genai SDK send.
 func geminiPassthrough() *domain.Request {
 	return &domain.Request{
-		Type:        domain.RequestTypePassthrough,
-		Model:       "gemini-2.5-flash",
-		Passthrough: domain.PassthroughRequest{Surface: domain.GeminiSurface()},
+		Type:    domain.RequestTypePassthrough,
+		Model:   "gemini-2.5-flash",
+		Surface: domain.GeminiSurface(),
 	}
 }
 

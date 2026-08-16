@@ -1,0 +1,240 @@
+/**
+ * ElevenLabs post-call webhook.
+ *
+ * Surface:
+ *   POST /api/elevenlabs/webhook/:modelProviderId
+ *
+ * A brokered ElevenLabs conversation reports nothing over its socket. Cost
+ * and duration arrive afterwards, on this webhook, and it is the only path by
+ * which a voice call reaches billing (ADR-097).
+ *
+ * The tenant is the path parameter, verified against the provider row it
+ * names. That keeps the signature check one HMAC computation instead of a
+ * walk over every configured provider, and an id that names no configured
+ * webhook answers 404 so the ids cannot be probed.
+ *
+ * Every delivery is acknowledged. A retry does not fix a payload this
+ * instance cannot act on, and an unmatched call is not lost: its spend record
+ * settles as cost-unknown at the grace, visibly, and a later delivery still
+ * supersedes the settled row.
+ *
+ * Spec: specs/ai-gateway/realtime-sessions.feature.
+ */
+
+import { createLogger } from "@langwatch/observability";
+import { createHmac, timingSafeEqual } from "crypto";
+import { z } from "zod";
+import { createServiceApp, publicEndpoint } from "~/server/api/security";
+import { prisma } from "~/server/db";
+import {
+  closeAndConfirmRealtimeSession,
+  matchRealtimeSession,
+} from "~/server/gateway/realtimeSession.service";
+import { decryptCustomKeys } from "~/server/modelProviders/customKeys";
+
+const logger = createLogger("langwatch:api:elevenlabs");
+
+const WEBHOOK_PUBLIC_REASON =
+  "ElevenLabs post-call webhook delivery URL — the vendor's own delivery " +
+  "target, so public by protocol; every payload is verified in-handler by " +
+  "its ElevenLabs-Signature HMAC against the secret stored on the provider " +
+  "row the path names.";
+
+const secured = createServiceApp({ basePath: "/api" });
+
+/** The custom key an operator stores the workspace webhook secret under. */
+export const ELEVENLABS_WEBHOOK_SECRET_KEY = "ELEVENLABS_WEBHOOK_SECRET";
+
+/**
+ * How far out of date a delivery's own timestamp may be.
+ *
+ * The timestamp is inside the signed payload, so an attacker cannot move it
+ * without breaking the signature. Bounding it stops a captured delivery from
+ * being replayed later; thirty minutes is well past any delivery retry the
+ * vendor performs.
+ */
+const SIGNATURE_TOLERANCE_SECONDS = 30 * 60;
+
+/**
+ * The fields this handler reads. Everything else in the payload, including
+ * the transcript and the analysis, is deliberately not read: the platform
+ * bills a call, it does not store what was said on it.
+ */
+const postCallSchema = z.object({
+  type: z.string().optional(),
+  event_timestamp: z.number().optional(),
+  data: z
+    .object({
+      agent_id: z.string().optional(),
+      conversation_id: z.string().optional(),
+      metadata: z
+        .object({
+          start_time_unix_secs: z.number().optional(),
+          call_duration_secs: z.number().optional(),
+          cost: z.number().optional(),
+        })
+        .passthrough()
+        .optional(),
+      conversation_initiation_client_data: z
+        .object({
+          dynamic_variables: z.record(z.string(), z.unknown()).optional(),
+        })
+        .passthrough()
+        .optional(),
+    })
+    .passthrough()
+    .optional(),
+});
+
+/**
+ * Verifies the `ElevenLabs-Signature: t=<unix>,v0=<hex>` header.
+ *
+ * The signed payload is the timestamp, a dot, then the raw request bytes, so
+ * the body must be read as text and never re-serialised: a JSON round trip
+ * reorders keys and the signature stops matching.
+ */
+export function verifyElevenLabsSignature(params: {
+  rawBody: string;
+  header: string | undefined;
+  secret: string;
+  nowSeconds?: number;
+}): boolean {
+  if (!params.header || !params.secret) return false;
+  let timestamp = "";
+  let signature = "";
+  for (const part of params.header.split(",")) {
+    const [name, value] = part.trim().split("=", 2);
+    if (name === "t") timestamp = value ?? "";
+    if (name === "v0") signature = value ?? "";
+  }
+  if (!timestamp || !signature) return false;
+
+  const sentAt = Number(timestamp);
+  const now = params.nowSeconds ?? Math.floor(Date.now() / 1000);
+  if (!Number.isFinite(sentAt) || Math.abs(now - sentAt) > SIGNATURE_TOLERANCE_SECONDS) {
+    return false;
+  }
+
+  const expected = createHmac("sha256", params.secret)
+    .update(`${timestamp}.${params.rawBody}`)
+    .digest("hex");
+  const a = Buffer.from(signature);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+/** The workspace webhook secret stored on one provider row, or "". */
+async function webhookSecretFor(modelProviderId: string): Promise<{
+  secret: string;
+  organizationId: string;
+} | null> {
+  const provider = await prisma.modelProvider.findUnique({
+    where: { id: modelProviderId },
+    select: {
+      id: true,
+      provider: true,
+      organizationId: true,
+      customKeys: true,
+    },
+  });
+  if (!provider || provider.provider !== "elevenlabs") return null;
+  const keys = decryptCustomKeys(provider.customKeys);
+  const secret = keys[ELEVENLABS_WEBHOOK_SECRET_KEY];
+  if (typeof secret !== "string" || secret.length === 0) return null;
+  return { secret, organizationId: provider.organizationId };
+}
+
+/**
+ * Reads the LangWatch session id the mint echoed into the conversation's own
+ * variables. Used only when the delivery carries no conversation id we
+ * already recorded.
+ */
+function echoedSessionId(payload: z.infer<typeof postCallSchema>): string | undefined {
+  const value =
+    payload.data?.conversation_initiation_client_data?.dynamic_variables?.[
+      "lw_session_id"
+    ];
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function handleElevenLabsWebhook(c: any): Promise<Response> {
+  const modelProviderId = c.req.param("modelProviderId");
+  const configured = await webhookSecretFor(modelProviderId);
+  if (!configured) {
+    // 404 rather than 401: an id with no webhook configured must look the
+    // same as an id that does not exist, or the ids are enumerable.
+    return c.json({ error: "Webhook not configured" }, { status: 404 });
+  }
+
+  // The RAW bytes: the HMAC is over exactly what the vendor sent.
+  const rawBody = await c.req.text();
+  if (
+    !verifyElevenLabsSignature({
+      rawBody,
+      header:
+        c.req.header("elevenlabs-signature") ?? c.req.header("ElevenLabs-Signature"),
+      secret: configured.secret,
+    })
+  ) {
+    return c.json({ error: "Invalid signature" }, { status: 401 });
+  }
+
+  let payload: z.infer<typeof postCallSchema>;
+  try {
+    payload = postCallSchema.parse(JSON.parse(rawBody));
+  } catch {
+    return c.json({ error: "Invalid payload" }, { status: 400 });
+  }
+
+  try {
+    await applyPostCallReport({
+      payload,
+      modelProviderId,
+      organizationId: configured.organizationId,
+    });
+  } catch (err) {
+    logger.warn(
+      { err, modelProviderId },
+      "an ElevenLabs post-call report could not be applied; its session settles as cost-unknown",
+    );
+  }
+  return c.json({ received: true });
+}
+
+/** Matches the report to its session and confirms that session's spend. */
+async function applyPostCallReport(params: {
+  payload: z.infer<typeof postCallSchema>;
+  modelProviderId: string;
+  organizationId: string;
+}): Promise<void> {
+  const data = params.payload.data;
+  const startedAtSecs = data?.metadata?.start_time_unix_secs;
+  const session = await matchRealtimeSession({
+    vendor: "elevenlabs",
+    organizationId: params.organizationId,
+    modelProviderId: params.modelProviderId,
+    vendorConversationId: data?.conversation_id,
+    echoedSessionId: echoedSessionId(params.payload),
+    callStartedAt: startedAtSecs ? new Date(startedAtSecs * 1000) : undefined,
+  });
+  if (!session) return;
+
+  // The vendor prices a conversation by duration, so duration is the
+  // quantity. It arrives in whole seconds and every quantity on the spend
+  // wire is an integer, so it becomes milliseconds here, once.
+  const durationSecs = Math.max(0, Math.round(data?.metadata?.call_duration_secs ?? 0));
+  await closeAndConfirmRealtimeSession({
+    session,
+    usage: { audio_ms: durationSecs * 1000 },
+    vendorCostRaw: data?.metadata ?? null,
+    durationMs: durationSecs * 1000,
+    reason: "post-call report",
+  });
+}
+
+secured
+  .access(publicEndpoint(WEBHOOK_PUBLIC_REASON))
+  .post("/elevenlabs/webhook/:modelProviderId", handleElevenLabsWebhook);
+
+export const app = secured.hono;

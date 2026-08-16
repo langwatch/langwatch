@@ -16,7 +16,7 @@ import type {
   VirtualKey,
 } from "~/generated/prisma/client";
 
-import { decrypt } from "../../utils/encryption";
+import { decryptCustomKeys } from "~/server/modelProviders/customKeys";
 import {
   type LangyMirrorTier,
   resolveLangyMirrorTier,
@@ -421,19 +421,6 @@ export class GatewayConfigMaterialiser {
   }
 }
 
-function decryptCustomKeys(raw: unknown): Record<string, unknown> {
-  if (raw === null || raw === undefined) return {};
-  if (typeof raw === "object") return raw as Record<string, unknown>;
-  if (typeof raw === "string") {
-    try {
-      return JSON.parse(decrypt(raw)) as Record<string, unknown>;
-    } catch {
-      return {};
-    }
-  }
-  return {};
-}
-
 // Resolve the policy-side of the bundle (model aliases + policy rules)
 // from the VK's RoutingPolicy when present, falling back to the VK
 // config defaults otherwise. Post-bug-7 step (iv) the legacy VK config
@@ -653,10 +640,15 @@ function buildProviderSlot(mp: ModelProvider, index: number): ProviderSlot {
   // with an endpointKey resolve their endpoint elsewhere (Azure/Vertex via
   // credentials.endpoint), so emitting a per-slot base_url for them would
   // be a dead field. Scope the override to what's consumed.
+  // "elevenlabs" is on the list for the realtime session mint, which dials
+  // the vendor directly and must reach the residency host the customer
+  // chose: a signed URL minted against the default host is signed in the
+  // wrong region.
   const supportsBaseURLOverride =
     mp.provider === "custom" ||
     mp.provider === "openai" ||
-    mp.provider === "anthropic";
+    mp.provider === "anthropic" ||
+    mp.provider === "elevenlabs";
   const endpointKey = supportsBaseURLOverride
     ? modelProviders[mp.provider as keyof typeof modelProviders]?.endpointKey
     : undefined;

@@ -434,16 +434,26 @@ export const modelProviders = {
   },
   elevenlabs: {
     name: "ElevenLabs",
-    // Ships audio only (TTS + STT through the gateway's /v1/audio routes).
-    // Registered like every provider so the key lives in Settings -> Model
-    // Providers; the LLM model catalog carries no elevenlabs chat models, so
-    // it never shows up in chat model selectors.
+    // Audio (TTS + STT through the gateway's /v1/audio routes) plus brokered
+    // Conversational AI sessions. Registered like every provider so the key
+    // lives in Settings -> Model Providers; the LLM model catalog carries no
+    // elevenlabs chat models, so it never shows up in chat model selectors.
     type: "llm",
     apiKey: "ELEVENLABS_API_KEY",
-    endpointKey: undefined,
+    endpointKey: "ELEVENLABS_BASE_URL",
     keysSchema: z.object({
       ELEVENLABS_API_KEY: z.string().min(1),
+      // The workspace post-call webhook secret. A brokered voice
+      // conversation reports nothing over its socket: cost and duration
+      // arrive on that webhook, and without this secret its signature
+      // cannot be verified, so the calls settle as cost-unknown.
+      ELEVENLABS_WEBHOOK_SECRET: z.string().nullable().optional(),
+      // The regional API host. ElevenLabs publishes residency endpoints, and
+      // a session minted against the default host is signed in the wrong
+      // region for a customer who chose one.
+      ELEVENLABS_BASE_URL: z.string().nullable().optional(),
     }),
+    optionalKeys: ["ELEVENLABS_WEBHOOK_SECRET", "ELEVENLABS_BASE_URL"],
     enabledSince: new Date("2026-07-25"),
     blurb:
       "Voice models for lifelike text to speech and accurate transcription.",

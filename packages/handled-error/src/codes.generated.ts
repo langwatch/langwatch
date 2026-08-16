@@ -330,6 +330,24 @@ export const goErrorCodes = {
    */
   rate_limited: { service: "aigateway", httpStatus: 429 },
   /**
+   * ErrRealtimeRegistryUnavailable — means the control plane could not record
+   * the session, so the gateway refused to mint one. This is a deliberate
+   * departure from the budget fail-open rule: an unrecorded session is voice
+   * nobody can bill and a cap nobody can enforce.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  realtime_registry_unavailable: { service: "aigateway", httpStatus: 503 },
+  /**
+   * ErrRealtimeSessionLimit — means the virtual key already holds as many open
+   * realtime voice sessions as its realtime.maxOpenSessions allows. A voice
+   * session bills for as long as it runs, so the arrival-rate limits do not
+   * bound it and this is the only cap that does.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  realtime_session_limit: { service: "aigateway", httpStatus: 429 },
+  /**
    * ErrSSRFBlocked — signals an HTTP block tried to reach a destination
    * disallowed by the SSRF policy (loopback, private, link-local, metadata).
    *

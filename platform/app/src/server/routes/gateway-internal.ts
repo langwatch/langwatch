@@ -29,6 +29,7 @@ import {
   admitSpendWireSchema,
   confirmSpendWireSchema,
   failSpendWireSchema,
+  spendUsageSchema,
   type SpendUsage,
 } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/commands";
 import { GATEWAY_SPEND_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/constants";
@@ -41,6 +42,12 @@ import {
 } from "~/server/gateway/budgetResolution.service";
 import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
 import { GatewayConfigMaterialiser } from "~/server/gateway/config.materialiser";
+import {
+  closeAndConfirmRealtimeSession,
+  correlateRealtimeSession,
+  releaseRealtimeSession,
+  reserveRealtimeSession,
+} from "~/server/gateway/realtimeSession.service";
 import { signGatewayJwt } from "~/server/gateway/gatewayJwt";
 import {
   GatewayGuardrailEvaluationService,
@@ -1237,6 +1244,191 @@ secured.access(gatewayPolicy()).post("/spend-commands", async (c) => {
     rejected,
   });
 });
+
+// ── realtime voice sessions (ADR-097) ───────────────────────────────────
+
+const reserveRealtimeSessionSchema = z.object({
+  session_id: z.string().min(1).max(256),
+  project_id: z.string().min(1).max(256),
+  organization_id: z.string().min(1).max(256),
+  virtual_key_id: z.string().min(1).max(256),
+  model_provider_id: z.string().min(1).max(256),
+  vendor: z.enum(["openai", "elevenlabs"]),
+  agent_id: z.string().max(256).optional(),
+  model: z.string().min(1).max(512),
+});
+
+const patchRealtimeSessionSchema = z.object({
+  project_id: z.string().min(1).max(256),
+  vendor_conversation_id: z.string().max(256).optional(),
+  status: z.enum(["FAILED", "EXPIRED"]).optional(),
+  reason: z.string().max(256).optional(),
+});
+
+const reportRealtimeUsageSchema = z.object({
+  project_id: z.string().min(1).max(256),
+  usage: spendUsageSchema,
+});
+
+/**
+ * Books a voice session and decides the key's open-session cap in the same
+ * transaction that inserts the row.
+ *
+ * The gateway calls this BEFORE it mints, and refuses the mint when this
+ * refuses. That ordering is what makes the cap real: a mint that ran first
+ * would already have handed out a working credential by the time the count
+ * said no.
+ */
+secured.access(gatewayPolicy()).post("/realtime-sessions", async (c) => {
+  const parsed = reserveRealtimeSessionSchema.safeParse(
+    await c.req.json().catch(() => null),
+  );
+  if (!parsed.success) {
+    return c.json(
+      {
+        error: {
+          type: "bad_request",
+          code: "invalid_reservation",
+          message: "a session reservation names the session, its tenancy, its key and its vendor",
+        },
+      },
+      400,
+    );
+  }
+  const body = parsed.data;
+  const result = await reserveRealtimeSession({
+    sessionId: body.session_id,
+    projectId: body.project_id,
+    organizationId: body.organization_id,
+    virtualKeyId: body.virtual_key_id,
+    modelProviderId: body.model_provider_id,
+    vendor: body.vendor,
+    agentId: body.agent_id,
+    model: body.model,
+  });
+  if (!result.ok) {
+    return c.json(
+      {
+        error: {
+          type: "rate_limited",
+          code: "realtime_session_limit",
+          message: "this virtual key already holds the most realtime voice sessions it may keep open at once",
+          open: result.open,
+          limit: result.limit,
+        },
+      },
+      429,
+    );
+  }
+  return c.json({ session_id: body.session_id, status: "OPEN" });
+});
+
+/**
+ * Records the vendor's own conversation id on a booked session, or closes a
+ * booking whose mint never produced a credential.
+ */
+secured
+  .access(gatewayPolicy())
+  .patch("/realtime-sessions/:session_id", async (c) => {
+    const parsed = patchRealtimeSessionSchema.safeParse(
+      await c.req.json().catch(() => null),
+    );
+    if (!parsed.success) {
+      return c.json(
+        {
+          error: {
+            type: "bad_request",
+            code: "invalid_session_patch",
+            message: "project_id is required, with a vendor_conversation_id or a terminal status",
+          },
+        },
+        400,
+      );
+    }
+    const sessionId = c.req.param("session_id");
+    const body = parsed.data;
+    let applied = false;
+    if (body.vendor_conversation_id) {
+      applied = await correlateRealtimeSession({
+        sessionId,
+        projectId: body.project_id,
+        vendorConversationId: body.vendor_conversation_id,
+      });
+    }
+    if (body.status) {
+      applied =
+        (await releaseRealtimeSession({
+          sessionId,
+          projectId: body.project_id,
+          status: body.status,
+          reason: body.reason ?? "released by the gateway",
+        })) || applied;
+    }
+    if (!applied) {
+      return c.json(
+        {
+          error: {
+            type: "not_found",
+            code: "realtime_session_not_found",
+            message: "no session with that id belongs to this project",
+          },
+        },
+        404,
+      );
+    }
+    return c.json({ session_id: sessionId, updated: true });
+  });
+
+/**
+ * Closes an OpenAI voice session with the usage its socket reported.
+ *
+ * OpenAI reports a realtime session's usage over the socket, and that socket
+ * runs client to vendor, so the client posting it back is the only path by
+ * which those numbers reach billing. The gateway has already made the audio
+ * and text counts disjoint.
+ */
+secured
+  .access(gatewayPolicy())
+  .post("/realtime-sessions/:session_id/usage", async (c) => {
+    const parsed = reportRealtimeUsageSchema.safeParse(
+      await c.req.json().catch(() => null),
+    );
+    if (!parsed.success) {
+      return c.json(
+        {
+          error: {
+            type: "bad_request",
+            code: "invalid_usage_report",
+            message: "project_id and a usage object of integer quantities are required",
+          },
+        },
+        400,
+      );
+    }
+    const sessionId = c.req.param("session_id");
+    const session = await prisma.gatewayRealtimeSession.findFirst({
+      where: { id: sessionId, projectId: parsed.data.project_id },
+    });
+    if (!session) {
+      return c.json(
+        {
+          error: {
+            type: "not_found",
+            code: "realtime_session_not_found",
+            message: "no session with that id belongs to this project",
+          },
+        },
+        404,
+      );
+    }
+    await closeAndConfirmRealtimeSession({
+      session,
+      usage: parsed.data.usage,
+      reason: "usage reported by the client",
+      durationMs: Date.now() - session.mintedAt.getTime(),
+    });
+    return c.json({ session_id: sessionId, status: "CLOSED" });
+  });
 
 secured.access(gatewayPolicy()).get("/bootstrap", (c) => notImplemented(c));
 

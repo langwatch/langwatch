@@ -16,6 +16,7 @@ import (
 
 	"github.com/bytedance/sonic"
 	"github.com/go-chi/chi/v5"
+	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/pkg/clog"
@@ -149,6 +150,15 @@ func NewRouter(deps RouterDeps) http.Handler {
 		v1.Post("/audio/speech", speechHandler(deps))
 		v1.Post("/audio/transcriptions", transcriptionsHandler(deps))
 		v1.Get("/models", modelsHandler(deps))
+		// Realtime voice session mints (ADR-097). Both paths mirror the
+		// vendor's own, so a vendor SDK pointed at the gateway base URL
+		// mints through us with no code change. The media socket the
+		// credential opens goes client to vendor and never comes here.
+		v1.Post("/realtime/client_secrets", openAIRealtimeSessionHandler(deps))
+		v1.Get("/convai/conversation/get-signed-url", elevenLabsSignedURLHandler(deps))
+		// The OpenAI socket reports its usage to the client, not to us, so
+		// the client posts it back to close the session's spend record.
+		v1.Post("/realtime/sessions/{session_id}/usage", realtimeUsageHandler(deps))
 	})
 
 	// Gemini-native surface. gemini-cli (GOOGLE_GEMINI_BASE_URL) and the
@@ -468,6 +478,130 @@ func transcriptionsHandler(deps RouterDeps) http.HandlerFunc {
 	}
 }
 
+// maxRealtimeMintBodyBytes caps a session-mint body. An OpenAI session
+// declaration carries instructions, a tool list and turn-detection settings;
+// 256 KiB is far past any real one and well short of a payload worth
+// forwarding to a vendor by mistake.
+const maxRealtimeMintBodyBytes = 256 << 10
+
+// openAIRealtimeSessionHandler terminates POST /v1/realtime/client_secrets,
+// OpenAI's own mint path. The caller's session declaration is forwarded to
+// OpenAI as they wrote it, with the resolved model written back into
+// session.model, and the ephemeral secret comes back verbatim.
+//
+// The route states its own vendor through domain.OpenAIRealtimeSurface(). No
+// other provider serves this wire, and the body carries a customer's
+// instructions and tool definitions, so it must never reach a vendor the
+// caller did not name.
+func openAIRealtimeSessionHandler(deps RouterDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		bundle, ok := requireBundle(w, r, deps.Logger)
+		if !ok {
+			return
+		}
+		body, ok := readFullBody(deps.Logger, w, r, maxRealtimeMintBodyBytes)
+		if !ok {
+			return
+		}
+		if len(bytes.TrimSpace(body)) == 0 {
+			body = []byte(`{}`)
+		}
+		model := gjson.GetBytes(body, "session.model").String()
+
+		result, err := deps.App.HandleRealtimeSession(r.Context(), bundle, app.RealtimeMintDispatch{
+			Body:    body,
+			Model:   model,
+			Session: domain.RealtimeSessionRequest{Vendor: domain.RealtimeVendorOpenAI},
+			Surface: domain.OpenAIRealtimeSurface(),
+		})
+		if err != nil {
+			writeError(deps.Logger, w, r.Context(), err)
+			return
+		}
+		setMetaHeaders(w, result.Meta)
+		writeJSONResponse(w, result.Response)
+	}
+}
+
+// elevenLabsSignedURLHandler terminates
+// GET /v1/convai/conversation/get-signed-url, ElevenLabs' own mint path.
+//
+// The request carries no body, so the handler synthesizes one naming the
+// catalog model this session bills under, the same way the transcription
+// route does, and the body-reading stages of the pipeline see well-formed
+// JSON instead of a query string.
+func elevenLabsSignedURLHandler(deps RouterDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		bundle, ok := requireBundle(w, r, deps.Logger)
+		if !ok {
+			return
+		}
+		agentID := strings.TrimSpace(r.URL.Query().Get("agent_id"))
+		if agentID == "" {
+			writeError(deps.Logger, w, r.Context(), herr.New(r.Context(), domain.ErrBadRequest, herr.M{
+				"message": "agent_id query parameter is required: a signed URL is bound to one agent",
+				"fault":   "customer",
+			}))
+			return
+		}
+		body := []byte(`{"model":` + strconv.Quote(domain.ElevenLabsConvAIModel) +
+			`,"agent_id":` + strconv.Quote(agentID) + `}`)
+
+		result, err := deps.App.HandleRealtimeSession(r.Context(), bundle, app.RealtimeMintDispatch{
+			Body:  body,
+			Model: domain.ElevenLabsConvAIModel,
+			Session: domain.RealtimeSessionRequest{
+				Vendor:  domain.RealtimeVendorElevenLabs,
+				AgentID: agentID,
+			},
+			Surface: domain.ElevenLabsConvAISurface(),
+		})
+		if err != nil {
+			writeError(deps.Logger, w, r.Context(), err)
+			return
+		}
+		setMetaHeaders(w, result.Meta)
+		writeJSONResponse(w, result.Response)
+	}
+}
+
+// maxRealtimeUsageBodyBytes caps a usage report. It is one usage object.
+const maxRealtimeUsageBodyBytes = 64 << 10
+
+// realtimeUsageHandler terminates
+// POST /v1/realtime/sessions/{session_id}/usage.
+//
+// OpenAI reports a realtime session's usage over the socket, in
+// response.done, and that socket runs client to vendor. The client posts
+// what it read back here, and the control plane closes the session's spend
+// record with it.
+//
+// Deliberately outside the dispatch pipeline: this is a report about a
+// request that was already admitted, not a new one. Running it through the
+// chain would admit a second spend record, and the report itself calls no
+// provider, so there is nothing for a budget or a guardrail to gate.
+func realtimeUsageHandler(deps RouterDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		bundle, ok := requireBundle(w, r, deps.Logger)
+		if !ok {
+			return
+		}
+		sessionID := chi.URLParam(r, "session_id")
+		body, ok := readFullBody(deps.Logger, w, r, maxRealtimeUsageBodyBytes)
+		if !ok {
+			return
+		}
+		report := app.RealtimeUsagePost{SessionID: sessionID, Body: body}
+		if err := deps.App.ReportRealtimeUsage(r.Context(), bundle, report); err != nil {
+			writeError(deps.Logger, w, r.Context(), err)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusAccepted)
+		_, _ = w.Write([]byte(`{"received":true}`))
+	}
+}
+
 // geminiPassthroughHandler terminates any POST /v1beta/... request.
 // Specifically targets the Gemini-native shape used by gemini-cli
 // (`GOOGLE_GEMINI_BASE_URL=http://…/gateway`) and the @google/genai
@@ -514,11 +648,16 @@ func geminiPassthroughHandler(deps RouterDeps) http.HandlerFunc {
 			RawQuery: r.URL.RawQuery,
 			Headers:  forwardedPassthroughHeaders(r.Header),
 			Stream:   isStream,
-			Surface:  domain.GeminiSurface(),
+		}
+		dispatch := app.PassthroughDispatch{
+			Body:    body,
+			Model:   model,
+			Meta:    meta,
+			Surface: domain.GeminiSurface(),
 		}
 
 		if isStream {
-			result, err := deps.App.HandlePassthroughStream(r.Context(), bundle, body, model, meta)
+			result, err := deps.App.HandlePassthroughStream(r.Context(), bundle, dispatch)
 			if err != nil {
 				writeError(deps.Logger, w, r.Context(), err)
 				return
@@ -529,7 +668,7 @@ func geminiPassthroughHandler(deps RouterDeps) http.HandlerFunc {
 		}
 
 		result, hw, err := withHeartbeat(r.Context(), w, deps.HeartbeatInterval, func() (*app.CompletionResult, error) {
-			return deps.App.HandlePassthrough(r.Context(), bundle, body, model, meta)
+			return deps.App.HandlePassthrough(r.Context(), bundle, dispatch)
 		})
 		if err != nil {
 			writeError(deps.Logger, hw, r.Context(), err)
@@ -999,6 +1138,12 @@ func setMetaHeaders(w http.ResponseWriter, meta app.DispatchMeta) {
 	if meta.CustomerTraceparent != "" {
 		h.Set("Traceparent", meta.CustomerTraceparent)
 	}
+	if meta.GuardrailsNotApplied != "" {
+		h.Set("X-LangWatch-Guardrails-Not-Applied", meta.GuardrailsNotApplied)
+	}
+	if meta.RealtimeSessionID != "" {
+		h.Set("X-LangWatch-Session-Id", meta.RealtimeSessionID)
+	}
 }
 
 // Pre-allocated SSE framing bytes — three w.Write calls instead of one
@@ -1245,4 +1390,11 @@ func registerErrorStatuses() {
 	// Retryable by contract: the control plane failed us, not the caller.
 	// A 5xx keeps client SDKs retrying instead of bubbling a config error.
 	herr.RegisterStatus(domain.ErrAuthUpstream, http.StatusServiceUnavailable)
+	// 429, like the rate limit above it: the key is at a cap that a call
+	// ending will clear, so a client should back off and try again rather
+	// than treat the refusal as terminal.
+	herr.RegisterStatus(domain.ErrRealtimeSessionLimit, http.StatusTooManyRequests)
+	// 503: the control plane could not record the session, which is our
+	// fault and passes.
+	herr.RegisterStatus(domain.ErrRealtimeRegistryUnavailable, http.StatusServiceUnavailable)
 }

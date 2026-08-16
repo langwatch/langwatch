@@ -26,6 +26,7 @@ type App struct {
 	models     ModelResolver
 	traces     AITraceEmitter
 	spend      pipeline.SpendEmitter
+	realtime   RealtimeSessionRegistry
 	metrics    MetricsRecorder
 	breaker    CircuitBreaker
 	logger     *zap.Logger
@@ -47,7 +48,14 @@ func WithModels(m ModelResolver) Option          { return func(app *App) { app.m
 func WithTraces(t AITraceEmitter) Option         { return func(app *App) { app.traces = t } }
 
 // WithSpend wires the spend emitter that records billing lifecycle events.
-func WithSpend(e pipeline.SpendEmitter) Option   { return func(app *App) { app.spend = e } }
+func WithSpend(e pipeline.SpendEmitter) Option { return func(app *App) { app.spend = e } }
+
+// WithRealtimeSessions wires the control plane's open-voice-session record.
+// Without it the realtime mint endpoints refuse rather than mint: a session
+// nobody recorded is unbillable voice.
+func WithRealtimeSessions(r RealtimeSessionRegistry) Option {
+	return func(app *App) { app.realtime = r }
+}
 func WithMetrics(m MetricsRecorder) Option       { return func(app *App) { app.metrics = m } }
 func WithCircuitBreaker(b CircuitBreaker) Option { return func(app *App) { app.breaker = b } }
 func WithLogger(l *zap.Logger) Option            { return func(app *App) { app.logger = l } }
@@ -143,6 +151,9 @@ func (discardMetrics) SetCircuitState(_ string, _ int)                    {}
 func (discardMetrics) RecordCacheOutcome(_ domain.Usage)                  {}
 func (discardMetrics) RecordCacheRuleHit(_, _ string)                     {}
 func (discardMetrics) RecordBudgetBlock(_ string)                         {}
+func (discardMetrics) RecordRealtimeMint(_, _ string)                     {}
+func (discardMetrics) RecordRealtimeSessionLimitBlock(_ string)           {}
+func (discardMetrics) RecordRealtimeRegistryError(_ string)               {}
 func (discardMetrics) SetRequestLabels(_ context.Context, _, _ string)    {}
 func (discardMetrics) ModelLabel(_ domain.BundleConfig, model string) string {
 	return model

@@ -120,6 +120,21 @@ async function bootSpendSpikeAnomalyWorker(
   logger.info("spend spike anomaly worker ready");
 }
 
+// Reconciles brokered realtime voice sessions whose post-call webhook never
+// arrived, so the webhook is an optimisation rather than something a
+// customer must configure before voice spend can be billed at all
+// (specs/ai-gateway/realtime-sessions.feature).
+async function bootRealtimeSessionPoller(
+  shutdownHandles: ShutdownHandles,
+): Promise<void> {
+  const { startRealtimeSessionPoller } = await import(
+    "~/server/gateway/realtimeSessionPoller"
+  );
+  const poller = startRealtimeSessionPoller();
+  shutdownHandles.push(() => poller.stop());
+  logger.info("realtime voice session poller ready");
+}
+
 // Self-hosted daily usage telemetry (no-op on SaaS or when
 // DISABLE_USAGE_STATS is set).
 async function bootUsageStatsWorker(
@@ -502,6 +517,7 @@ export async function startWorkers(
     await bootAnomalyWorker(shutdownHandles);
     await bootSpendSpikeAnomalyWorker(shutdownHandles);
     await bootUsageStatsWorker(shutdownHandles);
+    await bootRealtimeSessionPoller(shutdownHandles);
     if (shouldStartMetricsServer) {
       await bootMetricsServer(shutdownHandles);
     }

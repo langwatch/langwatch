@@ -102,4 +102,14 @@ const (
 	// and the lane has no mapping for it. The code matches OpenAI's own
 	// parameter rejections so SDK error handling stays familiar.
 	ErrUnsupportedParameter = herr.Code("unsupported_parameter")
+	// ErrRealtimeSessionLimit means the virtual key already holds as many
+	// open realtime voice sessions as its realtime.maxOpenSessions allows.
+	// A voice session bills for as long as it runs, so the arrival-rate
+	// limits do not bound it and this is the only cap that does.
+	ErrRealtimeSessionLimit = herr.Code("realtime_session_limit")
+	// ErrRealtimeRegistryUnavailable means the control plane could not
+	// record the session, so the gateway refused to mint one. This is a
+	// deliberate departure from the budget fail-open rule: an unrecorded
+	// session is voice nobody can bill and a cap nobody can enforce.
+	ErrRealtimeRegistryUnavailable = herr.Code("realtime_registry_unavailable")
 )

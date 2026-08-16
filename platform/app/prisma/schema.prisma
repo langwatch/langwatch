@@ -3922,3 +3922,74 @@ model IdempotencyReceipt {
   @@unique([scopeId, key])
   @@index([expiresAt])
 }
+
+// The status of a brokered realtime voice session (ADR-097).
+enum GatewayRealtimeSessionStatus {
+  // The credential was minted and the call may be running. Only OPEN rows
+  // count against the key's cap.
+  OPEN
+  // The vendor reported the call, or the client posted its usage.
+  CLOSED
+  // The mint never produced a credential, so no call exists.
+  FAILED
+  // The row outlived the longest call the vendor allows with no report.
+  // Its spend record settles as cost-unknown; a late report supersedes it.
+  EXPIRED
+}
+
+// One brokered realtime voice session.
+//
+// The gateway holds no session state: a voice session outlives the request
+// that minted it, its vendor report lands on whichever replica answers next,
+// and the per-key open-session cap has to be counted somewhere every replica
+// sees. This row is that place.
+//
+// `id` IS the gateway request id, so the session and its spend record are one
+// aggregate seen from two sides. Nothing here carries conversation content:
+// the media socket runs client to vendor and never reaches this platform.
+model GatewayRealtimeSession {
+  id             String @id
+  projectId      String
+  organizationId String
+  virtualKeyId   String
+
+  // The credential row the mint used. The vendor's webhook is verified
+  // against this row's own secret, which is what keeps the HMAC check a
+  // single computation instead of a walk over every configured provider.
+  modelProviderId String
+
+  // "openai" or "elevenlabs". Not an enum: a vendor added later must not
+  // need a migration on the hot path of a mint.
+  vendor  String
+  agentId String?
+
+  // The catalog id this session bills under.
+  model String
+
+  // The vendor's own id for the conversation. Unique per vendor so a
+  // redelivered post-call report resolves to exactly one session, and NULL
+  // until the mint reports one, since Postgres treats NULLs as distinct.
+  vendorConversationId String?
+
+  status GatewayRealtimeSessionStatus @default(OPEN)
+
+  mintedAt DateTime  @default(now())
+  closedAt DateTime?
+  // Why the session left OPEN, for the rows that did not close normally.
+  closeReason String?
+
+  // The vendor's own cost payload, kept verbatim for reconciliation only.
+  // Money is rated from the quantities like every other request; this is
+  // what the two are compared against when they disagree.
+  vendorCostRaw Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  // The cap count: open sessions for one key inside the window.
+  @@index([virtualKeyId, status, mintedAt])
+  // The webhook lookup: one vendor conversation inside one tenant.
+  @@unique([vendor, vendorConversationId])
+  // The fallback match, and the expiry sweep.
+  @@index([projectId, status, mintedAt])
+}

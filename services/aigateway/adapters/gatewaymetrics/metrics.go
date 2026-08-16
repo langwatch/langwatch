@@ -115,6 +115,9 @@ type Recorder struct {
 	controlPlane   *prometheus.CounterVec
 	rateLimits     *prometheus.CounterVec
 	clientRejects  *prometheus.CounterVec
+	realtimeMints  *prometheus.CounterVec
+	realtimeLimits *prometheus.CounterVec
+	realtimeErrors *prometheus.CounterVec
 
 	draining      gaugeSource
 	authCacheSize gaugeSource
@@ -205,6 +208,21 @@ func New() *Recorder {
 		Help: "Requests rejected by budget precheck, labeled by the scope whose limit was breached.",
 	}, []string{"scope"})
 
+	r.realtimeMints = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "gateway_realtime_mints_total",
+		Help: "Realtime voice session mints, by vendor and outcome (minted, session_limit, registry_unavailable, provider_error). One mint is one billable voice session.",
+	}, []string{"vendor", "outcome"})
+
+	r.realtimeLimits = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "gateway_realtime_session_limit_blocks_total",
+		Help: "Mints refused because the virtual key already held its maximum open voice sessions. A rising count on one key means its cap is too low for its traffic, or that sessions are not being closed.",
+	}, []string{"virtual_key_id"})
+
+	r.realtimeErrors = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "gateway_realtime_registry_errors_total",
+		Help: "Failed calls to the control plane's voice-session record, by operation (reserve, correlate, release, usage). A reserve failure refuses the mint; a correlate failure costs the session its exact join key to the vendor's report.",
+	}, []string{"operation"})
+
 	r.cacheHits = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "gateway_cache_hits_total",
 		Help: "Prompt-cache effectiveness by outcome: hit when the provider reported cache-read tokens, miss otherwise.",
@@ -272,6 +290,7 @@ func New() *Recorder {
 		r.budgetBlocks, r.cacheHits, r.cacheRuleHits,
 		r.guardrails, r.internalRTT, r.controlPlane, r.rateLimits,
 		r.clientRejects,
+		r.realtimeMints, r.realtimeLimits, r.realtimeErrors,
 	)
 	return r
 }
@@ -522,6 +541,31 @@ func (r *Recorder) RecordBudgetBlock(scope string) {
 		return
 	}
 	r.budgetBlocks.WithLabelValues(orUnknown(scope)).Inc()
+}
+
+// RecordRealtimeMint counts one voice session mint attempt.
+func (r *Recorder) RecordRealtimeMint(vendor, outcome string) {
+	if r == nil {
+		return
+	}
+	r.realtimeMints.WithLabelValues(orUnknown(vendor), orUnknown(outcome)).Inc()
+}
+
+// RecordRealtimeSessionLimitBlock counts a mint the per-key open-session cap
+// refused.
+func (r *Recorder) RecordRealtimeSessionLimitBlock(virtualKeyID string) {
+	if r == nil {
+		return
+	}
+	r.realtimeLimits.WithLabelValues(orUnknown(virtualKeyID)).Inc()
+}
+
+// RecordRealtimeRegistryError counts a failed call to the session record.
+func (r *Recorder) RecordRealtimeRegistryError(operation string) {
+	if r == nil {
+		return
+	}
+	r.realtimeErrors.WithLabelValues(orUnknown(operation)).Inc()
 }
 
 // RecordCacheOutcome counts prompt-cache effectiveness for one response.

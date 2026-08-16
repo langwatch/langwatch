@@ -34,16 +34,37 @@ type Request struct {
 	// with access to the HTTP request) so the rest of the pipeline works on
 	// materialized bytes like every other request type. Nil otherwise.
 	Transcription *TranscriptionUpload
+
+	// RealtimeSession carries the mint parameters for
+	// RequestTypeRealtimeSession. Nil otherwise.
+	RealtimeSession *RealtimeSessionRequest
+
+	// Surface is the route this request arrived on, stated by the handler
+	// registered there, when that route can only be served by named
+	// providers. Zero on the routes the gateway translates, which any
+	// provider can serve.
+	Surface Surface
 }
 
 // InboundSurface reports the route this request arrived on when that route
-// pins its own providers, and the zero Surface when it does not. Only the
-// raw-forward routes pin.
+// pins its own providers, and the zero Surface when it does not. The routes
+// that pin are the ones whose wire the gateway does not translate: the
+// raw-forward passthrough, and the realtime session mints.
 func (r *Request) InboundSurface() Surface {
-	if r == nil || r.Type != RequestTypePassthrough {
+	if r == nil {
 		return Surface{}
 	}
-	return r.Passthrough.Surface
+	return r.Surface
+}
+
+// ModelBodyPath is where the model id sits in this request's JSON body, in
+// sjson path syntax. The realtime mint nests it under the session object the
+// vendor reads; every other shape uses the top-level field.
+func (r *Request) ModelBodyPath() string {
+	if r != nil && r.Type == RequestTypeRealtimeSession {
+		return "session.model"
+	}
+	return "model"
 }
 
 // TranscriptionUpload is the normalized content of a /v1/audio/transcriptions
@@ -67,21 +88,16 @@ type PassthroughRequest struct {
 	RawQuery string            // Query string without leading "?"
 	Headers  map[string]string // Forwarded client headers (auth already stripped)
 	Stream   bool              // True when the path resolves to a streaming endpoint
-	// Surface is the route this request arrived on, stated by the handler
-	// registered there. A raw-forward route knows its vendor from its own
-	// registration; leaving it to be guessed from the model name is what
-	// sent Gemini-shaped bodies to other vendors.
-	Surface Surface
 }
 
-// Surface is an inbound route the gateway forwards verbatim, and the
+// Surface is an inbound route the gateway does not translate, and the
 // providers that can answer it. The body and the URL path reach the vendor
-// unchanged on such a route, so the route decides the vendor, not the model
-// name in it.
+// as the caller wrote them on such a route, so the route decides the vendor,
+// not the model name in it.
 //
-// Translated routes carry no Surface. Everything under /v1 is rewritten per
-// provider before it leaves, so any provider can serve those and the model
-// resolver picks.
+// Translated routes carry no Surface. Most of what is under /v1 is rewritten
+// per provider before it leaves, so any provider can serve those and the
+// model resolver picks.
 type Surface struct {
 	// Name is the route as the caller wrote it, for use in a refusal.
 	Name string
@@ -123,6 +139,10 @@ const (
 	// RequestTypeTranscription is POST /v1/audio/transcriptions
 	// (OpenAI-wire multipart STT).
 	RequestTypeTranscription RequestType = "transcription"
+	// RequestTypeRealtimeSession mints a vendor session credential for a
+	// realtime voice socket the gateway does not carry (ADR-097). Its spend
+	// record is admitted here and closed later, by the vendor's own report.
+	RequestTypeRealtimeSession RequestType = "realtime_session"
 )
 
 // RequestMetadata holds extracted fields for policy evaluation (guardrails, blocked patterns).
