@@ -107,7 +107,6 @@ export const MainMenuSections = function MainMenuSections({
   );
 };
 
-/** The props every project section needs to render its links. */
 interface ProjectSectionProps {
   showExpanded: boolean;
   project: ReturnType<typeof useOrganizationTeamProject>["project"];

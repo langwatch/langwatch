@@ -71,3 +71,10 @@ Feature: Product switcher navigation
     Given a page that collapses the sidebar in the current chrome
     When it renders in the product-switcher mode
     Then the sidebar stays expanded
+
+  @unit
+  Scenario: A project whose slug reads like a product keeps the project shell
+    Given a project whose slug starts with the name of a top-level product
+    When I open one of its pages
+    Then the page renders as a project page in the LLM Ops product
+    And it does not render as the personal or the settings surface

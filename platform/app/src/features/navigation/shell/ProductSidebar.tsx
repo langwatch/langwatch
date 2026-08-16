@@ -19,7 +19,7 @@ import { useRouter } from "~/utils/compat/next-router";
 import { featureIcons } from "~/utils/featureIcons";
 import { readLastVisitedProduct } from "../logic/productMemory";
 import { resolveSettingsBackTarget } from "../logic/resolveSettingsBackTarget";
-import type { ProductId } from "../products";
+import { isPathUnder, type ProductId } from "../products";
 import {
   gatewayNavItems,
   governanceNavItems,
@@ -84,7 +84,7 @@ function SidebarBottomBlock({
           icon={featureIcons.settings.icon}
           label="Settings"
           href="/settings"
-          isActive={router.pathname.startsWith("/settings")}
+          isActive={isPathUnder(router.pathname, "/settings")}
           showLabel={showExpanded}
         />
       )}

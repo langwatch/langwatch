@@ -13,8 +13,8 @@ import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { findCurrentRoute } from "~/utils/routes";
+import { resolveShellRoute, type ShellRoute } from "../logic/resolveShellRoute";
 import type { ProductId } from "../products";
-import { productFromPathname } from "../products";
 
 type OrganizationTeamProject = ReturnType<typeof useOrganizationTeamProject>;
 type AppSession = ReturnType<typeof useRequiredSession>["data"];
@@ -206,49 +206,4 @@ function isShellDataPending({
   if (route.isPersonalScopeRoute || route.isOrgScopeRoute) return false;
   if (organization?.primaryIntent) return false;
   return !team || !project;
-}
-
-interface ShellRoute {
-  isSettingsRoute: boolean;
-  isPersonalScopeRoute: boolean;
-  isOrgScopeRoute: boolean;
-  activeProductId: ProductId | null;
-}
-
-/**
- * Which product the address belongs to, and which scope its top bar
- * carries. Settings is not a product: no active product, a static title
- * in the top bar, and the settings sidebar surface.
- */
-function resolveShellRoute({
-  pathname,
-  isPersonalScope,
-  isOrgScope,
-  isOnOwnPersonalProject,
-}: {
-  pathname: string;
-  isPersonalScope: boolean;
-  isOrgScope: boolean;
-  isOnOwnPersonalProject: boolean;
-}): ShellRoute {
-  const isSettingsRoute = pathname.startsWith("/settings");
-  const isPersonalScopeRoute =
-    !isSettingsRoute &&
-    (isPersonalScope || pathname.startsWith("/me") || isOnOwnPersonalProject);
-  const activeProductId = isSettingsRoute
-    ? null
-    : ((isPersonalScopeRoute ? "me" : productFromPathname(pathname)) ??
-      "llm-ops");
-  const isOrgScopeRoute =
-    isOrgScope ||
-    isSettingsRoute ||
-    activeProductId === "gateway" ||
-    activeProductId === "governance";
-
-  return {
-    isSettingsRoute,
-    isPersonalScopeRoute,
-    isOrgScopeRoute,
-    activeProductId,
-  };
 }

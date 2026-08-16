@@ -96,19 +96,25 @@ export function productById(id: ProductId): ProductDefinition {
 }
 
 /**
+ * Whether an address is a top-level base or sits under it, matched on the
+ * segment boundary. A plain `startsWith` would read a project named
+ * "metadata" as the Me product and "settings-team" as Settings, because a
+ * project slug is a top-level address and those names are not reserved.
+ */
+export function isPathUnder(pathname: string, base: string): boolean {
+  return pathname === base || pathname.startsWith(`${base}/`);
+}
+
+/**
  * Which product a browser address belongs to, or null for everything that
  * is not a product page (settings, ops, auth, onboarding, the root).
  * Landing memory writes through this, so a null keeps the previous
  * product remembered; visiting Settings never becomes "where I was".
  */
 export function productFromPathname(pathname: string): ProductId | null {
-  if (pathname === "/me" || pathname.startsWith("/me/")) return "me";
-  if (pathname === "/gateway" || pathname.startsWith("/gateway/")) {
-    return "gateway";
-  }
-  if (pathname === "/governance" || pathname.startsWith("/governance/")) {
-    return "governance";
-  }
+  if (isPathUnder(pathname, "/me")) return "me";
+  if (isPathUnder(pathname, "/gateway")) return "gateway";
+  if (isPathUnder(pathname, "/governance")) return "governance";
   const nonProductPrefixes = [
     "/settings",
     "/ops",
@@ -125,9 +131,7 @@ export function productFromPathname(pathname: string): ProductId | null {
   ];
   if (
     pathname === "/" ||
-    nonProductPrefixes.some(
-      (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
-    )
+    nonProductPrefixes.some((prefix) => isPathUnder(pathname, prefix))
   ) {
     return null;
   }
