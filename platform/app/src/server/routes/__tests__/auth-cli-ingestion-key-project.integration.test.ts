@@ -393,40 +393,44 @@ describe("POST /api/auth/cli/governance/ingestion-key with a named project", () 
   });
 
   describe("given the caller left the organization after the token was issued", () => {
-    it("refuses to mint on a pre-removal token", async () => {
-      await prisma.organizationUser.create({
-        data: { organizationId: ORG_ID, userId: LEAVER_ID, role: "MEMBER" },
-      });
-      await prisma.organizationUser.delete({
-        where: {
-          userId_organizationId: {
-            userId: LEAVER_ID,
-            organizationId: ORG_ID,
+    describe("when they present the token they still hold", () => {
+      it("refuses to mint on a pre-removal token", async () => {
+        await prisma.organizationUser.create({
+          data: { organizationId: ORG_ID, userId: LEAVER_ID, role: "MEMBER" },
+        });
+        await prisma.organizationUser.delete({
+          where: {
+            userId_organizationId: {
+              userId: LEAVER_ID,
+              organizationId: ORG_ID,
+            },
           },
-        },
-      });
-      const before = await liveIngestKeyCount(PROJECT_ID);
+        });
+        const before = await liveIngestKeyCount(PROJECT_ID);
 
-      const { status, json } = await mintIngestionKey(LEAVER_TOKEN, {
-        source_type: "claude_code",
-        project: PROJECT_ID,
-      });
+        const { status, json } = await mintIngestionKey(LEAVER_TOKEN, {
+          source_type: "claude_code",
+          project: PROJECT_ID,
+        });
 
-      expect(status).toBe(403);
-      expect(json.token).toBeUndefined();
-      expect(await liveIngestKeyCount(PROJECT_ID)).toBe(before);
+        expect(status).toBe(403);
+        expect(json.token).toBeUndefined();
+        expect(await liveIngestKeyCount(PROJECT_ID)).toBe(before);
+      });
     });
   });
 
   describe("given a source type that names an inherited object property", () => {
-    it("treats it as ungoverned rather than failing the request", async () => {
-      const { status, json } = await mintIngestionKey(ADMIN_TOKEN, {
-        source_type: "toString",
-        project: PROJECT_ID,
-      });
+    describe("when the mint reads it against the policy table", () => {
+      it("treats it as ungoverned rather than failing the request", async () => {
+        const { status, json } = await mintIngestionKey(ADMIN_TOKEN, {
+          source_type: "toString",
+          project: PROJECT_ID,
+        });
 
-      expect(status).toBe(201);
-      expect(json.token).toEqual(expect.stringMatching(/^ik-lw-/));
+        expect(status).toBe(201);
+        expect(json.token).toEqual(expect.stringMatching(/^ik-lw-/));
+      });
     });
   });
 

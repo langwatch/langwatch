@@ -152,7 +152,15 @@ export function installTelemetryWiring({
 		// reporting a wired tool here would be reporting a tool that sends
 		// nothing.
 		try {
-			setOpencodeOpenTelemetryFlag();
+			const flag = setOpencodeOpenTelemetryFlag();
+			if (flag.action === "disabled-by-user") {
+				// The writer leaves an explicit `false` alone rather than
+				// overruling the user, and returns instead of throwing, so the
+				// result has to be read for the tool to be reported honestly.
+				requiredFailures.push(
+					`opencode's config sets experimental.openTelemetry to false, so it emits no spans. Remove that line from ${tildify(flag.path)} and run this again.`,
+				);
+			}
 		} catch (err) {
 			requiredFailures.push(
 				`could not enable opencode's OpenTelemetry flag: ${(err as Error).message}`,
