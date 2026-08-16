@@ -109,6 +109,17 @@ Feature: Automation dispatch on the process-manager substrate
     Then the page is retried for the failed trace
     And the dispatched trace can run again instead of being lost
 
+  # A retryable failure is rethrown into the outbox, and the outbox redacts an
+  # error message before it logs the attempt. The page's own retry line was the
+  # only place the cause could still be named, and it carried a count alone, so
+  # a page that retried to its attempt ceiling told an operator "one trace
+  # failed" and nothing about why.
+  @unit
+  Scenario: A retrying page names the failure that caused the retry
+    Given a page where one trace fails with a retryable error
+    When the page decides to retry
+    Then the retry record names the failing error type and message
+
   @unit
   Scenario: A daily-ceiling breach is reported once per page
     Given a page whose traces exceed the automation's daily ceiling
