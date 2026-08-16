@@ -1,0 +1,114 @@
+import { Box, Button, HStack, Portal, Text, VStack } from "@chakra-ui/react";
+import { Check, ChevronsUpDown } from "lucide-react";
+import { Menu } from "~/components/ui/menu";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useRouter } from "~/utils/compat/next-router";
+import { trackEvent } from "~/utils/tracking";
+import {
+  PRODUCTS,
+  type ProductDefinition,
+  type ProductId,
+  productById,
+} from "../products";
+import { useReachableProducts } from "../useReachableProducts";
+
+/**
+ * The product dropdown in the product-switcher top bar. Lists only the
+ * products the user can reach, each with its pitch line so a first-time
+ * visitor learns what it does, and marks the product the page belongs
+ * to. Picking one opens that product's home.
+ *
+ * Spec: specs/navigation/product-switcher-navigation.feature
+ */
+export function ProductSwitcherMenu({
+  activeProductId,
+}: {
+  activeProductId: ProductId;
+}) {
+  const router = useRouter();
+  const { reachableProducts } = useReachableProducts();
+  const { project } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+    redirectToProjectOnboarding: false,
+  });
+  const projectSlug = project && !project.isPersonal ? project.slug : null;
+
+  const active = productById(activeProductId);
+  const ActiveIcon = active.icon;
+  const options = PRODUCTS.filter(
+    (product) =>
+      product.id === activeProductId || reachableProducts.includes(product.id),
+  );
+
+  const openProduct = (product: ProductDefinition) => {
+    if (product.id === activeProductId) return;
+    const home = product.homeHref({ projectSlug });
+    if (!home) return;
+    trackEvent("navigation_product_switch", { product: product.id });
+    void router.push(home);
+  };
+
+  return (
+    <Menu.Root>
+      <Menu.Trigger asChild>
+        <Button
+          variant="ghost"
+          aria-label="Switch product"
+          fontSize="13px"
+          fontWeight="medium"
+          paddingX={2}
+          height="32px"
+          color="fg"
+          gap={2}
+          _hover={{ backgroundColor: "bg.muted" }}
+        >
+          <ActiveIcon size={14} />
+          <Text>{active.label}</Text>
+          <ChevronsUpDown size={13} color="var(--chakra-colors-fg-muted)" />
+        </Button>
+      </Menu.Trigger>
+      <Portal>
+        <Menu.Content minWidth="280px" padding={1.5}>
+          {options.map((product) => {
+            const Icon = product.icon;
+            const home = product.homeHref({ projectSlug });
+            const isActive = product.id === activeProductId;
+            return (
+              <Menu.Item
+                key={product.id}
+                value={product.id}
+                disabled={!isActive && !home}
+                onClick={() => openProduct(product)}
+                paddingY={2}
+                borderRadius="lg"
+                marginBottom="1px"
+              >
+                <VStack align="start" gap={0.5} width="full">
+                  <HStack gap={2} width="full">
+                    <Icon size={13} color="var(--chakra-colors-fg-muted)" />
+                    <Text fontSize="13px" fontWeight="medium">
+                      {product.label}
+                    </Text>
+                    {isActive && (
+                      <Box marginLeft="auto" display="flex">
+                        <Check size={13} aria-label="Current product" />
+                      </Box>
+                    )}
+                  </HStack>
+                  <Text
+                    fontSize="11px"
+                    lineHeight="short"
+                    color="fg.muted"
+                    paddingLeft="21px"
+                  >
+                    {product.pitch}
+                  </Text>
+                </VStack>
+              </Menu.Item>
+            );
+          })}
+        </Menu.Content>
+      </Portal>
+    </Menu.Root>
+  );
+}

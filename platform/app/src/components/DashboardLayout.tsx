@@ -28,6 +28,8 @@ import Head from "~/utils/compat/next-head";
 import { useRouter } from "~/utils/compat/next-router";
 import { ImpersonationBanner } from "../../ee/admin/ImpersonationBanner";
 import { CommandBarTrigger } from "../features/command-bar";
+import { productFromPathname } from "../features/navigation/products";
+import { ProductSwitcherShell } from "../features/navigation/shell/ProductSwitcherShell";
 import { useNavigationMode } from "../features/navigation/useNavigationMode";
 import { useDrawer } from "../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
@@ -395,10 +397,19 @@ export const DashboardLayout = (dashboardProps: DashboardLayoutProps) => {
 
 const ModeResolvedDashboardLayout = (dashboardProps: DashboardLayoutProps) => {
   const resolution = useNavigationMode();
+  const router = useRouter();
   if (resolution.status === "loading") return <LoadingScreen />;
-  // The v2 shells land in a follow-up step of the navigation-v2 work;
-  // until they mount here, every resolved mode renders the legacy chrome.
-  return <LegacyDashboardLayout {...dashboardProps} />;
+  if (resolution.mode === "legacy") {
+    return <LegacyDashboardLayout {...dashboardProps} />;
+  }
+  // Settings and internal ops pages keep the current chrome until their
+  // own v2 shells land; the product shells cover the product routes.
+  if (productFromPathname(router.pathname) === null) {
+    return <LegacyDashboardLayout {...dashboardProps} />;
+  }
+  // The icon-rail shell lands in a follow-up step of the navigation-v2
+  // work; until it mounts here, that mode renders the switcher shell.
+  return <ProductSwitcherShell {...dashboardProps} />;
 };
 
 export const LegacyDashboardLayout = ({

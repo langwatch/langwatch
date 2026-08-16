@@ -35,25 +35,30 @@ import { ThemeToggle } from "./sidebar/ThemeToggle";
  * Spec: specs/ai-gateway/governance/persona-aware-chrome.feature
  *       — Persona 1 / Persona 2 (personal scope)
  */
-export const PersonalSidebar = React.memo(function PersonalSidebar({
-  isCompact = false,
+/**
+ * The personal navigation links, extracted so the navigation-v2 Me
+ * sidebar renders the same list as the legacy chrome and the two cannot
+ * drift. The v2 sidebar drops the Govern group because the product
+ * switcher replaces it.
+ *
+ * Spec: specs/navigation/product-sidebars.feature
+ */
+export const PersonalSidebarLinks = function PersonalSidebarLinks({
+  showExpanded,
+  includeGovernSection = true,
 }: {
-  isCompact?: boolean;
+  showExpanded: boolean;
+  includeGovernSection?: boolean;
 }) {
   const router = useRouter();
-  const [isHovered, setIsHovered] = useState(false);
-
-  const showExpanded = !isCompact || isHovered;
-  const currentWidth = showExpanded ? MENU_WIDTH_EXPANDED : MENU_WIDTH_COMPACT;
 
   const isUsageActive = router.pathname === "/me";
   const isConfigureActive = router.pathname.startsWith("/me/configure");
   const isSessionsActive = router.pathname.startsWith("/me/sessions");
   const isPullRequestsActive = router.pathname.startsWith("/me/pull-requests");
-  const isOrgSettingsActive = router.pathname.startsWith("/settings");
 
   const session = useRequiredSession();
-  const { organizations, hasPermission } = useOrganizationTeamProject({
+  const { organizations } = useOrganizationTeamProject({
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
@@ -93,6 +98,103 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
   const features = featuresQuery.data;
 
   return (
+    <>
+      <SideMenuLink
+        icon={Gauge}
+        label="My Usage"
+        href="/me"
+        isActive={isUsageActive}
+        showLabel={showExpanded}
+      />
+      {tracesHref && (
+        <SideMenuLink
+          icon={ListTree}
+          label="Traces"
+          href={tracesHref}
+          isActive={isTracesActive}
+          showLabel={showExpanded}
+        />
+      )}
+      <SideMenuLink
+        icon={SquareTerminal}
+        label="Sessions"
+        href="/me/sessions"
+        isActive={isSessionsActive}
+        showLabel={showExpanded}
+      />
+      <SideMenuLink
+        icon={GitPullRequest}
+        label="Pull Requests"
+        href="/me/pull-requests"
+        isActive={isPullRequestsActive}
+        showLabel={showExpanded}
+      />
+      {personalProjectSlug && features?.evaluations && (
+        <SideMenuLink
+          icon={ClipboardList}
+          label="Online Evals"
+          href={`/${personalProjectSlug}/online-evaluations`}
+          isActive={isOnlineEvaluationsActive}
+          showLabel={showExpanded}
+        />
+      )}
+      {personalProjectSlug && features?.datasets && (
+        <SideMenuLink
+          icon={Database}
+          label="Datasets"
+          href={`/${personalProjectSlug}/datasets`}
+          isActive={isDatasetsActive}
+          showLabel={showExpanded}
+        />
+      )}
+      {personalProjectSlug && features?.annotations && (
+        <SideMenuLink
+          icon={Sparkles}
+          label="Annotations"
+          href={`/${personalProjectSlug}/annotations`}
+          isActive={isAnnotationsActive}
+          showLabel={showExpanded}
+        />
+      )}
+      {personalProjectSlug && features?.automations && (
+        <SideMenuLink
+          icon={Bot}
+          label="Automations"
+          href={`/${personalProjectSlug}/automations`}
+          isActive={isAutomationsActive}
+          showLabel={showExpanded}
+        />
+      )}
+      <SideMenuLink
+        icon={Sliders}
+        label="Configure"
+        href="/me/configure"
+        isActive={isConfigureActive}
+        showLabel={showExpanded}
+      />
+      {includeGovernSection && <GovernSection showExpanded={showExpanded} />}
+    </>
+  );
+};
+
+export const PersonalSidebar = React.memo(function PersonalSidebar({
+  isCompact = false,
+}: {
+  isCompact?: boolean;
+}) {
+  const router = useRouter();
+  const [isHovered, setIsHovered] = useState(false);
+
+  const showExpanded = !isCompact || isHovered;
+  const currentWidth = showExpanded ? MENU_WIDTH_EXPANDED : MENU_WIDTH_COMPACT;
+
+  const isOrgSettingsActive = router.pathname.startsWith("/settings");
+  const { hasPermission } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+    redirectToProjectOnboarding: false,
+  });
+
+  return (
     <Box
       background="bg.page"
       width={isCompact ? MENU_WIDTH_COMPACT : MENU_WIDTH_EXPANDED}
@@ -124,80 +226,7 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
           justifyContent="space-between"
         >
           <VStack width="full" gap={0.5} align="start">
-            <SideMenuLink
-              icon={Gauge}
-              label="My Usage"
-              href="/me"
-              isActive={isUsageActive}
-              showLabel={showExpanded}
-            />
-            {tracesHref && (
-              <SideMenuLink
-                icon={ListTree}
-                label="Traces"
-                href={tracesHref}
-                isActive={isTracesActive}
-                showLabel={showExpanded}
-              />
-            )}
-            <SideMenuLink
-              icon={SquareTerminal}
-              label="Sessions"
-              href="/me/sessions"
-              isActive={isSessionsActive}
-              showLabel={showExpanded}
-            />
-            <SideMenuLink
-              icon={GitPullRequest}
-              label="Pull Requests"
-              href="/me/pull-requests"
-              isActive={isPullRequestsActive}
-              showLabel={showExpanded}
-            />
-            {personalProjectSlug && features?.evaluations && (
-              <SideMenuLink
-                icon={ClipboardList}
-                label="Online Evals"
-                href={`/${personalProjectSlug}/online-evaluations`}
-                isActive={isOnlineEvaluationsActive}
-                showLabel={showExpanded}
-              />
-            )}
-            {personalProjectSlug && features?.datasets && (
-              <SideMenuLink
-                icon={Database}
-                label="Datasets"
-                href={`/${personalProjectSlug}/datasets`}
-                isActive={isDatasetsActive}
-                showLabel={showExpanded}
-              />
-            )}
-            {personalProjectSlug && features?.annotations && (
-              <SideMenuLink
-                icon={Sparkles}
-                label="Annotations"
-                href={`/${personalProjectSlug}/annotations`}
-                isActive={isAnnotationsActive}
-                showLabel={showExpanded}
-              />
-            )}
-            {personalProjectSlug && features?.automations && (
-              <SideMenuLink
-                icon={Bot}
-                label="Automations"
-                href={`/${personalProjectSlug}/automations`}
-                isActive={isAutomationsActive}
-                showLabel={showExpanded}
-              />
-            )}
-            <SideMenuLink
-              icon={Sliders}
-              label="Configure"
-              href="/me/configure"
-              isActive={isConfigureActive}
-              showLabel={showExpanded}
-            />
-            <GovernSection showExpanded={showExpanded} />
+            <PersonalSidebarLinks showExpanded={showExpanded} />
           </VStack>
 
           <VStack width="full" gap={0.5} align="start">

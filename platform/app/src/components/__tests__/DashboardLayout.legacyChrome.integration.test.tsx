@@ -66,18 +66,22 @@ vi.mock("~/hooks/useLiteMemberGuard", () => ({
   useLiteMemberGuard: () => ({ isLiteMember: false }),
 }));
 
-vi.mock("~/hooks/useFeatureFlag", () => ({
-  useFeatureFlag: (flag: string) => ({
-    enabled:
-      flag === "release_ui_navigation_v2_enabled"
-        ? mockNavigationV2FlagEnabled
-        : true,
-    isLoading:
-      flag === "release_ui_navigation_v2_enabled"
-        ? mockNavigationV2FlagLoading
-        : false,
-  }),
-}));
+vi.mock("~/hooks/useFeatureFlag", async () => {
+  const actual = await vi.importActual<object>("~/hooks/useFeatureFlag");
+  return {
+    ...actual,
+    useFeatureFlag: (flag: string) => ({
+      enabled:
+        flag === "release_ui_navigation_v2_enabled"
+          ? mockNavigationV2FlagEnabled
+          : true,
+      isLoading:
+        flag === "release_ui_navigation_v2_enabled"
+          ? mockNavigationV2FlagLoading
+          : false,
+    }),
+  };
+});
 
 const trackEventMock = vi.fn();
 vi.mock("~/utils/tracking", () => ({
@@ -136,17 +140,24 @@ vi.mock("~/utils/api", () => ({
         useMutation: () => ({ mutate: vi.fn(), isPending: false }),
       },
     },
+    featureFlag: {
+      isEnabledForEachOrganization: {
+        useQuery: () => ({ data: undefined }),
+      },
+    },
   },
 }));
 
 vi.mock("../MainMenu", () => ({
   MainMenu: () => <nav data-testid="main-menu" />,
+  MainMenuSections: () => null,
   MENU_WIDTH_COMPACT: "49px",
   MENU_WIDTH_EXPANDED: "190px",
 }));
 
 vi.mock("../PersonalSidebar", () => ({
   PersonalSidebar: () => <nav data-testid="personal-sidebar" />,
+  PersonalSidebarLinks: () => null,
 }));
 
 vi.mock("../WorkspaceSwitcher", () => ({
@@ -154,11 +165,21 @@ vi.mock("../WorkspaceSwitcher", () => ({
 }));
 
 vi.mock("../useWorkspaceData", () => ({
-  useWorkspaceData: () => ({ organizations: [], currentOrganization: null }),
+  useWorkspaceData: () => ({
+    personals: [],
+    teams: [],
+    projects: [],
+    onCreateProjectForTeam: vi.fn(),
+  }),
+}));
+
+vi.mock("~/utils/crispBubblePolicy", () => ({
+  toggleSupportChat: vi.fn(),
 }));
 
 vi.mock("../../features/command-bar", () => ({
   CommandBarTrigger: () => null,
+  useCommandBar: () => ({ open: vi.fn() }),
 }));
 
 vi.mock("../../features/traces-v2/components/GlobalTraceV2DrawerMount", () => ({
