@@ -3217,7 +3217,7 @@ packages:
         optional: true
 
   '@langwatch/scenario@file:platform/app/vendor/langwatch-scenario-1.1.1.tgz':
-    resolution: {integrity: sha512-tkUn7XyYV8Xi95xOfa1dq/hUoYn2+5YCXd2BZWvwwUuFAsTXMZZxwv2Fm0e2wvUzyyIo5kgW6uPt2igIjD9eAg==, tarball: file:platform/app/vendor/langwatch-scenario-1.1.1.tgz}
+    resolution: {integrity: sha512-fdzW66eUpj9eWnlNs0e1dPO4olHy4l4oohlDlWgI4GPsGZoRfpUl8uQuhOu6q1AbdSZY2z1NyHP1glGu2lhsGQ==, tarball: file:platform/app/vendor/langwatch-scenario-1.1.1.tgz}
     version: 1.1.1
     engines: {node: '>=20', pnpm: '>=8'}
     peerDependencies:
