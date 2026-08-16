@@ -2879,11 +2879,17 @@ ElevenLabs reports cost and duration after the call, not over the socket. The
 gateway reads that report in two ways, and either one is enough:
 
 1. **The post-call webhook.** Point your workspace webhook at
-   `https://<your-langwatch-host>/api/elevenlabs/webhook/<model-provider-id>`
+   `$LANGWATCH_GATEWAY_URL/v1/convai/webhook/<model-provider-id>`
    and store the webhook secret on the ElevenLabs provider in Settings ->
    Model Providers, under `ELEVENLABS_WEBHOOK_SECRET`. The model provider id
    is the row id shown on that provider. Deliveries are verified against that
    secret; a provider with no secret stored answers 404.
+
+   The URL is on the gateway, the same host as the two mints and the usage
+   report. The gateway is built to be public, so a delivery reaches it in any
+   topology where voice already works. Verification stays on the LangWatch
+   app, which holds the secret; the gateway passes the raw bytes through
+   untouched, because the signature covers them.
 2. **The reconciler.** If no webhook arrives, LangWatch reads the conversation
    back from ElevenLabs by its own id, a couple of minutes after the mint. The
    webhook is faster; it is not required.

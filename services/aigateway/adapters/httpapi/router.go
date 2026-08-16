@@ -25,6 +25,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/health"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/pkg/httpmiddleware"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/controlplane"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaymetrics"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaytracer"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/ottlserver"
@@ -80,6 +81,20 @@ type RouterDeps struct {
 	// reusing an already-bound port (specs/setup/
 	// aigateway-control-plane-target.feature).
 	ControlPlaneBaseURL string
+	// WebhookRelay forwards a vendor post-call delivery to the control
+	// plane, which owns the per-tenant secret that verifies it. Optional;
+	// when nil the webhook route is not mounted and a customer bills voice
+	// through the reconciler alone.
+	WebhookRelay WebhookRelay
+}
+
+// WebhookRelay hands one vendor delivery to the control plane byte for byte.
+// The gateway never verifies or parses a delivery: the secret is per tenant
+// and lives in the control plane's database.
+type WebhookRelay interface {
+	ForwardElevenLabsWebhook(
+		ctx context.Context, relay controlplane.WebhookRelay,
+	) (controlplane.WebhookRelayResult, error)
 }
 
 // NewRouter creates the chi router with all gateway routes mounted.
@@ -139,26 +154,44 @@ func NewRouter(deps RouterDeps) http.Handler {
 	r.Get("/debug/control-plane", debugControlPlaneHandler(deps.ControlPlaneBaseURL))
 
 	r.Route("/v1", func(v1 chi.Router) {
-		v1.Use(AuthMiddleware(deps.App.Auth()))
-		v1.Use(DispatchMetaMiddleware())
-		v1.Use(CustomerTraceMiddleware())
-		v1.Use(TraceRegistryMiddleware(deps.TraceRegistry, deps.DefaultExportEndpoint))
-		v1.Post("/chat/completions", chatHandler(deps))
-		v1.Post("/messages", messagesHandler(deps))
-		v1.Post("/responses", responsesHandler(deps))
-		v1.Post("/embeddings", embeddingsHandler(deps))
-		v1.Post("/audio/speech", speechHandler(deps))
-		v1.Post("/audio/transcriptions", transcriptionsHandler(deps))
-		v1.Get("/models", modelsHandler(deps))
-		// Realtime voice session mints (ADR-097). Both paths mirror the
-		// vendor's own, so a vendor SDK pointed at the gateway base URL
-		// mints through us with no code change. The media socket the
-		// credential opens goes client to vendor and never comes here.
-		v1.Post("/realtime/client_secrets", openAIRealtimeSessionHandler(deps))
-		v1.Get("/convai/conversation/get-signed-url", elevenLabsSignedURLHandler(deps))
-		// The OpenAI socket reports its usage to the client, not to us, so
-		// the client posts it back to close the session's spend record.
-		v1.Post("/realtime/sessions/{session_id}/usage", realtimeUsageHandler(deps))
+		// The ElevenLabs post-call webhook, and the one route under /v1 that
+		// carries no virtual key. The caller is ElevenLabs, which has no key
+		// and never will; the delivery authenticates itself with the HMAC the
+		// control plane checks against the tenant's stored secret.
+		//
+		// Under /v1 rather than a path of its own so that a self-hosted
+		// install that already publishes the gateway gets voice billing with
+		// no ingress change: the chart allowlists /v1 as a prefix. It is on
+		// the gateway rather than the control plane because a webhook has to
+		// be reachable from the vendor's network, the gateway is public by
+		// design, and the control plane is the admin surface that self-hosted
+		// customers keep behind a VPN.
+		if deps.WebhookRelay != nil {
+			v1.Post("/convai/webhook/{model_provider_id}", elevenLabsWebhookHandler(deps))
+		}
+
+		v1.Group(func(v1 chi.Router) {
+			v1.Use(AuthMiddleware(deps.App.Auth()))
+			v1.Use(DispatchMetaMiddleware())
+			v1.Use(CustomerTraceMiddleware())
+			v1.Use(TraceRegistryMiddleware(deps.TraceRegistry, deps.DefaultExportEndpoint))
+			v1.Post("/chat/completions", chatHandler(deps))
+			v1.Post("/messages", messagesHandler(deps))
+			v1.Post("/responses", responsesHandler(deps))
+			v1.Post("/embeddings", embeddingsHandler(deps))
+			v1.Post("/audio/speech", speechHandler(deps))
+			v1.Post("/audio/transcriptions", transcriptionsHandler(deps))
+			v1.Get("/models", modelsHandler(deps))
+			// Realtime voice session mints (ADR-097). Both paths mirror the
+			// vendor's own, so a vendor SDK pointed at the gateway base URL
+			// mints through us with no code change. The media socket the
+			// credential opens goes client to vendor and never comes here.
+			v1.Post("/realtime/client_secrets", openAIRealtimeSessionHandler(deps))
+			v1.Get("/convai/conversation/get-signed-url", elevenLabsSignedURLHandler(deps))
+			// The OpenAI socket reports its usage to the client, not to us, so
+			// the client posts it back to close the session's spend record.
+			v1.Post("/realtime/sessions/{session_id}/usage", realtimeUsageHandler(deps))
+		})
 	})
 
 	// Gemini-native surface. gemini-cli (GOOGLE_GEMINI_BASE_URL) and the
@@ -612,6 +645,60 @@ func realtimeUsageHandler(deps RouterDeps) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusAccepted)
 		_, _ = w.Write([]byte(`{"received":true}`))
+	}
+}
+
+// elevenLabsWebhookHandler terminates
+// POST /v1/convai/webhook/{model_provider_id}, the URL a customer pastes into
+// their own ElevenLabs dashboard (ADR-097).
+//
+// It relays and nothing else. The body is streamed to the control plane
+// exactly as received, because the vendor's HMAC covers those raw bytes and
+// any re-encoding here would fail every delivery. The gateway does not parse
+// the body, does not hold the tenant's secret, and does not decide whether the
+// delivery is genuine.
+//
+// A failure to reach the control plane answers 502, which is deliberate even
+// though the vendor may not retry. Acknowledging a delivery this gateway never
+// passed on would tell the vendor the report landed when it did not, and the
+// count of consecutive failures is what eventually disables the webhook, so
+// hiding them removes the only signal that the relay is broken. Nothing is
+// lost by the honest answer: the reconciler reads the same numbers back from
+// the vendor on its own schedule and bills the call regardless.
+func elevenLabsWebhookHandler(deps RouterDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		result, err := deps.WebhookRelay.ForwardElevenLabsWebhook(
+			r.Context(),
+			controlplane.WebhookRelay{
+				ModelProviderID: chi.URLParam(r, "model_provider_id"),
+				Signature:       r.Header.Get("ElevenLabs-Signature"),
+				ContentType:     r.Header.Get("Content-Type"),
+				Body:            r.Body,
+			},
+		)
+		if err != nil {
+			// An oversized delivery is the caller's shape, not our outage,
+			// and relaying a truncated one would fail its own HMAC and read
+			// as a forgery. 413 says which it is.
+			if errors.Is(err, controlplane.ErrWebhookTooLarge) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusRequestEntityTooLarge)
+				_, _ = w.Write([]byte(`{"error":"the delivery is too large to relay"}`))
+				return
+			}
+			deps.Logger.Warn("an ElevenLabs post-call delivery could not be relayed to the control plane",
+				zap.Error(err))
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadGateway)
+			_, _ = w.Write([]byte(`{"error":"the delivery could not be relayed"}`))
+			return
+		}
+		// The control plane's own status, unchanged: 404 keeps provider ids
+		// unprobeable, 401 is a real signature failure, and 200 is an
+		// acknowledgement it issued rather than one this hop invented.
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(result.StatusCode)
+		_, _ = w.Write(result.Body)
 	}
 }
 

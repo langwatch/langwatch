@@ -4,6 +4,17 @@
  * Surface:
  *   POST /api/elevenlabs/webhook/:modelProviderId
  *
+ * Customers do not paste this URL anywhere. The documented one is on the
+ * gateway, `POST /v1/convai/webhook/{model_provider_id}`, which relays the
+ * raw bytes here and returns whatever this answers. A webhook has to be
+ * reachable from the vendor's network, the gateway is public by design, and
+ * this app is the admin surface that a self-hosted customer often keeps
+ * behind a VPN. Verification stays here because the per-tenant secret is in
+ * this database.
+ *
+ * The route stays mounted and unchanged. It is the relay's target, and a
+ * deployment that already points ElevenLabs at it keeps working.
+ *
  * A brokered ElevenLabs conversation reports nothing over its socket. Cost
  * and duration arrive afterwards, on this webhook, and it is the only path by
  * which a voice call reaches billing (ADR-097).

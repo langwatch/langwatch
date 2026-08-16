@@ -205,6 +205,53 @@ Feature: Brokered realtime voice sessions on the AI Gateway
       # that cannot exist.
 
   # ============================================================
+  Rule: The vendor's webhook is received on the gateway and verified on the control plane
+
+    # The URL a customer pastes into their own ElevenLabs dashboard is on the
+    # gateway, so every customer-facing voice URL is on one host. The gateway
+    # is public by design; the control plane is the admin surface, which a
+    # self-hosted customer often keeps behind a VPN, and a webhook has to be
+    # reachable from the vendor's network.
+
+    @unit
+    Scenario: The gateway relays a post-call delivery byte for byte
+      Given a signed delivery arrives at the gateway webhook URL
+      When the gateway forwards it to the control plane
+      Then the raw body and the ElevenLabs-Signature header arrive unchanged
+      # The HMAC covers the raw bytes, so any re-encoding on this hop would
+      # fail every delivery. The gateway never parses the body.
+
+    @unit
+    Scenario: The gateway relays the control plane's own status
+      Given the control plane answers a delivery
+      Then the gateway returns that status unchanged
+      # 404 keeps provider ids unprobeable and 401 is a real signature
+      # failure, so neither may be reshaped into an acknowledgement.
+
+    @unit
+    Scenario: The webhook route carries no virtual key
+      Given a delivery arrives with no Authorization header
+      Then the gateway still relays it
+      # The caller is the vendor, which has no virtual key. The delivery's
+      # own HMAC is what authenticates it.
+
+    @unit
+    Scenario: A webhook the gateway cannot relay answers 502
+      Given the control plane cannot be reached
+      When a delivery arrives
+      Then the gateway answers 502 rather than acknowledging it
+      # An acknowledgement the gateway invented would report a landing that
+      # never happened and hide a broken relay. The reconciler bills the call
+      # either way, so the accurate answer costs nothing.
+
+    @unit
+    Scenario: A delivery past the relay cap answers 413
+      Given a delivery larger than the relay size limit
+      Then the gateway answers 413 and relays nothing
+      # A body truncated at the cap would arrive well formed and fail its own
+      # HMAC, which reads as a forgery rather than an oversized report.
+
+  # ============================================================
   Rule: A post-call report is matched exactly, or not at all
 
     @unit
