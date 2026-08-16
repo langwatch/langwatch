@@ -86,10 +86,13 @@ type ownServices struct {
 // counts and discards every record handed to it after Close, so draining the
 // listener last would throw away the spend of every request that completed
 // during the drain. Telemetry is registered first, so it is torn down last
-// and the shutdown itself is still traced.
+// and the shutdown itself is still traced — the profiler included, so a
+// shutdown slow enough to be worth profiling is still being sampled while it
+// happens.
 func addManagedServices(g *lifecycle.Group, deps *Deps, own ownServices) {
 	g.Add(
 		lifecycle.Closer("otel", deps.OTel.Shutdown),
+		lifecycle.Closer("profiling", deps.Profiler.Shutdown),
 		lifecycle.Closer("customer-trace-bridge", deps.TraceBridge.Shutdown),
 	)
 	if deps.SpendSpool != nil {
