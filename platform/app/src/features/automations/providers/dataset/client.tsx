@@ -1,8 +1,9 @@
-import { Text, VStack } from "@chakra-ui/react";
+import { Text, useDisclosure, VStack } from "@chakra-ui/react";
 import type { DatasetActionParams } from "@langwatch/automations/providers/dataset";
 import type { SavedTriggerRow } from "@langwatch/automations/providers/types";
 import { Database } from "lucide-react";
 import { useEffect } from "react";
+import { AddOrEditDatasetDrawer } from "~/components/AddOrEditDatasetDrawer";
 import { DatasetSelector } from "~/components/datasets/DatasetSelector";
 import type { Dataset } from "~/generated/prisma/client";
 import {
@@ -138,6 +139,7 @@ function DatasetConfigForm({
     { projectId: ctx.projectId },
     { enabled: !!ctx.projectId, refetchOnWindowFocus: false },
   );
+  const createDataset = useDisclosure();
 
   // Picking a dataset derives a default column mapping from that dataset's
   // columns and stores it on the slice, so the saved trigger carries a
@@ -176,14 +178,28 @@ function DatasetConfigForm({
         localStorageDatasetId={slice.datasetId}
         errors={{}}
         setValue={(_field: string, value: string) => selectDataset(value)}
-        onCreateNew={() => {
-          // noop
-        }}
+        onCreateNew={createDataset.onOpen}
       />
       <Text color="fg.muted" textStyle="xs">
         Columns map to the matching trace fields automatically; refine the
         mapping from the dataset view after creating.
       </Text>
+      {/* A project with no dataset yet has nothing to pick, so the automation
+          cannot be finished without creating one from here. The new dataset's
+          own columns drive the mapping, the same as picking an existing one. */}
+      <AddOrEditDatasetDrawer
+        open={createDataset.open}
+        onClose={createDataset.onClose}
+        onSuccess={({ datasetId, columnTypes }) => {
+          createDataset.onClose();
+          void datasets.refetch();
+          onChange({
+            ...slice,
+            datasetId,
+            mapping: deriveMappingFromColumns(columnTypes),
+          });
+        }}
+      />
     </VStack>
   );
 }
