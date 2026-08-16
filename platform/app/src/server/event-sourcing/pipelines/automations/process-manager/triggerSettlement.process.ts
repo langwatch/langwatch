@@ -119,8 +119,10 @@ export interface PersistPage {
 export function pagePersistMatches(
   matches: Array<{ traceId: string; settleWindowBucket: string }>,
 ): PersistPage[] {
+  // Byte order, not localeCompare: the page key must never depend on the
+  // process locale or ICU version.
   const sorted = [...matches].sort((left, right) =>
-    left.traceId.localeCompare(right.traceId),
+    left.traceId < right.traceId ? -1 : left.traceId > right.traceId ? 1 : 0,
   );
   const pages: PersistPage[] = [];
   for (let start = 0; start < sorted.length; start += PERSIST_PAGE_MAX) {
