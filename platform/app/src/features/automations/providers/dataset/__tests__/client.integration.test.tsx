@@ -83,7 +83,12 @@ const datasetDrawerProps = () => {
       onClose: () => void;
     },
   ];
-  expect(drawer).toBe("addOrEditDataset");
+  // A guard, not the assertion: a helper that reads the call has to know it
+  // read the right one. The drawer the section navigates to is asserted in
+  // the test below.
+  if (drawer !== "addOrEditDataset") {
+    throw new Error(`expected the dataset drawer, opened "${String(drawer)}"`);
+  }
   return props;
 };
 
@@ -105,10 +110,14 @@ describe("dataset automation configuration", () => {
 
       await chooseCreate();
 
+      expect(openDrawerMock).toHaveBeenCalledTimes(1);
+      expect(openDrawerMock).toHaveBeenCalledWith(
+        "addOrEditDataset",
+        expect.anything(),
+      );
       // The push unmounts this drawer, so the draft has to be spared the
       // reset a real close performs.
       expect(keepDraftMock).toHaveBeenCalled();
-      expect(openDrawerMock).toHaveBeenCalledTimes(1);
       // Leaving is not returning: until the sub-flow ends, nothing tells the
       // drawer to keep the draft on its next mount.
       expect(keepDraftOnReturnMock).not.toHaveBeenCalled();
