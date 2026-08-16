@@ -37,6 +37,8 @@ Feature: CLI login never lands a user on a personal project
       And a pending device code with credential_type "device_session"
       When the user approves it
       Then the approval is not refused by the governance gate
+      And no personal virtual key is minted, even though the organization has
+      a provider one could route to
 
     @integration @governance-gate
     Scenario: device-session approval is refused when governance is disabled
@@ -51,7 +53,7 @@ Feature: CLI login never lands a user on a personal project
       Given governance is enabled for the organization
       And a pending device code with credential_type "device_session"
       When the user approves it
-      Then the response is 200 and a personal virtual key is issued
+      Then the response is 200
 
   Rule: project login targets a deliberately chosen project; another user's personal project is never one
 

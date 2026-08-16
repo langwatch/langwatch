@@ -3,7 +3,7 @@
 /**
  * tRPC router for ingestion keys — the user-side mint/rotate/list flow for
  * personal-project trace ingest. An "ingestion key" is one row of the single
- * ApiKey primitive (`sk-lw-`) carrying a non-null `ingestSourceType`.
+ * ApiKey primitive (`ik-lw-`) carrying a non-null `ingestSourceType`.
  *
  * `organizationId` IS accepted in the input: a user can have a personal
  * project per org they're a member of, and the caller's currently-active
