@@ -155,16 +155,18 @@ describe("startAuthProxy()", () => {
 
   describe("when the local URL carries basic-auth credentials", () => {
     it("keeps them out of the response the caller receives", async () => {
-      // A port that nothing listens on, so the upstream call fails at connect.
-      const probe = http.createServer();
+      // A listener that stays bound and drops every connection. Releasing a
+      // port and reusing the number would let another process bind it
+      // between the two steps, which makes the failure non-deterministic.
+      const refusing = http.createServer();
+      refusing.on("connection", (socket) => socket.destroy());
       await new Promise<void>((resolve) =>
-        probe.listen(0, "127.0.0.1", resolve),
+        refusing.listen(0, "127.0.0.1", resolve),
       );
-      const closedPort = (probe.address() as { port: number }).port;
-      await new Promise<void>((resolve) => probe.close(() => resolve()));
+      const refusingPort = (refusing.address() as { port: number }).port;
 
       const proxy = await startAuthProxy({
-        targetUrl: `http://tunneluser:hunter2@127.0.0.1:${closedPort}/agent/chat`,
+        targetUrl: `http://tunneluser:hunter2@127.0.0.1:${refusingPort}/agent/chat`,
         secret: "session-secret",
       });
 
@@ -182,6 +184,7 @@ describe("startAuthProxy()", () => {
       });
 
       await proxy.close();
+      await new Promise<void>((resolve) => refusing.close(() => resolve()));
     });
   });
 
