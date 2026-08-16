@@ -27,6 +27,7 @@ export default function AiGatewayLayout({
       sectionLabel="AI Gateway"
       orgScope
       pageTitle={pageTitle}
+      standDownRailInProductShell
       navigationItems={gatewayNavItems.map((item) => ({
         label: item.label,
         href: item.href,

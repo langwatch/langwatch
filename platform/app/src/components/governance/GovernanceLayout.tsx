@@ -21,6 +21,7 @@ export default function GovernanceLayout({
       sectionLabel="AI Governance"
       orgScope
       pageTitle={pageTitle}
+      standDownRailInProductShell
       navigationItems={governanceNavItems.map((item) => ({
         label: item.label,
         href: item.href,
