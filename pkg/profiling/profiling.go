@@ -50,7 +50,7 @@ type Options struct {
 	// resource for the same reason.
 	Environment string
 	// Tags are extra labels merged onto every profile. Keys that Pyroscope
-	// cannot represent are normalised; see normaliseTagKey.
+	// cannot represent are normalized; see normalizeTagKey.
 	Tags map[string]string
 	// Logger receives the one line that says profiling started, and any
 	// warning about why it did not. Optional.
@@ -158,7 +158,7 @@ func StartFromEnv(serviceName, environment string, logger *zap.Logger) Profiler 
 func buildTags(opts Options) map[string]string {
 	tags := make(map[string]string, len(opts.Tags)+1)
 	for k, v := range opts.Tags {
-		if key := normaliseTagKey(k); key != "" && v != "" {
+		if key := normalizeTagKey(k); key != "" && v != "" {
 			tags[key] = v
 		}
 	}
@@ -187,8 +187,8 @@ func TagsFromOTelResourceAttributes(raw string) map[string]string {
 			continue
 		}
 		key, value = strings.TrimSpace(key), strings.TrimSpace(value)
-		if normalised := normaliseTagKey(key); normalised != "" && value != "" {
-			tags[normalised] = value
+		if normalized := normalizeTagKey(key); normalized != "" && value != "" {
+			tags[normalized] = value
 		}
 	}
 	if len(tags) == 0 {
@@ -197,7 +197,7 @@ func TagsFromOTelResourceAttributes(raw string) map[string]string {
 	return tags
 }
 
-// normaliseTagKey maps an OpenTelemetry attribute name onto a Pyroscope label
+// normalizeTagKey maps an OpenTelemetry attribute name onto a Pyroscope label
 // name. OTel names are dotted (langwatch.worktree); Pyroscope label names follow
 // the Prometheus grammar and reject a dot outright, so a key copied across
 // verbatim is silently dropped along with the tag it carried.
@@ -205,7 +205,7 @@ func TagsFromOTelResourceAttributes(raw string) map[string]string {
 // Underscore is the same substitution Loki's structured metadata already makes
 // for the same attribute (langwatch_worktree), so one spelling works across the
 // signals rather than one per store.
-func normaliseTagKey(key string) string {
+func normalizeTagKey(key string) string {
 	key = strings.TrimSpace(key)
 	if key == "" {
 		return ""

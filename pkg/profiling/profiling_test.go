@@ -39,7 +39,7 @@ func TestStartWithoutAServiceNameStartsNothing(t *testing.T) {
 // not there when someone goes looking for it.
 //
 // @scenario "Profiles carry the worktree label in local development"
-func TestTagsFromOTelResourceAttributesNormalisesDottedKeys(t *testing.T) {
+func TestTagsFromOTelResourceAttributesNormalizesDottedKeys(t *testing.T) {
 	tags := TagsFromOTelResourceAttributes("langwatch.worktree=portless,deployment.environment.name=development")
 
 	if got, want := tags["langwatch_worktree"], "portless"; got != want {
@@ -84,7 +84,7 @@ func TestTagsFromOTelResourceAttributesToleratesJunk(t *testing.T) {
 // than simply dropping the offending rune.
 //
 // @scenario "Profiles carry the worktree label in local development"
-func TestNormaliseTagKeyProducesValidLabelNames(t *testing.T) {
+func TestNormalizeTagKeyProducesValidLabelNames(t *testing.T) {
 	for input, want := range map[string]string{
 		"langwatch.worktree": "langwatch_worktree",
 		"service.name":       "service_name",
@@ -93,8 +93,8 @@ func TestNormaliseTagKeyProducesValidLabelNames(t *testing.T) {
 		"host-name":          "host_name",
 		"":                   "",
 	} {
-		if got := normaliseTagKey(input); got != want {
-			t.Errorf("normaliseTagKey(%q) = %q, want %q", input, got, want)
+		if got := normalizeTagKey(input); got != want {
+			t.Errorf("normalizeTagKey(%q) = %q, want %q", input, got, want)
 		}
 	}
 }
@@ -145,7 +145,7 @@ func TestStartPushesProfilesCarryingTheServiceIdentity(t *testing.T) {
 			t.Errorf("upload name = %q, want it to start with the service name", name)
 		}
 		if !strings.Contains(name, "langwatch_worktree=portless") {
-			t.Errorf("upload name = %q, want the normalised worktree tag", name)
+			t.Errorf("upload name = %q, want the normalized worktree tag", name)
 		}
 		if !strings.Contains(name, "environment=test") {
 			t.Errorf("upload name = %q, want the environment tag", name)

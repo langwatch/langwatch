@@ -708,6 +708,18 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 - name: NODE_ENV
   value: {{ .Values.app.nodeEnv | default .Values.global.env | default "production" }}
 
+{{/* The deployment environment, which is a different question from NODE_ENV.
+     NODE_ENV selects a runtime mode and is very often "production" in a staging
+     install; ENVIRONMENT names which install this is. Every other service in the
+     repo already reads ENVIRONMENT for exactly this — aigateway, nlpgo,
+     langyagent and cmd/service — so the Node processes reading it here are
+     joining a convention rather than inventing one.
+
+     Load bearing for profiling: a Pyroscope flame graph with no environment tag
+     cannot be told apart from any other install pushing to the same server. */}}
+- name: ENVIRONMENT
+  value: {{ .Values.global.env | default "production" }}
+
 - name: BASE_HOST
   value: {{ .Values.app.http.baseHost | default "http://localhost:5560" }}
 
