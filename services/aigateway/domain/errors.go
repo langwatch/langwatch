@@ -110,3 +110,9 @@ const (
 	// parameter rejections so SDK error handling stays familiar.
 	ErrUnsupportedParameter = herr.Code("unsupported_parameter")
 )
+
+// KeyExpiredMessage is what a tenant reads when a key's expiration date has
+// passed. One string in one place: the control plane's 403 and the auth
+// cache's own check are the same answer to the same person, and two copies of
+// it drift.
+const KeyExpiredMessage = "This key has expired. Extend its expiration date, or create a new key."

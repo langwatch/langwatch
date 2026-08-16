@@ -349,9 +349,9 @@ function virtualKeyParseRejection(presented: string): KeyAuthRejection | null {
  *
  *  Expiry is a date rather than a status, so it is checked here rather than
  *  read off the row's status: the key stays ACTIVE past the date, which is
- *  what keeps extending the date an ordinary edit. Precision is the life of
- *  the gateway JWT, 15 minutes: a key that expires now stops being resolved
- *  immediately, and any token minted before then runs out on its own clock. */
+ *  what keeps extending the date an ordinary edit. A key that expires now
+ *  stops being resolved immediately, and a token minted before then ends at
+ *  the date itself, because the mint clamps its exp to the key's expiry. */
 function virtualKeyStatusRejection({
   status,
   expiresAt,
@@ -447,6 +447,10 @@ secured.access(gatewayPolicy()).post("/resolve-key", async (c) => {
   // failing the auth handshake.
   const traceProject = await traceProjectFor(prisma, vk.traceProjectId);
 
+  // notAfter ends the token at the key's expiration date when that arrives
+  // before the ordinary 15 minute TTL, and travels on as the vk_expires_at
+  // claim. Without it the gateway holds a token that outlives the key, and its
+  // auth cache keeps serving that key while the control plane is unreachable.
   const { jwt } = signGatewayJwt({
     vk_id: vk.id,
     project_id: traceProject?.id ?? null,
@@ -454,6 +458,7 @@ secured.access(gatewayPolicy()).post("/resolve-key", async (c) => {
     org_id: vk.organizationId,
     principal_id: vk.principalUserId,
     revision: vk.revision.toString(),
+    notAfter: vk.expiresAt,
   });
 
   // Fire-and-forget last-used bump. Failures here must not deny the request.

@@ -386,6 +386,52 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       Then a bundle inside its own expiry is served without consulting the control plane, whether the window is positive, zero or negative
       And a bundle past its own expiry goes to the control plane before it serves
 
+  Rule: A key's own expiration date bounds the cache, and grace never crosses it
+    Stale-while-error covers a control plane the gateway cannot reach. An
+    expiration date is a different thing: the control plane already published
+    it, on the token itself, so the gateway can enforce it alone and needs no
+    round trip to know the key has stopped. Both cache deadlines are therefore
+    capped at that instant, and a request that arrives after it is refused with
+    the key's own error rather than served from grace or answered with a
+    retryable upstream failure.
+
+    Revoked and disabled keys keep the full grace window on purpose. A
+    revocation happens after the token was minted and cannot be predicted; a
+    date can. The operator opt-out for both is the same negative
+    LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS.
+
+    @unit
+    Scenario: the token carries the key's expiration date to the gateway
+      Given a token minted for a key that expires in five minutes
+      When the gateway reads its claims
+      Then the resolved bundle carries that expiration date
+      And a token with no such claim, or a null one, describes a key that never expires
+
+    @unit
+    Scenario: the hard cap never outlives the key's expiration date
+      Given a key that expires in five minutes
+      When its bundle is cached
+      Then the entry's hard cap is the key's expiration date, not the token expiry plus the grace window
+      And a bundle for a key with no expiration date keeps the deadlines it always had
+
+    @unit
+    Scenario: an outage across the expiration date fails closed
+      Given a cached entry for a key whose expiration date has passed
+      And the control plane is unreachable
+      When I send a request with that key
+      Then the request is rejected with error.type "virtual_key_expired"
+      And the cached bundle is not served
+      And the control plane is not called, because the date came with the token
+      And the entry is evicted
+
+    @unit
+    Scenario: an outage before the expiration date still serves stale
+      Given a cached entry past its token expiry for a key that expires in an hour
+      And the control plane is unreachable
+      When I send a request with that key
+      Then the cached bundle is served
+      And its soft expiry is bumped, transport-failure style
+
   Rule: Bootstrap-pull enables gateway to serve when control plane is cold
 
     # The flag is named the way contract.md §6 and §9 name it. Nothing reads

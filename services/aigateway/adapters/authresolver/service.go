@@ -9,6 +9,13 @@
 // (401/403/404) evicts immediately — bad credentials get no grace window.
 // See specs/ai-gateway/auth-cache.feature, Rule "Cached JWT serves
 // stale-while-error past natural expiry on transport failure".
+//
+// A key that carries its own expiration date bounds all of it: both deadlines
+// are capped at that instant and an entry past it is refused with
+// virtual_key_expired without asking the control plane. Grace covers a control
+// plane we cannot reach, and a date it already told us needs no round trip.
+// Revoked and disabled keys keep the full window on purpose, since neither is
+// knowable in advance.
 package authresolver
 
 import (
@@ -199,18 +206,31 @@ const (
 	entryStale
 	// entryDead is past the hard cap and is not servable at all.
 	entryDead
+	// entryKeyExpired is past the virtual key's own expiration date. The key
+	// has stopped, so no grace window applies and the request is refused with
+	// the key's own error rather than an upstream one.
+	entryKeyExpired
 )
 
-// classifyEntry is the one place that decides which of the three an entry is,
+// classifyEntry is the one place that decides which of the four an entry is,
 // so every path through the cache reaches the same verdict about the same
-// bundle. The order is load-bearing: soft expiry is checked BEFORE the hard
-// cap, because a negative HardGrace deliberately puts the cap earlier than
-// the JWT exp (the stale-while-error opt-out, LW_GATEWAY_AUTH_CACHE_HARD_
-// GRACE_SECONDS), and a bundle that has not reached its own expiry is
-// servable wherever the cap happens to sit. Testing the cap first would
-// throw away perfectly valid credentials under that configuration.
+// bundle. The order matters twice.
+//
+// The key's own expiration date is checked FIRST, ahead of every grace path:
+// the control plane published that date with the token, so the gateway can
+// enforce it alone, and a stale-while-error window that outlives the date
+// would let a key keep calling providers after it ran out.
+//
+// Soft expiry is then checked BEFORE the hard cap, because a negative
+// HardGrace deliberately puts the cap earlier than the JWT exp (the
+// stale-while-error opt-out, LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS), and a
+// bundle that has not reached its own expiry is servable wherever the cap
+// happens to sit. Testing the cap first would throw away perfectly valid
+// credentials under that configuration.
 func classifyEntry(e *entry) entryState {
 	switch {
+	case e.keyExpired():
+		return entryKeyExpired
 	case !e.softExpired():
 		return entryFresh
 	case !e.hardExpired():
@@ -218,6 +238,13 @@ func classifyEntry(e *entry) entryState {
 	default:
 		return entryDead
 	}
+}
+
+// keyExpired reports whether the cached bundle's virtual key has passed its
+// own expiration date. A bundle carrying no date never expires, which is what
+// keeps every key without one on exactly the behavior it had before.
+func (e *entry) keyExpired() bool {
+	return e.bundle != nil && e.bundle.KeyExpired(time.Now())
 }
 
 func (e *entry) softExpired() bool {
@@ -413,7 +440,7 @@ func (s *Service) Resolve(ctx context.Context, rawKey string) (*domain.Bundle, e
 		switch classifyEntry(e) {
 		case entryFresh:
 			// Serve, maybe trigger background refresh on near-expiry.
-			s.recordHit(tierL1)
+			s.recordHit()
 			if e.nearSoftExpiry(s.refreshThreshold) {
 				go s.refreshBackground(rawKey, h) //nolint:gosec // G118: intentional fire-and-forget refresh detached from request
 			} else if e.configStale(s.configTTL) && e.tryBeginConfigRefresh() {
@@ -425,12 +452,27 @@ func (s *Service) Resolve(ctx context.Context, rawKey string) (*domain.Bundle, e
 			// Soft-expired but within hard grace. A foreground refresh is
 			// needed before the entry can serve, so it counts as a miss
 			// even when stale-while-error ends up serving the old bundle.
-			s.recordMiss(tierL1)
+			s.recordMiss()
 			return s.refreshOrServeStale(ctx, rawKey, h, e)
+
+		case entryKeyExpired:
+			// The key ran out. Fail closed with the key's own error and skip
+			// the control plane: a reachable control plane answers exactly
+			// this, and an unreachable one must not turn a finished key into
+			// a retryable upstream failure that grace keeps serving through.
+			s.recordMiss()
+			s.l1.Remove(h)
+			s.logger.Error("auth_cache_hard_evict",
+				zap.String("vk_id", e.bundle.VirtualKeyID),
+				zap.String("reason", "virtual_key_expired"),
+			)
+			return nil, herr.New(ctx, domain.ErrKeyExpired, herr.M{
+				"message": domain.KeyExpiredMessage,
+			})
 
 		default:
 			// Past hard cap: evict, fall through to fresh resolve.
-			s.recordMiss(tierL1)
+			s.recordMiss()
 			s.l1.Remove(h)
 			s.logger.Error("auth_cache_hard_evict",
 				zap.String("vk_id", e.bundle.VirtualKeyID),
@@ -438,7 +480,7 @@ func (s *Service) Resolve(ctx context.Context, rawKey string) (*domain.Bundle, e
 			)
 		}
 	} else {
-		s.recordMiss(tierL1)
+		s.recordMiss()
 	}
 
 	return s.resolveFresh(ctx, rawKey, h)
@@ -454,15 +496,18 @@ func (s *Service) recordLookup() {
 	}
 }
 
-func (s *Service) recordHit(tier string) {
+// recordHit and recordMiss stamp the one tier this cache has. The published
+// metrics keep the label, so an operator dashboard built on them survives a
+// second tier arriving; only the call sites are spared repeating it.
+func (s *Service) recordHit() {
 	if s.metrics != nil {
-		s.metrics.RecordAuthCacheHit(tier)
+		s.metrics.RecordAuthCacheHit(tierL1)
 	}
 }
 
-func (s *Service) recordMiss(tier string) {
+func (s *Service) recordMiss() {
 	if s.metrics != nil {
-		s.metrics.RecordAuthCacheMiss(tier)
+		s.metrics.RecordAuthCacheMiss(tierL1)
 	}
 }
 
@@ -632,10 +677,11 @@ func (s *Service) Stop() {
 // after a response that carried none: the next staleness refresh asks for the
 // config outright rather than revalidating against a token we do not have.
 func (s *Service) storeL1(h [64]byte, bundle *domain.Bundle, configETag string) {
+	softExpiresAt, hardExpiresAt := entryDeadlines(bundle, s.hardGrace)
 	s.l1.Add(h, &entry{
 		bundle:          bundle,
-		softExpiresAt:   bundle.ExpiresAt,
-		hardExpiresAt:   bundle.ExpiresAt.Add(s.hardGrace),
+		softExpiresAt:   softExpiresAt,
+		hardExpiresAt:   hardExpiresAt,
 		configFetchedAt: time.Now(),
 		configETag:      configETag,
 	})
@@ -647,6 +693,30 @@ func (s *Service) storeL1(h [64]byte, bundle *domain.Bundle, configETag string) 
 	if bundle.OrganizationID != "" {
 		s.activeOrgs.LoadOrStore(bundle.OrganizationID, &orgCursor{since: "0"})
 	}
+}
+
+// entryDeadlines computes the two instants a cached entry lives by: the JWT
+// exp it refreshes at, and the hard cap the stale-while-error grace may extend
+// it to.
+//
+// Both are capped at the virtual key's own expiration date when the bundle
+// carries one, because the grace window exists to cover an unreachable control
+// plane and this date needs no control plane to be true. Without the cap, the
+// grace is added to the JWT exp and a key that ran out keeps serving for the
+// length of the window. A bundle with no date is left exactly as it was.
+func entryDeadlines(bundle *domain.Bundle, hardGrace time.Duration) (soft, hard time.Time) {
+	soft = bundle.ExpiresAt
+	hard = bundle.ExpiresAt.Add(hardGrace)
+	if bundle.VirtualKeyExpiresAt.IsZero() {
+		return soft, hard
+	}
+	if soft.After(bundle.VirtualKeyExpiresAt) {
+		soft = bundle.VirtualKeyExpiresAt
+	}
+	if hard.After(bundle.VirtualKeyExpiresAt) {
+		hard = bundle.VirtualKeyExpiresAt
+	}
+	return soft, hard
 }
 
 // changeFeedLoop drives the per-org cache invalidation: long-polls the

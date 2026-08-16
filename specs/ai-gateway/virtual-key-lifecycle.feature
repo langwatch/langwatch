@@ -77,6 +77,23 @@ Feature: Virtual key disable, enable, and expiry
     # last minute before the date is as good as the first.
 
   @integration
+  Scenario: The token ends when the key does
+    Given the key expires in five minutes
+    When it is resolved for a request
+    Then the token expires at the key's expiration date, not at the ordinary fifteen minute mark
+    And the token carries the expiration date, so the gateway can enforce it alone
+    # The gateway keeps serving on a cached token while the control plane is
+    # unreachable. A token that outlives the key is what would let a key that
+    # has run out keep calling providers through an outage.
+
+  @unit
+  Scenario: A key with no expiration date keeps the ordinary token lifetime
+    Given the key has no expiration date
+    When it is resolved for a request
+    Then the token expires at the ordinary fifteen minute mark
+    And the token says the key never expires
+
+  @integration
   Scenario: Extending the date puts an expired key back in service
     Given the key's expiration date has passed
     When the date is moved into the future

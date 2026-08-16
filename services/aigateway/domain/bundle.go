@@ -21,6 +21,19 @@ type Bundle struct {
 
 	// ExpiresAt is when this bundle's JWT expires (for cache refresh).
 	ExpiresAt time.Time
+
+	// VirtualKeyExpiresAt is the terminal validity instant of the KEY itself,
+	// from the vk_expires_at claim. Unlike ExpiresAt, which is a refresh
+	// boundary a grace window may be built on, nothing extends this one: past
+	// it the key is finished and the request is refused. The zero value means
+	// the key has no expiration date and never runs out.
+	VirtualKeyExpiresAt time.Time
+}
+
+// KeyExpired reports whether the virtual key's own expiration date has passed
+// at instant now. A bundle carrying no date never expires.
+func (b *Bundle) KeyExpired(now time.Time) bool {
+	return !b.VirtualKeyExpiresAt.IsZero() && now.After(b.VirtualKeyExpiresAt)
 }
 
 // BundleConfig holds the policy knobs configured per virtual key.

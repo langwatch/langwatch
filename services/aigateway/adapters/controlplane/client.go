@@ -143,7 +143,7 @@ func (c *Client) ResolveKey(ctx context.Context, rawKey string) (*domain.Bundle,
 			})
 		case "virtual_key_expired":
 			return nil, herr.New(ctx, domain.ErrKeyExpired, herr.M{
-				"message": "This key has expired. Extend its expiration date, or create a new key.",
+				"message": domain.KeyExpiredMessage,
 			})
 		}
 		return nil, herr.New(ctx, domain.ErrKeyRevoked, nil)
@@ -405,6 +405,12 @@ type Claims struct {
 	TeamID         string
 	OrganizationID string
 	ExpiresAt      int64
+	// VirtualKeyExpiresAt is the vk_expires_at claim in unix seconds: the
+	// instant the key itself runs out. The control plane sends null for a key
+	// with no expiration date, and a gateway talking to a control plane older
+	// than the claim sees nothing at all; both decode to 0, which means the
+	// key never expires.
+	VirtualKeyExpiresAt int64
 }
 
 func extractClaims(m map[string]any) *Claims {
@@ -424,17 +430,26 @@ func extractClaims(m map[string]any) *Claims {
 	if v, ok := m["exp"].(float64); ok {
 		c.ExpiresAt = int64(v)
 	}
+	if v, ok := m["vk_expires_at"].(float64); ok {
+		c.VirtualKeyExpiresAt = int64(v)
+	}
 	return c
 }
 
 func claimsToBundle(c *Claims) *domain.Bundle {
-	return &domain.Bundle{
+	b := &domain.Bundle{
 		VirtualKeyID:   c.VirtualKeyID,
 		ProjectID:      c.ProjectID,
 		TeamID:         c.TeamID,
 		OrganizationID: c.OrganizationID,
 		ExpiresAt:      time.Unix(c.ExpiresAt, 0),
 	}
+	// A zero claim stays the zero time rather than becoming 1970, which every
+	// clock comparison would read as an expired key.
+	if c.VirtualKeyExpiresAt > 0 {
+		b.VirtualKeyExpiresAt = time.Unix(c.VirtualKeyExpiresAt, 0)
+	}
+	return b
 }
 
 // setCommonHeaders stamps headers shared by every outbound control-plane request.

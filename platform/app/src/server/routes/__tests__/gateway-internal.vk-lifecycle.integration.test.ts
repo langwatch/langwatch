@@ -10,6 +10,7 @@
 
 import { TRPCError } from "@trpc/server";
 import { createHash, createHmac } from "crypto";
+import jwt from "jsonwebtoken";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -18,6 +19,7 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import { verifyGatewayJwt } from "~/server/gateway/gatewayJwt";
 import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
 import { app } from "../gateway-internal";
 
@@ -51,12 +53,15 @@ function signedResolveKey(keyPresented: string) {
 
 describe("virtual key disable and enable (real PG + internal route)", () => {
   let previousSecret: string | undefined;
+  let previousJwtSecret: string | undefined;
   const service = VirtualKeyService.create(prisma);
 
   beforeAll(async () => {
     await startTestContainers();
     previousSecret = process.env.LW_GATEWAY_INTERNAL_SECRET;
     process.env.LW_GATEWAY_INTERNAL_SECRET = SECRET;
+    previousJwtSecret = process.env.LW_GATEWAY_JWT_SECRET;
+    process.env.LW_GATEWAY_JWT_SECRET = SECRET;
 
     await prisma.organization.create({
       data: { id: ORG_ID, name: `VKLC Org ${suffix}`, slug: `vklc-${suffix}` },
@@ -91,6 +96,11 @@ describe("virtual key disable and enable (real PG + internal route)", () => {
     } else {
       process.env.LW_GATEWAY_INTERNAL_SECRET = previousSecret;
     }
+    if (previousJwtSecret === undefined) {
+      delete process.env.LW_GATEWAY_JWT_SECRET;
+    } else {
+      process.env.LW_GATEWAY_JWT_SECRET = previousJwtSecret;
+    }
     await prisma.gatewayBudget.deleteMany({
       where: { organizationId: ORG_ID },
     });
@@ -102,13 +112,14 @@ describe("virtual key disable and enable (real PG + internal route)", () => {
     await stopTestContainers();
   });
 
-  async function mintKey(name: string) {
+  async function mintKey(name: string, expiresAt?: Date) {
     return service.create({
       organizationId: ORG_ID,
       name,
       scopes: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }],
       actorUserId: USER_ID,
       budget: { limitUsd: "100", window: "MONTH", onBreach: "BLOCK" },
+      expiresAt: expiresAt ?? null,
     });
   }
 
@@ -179,6 +190,24 @@ describe("virtual key disable and enable (real PG + internal route)", () => {
     expect(res.status).toBe(403);
     const body = (await res.json()) as { error: { code: string } };
     expect(body.error.code).toBe("virtual_key_disabled");
+  });
+
+  /** @scenario "The token ends when the key does" */
+  it("ends the token at the key's expiration date and carries that date on it", async () => {
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+    const { virtualKey, secret } = await mintKey("short-lived", expiresAt);
+    const stored = await prisma.virtualKey.findUniqueOrThrow({
+      where: { id: virtualKey.id },
+    });
+    const keyExpiresAt = Math.floor(stored.expiresAt!.getTime() / 1000);
+
+    const res = await app.request(signedResolveKey(secret));
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { jwt: string };
+
+    const decoded = jwt.decode(body.jwt) as { exp: number };
+    expect(decoded.exp).toBe(keyExpiresAt);
+    expect(verifyGatewayJwt(body.jwt).vk_expires_at).toBe(keyExpiresAt);
   });
 
   /** @scenario Revocation is terminal in both directions */

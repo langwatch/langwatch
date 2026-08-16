@@ -158,7 +158,7 @@ Request:
 Response (200):
 ```json
 {
-  "jwt": "<HS256 signed, TTL 15m>",
+  "jwt": "<HS256 signed, TTL 15m or the key's expiry, whichever is sooner>",
   "revision": 142,
   "key_id": "vk_01HZX...",
   "display_prefix": "vk-lw-01HZX9"
@@ -168,22 +168,29 @@ Response (200):
 JWT claims (short, hot-path-verified):
 ```
 {
-  "vk_id":        "vk_01HZX...",
-  "project_id":   "proj_01HZ...",
-  "team_id":      "team_01HZ...",
-  "org_id":       "org_01HZ...",
-  "principal_id": "user_01HZ... | svc_01HZ...",  // for trace attribution
-  "revision":     142,                            // bumped on any mutation
-  "iat":          1734567890,
-  "exp":          1734568790,                     // TTL 900s
-  "iss":          "langwatch-control-plane",
-  "aud":          "langwatch-gateway"
+  "vk_id":         "vk_01HZX...",
+  "project_id":    "proj_01HZ...",
+  "team_id":       "team_01HZ...",
+  "org_id":        "org_01HZ...",
+  "principal_id":  "user_01HZ... | svc_01HZ...",  // for trace attribution
+  "revision":      142,                            // bumped on any mutation
+  "vk_expires_at": 1734568790,                     // key's own expiry, null when it has none
+  "iat":           1734567890,
+  "exp":           1734568790,                     // TTL 900s, or vk_expires_at when sooner
+  "iss":           "langwatch-control-plane",
+  "aud":           "langwatch-gateway"
 }
 ```
 
 Gateway refreshes asynchronously at `exp - 5min` (so T+10min from issue).
 
-Errors: `401 invalid_api_key`, `403 virtual_key_revoked`.
+`vk_expires_at` is the terminal validity instant of the key itself, not a
+refresh boundary: the gateway caps both auth-cache deadlines at it and refuses
+a request past it with `403 virtual_key_expired`, without a round trip. That is
+what stops a key from serving through the stale-while-error window (§9) after
+its date has passed while the control plane is unreachable.
+
+Errors: `401 invalid_api_key`, `403 virtual_key_revoked`, `403 virtual_key_disabled`, `403 virtual_key_expired`.
 
 ### 4.2 `GET /api/internal/gateway/config/:vk_id`
 

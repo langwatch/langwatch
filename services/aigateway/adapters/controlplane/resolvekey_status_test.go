@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -79,6 +80,65 @@ func TestResolveKey_ForbiddenBodyDecidesTheCode(t *testing.T) {
 			_, err := cp.ResolveKey(context.Background(), "vk-lw-whatever")
 			require.Error(t, err)
 			assert.ErrorIs(t, err, tc.want)
+		})
+	}
+}
+
+// The vk_expires_at claim is what lets the gateway enforce the expiration date
+// on its own, so its three wire shapes must all decode to the right thing: a
+// date, or "this key never expires". A missing claim is the same answer as a
+// null one, because a control plane older than the claim sends neither.
+//
+// @scenario "the token carries the key's expiration date to the gateway"
+func TestExtractClaims_VirtualKeyExpiresAt(t *testing.T) {
+	expiresAt := time.Now().Add(5 * time.Minute).Truncate(time.Second)
+
+	cases := []struct {
+		name  string
+		claim any
+		set   bool
+		want  time.Time
+	}{
+		{
+			name:  "present",
+			claim: float64(expiresAt.Unix()),
+			set:   true,
+			want:  expiresAt,
+		},
+		{
+			name: "absent",
+			set:  false,
+			want: time.Time{},
+		},
+		{
+			name:  "null",
+			claim: nil,
+			set:   true,
+			want:  time.Time{},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			m := map[string]any{
+				"vk_id":  "vk_01HZX",
+				"org_id": "org_01HZX",
+				"exp":    float64(time.Now().Add(15 * time.Minute).Unix()),
+			}
+			if tc.set {
+				m["vk_expires_at"] = tc.claim
+			}
+
+			bundle := claimsToBundle(extractClaims(m))
+
+			assert.True(t, bundle.VirtualKeyExpiresAt.Equal(tc.want),
+				"got %v, want %v", bundle.VirtualKeyExpiresAt, tc.want)
+			pastTheDate := bundle.KeyExpired(time.Now().Add(10 * time.Minute))
+			if tc.want.IsZero() {
+				assert.False(t, pastTheDate, "a key with no date never expires")
+			} else {
+				assert.True(t, pastTheDate, "a key with a date expires once it passes")
+			}
 		})
 	}
 }
