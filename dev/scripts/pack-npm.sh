@@ -303,6 +303,7 @@ if git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
   git -C "$ROOT" -c core.quotePath=false ls-files \
       platform/app/src platform/app/ee \
       mcp/typescript/src \
+      packages/authz/src packages/authz-server/src \
       packages/handled-error/src packages/langy/src \
       skills dev/scripts \
     | { grep -vE '__tests__|\.test\.|\.spec\.|(^|/)tests?/|(^|/)\.npmrc$|\.env\.example$' || true; } | sort > "$tracked"
