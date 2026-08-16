@@ -1,18 +1,23 @@
 /**
  * Single source of truth for the model catalog. Merges the base
- * `llmModels.json` (regenerated periodically from the upstream model
- * source) with the hand-curated `llmModels.overlay.json` so direct-API
- * providers whose models aren't in the upstream catalog (Voyage today,
- * additions later) stay in the registry across regenerations.
+ * `llmModels.json`, regenerated weekly from the upstream price sources, with
+ * the hand-curated `llmModels.overlay.json`.
  *
- * Merge rule: the base catalog wins on key collision. If the upstream
- * source ever starts carrying a model that the overlay also has, the
- * regen-side entry takes precedence automatically (it has authoritative
- * pricing + context-length) and the overlay shadow becomes a no-op
- * without a code change. The overlay only fills gaps.
+ * Merge rule: the overlay wins on key collision. It is the correction lane,
+ * so a hand-written rate has to be able to override a wrong generated one.
+ * The rule used to be the other way around, which made the overlay unable to
+ * do the one job it existed for: an upstream source that carries a model at
+ * the wrong price shadowed the hand-written fix, and no comment in the
+ * overlay could change that. It went unnoticed for as long as every overlay
+ * entry happened to be a model the base file did not carry.
  *
- * The regen task is not aware of and never writes the overlay file —
- * keep it that way.
+ * The cost of this direction is that a stale overlay entry now overrides a
+ * corrected upstream price instead of quietly losing to it. That is why the
+ * weekly sync audits every overlay entry against upstream and fails on a
+ * disagreement it has not already accepted: an override has to keep earning
+ * its place. Never take the audit out and leave this merge order in.
+ *
+ * The regen task never writes the overlay file. Keep it that way.
  */
 import * as llmModelsRaw from "./llmModels.json";
 import * as llmModelsOverlayRaw from "./llmModels.overlay.json";
@@ -23,10 +28,10 @@ const overlay = llmModelsOverlayRaw as unknown as {
   models: Record<string, LLMModelEntry>;
 };
 
-// Overlay first, base second so base wins on collision.
+// Base first, overlay second so the hand-written correction wins.
 const mergedModels: Record<string, LLMModelEntry> = {
-  ...overlay.models,
   ...base.models,
+  ...overlay.models,
 };
 
 /** Merged model catalog ready for callers. Same shape as the base
@@ -36,3 +41,9 @@ export const llmModels: LLMModelRegistry = {
   modelCount: Object.keys(mergedModels).length,
   models: mergedModels,
 };
+
+/** Ids the overlay overrides in the base catalog. The weekly price audit
+ *  reports these so an override that is no longer needed gets retired. */
+export const overlayOverriddenModelIds: string[] = Object.keys(overlay.models)
+  .filter((id) => id in base.models)
+  .sort();
