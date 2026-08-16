@@ -193,6 +193,17 @@ Feature: Staged automation authoring drawer
       Then the dataset chosen before is still the automation's target
       And the automation drawer is back
 
+    # The draft is kept across the hand-over, so something has to discard it
+    # when the user never comes back. Otherwise the next new automation opens
+    # holding the abandoned one.
+    @unit
+    Scenario: An abandoned sub-flow does not seed the next automation
+      Given the user is configuring an add-to-dataset action
+      When the user chooses to create a dataset
+      And the user goes to another page instead of returning
+      And the user starts a new automation later
+      Then the new automation starts empty
+
   Rule: The Slack channel list never claims to be complete when it isn't
 
     The picker is populated from what the bot token can see, and there are

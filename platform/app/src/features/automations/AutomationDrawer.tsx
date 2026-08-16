@@ -93,7 +93,10 @@ import {
   useDraft,
   useSection,
 } from "./state/selectors";
-import { consumeDraftKeptForSubFlow } from "./state/subFlow";
+import {
+  consumeDraftKeptForSubFlow,
+  consumeDraftKeptOnSubFlowReturn,
+} from "./state/subFlow";
 
 /**
  * Headlines naming the template the server rejected.
@@ -287,6 +290,17 @@ export function AutomationDrawer({
     },
     [reset],
   );
+
+  // Open on a blank draft unless this mount is the return leg of a sub-flow.
+  // The departure above skips its reset, so a sub-flow the user walks away
+  // from (navigating elsewhere while the dataset drawer is open) would leave
+  // that draft in the store and seed the next new automation with it.
+  useEffect(() => {
+    if (consumeDraftKeptOnSubFlowReturn()) return;
+    reset();
+    // Mount only: running this again would wipe the draft being written.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Baseline the close-guard diffs against: the hydrated row on edit, the
   // traces-prefilled (or empty) draft on create. Set once the relevant

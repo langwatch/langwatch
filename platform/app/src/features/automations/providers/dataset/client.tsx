@@ -11,7 +11,10 @@ import {
   datasetColumnsSchema,
 } from "~/server/datasets/types";
 import { api } from "~/utils/api";
-import { keepDraftForSubFlow } from "../../state/subFlow";
+import {
+  keepDraftForSubFlow,
+  keepDraftOnSubFlowReturn,
+} from "../../state/subFlow";
 import type { ClientDef, ConfigFormProps, SummaryIdentity } from "../types";
 
 /** A single dataset column's trace source. Mirrors the `traceMappingEntrySchema`
@@ -225,6 +228,10 @@ function DatasetConfigForm({
         if (!created && previousDatasetId) {
           onChange({ ...slice, datasetId: previousDatasetId });
         }
+        // The drawer opens blank unless the return says otherwise, so that
+        // a sub-flow the user walks away from cannot seed the next
+        // automation with this draft.
+        keepDraftOnSubFlowReturn();
         goBack();
       },
     });

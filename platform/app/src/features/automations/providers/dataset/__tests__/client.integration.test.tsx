@@ -6,14 +6,19 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { refetchMock, openDrawerMock, goBackMock, keepDraftMock } = vi.hoisted(
-  () => ({
-    refetchMock: vi.fn(),
-    openDrawerMock: vi.fn(),
-    goBackMock: vi.fn(),
-    keepDraftMock: vi.fn(),
-  }),
-);
+const {
+  refetchMock,
+  openDrawerMock,
+  goBackMock,
+  keepDraftMock,
+  keepDraftOnReturnMock,
+} = vi.hoisted(() => ({
+  refetchMock: vi.fn(),
+  openDrawerMock: vi.fn(),
+  goBackMock: vi.fn(),
+  keepDraftMock: vi.fn(),
+  keepDraftOnReturnMock: vi.fn(),
+}));
 
 vi.mock("~/utils/api", () => ({
   api: {
@@ -36,6 +41,7 @@ vi.mock("~/hooks/useDrawer", () => ({
 
 vi.mock("../../../state/subFlow", () => ({
   keepDraftForSubFlow: keepDraftMock,
+  keepDraftOnSubFlowReturn: keepDraftOnReturnMock,
 }));
 
 const { default: client } = await import("../client");
@@ -49,7 +55,10 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 const renderForm = ({
   onChange = vi.fn(),
   datasetId = "",
-}: { onChange?: ReturnType<typeof vi.fn>; datasetId?: string } = {}) => {
+}: {
+  onChange?: ReturnType<typeof vi.fn>;
+  datasetId?: string;
+} = {}) => {
   render(
     <ConfigForm
       slice={{ ...client.initialSlice(), datasetId }}
@@ -100,6 +109,19 @@ describe("dataset automation configuration", () => {
       // reset a real close performs.
       expect(keepDraftMock).toHaveBeenCalled();
       expect(openDrawerMock).toHaveBeenCalledTimes(1);
+      // Leaving is not returning: until the sub-flow ends, nothing tells the
+      // drawer to keep the draft on its next mount.
+      expect(keepDraftOnReturnMock).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "An abandoned sub-flow does not seed the next automation" */
+    it("announces the return only when the sub-flow actually ends", async () => {
+      renderForm();
+
+      const props = await chooseCreate();
+      props.onClose();
+
+      expect(keepDraftOnReturnMock).toHaveBeenCalledTimes(1);
     });
 
     /** @scenario "Creating a dataset from the automation is offered and works" */
