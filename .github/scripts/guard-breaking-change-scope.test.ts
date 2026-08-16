@@ -38,6 +38,19 @@ const liveComponents = () =>
     ),
   );
 
+/**
+ * The version the live manifest records for a component path. The guard reads
+ * the same file, so an assertion on the reported version has to follow every
+ * release instead of pinning a number the next release invalidates.
+ */
+const liveVersion = (path: string): string =>
+  JSON.parse(
+    readFileSync(
+      resolve(repoRoot, ".github/.release-please-manifest.json"),
+      "utf8",
+    ),
+  )[path];
+
 const names = (files: string[]): string[] =>
   bumpedComponents(files, liveComponents())
     .map((component) => component.name)
@@ -430,7 +443,9 @@ describe("breaking-change scope guard", () => {
       assert.equal(result.status, 1);
       assert.ok(
         result.stderr.includes(
-          "- typescript-sdk (sdks/typescript), now 1.4.0, pinned to 1.5.0",
+          `- typescript-sdk (sdks/typescript), now ${liveVersion(
+            "sdks/typescript",
+          )}, pinned to 1.5.0`,
         ),
         result.stderr,
       );
