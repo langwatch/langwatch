@@ -125,7 +125,8 @@ describe("endpoint success status", () => {
           v.post(
             "/created",
             { output: z.object({ id: z.string() }), status: 201 },
-            // biome-ignore lint/suspicious/useAwait: the cast is the point — a handler that returns nothing where a body is declared.
+            // The cast is the point: a handler that returns nothing where a
+            // body is declared.
             async () => undefined as unknown as { id: string },
           );
         })
