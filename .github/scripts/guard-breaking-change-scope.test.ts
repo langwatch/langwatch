@@ -28,6 +28,29 @@ const scriptPath = resolve(
   "guard-breaking-change-scope.ts",
 );
 
+/**
+ * The version the manifest currently records for a component path.
+ *
+ * Read rather than hardcoded: the guard prints the live version, so a literal
+ * here goes stale the moment that component is released, and the guard's own
+ * test suite fails on a pull request that has nothing to do with it. That is
+ * what happened when typescript-sdk went to 1.5.0.
+ */
+const currentVersion = (path: string): string => {
+  const manifest = JSON.parse(
+    readFileSync(resolve(repoRoot, ".github/.release-please-manifest.json"), "utf8"),
+  ) as Record<string, string>;
+  const version = manifest[path];
+  assert.ok(version, `no manifest version for ${path}`);
+  return version;
+};
+
+/** A version one minor above the given one, so a pin is always ahead. */
+const nextMinor = (version: string): string => {
+  const [major, minor] = version.split(".");
+  return `${major}.${Number(minor) + 1}.0`;
+};
+
 const liveComponents = () =>
   releaseComponents(
     JSON.parse(
@@ -37,19 +60,6 @@ const liveComponents = () =>
       ),
     ),
   );
-
-/**
- * The version the live manifest records for a component path. The guard reads
- * the same file, so an assertion on the reported version has to follow every
- * release instead of pinning a number the next release invalidates.
- */
-const liveVersion = (path: string): string =>
-  JSON.parse(
-    readFileSync(
-      resolve(repoRoot, ".github/.release-please-manifest.json"),
-      "utf8",
-    ),
-  )[path];
 
 const names = (files: string[]): string[] =>
   bumpedComponents(files, liveComponents())
@@ -432,20 +442,20 @@ describe("breaking-change scope guard", () => {
 
     /** @scenario "A break spanning two components fails" */
     it("fails while more than one bumped component is still unpinned", () => {
+      const now = currentVersion("sdks/typescript");
+      const pinned = nextMinor(now);
       const result = runGuard(
         checkout({
           files: [...threeComponents, typescriptShim],
-          messages: [breakingCommit, pinCommit("typescript-sdk", "1.5.0")],
-          shims: { [typescriptShim]: shimSaying("1.5.0") },
+          messages: [breakingCommit, pinCommit("typescript-sdk", pinned)],
+          shims: { [typescriptShim]: shimSaying(pinned) },
         }),
       );
 
       assert.equal(result.status, 1);
       assert.ok(
         result.stderr.includes(
-          `- typescript-sdk (sdks/typescript), now ${liveVersion(
-            "sdks/typescript",
-          )}, pinned to 1.5.0`,
+          `- typescript-sdk (sdks/typescript), now ${now}, pinned to ${pinned}`,
         ),
         result.stderr,
       );
