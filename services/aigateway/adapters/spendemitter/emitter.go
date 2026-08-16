@@ -50,11 +50,10 @@ func (e *Emitter) ConfirmSpend(o pipeline.SpendOutcome) {
 		GatewayRequestID: o.GatewayRequestID,
 		OccurredAtUnixMs: o.OccurredAt.UTC().UnixMilli(),
 		ProjectID:        o.ProjectID,
-		// reasoning tokens do not reach domain.Usage today; see report
-		Usage:           usageFromDomain(o.Usage, 0),
-		Model:           o.Model,
-		ModelProviderID: o.ModelProviderID,
-		DurationMS:      o.Duration.Milliseconds(),
+		Usage:            usageFromDomain(o.Usage),
+		Model:            o.Model,
+		ModelProviderID:  o.ModelProviderID,
+		DurationMS:       o.Duration.Milliseconds(),
 	})
 }
 
@@ -69,7 +68,7 @@ func (e *Emitter) FailSpend(o pipeline.SpendOutcome) {
 		OccurredAtUnixMs: o.OccurredAt.UTC().UnixMilli(),
 		ProjectID:        o.ProjectID,
 		Error:            errPayload,
-		Usage:            usageFromDomain(o.Usage, 0),
+		Usage:            usageFromDomain(o.Usage),
 		Model:            o.Model,
 		ModelProviderID:  o.ModelProviderID,
 		DurationMS:       o.Duration.Milliseconds(),
