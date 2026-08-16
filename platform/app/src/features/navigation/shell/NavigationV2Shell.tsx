@@ -1,4 +1,5 @@
 import { Box, HStack, Text, useBreakpointValue } from "@chakra-ui/react";
+import { Settings as SettingsIcon } from "lucide-react";
 import { useLayoutEffect } from "react";
 import { AppHeaderUserMenu } from "~/components/AppHeaderUserMenu";
 import type { DashboardLayoutProps } from "~/components/DashboardLayout";
@@ -117,17 +118,23 @@ export const NavigationV2Shell = ({
     return <NotFoundScene />;
   }
 
+  const isSettingsRoute = router.pathname.startsWith("/settings");
   const isOnOwnPersonalProject =
     !!team?.isPersonal && team.ownerUserId === session?.user?.id;
   const isPersonalScopeRoute =
-    personalScope ||
-    router.pathname.startsWith("/me") ||
-    isOnOwnPersonalProject;
-  const activeProductId =
-    (isPersonalScopeRoute ? "me" : productFromPathname(router.pathname)) ??
-    "llm-ops";
+    !isSettingsRoute &&
+    (personalScope ||
+      router.pathname.startsWith("/me") ||
+      isOnOwnPersonalProject);
+  // Settings is not a product: no active product, a static title in the
+  // top bar, and the settings sidebar surface.
+  const activeProductId = isSettingsRoute
+    ? null
+    : ((isPersonalScopeRoute ? "me" : productFromPathname(router.pathname)) ??
+      "llm-ops");
   const isOrgScopeRoute =
     orgScope ||
+    isSettingsRoute ||
     activeProductId === "gateway" ||
     activeProductId === "governance";
 
@@ -214,7 +221,21 @@ export const NavigationV2Shell = ({
                 <Link href="/" display="flex" alignItems="center">
                   <LogoIcon width={25 * 0.7} height={32 * 0.7} />
                 </Link>
-                <ProductSwitcherMenu activeProductId={activeProductId} />
+                {activeProductId ? (
+                  <ProductSwitcherMenu activeProductId={activeProductId} />
+                ) : (
+                  // Settings is a detour, not a product to switch between;
+                  // the way out is the sidebar's back entry.
+                  <HStack gap={2} paddingX={2}>
+                    <SettingsIcon
+                      size={14}
+                      color="var(--chakra-colors-fg-muted)"
+                    />
+                    <Text fontSize="13px" fontWeight="medium">
+                      Settings
+                    </Text>
+                  </HStack>
+                )}
               </>
             )}
             <OrganizationSelect activeProductId={activeProductId} />
@@ -253,7 +274,7 @@ export const NavigationV2Shell = ({
           minHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
         >
           <ProductSidebar
-            activeProductId={activeProductId}
+            surface={activeProductId ?? "settings"}
             isCompact={isCompactSidebar}
           />
 

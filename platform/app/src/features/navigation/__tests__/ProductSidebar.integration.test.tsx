@@ -151,12 +151,10 @@ vi.mock("~/utils/tracking", () => ({
 
 import { ProductSidebar } from "../shell/ProductSidebar";
 
-function renderSidebar(
-  activeProductId: "me" | "llm-ops" | "gateway" | "governance",
-) {
+function renderSidebar(surface: "me" | "llm-ops" | "gateway" | "governance") {
   return render(
     <ChakraProvider value={defaultSystem}>
-      <ProductSidebar activeProductId={activeProductId} isCompact={false} />
+      <ProductSidebar surface={surface} isCompact={false} />
     </ChakraProvider>,
   );
 }

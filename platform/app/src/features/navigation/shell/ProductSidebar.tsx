@@ -1,5 +1,5 @@
-import { Box, Kbd, VStack } from "@chakra-ui/react";
-import { ExternalLink, Search } from "lucide-react";
+import { Badge, Box, Kbd, Text, VStack } from "@chakra-ui/react";
+import { ArrowLeft, ExternalLink, Search } from "lucide-react";
 import { useState } from "react";
 import {
   MainMenuSections,
@@ -17,12 +17,18 @@ import { APP_HEADER_HEIGHT } from "~/features/langy/logic/langyPanelLayout";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRouter } from "~/utils/compat/next-router";
 import { featureIcons } from "~/utils/featureIcons";
+import { readLastVisitedProduct } from "../logic/productMemory";
+import { resolveSettingsBackTarget } from "../logic/resolveSettingsBackTarget";
 import type { ProductId } from "../products";
 import {
   gatewayNavItems,
   governanceNavItems,
   type SectionNavItemData,
 } from "../sectionNavItems";
+import { useReachableProducts } from "../useReachableProducts";
+import { useSettingsMenu } from "../useSettingsMenu";
+
+export type SidebarSurface = ProductId | "settings";
 
 /**
  * Quick Search as the first sidebar entry in the navigation-v2 shells,
@@ -54,9 +60,16 @@ function QuickSearchMenuItem({ showLabel }: { showLabel: boolean }) {
 /**
  * The pinned utility block at the bottom of every navigation-v2 sidebar:
  * usage, Settings, Support (with the human chat folded in) and the theme
- * control.
+ * control. The Settings sidebar drops its own entry, since the back
+ * entry above already frames it.
  */
-function SidebarBottomBlock({ showExpanded }: { showExpanded: boolean }) {
+function SidebarBottomBlock({
+  showExpanded,
+  includeSettingsLink,
+}: {
+  showExpanded: boolean;
+  includeSettingsLink: boolean;
+}) {
   const router = useRouter();
   const { hasPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
@@ -66,7 +79,7 @@ function SidebarBottomBlock({ showExpanded }: { showExpanded: boolean }) {
   return (
     <VStack width="full" gap={0.5} align="start">
       <UsageIndicator showLabel={showExpanded} />
-      {hasPermission("organization:view") && (
+      {includeSettingsLink && hasPermission("organization:view") && (
         <SideMenuLink
           icon={featureIcons.settings.icon}
           label="Settings"
@@ -78,6 +91,105 @@ function SidebarBottomBlock({ showExpanded }: { showExpanded: boolean }) {
       <SupportMenu showLabel={showExpanded} chatPlacement="in-menu" />
       <ThemeToggle showLabel={showExpanded} />
     </VStack>
+  );
+}
+
+/**
+ * The way out of Settings: back to the page the user came from in this
+ * tab, else the remembered product's home. First entry of the Settings
+ * sidebar.
+ *
+ * Spec: specs/navigation/settings-shell-v2.feature
+ */
+function SettingsBackEntry({ showLabel }: { showLabel: boolean }) {
+  const { organization, project } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+    redirectToProjectOnboarding: false,
+  });
+  const { reachableProducts } = useReachableProducts();
+  const target = resolveSettingsBackTarget({
+    rememberedProduct: organization
+      ? readLastVisitedProduct({ organizationId: organization.id })
+      : null,
+    reachableProducts,
+    projectSlug: project && !project.isPersonal ? project.slug : null,
+  });
+
+  return (
+    <Box
+      width="full"
+      borderBottomWidth="1px"
+      borderBottomColor="border.muted"
+      paddingBottom={1.5}
+      marginBottom={1}
+    >
+      <SideMenuLink
+        icon={ArrowLeft}
+        label={target.label}
+        href={target.href}
+        showLabel={showLabel}
+      />
+    </Box>
+  );
+}
+
+/**
+ * The Settings sidebar body: the regrouped, iconed settings menu with
+ * the same gates the legacy settings navigation applies. Enterprise
+ * entries carry the violet pill.
+ */
+function SettingsMenuBody({ showExpanded }: { showExpanded: boolean }) {
+  const router = useRouter();
+  const groups = useSettingsMenu();
+
+  return (
+    <>
+      {groups.map((group) => (
+        <VStack key={group.label} width="full" gap={0.5} align="start">
+          {showExpanded && (
+            <Text
+              fontSize="11px"
+              fontWeight="medium"
+              textTransform="uppercase"
+              whiteSpace="nowrap"
+              color="gray.500"
+              paddingX={2}
+              paddingTop={2.5}
+              paddingBottom={0.5}
+            >
+              {group.label}
+            </Text>
+          )}
+          {group.items.map((item) => (
+            <SideMenuLink
+              key={item.href}
+              icon={item.icon}
+              label={item.label}
+              href={item.href}
+              isActive={
+                item.exact
+                  ? router.pathname === item.href
+                  : router.pathname.startsWith(item.includePath ?? item.href)
+              }
+              showLabel={showExpanded}
+              rightElement={
+                item.enterprise ? (
+                  <Badge
+                    title="Enterprise plan feature"
+                    colorPalette="purple"
+                    variant="outline"
+                    fontSize="9px"
+                    borderRadius="sm"
+                  >
+                    ENT
+                  </Badge>
+                ) : undefined
+              }
+            />
+          ))}
+        </VStack>
+      ))}
+    </>
   );
 }
 
@@ -118,13 +230,16 @@ function SectionItemsNav({
 }
 
 function ProductSidebarBody({
-  productId,
+  surface,
   showExpanded,
 }: {
-  productId: ProductId;
+  surface: SidebarSurface;
   showExpanded: boolean;
 }) {
-  if (productId === "me") {
+  if (surface === "settings") {
+    return <SettingsMenuBody showExpanded={showExpanded} />;
+  }
+  if (surface === "me") {
     return (
       <PersonalSidebarLinks
         showExpanded={showExpanded}
@@ -132,12 +247,12 @@ function ProductSidebarBody({
       />
     );
   }
-  if (productId === "gateway") {
+  if (surface === "gateway") {
     return (
       <SectionItemsNav items={gatewayNavItems} showExpanded={showExpanded} />
     );
   }
-  if (productId === "governance") {
+  if (surface === "governance") {
     return (
       <SectionItemsNav items={governanceNavItems} showExpanded={showExpanded} />
     );
@@ -152,17 +267,20 @@ function ProductSidebarBody({
 
 /**
  * The navigation-v2 sidebar frame, shared by the product-switcher and
- * icon-rail shells: Quick Search first, the active product's own pages,
- * and the pinned bottom block. It never auto-hides; only small screens
- * keep the hover-expanded responsive collapse the legacy chrome has.
+ * icon-rail shells: Quick Search first, the active surface's own pages,
+ * and the pinned bottom block. The Settings surface opens with the way
+ * back to the product the user came from. It never auto-hides; only
+ * small screens keep the hover-expanded responsive collapse the legacy
+ * chrome has.
  *
- * Spec: specs/navigation/product-sidebars.feature
+ * Specs: specs/navigation/product-sidebars.feature,
+ *        specs/navigation/settings-shell-v2.feature
  */
 export function ProductSidebar({
-  activeProductId,
+  surface,
   isCompact,
 }: {
-  activeProductId: ProductId;
+  surface: SidebarSurface;
   isCompact: boolean;
 }) {
   const [isHovered, setIsHovered] = useState(false);
@@ -218,15 +336,18 @@ export function ProductSidebar({
               "&::-webkit-scrollbar-track": { background: "transparent" },
             }}
           >
+            {surface === "settings" && (
+              <SettingsBackEntry showLabel={showExpanded} />
+            )}
             <QuickSearchMenuItem showLabel={showExpanded} />
             <Box height={2} width="full" flexShrink={0} />
-            <ProductSidebarBody
-              productId={activeProductId}
-              showExpanded={showExpanded}
-            />
+            <ProductSidebarBody surface={surface} showExpanded={showExpanded} />
           </VStack>
 
-          <SidebarBottomBlock showExpanded={showExpanded} />
+          <SidebarBottomBlock
+            showExpanded={showExpanded}
+            includeSettingsLink={surface !== "settings"}
+          />
         </VStack>
       </Box>
     </Box>

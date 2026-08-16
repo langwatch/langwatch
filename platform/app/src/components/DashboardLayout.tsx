@@ -28,9 +28,9 @@ import Head from "~/utils/compat/next-head";
 import { useRouter } from "~/utils/compat/next-router";
 import { ImpersonationBanner } from "../../ee/admin/ImpersonationBanner";
 import { CommandBarTrigger } from "../features/command-bar";
-import { productFromPathname } from "../features/navigation/products";
 import { NavigationV2Shell } from "../features/navigation/shell/NavigationV2Shell";
 import { useNavigationMode } from "../features/navigation/useNavigationMode";
+import { isNavigationV2ShellRoute } from "../features/navigation/useNavigationV2ShellActive";
 import { useDrawer } from "../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { useOrgQueryParamSelection } from "../hooks/useOrgQueryParamSelection";
@@ -402,9 +402,9 @@ const ModeResolvedDashboardLayout = (dashboardProps: DashboardLayoutProps) => {
   if (resolution.mode === "legacy") {
     return <LegacyDashboardLayout {...dashboardProps} />;
   }
-  // Settings and internal ops pages keep the current chrome until their
-  // own v2 shells land; the product shells cover the product routes.
-  if (productFromPathname(router.pathname) === null) {
+  // Internal ops pages keep the current chrome; the shells cover the
+  // product routes and the settings pages.
+  if (!isNavigationV2ShellRoute(router.pathname)) {
     return <LegacyDashboardLayout {...dashboardProps} />;
   }
   return <NavigationV2Shell mode={resolution.mode} {...dashboardProps} />;

@@ -34,7 +34,7 @@ function firstProjectSlug(
 export function OrganizationSelect({
   activeProductId,
 }: {
-  activeProductId: ProductId;
+  activeProductId: ProductId | null;
 }) {
   const router = useRouter();
   const { organization, organizations } = useOrganizationTeamProject({

@@ -1,0 +1,336 @@
+/**
+ * @vitest-environment jsdom
+ *
+ * The Settings surface inside the navigation-v2 shell, rendered through
+ * the real SettingsLayout so the seam is exercised end to end: the back
+ * entry, the regrouped iconed menu with its gates, the static top-bar
+ * title, and the unchanged legacy chrome when the device stays on the
+ * legacy mode.
+ *
+ * Spec: specs/navigation/settings-shell-v2.feature
+ */
+
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { cleanup, render, screen } from "@testing-library/react";
+import type { PropsWithChildren } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+let mockPathname = "/settings";
+let mockIsEnterprise = true;
+let mockIsLiteMember = false;
+const pushMock = vi.fn().mockResolvedValue(true);
+
+const team = {
+  id: "team_1",
+  name: "Core",
+  slug: "core",
+  isPersonal: false,
+  ownerUserId: null,
+  members: [{ userId: "user_1", role: "ADMIN" }],
+  projects: [
+    { id: "project_1", slug: "demo", name: "Demo", isPersonal: false },
+  ],
+};
+const organization = {
+  id: "org_1",
+  name: "ACME",
+  members: [{ userId: "user_1", role: "ADMIN" }],
+  teams: [team],
+};
+
+vi.mock("~/utils/compat/next-router", () => ({
+  useRouter: () => ({
+    pathname: mockPathname,
+    query: {},
+    asPath: mockPathname,
+    push: pushMock,
+    replace: vi.fn(),
+    events: { on: vi.fn(), off: vi.fn(), emit: vi.fn() },
+  }),
+}));
+
+vi.mock("~/utils/compat/next-navigation", () => ({
+  usePathname: () => mockPathname,
+}));
+
+vi.mock("~/utils/compat/next-head", () => ({
+  default: () => null,
+}));
+
+vi.mock("~/hooks/useRequiredSession", () => ({
+  useRequiredSession: () => ({
+    data: {
+      user: { id: "user_1", name: "Ada", email: "ada@acme.test" },
+    },
+  }),
+}));
+
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+  userBelongsToTeam: () => true,
+  useOrganizationTeamProject: () => ({
+    isLoading: false,
+    organization,
+    organizations: [organization],
+    team,
+    project: team.projects[0],
+    organizationRole: "ADMIN",
+    hasPermission: () => true,
+  }),
+}));
+
+vi.mock("~/hooks/useLiteMemberGuard", () => ({
+  useLiteMemberGuard: () => ({ isLiteMember: mockIsLiteMember }),
+}));
+
+vi.mock("~/hooks/useActivePlan", () => ({
+  useActivePlan: () => ({ isEnterprise: mockIsEnterprise, isLoading: false }),
+}));
+
+vi.mock("~/hooks/useFeatureFlag", async () => {
+  const actual = await vi.importActual<object>("~/hooks/useFeatureFlag");
+  return {
+    ...actual,
+    useFeatureFlag: () => ({ enabled: true, isLoading: false }),
+  };
+});
+
+const trackEventMock = vi.fn();
+vi.mock("~/utils/tracking", () => ({
+  trackEvent: (...args: unknown[]) => trackEventMock(...args),
+}));
+
+vi.mock("~/components/LoadingScreen", () => ({
+  LoadingScreen: () => <div data-testid="loading-screen" />,
+}));
+
+vi.mock("~/hooks/usePublicEnv", () => ({
+  usePublicEnv: () => ({
+    data: {
+      NODE_ENV: "test",
+      IS_SAAS: true,
+      HAS_LANGWATCH_NLP_SERVICE: true,
+      HAS_LANGEVALS_ENDPOINT: true,
+    },
+  }),
+}));
+
+vi.mock("~/hooks/usePlanManagementUrl", () => ({
+  usePlanManagementUrl: () => ({ url: "" }),
+}));
+
+vi.mock("~/hooks/usePostHogIdentify", () => ({
+  usePostHogIdentify: () => undefined,
+}));
+
+vi.mock("~/hooks/useOrgQueryParamSelection", () => ({
+  useOrgQueryParamSelection: () => undefined,
+}));
+
+vi.mock("~/hooks/useSavedViews", () => ({
+  SavedViewsProvider: ({ children }: PropsWithChildren) => <>{children}</>,
+}));
+
+vi.mock("~/hooks/useDrawer", () => ({
+  useDrawer: () => ({ openDrawer: vi.fn(), closeDrawer: vi.fn() }),
+}));
+
+vi.mock("~/hooks/useOpsPermission", () => ({
+  useOpsPermission: () => ({ hasAccess: false }),
+}));
+
+vi.mock("~/features/langy/stores/langyStore", () => ({
+  useLangyStore: (selector: (state: unknown) => unknown) =>
+    selector({
+      dockShifted: false,
+      claimDockShell: () => undefined,
+      releaseDockShell: () => undefined,
+    }),
+}));
+
+vi.mock("~/components/messages/HeaderButtons", () => ({
+  useTableView: () => ({ isTableView: false }),
+}));
+
+vi.mock("~/utils/crispBubblePolicy", () => ({
+  toggleSupportChat: vi.fn(),
+}));
+
+vi.mock("~/utils/api", () => ({
+  api: {
+    limits: {
+      getUsage: { useQuery: () => ({ data: undefined }) },
+    },
+    user: {
+      getSsoStatus: { useQuery: () => ({ data: undefined }) },
+      isAdmin: { useQuery: () => ({ data: { isAdmin: false } }) },
+    },
+    governance: {
+      recordWorkspaceView: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
+    },
+    annotation: {
+      getPendingItemsCount: { useQuery: () => ({ data: 0 }) },
+    },
+    personalWorkspaceFeatures: {
+      get: { useQuery: () => ({ data: undefined }) },
+    },
+    ops: {
+      getBadgeCounts: { useQuery: () => ({ data: undefined }) },
+      getDashboardSnapshot: { useQuery: () => ({ data: undefined }) },
+    },
+    featureFlag: {
+      isEnabledForEachOrganization: {
+        useQuery: () => ({ data: undefined }),
+      },
+    },
+  },
+}));
+
+const commandBarOpenMock = vi.fn();
+vi.mock("~/features/command-bar", () => ({
+  CommandBarTrigger: () => null,
+  useCommandBar: () => ({ open: commandBarOpenMock }),
+}));
+
+vi.mock("~/features/traces-v2/components/GlobalTraceV2DrawerMount", () => ({
+  GlobalTraceV2DrawerMount: () => null,
+}));
+
+vi.mock("~/components/CurrentDrawer", () => ({ CurrentDrawer: () => null }));
+vi.mock("~/components/AnnouncementBanner", () => ({
+  AnnouncementBanner: () => null,
+}));
+vi.mock("~/components/UpgradeModal", () => ({
+  GlobalUpgradeModal: () => null,
+}));
+vi.mock("~/components/messages/SavedViewsBar", () => ({
+  SavedViewsBar: () => null,
+}));
+vi.mock("~/components/governance/AdminViewingAsBanner", () => ({
+  AdminViewingAsBanner: () => null,
+}));
+vi.mock("~/components/WorkspaceSwitcher", () => ({
+  WorkspaceSwitcher: () => <div data-testid="workspace-switcher" />,
+}));
+vi.mock("../../../../ee/admin/ImpersonationBanner", () => ({
+  ImpersonationBanner: () => null,
+}));
+vi.mock("../../../../ee/admin/ImpersonationSwitchBackMenuItem", () => ({
+  ImpersonationSwitchBackMenuItem: () => null,
+}));
+vi.mock("~/components/sidebar/PresenceMenuItem", () => ({
+  PresenceMenuItem: () => null,
+}));
+
+import SettingsLayout from "~/components/SettingsLayout";
+import { useNavigationModeStore } from "~/features/navigation/navigationModeStore";
+import { captureSettingsReturnPath } from "../logic/resolveSettingsBackTarget";
+
+function renderSettings() {
+  return render(
+    <ChakraProvider value={defaultSystem}>
+      <SettingsLayout>
+        <div data-testid="settings-page-content" />
+      </SettingsLayout>
+    </ChakraProvider>,
+  );
+}
+
+beforeEach(() => {
+  mockPathname = "/settings";
+  mockIsEnterprise = true;
+  mockIsLiteMember = false;
+  pushMock.mockClear();
+  localStorage.clear();
+  sessionStorage.clear();
+  useNavigationModeStore.setState({ storedMode: "product-switcher" });
+});
+
+afterEach(() => {
+  cleanup();
+});
+
+describe("the settings shell in a new navigation mode", () => {
+  describe("when Settings was entered from a Gateway page", () => {
+    /** @scenario The Settings sidebar opens with the way back */
+    it("opens with the back entry, then Quick Search", () => {
+      captureSettingsReturnPath({ pathname: "/gateway/budgets" });
+      renderSettings();
+
+      const back = screen.getByRole("link", { name: "Back to Gateway" });
+      expect(back).toHaveAttribute("href", "/gateway/budgets");
+      expect(
+        screen.getByRole("button", { name: "Quick Search" }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe("the regrouped settings menu", () => {
+    /** @scenario The settings menu is grouped with its gates kept */
+    it("shows the groups with the current addresses", () => {
+      renderSettings();
+
+      expect(screen.getByText("Organization")).toBeInTheDocument();
+      expect(screen.getByText("Access")).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "General" })).toHaveAttribute(
+        "href",
+        "/settings",
+      );
+      expect(screen.getByRole("link", { name: "Members" })).toHaveAttribute(
+        "href",
+        "/settings/members",
+      );
+      expect(screen.getByTestId("settings-page-content")).toBeInTheDocument();
+    });
+
+    /** @scenario Enterprise entries carry a violet pill */
+    it("marks the enterprise entries with the pill", () => {
+      renderSettings();
+
+      expect(screen.getByRole("link", { name: "Groups" })).toBeInTheDocument();
+      expect(screen.getAllByText("ENT").length).toBeGreaterThanOrEqual(1);
+    });
+
+    /** @scenario A lite member sees no restricted settings entries */
+    it("hides the restricted entries from a lite member", () => {
+      mockIsLiteMember = true;
+      renderSettings();
+
+      expect(
+        screen.queryByRole("link", { name: "API Keys" }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("link", { name: "Secrets" }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("the top bar", () => {
+    /** @scenario The top bar shows a static Settings title */
+    it("shows a static Settings title, no product dropdown, and the organization", () => {
+      renderSettings();
+
+      expect(
+        screen.queryByRole("button", { name: "Switch product" }),
+      ).not.toBeInTheDocument();
+      expect(screen.getByText("Settings")).toBeInTheDocument();
+      expect(screen.getByText("ACME")).toBeInTheDocument();
+    });
+  });
+
+  describe("when the device is in legacy mode", () => {
+    /** @scenario Legacy mode keeps the current settings chrome */
+    it("keeps the current settings navigation", () => {
+      useNavigationModeStore.setState({ storedMode: "legacy" });
+      renderSettings();
+
+      expect(
+        screen.getByRole("link", { name: "General Settings" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Quick Search" }),
+      ).not.toBeInTheDocument();
+    });
+  });
+});

@@ -79,7 +79,7 @@ export function IconRail({
   activeProductId,
   isSettingsActive,
 }: {
-  activeProductId: ProductId;
+  activeProductId: ProductId | null;
   isSettingsActive: boolean;
 }) {
   const router = useRouter();

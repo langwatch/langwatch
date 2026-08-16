@@ -154,7 +154,7 @@ function ProjectScopeMenu() {
 export function ProductScopeControl({
   activeProductId,
 }: {
-  activeProductId: ProductId;
+  activeProductId: ProductId | null;
 }) {
   if (activeProductId === "llm-ops") {
     return (

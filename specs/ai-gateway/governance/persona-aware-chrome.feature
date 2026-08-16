@@ -13,6 +13,10 @@ Feature: AI Gateway Governance — Persona-aware chrome (sidebar + header)
   …  jane@miro.com ⚙` — ONE workspace chip, no project sidebar, no Govern
   unless gated.
 
+  This feature describes the legacy chrome, which every device on the legacy
+  navigation mode keeps unchanged. Devices on a new navigation mode render
+  the navigation-v2 shells instead (specs/navigation/).
+
   This spec is the LAYOUT-LAYER contract. The persona resolver
   (`PersonaResolverService`) and home-routing redirect (`/` → resolved
   destination) are already shipped (`e40ee0045`); this feature locks down
