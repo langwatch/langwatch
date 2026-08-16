@@ -92,42 +92,72 @@ export async function resolveTargetAgent({
   const httpAgents = listing.data.filter((agent) => agent.type === "http");
 
   if (agentFlag) {
-    const byId = listing.data.find((agent) => agent.id === agentFlag);
-    const byName = httpAgents.filter(
-      (agent) => agent.name.toLowerCase() === agentFlag.toLowerCase(),
+    return agentFromFlag({ agentFlag, all: listing.data, httpAgents });
+  }
+
+  const remembered = agentFromMemory(httpAgents);
+  if (remembered) return remembered;
+
+  return pickHttpAgent(httpAgents);
+}
+
+/** `--agent <id|name>`: an exact id, else a name match over HTTP agents. */
+function agentFromFlag({
+  agentFlag,
+  all,
+  httpAgents,
+}: {
+  agentFlag: string;
+  all: AgentResponse[];
+  httpAgents: AgentResponse[];
+}): AgentResponse {
+  const byId = all.find((agent) => agent.id === agentFlag);
+  const byName = httpAgents.filter(
+    (agent) => agent.name.toLowerCase() === agentFlag.toLowerCase(),
+  );
+  const match = byId ?? byName[0];
+  if (!match) {
+    fail(
+      `No agent matches "${agentFlag}". Run \`langwatch agent list\` to see the registered agents.`,
     );
-    const match = byId ?? byName[0];
-    if (!match) {
-      fail(
-        `No agent matches "${agentFlag}". Run \`langwatch agent list\` to see the registered agents.`,
-      );
-    }
-    if (match.type !== "http") {
-      fail(
-        `Agent "${match.name}" has type "${match.type}". Only HTTP agents can point at a local tunnel.`,
-      );
-    }
-    if (!byId && byName.length > 1) {
-      fail(
-        `More than one HTTP agent is named "${agentFlag}". Pass the agent id instead: langwatch agent dev --agent <id>`,
-      );
-    }
-    return match;
   }
+  if (match.type !== "http") {
+    fail(
+      `Agent "${match.name}" has type "${match.type}". Only HTTP agents can point at a local tunnel.`,
+    );
+  }
+  if (!byId && byName.length > 1) {
+    fail(
+      `More than one HTTP agent is named "${agentFlag}". Pass the agent id instead: langwatch agent dev --agent <id>`,
+    );
+  }
+  return match;
+}
 
+/**
+ * The agent remembered for this directory from a previous run. Undefined when
+ * nothing is remembered, or when the remembered agent is gone from the
+ * project, in which case selection falls through to the picker.
+ */
+function agentFromMemory(httpAgents: AgentResponse[]): AgentResponse | undefined {
   const remembered = rememberedAgentForDirectory();
-  if (remembered) {
-    const match = httpAgents.find((agent) => agent.id === remembered);
-    if (match) {
-      console.log(
-        chalk.gray(
-          `Using agent "${match.name}" remembered for this directory (override with --agent).`,
-        ),
-      );
-      return match;
-    }
-  }
+  if (!remembered) return undefined;
 
+  const match = httpAgents.find((agent) => agent.id === remembered);
+  if (!match) return undefined;
+
+  console.log(
+    chalk.gray(
+      `Using agent "${match.name}" remembered for this directory (override with --agent).`,
+    ),
+  );
+  return match;
+}
+
+/** The only HTTP agent, else an interactive picker over them (TTY only). */
+async function pickHttpAgent(
+  httpAgents: AgentResponse[],
+): Promise<AgentResponse> {
   if (httpAgents.length === 0) {
     fail(
       "This project has no HTTP agents. Create one first: langwatch agent create \"My Agent\" --type http --config '{\"url\":\"https://...\"}'",
@@ -136,7 +166,6 @@ export async function resolveTargetAgent({
   if (httpAgents.length === 1) {
     return httpAgents[0]!;
   }
-
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
     fail(
       "More than one HTTP agent is registered. Pass which one to use: langwatch agent dev --agent <id|name>",

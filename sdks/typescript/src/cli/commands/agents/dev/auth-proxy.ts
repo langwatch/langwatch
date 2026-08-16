@@ -88,73 +88,106 @@ export function startAuthProxy({
   upstreamTimeoutMs?: number;
 }): Promise<AuthProxy> {
   const target = new URL(targetUrl);
-  const requestFn = target.protocol === "https:" ? https.request : http.request;
 
   const server = http.createServer((req, res) => {
-    const presented = req.headers[DEV_SECRET_HEADER.toLowerCase()];
-    if (!secretMatches(presented, secret)) {
-      res.writeHead(401, { "Content-Type": "application/json" });
-      res.end(
-        JSON.stringify({
-          error:
-            "Missing or invalid dev tunnel secret. Requests must come through the LangWatch platform.",
-        }),
-      );
+    if (!isAuthorized(req, secret)) {
+      rejectUnauthorized(res);
       return;
     }
-
-    const headers = { ...req.headers };
-    delete headers.host;
-    delete headers[DEV_SECRET_HEADER.toLowerCase()];
-    for (const name of HOP_BY_HOP_HEADERS) {
-      delete headers[name];
-    }
-
-    const upstream = requestFn(
-      {
-        protocol: target.protocol,
-        hostname: target.hostname,
-        port: target.port,
-        path: joinProxyPath(target.pathname, req.url ?? "/"),
-        method: req.method,
-        headers,
-        timeout: upstreamTimeoutMs,
-      },
-      (upstreamRes) => {
-        res.writeHead(upstreamRes.statusCode ?? 502, upstreamRes.headers);
-        upstreamRes.pipe(res);
-        upstreamRes.on("error", () => {
-          // The upstream died mid-response: cutting the client's socket is
-          // what tells it the response is incomplete.
-          res.destroy();
-        });
-      },
-    );
-    upstream.on("timeout", () => {
-      upstream.destroy(
-        new Error(
-          `it did not answer within ${upstreamTimeoutMs / 1000} seconds`,
-        ),
-      );
-    });
-    upstream.on("error", (error) => {
-      if (res.headersSent) {
-        // The upstream died mid-response. Appending an error body here would
-        // corrupt a response the client is already parsing; ending the socket
-        // is what tells the client the response is incomplete.
-        res.destroy();
-        return;
-      }
-      res.writeHead(502, { "Content-Type": "application/json" });
-      res.end(
-        JSON.stringify({
-          error: `Could not reach the local agent at ${targetUrl}: ${error.message}`,
-        }),
-      );
-    });
-    req.pipe(upstream);
+    forwardToUpstream({ req, res, target, targetUrl, upstreamTimeoutMs });
   });
 
+  return listenOnEphemeralPort(server);
+}
+
+/** True when the request carries the session secret in the dev-secret header. */
+function isAuthorized(req: http.IncomingMessage, secret: string): boolean {
+  return secretMatches(req.headers[DEV_SECRET_HEADER.toLowerCase()], secret);
+}
+
+function rejectUnauthorized(res: http.ServerResponse): void {
+  res.writeHead(401, { "Content-Type": "application/json" });
+  res.end(
+    JSON.stringify({
+      error:
+        "Missing or invalid dev tunnel secret. Requests must come through the LangWatch platform.",
+    }),
+  );
+}
+
+/**
+ * Headers for the upstream call: the client's own, minus the ones that
+ * describe the hop to this proxy rather than the request itself.
+ */
+function forwardableHeaders(req: http.IncomingMessage): http.IncomingHttpHeaders {
+  const headers = { ...req.headers };
+  delete headers.host;
+  delete headers[DEV_SECRET_HEADER.toLowerCase()];
+  for (const name of HOP_BY_HOP_HEADERS) {
+    delete headers[name];
+  }
+  return headers;
+}
+
+function forwardToUpstream({
+  req,
+  res,
+  target,
+  targetUrl,
+  upstreamTimeoutMs,
+}: {
+  req: http.IncomingMessage;
+  res: http.ServerResponse;
+  target: URL;
+  targetUrl: string;
+  upstreamTimeoutMs: number;
+}): void {
+  const requestFn = target.protocol === "https:" ? https.request : http.request;
+
+  const upstream = requestFn(
+    {
+      protocol: target.protocol,
+      hostname: target.hostname,
+      port: target.port,
+      path: joinProxyPath(target.pathname, req.url ?? "/"),
+      method: req.method,
+      headers: forwardableHeaders(req),
+      timeout: upstreamTimeoutMs,
+    },
+    (upstreamRes) => {
+      res.writeHead(upstreamRes.statusCode ?? 502, upstreamRes.headers);
+      upstreamRes.pipe(res);
+      upstreamRes.on("error", () => {
+        // The upstream died mid-response: cutting the client's socket is
+        // what tells it the response is incomplete.
+        res.destroy();
+      });
+    },
+  );
+  upstream.on("timeout", () => {
+    upstream.destroy(
+      new Error(`it did not answer within ${upstreamTimeoutMs / 1000} seconds`),
+    );
+  });
+  upstream.on("error", (error) => {
+    if (res.headersSent) {
+      // The upstream died mid-response. Appending an error body here would
+      // corrupt a response the client is already parsing; ending the socket
+      // is what tells the client the response is incomplete.
+      res.destroy();
+      return;
+    }
+    res.writeHead(502, { "Content-Type": "application/json" });
+    res.end(
+      JSON.stringify({
+        error: `Could not reach the local agent at ${targetUrl}: ${error.message}`,
+      }),
+    );
+  });
+  req.pipe(upstream);
+}
+
+function listenOnEphemeralPort(server: http.Server): Promise<AuthProxy> {
   return new Promise((resolve, reject) => {
     server.once("error", reject);
     server.listen(0, "127.0.0.1", () => {
