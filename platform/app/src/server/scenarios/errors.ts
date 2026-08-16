@@ -35,7 +35,9 @@ export class AgentDevTunnelUnreachableError extends HandledError {
   constructor() {
     super(
       "agent_dev_tunnel_unreachable",
-      "The agent points at a local development tunnel that is no longer responding.",
+      "The agent points at a local development tunnel that is no longer " +
+        "responding. The `langwatch agent dev` session that created it has " +
+        "probably ended.",
       {
         httpStatus: 502,
         fault: "customer",
