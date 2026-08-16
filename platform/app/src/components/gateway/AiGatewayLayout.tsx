@@ -33,7 +33,7 @@ export default function AiGatewayLayout({
         href: item.href,
         includePath: item.includePath,
         icon: <item.icon size={14} />,
-        ...(item.external
+        ...(item.isExternal
           ? {
               menuEnd: <ExternalLink size={12} aria-hidden />,
               target: "_blank" as const,

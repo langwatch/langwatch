@@ -47,10 +47,10 @@ export interface SettingsMenuItem {
   /** Prefix that marks the item active; the href itself when unset. */
   includePath?: string;
   /** Only the exact address marks the item active (group index pages). */
-  exact?: boolean;
+  isExactMatch?: boolean;
   icon: LucideIcon;
   /** Enterprise-plan entry; renders the violet pill. */
-  enterprise?: boolean;
+  isEnterprise?: boolean;
 }
 
 export interface SettingsMenuGroup {
@@ -75,7 +75,12 @@ function organizationGroup({
   return {
     label: "Organization",
     items: [
-      { label: "General", href: "/settings", exact: true, icon: Settings2 },
+      {
+        label: "General",
+        href: "/settings",
+        isExactMatch: true,
+        icon: Settings2,
+      },
       {
         label: "Authentication",
         href: "/settings/authentication",
@@ -87,7 +92,7 @@ function organizationGroup({
               label: "Audit Log",
               href: "/settings/audit-log",
               icon: ScrollText,
-              enterprise: true,
+              isEnterprise: true,
             },
           ]
         : []),
@@ -142,25 +147,25 @@ function enterpriseAccessItems(): SettingsMenuItem[] {
       label: "Groups",
       href: "/settings/groups",
       icon: UsersRound,
-      enterprise: true,
+      isEnterprise: true,
     },
     {
       label: "Roles & Permissions",
       href: "/settings/roles",
       icon: ShieldCheck,
-      enterprise: true,
+      isEnterprise: true,
     },
     {
       label: "Role Bindings",
       href: "/settings/role-bindings",
       icon: Link2,
-      enterprise: true,
+      isEnterprise: true,
     },
     {
       label: "SCIM Provisioning",
       href: "/settings/scim",
       icon: RefreshCw,
-      enterprise: true,
+      isEnterprise: true,
     },
   ];
 }
@@ -236,7 +241,7 @@ function opsGroup(): SettingsMenuGroup {
   return {
     label: "Ops",
     items: [
-      { label: "Dashboard", href: "/ops", exact: true, icon: Activity },
+      { label: "Dashboard", href: "/ops", isExactMatch: true, icon: Activity },
       {
         label: "Projection Replay",
         href: "/ops/projections",

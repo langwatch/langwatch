@@ -353,7 +353,7 @@ describe("the icon-rail shell", () => {
     });
   });
 
-  describe("the top bar", () => {
+  describe("when the icon-rail top bar renders", () => {
     /** @scenario The top bar drops the product dropdown in the icon-rail mode */
     it("has no product dropdown but keeps the organization and the scope", () => {
       renderShell();

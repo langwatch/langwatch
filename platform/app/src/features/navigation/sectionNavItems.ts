@@ -28,7 +28,7 @@ export interface SectionNavItemData {
   includePath?: string;
   icon: LucideIcon;
   /** Opens in a new tab with an external-link marker. */
-  external?: boolean;
+  isExternal?: boolean;
 }
 
 export const gatewayNavItems: readonly SectionNavItemData[] = [
@@ -43,7 +43,7 @@ export const gatewayNavItems: readonly SectionNavItemData[] = [
     href: "/settings/model-providers",
     includePath: "/settings/model-providers",
     icon: Brain,
-    external: true,
+    isExternal: true,
   },
   {
     label: "Budgets",

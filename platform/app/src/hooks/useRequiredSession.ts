@@ -47,6 +47,13 @@ export const noOrgBouncerRoutes = [
   "/governance/ingestion-sources/[id]",
   "/governance/anomaly-rules",
   "/governance/routing-policies",
+  "/governance/tool-catalog",
+  "/governance/departments",
+  "/governance/cost-centers",
+  "/governance/teams",
+  "/governance/teams/[id]",
+  "/governance/users",
+  "/governance/users/[id]",
   // Personal-scope pages — persona-1 (org-less CLI/IDE devs) is a
   // first-class persona per the persona-aware-chrome spec. They have
   // a legitimate home at /me + /me/configure without needing to create

@@ -65,10 +65,10 @@ function QuickSearchMenuItem({ showLabel }: { showLabel: boolean }) {
  */
 function SidebarBottomBlock({
   showExpanded,
-  includeSettingsLink,
+  shouldIncludeSettingsLink,
 }: {
   showExpanded: boolean;
-  includeSettingsLink: boolean;
+  shouldIncludeSettingsLink: boolean;
 }) {
   const router = useRouter();
   const { hasPermission } = useOrganizationTeamProject({
@@ -79,7 +79,7 @@ function SidebarBottomBlock({
   return (
     <VStack width="full" gap={0.5} align="start">
       <UsageIndicator showLabel={showExpanded} />
-      {includeSettingsLink && hasPermission("organization:view") && (
+      {shouldIncludeSettingsLink && hasPermission("organization:view") && (
         <SideMenuLink
           icon={featureIcons.settings.icon}
           label="Settings"
@@ -108,6 +108,7 @@ function SettingsBackEntry({ showLabel }: { showLabel: boolean }) {
   });
   const { reachableProducts } = useReachableProducts();
   const target = resolveSettingsBackTarget({
+    organizationId: organization?.id ?? null,
     rememberedProduct: organization
       ? readLastVisitedProduct({ organizationId: organization.id })
       : null,
@@ -167,13 +168,13 @@ function SettingsMenuBody({ showExpanded }: { showExpanded: boolean }) {
               label={item.label}
               href={item.href}
               isActive={
-                item.exact
+                item.isExactMatch
                   ? router.pathname === item.href
                   : router.pathname.startsWith(item.includePath ?? item.href)
               }
               showLabel={showExpanded}
               rightElement={
-                item.enterprise ? (
+                item.isEnterprise ? (
                   <Badge
                     title="Enterprise plan feature"
                     colorPalette="purple"
@@ -219,9 +220,9 @@ function SectionItemsNav({
               : router.pathname === item.href
           }
           showLabel={showExpanded}
-          isExternal={item.external}
+          isExternal={item.isExternal}
           rightElement={
-            item.external ? <ExternalLink size={12} aria-hidden /> : undefined
+            item.isExternal ? <ExternalLink size={12} aria-hidden /> : undefined
           }
         />
       ))}
@@ -243,7 +244,7 @@ function ProductSidebarBody({
     return (
       <PersonalSidebarLinks
         showExpanded={showExpanded}
-        includeGovernSection={false}
+        shouldIncludeGovernSection={false}
       />
     );
   }
@@ -260,7 +261,7 @@ function ProductSidebarBody({
   return (
     <MainMenuSections
       showExpanded={showExpanded}
-      includeGovernSection={false}
+      shouldIncludeGovernSection={false}
     />
   );
 }
@@ -346,7 +347,7 @@ export function ProductSidebar({
 
           <SidebarBottomBlock
             showExpanded={showExpanded}
-            includeSettingsLink={surface !== "settings"}
+            shouldIncludeSettingsLink={surface !== "settings"}
           />
         </VStack>
       </Box>

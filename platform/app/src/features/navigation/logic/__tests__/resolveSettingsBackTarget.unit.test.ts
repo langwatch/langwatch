@@ -21,12 +21,14 @@ describe("settings back target", () => {
     /** @scenario Leaving Settings goes back to the product I came from */
     it("returns to the captured page with its product label", () => {
       captureSettingsReturnPath({
+        organizationId: "org_1",
         pathname: "/gateway/budgets",
         search: "?days=mtd",
       });
 
       expect(
         resolveSettingsBackTarget({
+          organizationId: "org_1",
           rememberedProduct: null,
           reachableProducts: ALL,
           projectSlug: null,
@@ -37,18 +39,59 @@ describe("settings back target", () => {
       });
     });
 
-    /** @scenario Settings is never the remembered product */
-    it("never captures a settings page as the return path", () => {
-      captureSettingsReturnPath({ pathname: "/gateway/budgets" });
-      captureSettingsReturnPath({ pathname: "/settings/members" });
+    it("names the product from the address, not from its query", () => {
+      captureSettingsReturnPath({
+        organizationId: "org_1",
+        pathname: "/gateway",
+        search: "?tab=usage",
+      });
 
       expect(
         resolveSettingsBackTarget({
+          organizationId: "org_1",
+          rememberedProduct: null,
+          reachableProducts: ALL,
+          projectSlug: null,
+        }),
+      ).toEqual({ label: "Back to Gateway", href: "/gateway?tab=usage" });
+    });
+
+    /** @scenario Settings is never the remembered product */
+    it("never captures a settings page as the return path", () => {
+      captureSettingsReturnPath({
+        organizationId: "org_1",
+        pathname: "/gateway/budgets",
+      });
+      captureSettingsReturnPath({
+        organizationId: "org_1",
+        pathname: "/settings/members",
+      });
+
+      expect(
+        resolveSettingsBackTarget({
+          organizationId: "org_1",
           rememberedProduct: null,
           reachableProducts: ALL,
           projectSlug: null,
         }).href,
       ).toBe("/gateway/budgets");
+    });
+
+    /** @scenario The back entry drops a page from another organization */
+    it("drops a page captured in another organization", () => {
+      captureSettingsReturnPath({
+        organizationId: "org_1",
+        pathname: "/gateway/budgets",
+      });
+
+      expect(
+        resolveSettingsBackTarget({
+          organizationId: "org_2",
+          rememberedProduct: null,
+          reachableProducts: ALL,
+          projectSlug: null,
+        }),
+      ).toEqual({ label: "Back", href: "/" });
     });
   });
 
@@ -57,6 +100,7 @@ describe("settings back target", () => {
     it("falls back to the remembered product home", () => {
       expect(
         resolveSettingsBackTarget({
+          organizationId: "org_1",
           rememberedProduct: "governance",
           reachableProducts: ALL,
           projectSlug: null,
@@ -67,6 +111,7 @@ describe("settings back target", () => {
     it("falls back to the root when nothing is remembered", () => {
       expect(
         resolveSettingsBackTarget({
+          organizationId: "org_1",
           rememberedProduct: null,
           reachableProducts: ALL,
           projectSlug: null,

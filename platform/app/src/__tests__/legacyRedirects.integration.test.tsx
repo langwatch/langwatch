@@ -132,6 +132,18 @@ describe("legacy gateway redirects", () => {
       });
     });
   });
+
+  describe("when the canonical address is opened", () => {
+    /** @scenario The canonical gateway address renders the gateway */
+    it("stays on the canonical address with no redirect", async () => {
+      const router = renderRouterAt(["/gateway/virtual-keys"]);
+
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe("/gateway/virtual-keys");
+      });
+      expect(router.state.location.search).toBe("");
+    });
+  });
 });
 
 describe("legacy governance redirects", () => {

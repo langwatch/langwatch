@@ -47,10 +47,11 @@ export function OrganizationSelect({
 
   const organizationIds = (organizations ?? []).map((org) => org.id);
   const isMultiOrg = organizationIds.length > 1;
-  const reachableProductsIn = useProductFlagsByOrganization({
-    organizationIds,
-    enabled: isMultiOrg,
-  });
+  const { reachableProductsIn, isLoading: isReachabilityLoading } =
+    useProductFlagsByOrganization({
+      organizationIds,
+      enabled: isMultiOrg,
+    });
 
   if (!organization) return null;
 
@@ -69,12 +70,17 @@ export function OrganizationSelect({
     // would resolve a cross-organization project on the next slug-less
     // page. The landing target repopulates it.
     window.localStorage.removeItem("selectedProjectSlug");
+    // Before the target organization's product gates answer, every
+    // optional product reads as unreachable, which would land the user
+    // on a fallback. The root re-resolves once they answer.
     void router.push(
-      resolveOrgSwitchDestination({
-        currentProduct: activeProductId,
-        reachableProducts: reachableProductsIn(target.id),
-        projectSlug: firstProjectSlug(target),
-      }),
+      isReachabilityLoading
+        ? "/"
+        : resolveOrgSwitchDestination({
+            currentProduct: activeProductId,
+            reachableProducts: reachableProductsIn(target.id),
+            projectSlug: firstProjectSlug(target),
+          }),
     );
   };
 

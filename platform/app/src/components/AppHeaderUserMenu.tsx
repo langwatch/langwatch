@@ -49,10 +49,11 @@ export function AppHeaderUserMenu({
 }) {
   const { data: session } = useRequiredSession({ required: !publicPage });
   const user = session?.user;
-  const { organization } = useOrganizationTeamProject({
-    redirectToOnboarding: false,
-    redirectToProjectOnboarding: false,
-  });
+  const { organization, isLoading: isOrganizationLoading } =
+    useOrganizationTeamProject({
+      redirectToOnboarding: false,
+      redirectToProjectOnboarding: false,
+    });
   const { isLiteMember } = useLiteMemberGuard();
 
   // The "My Workspace" entry in the user-avatar dropdown is part of the
@@ -67,10 +68,16 @@ export function AppHeaderUserMenu({
   );
 
   // The navigation-mode picker only appears once the v2 flag is on; the
-  // preference itself lives on the device (see navigationModeStore).
+  // preference itself lives on the device (see navigationModeStore). The
+  // gate matches useNavigationMode, which resolves the flag at user level
+  // for a user with no organization: that persona reaches the new shells
+  // on /me, so it must also reach the control that selects them.
   const { enabled: navigationV2Enabled } = useFeatureFlag(
     "release_ui_navigation_v2_enabled",
-    { organizationId: organization?.id, enabled: !!organization?.id },
+    {
+      organizationId: organization?.id,
+      enabled: !isOrganizationLoading,
+    },
   );
   const storedNavigationMode = useNavigationModeStore((s) => s.storedMode);
   const setStoredNavigationMode = useNavigationModeStore(

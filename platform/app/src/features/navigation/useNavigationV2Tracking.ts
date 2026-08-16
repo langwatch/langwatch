@@ -46,7 +46,10 @@ export function useNavigationV2Tracking(): void {
     if (enteringSettings && previous) {
       // No-ops unless the previous page belonged to a product, so hopping
       // between settings pages never overwrites the capture.
-      captureSettingsReturnPath(previous);
+      captureSettingsReturnPath({
+        organizationId: organizationId ?? null,
+        ...previous,
+      });
     }
   }, [location.pathname, location.search, isV2, organizationId]);
 }

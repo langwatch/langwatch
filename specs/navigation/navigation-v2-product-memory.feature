@@ -57,3 +57,15 @@ Feature: The device remembers the last product per organization
     Given I am in a new navigation mode
     When I go from a Gateway page to a Settings page
     Then the Settings back entry points at that Gateway page
+
+  @integration
+  Scenario: Moving between settings pages keeps the captured page
+    Given I went from a Gateway page to a Settings page
+    When I open another Settings page
+    Then the Settings back entry still points at that Gateway page
+
+  @integration
+  Scenario: The back entry drops a page from another organization
+    Given I went from a Gateway page to a Settings page
+    When I switch to another organization
+    Then the Settings back entry points at the root instead

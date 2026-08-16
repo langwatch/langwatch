@@ -29,19 +29,22 @@ function MeScopeChip() {
   const name = session?.user?.name;
   if (!name) return null;
   return (
-    <HStack gap={2} paddingX={1.5} minWidth={0}>
-      <Text fontSize="13px" whiteSpace="nowrap">
-        {name}
-      </Text>
-      <Badge
-        variant="outline"
-        fontSize="10px"
-        color="fg.muted"
-        borderRadius="md"
-      >
-        Personal
-      </Badge>
-    </HStack>
+    <>
+      <ScopeDivider />
+      <HStack gap={2} paddingX={1.5} minWidth={0}>
+        <Text fontSize="13px" whiteSpace="nowrap">
+          {name}
+        </Text>
+        <Badge
+          variant="outline"
+          fontSize="10px"
+          color="fg.muted"
+          borderRadius="md"
+        >
+          Personal
+        </Badge>
+      </HStack>
+    </>
   );
 }
 
@@ -75,71 +78,74 @@ function ProjectScopeMenu() {
     );
 
   return (
-    <Menu.Root>
-      <Menu.Trigger asChild>
-        <Button
-          variant="ghost"
-          aria-label="Switch project"
-          fontSize="13px"
-          fontWeight="normal"
-          paddingX={2}
-          height="32px"
-          color="fg"
-          gap={2}
-          _hover={{ backgroundColor: "bg.muted" }}
-        >
-          <ProjectAvatar name={project.name} />
-          <Text whiteSpace="nowrap">{project.name}</Text>
-          <ChevronsUpDown size={12} color="var(--chakra-colors-fg-muted)" />
-        </Button>
-      </Menu.Trigger>
-      <Portal>
-        <Menu.Content minWidth="240px">
-          {groups.map(({ team, projects: teamProjects }) => (
-            <Menu.ItemGroup
-              key={team.teamId}
-              title={orgTeams.length > 1 ? team.label : "Projects"}
-            >
-              {teamProjects.map((candidate) => (
-                <Menu.Item
-                  key={candidate.projectId}
-                  value={candidate.projectId}
-                  fontSize="13px"
-                  asChild
-                >
-                  <Link
-                    href={candidate.href}
-                    _hover={{ textDecoration: "none" }}
+    <>
+      <ScopeDivider />
+      <Menu.Root>
+        <Menu.Trigger asChild>
+          <Button
+            variant="ghost"
+            aria-label="Switch project"
+            fontSize="13px"
+            fontWeight="normal"
+            paddingX={2}
+            height="32px"
+            color="fg"
+            gap={2}
+            _hover={{ backgroundColor: "bg.muted" }}
+          >
+            <ProjectAvatar name={project.name} />
+            <Text whiteSpace="nowrap">{project.name}</Text>
+            <ChevronsUpDown size={12} color="var(--chakra-colors-fg-muted)" />
+          </Button>
+        </Menu.Trigger>
+        <Portal>
+          <Menu.Content minWidth="240px">
+            {groups.map(({ team, projects: teamProjects }) => (
+              <Menu.ItemGroup
+                key={team.teamId}
+                title={orgTeams.length > 1 ? team.label : "Projects"}
+              >
+                {teamProjects.map((candidate) => (
+                  <Menu.Item
+                    key={candidate.projectId}
+                    value={candidate.projectId}
+                    fontSize="13px"
+                    asChild
                   >
-                    <HStack gap={2} width="full">
-                      <ProjectAvatar name={candidate.label} />
-                      <Text flex={1}>{candidate.label}</Text>
-                      {candidate.projectId === project.id && (
-                        <Check size={13} aria-label="Current project" />
-                      )}
-                    </HStack>
-                  </Link>
-                </Menu.Item>
-              ))}
-              {team.canCreateProject && (
-                <Menu.Item
-                  value={`new-project-${team.teamId}`}
-                  fontSize="13px"
-                  onClick={() =>
-                    onCreateProjectForTeam?.({
-                      teamId: team.teamId,
-                      orgId: team.orgId,
-                    })
-                  }
-                >
-                  <Plus size={13} /> New Project
-                </Menu.Item>
-              )}
-            </Menu.ItemGroup>
-          ))}
-        </Menu.Content>
-      </Portal>
-    </Menu.Root>
+                    <Link
+                      href={candidate.href}
+                      _hover={{ textDecoration: "none" }}
+                    >
+                      <HStack gap={2} width="full">
+                        <ProjectAvatar name={candidate.label} />
+                        <Text flex={1}>{candidate.label}</Text>
+                        {candidate.projectId === project.id && (
+                          <Check size={13} aria-label="Current project" />
+                        )}
+                      </HStack>
+                    </Link>
+                  </Menu.Item>
+                ))}
+                {team.canCreateProject && (
+                  <Menu.Item
+                    value={`new-project-${team.teamId}`}
+                    fontSize="13px"
+                    onClick={() =>
+                      onCreateProjectForTeam?.({
+                        teamId: team.teamId,
+                        orgId: team.orgId,
+                      })
+                    }
+                  >
+                    <Plus size={13} /> New Project
+                  </Menu.Item>
+                )}
+              </Menu.ItemGroup>
+            ))}
+          </Menu.Content>
+        </Portal>
+      </Menu.Root>
+    </>
   );
 }
 
@@ -156,21 +162,9 @@ export function ProductScopeControl({
 }: {
   activeProductId: ProductId | null;
 }) {
-  if (activeProductId === "llm-ops") {
-    return (
-      <>
-        <ScopeDivider />
-        <ProjectScopeMenu />
-      </>
-    );
-  }
-  if (activeProductId === "me") {
-    return (
-      <>
-        <ScopeDivider />
-        <MeScopeChip />
-      </>
-    );
-  }
+  // Each scope renders its own leading divider, so a scope that has
+  // nothing to show leaves no separator behind it.
+  if (activeProductId === "llm-ops") return <ProjectScopeMenu />;
+  if (activeProductId === "me") return <MeScopeChip />;
   return null;
 }

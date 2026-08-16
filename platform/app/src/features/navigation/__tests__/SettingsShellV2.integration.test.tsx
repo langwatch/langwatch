@@ -255,7 +255,10 @@ describe("the settings shell in a new navigation mode", () => {
   describe("when Settings was entered from a Gateway page", () => {
     /** @scenario The Settings sidebar opens with the way back */
     it("opens with the back entry, then Quick Search", () => {
-      captureSettingsReturnPath({ pathname: "/gateway/budgets" });
+      captureSettingsReturnPath({
+        organizationId: organization.id,
+        pathname: "/gateway/budgets",
+      });
       renderSettings();
 
       const back = screen.getByRole("link", { name: "Back to Gateway" });
@@ -266,7 +269,7 @@ describe("the settings shell in a new navigation mode", () => {
     });
   });
 
-  describe("the regrouped settings menu", () => {
+  describe("when the settings menu renders in a v2 mode", () => {
     /** @scenario The settings menu is grouped with its gates kept */
     it("shows the groups with the current addresses", () => {
       renderSettings();
@@ -292,6 +295,19 @@ describe("the settings shell in a new navigation mode", () => {
       expect(screen.getAllByText("ENT").length).toBeGreaterThanOrEqual(1);
     });
 
+    it("hides the enterprise entries outside an enterprise plan", () => {
+      mockIsEnterprise = false;
+      renderSettings();
+
+      expect(
+        screen.queryByRole("link", { name: "Groups" }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("link", { name: "SCIM Provisioning" }),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText("ENT")).not.toBeInTheDocument();
+    });
+
     /** @scenario A lite member sees no restricted settings entries */
     it("hides the restricted entries from a lite member", () => {
       mockIsLiteMember = true;
@@ -306,7 +322,7 @@ describe("the settings shell in a new navigation mode", () => {
     });
   });
 
-  describe("the top bar", () => {
+  describe("when the settings top bar renders", () => {
     /** @scenario The top bar shows a static Settings title */
     it("shows a static Settings title, no product dropdown, and the organization", () => {
       renderSettings();

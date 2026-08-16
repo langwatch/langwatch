@@ -239,7 +239,7 @@ describe("the product sidebar", () => {
     });
   });
 
-  describe("the bottom block", () => {
+  describe("when the sidebar bottom block renders", () => {
     /** @scenario The sidebar bottom block keeps usage, settings, support and theme */
     it("holds the usage indicator, Settings, Support and the theme control", () => {
       renderSidebar("governance");

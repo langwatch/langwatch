@@ -83,11 +83,51 @@ describe("useNavigationV2Tracking", () => {
 
       expect(
         resolveSettingsBackTarget({
+          organizationId: "org_1",
           rememberedProduct: null,
           reachableProducts: [],
           projectSlug: null,
         }),
       ).toEqual({ label: "Back to Gateway", href: "/gateway/budgets" });
+    });
+
+    /** @scenario Moving between settings pages keeps the captured page */
+    it("keeps the first capture when hopping between settings pages", async () => {
+      const router = renderRouterAt("/gateway/budgets");
+
+      await act(async () => {
+        await router.navigate("/settings/members");
+      });
+      await act(async () => {
+        await router.navigate("/settings/api-keys");
+      });
+
+      expect(
+        resolveSettingsBackTarget({
+          organizationId: "org_1",
+          rememberedProduct: null,
+          reachableProducts: [],
+          projectSlug: null,
+        }),
+      ).toEqual({ label: "Back to Gateway", href: "/gateway/budgets" });
+    });
+
+    /** @scenario The back entry drops a page from another organization */
+    it("drops the capture after an organization switch", async () => {
+      const router = renderRouterAt("/gateway/budgets");
+
+      await act(async () => {
+        await router.navigate("/settings/members");
+      });
+
+      expect(
+        resolveSettingsBackTarget({
+          organizationId: "org_2",
+          rememberedProduct: null,
+          reachableProducts: [],
+          projectSlug: null,
+        }),
+      ).toEqual({ label: "Back", href: "/" });
     });
   });
 

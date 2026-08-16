@@ -137,10 +137,13 @@ describe("cross-organization project teleport", () => {
     /** @scenario A member kept in an empty organization stays put in the new modes */
     it("stays put", async () => {
       useNavigationModeStore.setState({ storedMode: "product-switcher" });
-      renderWithRedirects();
+      const { result } = renderWithRedirects();
 
-      // Give the redirect effect a macrotask to fire if it were going to.
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      // The hook resolving the empty organization proves the render cycle
+      // finished, so the redirect effect already had its chance to fire.
+      await waitFor(() => {
+        expect(result.current.organization?.id).toBe("org-empty");
+      });
       expect(mockRouter.push).not.toHaveBeenCalled();
     });
   });

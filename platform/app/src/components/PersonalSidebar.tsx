@@ -45,10 +45,10 @@ import { ThemeToggle } from "./sidebar/ThemeToggle";
  */
 export const PersonalSidebarLinks = function PersonalSidebarLinks({
   showExpanded,
-  includeGovernSection = true,
+  shouldIncludeGovernSection = true,
 }: {
   showExpanded: boolean;
-  includeGovernSection?: boolean;
+  shouldIncludeGovernSection?: boolean;
 }) {
   const router = useRouter();
 
@@ -172,7 +172,9 @@ export const PersonalSidebarLinks = function PersonalSidebarLinks({
         isActive={isConfigureActive}
         showLabel={showExpanded}
       />
-      {includeGovernSection && <GovernSection showExpanded={showExpanded} />}
+      {shouldIncludeGovernSection && (
+        <GovernSection showExpanded={showExpanded} />
+      )}
     </>
   );
 };

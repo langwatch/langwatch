@@ -28,7 +28,7 @@ export type NavigationModeResolution =
  */
 export function useNavigationMode(): NavigationModeResolution {
   const storedMode = useNavigationModeStore((state) => state.storedMode);
-  const wantsV2 = storedMode !== "legacy";
+  const isV2Requested = storedMode !== "legacy";
 
   // The same organization queries the dashboard layout itself runs; react-query
   // dedupes them, so the legacy path stays at zero extra requests.
@@ -45,11 +45,11 @@ export function useNavigationMode(): NavigationModeResolution {
       // Only a device that opted into a v2 mode pays for the flag check, and
       // only once the organization is known (an org-less user still resolves
       // user-level).
-      enabled: wantsV2 && !isOrganizationLoading,
+      enabled: isV2Requested && !isOrganizationLoading,
     },
   );
 
-  if (!wantsV2) return { status: "ready", mode: "legacy" };
+  if (!isV2Requested) return { status: "ready", mode: "legacy" };
   if (isOrganizationLoading || isFlagLoading) return { status: "loading" };
   return { status: "ready", mode: flagEnabled ? storedMode : "legacy" };
 }

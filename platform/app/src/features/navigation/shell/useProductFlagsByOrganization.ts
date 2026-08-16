@@ -16,7 +16,10 @@ export function useProductFlagsByOrganization({
 }: {
   organizationIds: string[];
   enabled: boolean;
-}): (organizationId: string) => ProductId[] {
+}): {
+  reachableProductsIn: (organizationId: string) => ProductId[];
+  isLoading: boolean;
+} {
   const queryOptions = {
     enabled,
     staleTime: CLIENT_FLAG_STALE_TIME_MS,
@@ -32,14 +35,17 @@ export function useProductFlagsByOrganization({
     queryOptions,
   );
 
-  return (organizationId: string) => {
-    const products: ProductId[] = ["llm-ops"];
-    if (governanceByOrg.data?.enabledByOrganizationId?.[organizationId]) {
-      products.push("me", "governance");
-    }
-    if (gatewayByOrg.data?.enabledByOrganizationId?.[organizationId]) {
-      products.push("gateway");
-    }
-    return products;
+  return {
+    reachableProductsIn: (organizationId: string) => {
+      const products: ProductId[] = ["llm-ops"];
+      if (governanceByOrg.data?.enabledByOrganizationId?.[organizationId]) {
+        products.push("me", "governance");
+      }
+      if (gatewayByOrg.data?.enabledByOrganizationId?.[organizationId]) {
+        products.push("gateway");
+      }
+      return products;
+    },
+    isLoading: enabled && (governanceByOrg.isLoading || gatewayByOrg.isLoading),
   };
 }

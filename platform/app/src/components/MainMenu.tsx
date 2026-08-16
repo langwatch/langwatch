@@ -55,10 +55,10 @@ export type MainMenuProps = {
  */
 export const MainMenuSections = function MainMenuSections({
   showExpanded,
-  includeGovernSection = true,
+  shouldIncludeGovernSection = true,
 }: {
   showExpanded: boolean;
-  includeGovernSection?: boolean;
+  shouldIncludeGovernSection?: boolean;
 }) {
   const router = useRouter();
   const { project, organization, hasPermission } = useOrganizationTeamProject();
@@ -293,7 +293,9 @@ export const MainMenuSections = function MainMenuSections({
         )}
       </SidebarSection>
 
-      {includeGovernSection && <GovernSection showExpanded={showExpanded} />}
+      {shouldIncludeGovernSection && (
+        <GovernSection showExpanded={showExpanded} />
+      )}
 
       <OpsSection showExpanded={showExpanded} />
     </>

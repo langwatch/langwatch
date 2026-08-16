@@ -51,7 +51,16 @@ describe("product memory", () => {
   describe("when the stored value is garbage", () => {
     /** @scenario Garbage in the memory reads as nothing */
     it("reads as nothing", () => {
-      localStorage.setItem("langwatch:nav:last-product:org_1:v1", "banana");
+      // The key comes from a real write, so this case cannot pass by
+      // reading a key the module never uses.
+      writeLastVisitedProduct({
+        organizationId: "org_1",
+        productId: "gateway",
+      });
+      const [storageKey] = Object.keys(localStorage);
+      expect(storageKey).toBeDefined();
+      localStorage.setItem(storageKey!, "banana");
+
       expect(readLastVisitedProduct({ organizationId: "org_1" })).toBeNull();
     });
   });
