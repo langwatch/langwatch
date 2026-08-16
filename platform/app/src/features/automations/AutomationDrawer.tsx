@@ -339,10 +339,12 @@ export function AutomationDrawer({
    * identity) find their latches re-armed and the draft blanked when they
    * run for the new identity.
    *
-   * The baseline is re-armed rather than cleared, because the effect that
-   * captures a create's baseline runs on mount only. Left null, `isDirty`
-   * would be false forever and closing a fully configured new automation would
-   * discard it without a word.
+   * The baseline is cleared, not captured here: the prefill effects below run
+   * later in this same commit and mutate the draft, so a baseline taken now
+   * would read the prefill as unsaved edits and a freshly reopened create
+   * would prompt "Discard unsaved changes?" with nothing typed. The
+   * create-baseline effect — declared after the prefills and keyed on the
+   * same identity — re-captures it once they have landed.
    */
   const drawerIdentity = automationId
     ? `edit:${automationId}`
@@ -363,7 +365,7 @@ export function AutomationDrawer({
     openedForRef.current = drawerIdentity;
     reset();
     hydratedFromServerFor.current = null;
-    baselineRef.current = JSON.stringify(useAutomationStore.getState().draft);
+    baselineRef.current = null;
     prefilledFromTraces.current = false;
     prefilledFromGraph.current = false;
     prefilledFromParams.current = false;
@@ -589,16 +591,17 @@ export function AutomationDrawer({
     baselineRef.current = JSON.stringify(next);
   }, [triggerQuery.data, automationId, hydrate]);
 
-  // Capture the create-mode baseline once the synchronous traces-prefill has
-  // had a chance to land (the prefill effect above runs on mount before this
-  // commits). After this, any change to the draft reads as unsaved and the
-  // close-guard kicks in.
+  // Capture the create-mode baseline once the synchronous prefills have had
+  // a chance to land (the prefill effects above are declared before this one,
+  // so they run first in the same commit — on mount and on every identity
+  // change alike). After this, any change to the draft reads as unsaved and
+  // the close-guard kicks in.
   useEffect(() => {
     if (automationId) return;
     if (baselineRef.current !== null) return;
     baselineRef.current = JSON.stringify(useAutomationStore.getState().draft);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [drawerIdentity]);
 
   // Build the example TemplateContext the preview pane (and autocomplete)
   // render against. Static-ish — only depends on the project identity, so the
@@ -754,7 +757,7 @@ export function AutomationDrawer({
         ? entry.client.previewOptions({
             slice: draft.slices[draft.action!] as never,
             context: {
-              projectSlackIntegrationConnected: slackIntegrationConnected,
+              hasProjectSlackIntegration: slackIntegrationConnected,
             },
           })
         : {};

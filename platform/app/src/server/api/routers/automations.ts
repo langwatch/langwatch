@@ -6,7 +6,10 @@ import {
 } from "@langwatch/automations/cadences";
 import { EMAIL_RX } from "@langwatch/automations/providers/email";
 import type { SlackActionParams } from "@langwatch/automations/providers/slack";
-import { WEBHOOK_HEADER_VALUE_KEPT } from "@langwatch/automations/providers/webhook";
+import {
+  DEFAULT_WEBHOOK_CONTENT_TYPE,
+  WEBHOOK_HEADER_VALUE_KEPT,
+} from "@langwatch/automations/providers/webhook";
 import { HandledError } from "@langwatch/handled-error";
 import { generate as ksuid } from "@langwatch/ksuid";
 import { TRPCError } from "@trpc/server";
@@ -828,7 +831,7 @@ export const automationRouter = createTRPCRouter({
             // header; the save path's provider schema validates the shape.
             contentType: z
               .string()
-              .default("application/json")
+              .default(DEFAULT_WEBHOOK_CONTENT_TYPE)
               .transform((v) => v.replace(/[\r\n\0]+/g, " ").trim()),
           })
           .nullable()

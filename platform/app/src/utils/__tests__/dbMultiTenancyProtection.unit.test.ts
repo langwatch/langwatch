@@ -1190,7 +1190,7 @@ describe("guardProjectId — SlackIntegration", () => {
           args: { data: { ...projectScope, botTokenEncrypted: "enc" } },
         }),
       ).rejects.toThrow(
-        "The create action on the SlackIntegration model create requires an organizationId in the data payload.",
+        "The create action on the SlackIntegration model requires an organizationId in the data payload.",
       );
     });
   });

@@ -7,7 +7,9 @@ import {
   slackDeliveryMethodOf,
 } from "@langwatch/automations/providers/slack";
 import { DEFAULT_WEBHOOK_CONTENT_TYPE } from "@langwatch/automations/providers/webhook";
-import { nanoid } from "nanoid";
+import { generate as ksuid } from "@langwatch/ksuid";
+import { createLogger } from "@langwatch/observability";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import type { AlertType, Prisma, Trigger } from "~/generated/prisma/client";
 import { TriggerAction, TriggerKind } from "~/generated/prisma/client";
 import { hasActionableTriggerFilters } from "~/server/filters/triggerFilter.matcher";
@@ -46,7 +48,6 @@ import {
   resolveNotificationCadenceForUpdate,
 } from "./notification-cadence";
 import { actionParamsSchemaFor } from "./providers/registry";
-import { decryptSlackBotToken } from "./providers/slack/server";
 import {
   decryptWebhookHeaders,
   decryptWebhookSigningSecrets,
@@ -107,6 +108,8 @@ const RULE_FIELD_NAMES: Record<"graphAlert" | "report", Set<string>> = {
  *    are three different rows: an alert owns its graph's alert slot and a
  *    report owns a calendar entry. Converting one is a create and a delete.
  */
+const logger = createLogger("langwatch:automations:public-api-trigger");
+
 export class PublicApiTriggerService {
   constructor(
     private readonly triggers: TriggerService,
@@ -117,11 +120,10 @@ export class PublicApiTriggerService {
       resolveProject: (projectId: string) => Promise<DraftProject>;
       /**
        * ADR-093 §5 token resolution: the automation's own stored token, else
-       * the project's Slack integration, else null. Optional so the existing
-       * test doubles keep working; absent behaves as "the project has no
-       * integration".
+       * the project's Slack integration, else null. Required — an absent
+       * resolver would silently skip project-scoped resolution.
        */
-      resolveSlackToken?: (params: {
+      resolveSlackToken: (params: {
         projectId: string;
         actionParams: Pick<SlackActionParams, "slackBotToken">;
       }) => Promise<ResolvedSlackToken | null>;
@@ -156,7 +158,7 @@ export class PublicApiTriggerService {
 
     const isGraphAlert = !!input.customGraphId;
     const isReport = !isGraphAlert && !!input.report;
-    const id = nanoid();
+    const id = ksuid(KSUID_RESOURCES.TRIGGER).toString();
     const data = await this.buildCreateData({ id, projectId, input });
 
     const trigger = await this.triggers.create({
@@ -677,11 +679,9 @@ export class PublicApiTriggerService {
     }
   }
 
-  /** A Slack automation reaches Slack the way it is configured to: as the bot
-   *  in its channel where a token resolves — its own first, then the project's
-   *  Slack integration (ADR-093 §5) — otherwise through its incoming webhook. */
-  /** ADR-093 §5 resolution: the shared resolver when the composition root
-   *  wired one, the row's own token alone otherwise. */
+  /** ADR-093 §5 resolution: the automation's own token first, then the
+   *  project's Slack integration — the wired resolver owns the whole
+   *  decision. */
   private async resolveSlackTokenFor({
     params,
     projectId,
@@ -689,11 +689,7 @@ export class PublicApiTriggerService {
     params: SlackActionParams;
     projectId: string;
   }): Promise<ResolvedSlackToken | null> {
-    if (this.deps.resolveSlackToken) {
-      return this.deps.resolveSlackToken({ projectId, actionParams: params });
-    }
-    const ownToken = decryptSlackBotToken(params);
-    return ownToken ? { token: ownToken, source: "automation" } : null;
+    return this.deps.resolveSlackToken({ projectId, actionParams: params });
   }
 
   private async savedSlackDestination({
@@ -720,14 +716,22 @@ export class PublicApiTriggerService {
       });
       const botToken = resolved?.token ?? null;
       const channelId = (params.slackChannelId ?? "") as string;
-      if (botToken && channelId) {
-        return {
-          channel: "slack",
-          recipients: [],
-          webhook: null,
-          botDestination: { token: botToken, channel: channelId },
-        };
+      if (!botToken || !channelId) {
+        // Fail closed: falling through to the stored webhook would report a
+        // successful test fire through a surface the real delivery does not
+        // use, and the caller would read a broken bot connection as working.
+        throw new TestFireUnavailableError(
+          "slack",
+          "This automation delivers through a Slack connection, and no " +
+            "connected workspace and channel resolve for it.",
+        );
       }
+      return {
+        channel: "slack",
+        recipients: [],
+        webhook: null,
+        botDestination: { token: botToken, channel: channelId },
+      };
     }
     const webhook = (params.slackWebhook ?? "") as string;
     if (!webhook) {
@@ -813,11 +817,12 @@ export class PublicApiTriggerService {
   }): Record<string, unknown> {
     const rule = stated ?? this.storedGraphAlertRule(stored);
     if (!rule) {
-      throw new GraphAlertIncompleteError(
-        "graphAlert",
-        "This alert has no rule to fire by. State the series, the operator, " +
-          "the threshold and the time window.",
-      );
+      throw new GraphAlertIncompleteError({
+        field: "graphAlert",
+        reason:
+          "This alert has no rule to fire by. State the series, the " +
+          "operator, the threshold and the time window.",
+      });
     }
     return { ...rule };
   }
@@ -899,24 +904,26 @@ export class PublicApiTriggerService {
     graphAlert: GraphAlertActionParams | undefined;
   }): Promise<GraphAlertActionParams> {
     if (!NOTIFY_TRIGGER_ACTIONS.has(action)) {
-      throw new GraphAlertIncompleteError(
-        "action",
-        "An alert notifies when a metric crosses a threshold, so it delivers " +
-          "by email, to Slack or to an endpoint.",
-      );
+      throw new GraphAlertIncompleteError({
+        field: "action",
+        reason:
+          "An alert notifies when a metric crosses a threshold, so it " +
+          "delivers by email, to Slack or to an endpoint.",
+      });
     }
     if (!graphAlert) {
-      throw new GraphAlertIncompleteError(
-        "graphAlert",
-        "State the series, the operator, the threshold and the time window " +
-          "this alert fires on.",
-      );
+      throw new GraphAlertIncompleteError({
+        field: "graphAlert",
+        reason:
+          "State the series, the operator, the threshold and the time " +
+          "window this alert fires on.",
+      });
     }
     if (!alertType) {
-      throw new GraphAlertIncompleteError(
-        "alertType",
-        "State the severity this alert fires at.",
-      );
+      throw new GraphAlertIncompleteError({
+        field: "alertType",
+        reason: "State the severity this alert fires at.",
+      });
     }
     await this.assertGraphInProject({ projectId, customGraphId });
     return graphAlert;
@@ -972,9 +979,13 @@ export class PublicApiTriggerService {
     try {
       translateFilterToClickHouse(query, projectId, { from: 0, to: 0 });
     } catch (error) {
-      throw new TriggerFilterQueryInvalidError(
-        error instanceof Error ? error.message : "could not parse the query",
+      // The translator's account can name internal columns, so it goes to
+      // the log; the caller gets the fixed customer-safe refusal.
+      logger.warn(
+        { projectId, error },
+        "trace query refused by the filter translator",
       );
+      throw new TriggerFilterQueryInvalidError();
     }
     return query;
   }
@@ -1022,13 +1033,16 @@ export class PublicApiTriggerService {
         RULE_FIELD_NAMES[ruleField].has(field),
       );
       if (misplaced.length > 0) {
-        throw new TriggerRuleFieldsMisplacedError(misplaced, ruleField);
+        throw new TriggerRuleFieldsMisplacedError({
+          fields: misplaced,
+          expectedField: ruleField,
+        });
       }
     }
-    throw new TriggerActionParamsUnknownFieldsError(
-      unknown,
-      [...accepted].sort(),
-    );
+    throw new TriggerActionParamsUnknownFieldsError({
+      fields: unknown,
+      accepted: [...accepted].sort(),
+    });
   }
 
   /** Conditions naming fields this platform no longer filters on are dropped.

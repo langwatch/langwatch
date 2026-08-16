@@ -63,7 +63,15 @@ describe("Feature: delivery credentials survive the REST write paths redacted", 
       expect(response.status).toBe(201);
       const body = await response.text();
       expect(body).not.toContain(SLACK_WEBHOOK);
-      const created = JSON.parse(body) as { id: string };
+      const created = JSON.parse(body) as {
+        id: string;
+        actionParams: Record<string, unknown>;
+      };
+      // The create response redacts like a read: the shape stays visible,
+      // the credential comes back as the placeholder.
+      expect(created.actionParams).toMatchObject({
+        slackWebhook: REDACTED_CREDENTIAL,
+      });
       expect(
         await prisma.trigger.findUniqueOrThrow({
           where: { id: created.id, projectId: projectId() },

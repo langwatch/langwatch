@@ -13,7 +13,6 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { NotificationCadence } from "@langwatch/automations/cadences";
-import { keepPreviousData } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -34,6 +33,12 @@ import { formatMilliseconds } from "~/utils/formatMilliseconds";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import { queryIsStructurable } from "../logic/conditionQuery";
 import { type DailyCapAdvice, dailyCapAdvice } from "../logic/dailyCapAdvice";
+import {
+  DAILY_CAP_OPTIONS,
+  PREVIEW_LIST_OPTIONS,
+  PREVIEW_SORT,
+  PREVIEW_WINDOW_MS,
+} from "../logic/useDailyCapAdvice";
 import {
   type AutomationDraft,
   filterQueryIsSet,
@@ -192,7 +197,10 @@ function GraphSubject({ prefilledGraphId }: { prefilledGraphId?: string }) {
   const view = graphSubjectView({
     isPrefilled,
     hasSelection: !!draft.customGraphId,
-    isLoading: graphs.isLoading,
+    // An unresolved project disables the query, which react-query reports as
+    // "not loading" — but it is not "no graphs" either. Treat it as loading
+    // so the terminal empty state only shows for a real, answered project.
+    isLoading: graphs.isLoading || !projectId,
     isError: graphs.isError,
     data: graphs.data,
   });
@@ -222,12 +230,12 @@ function GraphSubject({ prefilledGraphId }: { prefilledGraphId?: string }) {
   return (
     <VStack align="stretch" gap={4}>
       <GraphPickerField
-        invalid={isCustomGraphMissing}
-        locked={isPrefilled}
+        isInvalid={isCustomGraphMissing}
+        isLocked={isPrefilled}
         options={graphs.data ?? []}
       />
       <SeriesPickerField
-        invalid={isSeriesMissing}
+        isInvalid={isSeriesMissing}
         seriesOptions={seriesOptions}
       />
     </VStack>
@@ -237,13 +245,13 @@ function GraphSubject({ prefilledGraphId }: { prefilledGraphId?: string }) {
 /** The graph half of the subject. Reads and writes the draft directly, the
  *  same way the parent does. */
 function GraphPickerField({
-  invalid,
-  locked,
+  isInvalid,
+  isLocked,
   options,
 }: {
-  invalid: boolean;
+  isInvalid: boolean;
   /** True when the drawer was opened from a specific chart card. */
-  locked: boolean;
+  isLocked: boolean;
   options: { id: string; name: string | null; trigger?: unknown }[];
 }) {
   const draft = useDraft();
@@ -251,9 +259,9 @@ function GraphPickerField({
   return (
     /* `disabled` on Field.Root stamps the native attribute through the
        field context, so the control is genuinely inert (keyboard + AT). */
-    <Field.Root invalid={invalid} disabled={locked}>
+    <Field.Root invalid={isInvalid} disabled={isLocked}>
       <Field.Label>Custom graph</Field.Label>
-      <NativeSelect.Root disabled={locked}>
+      <NativeSelect.Root disabled={isLocked}>
         <NativeSelect.Field
           value={draft.customGraphId ?? ""}
           onChange={(e) => {
@@ -279,7 +287,7 @@ function GraphPickerField({
         <NativeSelect.Indicator />
       </NativeSelect.Root>
       <Field.ErrorText>Pick a custom graph to continue.</Field.ErrorText>
-      {locked ? (
+      {isLocked ? (
         <Field.HelperText>
           Set from the dashboard graph that opened this drawer.
         </Field.HelperText>
@@ -290,19 +298,19 @@ function GraphPickerField({
 
 /** The series half: which line on the picked graph. */
 function SeriesPickerField({
-  invalid,
+  isInvalid,
   seriesOptions,
 }: {
-  invalid: boolean;
+  isInvalid: boolean;
   seriesOptions: ReturnType<typeof deriveSeriesOptionsFromGraph>;
 }) {
   const draft = useDraft();
   const dispatch = useAutomationStore((s) => s.dispatch);
-  const disabled = !draft.customGraphId || seriesOptions.length === 0;
+  const isDisabled = !draft.customGraphId || seriesOptions.length === 0;
   return (
-    <Field.Root invalid={invalid} disabled={disabled}>
+    <Field.Root invalid={isInvalid} disabled={isDisabled}>
       <Field.Label>Series</Field.Label>
-      <NativeSelect.Root disabled={disabled}>
+      <NativeSelect.Root disabled={isDisabled}>
         <NativeSelect.Field
           value={draft.graphAlert.seriesName}
           onChange={(e) =>
@@ -598,8 +606,6 @@ const STATUS_DOT_COLOR: Record<PreviewTrace["status"], string> = {
   warning: "orange.solid",
 };
 
-const PREVIEW_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
-const PREVIEW_SORT = { columnId: "time", direction: "desc" as const };
 const QUERY_DEBOUNCE_MS = 400;
 
 /**
@@ -652,29 +658,14 @@ function TraceQuerySubject({
       pageSize: 5,
       query: trimmed,
     },
-    {
-      enabled: !!projectId && trimmed.length > 0,
-      retry: false,
-      // A long stale window plus keepPreviousData keeps the last result on
-      // screen while a new query resolves, so the preview refreshes in place
-      // instead of blanking to a spinner. Focus changes never refetch — the
-      // matched set doesn't move fast enough to justify the flicker.
-      staleTime: 5 * 60_000,
-      placeholderData: keepPreviousData,
-      refetchOnWindowFocus: false,
-    },
+    { enabled: !!projectId && trimmed.length > 0, ...PREVIEW_LIST_OPTIONS },
   );
 
   // The plan's daily ceiling on persist actions, read once and held: it moves
   // only when the plan does, and a failed read simply means no advice below.
   const capStatus = api.automation.getDailyCap.useQuery(
     { projectId },
-    {
-      enabled: !!projectId,
-      staleTime: 10 * 60 * 1000,
-      retry: false,
-      refetchOnWindowFocus: false,
-    },
+    { enabled: !!projectId, ...DAILY_CAP_OPTIONS },
   );
 
   // Advice, never a gate: this warns that the drafted condition would outrun

@@ -81,7 +81,22 @@ vi.mock("../../ConditionBuilder", () => ({
   ConditionBuilder: () => <div data-testid="condition-builder" />,
 }));
 vi.mock("../../QueryFilterInput", () => ({
-  QueryFilterInput: () => <div data-testid="query-filter-input" />,
+  // A live stand-in, not an inert div: the suggestion machinery is not what
+  // these tests are about, but "the filter stays editable" is — so the stub
+  // keeps the value/onChange wiring a real edit travels through.
+  QueryFilterInput: ({
+    value,
+    onChange,
+  }: {
+    value: string;
+    onChange: (value: string) => void;
+  }) => (
+    <input
+      data-testid="query-filter-input"
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+    />
+  ),
 }));
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -208,8 +223,17 @@ describe("AutomationWizard", () => {
         expect(
           screen.getByText(/What this automation watches cannot change/),
         ).toBeInTheDocument();
-        // The filter itself stays editable.
+        // The filter itself stays editable — proven by editing it, not by
+        // the section heading alone: a read-only filter would render the
+        // heading just the same.
         expect(screen.getByText("Which traces")).toBeInTheDocument();
+        await user.click(screen.getByRole("button", { name: "Code" }));
+        const queryInput = screen.getByTestId("query-filter-input");
+        await user.clear(queryInput);
+        await user.type(queryInput, "status:ok");
+        expect(useAutomationStore.getState().draft.filterQuery).toBe(
+          "status:ok",
+        );
         // And the way out is offered — as the create entry point the drawer
         // wires it to. That the transition genuinely resets the draft (rather
         // than carrying this saved automation into the new one) is pinned on
@@ -221,8 +245,12 @@ describe("AutomationWizard", () => {
         await user.click(offer);
         expect(onCreateNew).toHaveBeenCalledTimes(1);
         // The lock is not a dead end: the automation being edited is left
-        // exactly as it was by asking for a new one.
-        expect(useAutomationStore.getState().draft).toEqual(persistDraft);
+        // exactly as it was by asking for a new one — including the filter
+        // edit typed above, which asking for a new automation must not undo.
+        expect(useAutomationStore.getState().draft).toEqual({
+          ...persistDraft,
+          filterQuery: "status:ok",
+        });
       });
     });
   });

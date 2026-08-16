@@ -112,7 +112,12 @@ function initialSlice(): WebhookSlice {
 function isComplete(slice: WebhookSlice): boolean {
   return (
     validateWebhookUrlShape(slice.url.trim()) === null &&
-    validateWebhookContentType(slice.contentType) === null
+    // Blank means the default, exactly as `toActionParams` and the test-fire
+    // target read it — a cleared field must not block a save the send would
+    // treat as JSON.
+    validateWebhookContentType(
+      slice.contentType.trim() || DEFAULT_WEBHOOK_CONTENT_TYPE,
+    ) === null
   );
 }
 

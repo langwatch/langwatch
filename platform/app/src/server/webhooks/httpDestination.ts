@@ -69,7 +69,9 @@ type SsrfResponseHeaders = Awaited<ReturnType<typeof ssrfSafeFetch>>["headers"];
  *  at capture — the name still appears, which is the debugging signal. */
 const SENSITIVE_RESPONSE_HEADERS = new Set([
   "set-cookie",
+  "cookie",
   "authorization",
+  "proxy-authorization",
   "proxy-authenticate",
   "www-authenticate",
 ]);

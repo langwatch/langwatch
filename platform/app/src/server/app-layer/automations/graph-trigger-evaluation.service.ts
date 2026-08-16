@@ -48,7 +48,6 @@ import {
   type GraphAlertDispatchResult,
   graphAlertFireDigest,
 } from "~/server/app-layer/automations/dispatch/graphAlertActionDispatch";
-import { decryptSlackBotToken } from "~/server/app-layer/automations/providers/slack/server";
 import {
   type ResolvedSlackToken,
   slackTokenMissingDispatchError,
@@ -207,11 +206,11 @@ export interface GraphTriggerEvaluationDeps {
   recordEvaluation?(input: RecordEvaluationInput): Promise<void>;
   /**
    * ADR-093 §5 token resolution: the automation's own stored token, else the
-   * project's Slack integration, else null. Optional so the test doubles that
-   * predate the integration keep working; absent behaves as "the project has
-   * no integration", which is what this path did before.
+   * project's Slack integration, else null. Required — an absent resolver
+   * would silently skip project-scoped resolution, which is exactly the
+   * regression the wiring exists to prevent.
    */
-  resolveSlackToken?(params: {
+  resolveSlackToken(params: {
     projectId: string;
     actionParams: Pick<SlackActionParams, "slackBotToken">;
   }): Promise<ResolvedSlackToken | null>;
@@ -245,7 +244,7 @@ export async function evaluateGraphTrigger(params: {
   // The condition the check ran against, captured by the evaluation as soon
   // as it is known. Recorded alongside the observed value so the snapshot
   // stays truthful after someone edits the alert's threshold.
-  const observed: ObservedCondition = { condition: null };
+  const observed: ObservedCondition = { condition: null, evaluatedAt: null };
   const result = await runGraphTriggerEvaluation({ ...params, observed });
   if (params.deps.recordEvaluation) {
     try {
@@ -253,7 +252,9 @@ export async function evaluateGraphTrigger(params: {
         evaluationRecordOf({
           result,
           condition: observed.condition,
-          evaluatedAt: params.deps.now(),
+          // A branch that returns before the window clock is read (trigger
+          // gone, rule unreadable) still gets a fresh instant.
+          evaluatedAt: observed.evaluatedAt ?? params.deps.now(),
         }),
       );
     } catch (error) {
@@ -282,6 +283,9 @@ interface ObservedCondition {
     operator: string;
     timePeriodMinutes: number;
   } | null;
+  /** The instant the metric was read — the same `now` that closed the
+   *  window, not a later clock read taken after dispatch. */
+  evaluatedAt: Date | null;
 }
 
 /**
@@ -440,6 +444,7 @@ async function runGraphTriggerEvaluation({
   }
 
   const now = deps.now();
+  observed.evaluatedAt = now;
   const endDate = now;
   const startDate = new Date(endDate.getTime() - timePeriod * 60 * 1000);
 
@@ -649,18 +654,12 @@ async function runGraphTriggerEvaluation({
       if (slackDeliveryMethodOf(slackParams) === "bot") {
         // ADR-093 §5: the automation's own token wins; the project's Slack
         // integration serves the rest. The wired resolver owns the whole
-        // decision, so the row's own token is only decrypted on the fallback
-        // path that actually reads it.
-        const ownTokenFallback = (): ResolvedSlackToken | null => {
-          const ownToken = decryptSlackBotToken(slackParams);
-          return ownToken ? { token: ownToken, source: "automation" } : null;
-        };
-        const resolved: ResolvedSlackToken | null = deps.resolveSlackToken
-          ? await deps.resolveSlackToken({
-              projectId,
-              actionParams: slackParams,
-            })
-          : ownTokenFallback();
+        // decision.
+        const resolved: ResolvedSlackToken | null =
+          await deps.resolveSlackToken({
+            projectId,
+            actionParams: slackParams,
+          });
         if (!resolved) {
           throw slackTokenMissingDispatchError({ triggerName: trigger.name });
         }

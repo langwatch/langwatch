@@ -11,7 +11,9 @@ const FALLBACK_SCALE_MINUTES = 60;
 function normalizeNumericTimeScale(value: unknown): number {
   const parsed =
     typeof value === "number" ? value : parseInt(String(value ?? ""), 10);
-  return Number.isFinite(parsed) ? parsed : FALLBACK_SCALE_MINUTES;
+  return Number.isFinite(parsed) && parsed > 0
+    ? parsed
+    : FALLBACK_SCALE_MINUTES;
 }
 
 /**
@@ -65,7 +67,7 @@ export function resolveGraphTimeScale({
     daysDifference !== undefined &&
     daysDifference <= 2
   ) {
-    return 60;
+    return FALLBACK_SCALE_MINUTES;
   }
 
   return resolved;

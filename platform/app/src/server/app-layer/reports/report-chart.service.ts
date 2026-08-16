@@ -113,6 +113,17 @@ function parseGraphConfig(graph: CustomGraph): CustomGraphInput {
       [graph.id],
     );
   }
+  // The stored JSON is cast, not parsed, everywhere it is read — but a
+  // `series` that is not an array would crash the panel build OUTSIDE
+  // `buildChartSafely`, rejecting the whole report and retrying a row that
+  // can never change shape. Refuse it here as the config problem it is.
+  const candidate = raw as { series?: unknown };
+  if (candidate.series !== undefined && !Array.isArray(candidate.series)) {
+    throw new TerminalReportPanelError(
+      `Graph "${graph.id}" has an unreadable series configuration`,
+      [graph.id],
+    );
+  }
   return raw as unknown as CustomGraphInput;
 }
 

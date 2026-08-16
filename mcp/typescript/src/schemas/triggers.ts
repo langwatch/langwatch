@@ -133,11 +133,38 @@ export const actionParamsSchema = z.union([
   annotationQueueActionParamsSchema,
 ]);
 
+/**
+ * The write-side Slack shape. Every field on the read schema is optional so a
+ * redacted read round-trips, but a WRITE with no destination cannot deliver —
+ * the server refuses it, so refuse it here with the field named: `webhook`
+ * delivery (the default) needs `slackWebhook`, `bot` delivery needs
+ * `slackChannelId` (the token may come from the project's Slack integration).
+ */
+const slackActionParamsWriteSchema = slackActionParamsSchema.superRefine(
+  (params, ctx) => {
+    const delivery = params.slackDelivery ?? "webhook";
+    if (delivery === "webhook" && !params.slackWebhook) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["slackWebhook"],
+        message: "webhook delivery needs the incoming webhook URL",
+      });
+    }
+    if (delivery === "bot" && !params.slackChannelId) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["slackChannelId"],
+        message: "bot delivery needs the channel to post in",
+      });
+    }
+  },
+);
+
 const ACTION_PARAMS_SCHEMA_BY_ACTION: Partial<
   Record<string, z.ZodTypeAny>
 > = {
   SEND_EMAIL: emailActionParamsSchema,
-  SEND_SLACK_MESSAGE: slackActionParamsSchema,
+  SEND_SLACK_MESSAGE: slackActionParamsWriteSchema,
   SEND_WEBHOOK: webhookActionParamsSchema,
   ADD_TO_DATASET: datasetActionParamsSchema,
   ADD_TO_ANNOTATION_QUEUE: annotationQueueActionParamsSchema,

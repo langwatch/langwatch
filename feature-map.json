@@ -822,7 +822,7 @@
             "trigger delete"
           ],
           "skill": null,
-          "docs": "/api-reference/triggers/overview"
+          "docs": "https://langwatch.ai/docs/api-reference/triggers/overview.md"
         },
         "platform": {
           "ui": "/automations",
@@ -832,13 +832,14 @@
             "platform_create_trigger",
             "platform_update_trigger",
             "platform_test_fire_trigger",
+            "platform_list_trigger_fires",
             "platform_delete_trigger"
           ],
           "skill": null,
-          "docs": "/api-reference/triggers/overview"
+          "docs": "https://langwatch.ai/docs/api-reference/triggers/overview.md"
         },
         "api": "/api/triggers",
-        "docs": "/api-reference/triggers/overview"
+        "docs": "https://langwatch.ai/docs/api-reference/triggers/overview.md"
       },
       "sync": null,
       "produces": [

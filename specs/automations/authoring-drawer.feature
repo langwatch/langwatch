@@ -28,15 +28,15 @@ Feature: Staged automation authoring drawer
       And the first step asks what the automation should watch
       And delivery and review are steps the author has not reached yet
 
-    Scenario: Choosing a category offers the matching types
+    Scenario: The delivery step offers channels grouped by what they do
       Given the user is creating an automation
-      When the user opens the type picker
-      Then the picker offers Slack and email under Notification
-      And the picker offers add-to-dataset and add-to-annotation-queue under Action
+      When the user reaches the delivery step
+      Then Slack and email are offered under Notify
+      And add-to-dataset and add-to-annotation-queue are offered under Actions
 
-    Scenario: Changing the type clears configuration that no longer applies
+    Scenario: Changing the delivery channel clears configuration that no longer applies
       Given the user has configured an email notification
-      When the user changes the type to Slack
+      When the user changes the delivery channel to Slack
       Then the email-specific configuration is cleared
       And the Slack configuration secondary opens empty
 

@@ -68,7 +68,7 @@ Feature: Automations over the public API
       And the header value is the placeholder
 
     @unit
-    Scenario: A delivery channel the server no longer offers returns nothing
+    Scenario: Reading an unknown delivery channel returns nothing
       Given a stored automation whose delivery channel is not one this server offers
       When the automation is redacted for the public API
       Then its delivery configuration is returned empty
@@ -190,14 +190,12 @@ Feature: Automations over the public API
 
     @integration
     Scenario: The upsert shape is expressible over the API
-      When an automation is created over the API with templates, a cadence, a
-      settle time and a trace query
+      When an automation is created over the API with templates, a cadence, a settle time and a trace query
       Then each of them is saved on the automation
 
     @integration
     Scenario: A trace query the platform cannot read is refused
-      When an automation is created over the API with a trace query that
-      cannot be read
+      When an automation is created over the API with a trace query that cannot be read
       Then the save is refused as a query it cannot read
 
     @unit

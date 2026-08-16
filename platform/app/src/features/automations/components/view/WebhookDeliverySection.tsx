@@ -122,15 +122,17 @@ function guidanceForStatus(status: number | null): string | undefined {
 /** What one attempt row shows, decided ahead of the JSX so the components
  *  below stay presentational. */
 function attemptRowFacts(attempt: WebhookDelivery) {
+  // `||`, not `??`: a stored error of "" carries no words to show, and
+  // falling through to the next fact is the point.
   const statusText =
     attempt.responseStatus != null
       ? `HTTP ${attempt.responseStatus}`
-      : (attempt.error ?? "No response");
+      : attempt.error || "No response";
   const guidance =
     attempt.outcome === "success"
       ? undefined
       : guidanceForStatus(attempt.responseStatus);
-  const hasDetail = Boolean(attempt.error ?? guidance ?? attempt.response);
+  const hasDetail = Boolean(attempt.error || guidance || attempt.response);
   return { statusText, guidance, hasDetail };
 }
 

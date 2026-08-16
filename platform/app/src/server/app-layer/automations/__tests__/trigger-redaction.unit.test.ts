@@ -140,7 +140,7 @@ describe("redactTriggerForPublicApi", () => {
   });
 
   describe("given a stored row naming a channel this server does not offer", () => {
-    /** @scenario "A delivery channel the server no longer offers returns nothing" */
+    /** @scenario "Reading an unknown delivery channel returns nothing" */
     it("returns an empty delivery configuration", () => {
       const redacted = redactTriggerForPublicApi({
         action: "SEND_CARRIER_PIGEON" as TriggerAction,

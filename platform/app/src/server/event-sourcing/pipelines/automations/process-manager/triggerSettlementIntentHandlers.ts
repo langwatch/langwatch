@@ -570,6 +570,8 @@ async function dispatchNotifyDigest({
         if (!channel) {
           throw new DispatchError({
             message: `Slack bot connection for trigger "${trigger.name}" is missing its channel`,
+            customerMessage:
+              "This automation has no Slack channel to post in. Pick a channel in its delivery settings.",
             retryable: false,
           });
         }

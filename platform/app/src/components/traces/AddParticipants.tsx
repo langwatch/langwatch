@@ -162,7 +162,8 @@ export const AddParticipants = ({
             bug, see #2519). The listbox rendered fine within a single
             drawer, so its clicks reached the combobox trigger but never the
             options underneath the stacked drawer body. Portalling (the
-            default) fixes it in every context, single or nested drawer alike.
+            default) fixes it in the single- and stacked-drawer contexts this
+            listbox renders in.
           */}
           <Select.Content maxHeight="300px">
             <Box

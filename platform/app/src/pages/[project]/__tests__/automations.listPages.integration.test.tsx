@@ -15,6 +15,7 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { allTriggers } from "./listPages.fixture";
 
 const {
   mockPathnameRef,
@@ -75,83 +76,6 @@ vi.mock("~/components/WithPermissionGuard", () => ({
 vi.mock("~/components/ui/toaster", () => ({
   toaster: { create: mockToastCreate },
 }));
-
-const graphTrigger = {
-  id: "alert-1",
-  name: "Cost spike",
-  active: true,
-  pausedReason: null,
-  customGraphId: "graph-1",
-  customGraph: { name: "Cost graph" },
-  triggerKind: "TRIGGER",
-  action: "SEND_EMAIL",
-  actionParams: {
-    seriesName: "cost",
-    operator: "gt",
-    threshold: 10,
-    timePeriod: 60,
-    members: ["a@b.com"],
-  },
-  checks: [],
-  filterQuery: null,
-  filters: "{}",
-};
-
-const scheduleTrigger = {
-  id: "schedule-1",
-  name: "Weekly digest",
-  active: true,
-  pausedReason: null,
-  customGraphId: null,
-  customGraph: null,
-  triggerKind: "REPORT",
-  action: "SEND_EMAIL",
-  actionParams: {
-    source: { kind: "traceQuery", topN: 5 },
-    schedule: { cron: "0 9 * * 1", timezone: "UTC" },
-    members: ["a@b.com"],
-  },
-  checks: [],
-  filterQuery: null,
-  filters: "{}",
-};
-
-const filterTrigger = {
-  id: "automation-1",
-  name: "Flag failures",
-  active: true,
-  pausedReason: null,
-  customGraphId: null,
-  customGraph: null,
-  triggerKind: "TRIGGER",
-  action: "SEND_SLACK_MESSAGE",
-  actionParams: { slackWebhook: "https://hooks.slack.example/x" },
-  checks: [],
-  filterQuery: "status:error",
-  filters: "{}",
-};
-
-const botSlackTrigger = {
-  id: "automation-2",
-  name: "Errors to #ops",
-  active: true,
-  pausedReason: null,
-  customGraphId: null,
-  customGraph: null,
-  triggerKind: "TRIGGER",
-  action: "SEND_SLACK_MESSAGE",
-  actionParams: { slackDelivery: "bot", slackChannelId: "C0999999" },
-  checks: [],
-  filterQuery: "status:error",
-  filters: "{}",
-};
-
-const allTriggers = [
-  graphTrigger,
-  scheduleTrigger,
-  filterTrigger,
-  botSlackTrigger,
-];
 
 vi.mock("~/utils/api", () => ({
   api: {
@@ -378,77 +302,6 @@ describe("given the Reports table", () => {
           description: "Report deleted",
         }),
       );
-    });
-  });
-});
-
-describe("given a Slack automation on the unified table", () => {
-  beforeEach(() => {
-    mockPathnameRef.current = "/test-project/automations/automations";
-  });
-
-  afterEach(() => {
-    cleanup();
-  });
-
-  describe("when a row is a bot-delivery Slack automation", () => {
-    /** @scenario The delivery cell names a bot-delivery Slack automation */
-    it("names the Slack app and its destination channel, not 'Webhook'", async () => {
-      await renderPage();
-
-      // #6244: this cell used to show "Webhook" with an empty tooltip for
-      // every Slack row, including bot deliveries that never carry a
-      // webhook at all.
-      expect(
-        screen.getByText("Slack app · channel C0999999"),
-      ).toBeInTheDocument();
-      expect(screen.queryByText("Webhook")).toBeNull();
-    });
-  });
-
-  describe("when a row is a legacy webhook-delivery Slack automation", () => {
-    it("keeps the existing webhook presentation", async () => {
-      await renderPage();
-
-      expect(screen.getByText("Slack webhook")).toBeInTheDocument();
-    });
-  });
-});
-
-describe("given the Overview tab", () => {
-  beforeEach(() => {
-    mockPathnameRef.current = "/test-project/automations";
-    mockOpenDrawer.mockReset();
-  });
-
-  afterEach(() => {
-    cleanup();
-  });
-
-  describe("when the user opens the create menu", () => {
-    /** @scenario "The Overview offers creating an automation or a report" */
-    it("offers an automation and a report, and no longer an alert", async () => {
-      const user = userEvent.setup();
-      await renderPage();
-
-      await user.click(screen.getByRole("button", { name: /Create/ }));
-
-      expect(
-        screen.getByRole("menuitem", { name: "New automation" }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("menuitem", { name: "New report" }),
-      ).toBeInTheDocument();
-      // What an automation watches is chosen in its own first step now, so
-      // there is nothing left for a third menu item to pre-set (ADR-093 §1).
-      expect(
-        screen.queryByRole("menuitem", { name: "New alert" }),
-      ).not.toBeInTheDocument();
-
-      await user.click(
-        screen.getByRole("menuitem", { name: "New automation" }),
-      );
-      expect(mockOpenDrawer).toHaveBeenCalledWith("automation", {});
     });
   });
 });

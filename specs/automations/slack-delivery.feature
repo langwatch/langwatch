@@ -56,17 +56,20 @@ Feature: Slack delivery
 
     Encryption is the same AES-256-GCM helper the rest of the platform uses.
     What matters to a customer is the consequence: the token they paste is not
-    readable afterwards, by them or by anyone reading the row.
+    readable afterwards, by them or by anyone reading the row. The composer no
+    longer asks for a token (ADR-093 §5), so only legacy automations saved
+    before the project integration carry one — and they keep these guarantees
+    for as long as they exist.
 
     @unit
     Scenario: The bot token is protected at rest
-      Given a Slack automation is saved with a bot token
+      Given a legacy Slack automation saved with its own bot token
       Then the token is stored encrypted, never in plaintext
       And reading the automation back never returns the token to the browser
 
     @unit
     Scenario: Editing a bot automation without re-entering the token
-      Given a saved Slack automation with a bot token
+      Given a saved legacy Slack automation with its own bot token
       When the author edits it and leaves the token blank
       Then the existing token is kept
 

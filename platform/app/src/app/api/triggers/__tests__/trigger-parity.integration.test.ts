@@ -622,7 +622,7 @@ describe("Feature: automations over the public API express what the dashboard ex
           columnTypes: [],
         },
       });
-      const created = (await (
+      const automation = await created(
         await createTrigger({
           name: `Dataset rows ${ns}`,
           action: TriggerAction.ADD_TO_DATASET,
@@ -631,10 +631,10 @@ describe("Feature: automations over the public API express what the dashboard ex
             datasetMapping: { mapping: { input: { source: "trace" } } },
           },
           filters: CONDITION,
-        })
-      ).json()) as { id: string };
+        }),
+      );
 
-      const response = await post(`/api/triggers/${created.id}/test-fire`);
+      const response = await post(`/api/triggers/${automation.id}/test-fire`);
 
       expect(response.status).toBe(400);
       expect((await response.json()).error).toBe("test_fire_unavailable");

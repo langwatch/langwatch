@@ -102,7 +102,7 @@ export class SlackIntegrationMissingError extends HandledError {
   constructor() {
     super(
       "slack_integration_missing",
-      "This project has no Slack integration, and this automation stores no Slack token of its own.",
+      "Connect Slack in this project's integration settings before sending this automation.",
       { httpStatus: 422 },
     );
     this.name = "SlackIntegrationMissingError";
@@ -232,17 +232,25 @@ export class TriggerKindImmutableError extends HandledError {
 export class TriggerActionParamsUnknownFieldsError extends HandledError {
   declare readonly code: "trigger_action_params_unknown_fields";
 
-  constructor(
-    /** The fields this channel does not have, in the order they were sent. */
-    public readonly fields: string[],
-    /** Every field it does have, so the caller can see the one it meant. */
-    public readonly accepted: string[],
-  ) {
+  /** The fields this channel does not have, in the order they were sent. */
+  public readonly fields: string[];
+  /** Every field it does have, so the caller can see the one it meant. */
+  public readonly accepted: string[];
+
+  constructor({
+    fields,
+    accepted,
+  }: {
+    fields: string[];
+    accepted: string[];
+  }) {
     super(
       "trigger_action_params_unknown_fields",
       "This delivery configuration names fields the channel does not have.",
       { meta: { field: "actionParams", fields, accepted }, httpStatus: 422 },
     );
+    this.fields = fields;
+    this.accepted = accepted;
     this.name = "TriggerActionParamsUnknownFieldsError";
   }
 }
@@ -259,12 +267,18 @@ export class TriggerActionParamsUnknownFieldsError extends HandledError {
 export class TriggerRuleFieldsMisplacedError extends HandledError {
   declare readonly code: "trigger_rule_fields_misplaced";
 
-  constructor(
-    /** The rule fields that arrived in the wrong place. */
-    public readonly fields: string[],
-    /** Where they belong: `graphAlert` or `report`. */
-    public readonly expectedField: "graphAlert" | "report",
-  ) {
+  /** The rule fields that arrived in the wrong place. */
+  public readonly fields: string[];
+  /** Where they belong: `graphAlert` or `report`. */
+  public readonly expectedField: "graphAlert" | "report";
+
+  constructor({
+    fields,
+    expectedField,
+  }: {
+    fields: string[];
+    expectedField: "graphAlert" | "report";
+  }) {
     super(
       "trigger_rule_fields_misplaced",
       `The rule this automation fires by is stated in "${expectedField}", not ` +
@@ -274,6 +288,8 @@ export class TriggerRuleFieldsMisplacedError extends HandledError {
         httpStatus: 422,
       },
     );
+    this.fields = fields;
+    this.expectedField = expectedField;
     this.name = "TriggerRuleFieldsMisplacedError";
   }
 }
@@ -310,18 +326,20 @@ export class TriggerTestFireRateLimitedError extends HandledError {
 export class GraphAlertIncompleteError extends HandledError {
   declare readonly code: "graph_alert_incomplete";
 
-  constructor(
-    /** What is missing or wrong — `graphAlert`, `alertType`, `action`. */
-    public readonly field: string,
-    /** Which piece is missing, written for whoever has to add it. Travels in
-     *  `meta` because an error's own message no longer crosses the tRPC wire
-     *  (#5984), and the generic line cannot name the missing piece. */
-    public readonly reason: string,
-  ) {
+  /** What is missing or wrong — `graphAlert`, `alertType`, `action`. */
+  public readonly field: string;
+  /** Which piece is missing, written for whoever has to add it. Travels in
+   *  `meta` because an error's own message no longer crosses the tRPC wire
+   *  (#5984), and the generic line cannot name the missing piece. */
+  public readonly reason: string;
+
+  constructor({ field, reason }: { field: string; reason: string }) {
     super("graph_alert_incomplete", reason, {
       meta: { field, reason },
       httpStatus: 422,
     });
+    this.field = field;
+    this.reason = reason;
     this.name = "GraphAlertIncompleteError";
   }
 }
@@ -378,19 +396,18 @@ export class ReportChannelUnsupportedError extends HandledError {
 }
 
 /** The trace query the automation is about could not be read. Rejected at the
- *  save rather than at dispatch, where it would silently match nothing. */
+ *  save rather than at dispatch, where it would silently match nothing. The
+ *  parser's own account stays in the thrower's log — it can name internal
+ *  columns, and nothing on a handled error is allowed to. */
 export class TriggerFilterQueryInvalidError extends HandledError {
   declare readonly code: "trigger_filter_query_invalid";
 
-  constructor(
-    /** The parser's own account of what it could not read. */
-    public readonly reason: string,
-  ) {
+  constructor() {
     super(
       "trigger_filter_query_invalid",
       "This trace query could not be read. Check it against the query syntax " +
         "the traces view uses.",
-      { meta: { field: "filterQuery", reason }, httpStatus: 422 },
+      { meta: { field: "filterQuery" }, httpStatus: 422 },
     );
     this.name = "TriggerFilterQueryInvalidError";
   }

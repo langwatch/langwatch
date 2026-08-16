@@ -4,7 +4,10 @@ import {
   fetchSlackWorkspaceIdentity,
   type SlackWorkspaceIdentity,
 } from "../delivery/slackWebApi";
-import { SlackIntegrationInvalidTokenError } from "../errors";
+import {
+  SlackIntegrationInvalidTokenError,
+  SlackIntegrationMissingError,
+} from "../errors";
 import { PrismaSlackIntegrationRepository } from "./repositories/slack-integration.prisma.repository";
 import type {
   LegacySlackTokenAutomation,
@@ -36,6 +39,8 @@ const DISCONNECTED: SlackIntegrationStatus = {
 /** Outcome of switching several automations off their own tokens at once. */
 export interface LegacyTokenClearResult {
   cleared: number;
+  /** Rows that already carried no token — nothing to do, not a failure. */
+  alreadyClear: number;
   failed: number;
 }
 
@@ -100,10 +105,22 @@ export class SlackIntegrationService {
     userId: string;
   }): Promise<SlackIntegrationStatus> {
     const token = botToken.trim();
-    if (!token) throw new SlackIntegrationInvalidTokenError("invalid_auth");
+    // A local slug, not "invalid_auth": `meta.slackError` carries Slack's own
+    // code, and Slack never saw this request.
+    if (!token) throw new SlackIntegrationInvalidTokenError("empty_token");
 
     const verified = await this.verifyToken(token);
     if (!verified.ok) {
+      // A transport failure is infrastructure, not a token refusal — it stays
+      // a plain Error and degrades to the generic unknown at the boundary.
+      if (
+        verified.error === "request_failed" ||
+        verified.error === "bad_response"
+      ) {
+        throw new Error(
+          `Slack auth.test did not answer usably: ${verified.error}`,
+        );
+      }
       throw new SlackIntegrationInvalidTokenError(verified.error);
     }
 
@@ -154,9 +171,12 @@ export class SlackIntegrationService {
 
   /**
    * Switch automations onto the project integration by clearing the token they
-   * store. Each row is independent: one that cannot be updated is counted as
-   * failed and keeps delivering with its own token, and the rest still move.
-   * Passing no ids switches every automation in the project that has one.
+   * store. Refused outright while the project has no integration — clearing
+   * then would leave the automations with nothing to deliver with. Each row is
+   * independent: one that cannot be updated is counted as failed and keeps
+   * delivering with its own token, one that already carries no token is
+   * already where the switch was taking it, and the rest still move. Passing
+   * no ids switches every automation in the project that has one.
    */
   async clearLegacyTokens({
     projectId,
@@ -165,6 +185,9 @@ export class SlackIntegrationService {
     projectId: string;
     triggerIds?: string[];
   }): Promise<LegacyTokenClearResult> {
+    const integration = await this.repo.findByProject({ projectId });
+    if (!integration) throw new SlackIntegrationMissingError();
+
     const targets =
       triggerIds ??
       (await this.repo.findAllWithOwnSlackToken({ projectId })).map(
@@ -172,19 +195,21 @@ export class SlackIntegrationService {
       );
 
     let cleared = 0;
+    let alreadyClear = 0;
     let failed = 0;
     for (const triggerId of targets) {
       try {
-        const didClear = await this.repo.clearOwnSlackToken({
+        const outcome = await this.repo.clearOwnSlackToken({
           projectId,
           triggerId,
         });
-        if (didClear) cleared++;
+        if (outcome === "cleared") cleared++;
+        else if (outcome === "already_clear") alreadyClear++;
         else failed++;
       } catch {
         failed++;
       }
     }
-    return { cleared, failed };
+    return { cleared, alreadyClear, failed };
   }
 }

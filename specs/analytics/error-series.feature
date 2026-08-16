@@ -81,17 +81,17 @@ Feature: Per-series filters and percentage mode on analytics graphs
   @unit
   Scenario: Two series that differ only by their filters produce different queries
     Given a graph with the same measurement twice, filtered to traces with and without an error
-    When the query is built
-    Then the two series compile to different expressions
+    When the graph is queried
+    Then each series measures only the traces its own filter matches
 
   @unit
   Scenario: Percentage mode on an unfiltered series leaves the series unchanged
     Given a graph with a single unfiltered series shown as a percentage
-    When the query is built
+    When the graph is queried
     Then the series is measured exactly as it would be without percentage mode
 
   @unit
   Scenario: A percentage on a per-entity average is refused rather than answered wrongly
     Given a graph whose series averages per user and is both filtered and shown as a percentage
-    When the query is built
-    Then building the query fails and names the unsupported combination
+    When the graph is queried
+    Then the graph is refused with an explanation naming the unsupported combination

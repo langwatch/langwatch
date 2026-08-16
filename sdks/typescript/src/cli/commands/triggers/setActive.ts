@@ -59,8 +59,8 @@ export const setTriggerActiveCommand = async (
     );
 
     return {
-      // The API redacts delivery credentials before it answers, so machine
-      // output is the response exactly as it arrived.
+      // The state answer carries only id, name and active, so machine output
+      // is the response exactly as it arrived.
       data: trigger,
       table: () => {
         // The spinner line above is the whole human output.

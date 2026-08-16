@@ -42,6 +42,11 @@ function cadenceSummary(draft: AutomationDraft): string {
       : "Set a schedule";
   }
   const settle = Math.round(draft.traceDebounceMs / 1000);
+  // A persist action writes per match — the router coerces its cadence to
+  // immediate — so the summary must not echo a digest the server discards.
+  if (!isNotifyAction(draft)) {
+    return `Per matching trace, ${settle}s settle window`;
+  }
   return `${CADENCE_CHOICE_LABELS[draft.notificationCadence]}, ${settle}s settle window`;
 }
 
@@ -76,9 +81,9 @@ export function CadenceSection({
   // A channel whose templates depend on the receive choice hosts the chooser
   // itself, beside the templates it filters — rendering it here too would put
   // two controls for the same decision on one step.
-  const chooserHostedByChannel =
+  const isChooserHostedByChannel =
     draft.action !== null &&
-    CLIENT_PROVIDERS[draft.action].client.hostsReceiveChooser === true;
+    CLIENT_PROVIDERS[draft.action].client.hasOwnReceiveChooser === true;
 
   return (
     <FacetSection
@@ -98,7 +103,7 @@ export function CadenceSection({
               queue) always writes per match — the router coerces its cadence
               to immediate — so offering batch windows would promise behavior
               the server discards. */}
-          {chooserHostedByChannel || !isNotifyAction(draft) ? null : (
+          {isChooserHostedByChannel || !isNotifyAction(draft) ? null : (
             <ReceiveCadenceField
               value={draft.notificationCadence}
               onChange={(value) => dispatch({ type: "SET_CADENCE", value })}

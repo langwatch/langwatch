@@ -123,6 +123,16 @@ function makeDeps(
       sendSlack: sendSlack as unknown as ReportDispatchDeps["sendSlack"],
       sendSlackBot:
         sendSlackBot as unknown as ReportDispatchDeps["sendSlackBot"],
+      // The production resolver's own-token-first shape over the fake
+      // cipher: a stored ciphertext resolves, nothing else does.
+      resolveSlackToken: vi.fn(async ({ actionParams }) => {
+        const stored = actionParams.slackBotToken;
+        if (!stored) return null;
+        return {
+          token: stored.replace(/^enc\(/, "").replace(/\)$/, ""),
+          source: "automation" as const,
+        };
+      }),
       filterSuppressedRecipients: vi.fn(async ({ emails }) => emails),
       listReportTraces:
         listReportTraces as unknown as ReportDispatchDeps["listReportTraces"],
@@ -249,6 +259,44 @@ describe("dispatchScheduledReport", () => {
       expect(call.token).toBe("xoxb-live");
       expect(call.channel).toBe("C123");
       expect("blocks" in call.payload).toBe(true);
+    });
+
+    it("sends nothing and records no fire when no token resolves", async () => {
+      const { deps, sendSlack, sendSlackBot, recordFire } = makeDeps(
+        makeReportTrigger({
+          actionParams: {
+            source: { kind: "traceQuery", filters: {}, topN: 5 },
+            schedule: { cron: "0 9 * * 1", timezone: "UTC" },
+            slackDelivery: "bot",
+            slackChannelId: "C123",
+          },
+        }),
+      );
+
+      await dispatchScheduledReport({ deps, fire });
+
+      expect(sendSlackBot).not.toHaveBeenCalled();
+      expect(sendSlack).not.toHaveBeenCalled();
+      expect(recordFire).not.toHaveBeenCalled();
+    });
+
+    it("sends nothing and records no fire when the channel is blank", async () => {
+      const { deps, sendSlack, sendSlackBot, recordFire } = makeDeps(
+        makeReportTrigger({
+          actionParams: {
+            source: { kind: "traceQuery", filters: {}, topN: 5 },
+            schedule: { cron: "0 9 * * 1", timezone: "UTC" },
+            slackDelivery: "bot",
+            slackBotToken: "enc(xoxb-live)",
+          },
+        }),
+      );
+
+      await dispatchScheduledReport({ deps, fire });
+
+      expect(sendSlackBot).not.toHaveBeenCalled();
+      expect(sendSlack).not.toHaveBeenCalled();
+      expect(recordFire).not.toHaveBeenCalled();
     });
   });
 

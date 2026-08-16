@@ -46,7 +46,9 @@ export function persistSlackActionParams({
   return {
     slackDelivery: "bot",
     slackChannelId: incoming.slackChannelId?.trim(),
-    slackBotToken,
+    // Omitted, not `undefined`: the stored JSON must carry no token KEY when
+    // there is no token, so a read never mistakes the field for present.
+    ...(slackBotToken === undefined ? {} : { slackBotToken }),
   };
 }
 

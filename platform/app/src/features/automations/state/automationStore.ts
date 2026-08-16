@@ -49,7 +49,7 @@ export interface AutomationStore {
   /** Drives the pure reducer. */
   dispatch: (action: DraftAction) => void;
   /** Reported by the condition builder as its rows change. */
-  setHasInvalidConditionRows: (invalid: boolean) => void;
+  setHasInvalidConditionRows: (isInvalid: boolean) => void;
   /** Open or close a secondary drawer. */
   setSection: (section: Section) => void;
   /** Show a wizard step. Reaching a later step never un-reaches an earlier
@@ -81,8 +81,8 @@ export const useAutomationStore = create<AutomationStore>((set) => ({
 
   dispatch: (action) =>
     set((state) => ({ draft: reducer(state.draft, action) })),
-  setHasInvalidConditionRows: (invalid) =>
-    set({ hasInvalidConditionRows: invalid }),
+  setHasInvalidConditionRows: (isInvalid) =>
+    set({ hasInvalidConditionRows: isInvalid }),
   setSection: (section) => set({ section }),
   setStep: (step) =>
     set((state) => ({

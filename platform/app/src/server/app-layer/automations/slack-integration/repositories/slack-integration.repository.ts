@@ -41,11 +41,14 @@ export interface SlackIntegrationRepository {
 
   /**
    * Drop the stored token from one automation's Slack params, leaving every
-   * other field alone. Returns false when the row is gone or no longer carries
-   * one, so a bulk switch can report it without failing the batch.
+   * other field alone. The outcomes are distinct so a bulk switch can report
+   * them honestly: `already_clear` is a row that carries no token — correct,
+   * not broken — while `failed` is a row that is gone or could not be written.
    */
   clearOwnSlackToken(params: {
     projectId: string;
     triggerId: string;
-  }): Promise<boolean>;
+  }): Promise<ClearOwnSlackTokenOutcome>;
 }
+
+export type ClearOwnSlackTokenOutcome = "cleared" | "already_clear" | "failed";

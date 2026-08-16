@@ -387,17 +387,17 @@ function AnalyticsCustomGraphContent({
                   <HStack gap={2}>
                     {/*
                      * ADR-034 Phase 8: both the bell-icon (edit) and the
-                     * "Add alert" (create) paths open the automations
+                     * "Add automation" (create) paths open the automations
                      * drawer pre-filled with this graph + its first series,
                      * mirroring the dashboard chart card flow from Phase
                      * 5.2. `deriveSeriesIdentifier` emits the canonical
                      * "{index}/{key|metric}/{aggregation}" form the
                      * automations secondary drawer matches against
                      * (Series.name is a free-form label and would not
-                     * pre-select). Alerts only exist for saved graphs —
-                     * `customId` is unset until the first save, so the
-                     * entry point hides rather than opening a drawer that
-                     * can't reference the graph.
+                     * pre-select). A graph-watching automation only exists
+                     * for a saved graph — `customId` is unset until the
+                     * first save, so the entry point hides rather than
+                     * opening a drawer that can't reference the graph.
                      */}
                     {customId ? (
                       form.watch("alert.enabled") ? (
@@ -709,9 +709,9 @@ function CustomGraphForm({
       graphJson.height = 300;
     }
 
-    // Alert-writing moved to the automations drawer (ADR-034 Phase 5.2 —
-    // the chart-card `Add alert` bell opens `automation` drawer with
-    // `prefilledGraphId`). This graph mutation is graph-shape only.
+    // Automation-writing moved to the automations drawer (ADR-034 Phase 5.2
+    // — the chart-card `Add automation` bell opens the `automation` drawer
+    // with `prefilledGraphId`). This graph mutation is graph-shape only.
 
     addNewGraph.mutate(
       {

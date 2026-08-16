@@ -321,7 +321,7 @@ describe("automationRouter", () => {
     // nothing once every project had the channel, and leaving the call in
     // invites the OFF branch growing back.
     it("test-fires a webhook without asking whether the channel is enabled", async () => {
-      await caller
+      const error = await caller
         .testFireTemplate({
           projectId: "proj_123",
           channel: "webhook",
@@ -338,8 +338,16 @@ describe("automationRouter", () => {
           graphAlert: null,
           report: null,
         })
-        .catch(() => undefined);
+        .then(
+          () => null,
+          (thrown: unknown) => thrown,
+        );
 
+      // The harness stores no proj_123 row, so the FIRE PATH refuses at
+      // project resolution — proof the call got past any channel gate and
+      // into the send. A gating or validation refusal would fail this match
+      // instead of being swallowed.
+      expect((error as Error).message).toMatch(/Project not found/);
       expect(mockFeatureFlagIsEnabled).not.toHaveBeenCalled();
     });
   });

@@ -22,9 +22,11 @@
  * Spec: specs/automations/source-merge.feature.
  */
 
-import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { checkProjectPermission } from "~/server/api/rbac";
+import {
+  checkProjectPermission,
+  resolveProjectPermission,
+} from "~/server/api/rbac";
 import { SlackIntegrationService } from "~/server/app-layer/automations/slack-integration/slack-integration.service";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -34,9 +36,18 @@ export const slackIntegrationRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("triggers:view"))
     .query(async ({ ctx, input }) => {
-      return SlackIntegrationService.create(ctx.prisma).getStatus({
-        projectId: input.projectId,
-      });
+      const status = await SlackIntegrationService.create(ctx.prisma).getStatus(
+        { projectId: input.projectId },
+      );
+      // Whether THIS caller may change the connection of THIS project — the
+      // settings picker can reach projects the session is not on, and the
+      // session project's permission says nothing about those.
+      const { permitted } = await resolveProjectPermission(
+        ctx,
+        input.projectId,
+        "project:update",
+      );
+      return { ...status, canManage: permitted };
     }),
 
   getLegacyTokenCensus: protectedProcedure
@@ -60,10 +71,12 @@ export const slackIntegrationRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const organizationId = await resolveOrganizationId(input.projectId);
       if (!organizationId) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message: "This project is not part of an organization.",
-        });
+        // Every project hangs off a team and an organization, so a project
+        // without one is a data-integrity anomaly the customer cannot act on
+        // — it degrades to the generic unknown with a trace id, per ADR-045.
+        throw new Error(
+          `project ${input.projectId} resolves to no organization`,
+        );
       }
       return SlackIntegrationService.create(ctx.prisma).setup({
         projectId: input.projectId,

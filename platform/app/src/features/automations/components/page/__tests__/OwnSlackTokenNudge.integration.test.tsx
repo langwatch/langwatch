@@ -136,7 +136,9 @@ describe("OwnSlackTokenNudge", () => {
 
   describe("given a project with no Slack integration to fall through to", () => {
     it("offers no switch that would leave the automation unable to deliver", () => {
-      renderNudge({ workspaceName: null, canSwitch: false });
+      // canSwitch true on purpose: the missing workspace alone must hide the
+      // action, not only the caller's composed permission flag.
+      renderNudge({ workspaceName: null, canSwitch: true });
 
       expect(screen.getByText(/uses its own slack token/i)).toBeInTheDocument();
       expect(

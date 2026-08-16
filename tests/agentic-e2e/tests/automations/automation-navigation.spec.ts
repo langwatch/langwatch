@@ -34,6 +34,9 @@ test("automation overview keeps activity and setup guidance", async ({
   // alerts path resolves to the one automations page (the path carries no
   // row identity — that lives in the drawer parameters).
   await page.goto(`${basePath}/alerts`);
+  // The retired path renders the merged table in place rather than
+  // redirecting, so the URL must survive too.
+  await expect(page).toHaveURL(`${basePath}/alerts`);
   await expect(page.locator("h1", { hasText: "Automations" })).toBeVisible();
   await expect(
     page.getByRole("button", { name: "New automation" }),

@@ -50,9 +50,6 @@ const triggerActionEnum = z.enum([
   "ADD_TO_DATASET",
   "ADD_TO_ANNOTATION_QUEUE",
   "SEND_SLACK_MESSAGE",
-  // Available to projects that deliver on the webhook channel; the save is
-  // refused for the rest, so the channel opens here the same day it opens in
-  // the dashboard.
   "SEND_WEBHOOK",
 ]);
 

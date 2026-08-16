@@ -15,19 +15,19 @@ export interface WatchSummary {
 }
 
 export function watchSummary({
-  watchesGraph,
+  isWatchingGraph,
   graphName,
   filterQuery,
   hasStructuredFilters = false,
 }: {
-  watchesGraph: boolean;
+  isWatchingGraph: boolean;
   /** The watched graph's name, once its row has loaded. */
   graphName?: string | null;
   filterQuery?: string | null;
   /** A legacy automation authored with structured filters instead of a query. */
   hasStructuredFilters?: boolean;
 }): WatchSummary {
-  if (watchesGraph) {
+  if (isWatchingGraph) {
     const name = graphName?.trim();
     return { label: name ? `Graph · ${name}` : "Graph", detail: null };
   }

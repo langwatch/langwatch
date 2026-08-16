@@ -74,7 +74,10 @@ const switchCalls: { projectId: string; automationIds?: string[] }[] = [];
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
+      automation: {
+        getTriggers: { invalidate: () => undefined },
+      },
       slackIntegration: {
         getLegacyTokenCensus: { invalidate: () => undefined },
       },
@@ -1026,7 +1029,7 @@ describe("Slack client slice contract", () => {
         expect(
           slackClient.previewOptions?.({
             slice: slice,
-            context: { projectSlackIntegrationConnected: false },
+            context: { hasProjectSlackIntegration: false },
           }),
         ).toEqual({ allowGatedBlocks: false });
       });
@@ -1042,7 +1045,7 @@ describe("Slack client slice contract", () => {
         expect(
           slackClient.previewOptions?.({
             slice: slice,
-            context: { projectSlackIntegrationConnected: true },
+            context: { hasProjectSlackIntegration: true },
           }),
         ).toEqual({ allowGatedBlocks: true });
       });
@@ -1065,7 +1068,7 @@ describe("Slack client slice contract", () => {
       expect(
         slackClient.previewOptions?.({
           slice: slice,
-          context: { projectSlackIntegrationConnected: true },
+          context: { hasProjectSlackIntegration: true },
         }),
       ).toEqual({ allowGatedBlocks: false });
     });

@@ -28,7 +28,7 @@ export const CADENCE_LABELS: Record<NotificationCadence, string> = {
  * messages?" — used on the choosing surface and in sentences built around the
  * author's pick, where "Immediate" would wrongly promise instant delivery
  * (every message still waits for its trace to settle). `CADENCE_LABELS` stays
- * the compact form for tables and summaries.
+ * the compact form for table cells and the wizard's step summary.
  */
 export const CADENCE_CHOICE_LABELS: Record<NotificationCadence, string> = {
   immediate: "One message per matching trace",

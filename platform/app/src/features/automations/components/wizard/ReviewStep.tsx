@@ -38,7 +38,7 @@ export function ReviewStep({
 }) {
   const draft = useDraft();
   const setStep = useAutomationStore((s) => s.setStep);
-  const watchesGraph = draft.source === "customGraph";
+  const isWatchingGraph = draft.source === "customGraph";
 
   // The ceiling advice needs the condition estimate AND the action class. This
   // is the first moment a create knows both; an edit re-entering the Watch step
@@ -52,7 +52,7 @@ export function ReviewStep({
   });
 
   const watches = watchSummary({
-    watchesGraph,
+    isWatchingGraph,
     graphName,
     filterQuery: draft.filterQuery,
     // The same predicate the rail summarises with, so the overview and the
@@ -68,7 +68,7 @@ export function ReviewStep({
         editLabel="Edit what this automation watches"
         onEdit={() => setStep("watch")}
       >
-        {watchesGraph ? (
+        {isWatchingGraph ? (
           <Text textStyle="xs" color="fg.muted">
             Fires when {seriesLabel ?? "the watched series"} is{" "}
             {OPERATOR_LABELS[draft.graphAlert.operator]}{" "}

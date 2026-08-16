@@ -1,7 +1,7 @@
 import { Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useState } from "react";
 import { describeError } from "~/features/errors";
-import { api } from "~/utils/api";
+import { api, type RouterOutputs } from "~/utils/api";
 import { formatMilliseconds } from "~/utils/formatMilliseconds";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 
@@ -110,21 +110,12 @@ export function MatchingTracesSection({
   );
 }
 
-interface MatchedTrace {
-  traceId: string;
-  name: string;
-  timestamp: number;
-  durationMs: number;
-  status: string;
-  input: string | null;
-  output: string | null;
-}
+// Derived from the router output the way HistorySection derives its rows, so
+// a procedure-side change fails the build here instead of at render.
+type MatchList = RouterOutputs["tracesV2"]["list"];
+type MatchedTrace = MatchList["items"][number];
 
-function MatchResults({
-  data,
-}: {
-  data: { totalHits: number; items: MatchedTrace[] };
-}) {
+function MatchResults({ data }: { data: MatchList }) {
   if (data.totalHits === 0) {
     return (
       <Text textStyle="sm" color="fg.muted">

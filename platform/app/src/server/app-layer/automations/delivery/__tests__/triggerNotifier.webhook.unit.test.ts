@@ -114,8 +114,6 @@ describe("webhook test fire", () => {
         bodyTemplate: "ALERT {{ trigger.name }}",
       });
 
-      // Through the SSRF-fenced sender: an unroutable destination would have
-      // thrown before `sendHttpDestination` was reached at all.
       expect(mockedSend.mock.calls[0]![0].url).toBe("https://example.com/hook");
       expect(sentBody()).toBe("ALERT High latency");
       // Non-suppressible: the destination below sets no headers, and a

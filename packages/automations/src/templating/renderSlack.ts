@@ -31,14 +31,15 @@ export type SlackTemplateType = "string" | "block_kit";
  * framework default") and how the message reaches Slack.
  *
  * ADR-041: a bot connection posts through the Web API, which renders the
- * modern Block Kit layouts (charts, tables, alert banners) — a webhook can't.
+ * modern Block Kit layouts (charts, tables, alert banners); webhook delivery
+ * defaults to plain text but honors an explicit "block_kit" pick.
  * Every bot-connection call site used to compute this inline as
  * `configured === "block_kit" ? "block_kit" : "string"`, which reads a
  * missing discriminator as "string" regardless of delivery method. That
  * silently sent the legacy plain-text default over a bot connection any time
  * the author had not explicitly picked Block Kit — exactly the send ADR-041
- * says a bot connection must never make. A webhook still can't render the
- * gated blocks, so its unconfigured default stays "string".
+ * says a bot connection must never make. A webhook's unconfigured default
+ * stays "string".
  */
 export function resolveSlackTemplateType({
   configured,

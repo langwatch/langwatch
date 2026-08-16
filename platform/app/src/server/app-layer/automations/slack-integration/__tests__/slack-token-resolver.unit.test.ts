@@ -54,16 +54,13 @@ describe("resolveSlackBotToken", () => {
   describe("given no token in either place", () => {
     /** @scenario "Slack delivery without any token fails with a named cause" */
     it("refuses with the integration-missing code", async () => {
-      const error = await resolveSlackBotToken({
-        actionParams: {},
-        projectId: "project-1",
-        projectIntegration: projectWith(null),
-      }).then(
-        () => null,
-        (thrown: unknown) => thrown,
-      );
-
-      expect((error as HandledError).code).toBe("slack_integration_missing");
+      await expect(
+        resolveSlackBotToken({
+          actionParams: {},
+          projectId: "project-1",
+          projectIntegration: projectWith(null),
+        }),
+      ).rejects.toMatchObject({ code: "slack_integration_missing" });
     });
 
     /** @scenario "Slack delivery without any token fails with a named cause" */

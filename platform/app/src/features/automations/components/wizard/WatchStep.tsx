@@ -40,7 +40,7 @@ export function WatchStep({
 }) {
   const draft = useDraft();
   const dispatch = useAutomationStore((s) => s.dispatch);
-  const watchesGraph = draft.source === "customGraph";
+  const isWatchingGraph = draft.source === "customGraph";
 
   const pick = (source: ConditionSource) => {
     if (source === draft.source) return;
@@ -58,22 +58,22 @@ export function WatchStep({
         <Text fontWeight="semibold">What should this automation watch?</Text>
         <HStack gap={2} align="stretch">
           <SourceCard
-            active={!watchesGraph}
+            active={!isWatchingGraph}
             title="A trace filter"
             description="Act on every incoming trace that matches your conditions."
             accent="blue"
             icon={<Zap size={16} />}
-            locked={subjectLocked && watchesGraph}
+            locked={subjectLocked && isWatchingGraph}
             lockedTooltip={WATCH_LOCKED_EXPLANATION}
             onClick={() => pick("trace")}
           />
           <SourceCard
-            active={watchesGraph}
+            active={isWatchingGraph}
             title="A graph"
             description="Watch one series on an analytics graph and fire when it crosses a threshold."
             accent="orange"
             icon={<TrendingUp size={16} />}
-            locked={subjectLocked && !watchesGraph}
+            locked={subjectLocked && !isWatchingGraph}
             lockedTooltip={WATCH_LOCKED_EXPLANATION}
             onClick={() => pick("customGraph")}
           />
@@ -85,13 +85,13 @@ export function WatchStep({
 
       <SubjectSection
         prefilledGraphId={prefilledGraphId}
-        title={watchesGraph ? "The graph and series" : "Which traces"}
+        title={isWatchingGraph ? "The graph and series" : "Which traces"}
       />
 
       {/* A graph's threshold rule is part of what it watches: it decides when
           the automation FIRES, which is a different question from when it
           sends (that one rides with the channel, in Delivery). */}
-      {watchesGraph ? <CadenceSection title="When it fires" /> : null}
+      {isWatchingGraph ? <CadenceSection title="When it fires" /> : null}
     </VStack>
   );
 }

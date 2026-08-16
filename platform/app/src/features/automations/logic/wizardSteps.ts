@@ -113,12 +113,12 @@ function watchStepSummary({
   draft: AutomationDraft;
   graphName?: string | null;
 }): string | null {
-  const watchesGraph = draft.source === "customGraph";
-  if (watchesGraph && !draft.customGraphId) return null;
-  if (!watchesGraph && !subjectIsSet(draft)) return null;
+  const isWatchingGraph = draft.source === "customGraph";
+  if (isWatchingGraph && !draft.customGraphId) return null;
+  if (!isWatchingGraph && !subjectIsSet(draft)) return null;
   return watchSummaryLine(
     watchSummary({
-      watchesGraph,
+      isWatchingGraph,
       graphName,
       filterQuery: draft.filterQuery,
       hasStructuredFilters: filtersAreSet(draft.filters),

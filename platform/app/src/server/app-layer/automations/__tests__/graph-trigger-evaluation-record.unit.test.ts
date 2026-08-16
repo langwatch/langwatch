@@ -107,6 +107,8 @@ function makeDeps({
       ({ id: PROJECT_ID, name: "Demo", slug: "demo" }) as Project,
     getTimeseries: getTimeseries ?? (async () => series),
     triggerSent: new StubTriggerSentRepo(),
+    // These fixtures never reach a Slack dispatch, so nothing resolves.
+    resolveSlackToken: async () => null,
     updateLastRunAt: async () => undefined,
     notifier: {
       dispatch: async () => ({

@@ -25,7 +25,7 @@ CREATE TABLE "TriggerLatestEvaluation" (
     "operator" TEXT,
     "timePeriodMinutes" INTEGER,
     "skipCode" TEXT,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "TriggerLatestEvaluation_pkey" PRIMARY KEY ("triggerId")
 );

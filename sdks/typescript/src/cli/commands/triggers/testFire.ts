@@ -47,13 +47,20 @@ export const testFireTriggerCommand = async (
       process.exit(1);
     }
 
-    const result = (await response.json()) as {
+    const parsed = (await response.json()) as {
       channel: string;
       recipientCount: number;
       usedDefault: boolean;
-      missingVariables: string[];
-      errors: string[];
+      missingVariables?: string[];
+      errors?: string[];
       httpStatus?: number;
+    };
+    // The cast is not validation: a control plane that omits either array
+    // must not make the CLI throw after reporting success.
+    const result = {
+      ...parsed,
+      missingVariables: parsed.missingVariables ?? [],
+      errors: parsed.errors ?? [],
     };
     spinner.succeed(`Test fire sent on the ${result.channel} channel`);
 

@@ -2,32 +2,46 @@ import { describe, expect, it } from "vitest";
 import { resolveSeriesValueFormat } from "../seriesValueFormat";
 
 describe("resolveSeriesValueFormat", () => {
+  const formatOf = (
+    format: ReturnType<typeof resolveSeriesValueFormat>,
+    value: number,
+  ) => {
+    if (typeof format !== "function") throw new Error("expected a formatter");
+    return format(value);
+  };
+
   describe("given a percentage series", () => {
     /** @scenario "A percentage series formats its values as a percentage" */
-    it("formats as a percentage regardless of the metric's own format", () => {
-      expect(
-        resolveSeriesValueFormat({
-          isPercent: true,
-          aggregation: "avg",
-          metricFormat: "0.00a",
-        }),
-      ).toBe("0%");
+    it("suffixes the query's 0-100 value regardless of the metric's own format", () => {
+      const format = resolveSeriesValueFormat({
+        isPercent: true,
+        aggregation: "avg",
+        metricFormat: "0.00a",
+      });
+
+      // The builder already emits `filtered / all * 100`; a numeral `%`
+      // token would multiply again and render 50 as "5000%".
+      expect(formatOf(format, 50)).toBe("50%");
+      expect(formatOf(format, 0)).toBe("0%");
     });
 
     it("wins over a cardinality aggregation", () => {
-      expect(
-        resolveSeriesValueFormat({
-          isPercent: true,
-          aggregation: "cardinality",
-          metricFormat: "0.00a",
-        }),
-      ).toBe("0%");
+      const format = resolveSeriesValueFormat({
+        isPercent: true,
+        aggregation: "cardinality",
+        metricFormat: "0.00a",
+      });
+
+      expect(formatOf(format, 33.4)).toBe("33%");
     });
 
     it("formats as a percentage even with no known metric", () => {
-      expect(
-        resolveSeriesValueFormat({ isPercent: true, aggregation: "avg" }),
-      ).toBe("0%");
+      const format = resolveSeriesValueFormat({
+        isPercent: true,
+        aggregation: "avg",
+      });
+
+      expect(formatOf(format, 100)).toBe("100%");
     });
   });
 

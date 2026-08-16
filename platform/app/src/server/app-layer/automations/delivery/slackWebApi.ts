@@ -1,5 +1,6 @@
 import type { SlackPayload } from "@langwatch/automations/templating/renderSlack";
 import { createLogger } from "@langwatch/observability";
+import { z } from "zod";
 import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import { sendHttpDestination } from "~/server/webhooks/httpDestination";
 import { webhookUrlValidator } from "~/server/webhooks/urlPolicy";
@@ -170,12 +171,14 @@ export interface SlackWorkspaceIdentity {
   teamName: string;
 }
 
-interface SlackAuthTestResponse {
-  ok: boolean;
-  error?: string;
-  team_id?: string;
-  team?: string;
-}
+/** External input: Slack's `auth.test` body is validated, never cast — a
+ *  payload that is not this shape reads as `bad_response`. */
+const slackAuthTestResponseSchema = z.object({
+  ok: z.boolean(),
+  error: z.string().optional(),
+  team_id: z.string().min(1).optional(),
+  team: z.string().min(1).optional(),
+});
 
 /**
  * Ask Slack which workspace a bot token belongs to (`auth.test`) — the
@@ -208,13 +211,19 @@ export async function fetchSlackWorkspaceIdentity(
       contextLabel: "Slack auth.test",
       validateUrl: validateSlackApiUrl,
     });
-  } catch {
+  } catch (error) {
+    // The token never goes in the log fields; the cause does — a DNS
+    // failure, a TLS failure and a timeout are otherwise indistinguishable.
+    logger.warn(
+      { error },
+      "Could not reach Slack auth.test — reporting request_failed",
+    );
     return { ok: false, error: "request_failed" };
   }
 
-  let body: SlackAuthTestResponse;
+  let body: z.infer<typeof slackAuthTestResponseSchema>;
   try {
-    body = JSON.parse(response.body) as SlackAuthTestResponse;
+    body = slackAuthTestResponseSchema.parse(JSON.parse(response.body));
   } catch {
     return { ok: false, error: "bad_response" };
   }

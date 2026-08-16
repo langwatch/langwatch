@@ -1659,7 +1659,7 @@ model TriggerLatestEvaluation {
   // explanation.
   skipCode String?
 
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   @@index([projectId])
 }

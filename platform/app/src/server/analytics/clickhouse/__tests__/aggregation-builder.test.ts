@@ -856,21 +856,27 @@ describe("aggregation-builder", () => {
     // drew the same line, and every alert on a filtered series watched the
     // wrong number.
     describe("when a series carries its own filters", () => {
-      const errorSeries = (
-        values: string[],
-        extra: { asPercent?: boolean } = {},
-      ) => ({
+      const errorSeries = ({
+        values,
+        isPercent,
+      }: {
+        values: string[];
+        isPercent?: boolean;
+      }) => ({
         metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
         aggregation: "cardinality" as const,
         filters: { "traces.error": values },
-        ...extra,
+        ...(isPercent === undefined ? {} : { asPercent: isPercent }),
       });
 
       // @scenario "Two series that differ only by their filters produce different queries"
       it("compiles opposite error filters to different aggregate expressions", () => {
         const result = buildTimeseriesQuery({
           ...baseInput,
-          series: [errorSeries(["true"]), errorSeries(["false"])],
+          series: [
+            errorSeries({ values: ["true"] }),
+            errorSeries({ values: ["false"] }),
+          ],
         });
 
         expect(result.sql).toContain(
@@ -884,20 +890,26 @@ describe("aggregation-builder", () => {
       it("keeps the graph-wide WHERE free of the per-series predicate", () => {
         const result = buildTimeseriesQuery({
           ...baseInput,
-          series: [errorSeries(["true"])],
+          series: [errorSeries({ values: ["true"] })],
         });
 
         // The predicate belongs to one series; putting it in the WHERE would
-        // narrow every other series in the same graph.
-        expect(result.sql).not.toMatch(
-          /WHERE[\s\S]*?AND \(ts\.ContainsErrorStatus = 1\)[\s\S]*?GROUP BY/,
-        );
+        // narrow every other series in the same graph. Slice every WHERE
+        // clause (up to its GROUP BY) rather than matching one formatting of
+        // the predicate, so a re-parenthesised or re-wrapped leak still fails.
+        const whereClauses = [
+          ...result.sql.matchAll(/WHERE([\s\S]*?)GROUP BY/g),
+        ].map((match) => match[1]);
+        expect(whereClauses.length).toBeGreaterThan(0);
+        for (const clause of whereClauses) {
+          expect(clause).not.toContain("ContainsErrorStatus");
+        }
       });
 
       it("keeps the column the predicate reads in the deduped trace subquery", () => {
         const result = buildTimeseriesQuery({
           ...baseInput,
-          series: [errorSeries(["true"])],
+          series: [errorSeries({ values: ["true"] })],
         });
 
         expect(result.sql).toMatch(
@@ -932,7 +944,7 @@ describe("aggregation-builder", () => {
         const result = buildTimeseriesQuery({
           ...baseInput,
           groupBy: "metadata.labels" as const,
-          series: [errorSeries(["true"])],
+          series: [errorSeries({ values: ["true"] })],
         });
 
         expect(result.sql).toContain(
@@ -993,7 +1005,7 @@ describe("aggregation-builder", () => {
         it("leaves an additive aggregation unguarded, because zero is the truth there", () => {
           const result = buildTimeseriesQuery({
             ...baseInput,
-            series: [errorSeries(["true"])],
+            series: [errorSeries({ values: ["true"] })],
           });
 
           expect(result.sql).not.toContain("NULL) AS 0__");
@@ -1022,12 +1034,35 @@ describe("aggregation-builder", () => {
         it("divides the filtered aggregate by the unfiltered one", () => {
           const result = buildTimeseriesQuery({
             ...baseInput,
-            series: [errorSeries(["true"], { asPercent: true })],
+            series: [errorSeries({ values: ["true"], isPercent: true })],
           });
 
           expect(result.sql).toContain(
             "if(uniq(ts.TraceId) > 0, (uniqIf(ts.TraceId, ((ts.ContainsErrorStatus = 1)))) / (uniq(ts.TraceId)) * 100, 0)",
           );
+        });
+
+        it("guards a non-additive percentage the same way as its plain series", () => {
+          const result = buildTimeseriesQuery({
+            ...baseInput,
+            series: [
+              {
+                metric:
+                  "performance.completion_time" as FlattenAnalyticsMetricsEnum,
+                aggregation: "min" as const,
+                filters: { "traces.error": ["true"] },
+                asPercent: true,
+              },
+            ],
+          });
+
+          // `minIf` over an empty match set returns 0 on a non-nullable
+          // column, so the unguarded ratio would report a real-looking 0%
+          // for a bucket the filter excluded.
+          expect(result.sql).toContain(
+            "if(countIf((ts.ContainsErrorStatus = 1)) > 0, if(min",
+          );
+          expect(result.sql).toContain(", NULL) AS 0__");
         });
 
         // @scenario "A percentage on a per-entity average is refused rather than answered wrongly"

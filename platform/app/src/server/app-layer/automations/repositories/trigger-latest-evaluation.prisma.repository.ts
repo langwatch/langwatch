@@ -84,6 +84,11 @@ export class PrismaTriggerLatestEvaluationRepository
       triggerId: row.triggerId,
       projectId: row.projectId,
       evaluatedAt: row.evaluatedAt,
+      // Asserted, not normalized: degradation is the READER's job — the UI's
+      // `describeEvaluation` reads an unknown verdict as a plain "checked"
+      // and an unknown skip code as the generic explanation, so a value a
+      // newer writer stored survives the round trip instead of being erased
+      // here.
       verdict: row.verdict as EvaluationVerdict,
       observedValue: row.observedValue,
       threshold: row.threshold,

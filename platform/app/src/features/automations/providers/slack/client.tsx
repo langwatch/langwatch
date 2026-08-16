@@ -609,7 +609,7 @@ function previewOptions({
       slice.deliveryMethod === "bot" &&
       slackTokenAvailable({
         slice,
-        projectIntegrationConnected: context.projectSlackIntegrationConnected,
+        projectIntegrationConnected: context.hasProjectSlackIntegration,
       }),
   };
 }
@@ -772,7 +772,7 @@ function SlackConfigForm({
       )}
       {/* The receive choice lives here, beside the layouts it filters — one
           decision drives both the cadence and which templates are offered
-          (`hostsReceiveChooser`). Only a trace automation has the choice: the
+          (`hasOwnReceiveChooser`). Only a trace automation has the choice: the
           server pins alerts and reports to their own timing. */}
       {ctx.sourceKind === "trace" ? (
         <ReceiveCadenceField
@@ -1232,7 +1232,7 @@ const client: NotifyClientDef<SlackSlice, SlackPreview> = {
   channel: "slack",
   // The layout gallery depends on the receive choice, so the chooser renders
   // beside it (in SlackConfigForm) and the cadence facet stands down.
-  hostsReceiveChooser: true,
+  hasOwnReceiveChooser: true,
   initialSlice,
   isComplete,
   summary,

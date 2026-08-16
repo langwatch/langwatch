@@ -1,10 +1,7 @@
 import { HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { api } from "~/utils/api";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
-import {
-  describeNextFiring,
-  type NextFiringResult,
-} from "./nextFiringPresentation";
+import { describeNextFiring } from "./nextFiringPresentation";
 
 /**
  * "What happens next" — the other half of the in-depth view. The history says
@@ -38,9 +35,7 @@ export function NextFiringSection({
   }
   if (!nextFiringQuery.data) return null;
 
-  const presentation = describeNextFiring(
-    nextFiringQuery.data as NextFiringResult,
-  );
+  const presentation = describeNextFiring(nextFiringQuery.data);
 
   return (
     <VStack align="start" gap={1} width="full">

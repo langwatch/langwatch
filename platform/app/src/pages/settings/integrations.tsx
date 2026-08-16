@@ -35,7 +35,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { GitHub } from "react-feather";
 import { FaSlack } from "react-icons/fa";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
@@ -278,7 +278,7 @@ function InstallationRow({
  * picker offers.
  */
 function SlackIntegrationCard() {
-  const { organization, project, hasPermission } = useOrganizationTeamProject();
+  const { organization, project } = useOrganizationTeamProject();
   const available = useAvailableScopes(organization);
   const availableProjects = useMemo(
     () =>
@@ -299,11 +299,6 @@ function SlackIntegrationCard() {
         ?.name ?? null,
     [availableProjects, selectedProjectId],
   );
-  // The permission is held per project, and the picker can reach a project
-  // other than the one the session is on. Reading it off the session project is
-  // what the hook offers, so this only decides whether the form is worth
-  // showing — the server is the gate.
-  const canManageProject = hasPermission("project:update");
 
   return (
     <Card.Root id="slack">
@@ -334,7 +329,6 @@ function SlackIntegrationCard() {
             <SlackProjectConnection
               projectId={selectedProjectId}
               projectName={selectedProjectName}
-              canManage={canManageProject}
             />
           ) : (
             <Text fontSize="sm" color="fg.muted">
@@ -353,14 +347,16 @@ function SlackIntegrationCard() {
 function SlackProjectConnection({
   projectId,
   projectName,
-  canManage,
 }: {
   projectId: string;
   projectName: string | null;
-  canManage: boolean;
 }) {
   const utils = api.useContext();
   const status = api.slackIntegration.getStatus.useQuery({ projectId });
+  // Per SELECTED project, answered by the server with the status read — the
+  // picker can reach projects the session is not on, where the session
+  // project's permission would show write controls that only invite a 403.
+  const canManage = status.data?.canManage ?? false;
   const census = api.slackIntegration.getLegacyTokenCensus.useQuery({
     projectId,
   });
@@ -429,15 +425,18 @@ function SlackLegacyTokenCensus({
 }) {
   const [confirming, setConfirming] = useState(false);
   const switchAll = api.slackIntegration.switchToIntegration.useMutation({
-    onSuccess: ({ cleared, failed }) => {
+    onSuccess: ({ cleared, alreadyClear, failed }) => {
       setConfirming(false);
       onSwitched();
+      // A row that already carried no token is where the switch was taking
+      // it, so it reads as switched rather than failed.
+      const switched = cleared + alreadyClear;
       toaster.create({
         type: failed > 0 ? "warning" : "success",
         title:
           failed > 0
-            ? `${cleared} switched, ${failed} failed`
-            : `${cleared} switched to the project integration`,
+            ? `${switched} switched, ${failed} failed`
+            : `${switched} switched to the project integration`,
         description:
           failed > 0
             ? "The ones that failed still post with their own token. Try again, or open them to check."
@@ -551,6 +550,15 @@ function SlackTokenForm({
 
   const disconnect = api.slackIntegration.disconnect.useMutation({
     onSuccess: onChanged,
+    onError: (error) =>
+      toaster.create({
+        type: "error",
+        title: "Couldn't disconnect Slack",
+        description: describeError({
+          error,
+          fallbackTitle: "Couldn't disconnect Slack",
+        }),
+      }),
   });
 
   if (!canManage) {
@@ -625,11 +633,30 @@ function SlackTokenForm({
 function SlackAppSetupCallout() {
   const [stepsOpen, setStepsOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const copyResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (copyResetTimer.current) clearTimeout(copyResetTimer.current);
+    },
+    [],
+  );
 
   const copyManifest = () => {
-    void navigator.clipboard?.writeText(SLACK_APP_MANIFEST);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    // "Manifest copied" only after the write lands — a denied clipboard must
+    // not claim otherwise.
+    navigator.clipboard
+      ?.writeText(SLACK_APP_MANIFEST)
+      .then(() => {
+        setCopied(true);
+        copyResetTimer.current = setTimeout(() => setCopied(false), 1500);
+      })
+      .catch(() =>
+        toaster.create({
+          type: "error",
+          title: "Couldn't copy the manifest",
+          description: "Select the manifest text and copy it manually.",
+        }),
+      );
   };
 
   return (

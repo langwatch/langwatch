@@ -2,6 +2,7 @@ import type { SlackActionParams } from "@langwatch/automations/providers/slack";
 import type { PrismaClient, SlackIntegration } from "@prisma/client";
 import { TriggerAction } from "@prisma/client";
 import type {
+  ClearOwnSlackTokenOutcome,
   LegacySlackTokenAutomation,
   SlackIntegrationRepository,
 } from "./slack-integration.repository";
@@ -104,19 +105,27 @@ export class PrismaSlackIntegrationRepository
   }: {
     projectId: string;
     triggerId: string;
-  }): Promise<boolean> {
-    const row = await this.prisma.trigger.findFirst({
-      where: { id: triggerId, projectId, deleted: false },
-      select: { actionParams: true },
-    });
-    if (!row) return false;
-    const params = (row.actionParams ?? {}) as Partial<SlackActionParams>;
-    if (!params.slackBotToken) return false;
-    const { slackBotToken: _cleared, ...rest } = params;
-    await this.prisma.trigger.update({
-      where: { id: triggerId, projectId },
-      data: { actionParams: rest },
-    });
-    return true;
+  }): Promise<ClearOwnSlackTokenOutcome> {
+    // Optimistic read-modify-write: the JSON value is replaced whole, so the
+    // write only lands if the row is still the one that was read — otherwise
+    // it would silently undo a concurrent edit to the channel or templates.
+    // A lost race re-reads and tries again; the token being gone by then is
+    // the outcome the caller wanted anyway.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const row = await this.prisma.trigger.findFirst({
+        where: { id: triggerId, projectId, deleted: false },
+        select: { actionParams: true, updatedAt: true },
+      });
+      if (!row) return "failed";
+      const params = (row.actionParams ?? {}) as Partial<SlackActionParams>;
+      if (!params.slackBotToken) return "already_clear";
+      const { slackBotToken: _cleared, ...rest } = params;
+      const updated = await this.prisma.trigger.updateMany({
+        where: { id: triggerId, projectId, updatedAt: row.updatedAt },
+        data: { actionParams: rest },
+      });
+      if (updated.count === 1) return "cleared";
+    }
+    return "failed";
   }
 }

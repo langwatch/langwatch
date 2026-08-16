@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { TriggerAction, TriggerKind } from "~/generated/prisma/client";
+import { GRAPH_TRIGGER_HEARTBEAT_INTERVAL_MS } from "../graph-trigger-heartbeat";
 import { describeNextFiring, type NextFiringSubject } from "../next-firing";
 
 const NOW = new Date("2026-08-12T12:03:20.000Z");
@@ -12,7 +13,9 @@ function subject(
     action: TriggerAction.SEND_SLACK_MESSAGE,
     customGraphId: null,
     notificationCadence: "immediate",
-    traceDebounceMs: 30_000,
+    // Distinct from the heartbeat interval, so the alert assertion below
+    // cannot pass by returning the debounce instead.
+    traceDebounceMs: 45_000,
     active: true,
     pausedReason: null,
     ...overrides,
@@ -112,7 +115,10 @@ describe("describeNextFiring", () => {
           now: NOW,
         });
 
-        expect(next).toEqual({ kind: "alert", sweepIntervalMs: 30_000 });
+        expect(next).toEqual({
+          kind: "alert",
+          sweepIntervalMs: GRAPH_TRIGGER_HEARTBEAT_INTERVAL_MS,
+        });
       });
     });
   });
@@ -147,7 +153,7 @@ describe("describeNextFiring", () => {
           now: NOW,
         });
 
-        expect(next).toEqual({ kind: "immediate", traceDebounceMs: 30_000 });
+        expect(next).toEqual({ kind: "immediate", traceDebounceMs: 45_000 });
       });
     });
   });

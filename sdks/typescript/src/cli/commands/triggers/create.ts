@@ -11,6 +11,16 @@ import { TRIGGER_REQUEST_TIMEOUT_MS } from "./requestTimeout";
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
 
+/** Parses a flag value that must be a JSON OBJECT — `JSON.parse("5")` and
+ *  `JSON.parse("[1]")` both succeed, and either would corrupt the payload. */
+function parseJsonObject(raw: string): Record<string, unknown> {
+  const parsed: unknown = JSON.parse(raw);
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new Error("not a JSON object");
+  }
+  return parsed as Record<string, unknown>;
+}
+
 /**
  * Returns the created trigger rather than printing it: the output port renders
  * it in whatever format the caller asked for (utils/output.ts).
@@ -50,15 +60,17 @@ export const createTriggerCommand = async (
   let actionParams: Record<string, unknown> = {};
   try {
     if (options.filters) {
-      filters = JSON.parse(options.filters) as Record<string, unknown>;
+      filters = parseJsonObject(options.filters);
     }
     if (options.actionParams) {
-      actionParams = JSON.parse(options.actionParams) as Record<string, unknown>;
+      actionParams = parseJsonObject(options.actionParams);
     }
   } catch {
     failSpinner({
       spinner,
-      error: commandValidationError("--filters and --action-params must be valid JSON"),
+      error: commandValidationError(
+        "--filters and --action-params must each be a JSON object",
+      ),
       action: "create trigger",
     });
     process.exit(1);

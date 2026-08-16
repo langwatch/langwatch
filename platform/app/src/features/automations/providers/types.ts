@@ -96,7 +96,7 @@ export interface ClientDef<S = unknown, TPreview = unknown> {
    *  itself — because its templates depend on the choice, so the chooser sits
    *  beside the template list it filters. The cadence facet reads this and
    *  offers only the settle window, never a competing second control. */
-  readonly hostsReceiveChooser?: boolean;
+  readonly hasOwnReceiveChooser?: boolean;
 
   /** Initial empty slice for this provider. */
   initialSlice(): S;
@@ -130,7 +130,7 @@ export interface ConfigFormProps<S, TPreview = unknown> {
 export interface PreviewDeliveryContext {
   /** ADR-093 §5: the project has a Slack integration, so a Slack delivery has
    *  a token even when the automation stores none of its own. */
-  projectSlackIntegrationConnected: boolean;
+  hasProjectSlackIntegration: boolean;
 }
 
 /** Notify-specific client additions. Generic over slice and preview. */

@@ -66425,7 +66425,7 @@ openapi: "POST /api/triggers/{id}/enable"
 # FILE: ./api-reference/triggers/action-test-fire.mdx
 
 ---
-title: "Create Test Fire"
+title: "Send a test fire"
 openapi: "POST /api/triggers/{id}/test-fire"
 ---
 
@@ -66461,7 +66461,7 @@ openapi: "DELETE /api/triggers/{id}"
 # FILE: ./api-reference/triggers/get-fires.mdx
 
 ---
-title: "Get Fires"
+title: "List an automation's fires"
 openapi: "GET /api/triggers/{id}/fires"
 ---
 

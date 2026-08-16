@@ -73,7 +73,10 @@ export function OwnSlackTokenNudge({
       <Text textStyle="xs" color="fg.muted">
         Uses its own Slack token
       </Text>
-      {canSwitch ? (
+      {/* Both gates hold here, not only in the caller's composition: without
+          a workspace to fall through to, the switch would leave the
+          automation unable to deliver, and the server refuses it. */}
+      {canSwitch && workspaceName ? (
         <Button
           variant="plain"
           size="xs"

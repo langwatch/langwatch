@@ -60,9 +60,17 @@ export const registerRedactionProject = (ns: string) => {
   /** The read-modify-write an integrator performs: read the automation, then
    *  send the delivery configuration back exactly as it arrived. */
   const makeWriteBack = (request: RequestLike) => async (id: string) => {
-    const read = (await (
-      await request(`/api/triggers/${id}`, { headers: headers() })
-    ).json()) as { actionParams: Record<string, unknown> };
+    const readResponse = await request(`/api/triggers/${id}`, {
+      headers: headers(),
+    });
+    if (readResponse.status !== 200) {
+      throw new Error(
+        `write-back read failed for ${id}: ${readResponse.status}`,
+      );
+    }
+    const read = (await readResponse.json()) as {
+      actionParams: Record<string, unknown>;
+    };
 
     return request(`/api/triggers/${id}`, {
       method: "PATCH",
@@ -71,12 +79,7 @@ export const registerRedactionProject = (ns: string) => {
     });
   };
 
-  // Several fixtures deliver to a customer endpoint, a channel a project
-  // only has once it is turned on for them.
-  const previousFlagOverride = process.env.FEATURE_FLAG_FORCE_ENABLE;
-
   beforeAll(async () => {
-    process.env.FEATURE_FLAG_FORCE_ENABLE = "release_webhook_automations";
     organization = await prisma.organization.create({
       data: { name: "Triggers Redaction Org", slug: `--test-org-${ns}` },
     });
@@ -100,11 +103,6 @@ export const registerRedactionProject = (ns: string) => {
   });
 
   afterAll(async () => {
-    if (previousFlagOverride === undefined) {
-      delete process.env.FEATURE_FLAG_FORCE_ENABLE;
-    } else {
-      process.env.FEATURE_FLAG_FORCE_ENABLE = previousFlagOverride;
-    }
     if (project) {
       await prisma.trigger.deleteMany({ where: { projectId: projectId() } });
       await prisma.project.delete({ where: { id: project.id } });

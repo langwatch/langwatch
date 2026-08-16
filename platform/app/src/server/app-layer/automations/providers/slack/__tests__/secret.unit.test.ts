@@ -27,8 +27,10 @@ describe("persistSlackActionParams", () => {
       expect(stored).toEqual({
         slackDelivery: "bot",
         slackChannelId: "C1",
-        slackBotToken: undefined,
       });
+      // `toEqual` treats an absent key and an explicit `undefined` alike, so
+      // the absence needs its own assertion to mean anything.
+      expect(stored).not.toHaveProperty("slackBotToken");
     });
   });
 

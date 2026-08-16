@@ -30,7 +30,7 @@ const WINDOW_OPTIONS: Array<{ value: DigestCadence; label: string }> =
  * type-switching.
  *
  * A channel whose templates depend on this choice hosts the field itself,
- * beside the templates it filters (`ClientDef.hostsReceiveChooser`); every
+ * beside the templates it filters (`ClientDef.hasOwnReceiveChooser`); every
  * other notify channel gets it from the cadence facet.
  */
 export function ReceiveCadenceField({

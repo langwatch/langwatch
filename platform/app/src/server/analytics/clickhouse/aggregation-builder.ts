@@ -560,9 +560,15 @@ function shapeSeriesExpression({
   // NULL; there is no aggregate to condition and no number to divide.
   if (base === "NULL") return selectExpression;
   const filtered = withAggregateCondition(base, condition);
-  // Percentage mode already answers the empty bucket, with ES's own 0.
   if (asPercent) {
-    return `if(${base} > 0, (${filtered}) / (${base}) * 100, 0) AS ${alias}`;
+    // An empty BUCKET reads as ES's own 0. An empty MATCH SET inside a
+    // non-empty bucket is different for a non-additive series: the `-If`
+    // aggregate returns 0 there, not NULL, so the ratio would report a
+    // real-looking 0% for data the filter excluded — the same hole the
+    // non-percentage branch guards below.
+    const ratio = `if(${base} > 0, (${filtered}) / (${base}) * 100, 0)`;
+    if (shouldZeroWhenAbsent) return `${ratio} AS ${alias}`;
+    return `if(countIf(${condition}) > 0, ${ratio}, NULL) AS ${alias}`;
   }
   if (shouldZeroWhenAbsent) return `${filtered} AS ${alias}`;
   return `if(countIf(${condition}) > 0, ${filtered}, NULL) AS ${alias}`;

@@ -15,11 +15,12 @@ Feature: One automation flow with a subject choice
   the word.
 
   The reference implementation (R0) binds the wizard, the edit-on-overview
-  rule, the cap-advice seats and the unified list. What is still
-  @unimplemented is what the later units own: the list's filter chips (F6),
-  the Slack project integration and the legacy-token migration (F2-F4), the
-  template that ships its graph (F5), and the wire `source` alias (F1). Each
-  binds as its unit lands, per the plan in the ADR's final section.
+  rule, the cap-advice seats and the unified list; the Slack project
+  integration and the legacy-token migration (F2-F4) landed and bind their
+  scenarios below. What is still @unimplemented is what the later units own:
+  the list's filter chips (F6), the template that ships its graph (F5), and
+  the wire `source` alias (F1). Each binds as its unit lands, per the plan
+  in the ADR's final section.
 
   See dev/docs/adr/093-automations-source-merge.md.
 
@@ -245,7 +246,7 @@ Feature: One automation flow with a subject choice
     Existing automations carry their own encrypted token, possibly for a
     different workspace than the one the project later connects. Delivery
     never silently retargets: the automation's own token wins until it is
-    explicitly cleared. The rotation gap that accepts is handled by
+    explicitly cleared. The rotation gap this order accepts is handled by
     visibility — every unmigrated token is flagged where the automation
     appears — never by silence.
 

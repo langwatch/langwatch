@@ -1667,7 +1667,7 @@ const presentations = {
           ? Math.ceil((resetAt - Date.now()) / 1000)
           : 0;
       return seconds > 0
-        ? `This project has sent as many as a minute allows. Try again in ${seconds} seconds.`
+        ? `This project has sent as many as a minute allows. Try again in ${seconds} second${seconds === 1 ? "" : "s"}.`
         : "This project has sent as many as a minute allows. Try again now.";
     },
   },
@@ -1688,9 +1688,9 @@ const presentations = {
 
   graph_alert_incomplete: {
     title: "This alert is missing something it needs",
-    // `meta.field` names which piece — the rule, the severity, the channel —
-    // and the service wrote the sentence for that exact case, which the
-    // generic line cannot do.
+    // `meta.reason` carries the sentence the service wrote for the exact
+    // missing piece — the rule, the severity, the channel — which the
+    // generic line cannot name.
     describe: (error) =>
       safeProse(str(error, "reason", "")) ||
       "Add the rule it fires by, the severity it fires at and a channel that " +

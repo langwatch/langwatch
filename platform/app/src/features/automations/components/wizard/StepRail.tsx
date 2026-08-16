@@ -42,8 +42,8 @@ export function StepRail({ graphName }: { graphName?: string | null }) {
           key={candidate}
           step={candidate}
           index={index}
-          current={candidate === step}
-          reachable={stepIsReachable({ step: candidate, furthestStep })}
+          isCurrent={candidate === step}
+          isReachable={stepIsReachable({ step: candidate, furthestStep })}
           graphName={graphName}
         />
       ))}
@@ -57,19 +57,19 @@ export function StepRail({ graphName }: { graphName?: string | null }) {
  * this state look like", the item's is "what does this step say".
  */
 function railItemChrome({
-  current,
-  reachable,
+  isCurrent,
+  isReachable,
 }: {
-  current: boolean;
-  reachable: boolean;
+  isCurrent: boolean;
+  isReachable: boolean;
 }) {
   return {
-    borderColor: current ? "colorPalette.emphasized" : "border",
-    bg: current ? "colorPalette.subtle" : "bg",
-    opacity: reachable ? 1 : 0.55,
-    cursor: reachable ? "pointer" : "not-allowed",
-    "aria-current": current ? ("step" as const) : undefined,
-    "aria-disabled": !reachable || undefined,
+    borderColor: isCurrent ? "colorPalette.emphasized" : "border",
+    bg: isCurrent ? "colorPalette.subtle" : "bg",
+    opacity: isReachable ? 1 : 0.55,
+    cursor: isReachable ? "pointer" : "not-allowed",
+    "aria-current": isCurrent ? ("step" as const) : undefined,
+    "aria-disabled": !isReachable || undefined,
   };
 }
 
@@ -78,22 +78,22 @@ function railItemChrome({
 function StepRailItem({
   step,
   index,
-  current,
-  reachable,
+  isCurrent,
+  isReachable,
   graphName,
 }: {
   step: WizardStep;
   index: number;
-  current: boolean;
-  reachable: boolean;
+  isCurrent: boolean;
+  isReachable: boolean;
   graphName?: string | null;
 }) {
   const draft = useDraft();
   const setStep = useAutomationStore((s) => s.setStep);
-  const complete = stepIsComplete({ step, draft });
+  const isComplete = stepIsComplete({ step, draft });
   // The current step is on screen in full, so its own summary would only
   // repeat what the author is already looking at.
-  const summary = current ? null : stepSummary({ step, draft, graphName });
+  const summary = isCurrent ? null : stepSummary({ step, draft, graphName });
 
   return (
     <chakra.button
@@ -108,13 +108,13 @@ function StepRailItem({
       // The rail must not change height when a step gains its first summary
       // (typing a name would make the whole bar hop): every item reserves at
       // least the two-line height — padding, title line, 12px summary line
-      // and the border land at 50px — and a summary-less item centers its
+      // and the border land at 52px — and a summary-less item centers its
       // title in it instead of sitting on a blank line.
       minHeight="52px"
       display="flex"
       alignItems="center"
-      {...railItemChrome({ current, reachable })}
-      onClick={reachable ? () => setStep(step) : undefined}
+      {...railItemChrome({ isCurrent, isReachable })}
+      onClick={isReachable ? () => setStep(step) : undefined}
     >
       <VStack align="start" gap={0} minWidth="0" width="full">
         <HStack gap={1.5}>
@@ -129,7 +129,7 @@ function StepRailItem({
           <Text textStyle="sm" fontWeight="semibold">
             {WIZARD_STEP_LABELS[step]}
           </Text>
-          {complete && !current ? (
+          {isComplete && !isCurrent ? (
             <Box as="span" color="green.solid" display="inline-flex">
               <Check size={13} aria-hidden="true" />
             </Box>

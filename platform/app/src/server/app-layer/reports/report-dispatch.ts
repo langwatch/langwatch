@@ -18,7 +18,6 @@ import { Cron } from "croner";
 import type { Project, Trigger } from "~/generated/prisma/client";
 import type { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
 import type { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
-import { decryptSlackBotToken } from "~/server/app-layer/automations/providers/slack/server";
 import type { ReportSource } from "~/server/app-layer/automations/report.builder";
 import { extractReportFromTriggerRow } from "~/server/app-layer/automations/report.builder";
 import type { ResolvedSlackToken } from "~/server/app-layer/automations/slack-integration/slack-token-resolver";
@@ -38,10 +37,10 @@ export interface ReportDispatchDeps {
   sendSlackBot: typeof postSlackChatMessage;
   /**
    * ADR-093 §5 token resolution: the report's own stored token, else the
-   * project's Slack integration, else null. Optional so the existing test
-   * doubles keep working; absent behaves as "the project has no integration".
+   * project's Slack integration, else null. Required — an absent resolver
+   * would silently skip project-scoped resolution.
    */
-  resolveSlackToken?(params: {
+  resolveSlackToken(params: {
     projectId: string;
     actionParams: Pick<SlackActionParams, "slackBotToken">;
   }): Promise<ResolvedSlackToken | null>;
@@ -184,11 +183,7 @@ async function resolveReportSlackToken({
   projectId: string;
   slackParams: SlackActionParams;
 }): Promise<ResolvedSlackToken | null> {
-  if (deps.resolveSlackToken) {
-    return deps.resolveSlackToken({ projectId, actionParams: slackParams });
-  }
-  const ownToken = decryptSlackBotToken(slackParams);
-  return ownToken ? { token: ownToken, source: "automation" } : null;
+  return deps.resolveSlackToken({ projectId, actionParams: slackParams });
 }
 
 /**
@@ -237,7 +232,13 @@ async function deliverReportSlack({
       );
       return false;
     }
-    if (!channel) return false;
+    if (!channel) {
+      logger.warn(
+        { projectId, triggerId: trigger.id, code: "slack_channel_missing" },
+        "Report is configured for Slack bot delivery but has no channel — nothing sent",
+      );
+      return false;
+    }
     const rendered = await renderTriggerSlack({
       templateType: resolveSlackTemplateType({
         configured: trigger.slackTemplateType,
@@ -257,7 +258,13 @@ async function deliverReportSlack({
     return true;
   }
 
-  if (!slackWebhook) return false;
+  if (!slackWebhook) {
+    logger.warn(
+      { projectId, triggerId: trigger.id, code: "slack_webhook_missing" },
+      "Report is configured for Slack webhook delivery but has no webhook — nothing sent",
+    );
+    return false;
+  }
   const rendered = await renderTriggerSlack({
     templateType: resolveSlackTemplateType({
       configured: trigger.slackTemplateType,

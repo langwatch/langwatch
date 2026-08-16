@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CustomGraph, Project, Trigger } from "~/generated/prisma/client";
 import { TriggerAction } from "~/generated/prisma/client";
+import { SeriesPercentageUnsupportedError } from "~/server/analytics/errors";
 import type { TimeseriesResult } from "~/server/analytics/types";
 import type { GraphAlertDispatchResult } from "~/server/app-layer/automations/dispatch/graphAlertActionDispatch";
 import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
@@ -231,6 +232,9 @@ function makeHarness({
     triggerSent,
     updateLastRunAt,
     notifier: { dispatch },
+    // The harness project has no Slack integration and its triggers store no
+    // token, so resolution answers "nothing to deliver with".
+    resolveSlackToken: async () => null,
     baseHost: "https://app.langwatch.test",
     now: () => NOW,
   };
@@ -332,10 +336,7 @@ describe("evaluateGraphTrigger", () => {
     // raises it on EVERY evaluation of such a trigger, and a rethrow here is a
     // redelivery — the same poison-pill shape the row ceiling above documents.
     function percentageUnsupported() {
-      const error = new Error("analytics_series_percentage_unsupported");
-      (error as Error & { code?: string }).code =
-        "analytics_series_percentage_unsupported";
-      return error;
+      return new SeriesPercentageUnsupportedError();
     }
 
     // @scenario "An alert on a series the query refuses is skipped, not retried forever"

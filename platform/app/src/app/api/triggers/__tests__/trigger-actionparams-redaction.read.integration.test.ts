@@ -77,6 +77,7 @@ describe("Feature: delivery credentials are redacted on the REST read paths", ()
         expect(body).not.toContain("sk-live");
         expect(body).not.toContain(WEBHOOK_SIGNING_SECRET);
         expect(body).not.toContain("headersEncrypted");
+        expect(body).not.toContain("signingSecretEncrypted");
 
         const listed = JSON.parse(body) as {
           id: string;

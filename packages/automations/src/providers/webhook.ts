@@ -220,7 +220,7 @@ export const webhookActionParamsSchema = z.object({
 export type WebhookActionParams = z.infer<typeof webhookActionParamsSchema>;
 
 /** The render-time preview shape this provider's ConfigForm consumes: the
- *  request the dispatch would make, with the rendered JSON body. */
+ *  request the dispatch would make, with the rendered request body. */
 export interface WebhookPreview extends PreviewEnvelope {
   channel: "webhook";
   payload: {

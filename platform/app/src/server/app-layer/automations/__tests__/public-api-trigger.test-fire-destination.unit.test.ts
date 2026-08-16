@@ -44,7 +44,15 @@ const savedTrigger = (actionParams: Record<string, unknown>): Trigger =>
     emailBodyTemplate: null,
   }) as unknown as Trigger;
 
-function makeService(trigger: Trigger) {
+function makeService(
+  trigger: Trigger,
+  overrides: {
+    resolveSlackToken?: () => Promise<{
+      token: string;
+      source: "project_integration";
+    } | null>;
+  } = {},
+) {
   const testFire = vi.fn(async (_input: PublicApiTestFireInput) => ({
     channel: "slack" as const,
     recipientCount: 0,
@@ -61,6 +69,7 @@ function makeService(trigger: Trigger) {
         token: "xoxb-project",
         source: "project_integration" as const,
       }),
+      ...overrides,
     } as never,
   );
   return { service, testFire };
@@ -101,6 +110,12 @@ describe("PublicApiTriggerService.testFire", () => {
 
       await fire(service);
 
+      expect(testFire).toHaveBeenCalledWith(
+        expect.objectContaining({
+          channel: "slack",
+          webhook: "https://hooks.slack.com/services/T000/B000/xyz",
+        }),
+      );
       expect(testFire.mock.calls[0]![0]).not.toHaveProperty("botDestination");
     });
   });
@@ -119,6 +134,24 @@ describe("PublicApiTriggerService.testFire", () => {
           botDestination: { token: "xoxb-project", channel: "C0123" },
         }),
       );
+    });
+
+    it("refuses when no connection resolves, never falling back to a stored webhook", async () => {
+      const { service, testFire } = makeService(
+        savedTrigger({
+          slackDelivery: "bot",
+          slackChannelId: "C0123",
+          // A webhook left behind by an earlier configuration must not
+          // become the test-fire surface for a bot automation.
+          slackWebhook: "https://hooks.slack.com/services/T000/B000/stale",
+        }),
+        { resolveSlackToken: async () => null },
+      );
+
+      await expect(fire(service)).rejects.toMatchObject({
+        code: "test_fire_unavailable",
+      });
+      expect(testFire).not.toHaveBeenCalled();
     });
   });
 });

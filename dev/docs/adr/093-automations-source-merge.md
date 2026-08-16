@@ -116,7 +116,7 @@ Most bound scenarios in the automations corpus pin behaviour the merge does not 
 
 The spec accompanying this ADR (`source-merge.feature`) covers the merged surface and ships `@unimplemented` until the reference implementation binds it.
 
-One dangling citation gets corrected on the way through: the schema comments at `prisma/schema.prisma:792` and `:815` attribute `TriggerKind` to "ADR-042", which is the local observability stack; the deciding record is ADR-044's discriminator section. R0 fixes the comment — a comment edit, not a change to any deployed migration.
+One dangling citation gets corrected on the way through: the schema comments at `platform/app/prisma/schema.prisma:792` and `:815` attribute `TriggerKind` to "ADR-042", which is the local observability stack; the deciding record is ADR-044's discriminator section. R0 fixes the comment — a comment edit, not a change to any deployed migration.
 
 ### 4. The composer becomes a wizard — linear to create, hub-and-spoke to edit
 
@@ -302,7 +302,7 @@ Phase-2 structure per the bug-bash plan: **one reference PR first, no fan-out un
 
 | Unit | Scope | Files (owned) | Depends on |
 |---|---|---|---|
-| F1 | Wire `source` on the public API: read alias, write acceptance, `trigger_source_kind_mismatch`; MCP + CLI + OpenAPI regen; the `TriggerKind` schema-comment citation fix (§3); `specs/features/trigger-cli.feature` gains the source field on its surface | `platform/app/src/app/api/triggers/[[...route]]/app.ts`, `mcp/typescript/src/**`, `sdks/typescript/src/cli/commands/triggers/**`, generated OpenAPI, `prisma/schema.prisma` (comments only), `specs/features/trigger-cli.feature` | R0 |
+| F1 | Wire `source` on the public API: read alias, write acceptance, `trigger_source_kind_mismatch`; MCP + CLI + OpenAPI regen; the `TriggerKind` schema-comment citation fix (§3); `specs/features/trigger-cli.feature` gains the source field on its surface | `platform/app/src/app/api/triggers/[[...route]]/app.ts`, `mcp/typescript/src/**`, `sdks/typescript/src/cli/commands/triggers/**`, generated OpenAPI, `platform/app/prisma/schema.prisma` (comments only), `specs/features/trigger-cli.feature` | R0 |
 | F2 | `SlackIntegration`: migration + tenancy-regime registration, service + new tRPC router (setup / rotate / remove / legacy-token census + bulk clear), Integrations settings card with `ScopeChipPicker`, `slack_integration_invalid_token` | `platform/app/prisma/` (new migration), `dbMultiTenancyProtection.ts` regime lists, new `server/app-layer/automations/slack-integration/**`, new router file, `pages/settings/integrations.tsx`, `features/errors/logic/codes.ts` + `presentation.ts` entries | R0 |
 | F3 | Dispatch + composer consume the integration: resolution order, `slack_integration_missing`, channel discovery via the resolved token, Slack step drops the token field; retire/rewrite the token-asking scenarios in `specs/automations/slack-delivery.feature` | `server/app-layer/automations/providers/slack/server.ts`, `server/app-layer/automations/delivery/**` (Slack sites), `features/automations/providers/slack/**`, `specs/automations/slack-delivery.feature` | F2 |
 | F4 | Legacy-token migration affordances: "Use the project integration" per automation + bulk from settings, kept-sentinel `null`-clears path over the API | slack-integration router/service (owned by the F2 seam), settings card components, the composer's legacy-token notice inside `providers/slack/**` (sequence with F3 — same directory, so F4 starts after F3 merges) | F3 |
@@ -310,7 +310,7 @@ Phase-2 structure per the bug-bash plan: **one reference PR first, no fan-out un
 | F6 | Unified list interactivity: filter/graph + delivery filter chips, row-action coherence with the View drawer, the legacy-token row nudge. (The delete-noun and Overview-menu rebinding this unit used to own ships in R0 — with no flag, the old copy dies at merge and its scenarios cannot wait) | `pages/[project]/automations.tsx`, `features/automations/components/page/**` | R0 (+#6899 landed; the nudge's data needs F2) |
 | F7 | Spec binding: upgrade the remaining `@unimplemented` scenarios as each unit lands (one PR per unit's scenarios, riding that unit). R0 binds its own — the wizard, edit-on-overview, the cap-advice seats and the unified list | the unit's own test files | each unit |
 
-Sequencing: R0 → F1 ∥ F2 ∥ F5 ∥ F6 → F3 → F4.
+Sequencing: R0 → F1 ∥ F2 ∥ F5 ∥ F6 → F3 → F4. F6's list interactivity needs only R0; its one F2-dependent subtask — the legacy-token row nudge — waits for F2 and lands as a follow-up inside the F6 files.
 
 ## References
 

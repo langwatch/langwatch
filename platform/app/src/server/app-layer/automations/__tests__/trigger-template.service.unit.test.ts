@@ -267,8 +267,11 @@ describe("testFireTrigger", () => {
         | { text: string }
         | { blocks: unknown[] };
       // Bot connections must never fall back to the plain-text builder
-      // (ADR-041) — a missing discriminator still resolves to Block Kit.
-      expect("blocks" in payload).toBe(true);
+      // (ADR-041) — a missing discriminator still resolves to Block Kit,
+      // and the default render carries real blocks, not an empty shell.
+      expect(payload).toMatchObject({
+        blocks: expect.arrayContaining([expect.any(Object)]),
+      });
     });
   });
 

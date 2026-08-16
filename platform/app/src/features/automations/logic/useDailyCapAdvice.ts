@@ -8,8 +8,26 @@ import {
 } from "./dailyCapAdvice";
 import { estimateRatePerDay } from "./firingRate";
 
-const PREVIEW_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
-const PREVIEW_SORT = { columnId: "time", direction: "desc" as const };
+/** Shared with the Watch step's `TraceQuerySubject`, which renders the same
+ *  preview this hook only reads a count from — one window, one sort, one set
+ *  of cache options, so the two seats can never drift into different
+ *  verdicts for the same draft. */
+export const PREVIEW_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+export const PREVIEW_SORT = { columnId: "time", direction: "desc" as const };
+export const PREVIEW_LIST_OPTIONS = {
+  retry: false,
+  // A long stale window plus keepPreviousData keeps the last result on
+  // screen while a new query resolves; focus changes never refetch — the
+  // matched set doesn't move fast enough to justify the flicker.
+  staleTime: 5 * 60_000,
+  placeholderData: keepPreviousData,
+  refetchOnWindowFocus: false,
+} as const;
+export const DAILY_CAP_OPTIONS = {
+  staleTime: 10 * 60 * 1000,
+  retry: false,
+  refetchOnWindowFocus: false,
+} as const;
 
 /**
  * The ceiling advice for a step that does not already have the match preview
@@ -40,7 +58,8 @@ export function useDailyCapAdvice({
   const trimmed = (query ?? "").trim();
   // Only the persist actions are governed by the ceiling, so nothing else is
   // worth a round trip.
-  const relevant = !!projectId && trimmed.length > 0 && isPersistAction(action);
+  const isCapGoverned =
+    !!projectId && trimmed.length > 0 && isPersistAction(action);
 
   const timeRange = useMemo(() => {
     const to = Date.now();
@@ -57,23 +76,12 @@ export function useDailyCapAdvice({
       pageSize: 5,
       query: trimmed,
     },
-    {
-      enabled: relevant,
-      retry: false,
-      staleTime: 5 * 60_000,
-      keepPreviousData: true,
-      refetchOnWindowFocus: false,
-    },
+    { enabled: isCapGoverned, ...PREVIEW_LIST_OPTIONS },
   );
 
   const capStatus = api.automation.getDailyCap.useQuery(
     { projectId },
-    {
-      enabled: relevant,
-      staleTime: 10 * 60 * 1000,
-      retry: false,
-      refetchOnWindowFocus: false,
-    },
+    { enabled: isCapGoverned, ...DAILY_CAP_OPTIONS },
   );
 
   return dailyCapAdvice({

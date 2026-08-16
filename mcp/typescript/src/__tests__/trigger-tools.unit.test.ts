@@ -183,6 +183,38 @@ describe("Feature: an agent configures an automation over MCP", () => {
       ).toBe(true);
     });
 
+    it("refuses a Slack destination with nothing to deliver to", () => {
+      expect(
+        validateActionParamsForAction({
+          action: "SEND_SLACK_MESSAGE",
+          actionParams: {},
+        }).ok,
+      ).toBe(false);
+      expect(
+        validateActionParamsForAction({
+          action: "SEND_SLACK_MESSAGE",
+          actionParams: { slackDelivery: "bot" },
+        }).ok,
+      ).toBe(false);
+    });
+
+    it("accepts a Slack destination once it names where to deliver", () => {
+      expect(
+        validateActionParamsForAction({
+          action: "SEND_SLACK_MESSAGE",
+          actionParams: {
+            slackWebhook: "https://hooks.slack.com/services/T/B/X",
+          },
+        }).ok,
+      ).toBe(true);
+      expect(
+        validateActionParamsForAction({
+          action: "SEND_SLACK_MESSAGE",
+          actionParams: { slackDelivery: "bot", slackChannelId: "C123" },
+        }).ok,
+      ).toBe(true);
+    });
+
     it("stays tolerant of an action this build does not know", () => {
       expect(
         validateActionParamsForAction({

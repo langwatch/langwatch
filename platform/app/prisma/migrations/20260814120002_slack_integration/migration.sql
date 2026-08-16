@@ -50,7 +50,7 @@ CREATE UNIQUE INDEX "SlackIntegration_scopeType_scopeId_key" ON "SlackIntegratio
 -- CreateIndex
 CREATE INDEX "SlackIntegration_organizationId_idx" ON "SlackIntegration"("organizationId");
 
--- To roll back, uncomment and run manually. Dropping the table deletes every
+-- Down (manual): uncomment and run manually. Dropping the table deletes every
 -- connected workspace's stored token, and each project has to paste a fresh one;
 -- there is no way to recover the values afterwards.
 -- DROP TABLE "SlackIntegration";

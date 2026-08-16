@@ -104,6 +104,11 @@ describe("resolveGraphTimeScale", () => {
       expect(badScale("not-a-number")).toBe(60);
     });
 
+    it("falls back to hourly on a zero or negative bucket size", () => {
+      expect(badScale(0)).toBe(60);
+      expect(badScale(-1440)).toBe(60);
+    });
+
     it("still reads a numeric string the way the UI stores one", () => {
       expect(badScale("1440")).toBe(1440);
     });
@@ -113,14 +118,31 @@ describe("resolveGraphTimeScale", () => {
 describe("withGroupedPipeline", () => {
   describe("given a pie chart grouped by a field, with no pipeline of its own", () => {
     it("injects the default sum-over-trace_id pipeline on every series", () => {
-      const input = makeInput({ graphType: "pie", groupBy: "metadata.model" });
+      const input = makeInput({
+        graphType: "pie",
+        groupBy: "metadata.model",
+        series: [
+          {
+            metric: "metadata.trace_id",
+            aggregation: "cardinality",
+            name: "Traces",
+          },
+          {
+            metric: "metadata.trace_id",
+            aggregation: "cardinality",
+            name: "Also bare",
+          },
+        ] as CustomGraphInput["series"],
+      });
 
       const result = withGroupedPipeline(input);
 
-      expect(result.series[0]!.pipeline).toEqual({
-        field: "trace_id",
-        aggregation: "sum",
-      });
+      for (const series of result.series) {
+        expect(series.pipeline).toEqual({
+          field: "trace_id",
+          aggregation: "sum",
+        });
+      }
     });
   });
 

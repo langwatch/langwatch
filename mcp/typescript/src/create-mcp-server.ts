@@ -1419,6 +1419,24 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
   );
 
   server.tool(
+    "platform_list_trigger_fires",
+    "What an automation has done, newest first. Metadata only — no message content.",
+    {
+      id: z.string().describe("The trigger ID"),
+      limit: z.number().int().positive().optional().describe("How many fires to return"),
+    },
+    withToolLogging("platform_list_trigger_fires", async (params) => {
+      requireApiKey();
+      const { listTriggerFires } = await import("./langwatch-api-triggers.js");
+      const fires = await listTriggerFires({ id: params.id, limit: params.limit });
+      if (fires.length === 0) {
+        return { content: [{ type: "text", text: "This automation has not fired yet." }] };
+      }
+      return { content: [{ type: "text", text: JSON.stringify(fires, null, 2) }] };
+    })
+  );
+
+  server.tool(
     "platform_delete_trigger",
     "Delete a trigger (automation).",
     {

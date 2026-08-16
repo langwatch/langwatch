@@ -11,6 +11,7 @@ import type { HandledError } from "@langwatch/handled-error";
 import type { SlackIntegration } from "@prisma/client";
 import type { SlackWorkspaceIdentity } from "../../delivery/slackWebApi";
 import type {
+  ClearOwnSlackTokenOutcome,
   LegacySlackTokenAutomation,
   SlackIntegrationRepository,
 } from "../repositories/slack-integration.repository";
@@ -66,11 +67,18 @@ class FakeSlackIntegrationRepository implements SlackIntegrationRepository {
     return this.legacy;
   }
 
-  async clearOwnSlackToken({ triggerId }: { triggerId: string }) {
-    if (this.unswitchable.has(triggerId)) return false;
+  async clearOwnSlackToken({
+    triggerId,
+  }: {
+    triggerId: string;
+  }): Promise<ClearOwnSlackTokenOutcome> {
+    if (this.unswitchable.has(triggerId)) return "failed";
+    if (!this.legacy.some((row) => row.id === triggerId)) {
+      return "already_clear";
+    }
     this.clearedIds.push(triggerId);
     this.legacy = this.legacy.filter((row) => row.id !== triggerId);
-    return true;
+    return "cleared";
   }
 }
 
@@ -206,6 +214,7 @@ describe("SlackIntegrationService", () => {
     /** @scenario "Bulk-switching clears each automation independently" */
     it("clears the ones it can and reports the one it cannot", async () => {
       const { repo, service } = makeService();
+      await service.setup({ ...setupInput, botToken: "xoxb-live" });
       repo.legacy = [
         { id: "automation-1", name: "Error spike" },
         { id: "automation-2", name: "Latency watch" },
@@ -217,7 +226,7 @@ describe("SlackIntegrationService", () => {
         projectId: "project-1",
       });
 
-      expect(result).toEqual({ cleared: 2, failed: 1 });
+      expect(result).toEqual({ cleared: 2, alreadyClear: 0, failed: 1 });
       expect(repo.clearedIds).toEqual(["automation-1", "automation-3"]);
       // The one that failed keeps its own token, so it keeps delivering.
       expect(repo.legacy.map((row) => row.id)).toEqual(["automation-2"]);
@@ -232,15 +241,41 @@ describe("SlackIntegrationService", () => {
       ];
       repo.clearOwnSlackToken = async ({ triggerId }) => {
         if (triggerId === "automation-1") throw new Error("row is locked");
-        return true;
+        return "cleared";
       };
       const service = new SlackIntegrationService(repo, async () => acme);
+      await service.setup({ ...setupInput, botToken: "xoxb-live" });
 
       const result = await service.clearLegacyTokens({
         projectId: "project-1",
       });
 
-      expect(result).toEqual({ cleared: 1, failed: 1 });
+      expect(result).toEqual({ cleared: 1, alreadyClear: 0, failed: 1 });
+    });
+
+    /** @scenario "Bulk-switching clears each automation independently" */
+    it("reports an already-clear row as done rather than failed", async () => {
+      const { repo, service } = makeService();
+      await service.setup({ ...setupInput, botToken: "xoxb-live" });
+      repo.legacy = [{ id: "automation-1", name: "Error spike" }];
+
+      const result = await service.clearLegacyTokens({
+        projectId: "project-1",
+        triggerIds: ["automation-1", "automation-already-migrated"],
+      });
+
+      expect(result).toEqual({ cleared: 1, alreadyClear: 1, failed: 0 });
+    });
+
+    /** @scenario "Bulk-switching clears each automation independently" */
+    it("refuses to clear anything while the project has no integration", async () => {
+      const { repo, service } = makeService();
+      repo.legacy = [{ id: "automation-1", name: "Error spike" }];
+
+      await expect(
+        service.clearLegacyTokens({ projectId: "project-1" }),
+      ).rejects.toMatchObject({ code: "slack_integration_missing" });
+      expect(repo.clearedIds).toEqual([]);
     });
   });
 });

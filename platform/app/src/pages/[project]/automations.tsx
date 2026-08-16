@@ -81,6 +81,12 @@ function triggerSource(trigger: EnhancedTrigger): ConditionSource {
   return "trace";
 }
 
+/** The customer's noun for a saved row — the menu item, the delete dialog and
+ *  both toasts must all name it identically. */
+function triggerNoun(trigger: EnhancedTrigger): string {
+  return presetLabels({ source: triggerSource(trigger), isEdit: false }).noun;
+}
+
 type AutomationSection = "overview" | "automations" | "reports";
 
 const sectionDetails: Record<
@@ -271,10 +277,7 @@ function AutomationsPage() {
     trigger: EnhancedTrigger;
     active: boolean;
   }) => {
-    const noun = presetLabels({
-      source: triggerSource(trigger),
-      isEdit: false,
-    }).noun;
+    const noun = triggerNoun(trigger);
     toggleTrigger.mutate(
       { triggerId: trigger.id, active, projectId: project?.id ?? "" },
       {
@@ -311,10 +314,7 @@ function AutomationsPage() {
   };
 
   const deleteTrigger = (trigger: EnhancedTrigger) => {
-    const noun = presetLabels({
-      source: triggerSource(trigger),
-      isEdit: false,
-    }).noun;
+    const noun = triggerNoun(trigger);
     deleteTriggerMutation.mutate(
       { triggerId: trigger.id, projectId: project?.id ?? "" },
       {
@@ -435,10 +435,7 @@ function AutomationsPage() {
   };
 
   const rowActionsMenu = (trigger: EnhancedTrigger) => {
-    const noun = presetLabels({
-      source: triggerSource(trigger),
-      isEdit: false,
-    }).noun;
+    const noun = triggerNoun(trigger);
     return (
       <Menu.Root>
         <Menu.Trigger asChild>
@@ -927,7 +924,7 @@ function AutomationsPage() {
                             const actionParams =
                               trigger.actionParams as TriggerActionParams;
                             const stats = statsByTriggerId.get(trigger.id);
-                            const watchesGraph = !!trigger.customGraphId;
+                            const isWatchingGraph = !!trigger.customGraphId;
                             return (
                               // Armed, the row can be handed to Langy; its own click (open the
                               // automation) is untouched. The chip id matches the one the
@@ -945,7 +942,7 @@ function AutomationsPage() {
                                     {trigger.name}
                                   </Table.Cell>
                                   <Table.Cell maxWidth="360px">
-                                    {watchesGraph ? (
+                                    {isWatchingGraph ? (
                                       <VStack gap={0} align="start">
                                         <GraphWatchCell
                                           graphName={
@@ -1014,7 +1011,7 @@ function AutomationsPage() {
                                         be firing or recovered from; a trace
                                         filter acts per match and has no such
                                         state to report. */}
-                                    {watchesGraph ? (
+                                    {isWatchingGraph ? (
                                       <FiringStatus
                                         firing={!!stats?.currentlyFiring}
                                       />
@@ -1048,9 +1045,7 @@ function AutomationsPage() {
           if (!open) setPendingDelete(null);
         }}
         title={
-          pendingDelete
-            ? `Delete ${presetLabels({ source: triggerSource(pendingDelete), isEdit: false }).noun}`
-            : "Delete"
+          pendingDelete ? `Delete ${triggerNoun(pendingDelete)}` : "Delete"
         }
         message={
           pendingDelete

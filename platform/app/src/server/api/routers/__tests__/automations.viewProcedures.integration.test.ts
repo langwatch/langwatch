@@ -4,8 +4,9 @@
  * The three reads behind the in-depth automation view: the paginated firing
  * history, the alert's latest evaluation, and what the automation does next.
  *
- * Binds specs/automations/evaluation-visibility.feature at the API boundary —
- * the drawer tests bind the same feature at the surface.
+ * Exercises specs/automations/evaluation-visibility.feature at the API
+ * boundary; the parity bindings (`@scenario`) live on the drawer suites,
+ * which cover the same feature at the surface.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

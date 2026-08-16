@@ -486,6 +486,27 @@ describe("AutomationDrawer", () => {
         expect(mockCloseDrawer).toHaveBeenCalled();
       });
     });
+
+    describe("when the drawer is reopened with a different create prefill", () => {
+      it("applies the new prefill instead of skipping on the previous opening's latch", async () => {
+        const opened = renderDrawer({ prefilledGraphId: "graph-1" });
+        await waitFor(() => {
+          expect(useAutomationStore.getState().draft.customGraphId).toBe(
+            "graph-1",
+          );
+        });
+
+        // Same drawer type reopened with new params: no remount, so only the
+        // identity change can re-arm the prefill effects.
+        opened.rerender(<AutomationDrawer prefilledGraphId="graph-2" />);
+
+        await waitFor(() => {
+          expect(useAutomationStore.getState().draft.customGraphId).toBe(
+            "graph-2",
+          );
+        });
+      });
+    });
   });
 
   describe("given an existing automation in edit mode", () => {
@@ -511,27 +532,6 @@ describe("AutomationDrawer", () => {
         expect(
           screen.getByRole("button", { name: "Save changes" }),
         ).toBeInTheDocument();
-      });
-    });
-
-    describe("when the drawer is reopened with a different create prefill", () => {
-      it("applies the new prefill instead of skipping on the previous opening's latch", async () => {
-        const opened = renderDrawer({ prefilledGraphId: "graph-1" });
-        await waitFor(() => {
-          expect(useAutomationStore.getState().draft.customGraphId).toBe(
-            "graph-1",
-          );
-        });
-
-        // Same drawer type reopened with new params: no remount, so only the
-        // identity change can re-arm the prefill effects.
-        opened.rerender(<AutomationDrawer prefilledGraphId="graph-2" />);
-
-        await waitFor(() => {
-          expect(useAutomationStore.getState().draft.customGraphId).toBe(
-            "graph-2",
-          );
-        });
       });
     });
 
