@@ -71,6 +71,19 @@ Feature: Automation dispatch on the process-manager substrate
     And a retry of a page re-runs only the traces not yet claimed
 
   @unit
+  Scenario: A later settlement round is never swallowed by a completed page
+    Given a page dispatched for a settle round
+    When the same trace matches again in a later settle window
+    Then the later round produces a distinct page message
+
+  @unit
+  Scenario: Two automations that match the same trace keep separate pages
+    Given two automations on one project that add matched traces to a dataset
+    And both match the same trace in the same settle window
+    When the settled matches dispatch
+    Then each automation dispatches its own page
+
+  @unit
   Scenario: An old single-trace persist intent still dispatches after the paging change
     Given a pending persist intent written before the paging change
     When the intent dispatches
@@ -95,6 +108,17 @@ Feature: Automation dispatch on the process-manager substrate
     When the page dispatches
     Then the page is retried for the failed trace
     And the dispatched trace can run again instead of being lost
+
+  # A retryable failure is rethrown into the outbox, and the outbox redacts an
+  # error message before it logs the attempt. The page's own retry line was the
+  # only place the cause could still be named, and it carried a count alone, so
+  # a page that retried to its attempt ceiling told an operator "one trace
+  # failed" and nothing about why.
+  @unit
+  Scenario: A retrying page names the failure that caused the retry
+    Given a page where one trace fails with a retryable error
+    When the page decides to retry
+    Then the retry record names the failing error type and message
 
   @unit
   Scenario: A daily-ceiling breach is reported once per page
