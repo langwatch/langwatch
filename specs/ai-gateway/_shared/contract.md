@@ -245,6 +245,23 @@ Returns the warm-cache config (fat, not on hot path). Supports conditional `If-N
                        so their behaviour is unchanged.
        policy        - ordering and rules come from the linked RoutingPolicy. */
   "routing_mode": "none",
+  /* Why a provider a request could resolve to is NOT in `providers[]`, so a
+     request-time block can name the reason instead of failing opaque. Each
+     entry is a ModelProvider id + its type, the same shape `providers[]`
+     carries, because the gateway matches a resolved request by provider type
+     and these rows are absent from `providers[]`.
+       routing_excluded_providers - reachable from the key's scope AND inside
+         provider access, but dropped by the routing policy (named by
+         routing_policy_name).
+       access_excluded_providers  - reachable from scope but outside
+         providers_allowed; empty when the key allows all providers.
+     A provider in neither list with no credential is not reachable from the
+     key's scope. */
+  "routing_excluded_providers": [{ "id": "pc_anthropic", "type": "anthropic" }],
+  "access_excluded_providers": [{ "id": "pc_gemini", "type": "gemini" }],
+  /* Display name of the key's routing policy, used to name the routing block.
+     null when the key is not on a routing policy. */
+  "routing_policy_name": null,
   "cache": { "mode": "respect|force|disable", "ttl_s": 3600 },
   "guardrails": {
     /* Both fail-open flags default false (fail-closed). Flip to true per

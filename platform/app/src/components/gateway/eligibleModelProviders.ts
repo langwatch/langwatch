@@ -1,5 +1,6 @@
 import { modelProviderRegistry } from "~/features/onboarding/regions/model-providers/registry";
 import { isDispatchableProvider } from "~/server/modelProviders/registry";
+import { SCOPE_BREADTH, scopeBreadthRank } from "~/utils/scopeBreadth";
 
 /**
  * A scope a VirtualKey is reachable from: the org/team/project triad the
@@ -123,9 +124,9 @@ function isRoutable(provider: OrgModelProvider): boolean {
 }
 
 /**
- * Resolves the union eligible-ModelProvider set for a multi-scope VirtualKey
- * client-side, mirroring `scopeResolver.eligibleModelProvidersForVk` on the
- * server. Inheritance rule from specs/ai-gateway/governance/vk-scope-inheritance.feature:
+ * Resolves the union scope-reachable ModelProvider set for a multi-scope
+ * VirtualKey client-side, mirroring `scopeResolver.scopeReachableModelProvidersForVk`
+ * on the server. Inheritance rule from specs/ai-gateway/governance/vk-scope-inheritance.feature:
  *
  *   "A VK at scope S sees a ModelProvider P iff P's scope is an ancestor
  *    of S OR equal to S. ORG is the broadest, then TEAM, then PROJECT."
@@ -133,6 +134,14 @@ function isRoutable(provider: OrgModelProvider): boolean {
  * Each surviving MP carries the broadest of its OWN scopes that the key
  * reaches, which is what the scope chip in the picker UI names. Keyed by
  * row id, so a provider attached at several scopes resolves once.
+ *
+ * Scope only: a key's routing policy narrows what the gateway DISPATCHES to,
+ * never what its provider allowlist may name. A provider the scope reaches
+ * but the policy omits stays offered here and is savable; the policy blocks
+ * it at dispatch, not at save.
+ *
+ * Rows come back broadest scope first (ORGANIZATION, then TEAM, then
+ * PROJECT), and by name within a scope.
  */
 export function resolveEligible(
   scopes: VirtualKeyScopeEntry[],
@@ -164,7 +173,6 @@ export function resolveEligible(
 
   // Rank the tiers so a provider attached at several scopes is attributed to
   // the broadest one (ORG > TEAM > PROJECT) it reaches the key through.
-  const scopeBreadth = { ORGANIZATION: 0, TEAM: 1, PROJECT: 2 } as const;
   const result = new Map<string, EligibleModelProvider>();
   for (const provider of providers) {
     if (!provider.id) continue;
@@ -174,7 +182,7 @@ export function resolveEligible(
       if (!scopes.some((vkScope) => matchesScope(mpScope, vkScope))) continue;
       if (
         !definedAt ||
-        scopeBreadth[mpScope.scopeType] < scopeBreadth[definedAt.scopeType]
+        SCOPE_BREADTH[mpScope.scopeType] < SCOPE_BREADTH[definedAt.scopeType]
       ) {
         definedAt = mpScope;
       }
@@ -197,8 +205,11 @@ export function resolveEligible(
       ),
     });
   }
-  return Array.from(result.values()).sort((a, b) =>
-    a.label.localeCompare(b.label),
+  return Array.from(result.values()).sort(
+    (a, b) =>
+      scopeBreadthRank(a.definedAt.scopeType) -
+        scopeBreadthRank(b.definedAt.scopeType) ||
+      a.label.localeCompare(b.label),
   );
 }
 

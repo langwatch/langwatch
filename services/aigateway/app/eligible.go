@@ -12,13 +12,52 @@ import (
 
 // routableChain trims the credential chain to the credentials that could
 // actually serve this request: first to the providers the inbound route
-// speaks, then to the providers the resolved model names.
-func routableChain(ctx context.Context, req *domain.Request, creds []domain.Credential) ([]domain.Credential, error) {
-	creds, err := surfaceCredentials(ctx, creds, req)
+// speaks (surface trim), then to the providers the resolved model names
+// (model-aware trim).
+//
+// When the model-aware trim leaves an explicitly named provider with no
+// credential, the failure names WHY, from what the control plane reported on
+// the bundle: the routing policy dropped it, provider access dropped it, or it
+// is not reachable from the key's scope. An empty chain gets the same reason: a
+// bundle whose allowlist names only an excluded provider carries no dispatchable
+// credential by design, and that is named rather than reported as an
+// organization with no provider configured.
+func routableChain(ctx context.Context, bundle *domain.Bundle, req *domain.Request) ([]domain.Credential, error) {
+	creds, err := surfaceCredentials(ctx, bundle.Credentials, req)
 	if err != nil {
+		// A raw-forward surface with no credential left can be a routing-policy
+		// or provider-access exclusion in disguise: the provider the route
+		// speaks was dropped from dispatch, so none of its credentials remain.
+		// Give that reason when the resolved provider is one the route speaks;
+		// otherwise the surface's own not-reachable message stands.
+		if reason := reasonForBlockedSurface(ctx, req, bundle.Config); reason != nil {
+			return nil, reason
+		}
 		return nil, err
 	}
-	return eligibleCredentials(ctx, creds, req.Resolved)
+	creds, err = eligibleCredentials(ctx, creds, req.Resolved)
+	if err != nil {
+		// eligibleCredentials refused an explicitly named provider that has no
+		// credential (the not-reachable-from-scope reason). When the control
+		// plane reported a routing-policy or provider-access exclusion for that
+		// provider, that is the more specific reason to give.
+		if reason := reasonForBlockedProvider(ctx, req.Resolved, bundle.Config); reason != nil {
+			return nil, reason
+		}
+		return nil, err
+	}
+	// An empty chain with no error means the bundle carries no dispatchable
+	// credential. That is a genuinely unconfigured organization, unless the key's
+	// allowlist names only a provider the routing policy or provider access
+	// dropped: then `providers[]` is empty by design and the reason is on the
+	// bundle. Name it here, so candidateChain does not fall back to the generic
+	// no_provider_configured for a request Phase 2 can explain.
+	if len(creds) == 0 {
+		if reason := reasonForEmptyChain(ctx, req, bundle.Config); reason != nil {
+			return nil, reason
+		}
+	}
+	return creds, nil
 }
 
 // surfaceCredentials keeps only the credentials whose provider speaks the
@@ -100,14 +139,14 @@ func providerNames(providers []domain.ProviderID) string {
 // credential's own provider and fails with that provider's real error.
 //
 // Explicitly-named providers (a "provider/model" prefix or an alias) get
-// the opposite treatment: an empty filter is a hard fail with
-// ErrProviderNotBound. Dispatching anyway would forward the prefixed
-// model string with a mismatched credential, and Bifrost's model-prefix
-// provider override then reads that credential through the wrong
-// provider's key-config shape — surfacing as opaque errors like
-// "deployments not set" (Azure), "no keys found that support model"
-// (Gemini), or raw HTML error pages (Vertex) instead of telling the
-// caller the provider isn't configured.
+// the opposite treatment: an empty filter is a hard fail with the
+// not-reachable-from-scope reason. `routableChain` upgrades that to the
+// routing-policy or provider-access reason when the control plane reported
+// one for the provider. Dispatching anyway would forward the prefixed model
+// string with a mismatched credential, and Bifrost's model-prefix provider
+// override then reads that credential through the wrong provider's key-config
+// shape — surfacing as opaque errors like "deployments not set" (Azure), "no
+// keys found that support model" (Gemini), or raw HTML error pages (Vertex).
 func eligibleCredentials(ctx context.Context, creds []domain.Credential, resolved *domain.ResolvedModel) ([]domain.Credential, error) {
 	if len(creds) == 0 || resolved == nil {
 		return creds, nil
@@ -122,22 +161,136 @@ func eligibleCredentials(ctx context.Context, creds []domain.Credential, resolve
 		return creds, nil
 	}
 
+	if out := credentialsForProvider(creds, target); len(out) > 0 {
+		return out, nil
+	}
+	if explicit {
+		return nil, providerNotReachable(ctx, target)
+	}
+	return creds, nil
+}
+
+// credentialsForProvider keeps the credentials that can serve the target
+// provider kind, preserving order so fallback semantics survive.
+func credentialsForProvider(creds []domain.Credential, target domain.ProviderID) []domain.Credential {
 	out := make([]domain.Credential, 0, len(creds))
 	for _, c := range creds {
 		if c.ProviderID == target {
 			out = append(out, c)
 		}
 	}
-	if len(out) == 0 {
-		if explicit {
-			return nil, herr.New(ctx, domain.ErrProviderNotBound, herr.M{
-				"message": fmt.Sprintf("no %q provider is configured for this key", target),
-				"hint":    fmt.Sprintf("bind a %q provider slot to this virtual key, or drop the %q model prefix", target, target),
-			})
-		}
-		return creds, nil
+	return out
+}
+
+// reasonForEmptyChain names why an empty dispatch chain blocked the request, or
+// nil when nothing the control plane reported explains it, so the caller keeps
+// no_provider_configured for a genuinely unconfigured bundle. A raw-forward
+// route is pinned to its surface, so it reads through the surface-guarded
+// reason; a translated route reads the resolved provider directly.
+func reasonForEmptyChain(ctx context.Context, req *domain.Request, cfg domain.BundleConfig) error {
+	if len(req.InboundSurface().Providers) > 0 {
+		return reasonForBlockedSurface(ctx, req, cfg)
 	}
-	return out, nil
+	return reasonForBlockedProvider(ctx, req.Resolved, cfg)
+}
+
+// reasonForBlockedProvider names the routing-policy or provider-access reason
+// the control plane reported for the request's resolved provider, or nil when
+// it reported neither (the caller then keeps the not-reachable-from-scope
+// reason).
+func reasonForBlockedProvider(ctx context.Context, resolved *domain.ResolvedModel, cfg domain.BundleConfig) error {
+	if resolved == nil {
+		return nil
+	}
+	target := resolved.ProviderID
+	if target == "" {
+		target = inferProviderFromModel(resolved.ModelID)
+	}
+	if target == "" {
+		return nil
+	}
+	return blockedProviderError(ctx, target, cfg)
+}
+
+// reasonForBlockedSurface names the routing-policy or provider-access reason for
+// a raw-forward route that has no credential left, when the resolved provider is
+// one the route speaks and the control plane reported an exclusion for it. It
+// returns nil otherwise, so the caller keeps the surface's not-reachable
+// message. The surface-provider guard stops a mismatched resolved provider from
+// borrowing another provider's reason.
+func reasonForBlockedSurface(ctx context.Context, req *domain.Request, cfg domain.BundleConfig) error {
+	if req == nil || req.Resolved == nil {
+		return nil
+	}
+	target := req.Resolved.ProviderID
+	if target == "" {
+		target = inferProviderFromModel(req.Resolved.ModelID)
+	}
+	if target == "" {
+		return nil
+	}
+	if !slices.Contains(req.InboundSurface().Providers, target) {
+		return nil
+	}
+	return blockedProviderError(ctx, target, cfg)
+}
+
+// blockedProviderError names why the control plane dropped the resolved provider
+// from the dispatch chain, or nil when nothing it reported excluded it.
+func blockedProviderError(ctx context.Context, target domain.ProviderID, cfg domain.BundleConfig) error {
+	switch cfg.BlockedProviderReason(target) {
+	case domain.ProviderBlockRouting:
+		return providerBlockedByRouting(ctx, target, cfg.RoutingPolicyName)
+	case domain.ProviderBlockAccess:
+		return providerBlockedByAccess(ctx, target)
+	case domain.ProviderBlockNone:
+		return nil
+	}
+	return nil
+}
+
+// providerBlockedByRouting is the block when the key's routing policy leaves the
+// resolved provider out of the dispatch chain. Names the policy when known.
+func providerBlockedByRouting(ctx context.Context, kind domain.ProviderID, policyName string) error {
+	msg := fmt.Sprintf(
+		"The %q provider is not available on this key: its routing policy does not include this provider. Ask the key's owner to add it to the routing policy, or send the request to a provider the policy allows.",
+		kind,
+	)
+	if policyName != "" {
+		msg = fmt.Sprintf(
+			"The %q provider is not available on this key: its routing policy %q does not include this provider. Ask the key's owner to add it to the routing policy, or send the request to a provider the policy allows.",
+			kind, policyName,
+		)
+	}
+	return herr.New(ctx, domain.ErrModelNotAllowed, herr.M{
+		"message": msg,
+		"fault":   "customer",
+	})
+}
+
+// providerBlockedByAccess is the block when the resolved provider is reachable
+// from the key's scope but outside its provider access allowlist.
+func providerBlockedByAccess(ctx context.Context, kind domain.ProviderID) error {
+	return herr.New(ctx, domain.ErrModelNotAllowed, herr.M{
+		"message": fmt.Sprintf(
+			"The %q provider is not in this key's provider access. Ask the key's owner to add it to the key's allowed providers.",
+			kind,
+		),
+		"fault": "customer",
+	})
+}
+
+// providerNotReachable is the block when the resolved provider is not reachable
+// from the key's scope at all, so no credential is configured for it.
+func providerNotReachable(ctx context.Context, kind domain.ProviderID) error {
+	return herr.New(ctx, domain.ErrProviderNotBound, herr.M{
+		"message": fmt.Sprintf(
+			"The %q provider is not reachable from this key's scope, so no credential is configured for it. Ask the key's owner to add the provider, or send the request to a configured provider.",
+			kind,
+		),
+		"hint":  fmt.Sprintf("add a %q provider in this key's scope, or drop the %q model prefix", kind, kind),
+		"fault": "customer",
+	})
 }
 
 // inferProviderFromModel maps a bare model name to the provider that
