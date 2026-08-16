@@ -27,18 +27,20 @@ targetRules = ["generic-api-key"]
 paths = ['''platform/app/ee/billing/stripe/stripeCatalog\.json''']
 
 # Gateway test fixtures that pattern-match `generic-api-key` but are provably
-# not credentials: a sequential-hex HMAC fixture (`0123456789abcdef...`) signing
-# the vk-lifecycle, vk-expiry and spend-ingest route tests, and the literal
-# process key `"conversation-1"` in the process-store suite.
+# not credentials: a sequential-hex fixture (`0123456789abcdef...`) signing the
+# vk-lifecycle, vk-expiry and spend-ingest route tests and the gateway JWT
+# suite, and the literal process key `"conversation-1"` in the process-store
+# suite.
 # Scoped to those test files and the generic rule only, so a real token
 # landing in either is still caught by every provider-specific rule.
 [[allowlists]]
-description = "Sequential-hex HMAC fixture in the signed-route tests, not a credential"
+description = "Sequential-hex signing fixture in the gateway tests, not a credential"
 targetRules = ["generic-api-key"]
 paths = [
   '''platform/app/src/server/routes/__tests__/gateway-internal\.vk-lifecycle\.integration\.test\.ts''',
   '''platform/app/src/server/routes/__tests__/gateway-internal\.vk-expiry\.integration\.test\.ts''',
   '''platform/app/src/server/routes/__tests__/gateway-internal\.spend-ingest\.integration\.test\.ts''',
+  '''platform/app/src/server/gateway/__tests__/gatewayJwt\.unit\.test\.ts''',
 ]
 
 [[allowlists]]
