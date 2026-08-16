@@ -55,7 +55,7 @@ describe("refreshTelemetryWiringForLogin", () => {
 			// codex → [otel] marker block at the stale instance
 			writeCodexOtelBlock(
 				{
-					endpoint: `${STALE_ENDPOINT}/v1/traces`,
+					baseEndpoint: STALE_ENDPOINT,
 					ingestionToken: STALE_TOKEN,
 				},
 				{ persistAuthHeader: true },

@@ -28,7 +28,6 @@
 import * as os from "node:os";
 
 import {
-	codexTraceEndpoint,
 	writeCodexGatewayBlock,
 	writeCodexOtelBlock,
 } from "@/cli/utils/codex-config-toml";
@@ -535,7 +534,7 @@ export async function resolveWrapperMode(
 		// logout` removes the block.
 		const result = writeCodexOtelBlock(
 			{
-				endpoint: codexTraceEndpoint(endpoint),
+				baseEndpoint: endpoint,
 				ingestionToken: token,
 				environment: cfg.organization?.slug ?? "langwatch",
 			},

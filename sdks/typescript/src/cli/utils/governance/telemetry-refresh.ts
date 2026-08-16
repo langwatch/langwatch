@@ -364,7 +364,7 @@ export function refreshCodexOtelBlockTo({
 }): string | null {
 	if (!codexHasOtelBlock(defaultCodexConfigPath())) return null;
 	const result = writeCodexOtelBlock({
-		endpoint: codexTraceEndpoint(endpoint),
+		baseEndpoint: endpoint,
 		ingestionToken: token,
 		environment,
 	});

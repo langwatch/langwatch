@@ -197,17 +197,15 @@ async function runInstall(
     endpoint,
     ingestion_token: token,
     token_prefix: prefix ?? token.slice(0, 12),
+    scope,
+    destination_project: projectLabel,
     env_block: envBlock,
   };
 
   if (tool === "codex" && !options.envOnly) {
-    // codex's OTLP/HTTP exporter sends every signal to the configured
-    // endpoint verbatim — it does NOT append `/v1/traces` the way the
-    // OTel SDKs do. Spell the trace-signal suffix out (mirror of the
-    // wrapper-mode.ts behaviour) so the POST lands on the real handler.
     const result = writeCodexOtelBlock(
       {
-        endpoint: `${endpoint}/v1/traces`,
+        baseEndpoint: endpoint,
         ingestionToken: token,
         environment: cfg.organization?.slug ?? "langwatch",
       },

@@ -35,7 +35,6 @@ import {
 	type CodexNotifyWriteResult,
 	codexNotifyCommandIsEphemeral,
 	codexOtelBlockHasAuthHeader,
-	codexTraceEndpoint,
 	defaultCodexConfigPath,
 	defaultCodexNotifyCommand,
 	displayCodexConfigPath,
