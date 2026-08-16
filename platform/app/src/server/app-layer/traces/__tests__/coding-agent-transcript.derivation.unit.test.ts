@@ -1432,6 +1432,56 @@ describe("given a codex trace whose recovered conversation and prompt event desc
       expect(prompts[1]).toMatchObject({ chars: 11 });
     });
   });
+
+  describe("when two prompts are the same length and only the later one was recovered", () => {
+    /** @scenario "A redacted prompt with no recovered turn behind it is kept" */
+    it("keeps the earlier stub and does not show the recovered turn twice", () => {
+      // Both turns typed a 24-character prompt, so the length alone cannot say
+      // which turn the recovered conversation belongs to. Suppressing the
+      // first stub would delete the turn that was never recovered.
+      const later = "tell me about the second";
+      expect(later).toHaveLength(24);
+
+      const transcript = buildCodingAgentTranscript({
+        spans: [
+          recoveredCodexTurn({
+            atMs: 5_000,
+            messages: [{ role: "user", content: later }],
+            output: "the second one.",
+          }),
+        ],
+        logs: [
+          log(
+            {
+              "event.name": "codex.user_prompt",
+              prompt: "[REDACTED]",
+              prompt_length: "24",
+              "conversation.id": "conv-1",
+            },
+            1_042,
+          ),
+          log(
+            {
+              "event.name": "codex.user_prompt",
+              prompt: "[REDACTED]",
+              prompt_length: "24",
+              "conversation.id": "conv-1",
+            },
+            5_042,
+          ),
+        ],
+      });
+
+      const prompts = transcript.entries.filter(
+        (entry) => entry.kind === "user_prompt",
+      );
+      expect(prompts).toHaveLength(2);
+      // The unrecovered turn keeps its stub, in its own place in time, and the
+      // recovered turn is shown once with its words.
+      expect(prompts.map((entry) => entry.text)).toEqual(["[REDACTED]", later]);
+      expect(prompts[0]).toMatchObject({ atMs: 1_042 });
+    });
+  });
 });
 
 describe("given a prompt pasting tens of thousands of unclosed tags", () => {

@@ -439,10 +439,23 @@ describe("harvestCodexThread", () => {
 				fetchImpl: impl,
 			});
 
-		const contextAttr = (bodies: any[], urls: string[], key: string) =>
-			bodies[urls.indexOf("https://e/v1/logs")].resourceLogs[0].scopeLogs[0].logRecords[0].attributes.find(
+		const contextAttr = ({
+			bodies,
+			urls,
+			key,
+		}: {
+			bodies: any[];
+			urls: string[];
+			key: string;
+		}) => {
+			const at = urls.indexOf("https://e/v1/logs");
+			// Without this the missing POST reads as `bodies[-1]` and the chain
+			// throws a TypeError, which hides which expectation actually failed.
+			expect(at, "no session-context record was posted").toBeGreaterThan(-1);
+			return bodies[at].resourceLogs[0].scopeLogs[0].logRecords[0].attributes.find(
 				(a: any) => a.key === key,
 			)?.value?.stringValue;
+		};
 
 		describe("when the session is harvested", () => {
 			/** @scenario "The harvest names the session by the first thing the user asked" */
@@ -458,7 +471,7 @@ describe("harvestCodexThread", () => {
 
 				await harvest(impl);
 
-				expect(contextAttr(bodies, urls, "langwatch.session.title")).toBe(
+				expect(contextAttr({ bodies, urls, key: "langwatch.session.title" })).toBe(
 					"Fix the pricing rounding bug",
 				);
 			});
@@ -478,7 +491,7 @@ describe("harvestCodexThread", () => {
 
 				expect(urls).toContain("https://e/v1/logs");
 				expect(
-					contextAttr(bodies, urls, "langwatch.session.title"),
+					contextAttr({ bodies, urls, key: "langwatch.session.title" }),
 				).toBeUndefined();
 			});
 		});
