@@ -69,6 +69,11 @@ export function resolveExpiresAt({
  * Built from the split parts rather than `new Date(value)`: parsing the
  * string lands on midnight, so a key set to expire "today" would be born
  * expired, and the whole day the person picked would be gone.
+ *
+ * A day that does not exist is refused rather than moved. `Date.UTC` rolls
+ * `2026-02-31` forward into March without saying so, and a key that expires
+ * three days after the date on the form is worse than one that refuses to
+ * be saved.
  */
 function endOfDayUtc(value: string | undefined): Date | null {
   if (!value) return null;
@@ -80,7 +85,15 @@ function endOfDayUtc(value: string | undefined): Date | null {
     Number(match[3]),
   ];
   const date = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
-  return Number.isNaN(date.getTime()) ? null : date;
+  if (Number.isNaN(date.getTime())) return null;
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return null;
+  }
+  return date;
 }
 
 /** The `yyyy-mm-dd` an `<input type="date">` shows for a stored instant. */
@@ -130,6 +143,25 @@ export function expirationStateFromStored(expiresAt: string | Date | null): {
   const date = expiresAt instanceof Date ? expiresAt : new Date(expiresAt);
   if (Number.isNaN(date.getTime())) return { preset: "", customDate: "" };
   return { preset: "custom", customDate: dateInputValue(date) };
+}
+
+/**
+ * Why the expiration choice cannot be submitted yet, or null.
+ *
+ * The one incomplete state a date field has is "Custom date" with no day
+ * typed. Every other option already carries its own answer.
+ */
+export function expiryIncompleteReason({
+  preset,
+  expiresAt,
+}: {
+  preset: VirtualKeyExpirationPreset;
+  expiresAt: Date | null;
+}): string | null {
+  if (preset === "custom" && !expiresAt) {
+    return "Pick the date this key expires, or choose Never.";
+  }
+  return null;
 }
 
 /**

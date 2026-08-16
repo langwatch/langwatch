@@ -53,6 +53,7 @@ import {
 import {
   expirationStateFromStored,
   expiryFieldErrorFrom,
+  expiryIncompleteReason,
   resolveExpiresAt,
 } from "./virtualKeyExpiration";
 import {
@@ -250,30 +251,29 @@ export function VirtualKeyEditDrawer({
   }>;
   const eligible = useMemo(
     () =>
-      resolveEligible(
-        vk?.scopes ?? [],
+      resolveEligible({
+        scopes: vk?.scopes ?? [],
         providers,
-        buildScopeHierarchy(availableProjects, organizationId),
-      ),
+        hierarchy: buildScopeHierarchy(availableProjects, organizationId),
+      }),
     [vk?.scopes, providers, availableProjects, organizationId],
   );
 
   const tagsNotice = tagsBeyondLimitsNotice(tagsCsv);
-  // A stored date is seeded as the day it falls on, so re-resolving an
-  // untouched form would round the saved instant to the end of that day.
-  // Saving a form nobody edited has to change nothing, so the stored
-  // instant is sent back verbatim until the choice actually moves.
   const seededExpiration = expirationStateFromStored(vk?.expiresAt ?? null);
   const expirationUntouched =
     expiration.preset === seededExpiration.preset &&
     expiration.customDate === seededExpiration.customDate;
-  const expiresAt =
-    expirationUntouched && vk?.expiresAt
-      ? new Date(vk.expiresAt)
-      : resolveExpiresAt({
-          preset: expiration.preset,
-          customDate: expiration.customDate,
-        });
+  const expiresAt = resolveExpiresAt({
+    preset: expiration.preset,
+    customDate: expiration.customDate,
+  });
+  // Omitted leaves the stored date alone, which is what an untouched block
+  // means. Sending it back would round a stored instant to the end of the
+  // day it was seeded as, and would fail the future-date check on every
+  // unrelated edit to a key that has already expired: renaming an expired
+  // key or extending it is exactly what this drawer is for.
+  const expiresAtPatch = expirationUntouched ? undefined : expiresAt;
 
   const close = () => {
     if (updateMutation.isPending) return;
@@ -296,10 +296,7 @@ export function VirtualKeyEditDrawer({
       eligible,
     );
     if (providerReason) return providerReason;
-    if (expiration.preset === "custom" && !expiresAt) {
-      return "Pick the date this key expires, or choose Never.";
-    }
-    return null;
+    return expiryIncompleteReason({ preset: expiration.preset, expiresAt });
   })();
 
   const submit = async () => {
@@ -319,10 +316,9 @@ export function VirtualKeyEditDrawer({
         description: description || null,
         routingMode: routing.mode,
         routingPolicyId: routing.mode === "POLICY" ? routing.policyId : null,
-        // Null clears the date, which is what "Never" means here. The
-        // block always seeds from what is stored, so an unchanged form
-        // sends back the same date rather than silently dropping it.
-        expiresAt,
+        // Absent leaves the stored date alone; null clears it, which is
+        // what "Never" means here; a date moves it.
+        ...(expiresAtPatch !== undefined ? { expiresAt: expiresAtPatch } : {}),
         // Undefined leaves an absent budget alone; null archives one the
         // key had; a value creates or updates it.
         budget: trimmedLimit

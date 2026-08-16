@@ -178,12 +178,13 @@ const virtualKeyDtoSchema = z.object({
   routing_mode: routingModeWireSchema,
   config: z.unknown(),
   revision: z.string(),
-  created_at: z.string(),
-  updated_at: z.string(),
-  last_used_at: z.string().nullable(),
-  revoked_at: z.string().nullable(),
+  created_at: z.string().datetime(),
+  updated_at: z.string().datetime(),
+  last_used_at: z.string().datetime().nullable(),
+  revoked_at: z.string().datetime().nullable(),
   expires_at: z
     .string()
+    .datetime()
     .nullable()
     .describe(
       "When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.",

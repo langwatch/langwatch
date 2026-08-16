@@ -142,6 +142,15 @@ export type VirtualKeySnakeDto = {
 
 type BaseVk = Omit<VirtualKeyCamelDto, never>;
 
+const STATUS_BY_ROW: Record<
+  VirtualKeyWithScopes["status"],
+  VirtualKeyCamelDto["status"]
+> = {
+  ACTIVE: "active",
+  DISABLED: "disabled",
+  REVOKED: "revoked",
+};
+
 function baseVk(
   vk: VirtualKeyWithScopes,
   facts: TraceDestinationFacts,
@@ -151,12 +160,7 @@ function baseVk(
     organizationId: vk.organizationId,
     name: vk.name,
     description: vk.description,
-    status:
-      vk.status === "ACTIVE"
-        ? "active"
-        : vk.status === "DISABLED"
-          ? "disabled"
-          : "revoked",
+    status: STATUS_BY_ROW[vk.status],
     purpose: vk.purpose === "LANGY" ? "langy" : "user",
     displayPrefix: vk.displayPrefix,
     principalUserId: vk.principalUserId,

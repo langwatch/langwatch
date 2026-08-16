@@ -143,10 +143,15 @@ function isRoutable(provider: OrgModelProvider): boolean {
  * Rows come back broadest scope first (ORGANIZATION, then TEAM, then
  * PROJECT), and by name within a scope.
  */
-export function resolveEligible(
-  scopes: VirtualKeyScopeEntry[],
-  providers: OrgModelProvider[],
-  hierarchy: ScopeHierarchy,
+export function resolveEligible({
+  scopes,
+  providers,
+  hierarchy,
+  providersAllowed,
+}: {
+  scopes: VirtualKeyScopeEntry[];
+  providers: OrgModelProvider[];
+  hierarchy: ScopeHierarchy;
   /**
    * The key's own provider allowlist, when it has one.
    *
@@ -157,8 +162,8 @@ export function resolveEligible(
    * the key does not hold yet; a read-only view of an existing key passes
    * its list, or it overstates what the key can do.
    */
-  providersAllowed?: string[] | null,
-): EligibleModelProvider[] {
+  providersAllowed?: string[] | null;
+}): EligibleModelProvider[] {
   if (scopes.length === 0 || providers.length === 0) return [];
   const allowed =
     providersAllowed && providersAllowed.length > 0
@@ -243,5 +248,5 @@ export function firstEligibleDefaultModel(args: {
 }): string | undefined {
   const { scopes, providers, availableProjects, organizationId } = args;
   const hierarchy = buildScopeHierarchy(availableProjects, organizationId);
-  return resolveEligible(scopes, providers, hierarchy)[0]?.defaultModel;
+  return resolveEligible({ scopes, providers, hierarchy })[0]?.defaultModel;
 }

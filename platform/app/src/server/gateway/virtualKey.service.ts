@@ -305,7 +305,7 @@ export class VirtualKeyService {
       input.routingPolicyId ?? null,
     );
     assertProvidersAllowedShape(input.config?.providersAllowed);
-    assertExpiryInFuture(input.expiresAt);
+    assertExpiryInFuture({ expiresAt: input.expiresAt });
 
     const id = this.nextVirtualKeyId();
 
@@ -436,7 +436,7 @@ export class VirtualKeyService {
           )
         : existing.routingMode;
     assertProvidersAllowedShape(input.config?.providersAllowed);
-    assertExpiryInFuture(input.expiresAt);
+    assertExpiryInFuture({ expiresAt: input.expiresAt });
 
     const updated = await this.prisma
       .$transaction(async (tx) => {
@@ -1130,7 +1130,11 @@ function assertProvidersAllowedShape(
  * makes "now" itself a refusal: a key that expires at the instant it is
  * saved serves nothing and reads as a bug in whatever wrote it.
  */
-function assertExpiryInFuture(expiresAt: Date | null | undefined): void {
+function assertExpiryInFuture({
+  expiresAt,
+}: {
+  expiresAt: Date | null | undefined;
+}): void {
   if (!expiresAt) return;
   if (expiresAt.getTime() <= Date.now()) {
     throw new VirtualKeyExpiryInPastError();

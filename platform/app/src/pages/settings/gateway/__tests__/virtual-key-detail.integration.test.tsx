@@ -209,7 +209,7 @@ describe("virtual key detail page", () => {
   });
   afterEach(() => cleanup());
 
-  describe("when the key carries an expiration date", () => {
+  describe("when the key carries a future expiration date", () => {
     /** @scenario "The detail page states when the key expires" */
     it("states the date and how long is left", async () => {
       const expiresAt = new Date(Date.now() + 4 * 24 * 60 * 60 * 1000);
@@ -228,15 +228,19 @@ describe("virtual key detail page", () => {
       );
       expect(row.textContent).toContain("in 4 days");
     });
+  });
 
+  describe("when the key has no expiration date", () => {
     /** @scenario "The detail page states when the key expires" */
-    it("reads Never for a key with no date", async () => {
+    it("reads Never", async () => {
       renderPage();
       expect((await screen.findByTestId("vk-detail-expires")).textContent).toBe(
         "Never",
       );
     });
+  });
 
+  describe("when the key is past its expiration date", () => {
     /** @scenario "A key past its expiration date is badged Expired" */
     it("badges a key past its date as expired", async () => {
       detail.current = baseKey({ expiresAt: "2020-01-01T00:00:00.000Z" });

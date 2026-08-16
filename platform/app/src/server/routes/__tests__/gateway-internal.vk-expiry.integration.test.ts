@@ -25,7 +25,9 @@ const ORG_ID = `org-vkex-${suffix}`;
 const TEAM_ID = `team-vkex-${suffix}`;
 const PROJECT_ID = `proj-vkex-${suffix}`;
 const USER_ID = `usr-vkex-${suffix}`;
-// gitleaks:allow (sequential-hex HMAC fixture for the signed-route test, not a credential)
+// Sequential-hex HMAC fixture for the signed-route test, not a credential.
+// Allowlisted by path in .gitleaks.toml, alongside the sibling route suites
+// that sign with the same value.
 const SECRET = "0123456789abcdef0123456789abcdef";
 
 const DAY_MS = 24 * 60 * 60 * 1000;

@@ -120,7 +120,11 @@ describe("resolveEligible", () => {
   describe("when the provider lives at the organization and the key at a project", () => {
     /** @scenario An org-scoped provider inherited into a project is attributed to the organization */
     it("attributes the provider to the organization it is defined at", () => {
-      const [row] = resolveEligible(keyAtProject, [orgProvider], hierarchy);
+      const [row] = resolveEligible({
+        scopes: keyAtProject,
+        providers: [orgProvider],
+        hierarchy,
+      });
 
       expect(row?.definedAt).toEqual({
         scopeType: "ORGANIZATION",
@@ -132,9 +136,9 @@ describe("resolveEligible", () => {
   describe("when the provider is attached at every tier the key reaches", () => {
     /** @scenario A provider reachable through several tiers is attributed to the broadest one */
     it("attributes it to the broadest tier", () => {
-      const [row] = resolveEligible(
-        keyAtProject,
-        [
+      const [row] = resolveEligible({
+        scopes: keyAtProject,
+        providers: [
           {
             ...orgProvider,
             scopes: [
@@ -145,7 +149,7 @@ describe("resolveEligible", () => {
           },
         ],
         hierarchy,
-      );
+      });
 
       expect(row?.definedAt).toEqual({
         scopeType: "ORGANIZATION",
@@ -156,9 +160,9 @@ describe("resolveEligible", () => {
     /** @scenario The same provider is never listed twice */
     it("returns it once", () => {
       expect(
-        resolveEligible(
-          keyAtProject,
-          [
+        resolveEligible({
+          scopes: keyAtProject,
+          providers: [
             {
               ...orgProvider,
               scopes: [
@@ -169,7 +173,7 @@ describe("resolveEligible", () => {
             },
           ],
           hierarchy,
-        ),
+        }),
       ).toHaveLength(1);
     });
   });
@@ -178,11 +182,11 @@ describe("resolveEligible", () => {
     /** @scenario A provider an admin turned off is not offered to a new key */
     it("leaves it out", () => {
       expect(
-        resolveEligible(
-          keyAtProject,
-          [{ ...orgProvider, enabled: false }],
+        resolveEligible({
+          scopes: keyAtProject,
+          providers: [{ ...orgProvider, enabled: false }],
           hierarchy,
-        ),
+        }),
       ).toEqual([]);
     });
   });
@@ -191,11 +195,13 @@ describe("resolveEligible", () => {
     /** @scenario A provider an admin removed is not offered to a new key */
     it("leaves it out", () => {
       expect(
-        resolveEligible(
-          keyAtProject,
-          [{ ...orgProvider, disabledAt: new Date("2026-07-01T00:00:00Z") }],
+        resolveEligible({
+          scopes: keyAtProject,
+          providers: [
+            { ...orgProvider, disabledAt: new Date("2026-07-01T00:00:00Z") },
+          ],
           hierarchy,
-        ),
+        }),
       ).toEqual([]);
     });
   });
@@ -204,7 +210,13 @@ describe("resolveEligible", () => {
     it("fails closed rather than advertising it", () => {
       const { enabled: _dropped, ...noSignal } = orgProvider;
 
-      expect(resolveEligible(keyAtProject, [noSignal], hierarchy)).toEqual([]);
+      expect(
+        resolveEligible({
+          scopes: keyAtProject,
+          providers: [noSignal],
+          hierarchy,
+        }),
+      ).toEqual([]);
     });
   });
 
@@ -221,39 +233,43 @@ describe("resolveEligible", () => {
     /** @scenario "The provider panel shows what the key may use, not what its scope reaches" */
     it("narrows the answer to the providers the key may hold", () => {
       expect(
-        resolveEligible(
-          keyAtProject,
-          [orgProvider, secondProvider],
+        resolveEligible({
+          scopes: keyAtProject,
+          providers: [orgProvider, secondProvider],
           hierarchy,
-          ["mp-project"],
-        ).map((p) => p.id),
+          providersAllowed: ["mp-project"],
+        }).map((p) => p.id),
       ).toEqual(["mp-project"]);
     });
 
     it("answers with everything in scope when the list is absent or empty", () => {
       const everything = ["mp-org", "mp-project"];
       expect(
-        resolveEligible(keyAtProject, [orgProvider, secondProvider], hierarchy)
+        resolveEligible({
+          scopes: keyAtProject,
+          providers: [orgProvider, secondProvider],
+          hierarchy,
+        })
           .map((p) => p.id)
           .sort(),
       ).toEqual(everything);
       expect(
-        resolveEligible(
-          keyAtProject,
-          [orgProvider, secondProvider],
+        resolveEligible({
+          scopes: keyAtProject,
+          providers: [orgProvider, secondProvider],
           hierarchy,
-          null,
-        )
+          providersAllowed: null,
+        })
           .map((p) => p.id)
           .sort(),
       ).toEqual(everything);
       expect(
-        resolveEligible(
-          keyAtProject,
-          [orgProvider, secondProvider],
+        resolveEligible({
+          scopes: keyAtProject,
+          providers: [orgProvider, secondProvider],
           hierarchy,
-          [],
-        )
+          providersAllowed: [],
+        })
           .map((p) => p.id)
           .sort(),
       ).toEqual(everything);
@@ -263,12 +279,12 @@ describe("resolveEligible", () => {
       // A provider named by the key but out of its scope stays out: the
       // allowlist narrows, it does not grant.
       expect(
-        resolveEligible(
-          [{ scopeType: "TEAM" as const, scopeId: TEAM_ID }],
-          [orgProvider, secondProvider],
+        resolveEligible({
+          scopes: [{ scopeType: "TEAM" as const, scopeId: TEAM_ID }],
+          providers: [orgProvider, secondProvider],
           hierarchy,
-          ["mp-project"],
-        ),
+          providersAllowed: ["mp-project"],
+        }),
       ).toEqual([]);
     });
   });
@@ -311,7 +327,11 @@ describe("resolveEligible", () => {
 
     /** @scenario Provider access lists organization scope before team before project */
     it("lists organization first, then team, then project, by name within a scope", () => {
-      const rows = resolveEligible(keyAtProject, mixedTierProviders, hierarchy);
+      const rows = resolveEligible({
+        scopes: keyAtProject,
+        providers: mixedTierProviders,
+        hierarchy,
+      });
 
       expect(rows.map((r) => r.label)).toEqual([
         "Alpha Org",

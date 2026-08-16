@@ -4464,6 +4464,50 @@
               }
             }
           },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
           "500": {
             "description": "Internal Server Error",
             "content": {
@@ -4559,10 +4603,30 @@
                     "type": "object",
                     "properties": {
                       "start": {
-                        "type": "string"
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ]
                       },
                       "end": {
-                        "type": "string"
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ]
                       }
                     },
                     "required": [
@@ -6085,7 +6149,8 @@
                     "maxLength": 200
                   },
                   "definition": {}
-                }
+                },
+                "minProperties": 1
               }
             }
           }
@@ -17129,28 +17194,33 @@
                             "type": "string"
                           },
                           "created_at": {
-                            "type": "string"
+                            "type": "string",
+                            "format": "date-time"
                           },
                           "updated_at": {
-                            "type": "string"
+                            "type": "string",
+                            "format": "date-time"
                           },
                           "last_used_at": {
                             "type": [
                               "string",
                               "null"
-                            ]
+                            ],
+                            "format": "date-time"
                           },
                           "revoked_at": {
                             "type": [
                               "string",
                               "null"
-                            ]
+                            ],
+                            "format": "date-time"
                           },
                           "expires_at": {
                             "type": [
                               "string",
                               "null"
                             ],
+                            "format": "date-time",
                             "description": "When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended."
                           }
                         },
@@ -17540,28 +17610,33 @@
                           "type": "string"
                         },
                         "created_at": {
-                          "type": "string"
+                          "type": "string",
+                          "format": "date-time"
                         },
                         "updated_at": {
-                          "type": "string"
+                          "type": "string",
+                          "format": "date-time"
                         },
                         "last_used_at": {
                           "type": [
                             "string",
                             "null"
-                          ]
+                          ],
+                          "format": "date-time"
                         },
                         "revoked_at": {
                           "type": [
                             "string",
                             "null"
-                          ]
+                          ],
+                          "format": "date-time"
                         },
                         "expires_at": {
                           "type": [
                             "string",
                             "null"
                           ],
+                          "format": "date-time",
                           "description": "When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended."
                         }
                       },
@@ -18247,28 +18322,33 @@
                           "type": "string"
                         },
                         "created_at": {
-                          "type": "string"
+                          "type": "string",
+                          "format": "date-time"
                         },
                         "updated_at": {
-                          "type": "string"
+                          "type": "string",
+                          "format": "date-time"
                         },
                         "last_used_at": {
                           "type": [
                             "string",
                             "null"
-                          ]
+                          ],
+                          "format": "date-time"
                         },
                         "revoked_at": {
                           "type": [
                             "string",
                             "null"
-                          ]
+                          ],
+                          "format": "date-time"
                         },
                         "expires_at": {
                           "type": [
                             "string",
                             "null"
                           ],
+                          "format": "date-time",
                           "description": "When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended."
                         }
                       },
@@ -18662,28 +18742,33 @@
                           "type": "string"
                         },
                         "created_at": {
-                          "type": "string"
+                          "type": "string",
+                          "format": "date-time"
                         },
                         "updated_at": {
-                          "type": "string"
+                          "type": "string",
+                          "format": "date-time"
                         },
                         "last_used_at": {
                           "type": [
                             "string",
                             "null"
-                          ]
+                          ],
+                          "format": "date-time"
                         },
                         "revoked_at": {
                           "type": [
                             "string",
                             "null"
-                          ]
+                          ],
+                          "format": "date-time"
                         },
                         "expires_at": {
                           "type": [
                             "string",
                             "null"
                           ],
+                          "format": "date-time",
                           "description": "When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended."
                         }
                       },
@@ -19664,28 +19749,33 @@
                           "type": "string"
                         },
                         "created_at": {
-                          "type": "string"
+                          "type": "string",
+                          "format": "date-time"
                         },
                         "updated_at": {
-                          "type": "string"
+                          "type": "string",
+                          "format": "date-time"
                         },
                         "last_used_at": {
                           "type": [
                             "string",
                             "null"
-                          ]
+                          ],
+                          "format": "date-time"
                         },
                         "revoked_at": {
                           "type": [
                             "string",
                             "null"
-                          ]
+                          ],
+                          "format": "date-time"
                         },
                         "expires_at": {
                           "type": [
                             "string",
                             "null"
                           ],
+                          "format": "date-time",
                           "description": "When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended."
                         }
                       },
@@ -20042,28 +20132,33 @@
                           "type": "string"
                         },
                         "created_at": {
-                          "type": "string"
+                          "type": "string",
+                          "format": "date-time"
                         },
                         "updated_at": {
-                          "type": "string"
+                          "type": "string",
+                          "format": "date-time"
                         },
                         "last_used_at": {
                           "type": [
                             "string",
                             "null"
-                          ]
+                          ],
+                          "format": "date-time"
                         },
                         "revoked_at": {
                           "type": [
                             "string",
                             "null"
-                          ]
+                          ],
+                          "format": "date-time"
                         },
                         "expires_at": {
                           "type": [
                             "string",
                             "null"
                           ],
+                          "format": "date-time",
                           "description": "When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended."
                         }
                       },
@@ -20433,28 +20528,33 @@
                           "type": "string"
                         },
                         "created_at": {
-                          "type": "string"
+                          "type": "string",
+                          "format": "date-time"
                         },
                         "updated_at": {
-                          "type": "string"
+                          "type": "string",
+                          "format": "date-time"
                         },
                         "last_used_at": {
                           "type": [
                             "string",
                             "null"
-                          ]
+                          ],
+                          "format": "date-time"
                         },
                         "revoked_at": {
                           "type": [
                             "string",
                             "null"
-                          ]
+                          ],
+                          "format": "date-time"
                         },
                         "expires_at": {
                           "type": [
                             "string",
                             "null"
                           ],
+                          "format": "date-time",
                           "description": "When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended."
                         }
                       },
@@ -20807,28 +20907,33 @@
                           "type": "string"
                         },
                         "created_at": {
-                          "type": "string"
+                          "type": "string",
+                          "format": "date-time"
                         },
                         "updated_at": {
-                          "type": "string"
+                          "type": "string",
+                          "format": "date-time"
                         },
                         "last_used_at": {
                           "type": [
                             "string",
                             "null"
-                          ]
+                          ],
+                          "format": "date-time"
                         },
                         "revoked_at": {
                           "type": [
                             "string",
                             "null"
-                          ]
+                          ],
+                          "format": "date-time"
                         },
                         "expires_at": {
                           "type": [
                             "string",
                             "null"
                           ],
+                          "format": "date-time",
                           "description": "When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended."
                         }
                       },

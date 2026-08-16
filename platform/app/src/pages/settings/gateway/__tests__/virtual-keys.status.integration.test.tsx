@@ -179,9 +179,24 @@ describe("virtual keys status column", () => {
     });
 
     /** @scenario "A key past its expiration date is badged Expired" */
-    it("reports the stored stop first for a revoked key that also ran out", () => {
+    it("reports the stored stop first for a revoked key that also ran out", async () => {
+      // Chakra's tabs switch on a real click, which fake timers stall.
+      vi.useRealTimers();
       renderPage();
+
+      // The row lives on the Revoked tab, so the badge only proves the
+      // precedence once that tab is the one on screen.
       expect(screen.queryByTestId("vk-status-vk-gone")).not.toBeInTheDocument();
+      await userEvent.click(screen.getByRole("tab", { name: /Revoked/ }));
+
+      await waitFor(() =>
+        expect(screen.getByTestId("vk-status-vk-gone")).toHaveTextContent(
+          "revoked",
+        ),
+      );
+      expect(screen.getByTestId("vk-status-vk-gone")).not.toHaveTextContent(
+        "expired",
+      );
     });
   });
 

@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -126,14 +125,23 @@ func (c *Client) ResolveKey(ctx context.Context, rawKey string) (*domain.Bundle,
 		// The control plane distinguishes the reversible disable and the
 		// self-serve expiry from the one-way revoke in its error code;
 		// forward the distinction so neither tenant is told its credential
-		// is gone for good. An unrecognized 403 still reads as revoked,
-		// which is the safe answer for a gateway older than the code.
-		if strings.Contains(string(respBody), "virtual_key_disabled") {
+		// is gone for good. The decoded code decides it, never a substring
+		// of the body: the human-readable message travels in the same
+		// payload and may name a code this is not. An unrecognized or
+		// undecodable 403 still reads as revoked, which is the safe answer
+		// for a gateway older than the code.
+		var rejection struct {
+			Error struct {
+				Code string `json:"code"`
+			} `json:"error"`
+		}
+		_ = json.Unmarshal(respBody, &rejection)
+		switch rejection.Error.Code {
+		case "virtual_key_disabled":
 			return nil, herr.New(ctx, domain.ErrKeyDisabled, herr.M{
 				"message": "This key is disabled. An administrator can re-enable it; the key material is unchanged.",
 			})
-		}
-		if strings.Contains(string(respBody), "virtual_key_expired") {
+		case "virtual_key_expired":
 			return nil, herr.New(ctx, domain.ErrKeyExpired, herr.M{
 				"message": "This key has expired. Extend its expiration date, or create a new key.",
 			})

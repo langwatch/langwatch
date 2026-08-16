@@ -369,7 +369,7 @@ describe("given the edit drawer for an existing key", () => {
 
   describe("when the key carries an expiration date", () => {
     /** @scenario "The edit drawer round-trips the stored date" */
-    it("shows the stored day and sends the same instant back untouched", async () => {
+    it("shows the stored day and sends no date back untouched", async () => {
       renderDrawer({ expiresAt: "2030-08-20T09:15:00.000Z" });
 
       await waitFor(() =>
@@ -383,11 +383,27 @@ describe("given the edit drawer for an existing key", () => {
       ).toBe("2030-08-20");
 
       await save();
-      // Untouched means untouched: re-resolving the day would silently
-      // push the key's last minutes to the end of that day.
-      expect((lastUpdateInput().expiresAt as Date).toISOString()).toBe(
-        "2030-08-20T09:15:00.000Z",
+      // Untouched means untouched: the field is left out, so the stored
+      // instant stays exactly where it is. Re-resolving the day would
+      // push the key's last minutes to the end of that day instead.
+      expect("expiresAt" in lastUpdateInput()).toBe(false);
+    });
+
+    /** @scenario "An expired key can still be edited so the date can be extended" */
+    it("leaves a passed date out, so an unrelated edit to an expired key saves", async () => {
+      renderDrawer({ expiresAt: "2020-01-01T00:00:00.000Z" });
+
+      const nameInput = await waitFor(() =>
+        screen.getByDisplayValue("legacy-key"),
       );
+      await userEvent.clear(nameInput);
+      await userEvent.type(nameInput, "renamed-key");
+
+      await save();
+      // A resent past date fails the server's future-date check, which
+      // would make renaming an expired key impossible.
+      expect("expiresAt" in lastUpdateInput()).toBe(false);
+      expect(lastUpdateInput().name).toBe("renamed-key");
     });
 
     it("clears the date when the choice moves back to Never", async () => {
@@ -430,7 +446,7 @@ describe("given the edit drawer for an existing key", () => {
         ).toBe(""),
       );
       await save();
-      expect(lastUpdateInput().expiresAt).toBeNull();
+      expect("expiresAt" in lastUpdateInput()).toBe(false);
     });
   });
 });

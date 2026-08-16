@@ -55,7 +55,11 @@ import {
   VirtualKeyRoutingSection,
   type VirtualKeyRoutingValue,
 } from "./VirtualKeyRoutingSection";
-import { expiryFieldErrorFrom, resolveExpiresAt } from "./virtualKeyExpiration";
+import {
+  expiryFieldErrorFrom,
+  expiryIncompleteReason,
+  resolveExpiresAt,
+} from "./virtualKeyExpiration";
 import {
   parseTagsCsv,
   TAGS_CSV_MAX_LENGTH,
@@ -187,11 +191,11 @@ export function VirtualKeyCreateDrawer({
   );
   const eligible = useMemo(
     () =>
-      resolveEligible(
+      resolveEligible({
         scopes,
         providers,
-        buildScopeHierarchy(availableProjects, organizationId),
-      ),
+        hierarchy: buildScopeHierarchy(availableProjects, organizationId),
+      }),
     [scopes, providers, availableProjects, organizationId],
   );
 
@@ -244,10 +248,7 @@ export function VirtualKeyCreateDrawer({
       eligible,
     );
     if (providerReason) return providerReason;
-    if (expiration.preset === "custom" && !expiresAt) {
-      return "Pick the date this key expires, or choose Never.";
-    }
-    return null;
+    return expiryIncompleteReason({ preset: expiration.preset, expiresAt });
   })();
 
   const handleSubmit = async () => {

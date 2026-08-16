@@ -46,6 +46,19 @@ func TestResolveKey_ForbiddenBodyDecidesTheCode(t *testing.T) {
 			body: `{"error":{"type":"virtual_key_hibernated","code":"virtual_key_hibernated","message":"?"}}`,
 			want: domain.ErrKeyRevoked,
 		},
+		{
+			// The code decides, never the prose beside it: a message is
+			// written for a person and may name any other code.
+			name: "a message naming a code the key is not",
+			body: `{"error":{"code":"virtual_key_expired","message":"not virtual_key_disabled, and not virtual_key_revoked"}}`,
+			want: domain.ErrKeyExpired,
+		},
+		{
+			// A 403 the gateway cannot read at all is still a stop.
+			name: "a body that is not the error envelope",
+			body: `forbidden`,
+			want: domain.ErrKeyRevoked,
+		},
 	}
 
 	for _, tc := range cases {

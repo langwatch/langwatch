@@ -105,7 +105,7 @@ export function EligibleModelProvidersPreview({
   }, [availableTeams, availableProjects, organizationName]);
 
   const eligible = useMemo(
-    () => resolveEligible(scopes, providers, hierarchy, providersAllowed),
+    () => resolveEligible({ scopes, providers, hierarchy, providersAllowed }),
     [scopes, providers, hierarchy, providersAllowed],
   );
   const inRoutingPolicy = useMemo(
@@ -295,7 +295,7 @@ export function EligibleModelProvidersSummary({
   }, [availableTeams, availableProjects, organizationName]);
 
   const eligible = useMemo(
-    () => resolveEligible(scopes, providers, hierarchy, providersAllowed),
+    () => resolveEligible({ scopes, providers, hierarchy, providersAllowed }),
     [scopes, providers, hierarchy, providersAllowed],
   );
 
