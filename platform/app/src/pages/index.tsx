@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useLocalStorage } from "usehooks-ts";
 import { readLastVisitedProduct } from "~/features/navigation/logic/productMemory";
 import { resolveLandingDestination } from "~/features/navigation/logic/resolveLandingDestination";
@@ -52,7 +52,19 @@ export default function Index() {
     navigationResolution.status === "ready" &&
     navigationResolution.mode !== "legacy";
 
+  // Several effect dependencies get a fresh identity per render while the
+  // target route lazy-loads, so the effect re-runs during the navigation.
+  // Repeating router.replace with the same target interrupts and restarts
+  // that navigation, which React reports as an update-depth loop. One
+  // navigation per destination; a changed destination still goes through.
+  const lastReplacedRef = useRef<string | null>(null);
+
   useEffect(() => {
+    const replaceOnce = (destination: string) => {
+      if (lastReplacedRef.current === destination) return;
+      lastReplacedRef.current = destination;
+      void router.replace(destination);
+    };
     if (navigationResolution.status === "loading") return;
     if (isV2) {
       if (resolved.data && !isReachableLoading) {
@@ -68,16 +80,16 @@ export default function Index() {
           projectSlug: project && !project.isPersonal ? project.slug : null,
         });
         if (destination) {
-          void router.replace(destination);
+          replaceOnce(destination);
           return;
         }
       }
       if (resolved.isError && project) {
-        void router.replace(`/${project.slug}`);
+        replaceOnce(`/${project.slug}`);
         return;
       }
       if (!isLoading && !organization && (organizations?.length ?? 0) === 0) {
-        void router.replace("/onboarding/welcome");
+        replaceOnce("/onboarding/welcome");
       }
       return;
     }
@@ -89,7 +101,7 @@ export default function Index() {
       // here is the last-visited project (useOrganizationTeamProject resolves
       // it from the selectedProjectSlug on a slug-less route). An explicit
       // picker pin (isOverride) always wins.
-      void router.replace(
+      replaceOnce(
         resolveHomeDestination({
           resolverDestination: resolved.data.destination,
           isOverride: resolved.data.isOverride,
@@ -105,7 +117,7 @@ export default function Index() {
       return;
     }
     if (resolved.isError && project) {
-      void router.replace(`/${project.slug}`);
+      replaceOnce(`/${project.slug}`);
       return;
     }
     // No org membership → bootstrap. Caught by Ariana QA dogfood (G73):
@@ -126,7 +138,7 @@ export default function Index() {
     // an extra page they can navigate away from, vs admin funnel
     // hitting an unrecoverable dead-end on /me).
     if (!isLoading && !organization && (organizations?.length ?? 0) === 0) {
-      void router.replace("/onboarding/welcome");
+      replaceOnce("/onboarding/welcome");
     }
   }, [
     resolved.data,

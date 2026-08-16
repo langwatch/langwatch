@@ -86,6 +86,12 @@ Feature: Landing in the new navigation modes
     Then the current home resolution applies unchanged
 
   @integration
+  Scenario: The landing redirect navigates once per destination
+    Given "/" resolved my destination
+    When the landing page renders again while the navigation is in flight
+    Then no second navigation starts for the same destination
+
+  @integration
   Scenario: A member kept in an empty organization stays put in the new modes
     Given my current organization has no project
     And another organization of mine has one

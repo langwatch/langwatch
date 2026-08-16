@@ -115,6 +115,26 @@ describe("the root landing", () => {
     });
   });
 
+  describe("when the landing page re-renders while the navigation is in flight", () => {
+    /** @scenario The landing redirect navigates once per destination */
+    it("navigates once per destination", async () => {
+      mockMode = "legacy";
+      const { rerender } = render(<Index />);
+
+      await waitFor(() => {
+        expect(replaceMock).toHaveBeenCalledWith("/demo");
+      });
+
+      // Every mocked hook above returns a fresh object per call, the way
+      // the real hooks behave while a lazy route is loading. A re-render
+      // must not restart the same navigation.
+      rerender(<Index />);
+      rerender(<Index />);
+
+      expect(replaceMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("when the device is in legacy mode", () => {
     /** @scenario The root address keeps its current behavior in legacy mode */
     it("resolves through the current home resolution, ignoring the memory", async () => {
