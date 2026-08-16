@@ -16,7 +16,7 @@
 -- to the latest version per trace (argMax / FINAL) yields the same row no
 -- matter which duplicate wins the version tie.
 -- Aggregation (per-run totals, per-role sums) is done at READ time over the
--- dedupe-safe rollup (00079) — this table stays a dumb per-trace fact log.
+-- dedupe-safe rollup (00081) — this table stays a dumb per-trace fact log.
 --
 -- No `_retention_days` column / TTL yet: retention for this table is a
 -- deliberate follow-up (it is absent from RETENTION_TABLE_CATEGORY_MAP and

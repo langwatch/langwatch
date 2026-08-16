@@ -3,7 +3,7 @@
 
 -- ============================================================================
 -- simulation_run_metrics_rollup — dedupe-safe per-trace rollup of
--- simulation_run_metrics (00078), fed by a materialized view.
+-- simulation_run_metrics (00080), fed by a materialized view.
 --
 -- Why not just read the base table: the base table's ReplacingMergeTree dedup
 -- is eventual, so every read of it must re-run the argMax-per-trace collapse
@@ -29,7 +29,7 @@
 -- hypothetical cross-partition duplicate is still collapsed at read time by
 -- argMaxMerge.
 --
--- No backfill: the base table is new in 00078 (same feature branch), so
+-- No backfill: the base table is new in 00080 (same feature branch), so
 -- there is no pre-existing data the view would miss.
 -- ============================================================================
 

@@ -80,7 +80,7 @@ read the event, not the fold.
 ### `simulation_run_metrics` table
 
 Per-trace cost/latency metrics gain a dedicated ClickHouse table (migration
-`00078_create_simulation_run_metrics.sql`), written by a new
+`00080_create_simulation_run_metrics.sql`), written by a new
 `simulationRunMetrics` map projection that appends one row per
 `metrics_computed` event. The table is a ReplacingMergeTree keyed
 `TenantId / ScenarioRunId / TraceId`, which collapses retry re-deliveries at
@@ -98,7 +98,7 @@ separate change, because it is a read-path migration with its own backfill
 question (the table starts empty, so every run that predates it would read as
 zero cost until refolded).
 
-A second migration (`00079_create_simulation_run_metrics_rollup.sql`) adds a
+A second migration (`00081_create_simulation_run_metrics_rollup.sql`) adds a
 materialized view onto an AggregatingMergeTree rollup so a read does not
 re-collapse every raw row. The states are `argMaxState`, not `sumState`,
 because a materialized view fires per inserted block: an additive state would
@@ -164,5 +164,5 @@ release cycle.
   [`specs/features/suites/cancel-queued-running-jobs.feature`](../../../specs/features/suites/cancel-queued-running-jobs.feature)
 - Code: `platform/app/src/server/event-sourcing/pipelines/simulation-processing/process-manager/`,
   `.../subscribers/`, `.../projections/simulationRunMetrics.mapProjection.ts`,
-  `platform/app/src/server/clickhouse/migrations/00078_create_simulation_run_metrics.sql`,
-  `platform/app/src/server/clickhouse/migrations/00079_create_simulation_run_metrics_rollup.sql`
+  `platform/app/src/server/clickhouse/migrations/00080_create_simulation_run_metrics.sql`,
+  `platform/app/src/server/clickhouse/migrations/00081_create_simulation_run_metrics_rollup.sql`
