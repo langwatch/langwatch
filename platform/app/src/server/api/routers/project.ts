@@ -17,12 +17,12 @@ import {
   personalWorkspaceCreateViolation,
   personalWorkspaceMoveViolation,
 } from "~/server/app-layer/projects/project.service";
+import { mintProjectSlug } from "~/server/app-layer/projects/projectSlug";
 import type { Session } from "~/server/auth";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { encrypt } from "~/utils/encryption";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { slugify } from "~/utils/slugify";
-import { mintProjectSlug } from "~/server/app-layer/projects/projectSlug";
 import { generateApiKey } from "../../utils/apiKeyGenerator";
 import {
   checkOrganizationPermission,

@@ -365,9 +365,7 @@ function VirtualKeysPage() {
                             cursor="pointer"
                             _hover={{ bg: "bg.subtle" }}
                             onClick={() =>
-                              void router.push(
-                                `/gateway/virtual-keys/${vk.id}`,
-                              )
+                              void router.push(`/gateway/virtual-keys/${vk.id}`)
                             }
                           >
                             <Table.Cell>

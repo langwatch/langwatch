@@ -133,11 +133,7 @@ function BudgetDetailPage() {
       <>
         <PageLayout.Header>
           <HStack>
-            <Link
-              href={`/gateway/budgets`}
-              color="fg.muted"
-              fontSize="sm"
-            >
+            <Link href={`/gateway/budgets`} color="fg.muted" fontSize="sm">
               <HStack gap={1}>
                 <ArrowLeft size={14} /> Budgets
               </HStack>
@@ -555,9 +551,7 @@ function ScopeBadge({
 }) {
   const kindLabel = target.kind.toLowerCase().replaceAll("_", " ");
   const vkHref =
-    target.kind === "VIRTUAL_KEY"
-      ? `/gateway/virtual-keys/${target.id}`
-      : null;
+    target.kind === "VIRTUAL_KEY" ? `/gateway/virtual-keys/${target.id}` : null;
   return (
     <HStack gap={2} align="baseline">
       <Badge colorPalette="gray">{kindLabel}</Badge>

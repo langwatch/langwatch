@@ -149,7 +149,9 @@ describe("PresenceMenuItem", () => {
       expect(layoutSrc).toMatch(
         /showPresenceMenuItem\s*=\s*router\.pathname\.startsWith\("\/\[project\]\/traces"\)/,
       );
-      expect(layoutSrc).toMatch(/showPresenceMenuItem=\{showPresenceMenuItem\}/);
+      expect(layoutSrc).toMatch(
+        /showPresenceMenuItem=\{showPresenceMenuItem\}/,
+      );
       // The avatar menu was extracted to AppHeaderUserMenu; it renders
       // the entry only when the gate is passed in true.
       const menuSrc = readFileSync(

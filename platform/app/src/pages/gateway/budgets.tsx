@@ -223,16 +223,12 @@ function BudgetsPage() {
                             cursor="pointer"
                             _hover={{ bg: "bg.subtle" }}
                             onClick={() =>
-                              void router.push(
-                                `/gateway/budgets/${b.id}`,
-                              )
+                              void router.push(`/gateway/budgets/${b.id}`)
                             }
                           >
                             <Table.Cell>
                               <VStack align="start" gap={0}>
-                                <Link
-                                  href={`/gateway/budgets/${b.id}`}
-                                >
+                                <Link href={`/gateway/budgets/${b.id}`}>
                                   <Text fontWeight="medium">{b.name}</Text>
                                 </Link>
                                 {b.description && (
