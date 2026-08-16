@@ -16,7 +16,6 @@ import {
   ChevronRight,
   Info,
   KeyRound,
-  Monitor,
   Plus,
 } from "lucide-react";
 import numeral from "numeral";
@@ -40,12 +39,10 @@ import {
 import Head from "~/utils/compat/next-head";
 import { useRouter } from "~/utils/compat/next-router";
 import { ImpersonationBanner } from "../../ee/admin/ImpersonationBanner";
-import { ImpersonationSwitchBackMenuItem } from "../../ee/admin/ImpersonationSwitchBackMenuItem";
 import { CommandBarTrigger } from "../features/command-bar";
+import { useNavigationMode } from "../features/navigation/useNavigationMode";
 import { GlobalTraceV2DrawerMount } from "../features/traces-v2/components/GlobalTraceV2DrawerMount";
 import { useDrawer } from "../hooks/useDrawer";
-import { useFeatureFlag } from "../hooks/useFeatureFlag";
-import { useLiteMemberGuard } from "../hooks/useLiteMemberGuard";
 import {
   useOrganizationTeamProject,
   userBelongsToTeam,
@@ -57,10 +54,6 @@ import { usePublicEnv } from "../hooks/usePublicEnv";
 import { useRequiredSession } from "../hooks/useRequiredSession";
 import { SavedViewsProvider } from "../hooks/useSavedViews";
 import type { FullyLoadedOrganization } from "../server/app-layer/organizations/repositories/organization.repository";
-import {
-  type GraphicsQualityOverride,
-  useGraphicsQualityOverrideStore,
-} from "../stores/graphicsQualityOverrideStore";
 import { api } from "../utils/api";
 import {
   buildProjectSwitchHref,
@@ -70,6 +63,7 @@ import {
 } from "../utils/routes";
 import { trackEvent } from "../utils/tracking";
 import { AnnouncementBanner } from "./AnnouncementBanner";
+import { AppHeaderUserMenu } from "./AppHeaderUserMenu";
 import { CurrentDrawer } from "./CurrentDrawer";
 import { AdminViewingAsBanner } from "./governance/AdminViewingAsBanner";
 import { FullLogo } from "./icons/FullLogo";
@@ -79,20 +73,12 @@ import { MainMenu, MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "./MainMenu";
 import { SavedViewsBar } from "./messages/SavedViewsBar";
 import { PersonalSidebar } from "./PersonalSidebar";
 import { ProjectAvatar } from "./ProjectAvatar";
-import { PresenceMenuItem } from "./sidebar/PresenceMenuItem";
 import { GlobalUpgradeModal } from "./UpgradeModal";
-import { UserAvatar } from "./UserAvatar";
 import { Link } from "./ui/link";
 import { Menu } from "./ui/menu";
 import { PageErrorFallback } from "./ui/PageErrorFallback";
 import { useWorkspaceData } from "./useWorkspaceData";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
-
-const GRAPHICS_OVERRIDE_LABELS: Record<GraphicsQualityOverride, string> = {
-  auto: "Auto",
-  on: "On",
-  off: "Off",
-};
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   // No redirects from the breadcrumb path - it only reads `project` for the
@@ -416,7 +402,30 @@ export type DashboardLayoutProps = {
   pageTitle?: string;
 } & StackProps;
 
-export const DashboardLayout = ({
+/**
+ * Entry point for the dashboard chrome. Dispatches on the device's
+ * navigation mode (specs/navigation/navigation-modes.feature): legacy
+ * renders the current chrome synchronously, and a device on a v2 mode
+ * shows the loading screen until the flag answers so the old chrome
+ * never flashes. Public pages never consult the mode — they carry no
+ * session to resolve a flag against.
+ */
+export const DashboardLayout = (dashboardProps: DashboardLayoutProps) => {
+  if (dashboardProps.publicPage) {
+    return <LegacyDashboardLayout {...dashboardProps} />;
+  }
+  return <ModeResolvedDashboardLayout {...dashboardProps} />;
+};
+
+const ModeResolvedDashboardLayout = (dashboardProps: DashboardLayoutProps) => {
+  const resolution = useNavigationMode();
+  if (resolution.status === "loading") return <LoadingScreen />;
+  // The v2 shells land in a follow-up step of the navigation-v2 work;
+  // until they mount here, every resolved mode renders the legacy chrome.
+  return <LegacyDashboardLayout {...dashboardProps} />;
+};
+
+export const LegacyDashboardLayout = ({
   children,
   publicPage = false,
   compactMenu: compactMenuProp = false,
@@ -456,7 +465,6 @@ export const DashboardLayout = ({
     redirectToOnboarding: !bypassProjectGating,
     redirectToProjectOnboarding: !bypassProjectGating,
   });
-  const { isLiteMember } = useLiteMemberGuard();
   const usage = api.limits.getUsage.useQuery(
     { organizationId: organization?.id ?? "" },
     {
@@ -471,23 +479,6 @@ export const DashboardLayout = ({
   const { data: ssoStatus } = api.user.getSsoStatus.useQuery(
     {},
     { enabled: !!session },
-  );
-  // The "My Workspace" entry in the user-avatar dropdown is part of the
-  // governance preview surface, distinct from the existing AI Gateway
-  // menu (which keeps shipping unblocked under release_ui_ai_gateway_menu_enabled).
-  // The flag is org-targeted, so it must resolve on the org id - gating on
-  // project would diverge from the /me pages (which key off the org) and
-  // show the menu entry while the page it links to 404s.
-  const { enabled: governancePreviewEnabled } = useFeatureFlag(
-    "release_ui_ai_governance_enabled",
-    { organizationId: organization?.id, enabled: !!organization?.id },
-  );
-
-  const graphicsQualityOverride = useGraphicsQualityOverrideStore(
-    (s) => s.override,
-  );
-  const setGraphicsQualityOverride = useGraphicsQualityOverrideStore(
-    (s) => s.setOverride,
   );
 
   usePostHogIdentify({
@@ -794,110 +785,10 @@ export const DashboardLayout = ({
           {/* Command bar trigger */}
           {project && <CommandBarTrigger />}
 
-          <Menu.Root>
-            <Menu.Trigger asChild>
-              <Button
-                variant="ghost"
-                size="xs"
-                padding={0}
-                minWidth="auto"
-                height="auto"
-                borderRadius="full"
-                aria-label={
-                  publicPage
-                    ? "Sign in"
-                    : user?.name
-                      ? `Open user menu for ${user.name}`
-                      : "Open user menu"
-                }
-                {...(publicPage
-                  ? {
-                      // On a public share page, clicking the avatar offers
-                      // sign-in. Route to the signin page with the current
-                      // URL as callbackUrl so the UI picks the right provider
-                      // from `publicEnv.NEXTAUTH_PROVIDER`. The old version
-                      // hardcoded `signIn("auth0")` which broke for on-prem
-                      // (email mode), google, gitlab, etc.
-                      onClick: () => {
-                        if (typeof window !== "undefined") {
-                          const callbackUrl = encodeURIComponent(
-                            window.location.pathname + window.location.search,
-                          );
-                          window.location.href = `/auth/signin?callbackUrl=${callbackUrl}`;
-                        }
-                      },
-                    }
-                  : {})}
-              >
-                <UserAvatar
-                  name={user?.name ?? undefined}
-                  image={user?.image ?? undefined}
-                  size="xs"
-                  backgroundColor="orange.400"
-                  color="white"
-                  width="28px"
-                  height="28px"
-                />
-              </Button>
-            </Menu.Trigger>
-            {session && (
-              <Portal>
-                <Menu.Content>
-                  <ImpersonationSwitchBackMenuItem />
-                  <Menu.ItemGroup
-                    title={`${session.user.name} (${session.user.email})`}
-                  >
-                    {governancePreviewEnabled && (
-                      <Menu.Item value="my-workspace" asChild>
-                        <Link href="/me">My Workspace</Link>
-                      </Menu.Item>
-                    )}
-                    {!isLiteMember && (
-                      <Menu.Item value="api-keys" asChild>
-                        <Link href="/settings/api-keys">API Keys</Link>
-                      </Menu.Item>
-                    )}
-                    <Menu.Item value="settings" asChild>
-                      <Link href="/settings">Settings</Link>
-                    </Menu.Item>
-                    <Menu.Root
-                      positioning={{ placement: "right-start", gutter: 2 }}
-                    >
-                      <Menu.TriggerItem value="reduced-graphics">
-                        <Monitor size={14} />
-                        Reduced graphics (
-                        {GRAPHICS_OVERRIDE_LABELS[graphicsQualityOverride]})
-                      </Menu.TriggerItem>
-                      <Menu.Content>
-                        <Menu.RadioItemGroup
-                          value={graphicsQualityOverride}
-                          onValueChange={(e) =>
-                            setGraphicsQualityOverride(
-                              e.value as GraphicsQualityOverride,
-                            )
-                          }
-                        >
-                          <Menu.RadioItem value="auto">
-                            Auto — adapts to this device on its own
-                          </Menu.RadioItem>
-                          <Menu.RadioItem value="on">
-                            On — always keep things responsive
-                          </Menu.RadioItem>
-                          <Menu.RadioItem value="off">
-                            Off — always show full decorative effects
-                          </Menu.RadioItem>
-                        </Menu.RadioItemGroup>
-                      </Menu.Content>
-                    </Menu.Root>
-                    {showPresenceMenuItem && <PresenceMenuItem />}
-                    <Menu.Item value="logout" asChild>
-                      <a href="/api/auth/logout">Logout</a>
-                    </Menu.Item>
-                  </Menu.ItemGroup>
-                </Menu.Content>
-              </Portal>
-            )}
-          </Menu.Root>
+          <AppHeaderUserMenu
+            publicPage={publicPage}
+            showPresenceMenuItem={showPresenceMenuItem}
+          />
         </HStack>
       </HStack>
 

@@ -66,6 +66,13 @@ Feature: Navigation modes behind one flag
     Then the device remembers "icon-rail" for the next visit
 
   @integration
+  Scenario: The avatar menu offers the three navigation modes
+    Given the navigation flag is on for me
+    When I open the avatar menu
+    Then a "Navigation" entry shows the current mode
+    And it offers "Old navigation", "Product switcher" and "Icon rail"
+
+  @integration
   Scenario: Flag off keeps the current chrome unchanged
     Given the navigation flag is off for me
     When I open any project page

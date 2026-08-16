@@ -18,6 +18,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 let mockPathname = "/[project]";
 let mockNavigationV2FlagEnabled = false;
+let mockNavigationV2FlagLoading = false;
 
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
@@ -71,8 +72,20 @@ vi.mock("~/hooks/useFeatureFlag", () => ({
       flag === "release_ui_navigation_v2_enabled"
         ? mockNavigationV2FlagEnabled
         : true,
-    isLoading: false,
+    isLoading:
+      flag === "release_ui_navigation_v2_enabled"
+        ? mockNavigationV2FlagLoading
+        : false,
   }),
+}));
+
+const trackEventMock = vi.fn();
+vi.mock("~/utils/tracking", () => ({
+  trackEvent: (...args: unknown[]) => trackEventMock(...args),
+}));
+
+vi.mock("../LoadingScreen", () => ({
+  LoadingScreen: () => <div data-testid="loading-screen" />,
 }));
 
 vi.mock("~/hooks/usePublicEnv", () => ({
@@ -169,6 +182,7 @@ vi.mock("../sidebar/PresenceMenuItem", () => ({
   PresenceMenuItem: () => null,
 }));
 
+import { useNavigationModeStore } from "~/features/navigation/navigationModeStore";
 import { DashboardLayout } from "../DashboardLayout";
 
 function renderLayout(props: Record<string, unknown> = {}) {
@@ -193,6 +207,10 @@ async function openAvatarMenu() {
 beforeEach(() => {
   mockPathname = "/[project]";
   mockNavigationV2FlagEnabled = false;
+  mockNavigationV2FlagLoading = false;
+  trackEventMock.mockReset();
+  localStorage.clear();
+  useNavigationModeStore.setState({ storedMode: "legacy" });
 });
 
 afterEach(() => {
@@ -233,7 +251,76 @@ describe("legacy dashboard chrome", () => {
       expect(screen.getByText("Settings")).toBeInTheDocument();
       expect(screen.getByText(/Reduced graphics/)).toBeInTheDocument();
       expect(screen.getByText("Logout")).toBeInTheDocument();
-      expect(screen.queryByText("Navigation")).not.toBeInTheDocument();
+      expect(screen.queryByText(/^Navigation \(/)).not.toBeInTheDocument();
+    });
+  });
+});
+
+describe("navigation mode dispatcher", () => {
+  describe("when the device stored a v2 mode and the flag has not answered", () => {
+    /** @scenario A device set to a new mode waits for the flag instead of flashing the old chrome */
+    it("shows the loading screen instead of any chrome", () => {
+      useNavigationModeStore.setState({ storedMode: "icon-rail" });
+      mockNavigationV2FlagLoading = true;
+      renderLayout();
+
+      expect(screen.getByTestId("loading-screen")).toBeInTheDocument();
+      expect(screen.queryByTestId("main-menu")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("page-body")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when the device stored a v2 mode and the flag is off", () => {
+    /** @scenario The flag off falls back to legacy and keeps the preference */
+    it("renders the legacy chrome", () => {
+      useNavigationModeStore.setState({ storedMode: "icon-rail" });
+      mockNavigationV2FlagEnabled = false;
+      renderLayout();
+
+      expect(screen.getByTestId("main-menu")).toBeInTheDocument();
+      expect(screen.getByTestId("page-body")).toBeInTheDocument();
+    });
+  });
+});
+
+describe("avatar menu navigation submenu", () => {
+  describe("when the navigation flag is on", () => {
+    /** @scenario The avatar menu offers the three navigation modes */
+    it("shows the Navigation entry with the current mode", async () => {
+      mockNavigationV2FlagEnabled = true;
+      renderLayout();
+      await openAvatarMenu();
+
+      expect(
+        screen.getByText("Navigation (Old navigation)"),
+      ).toBeInTheDocument();
+    });
+
+    /** @scenario Picking a mode persists on the device */
+    it("persists a picked mode and reports the change", async () => {
+      mockNavigationV2FlagEnabled = true;
+      renderLayout();
+      const user = await openAvatarMenu();
+
+      await user.click(screen.getByText("Navigation (Old navigation)"));
+      await waitFor(() => {
+        expect(
+          screen.getByRole("menuitemradio", { name: "Icon rail" }),
+        ).toBeInTheDocument();
+      });
+      await user.click(
+        screen.getByRole("menuitemradio", { name: "Icon rail" }),
+      );
+
+      await waitFor(() => {
+        expect(useNavigationModeStore.getState().storedMode).toBe("icon-rail");
+      });
+      expect(localStorage.getItem("langwatch:navigation-mode:v1")).toBe(
+        "icon-rail",
+      );
+      expect(trackEventMock).toHaveBeenCalledWith("navigation_mode_change", {
+        mode: "icon-rail",
+      });
     });
   });
 });
