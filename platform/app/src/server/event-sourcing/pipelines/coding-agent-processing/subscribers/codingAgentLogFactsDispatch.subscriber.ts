@@ -3,6 +3,7 @@ import { extractSessionTitleFromResponseBody } from "~/server/app-layer/traces/c
 import type { EventSubscriberDefinition } from "../../../subscribers/eventSubscriber.types";
 import { CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE } from "../../log-processing/schemas/constants";
 import type { LogProcessingEvent } from "../../log-processing/schemas/events";
+import { LOGS_REQUIRE_SESSION_KEY_AGENT_IDS } from "../agents";
 import type { ContributeLogFactsCommandData } from "../schemas/commands";
 import {
   declaredCodingAgent,
@@ -100,6 +101,13 @@ export function createCodingAgentLogFactsDispatchSubscriber(deps: {
         record.correlationSource !== "none" && record.correlationTraceId
           ? record.correlationTraceId
           : null;
+
+      // An agent that stamps its session id on every session event (codex)
+      // gets no trace fallback: a keyless record of theirs is ambient
+      // process telemetry — an auth refresh, not a session — and keying it
+      // on the trace would mint an empty one-record session.
+      if (sessionKey === null && LOGS_REQUIRE_SESSION_KEY_AGENT_IDS.has(agent))
+        return;
 
       // No session key and no correlation: there is nothing to aggregate
       // under. The canonical row still holds the record.

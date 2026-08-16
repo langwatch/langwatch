@@ -85,6 +85,10 @@ function describe(
       return `Sub-agent invoked${attrs.subagent_type ? `: ${attrs.subagent_type}` : ""}`;
     case "commit":
       return "Commit created";
+    case "turn_ttft":
+      return attrs.duration_ms
+        ? `First token after ${attrs.duration_ms} ms`
+        : "First token timing reported";
     default: {
       const exhaustive: never = event;
       return exhaustive;
