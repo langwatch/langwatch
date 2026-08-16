@@ -228,6 +228,7 @@ export function TargetSelector({
                 filteredAgents.map((agent) => (
                   <HStack
                     key={agent.id}
+                    data-testid={`target-option-${agent.id}`}
                     paddingX={3}
                     paddingY={2}
                     cursor="pointer"

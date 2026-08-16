@@ -2005,7 +2005,7 @@ describe("prefetchScenarioData", () => {
     });
   });
 
-  describe("trace wait budget", () => {
+  describe("when the prefetcher sizes the trace wait budget", () => {
     const httpDeps = (budgetMs: number) =>
       createMockDeps({
         agentFetcher: {

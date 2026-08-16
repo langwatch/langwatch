@@ -189,10 +189,12 @@ describe("RunScenarioModal with TargetSelector", () => {
       // Only the agent carrying the devTunnel marker gets the badge.
       const badges = screen.getAllByText("Local tunnel");
       expect(badges).toHaveLength(1);
-      const tunneledRow = screen.getByText("Test HTTP Agent").closest("div");
-      expect(tunneledRow).toHaveTextContent("Local tunnel");
-      const plainRow = screen.getByText("Test Code Agent").closest("div");
-      expect(plainRow).not.toHaveTextContent("Local tunnel");
+      expect(screen.getByTestId("target-option-agent-1")).toHaveTextContent(
+        "Local tunnel",
+      );
+      expect(screen.getByTestId("target-option-agent-2")).not.toHaveTextContent(
+        "Local tunnel",
+      );
     });
   });
 

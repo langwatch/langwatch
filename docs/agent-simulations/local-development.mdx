@@ -38,7 +38,7 @@ If the agent is not registered yet, [Connect your agent](/agent-simulations/conn
 | `--port <port>` | Tunnel `localhost:<port>`. |
 | `--url <url>` | Tunnel a full local URL, path included, for example `http://localhost:8010/agent/chat`. |
 | `--agent <id or name>` | Which registered HTTP agent to repoint. A picker opens when omitted. |
-| `--tunnel-url <url>` | Use a tunnel you already run, for example a named Cloudflare tunnel or ngrok, and skip provisioning one. |
+| `--tunnel-url <url>` | Use a tunnel you already run, for example a named Cloudflare tunnel or ngrok, and skip provisioning one. This also skips the session secret proxy: the command prints a notice, and your tunnel endpoint must supply its own access control. |
 | `--no-update-url` | Print the tunnel URL and change nothing on the agent. |
 | `--no-auth` | Skip the session secret protection described below. |
 
@@ -46,7 +46,7 @@ If the agent is not registered yet, [Connect your agent](/agent-simulations/conn
 
 A tunnel URL is public, and a local agent process usually holds real model provider keys. `langwatch agent dev` therefore mints a per-session secret, fronts your local port with a proxy that rejects any request missing the `X-LangWatch-Dev-Secret` header, and writes that header onto the agent's configuration for the session. Only the platform's scenario calls carry the secret. On exit, the command removes both the proxy and the header row.
 
-`--no-auth` turns the proxy off, for a server that already authenticates every request. The agent's own configured authentication headers pass through the tunnel unchanged either way.
+`--no-auth` turns the proxy off, for a server that already authenticates every request. A bring-your-own tunnel (`--tunnel-url`) also runs without the proxy: your tunnel forwards directly to your server, so the tunnel endpoint must supply its own access control. The agent's own configured authentication headers pass through the tunnel unchanged either way.
 
 ## While the tunnel is up
 

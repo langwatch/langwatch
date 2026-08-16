@@ -7,8 +7,12 @@ canned-response function, so it runs with no provider account.
 
 ```bash
 pip install -r requirements.txt
-uvicorn main:app --port 8000
+INSECURE_DEV_COOKIES=1 uvicorn main:app --port 8000
 ```
+
+The session cookie is Secure by default, for HTTPS deployments.
+`INSECURE_DEV_COOKIES=1` turns that off so the cookie also works over
+plain HTTP on localhost.
 
 ## Use
 

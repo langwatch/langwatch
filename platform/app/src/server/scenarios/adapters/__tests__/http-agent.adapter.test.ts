@@ -659,7 +659,7 @@ describe("HttpAgentAdapter", () => {
     });
   });
 
-  describe("trace context propagation", () => {
+  describe("when a turn carries trace context to propagate", () => {
     const TRACE_ID = "0af7651916cd43dd8448eb211c80319c";
     const TRACEPARENT = `00-${TRACE_ID}-b7ad6b7169203331-01`;
 

@@ -4,12 +4,17 @@ FastAPI app with a cookie-session login and a /chat endpoint. The "LLM" is a
 canned-response function so the app runs with no model provider account.
 """
 
+import os
 import uuid
 
 from fastapi import FastAPI, HTTPException, Request, Response
 from pydantic import BaseModel
 
 app = FastAPI(title="ACME Outdoor Gear support agent")
+
+# The session cookie is Secure by default. Local HTTP development opts out
+# explicitly with INSECURE_DEV_COOKIES=1 (see README).
+INSECURE_DEV_COOKIES = os.environ.get("INSECURE_DEV_COOKIES") == "1"
 
 # In-memory session store. /login sets a session cookie; /chat requires it.
 SESSIONS: dict[str, str] = {}
@@ -71,7 +76,9 @@ def login(body: LoginBody, response: Response):
         raise HTTPException(status_code=401, detail="bad credentials")
     session_id = uuid.uuid4().hex
     SESSIONS[session_id] = body.email
-    response.set_cookie("session_id", session_id, httponly=True)
+    response.set_cookie(
+        "session_id", session_id, httponly=True, secure=not INSECURE_DEV_COOKIES
+    )
     return {"ok": True}
 
 

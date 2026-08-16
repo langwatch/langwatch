@@ -138,8 +138,15 @@ describe("Connect Agent Skill", () => {
                 "Expected the server to adopt the incoming traceparent (propagate.extract or traceparent handling)",
               ).toMatch(/propagate\.extract|traceparent/i);
 
-              // A dedicated env-var scenario auth path exists.
-              const envFiles = findFiles(tempFolder, /^\.env(\..+)?$/);
+              // A dedicated env-var scenario auth path exists. The test's own
+              // credential .env (written above with the real LANGWATCH_API_KEY)
+              // is excluded: a failed assertion prints the received string,
+              // and the key must never land in test output. That file never
+              // contains a SCENARIO key, so excluding it costs no coverage.
+              const credentialEnvPath = path.join(tempFolder, ".env");
+              const envFiles = findFiles(tempFolder, /^\.env(\..+)?$/).filter(
+                (file) => path.resolve(file) !== path.resolve(credentialEnvPath),
+              );
               const authSurface = pythonContent + "\n" + readAll(envFiles);
               expect(
                 authSurface,

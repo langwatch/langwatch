@@ -1609,31 +1609,34 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     },
   );
 
-  emitsResult(
-    agentCmd
-      .command("dev")
-      .alias("tunnel")
-      .description("Expose a local agent server through a public tunnel and point a registered HTTP agent at it (Ctrl-C restores the previous URL)")
-      .option("--port <number>", "Local port to expose (tunnels http://localhost:<number>)")
-      .option("--url <url>", "Local URL to expose (mutually exclusive with --port)")
-      .option("--agent <idOrName>", "Which registered HTTP agent to point at the tunnel (picker when omitted)")
-      .option("--tunnel-url <url>", "Bring your own tunnel URL and skip tunnel provisioning")
-      .option("--no-update-url", "Print the tunnel URL without changing the agent")
-      .option("--no-auth", "Skip the local auth proxy (for servers that already authenticate requests)")
-      .option("--api-key <key>", "API key to use for this run"),
-    async (options: {
-      port?: string;
-      url?: string;
-      agent?: string;
-      tunnelUrl?: string;
-      updateUrl?: boolean;
-      auth?: boolean;
-      apiKey?: string;
-    }) => {
-      const { agentDevCommand: impl } = await import("./commands/agents/dev.js");
-      return impl(options);
-    },
-  );
+  // A live, human-only session: it never returns a CommandResult, so it is
+  // registered with a plain action and the format gate honestly refuses
+  // `-o json` instead of accepting a format the command never renders.
+  agentCmd
+    .command("dev")
+    .alias("tunnel")
+    .description("Expose a local agent server through a public tunnel and point a registered HTTP agent at it (Ctrl-C restores the previous URL)")
+    .option("--port <number>", "Local port to expose (tunnels http://localhost:<number>)")
+    .option("--url <url>", "Local URL to expose (mutually exclusive with --port)")
+    .option("--agent <idOrName>", "Which registered HTTP agent to point at the tunnel (picker when omitted)")
+    .option("--tunnel-url <url>", "Bring your own tunnel URL and skip tunnel provisioning")
+    .option("--no-update-url", "Print the tunnel URL without changing the agent")
+    .option("--no-auth", "Skip the local auth proxy (for servers that already authenticate requests)")
+    .option("--api-key <key>", "API key to use for this run")
+    .action(
+      async (options: {
+        port?: string;
+        url?: string;
+        agent?: string;
+        tunnelUrl?: string;
+        updateUrl?: boolean;
+        auth?: boolean;
+        apiKey?: string;
+      }) => {
+        const { agentDevCommand: impl } = await import("./commands/agents/dev.js");
+        return impl(options);
+      },
+    );
 
   emitsResult(
     agentCmd
