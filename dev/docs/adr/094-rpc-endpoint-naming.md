@@ -93,13 +93,57 @@ concepts. Date-based versioning, forward-copying, `withdraw()`, the policy
 registry and the OpenAPI generator all work unmodified, because endpoint identity
 is already `` `${method}:${path}` `` and `post:/endpoints.create` is unique.
 
-**We will treat webhooks as a pilot, not as a new default.** The four REST
-families stay as they are. This ADR is scheduled for review once the webhooks
-family has been in production for one quarter — **review by 2026-11-13** — at
-which point we either extend RPC naming to new management families, or revert
-webhooks to resource-REST and record RPC as tried and rejected. Two naming
-conventions coexisting *indefinitely* is the failure mode this ADR is most
-worried about, and a dated review is the mechanism against it.
+**We will make RPC the only way to add a management endpoint, and close the
+list of families that may use resource-REST.** The four that predate this ADR —
+`organization`, `roles`, `role-bindings`, `scim-tokens` — keep their paths and
+their consumers; nothing about them changes. Every family added after webhooks
+registers with `v.rpc()` only.
+
+`@langwatch/api` still exposes `v.get` / `v.post` / `v.patch` / `v.delete`,
+because it is a general framework and both SSE and those four families need
+them. Removing them from the package is not what enforces this. The enforcement
+is `assertRpcOnlyOutsideLegacyFamilies` in
+`platform/app/src/server/api/management/managed-service.ts`, which every
+management route passes through, because `createManagementService` is the single
+product caller of `createService`. A new family that reaches for `v.get` fails
+the build with the legacy list in the message. Removing a name from that list is
+a port — paths, SDKs, CLI and the published document all move — not a
+configuration change.
+
+This is the one place the pilot framing changed during implementation. The
+original decision was "webhooks is a pilot, the four REST families stay as they
+are, revisit in a quarter". That left the actual failure mode — a fifth
+convention-less family landing next month — unaddressed, since nothing stopped a
+new family from copying the nearest neighbour. Closing the list addresses it
+without touching a live surface.
+
+**The dated review still stands — review by 2026-11-13.** What it now decides is
+narrower: whether to *port* the four legacy families, or to reopen the list and
+record RPC as tried and rejected. Two naming conventions coexisting
+*indefinitely* remains the failure mode this ADR is most worried about; a closed
+list plus a dated review is the mechanism against it.
+
+### One endpoint, one success status
+
+Related, and found while building this: `serializeEndpointResult` chose between
+200 and 204 by inspecting what the handler returned, so an `output` schema that
+accepted `undefined` gave a single operation two shapes — a body on the request
+that found something, an empty 204 on the one that did not. Callers, the
+published document and both SDKs each have to pick one.
+
+`assertStatusInvariant` fixes the status at registration instead:
+
+- no `output`, or `z.void()` / `z.undefined()` → the endpoint never sends a body
+  and always answers `status ?? 204`;
+- any other schema → the body is always present and it always answers
+  `status ?? 200`;
+- a schema accepting `undefined` *and* a value (`.optional()`, `z.any()`, a
+  union with `undefined`) is refused at registration.
+
+This also retired a latent bug: the undefined branch used `config.status ?? 204`
+while the value branch used `?? 200`, so an endpoint declaring `status: 201` with
+an optional output answered **201 with an empty body** — a created response whose
+own schema promised a representation.
 
 ## Rationale / Trade-offs
 

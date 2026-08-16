@@ -161,6 +161,54 @@ export function createManagementService({
  * (their inherited config carries the meta), and the two version-namespace
  * guards.
  */
+/**
+ * The families that predate ADR-094 and still register resource-REST routes.
+ * They keep working; the list is closed. Every family added after the webhooks
+ * pilot registers with `v.rpc("/resource.verb")` only.
+ *
+ * `@langwatch/api` still exposes `v.get` / `v.post` / `v.patch` / `v.delete`,
+ * because it is a general framework and SSE and the four families below need
+ * them. What makes RPC the only way to add a LangWatch management endpoint is
+ * this check rather than the package's surface: `createManagementService` is
+ * the single product caller of `createService`, so every management route in
+ * the app passes through here.
+ *
+ * Removing a name from this set is a port — the family's paths, SDKs, CLI and
+ * published document all move — not a configuration change.
+ */
+const REST_LEGACY_FAMILIES = new Set([
+  "organization",
+  "role-bindings",
+  "roles",
+  "scim-tokens",
+]);
+
+/**
+ * A new family may only mount RPC operations: a real POST whose last path
+ * segment is a dotted `<resource>.<verb>` name. The package asserts that
+ * grammar for anything registered through `v.rpc`; this asserts that nothing
+ * in a new family was registered any other way.
+ */
+function assertRpcOnlyOutsideLegacyFamilies({
+  route,
+  family,
+}: {
+  route: MountedRoute;
+  family: string;
+}): void {
+  if (REST_LEGACY_FAMILIES.has(family)) return;
+
+  const operation = route.path.split("/").pop() ?? "";
+  if (route.method === "post" && operation.includes(".")) return;
+
+  throw new Error(
+    `Management endpoint ${route.method.toUpperCase()} ${route.path} in ` +
+      `family "${family}" is not RPC-named. Families added after the webhooks ` +
+      `pilot register operations with v.rpc("/resource.verb") only (ADR-094); ` +
+      `the resource-REST helpers remain only for ${[...REST_LEGACY_FAMILIES].join(", ")}`,
+  );
+}
+
 function registerMountedRoute({
   route,
   family,
@@ -183,6 +231,8 @@ function registerMountedRoute({
     });
     return;
   }
+
+  assertRpcOnlyOutsideLegacyFamilies({ route, family });
 
   const meta = route.config?.meta as ManagementEndpointMeta | undefined;
   if (!meta?.policy) {

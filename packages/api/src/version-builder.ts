@@ -125,6 +125,7 @@ export class VersionBuilder<TApp> {
     handler: Handler<TApp, TConfig>,
   ): void {
     assertEndpointPath(path);
+    assertStatusInvariant(method, path, config);
     this._endpoints.push({
       method,
       path,
@@ -173,6 +174,58 @@ function assertRpcConfig(path: string, config: EndpointConfig): void {
         `arguments travel in the JSON body, so use "input" instead`,
     );
   }
+}
+
+/**
+ * An endpoint answers ONE success status, fixed here rather than per request.
+ *
+ * `serializeEndpointResult` used to read the handler's return value to choose:
+ * a declared `output` that parsed `undefined` answered 204 while a value
+ * answered 200, so one operation could return either depending on what it
+ * found — and callers, the published document and the SDKs all have to pick
+ * one. An `output` schema that accepts `undefined` is what makes that
+ * reachable, so it is refused at registration.
+ *
+ * The two honest shapes remain: declare a required `output` and always answer
+ * `status ?? 200`, or declare no `output` and always answer `status ?? 204`.
+ */
+function assertStatusInvariant(
+  method: HttpMethod,
+  path: string,
+  config: EndpointConfig,
+): void {
+  // No schema, or one whose only accepted value is `undefined`: the endpoint
+  // has no body and always answers `status ?? 204`.
+  if (!config.output || isNoBodySchema(config.output)) return;
+  // A schema that rejects `undefined`: the body is always present and the
+  // endpoint always answers `status ?? 200`.
+  if (!config.output.safeParse(undefined).success) return;
+
+  // What is left accepts `undefined` AND a value — `.optional()`, `z.any()`,
+  // a union with `undefined` in it — which is the only way the status can move.
+  throw new Error(
+    `Endpoint ${method.toUpperCase()} ${path} declares an "output" schema that ` +
+      `accepts undefined as well as a value, so its success status would ` +
+      `depend on what the handler returned — 204 when undefined, ` +
+      `${config.status ?? 200} otherwise. Make the output required, or declare ` +
+      `z.void() for an endpoint that never sends a body`,
+  );
+}
+
+/**
+ * True for the schemas whose ONLY accepted value is `undefined`, which declare
+ * an endpoint that never sends a body.
+ *
+ * Read off zod's internal `typeName` deliberately: probing with sample values
+ * cannot tell `z.undefined()` from `z.object({ id: z.string() }).optional()`,
+ * since both reject every probe a caller could think to try — `{}` included.
+ * `status-invariant.unit.test.ts` pins this against the pinned zod, so an
+ * upgrade that renames the tag fails there rather than silently reclassifying
+ * every no-body endpoint as ambiguous.
+ */
+function isNoBodySchema(output: ZodType): boolean {
+  const typeName = (output._def as { typeName?: string } | undefined)?.typeName;
+  return typeName === "ZodUndefined" || typeName === "ZodVoid";
 }
 
 function assertEndpointPath(path: string): void {
