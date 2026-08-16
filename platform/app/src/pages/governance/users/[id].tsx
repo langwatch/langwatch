@@ -36,53 +36,44 @@ const fmtRelative = (date: Date | string | null): string => {
   return `${days}d ago`;
 };
 
-/**
- * Per-team governance detail. Reads the same `spendByTeam` rollup
- * the bird's-eye uses, filters in-memory to the requested team id,
- * surfaces the team's headline metrics + a 'see this team in /messages'
- * deep-link. Detail-data depth (per-day spend, per-user breakdown,
- * model mix) defers to a follow-up; this page exists today to honor
- * the bird's-eye click-through invariant.
- */
-function GovernanceTeamDetailPage() {
+function GovernanceUserDetailPage() {
   const router = useRouter();
-  const teamId = typeof router.query.id === "string" ? router.query.id : null;
-  const { organization, organizations } = useOrganizationTeamProject({
+  const actor =
+    typeof router.query.id === "string"
+      ? decodeURIComponent(router.query.id)
+      : null;
+  const { organization } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
   const orgId = organization?.id ?? "";
-  // Resolve the team's first project slug for the bird's-eye drill-in
-  // link. Teams typically have a primary project (or a small set);
-  // navigating to /[projectSlug]/traces lands the admin on the team's
-  // workspace via the existing project-shell + auto-switches to
-  // PersonalSidebar via the v2 chrome retention discriminator (admin's
-  // not a TeamUser → AdminViewingAsBanner fires from DashboardLayout).
-  const teamProjectSlug =
-    organizations
-      ?.flatMap((org) => org.teams ?? [])
-      .find((t) => t.id === teamId)?.projects?.[0]?.slug ?? null;
 
-  const teamsQuery = api.activityMonitor.spendByTeam.useQuery(
+  const usersQuery = api.activityMonitor.spendByUser.useQuery(
     { organizationId: orgId, windowDays: 30, limit: 500 },
     { enabled: !!orgId, refetchOnWindowFocus: false },
   );
+  const personalProjectQuery =
+    api.governance.resolveActorPersonalProject.useQuery(
+      { organizationId: orgId, actor: actor ?? "" },
+      { enabled: !!orgId && !!actor, refetchOnWindowFocus: false },
+    );
+  const personalProject = personalProjectQuery.data;
 
-  const team = (teamsQuery.data ?? []).find((t) => t.teamId === teamId);
-  const pageTitle = team
-    ? `${team.teamName} · AI Governance · LangWatch`
-    : "Team · AI Governance · LangWatch";
+  const user = (usersQuery.data ?? []).find((u) => u.actor === actor);
+  const pageTitle = user
+    ? `${user.actor} · AI Governance · LangWatch`
+    : "User · AI Governance · LangWatch";
 
   return (
     <GovernanceLayout pageTitle={pageTitle}>
       <VStack align="stretch" gap={4} width="full" maxW="container.xl">
         <VStack align="start" gap={1}>
           <Text fontSize="xs" color="fg.muted">
-            <Link href="/settings/governance" color="blue.600">
+            <Link href="/governance" color="blue.600">
               ← AI Governance
             </Link>{" "}
             ·{" "}
-            <Link href="/settings/governance/teams" color="blue.600">
-              All teams
+            <Link href="/governance/users" color="blue.600">
+              All users
             </Link>
           </Text>
           <HStack gap={2}>
@@ -90,17 +81,17 @@ function GovernanceTeamDetailPage() {
               width="14px"
               height="14px"
               borderRadius="full"
-              backgroundColor={
-                team ? getHexColorForString(team.teamName) : "fg.muted"
-              }
+              backgroundColor={actor ? getHexColorForString(actor) : "fg.muted"}
             />
-            <Heading size="md">{team?.teamName ?? "Team not found"}</Heading>
+            <Heading size="md">
+              {user?.actor ?? actor ?? "User not found"}
+            </Heading>
           </HStack>
         </VStack>
 
-        {teamsQuery.isLoading ? (
+        {usersQuery.isLoading ? (
           <Spinner />
-        ) : !team ? (
+        ) : !user ? (
           <Box
             borderWidth="1px"
             borderColor="border.muted"
@@ -108,26 +99,22 @@ function GovernanceTeamDetailPage() {
             padding={5}
           >
             <Text fontSize="sm" color="fg.muted">
-              No spend data for this team in the last 30 days. The team may not
-              have any associated ingestion sources reporting activity yet.
+              No spend data for this user in the last 30 days.
             </Text>
           </Box>
         ) : (
           <>
             <SimpleGrid columns={{ base: 1, md: 4 }} gap={3}>
-              <Stat label="Spend (30 d)" value={fmtUsd(team.spendUsd)} />
+              <Stat label="Spend (30 d)" value={fmtUsd(user.spendUsd)} />
               <Stat
                 label="Requests"
-                value={numeral(team.requestCount).format("0,0")}
+                value={numeral(user.requests).format("0,0")}
               />
               <Stat
                 label="Last active"
-                value={fmtRelative(team.lastActivityIso)}
+                value={fmtRelative(user.lastActivityIso)}
               />
-              <Stat
-                label="Sources"
-                value={`${team.sourceCount} ${team.sourceCount === 1 ? "source" : "sources"}`}
-              />
+              <Stat label="Most-used" value={user.mostUsedTarget ?? "—"} />
             </SimpleGrid>
 
             <Box
@@ -140,18 +127,18 @@ function GovernanceTeamDetailPage() {
                 Detail metrics
               </Text>
               <Text fontSize="xs" color="fg.muted" marginBottom={3}>
-                Per-day spend, per-user breakdown, and model mix for this team
-                will land here in a follow-up.
+                Per-day spend trend and per-model breakdown for this user will
+                land here in a follow-up.
               </Text>
-              {teamProjectSlug && (
+              {personalProject && (
                 <>
                   <Link
-                    href={`/${teamProjectSlug}/traces`}
+                    href={`/${personalProject.projectSlug}/traces`}
                     color="blue.600"
                     fontSize="sm"
                     fontWeight="medium"
                   >
-                    View this team's workspace traces →
+                    View {personalProject.displayName}'s personal workspace →
                   </Link>
                   <Text
                     fontSize="xs"
@@ -159,22 +146,21 @@ function GovernanceTeamDetailPage() {
                     marginTop={1}
                     marginBottom={3}
                   >
-                    The trace explorer opens with the team's data. A 'Viewing as
-                    admin' banner stays present + the access is logged to
-                    /settings/audit-log.
+                    Opens their trace explorer with a 'Viewing as admin' banner.
+                    Each access is recorded at /settings/audit-log.
                   </Text>
                 </>
               )}
               <Link
-                href="/settings/governance"
+                href="/governance"
                 color="blue.600"
                 fontSize="sm"
                 fontWeight="medium"
               >
-                See this team in the bird's-eye chart →
+                See this user in the bird's-eye chart →
               </Link>
               <Text fontSize="xs" color="fg.subtle" marginTop={1}>
-                The chart's {`'By Team'`} toggle exercises the same data through
+                The chart's {`'By User'`} toggle exercises the same data through
                 one orthogonal lens until the dedicated drilldown ships.
               </Text>
             </Box>
@@ -214,5 +200,5 @@ export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
 })(
   withPermissionGuard("organization:manage", {
     bypassOnboardingRedirect: true,
-  })(GovernanceTeamDetailPage),
+  })(GovernanceUserDetailPage),
 );

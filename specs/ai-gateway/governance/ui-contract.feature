@@ -47,7 +47,7 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
   @bdd @ui @ui-contract @single-surface
   Scenario: Per-source detail page renders ONE unified events feed
     Given an IngestionSource "Cowork Production" exists
-    When the admin navigates to "/settings/governance/ingestion-sources/<id>"
+    When the admin navigates to "/governance/ingestion-sources/<id>"
     Then the page renders the source's metadata (name, type, status,
       recent volume)
     And the events tab below renders a single events feed mixing
@@ -165,7 +165,7 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
   Scenario: The IngestionSource composer does NOT show a Project
             selection field
     When the admin opens the "Create ingestion source" composer at
-      "/settings/governance/ingestion-sources/new"
+      "/governance/ingestion-sources/new"
     Then the composer asks for: name, source type, per-platform config
     And the composer does NOT ask the admin to select or assign a
       Project (the hidden Governance Project routing is done by the
@@ -249,7 +249,7 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
             IngestionSource IDs after the cutover
     Given Sergey's anomaly reactor has rebased on governance_kpis fold
     When the admin opens the AnomalyRule composer at
-      "/settings/governance/anomaly-rules/new"
+      "/governance/anomaly-rules/new"
     And selects scope = "source"
     Then the scope-id picker dropdown lists active IngestionSources
       by name + type (e.g. "Cowork Prod (claude_cowork)")
@@ -271,7 +271,7 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
     Then the page renders with the heading "Governance Overview"
     And a single CTA tile reads "Set up your first ingestion source
       to start collecting events from third-party AI platforms"
-    And the CTA links to "/settings/governance/ingestion-sources/new"
+    And the CTA links to "/governance/ingestion-sources/new"
 
   @bdd @ui @ui-contract @empty-state
   Scenario: Per-source detail empty state when source has no events yet

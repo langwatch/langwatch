@@ -4,7 +4,7 @@
  * tRPC router for IngestionTemplate (admin/platform-curated catalog).
  *
  * RBAC: gates on `aiTools:*` because the admin surface for v1 lives as
- * a second tab on the existing `/settings/governance/tool-catalog`
+ * a second tab on the existing `/governance/tool-catalog`
  * page (per the Andre PM call at 73a3bccdb — folding Ingestion
  * Templates into the AiToolEntry catalog editor instead of carving
  * out a new route). User-facing read uses `aiTools:view` (every org

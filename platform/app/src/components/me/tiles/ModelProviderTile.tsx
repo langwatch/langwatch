@@ -214,7 +214,7 @@ export function ModelProviderTile({
             </Link>
             . They&apos;ll also need to bind it into the{" "}
             <Link
-              href="/settings/routing-policies"
+              href="/governance/routing-policies"
               color="orange.800"
               fontWeight="medium"
               textDecoration="underline"

@@ -165,6 +165,7 @@ describe("virtual keys table", () => {
 
   describe("when the routing column renders", () => {
     /** @scenario "Virtual key list Routing column states its three modes" */
+    /** @scenario The canonical gateway address renders the gateway */
     it("renders the null glyph when the key falls back nowhere", () => {
       renderPage();
       expect(within(rowFor("no-fallback-key")).getByText("—")).toBeVisible();

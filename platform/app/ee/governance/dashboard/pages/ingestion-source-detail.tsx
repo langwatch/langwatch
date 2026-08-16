@@ -150,7 +150,7 @@ function IngestionSourceDetailPage() {
   const archiveMutation = api.ingestionSources.archive.useMutation({
     onSuccess: () => {
       toaster.create({ title: "Source archived", type: "success" });
-      void router.push("/settings/governance/ingestion-sources");
+      void router.push("/governance/ingestion-sources");
     },
     onError: (e) =>
       showErrorToast({
@@ -221,7 +221,7 @@ function IngestionSourceDetailPage() {
             <VStack align="start" gap={1}>
               <HStack gap={2}>
                 <Link
-                  href="/settings/governance/ingestion-sources"
+                  href="/governance/ingestion-sources"
                   color="blue.600"
                   fontSize="xs"
                 >

@@ -147,7 +147,7 @@ Feature: AI Gateway Governance — Persona-aware chrome (sidebar + header)
     And the sidebar shows Home + Observe + Evaluate + Library + Govern + Gateway
 
   # Govern sub-nav lives in the persona-4 layout component; sticky on every
-  # /settings/governance/* route. No multi-route Playwright sweep exists to
+  # /governance/* route. No multi-route Playwright sweep exists to
   # assert the sub-nav stays present across the table's full route list.
   # Pin @unimplemented until the persona-4 router sweep test lands.
   @bdd @ui @persona-chrome @persona-4 @regression @unimplemented
@@ -158,15 +158,15 @@ Feature: AI Gateway Governance — Persona-aware chrome (sidebar + header)
         Routing Policies)
     When the user clicks any of these sub-nav links and lands on:
       | route                                              |
-      | /settings/governance/ingestion-sources             |
-      | /settings/governance/ingestion-sources/<id>        |
-      | /settings/governance/anomaly-rules                 |
-      | /settings/governance/tool-catalog                  |
-      | /settings/governance/teams                         |
-      | /settings/governance/teams/<id>                    |
-      | /settings/governance/users                         |
-      | /settings/governance/users/<id>                    |
-      | /settings/routing-policies                         |
+      | /governance/ingestion-sources             |
+      | /governance/ingestion-sources/<id>        |
+      | /governance/anomaly-rules                 |
+      | /governance/tool-catalog                  |
+      | /governance/teams                         |
+      | /governance/teams/<id>                    |
+      | /governance/users                         |
+      | /governance/users/<id>                    |
+      | /governance/routing-policies                         |
     Then the destination page renders inside `<GovernanceLayout>` —
         the Govern sub-nav is still visible in the left rail with the
         active item highlighted
@@ -183,7 +183,7 @@ Feature: AI Gateway Governance — Persona-aware chrome (sidebar + header)
         ingestion-source-detail, anomaly-rules}.tsx` rendering under
         the legacy `<SettingsLayout>` instead of `<GovernanceLayout>`;
         fixed by `a8f2342c8`. Sibling regression on
-        `/settings/governance/tool-catalog` flagged separately as
+        `/governance/tool-catalog` flagged separately as
         Ariana QA G43; same fix shape — swap layout)
 
   @bdd @ui @persona-chrome @persona-4 @ff-off-regression

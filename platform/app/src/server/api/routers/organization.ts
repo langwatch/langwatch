@@ -306,7 +306,7 @@ export const organizationRouter = createTRPCRouter({
         // `useOrganizationTeamProject().organizationRole` and downstream guards
         // (`withPermissionGuard("organization:manage")`) honor it. Without this,
         // a stale `OrganizationUser.role=MEMBER` row shadows a fresh ADMIN
-        // RoleBinding, gating the admin out of /governance + /settings/governance/*.
+        // RoleBinding, gating the admin out of /governance + /governance/*.
         // Backend RBAC paths already honor RoleBindings (`resolveOrganizationPermission`,
         // `requireApiKeyPermission`); this closes the page-guard / SSR-only drift.
         if (isOrgAdminViaBinding) {

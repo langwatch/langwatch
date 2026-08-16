@@ -123,7 +123,7 @@ function GovernanceUsersListPage() {
         <HStack alignItems="end">
           <VStack align="start" gap={1}>
             <Text fontSize="xs" color="fg.muted">
-              <Link href="/settings/governance" color="blue.600">
+              <Link href="/governance" color="blue.600">
                 ← AI Governance
               </Link>{" "}
               · All users
@@ -241,7 +241,7 @@ function Row({ user }: { user: SpendByUser }) {
         : "fg.muted";
   return (
     <Link
-      href={`/settings/governance/users/${encodeURIComponent(user.actor)}`}
+      href={`/governance/users/${encodeURIComponent(user.actor)}`}
       display="block"
       width="full"
       _hover={{ textDecoration: "none" }}

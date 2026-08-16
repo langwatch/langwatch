@@ -550,7 +550,7 @@ function SourceRow({
       <VStack align="start" gap={0} flex={1} minWidth={0}>
         <HStack gap={2}>
           <Link
-            href={`/settings/governance/ingestion-sources/${source.id}`}
+            href={`/governance/ingestion-sources/${source.id}`}
             color="fg"
             _hover={{ color: "orange.600" }}
           >
@@ -1674,9 +1674,7 @@ function SecretModal({
           </VStack>
         </DialogBody>
         <DialogFooter>
-          <Link
-            href={`/settings/governance/ingestion-sources/${details.sourceId}`}
-          >
+          <Link href={`/governance/ingestion-sources/${details.sourceId}`}>
             <Button variant="outline">View source page →</Button>
           </Link>
           <Button colorPalette="blue" onClick={onClose}>

@@ -48,12 +48,10 @@ export const GovernSection = React.memo(function GovernSection({
 
   const isGatewayActive =
     router.pathname.startsWith("/gateway") ||
-    router.pathname === "/settings/routing-policies" ||
     router.pathname === "/settings/model-providers";
   const isGovernanceActive =
     router.pathname === "/governance" ||
-    router.pathname === "/settings/governance" ||
-    router.pathname.startsWith("/settings/governance/");
+    router.pathname.startsWith("/governance/");
 
   return (
     <SidebarSection

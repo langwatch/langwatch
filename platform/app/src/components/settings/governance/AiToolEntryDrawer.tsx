@@ -472,7 +472,7 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
                   No departments yet. The tile stays visible to every member.
                   Create departments under{" "}
                   <Link
-                    href="/settings/governance/departments"
+                    href="/governance/departments"
                     color="blue.600"
                   >
                     Governance → Departments

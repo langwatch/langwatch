@@ -39,10 +39,6 @@ const ROUTE_PATTERNS = [
   "/onboarding/product",
   "/onboarding/welcome",
   "/settings",
-  "/settings/governance",
-  "/settings/governance/ingestion-sources/:id",
-  "/settings/governance/ingestion-sources",
-  "/settings/governance/anomaly-rules",
   // Literal patterns for high-traffic /settings/* leafs that use
   // `router.push({ pathname: router.pathname, query: ... })` to update
   // their own filter state. Without these, the wildcard `/settings/*`
@@ -72,6 +68,16 @@ const ROUTE_PATTERNS = [
   "/me/configure",
   "/cli/auth",
   "/governance",
+  "/governance/ingestion-sources/:id",
+  "/governance/ingestion-sources",
+  "/governance/anomaly-rules",
+  "/governance/routing-policies",
+  "/governance/tool-catalog",
+  "/governance/departments",
+  "/governance/teams/:id",
+  "/governance/teams",
+  "/governance/users/:id",
+  "/governance/users",
   "/:project/messages/:trace/:openTab/:span",
   "/:project/messages/:trace/:openTab",
   "/:project/messages/:trace",

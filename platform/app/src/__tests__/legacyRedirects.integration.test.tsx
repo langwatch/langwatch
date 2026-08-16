@@ -17,6 +17,7 @@ import {
   RouterProvider,
 } from "react-router";
 import { describe, expect, it, vi } from "vitest";
+import { LegacyPrefixRedirect } from "../components/LegacyPrefixRedirect";
 import { legacyRedirectRoutes } from "../legacyRedirects";
 
 // The global test-setup.ts stubs ~/utils/compat/next-router with an inert
@@ -47,6 +48,22 @@ function renderRouterAt(initialEntries: string[]) {
       path: "/gateway/virtual-keys/:id",
       element: <div>virtual key detail</div>,
     },
+    { path: "/governance", element: <div>governance home</div> },
+    { path: "/governance/teams/:id", element: <div>team detail</div> },
+    {
+      path: "/governance/routing-policies",
+      element: <div>routing policies</div>,
+    },
+    {
+      path: "/governance/cost-centers",
+      element: (
+        <LegacyPrefixRedirect
+          from="/governance/cost-centers"
+          to="/governance/departments"
+        />
+      ),
+    },
+    { path: "/governance/departments", element: <div>departments</div> },
   ];
   const router = createMemoryRouter(routes, {
     initialEntries,
@@ -112,6 +129,48 @@ describe("legacy gateway redirects", () => {
 
       await waitFor(() => {
         expect(router.state.location.pathname).toBe("/gateway/virtual-keys");
+      });
+    });
+  });
+});
+
+describe("legacy governance redirects", () => {
+  describe("when an old governance deep link is cold-loaded", () => {
+    /** @scenario An old governance deep link lands on the same page at its new address */
+    it("lands on the new address with sub-path and query intact", async () => {
+      const router = renderRouterAt([
+        "/settings/governance/teams/team_123?range=30d",
+      ]);
+
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe(
+          "/governance/teams/team_123",
+        );
+      });
+      expect(router.state.location.search).toBe("?range=30d");
+    });
+  });
+
+  describe("when the old routing policies address is cold-loaded", () => {
+    /** @scenario Routing policies join governance */
+    it("lands on the governance routing policies page", async () => {
+      const router = renderRouterAt(["/settings/routing-policies"]);
+
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe(
+          "/governance/routing-policies",
+        );
+      });
+    });
+  });
+
+  describe("when the retired cost centers address is cold-loaded", () => {
+    /** @scenario The retired cost centers address lands on departments */
+    it("chains through to the departments page", async () => {
+      const router = renderRouterAt(["/settings/governance/cost-centers"]);
+
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe("/governance/departments");
       });
     });
   });

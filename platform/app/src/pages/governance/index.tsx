@@ -196,7 +196,7 @@ function GovernanceOverviewPage() {
                 done={hasCatalogTiles}
                 title="Add tools to the catalog"
                 description="Publish the coding assistants, model providers, and internal tools your team installs from their /me portal."
-                href="/settings/governance/tool-catalog"
+                href="/governance/tool-catalog"
                 ctaLabel={
                   hasCatalogTiles
                     ? `${catalogTiles.length} tile${catalogTiles.length === 1 ? "" : "s"} in the catalog`
@@ -207,7 +207,7 @@ function GovernanceOverviewPage() {
                 done={hasPolicies}
                 title="Define a routing policy"
                 description="Tell virtual keys which providers + models to route through."
-                href="/settings/routing-policies"
+                href="/governance/routing-policies"
                 ctaLabel={
                   hasPolicies
                     ? `${policies.length} ${policies.length === 1 ? "policy" : "policies"} configured`
@@ -218,7 +218,7 @@ function GovernanceOverviewPage() {
                 done={hasSources}
                 title="Connect an ingestion source"
                 description="Map an external AI platform into the activity monitor via OTel push, webhook, or S3 audit drop."
-                href="/settings/governance/ingestion-sources"
+                href="/governance/ingestion-sources"
                 ctaLabel={
                   hasSources
                     ? `${sources.length} source${sources.length === 1 ? "" : "s"} configured`
@@ -229,7 +229,7 @@ function GovernanceOverviewPage() {
                 done={hasAnomalyRules}
                 title="Define anomaly rules"
                 description="Set thresholds that page on-call when activity drifts."
-                href="/settings/governance/anomaly-rules"
+                href="/governance/anomaly-rules"
                 ctaLabel={
                   hasAnomalyRules
                     ? `${anomalyRules.length} rule${anomalyRules.length === 1 ? "" : "s"} configured`
@@ -324,11 +324,7 @@ function GovernanceOverviewPage() {
           subline="Top 5 teams ranked by spend (last 30 days). Sources without a team land under 'Org-wide'."
           actions={
             teams.length > 0 ? (
-              <Link
-                href="/settings/governance/teams"
-                color="blue.600"
-                fontSize="sm"
-              >
+              <Link href="/governance/teams" color="blue.600" fontSize="sm">
                 View all teams →
               </Link>
             ) : null
@@ -353,11 +349,7 @@ function GovernanceOverviewPage() {
           subline="Top 5 LangWatch members ranked by spend (last 30 days)."
           actions={
             users.length > 0 ? (
-              <Link
-                href="/settings/governance/users"
-                color="blue.600"
-                fontSize="sm"
-              >
+              <Link href="/governance/users" color="blue.600" fontSize="sm">
                 View all users →
               </Link>
             ) : null
@@ -381,11 +373,7 @@ function GovernanceOverviewPage() {
           title="Spend by department"
           subline="Spend grouped by department across every project in the org, including personal AI use (last 30 days)."
           actions={
-            <Link
-              href="/settings/governance/departments"
-              color="blue.600"
-              fontSize="sm"
-            >
+            <Link href="/governance/departments" color="blue.600" fontSize="sm">
               Manage departments →
             </Link>
           }
@@ -437,10 +425,7 @@ function GovernanceOverviewPage() {
               <Text color="fg.muted" fontSize="sm">
                 No ingestion sources configured.
               </Text>
-              <Link
-                href="/settings/governance/ingestion-sources"
-                color="blue.600"
-              >
+              <Link href="/governance/ingestion-sources" color="blue.600">
                 + Add a source
               </Link>
             </VStack>
@@ -742,7 +727,7 @@ function SourceChip({ source }: { source: SourceHealth }) {
 
   return (
     <Link
-      href="/settings/governance/ingestion-sources"
+      href="/governance/ingestion-sources"
       _hover={{ textDecoration: "none" }}
     >
       <HStack
@@ -1029,7 +1014,7 @@ function TeamRow({ team }: { team: SpendByTeam }) {
   if (isOrgWide) return inner;
   return (
     <Link
-      href={`/settings/governance/teams/${team.teamId}`}
+      href={`/governance/teams/${team.teamId}`}
       display="block"
       width="full"
       _hover={{ textDecoration: "none" }}
@@ -1043,7 +1028,7 @@ function UserRow({ user }: { user: SpendByUser }) {
   const dotColor = getHexColorForString(user.actor);
   return (
     <Link
-      href={`/settings/governance/users/${encodeURIComponent(user.actor)}`}
+      href={`/governance/users/${encodeURIComponent(user.actor)}`}
       display="block"
       width="full"
       _hover={{ textDecoration: "none" }}

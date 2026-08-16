@@ -45,20 +45,20 @@ Feature: AI Gateway Governance — Anomaly Rules (admin authoring)
   @bdd @ui @anomaly-rules @permission
   Scenario: A non-admin user is redirected away from the rules page
     Given a user without "organization:manage" is signed in
-    When they navigate to "/settings/governance/anomaly-rules"
+    When they navigate to "/governance/anomaly-rules"
     Then they are redirected (or shown the existing settings-permission
       "Not allowed" page)
 
   @bdd @ui @anomaly-rules @permission
   Scenario: An org admin reaches the rules page
-    When the admin navigates to "/settings/governance/anomaly-rules"
+    When the admin navigates to "/governance/anomaly-rules"
     Then the page renders with the heading "Anomaly Rules"
-    And the URL stays at "/settings/governance/anomaly-rules"
+    And the URL stays at "/governance/anomaly-rules"
 
   @bdd @ui @anomaly-rules @feature-flag
   Scenario: Without the governance preview flag the page is hidden
     Given the feature flag "release_ui_ai_governance_enabled" is disabled
-    When the admin navigates to "/settings/governance/anomaly-rules"
+    When the admin navigates to "/governance/anomaly-rules"
     Then the page renders the standard NotFoundScene
     And no telemetry is emitted that reveals the page exists
 
@@ -193,7 +193,7 @@ Feature: AI Gateway Governance — Anomaly Rules (admin authoring)
   @bdd @ui @anomaly-rules @tenant-isolation
   Scenario: Rules from other orgs are never visible
     Given two orgs each have authored rules
-    When admin of org A loads "/settings/governance/anomaly-rules"
+    When admin of org A loads "/governance/anomaly-rules"
     Then `api.anomalyRules.list` returns ONLY org A's rules
     And no rule belonging to org B is queryable from the org A session
       (enforced by the existing org-scoped procedure pattern; the
@@ -210,7 +210,7 @@ Feature: AI Gateway Governance — Anomaly Rules (admin authoring)
       by the detection reactor
     When the admin clicks an alert row's rule name
     Then the browser navigates to
-      "/settings/governance/anomaly-rules?ruleId=<id>" and that rule's
+      "/governance/anomaly-rules?ruleId=<id>" and that rule's
       row is auto-scrolled into view + briefly highlighted
 
   # ---------------------------------------------------------------------------

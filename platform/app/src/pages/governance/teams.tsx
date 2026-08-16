@@ -132,7 +132,7 @@ function GovernanceTeamsListPage() {
         <HStack alignItems="end">
           <VStack align="start" gap={1}>
             <Text fontSize="xs" color="fg.muted">
-              <Link href="/settings/governance" color="blue.600">
+              <Link href="/governance" color="blue.600">
                 ← AI Governance
               </Link>{" "}
               · All teams
@@ -295,7 +295,7 @@ function Row({ team }: { team: SpendByTeam }) {
   if (isOrgWide) return inner;
   return (
     <Link
-      href={`/settings/governance/teams/${team.teamId}`}
+      href={`/governance/teams/${team.teamId}`}
       display="block"
       width="full"
       _hover={{ textDecoration: "none" }}

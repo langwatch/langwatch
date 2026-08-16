@@ -38,16 +38,15 @@ export const noOrgBouncerRoutes = [
   "/onboarding/[team]/project",
   "/onboarding/product",
   // Org-scoped governance pages — admin in an empty org (no project yet)
-  // must still reach /governance + /settings/governance/* to set up
-  // sources, rules, routing policies. Bouncing them to /onboarding/welcome
-  // is wrong: they ALREADY have an org, they just haven't created a
-  // project yet (and may never need to — governance is org-scoped).
+  // must still reach /governance/* to set up sources, rules, routing
+  // policies. Bouncing them to /onboarding/welcome is wrong: they ALREADY
+  // have an org, they just haven't created a project yet (and may never
+  // need to — governance is org-scoped).
   "/governance",
-  "/settings/governance",
-  "/settings/governance/ingestion-sources",
-  "/settings/governance/ingestion-sources/[id]",
-  "/settings/governance/anomaly-rules",
-  "/settings/routing-policies",
+  "/governance/ingestion-sources",
+  "/governance/ingestion-sources/[id]",
+  "/governance/anomaly-rules",
+  "/governance/routing-policies",
   // Personal-scope pages — persona-1 (org-less CLI/IDE devs) is a
   // first-class persona per the persona-aware-chrome spec. They have
   // a legitimate home at /me + /me/configure without needing to create

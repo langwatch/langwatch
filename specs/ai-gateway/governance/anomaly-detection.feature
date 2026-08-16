@@ -36,7 +36,7 @@ Feature: Anomaly detection — evaluate AnomalyRules + dispatch alerts (event-so
 
   Background:
     Given the org admin has authored at least one active AnomalyRule
-      (via api.anomalyRules.create from the /settings/governance/anomaly-rules UI)
+      (via api.anomalyRules.create from the /governance/anomaly-rules UI)
     And the IngestionSource for that rule's scope has been emitting
       events for the past 30 days
 

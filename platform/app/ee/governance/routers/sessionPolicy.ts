@@ -2,7 +2,7 @@
 
 /**
  * Org-scoped governance policy — admin-tunable knobs flipped from
- * `/settings/governance`:
+ * `/governance`:
  *
  *   - `maxSessionDurationDays` (Phase 8): max lifetime of CLI/device
  *     sessions before re-login is required. 0 = unbounded.

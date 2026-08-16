@@ -88,8 +88,8 @@ export default function AiGatewayLayout({
         },
         {
           label: "Routing Policies",
-          href: "/settings/routing-policies",
-          includePath: "/settings/routing-policies",
+          href: "/governance/routing-policies",
+          includePath: "/governance/routing-policies",
           icon: <Route size={14} />,
         },
       ]}

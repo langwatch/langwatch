@@ -18,4 +18,25 @@ export const legacyRedirectRoutes: RouteObject[] = [
     path: "/settings/gateway",
     element: <LegacyPrefixRedirect from="/settings/gateway" to="/gateway" />,
   },
+  {
+    path: "/settings/governance/*",
+    element: (
+      <LegacyPrefixRedirect from="/settings/governance" to="/governance" />
+    ),
+  },
+  {
+    path: "/settings/governance",
+    element: (
+      <LegacyPrefixRedirect from="/settings/governance" to="/governance" />
+    ),
+  },
+  {
+    path: "/settings/routing-policies",
+    element: (
+      <LegacyPrefixRedirect
+        from="/settings/routing-policies"
+        to="/governance/routing-policies"
+      />
+    ),
+  },
 ];

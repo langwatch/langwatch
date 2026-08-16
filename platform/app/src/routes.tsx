@@ -5,10 +5,10 @@ import {
   createBrowserRouter,
   Outlet,
   type RouteObject,
-  redirect,
   useLocation,
   useNavigation,
 } from "react-router";
+import { LegacyPrefixRedirect } from "~/components/LegacyPrefixRedirect";
 import { PageErrorFallback } from "~/components/ui/PageErrorFallback";
 import { InnerProviders } from "./AppProviders";
 import { legacyRedirectRoutes } from "./legacyRedirects";
@@ -202,84 +202,82 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/settings/usage")),
       },
       {
-        path: "/settings/routing-policies",
-        ...page(() => import("./pages/settings/routing-policies")),
-      },
-      {
         path: "/settings/email-suppressions",
         ...page(() => import("./pages/settings/email-suppressions")),
       },
       {
-        // Top-level governance home (admin oversight dashboard).
-        // Sub-routes for admin authoring (ingestion-sources, anomaly-rules,
-        // routing-policies) stay under /settings/* per the daily-use vs
-        // admin-authoring distinction.
+        // Governance home (admin oversight dashboard). The whole family
+        // lives at the top level: it is org-scoped, not a settings page.
         path: "/governance",
-        ...page(() => import("./pages/settings/governance")),
+        ...page(() => import("./pages/governance/index")),
       },
       {
-        // Back-compat alias for the original path. Any existing bookmarks
-        // / docs referencing /settings/governance still land on the same
-        // dashboard. Removed in a future cleanup once nothing links here.
-        path: "/settings/governance",
-        ...page(() => import("./pages/settings/governance")),
-      },
-      {
-        path: "/settings/governance/ingestion-sources",
+        path: "/governance/ingestion-sources",
         ...page(
           () => import("@ee/governance/dashboard/pages/ingestion-sources"),
         ),
       },
       {
-        path: "/settings/governance/ingestion-sources/:id",
+        path: "/governance/ingestion-sources/:id",
         ...page(
           () =>
             import("@ee/governance/dashboard/pages/ingestion-source-detail"),
         ),
       },
       {
-        path: "/settings/governance/anomaly-rules",
+        path: "/governance/anomaly-rules",
         ...page(() => import("@ee/governance/dashboard/pages/anomaly-rules")),
       },
       {
-        path: "/settings/governance/tool-catalog",
-        ...page(() => import("./pages/settings/governance/tool-catalog")),
+        path: "/governance/routing-policies",
+        ...page(() => import("./pages/governance/routing-policies")),
       },
       {
-        path: "/settings/governance/departments",
-        ...page(() => import("./pages/settings/governance/departments")),
+        path: "/governance/tool-catalog",
+        ...page(() => import("./pages/governance/tool-catalog")),
       },
       {
-        // Redirect the pre-rename path so old bookmarks do not 404.
-        path: "/settings/governance/cost-centers",
-        loader: () => redirect("/settings/governance/departments"),
+        path: "/governance/departments",
+        ...page(() => import("./pages/governance/departments")),
+      },
+      {
+        // The departments page was once named cost centers; old bookmarks
+        // land on the new name (the legacy /settings/governance/cost-centers
+        // address chains through here).
+        path: "/governance/cost-centers",
+        element: (
+          <LegacyPrefixRedirect
+            from="/governance/cost-centers"
+            to="/governance/departments"
+          />
+        ),
       },
       {
         // View-all teams listing - bird's-eye `View all teams →` lands here.
         // 500-row paginated list with sort chips for spend / requests /
         // last-activity. Per-row click-through routes to the team detail
         // page below.
-        path: "/settings/governance/teams",
-        ...page(() => import("./pages/settings/governance/teams")),
+        path: "/governance/teams",
+        ...page(() => import("./pages/governance/teams")),
       },
       {
         // Per-team detail - single-row scoped view of `spendByTeam` filtered
         // to the URL-encoded team id, four-stat KPI grid + breadcrumb back
         // to the listing. Detail-data depth (per-day trend, per-user
         // breakdown, model mix) defers to a follow-up.
-        path: "/settings/governance/teams/:id",
-        ...page(() => import("./pages/settings/governance/teams/[id]")),
+        path: "/governance/teams/:id",
+        ...page(() => import("./pages/governance/teams/[id]")),
       },
       {
         // View-all users listing - bird's-eye `View all users →` lands here.
-        path: "/settings/governance/users",
-        ...page(() => import("./pages/settings/governance/users")),
+        path: "/governance/users",
+        ...page(() => import("./pages/governance/users")),
       },
       {
         // Per-user detail - single-row scoped view keyed off the
         // URL-encoded actor id (email / sub claim).
-        path: "/settings/governance/users/:id",
-        ...page(() => import("./pages/settings/governance/users/[id]")),
+        path: "/governance/users/:id",
+        ...page(() => import("./pages/governance/users/[id]")),
       },
 
       // Personal-scope governance routes (must precede the /:project catch-all
