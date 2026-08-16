@@ -13,6 +13,7 @@ import type {
   ProjectWithOrgAdmin,
   ProjectWithTeam,
   SearchProjectsResult,
+  TouchCodingAgentActivityInput,
   TraceSharingConfig,
   UpdateProjectInput,
   UpdateProjectMetadataInput,
@@ -37,6 +38,49 @@ export class PrismaProjectRepository implements ProjectRepository {
     data,
   }: UpdateProjectMetadataInput): Promise<void> {
     await this.prisma.project.update({ where: { id }, data });
+  }
+
+  /**
+   * `updateMany` rather than `update`, and that is the guard rather than a
+   * style choice. `update` addresses one row by its primary key and throws
+   * when the extra predicates exclude it, so the "still recent, skip it" case
+   * would arrive as an error on the hot path. `updateMany` answers the same
+   * question with a count, and the staleness predicate rides in the same
+   * statement as the write: two concurrent folds cannot both read "stale" and
+   * both write, because there is no read.
+   */
+  async touchCodingAgentSessionSeen({
+    projectId,
+    at,
+    staleBefore,
+  }: TouchCodingAgentActivityInput): Promise<void> {
+    await this.prisma.project.updateMany({
+      where: {
+        id: projectId,
+        OR: [
+          { lastCodingAgentSessionAt: null },
+          { lastCodingAgentSessionAt: { lte: staleBefore } },
+        ],
+      },
+      data: { lastCodingAgentSessionAt: at },
+    });
+  }
+
+  async touchCodingAgentPullRequestSeen({
+    projectId,
+    at,
+    staleBefore,
+  }: TouchCodingAgentActivityInput): Promise<void> {
+    await this.prisma.project.updateMany({
+      where: {
+        id: projectId,
+        OR: [
+          { lastCodingAgentPullRequestAt: null },
+          { lastCodingAgentPullRequestAt: { lte: staleBefore } },
+        ],
+      },
+      data: { lastCodingAgentPullRequestAt: at },
+    });
   }
 
   async getWithOrgAdmin(id: string): Promise<ProjectWithOrgAdmin | null> {

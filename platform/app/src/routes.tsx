@@ -388,6 +388,17 @@ const routes: RouteObject[] = [
         path: "/:project/agents",
         ...page(() => import("./pages/[project]/agents")),
       },
+
+      // Coding-agent activity, project scope
+      {
+        path: "/:project/sessions",
+        ...page(() => import("./pages/[project]/sessions")),
+      },
+      {
+        path: "/:project/pull-requests",
+        ...page(() => import("./pages/[project]/pull-requests")),
+      },
+
       {
         path: "/:project/automations",
         ...page(() => import("./pages/[project]/automations")),

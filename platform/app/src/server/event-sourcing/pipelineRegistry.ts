@@ -106,6 +106,7 @@ import {
   CodingAgentTraceSessionAppendStore,
   SessionMetricSeriesAppendStore,
 } from "./pipelines/coding-agent-processing/projections/stores";
+import { createCodingAgentSessionSeenReactor } from "./pipelines/coding-agent-processing/reactors/codingAgentSessionSeen.reactor";
 import {
   createPullRequestMappingReactor,
   type PullRequestMappingReactorDeps,
@@ -908,6 +909,14 @@ export class PipelineRegistry {
               ),
             }
           : {}),
+        // Unconditional, unlike the mapping reactor above: recording that a
+        // session ran needs only the project store, which every app has, and
+        // an instance with no GitHub connection still shows the project's
+        // Sessions destination.
+        sessionSeenReactor: createCodingAgentSessionSeenReactor({
+          touchCodingAgentSessionSeen: (params) =>
+            this.deps.projects.touchCodingAgentSessionSeen(params),
+        }),
       }),
     );
   }

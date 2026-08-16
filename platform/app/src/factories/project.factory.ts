@@ -34,4 +34,6 @@ export const projectFactory = Factory.define<
   ownerUserId: null,
   presenceEnabled: false,
   departmentId: null,
+  lastCodingAgentSessionAt: null,
+  lastCodingAgentPullRequestAt: null,
 }));

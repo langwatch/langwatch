@@ -39,6 +39,16 @@ export interface CodingAgentProcessingPipelineDeps {
     CodingAgentProcessingEvent,
     CodingAgentSessionState
   >;
+  /**
+   * Records on the project that a coding-agent session folded, which is what
+   * puts the Sessions destination in the project's sidebar. Absent where there
+   * is no project store to write to (the test app), in which case the pipeline
+   * mounts no reactor at all.
+   */
+  sessionSeenReactor?: ReactorDefinition<
+    CodingAgentProcessingEvent,
+    CodingAgentSessionState
+  >;
 }
 
 /**
@@ -65,10 +75,12 @@ export interface CodingAgentProcessingPipelineDeps {
  *   per session event (model call, compaction, rate limit, tool run, …),
  *   the per-call sequence the session fold's converged totals erase
  *
- * Consumption is subscribers + projections, plus one reactor on the session
+ * Consumption is subscribers + projections, plus two reactors on the session
  * fold: pullRequestMapping, which asks the organization's GitHub connection
- * about the session's branch once the row is committed. Commands default to
- * per-aggregate grouping, so one session's contributions apply in order.
+ * about the session's branch once the row is committed, and
+ * codingAgentSessionSeen, which records on the project that a session ran at
+ * all. Commands default to per-aggregate grouping, so one session's
+ * contributions apply in order.
  */
 export function createCodingAgentProcessingPipeline(
   deps: CodingAgentProcessingPipelineDeps,
@@ -122,13 +134,21 @@ export function createCodingAgentProcessingPipeline(
       coalesceMaxBatch: CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH,
     });
 
+  const withPullRequestMapping = deps.pullRequestMappingReactor
+    ? builder.withReactor(
+        "codingAgentSession",
+        "pullRequestMapping",
+        deps.pullRequestMappingReactor,
+      )
+    : builder;
+
   return (
-    deps.pullRequestMappingReactor
-      ? builder.withReactor(
+    deps.sessionSeenReactor
+      ? withPullRequestMapping.withReactor(
           "codingAgentSession",
-          "pullRequestMapping",
-          deps.pullRequestMappingReactor,
+          "codingAgentSessionSeen",
+          deps.sessionSeenReactor,
         )
-      : builder
+      : withPullRequestMapping
   ).build();
 }

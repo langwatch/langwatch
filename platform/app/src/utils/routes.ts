@@ -37,6 +37,14 @@ export const projectRoutes = {
     path: "/[project]/online-evaluations",
     title: "Online Evaluations",
   },
+  coding_agent_sessions: {
+    path: "/[project]/sessions",
+    title: "Sessions",
+  },
+  coding_agent_pull_requests: {
+    path: "/[project]/pull-requests",
+    title: "Pull requests",
+  },
   evaluations_new_choose: {
     path: "/[project]/evaluations/new/choose",
     title: "New Evaluation",
