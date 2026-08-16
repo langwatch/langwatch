@@ -45,11 +45,9 @@ vi.mock("~/server/app-layer/app", () => ({
   }),
 }));
 
-import {
-  ELEVENLABS_WEBHOOK_SECRET_KEY,
-  app as elevenLabsApp,
-} from "~/server/routes/elevenlabs";
+import { app as elevenLabsApp } from "~/server/routes/elevenlabs";
 import { encrypt } from "~/utils/encryption";
+import { ELEVENLABS_WEBHOOK_SECRET_KEY } from "../elevenLabsCredential.service";
 import {
   correlateRealtimeSession,
   reserveRealtimeSession,

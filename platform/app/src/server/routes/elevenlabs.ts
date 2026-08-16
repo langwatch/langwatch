@@ -15,9 +15,10 @@
  *
  * Every delivery this handler can parse is acknowledged, and that is not
  * politeness. A retry is not guaranteed: ElevenLabs does not retry every
- * failed delivery, and retries are off for HIPAA workflows. Ten consecutive
- * failures also disable the webhook, which would stop delivery for every
- * tenant on the endpoint.
+ * failed delivery, and retries are off for HIPAA workflows. The webhook is
+ * also disabled once it has 10 or more consecutive failures and its last
+ * success is older than 7 days or never happened, which would stop delivery
+ * for every tenant on the endpoint.
  *
  * That is why this webhook is an optimisation and not the billing path. The
  * reconciler in realtimeSessionPoller.ts asks the vendor for the same numbers
@@ -34,12 +35,11 @@ import { createHmac, timingSafeEqual } from "crypto";
 import type { Context } from "hono";
 import { z } from "zod";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
-import { prisma } from "~/server/db";
+import { getElevenLabsWebhookSecret } from "~/server/gateway/elevenLabsCredential.service";
 import {
   closeAndConfirmRealtimeSession,
   matchRealtimeSession,
 } from "~/server/gateway/realtimeSession.service";
-import { decryptCustomKeys } from "~/server/modelProviders/customKeys";
 
 const logger = createLogger("langwatch:api:elevenlabs");
 
@@ -50,9 +50,6 @@ const WEBHOOK_PUBLIC_REASON =
   "row the path names.";
 
 const secured = createServiceApp({ basePath: "/api" });
-
-/** The custom key an operator stores the workspace webhook secret under. */
-export const ELEVENLABS_WEBHOOK_SECRET_KEY = "ELEVENLABS_WEBHOOK_SECRET";
 
 /**
  * How far out of date a delivery's own timestamp may be.
@@ -156,27 +153,6 @@ function parseSignatureHeader(
   return { timestamp, sentAt, signature };
 }
 
-/** The workspace webhook secret stored on one provider row, or "". */
-async function webhookSecretFor(modelProviderId: string): Promise<{
-  secret: string;
-  organizationId: string;
-} | null> {
-  const provider = await prisma.modelProvider.findUnique({
-    where: { id: modelProviderId },
-    select: {
-      id: true,
-      provider: true,
-      organizationId: true,
-      customKeys: true,
-    },
-  });
-  if (provider?.provider !== "elevenlabs") return null;
-  const keys = decryptCustomKeys(provider.customKeys);
-  const secret = keys[ELEVENLABS_WEBHOOK_SECRET_KEY];
-  if (typeof secret !== "string" || secret.length === 0) return null;
-  return { secret, organizationId: provider.organizationId };
-}
-
 /**
  * Reads the LangWatch session id the mint echoed into the conversation's own
  * variables. Used only when the delivery carries no conversation id we
@@ -196,7 +172,7 @@ async function handleElevenLabsWebhook(c: Context): Promise<Response> {
   // parameters. An empty id resolves no provider, so it answers 404 with the
   // rest of them.
   const modelProviderId = c.req.param("modelProviderId") ?? "";
-  const configured = await webhookSecretFor(modelProviderId);
+  const configured = await getElevenLabsWebhookSecret({ modelProviderId });
   if (!configured) {
     // 404 rather than 401: an id with no webhook configured must look the
     // same as an id that does not exist, or the ids are enumerable.

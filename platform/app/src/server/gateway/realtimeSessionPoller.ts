@@ -19,9 +19,8 @@
 import { createLogger } from "@langwatch/observability";
 import type { GatewayRealtimeSession } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
-import { decryptCustomKeys } from "~/server/modelProviders/customKeys";
-import { isElevenLabsHost } from "~/server/modelProviders/registry";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
+import { getElevenLabsApiCredential } from "./elevenLabsCredential.service";
 import {
   closeAndConfirmRealtimeSession,
   expireStaleRealtimeSessions,
@@ -46,7 +45,6 @@ const POLL_AFTER_MS = 2 * 60 * 1000;
 /** Bounds one tick, so a backlog cannot turn into a burst of vendor calls. */
 const MAX_SESSIONS_PER_TICK = 25;
 
-const DEFAULT_BASE_URL = "https://api.elevenlabs.io";
 const VENDOR_CALL_TIMEOUT_MS = 10_000;
 
 export interface RealtimeSessionPollerHandle {
@@ -66,35 +64,6 @@ interface ConversationReport {
 /** A conversation the vendor considers finished has a final duration. */
 function isTerminal(status: string | undefined): boolean {
   return status === "done" || status === "failed";
-}
-
-/** The API key and host for one ElevenLabs credential row. */
-async function credentialFor(
-  modelProviderId: string,
-): Promise<{ apiKey: string; baseUrl: string } | null> {
-  const provider = await prisma.modelProvider.findUnique({
-    where: { id: modelProviderId },
-    select: { provider: true, customKeys: true },
-  });
-  if (provider?.provider !== "elevenlabs") return null;
-  const keys = decryptCustomKeys(provider.customKeys);
-  const apiKey = keys.ELEVENLABS_API_KEY;
-  if (typeof apiKey !== "string" || apiKey.length === 0) return null;
-  const configured = keys.ELEVENLABS_BASE_URL;
-  if (typeof configured === "string" && configured.length > 0) {
-    // Checked again on read, not only on write. A row stored before the
-    // registry constrained this field would otherwise send the customer's
-    // key to whatever host it names.
-    if (!isElevenLabsHost(configured)) {
-      logger.warn(
-        { modelProviderId },
-        "an ElevenLabs credential names a base URL outside elevenlabs.io; reconciling against the default host instead",
-      );
-      return { apiKey, baseUrl: DEFAULT_BASE_URL };
-    }
-    return { apiKey, baseUrl: configured.replace(/\/$/, "") };
-  }
-  return { apiKey, baseUrl: DEFAULT_BASE_URL };
 }
 
 /**
@@ -134,7 +103,9 @@ async function readConversation(params: {
 /** Confirms one session from what the vendor reports about its call. */
 async function reconcile(session: GatewayRealtimeSession): Promise<boolean> {
   if (!session.vendorConversationId) return false;
-  const credential = await credentialFor(session.modelProviderId);
+  const credential = await getElevenLabsApiCredential({
+    modelProviderId: session.modelProviderId,
+  });
   if (!credential) return false;
 
   const { report, notFound } = await readConversation({

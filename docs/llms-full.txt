@@ -2895,8 +2895,9 @@ reconciliation, and a report arriving later still replaces that record.
 The reconciler exists because webhook delivery cannot be relied on as the only
 path. A retry is not guaranteed: ElevenLabs does not retry every failed
 delivery, and retries are off for HIPAA workflows. On top of that, a webhook
-is disabled after 10 consecutive failures, which would stop delivery for every
-session on it.
+is disabled once it has 10 or more consecutive failures **and** its last
+success is either older than 7 days or has never happened, which would stop
+delivery for every session on it.
 
 So if the webhook were the only path, one rejected delivery would lose that
 call's billing data. It is not the only path. The reconciler asks the vendor
