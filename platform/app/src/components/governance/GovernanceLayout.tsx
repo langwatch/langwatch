@@ -1,28 +1,16 @@
-import { Box, Text } from "@chakra-ui/react";
-import {
-  AlertTriangle,
-  Eye,
-  PackageOpen,
-  PlugZap,
-  Route,
-  Wallet,
-} from "lucide-react";
 import type { PropsWithChildren } from "react";
 import { SectionNavigationLayout } from "~/components/ui/layouts/SectionNavigationLayout";
+import { governanceNavItems } from "~/features/navigation/sectionNavItems";
 
 /**
- * Layout for `/governance` - wraps DashboardLayout in `orgScope` mode
+ * Layout for `/governance/*` - wraps DashboardLayout in `orgScope` mode
  * (no project picker in the header, replaced with an org-name chip
  * + "Organization-scoped" indicator) and renders a thin org-level
- * sub-navigation in the left column.
- *
- * The four sub-routes are admin-config surfaces under `/settings/...`
- * (Ingestion Sources, Anomaly Rules, Routing Policies). They keep
- * SettingsLayout chrome on their own pages - the GovernanceLayout
- * left rail is just the entry point for the daily-use home.
+ * sub-navigation in the left column. The item list itself lives in
+ * `~/features/navigation/sectionNavItems` so every shell renders the
+ * same navigation.
  *
  * Spec: specs/ai-gateway/governance/governance-home-routing.feature
- *       (the "future top-level layout" scenario, now current state)
  */
 export default function GovernanceLayout({
   children,
@@ -33,52 +21,12 @@ export default function GovernanceLayout({
       sectionLabel="AI Governance"
       orgScope
       pageTitle={pageTitle}
-      navigationItems={[
-        {
-          label: "Overview",
-          href: "/governance",
-          icon: <Eye size={14} />,
-        },
-        {
-          label: "Ingestion Sources",
-          href: "/governance/ingestion-sources",
-          includePath: "/governance/ingestion-sources",
-          icon: <PlugZap size={14} />,
-        },
-        {
-          label: "Anomaly Rules",
-          href: "/governance/anomaly-rules",
-          includePath: "/governance/anomaly-rules",
-          icon: <AlertTriangle size={14} />,
-        },
-        {
-          label: "Routing Policies",
-          href: "/governance/routing-policies",
-          includePath: "/governance/routing-policies",
-          icon: <Route size={14} />,
-        },
-        {
-          label: "Tool Catalog",
-          href: "/governance/tool-catalog",
-          includePath: "/governance/tool-catalog",
-          icon: <PackageOpen size={14} />,
-        },
-        {
-          label: "Departments",
-          href: "/governance/departments",
-          includePath: "/governance/departments",
-          icon: <Wallet size={14} />,
-        },
-      ]}
-      sidebarFooter={
-        <Box paddingX={3} paddingTop={4}>
-          <Text fontSize="xs" color="fg.subtle" lineHeight="1.5">
-            Sub-pages above are admin-config surfaces under Settings. This
-            Overview is the daily-use home, plus a few lightweight org-policy
-            toggles at the bottom.
-          </Text>
-        </Box>
-      }
+      navigationItems={governanceNavItems.map((item) => ({
+        label: item.label,
+        href: item.href,
+        includePath: item.includePath,
+        icon: <item.icon size={14} />,
+      }))}
     >
       {children}
     </SectionNavigationLayout>
