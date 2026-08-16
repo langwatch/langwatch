@@ -16,7 +16,10 @@ import {
   formatDuration,
   formatTokens,
 } from "../../../utils/formatters";
-import { findCacheRebuilds } from "../sessionView/tokenTimeline";
+import {
+  type CacheRebuildEvent,
+  findCacheRebuilds,
+} from "../sessionView/tokenTimeline";
 import { toolResultBodyToString } from "../transcript";
 import { classifyPromptText } from "./injectedNotice";
 import {
@@ -151,6 +154,51 @@ type ContextMarker =
  * false` suppresses the note — loading history can then only add lines above
  * the reader, never remove one below them.
  */
+/**
+ * The size band the walk believes the session is in. `known` says whether that
+ * belief is the truth rather than a guess: a call with no band leaves it as it
+ * was, since the sticky label above it could have been anything.
+ */
+type BandState = { label: string | null; known: boolean };
+
+/**
+ * The notes one model call contributes, and the band state after it.
+ */
+function markersForModelCall({
+  entry,
+  rebuild,
+  band: bandState,
+}: {
+  entry: Extract<TranscriptEntry, { kind: "model_call" }>;
+  rebuild: CacheRebuildEvent | undefined;
+  band: BandState;
+}): { markers: ContextMarker[]; band: BandState } {
+  const markers: ContextMarker[] = [];
+  if (rebuild) {
+    markers.push({
+      kind: "deadSite",
+      atMs: entry.atMs,
+      cacheCreationTokens: rebuild.cacheCreationTokens,
+      previousContextTokens: rebuild.previousContextTokens,
+    });
+  }
+
+  const contextTokens = entry.cacheReadTokens + entry.cacheCreationTokens;
+  const band = contextHeatBand(contextTokens);
+  if (!band) return { markers, band: bandState };
+
+  if (bandState.known && band.label !== bandState.label) {
+    markers.push({
+      kind: "heat",
+      atMs: entry.atMs,
+      contextTokens,
+      color: band.color,
+      label: band.label,
+    });
+  }
+  return { markers, band: { label: band.label, known: true } };
+}
+
 function buildContextMarkers(
   entries: TranscriptEntry[],
   visibleIndices: readonly number[],
@@ -163,39 +211,17 @@ function buildContextMarkers(
 
   const markers = new Map<number, ContextMarker[]>();
   let pending: ContextMarker[] = [];
-  let lastBandLabel: string | null = null;
-  // Whether `lastBandLabel` reflects the true state of the session so far. A
-  // call with no band keeps it unknown: the sticky label above it could have
-  // been anything, so a later crossing is still a guess.
-  let bandKnown = historyComplete;
+  let band: BandState = { label: null, known: historyComplete };
 
   entries.forEach((entry, fullIndex) => {
     if (entry.kind === "model_call") {
-      const rebuild = rebuildsByAtMs.get(entry.atMs);
-      if (rebuild) {
-        pending.push({
-          kind: "deadSite",
-          atMs: entry.atMs,
-          cacheCreationTokens: rebuild.cacheCreationTokens,
-          previousContextTokens: rebuild.previousContextTokens,
-        });
-      }
-
-      const contextTokens = entry.cacheReadTokens + entry.cacheCreationTokens;
-      const band = contextHeatBand(contextTokens);
-      if (band) {
-        if (bandKnown && band.label !== lastBandLabel) {
-          pending.push({
-            kind: "heat",
-            atMs: entry.atMs,
-            contextTokens,
-            color: band.color,
-            label: band.label,
-          });
-        }
-        lastBandLabel = band.label;
-        bandKnown = true;
-      }
+      const step = markersForModelCall({
+        entry,
+        rebuild: rebuildsByAtMs.get(entry.atMs),
+        band,
+      });
+      pending.push(...step.markers);
+      band = step.band;
       return;
     }
 
