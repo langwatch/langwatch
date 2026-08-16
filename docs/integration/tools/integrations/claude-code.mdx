@@ -195,10 +195,12 @@ export OTEL_LOG_TOOL_CONTENT=1
 export OTEL_LOG_RAW_API_BODIES=1
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
 export OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel
-export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer your-langwatch-api-key"
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ik-lw-your-ingest-key"
 export OTEL_RESOURCE_ATTRIBUTES="service.name=claude-code"
 claude
 ```
+
+The header takes an ingest key (`ik-lw-…`), which can create traces and nothing else. Keep a full project API key (`sk-lw-…`) out of the configuration of a coding agent: it can read and change your project data, and a coding agent has no use for that.
 
 For a self-hosted instance, replace the endpoint with the address of your instance followed by `/api/otel`. Claude Code appends `/v1/traces`, `/v1/logs` and `/v1/metrics` on its own. Never write the per-signal path yourself.
 
@@ -224,7 +226,7 @@ Claude Code reads the same variables from the `env` block of `~/.claude/settings
     "OTEL_LOG_RAW_API_BODIES": "1",
     "OTEL_EXPORTER_OTLP_PROTOCOL": "http/json",
     "OTEL_EXPORTER_OTLP_ENDPOINT": "https://app.langwatch.ai/api/otel",
-    "OTEL_EXPORTER_OTLP_HEADERS": "Authorization=Bearer your-langwatch-api-key",
+    "OTEL_EXPORTER_OTLP_HEADERS": "Authorization=Bearer ik-lw-your-ingest-key",
     "OTEL_RESOURCE_ATTRIBUTES": "service.name=claude-code"
   }
 }

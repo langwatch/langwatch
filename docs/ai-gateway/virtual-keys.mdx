@@ -160,7 +160,7 @@ Trace attribution on every request:
 
 Two flavours, distinguished by whether `principalUserId` is set:
 
-- **Personal VK** (`principalUserId` set): the VK is treated as that user's personal credential. Budget cascade includes the user's PRINCIPAL-scope budget first. Visibility is per-user by default; `virtualKeys:viewOtherPersonal` is required to inspect another user's personal VK. The CLI device-flow self-mints one of these at ORG scope on first login.
+- **Personal VK** (`principalUserId` set): the VK is treated as that user's personal credential. Budget cascade includes the user's PRINCIPAL-scope budget first. Visibility is per-user by default; `virtualKeys:viewOtherPersonal` is required to inspect another user's personal VK. The CLI device-flow self-mints one of these at ORG scope on the first gateway call, not at login.
 - **Shared VK** (`principalUserId` null): service-account-style credential. Budget cascade runs only through scope-driven budgets. Visibility follows the standard `virtualKeys:view` perm at the VK's scopes.
 
 Both use the same `vk-lw-…` format and the same multi-scope semantics; the principal column is orthogonal to scope.

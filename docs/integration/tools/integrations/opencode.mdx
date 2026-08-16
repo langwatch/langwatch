@@ -190,22 +190,30 @@ export OTEL_LOGS_EXPORTER=otlp
 export OTEL_METRICS_EXPORTER=otlp
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
 export OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel
-export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer your-langwatch-api-key"
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ik-lw-your-ingest-key"
 export OTEL_RESOURCE_ATTRIBUTES="service.name=opencode"
 opencode
 ```
 
+The header takes an ingest key (`ik-lw-…`), which can create traces and nothing else. Keep a full project API key (`sk-lw-…`) out of the configuration of a coding agent: it can read and change your project data, and a coding agent has no use for that.
+
 For a self-hosted instance, replace the endpoint with the address of your instance followed by `/api/otel`. opencode appends `/v1/traces`, `/v1/logs` and `/v1/metrics` on its own. Never write the per-signal path yourself.
 
 <Warning>
-  A plain `export` applies the key to every program the shell starts, not to opencode alone. To keep it to opencode, put the variables in a shell function:
+  A plain `export` applies the key to every program the shell starts, not to opencode alone. To keep it to opencode, put the variables in a shell function. This is the function `langwatch instrument opencode` writes to your shell rc file:
 
   ```bash
   opencode() {
       OTEL_TRACES_EXPORTER=otlp \
+      OTEL_LOGS_EXPORTER=otlp \
+      OTEL_METRICS_EXPORTER=otlp \
+      OTEL_EXPORTER_OTLP_PROTOCOL=http/json \
       OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel \
-      OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer your-langwatch-api-key" \
+      OTEL_EXPORTER_OTLP_HEADERS='Authorization=Bearer ik-lw-your-ingest-key' \
+      OTEL_RESOURCE_ATTRIBUTES=service.name=opencode \
       command opencode "$@"
   }
   ```
+
+  On fish, the same block is a function with `set -lx` for each variable.
 </Warning>

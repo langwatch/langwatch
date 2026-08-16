@@ -211,10 +211,12 @@ export OTEL_TRACES_EXPORTER=otlp
 export OTEL_METRICS_EXPORTER=otlp
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
 export OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel
-export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer your-langwatch-api-key"
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ik-lw-your-ingest-key"
 export OTEL_RESOURCE_ATTRIBUTES="service.name=copilot-cli"
 copilot
 ```
+
+The header takes an ingest key (`ik-lw-…`), which can create traces and nothing else. Keep a full project API key (`sk-lw-…`) out of the configuration of a coding agent: it can read and change your project data, and a coding agent has no use for that.
 
 Copilot reports spans and metrics, and no separate log records, so there is no logs exporter to set. It sends over HTTP only: a `grpc` protocol value is accepted and then ignored.
 
@@ -229,7 +231,7 @@ export OTEL_TRACES_EXPORTER=otlp
 export OTEL_METRICS_EXPORTER=otlp
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
 export OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel
-export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer your-langwatch-api-key"
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ik-lw-your-ingest-key"
 export OTEL_RESOURCE_ATTRIBUTES="service.name=copilot-chat"
 code
 ```
@@ -239,14 +241,22 @@ code
 For a self-hosted instance, replace the endpoint with the address of your instance followed by `/api/otel`. Copilot appends `/v1/traces` and `/v1/metrics` on its own. Never write the per-signal path yourself.
 
 <Warning>
-  A plain `export` applies the key to every program the shell starts, and Visual Studio Code passes its own environment to every integrated terminal. To keep the key to one tool, put the variables in a shell function:
+  A plain `export` applies the key to every program the shell starts, and Visual Studio Code passes its own environment to every integrated terminal. To keep the key to one tool, put the variables in a shell function. This is the function `langwatch instrument copilot` writes to your shell rc file:
 
   ```bash
   copilot() {
       COPILOT_OTEL_ENABLED=true \
+      COPILOT_OTEL_EXPORTER_TYPE=otlp-http \
+      OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true \
+      OTEL_TRACES_EXPORTER=otlp \
+      OTEL_METRICS_EXPORTER=otlp \
+      OTEL_EXPORTER_OTLP_PROTOCOL=http/json \
       OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel \
-      OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer your-langwatch-api-key" \
+      OTEL_EXPORTER_OTLP_HEADERS='Authorization=Bearer ik-lw-your-ingest-key' \
+      OTEL_RESOURCE_ATTRIBUTES=service.name=copilot-cli \
       command copilot "$@"
   }
   ```
+
+  `langwatch instrument code` writes the same function for `code`, without `COPILOT_OTEL_EXPORTER_TYPE` and with `service.name=copilot-chat`. On fish, both are a function with `set -lx` for each variable.
 </Warning>

@@ -8149,13 +8149,17 @@ $ langwatch claude
    Admin: platform-team@your-company.com
 
    Need urgent access? Request an increase:
-     https://app.langwatch.ai/me/budget/request
+     https://app.langwatch.ai/me/budget/request?scope=user&scope_id=user_2a1f&limit_usd=500.00&spent_usd=500.00
 ```
 
-The link opens your dashboard at the budget-request page. It carries
-your user, your limit and your spend as signed parameters, so the admin
-sees the request with full context and can change your budget at once.
-No token re-issuance is required.
+The server builds that link and returns it with the budget response. It
+carries the blocked scope, the scope id, the limit and the spend as query
+parameters, so the budget-request page opens with the context already
+filled in and the admin can change your limit at once. On an older server
+that returns no link, the CLI prints the plain
+`https://app.langwatch.ai/me/budget/request` page instead, and the
+dashboard reads the same context from your signed-in session. No token
+re-issuance is required.
 
 Budgets reset on the period your admin configured (monthly or
 weekly).
@@ -13623,7 +13627,7 @@ Trace attribution on every request:
 
 Two flavours, distinguished by whether `principalUserId` is set:
 
-- **Personal VK** (`principalUserId` set): the VK is treated as that user's personal credential. Budget cascade includes the user's PRINCIPAL-scope budget first. Visibility is per-user by default; `virtualKeys:viewOtherPersonal` is required to inspect another user's personal VK. The CLI device-flow self-mints one of these at ORG scope on first login.
+- **Personal VK** (`principalUserId` set): the VK is treated as that user's personal credential. Budget cascade includes the user's PRINCIPAL-scope budget first. Visibility is per-user by default; `virtualKeys:viewOtherPersonal` is required to inspect another user's personal VK. The CLI device-flow self-mints one of these at ORG scope on the first gateway call, not at login.
 - **Shared VK** (`principalUserId` null): service-account-style credential. Budget cascade runs only through scope-driven budgets. Visibility follows the standard `virtualKeys:view` perm at the VK's scopes.
 
 Both use the same `vk-lw-…` format and the same multi-scope semantics; the principal column is orthogonal to scope.
@@ -14894,7 +14898,8 @@ The current branch (PR #3524) implements Tier 1 end-to-end:
   cursor/gemini`, `langwatch instrument <tool>`, `langwatch whoami`,
   `langwatch me`, `langwatch logout`).
 - ✅ **Personal Workspace** (Team + Project with `isPersonal` flag).
-- ✅ **Personal Virtual Keys** (issued via the device-flow exchange).
+- ✅ **Personal Virtual Keys** (issued on the first gateway call, not at
+  device approval).
 - ✅ **Routing Policies** (Org/Team/Project hierarchy, provider-cred
   validation).
 - ✅ **`/me` + `/me/settings`** dashboards (web app, gated behind the
@@ -16567,9 +16572,12 @@ You install a template, paste an **ingestion key** into your tool's OTLP exporte
 traces land at `/me/traces` already shaped into the canonical `gen_ai.*` form, cost,
 tokens, and model populated automatically. An ingestion key is one
 [API key](/platform/api-keys) row with an `ik-lw-…` prefix, scoped to one project with a
-write-only, ingest-only role: it can create traces and nothing else, so it's safe to
-spray into an agent's environment. Full-access keys carry the `sk-lw-…` prefix instead,
-so you can tell the two apart at a glance.
+write-only, ingest-only role: it can create traces and nothing else. That is a much
+smaller blast radius than a full project key (`sk-lw-…`), which can read and change your
+project data, so the prefix tells you which one you are holding at a glance. An ingestion
+key is still a secret: the traces it writes carry your prompts and your tool content, and
+anyone who holds the key can write into your project. Protect it the same way you protect
+any other credential.
 
 ---
 
@@ -16921,8 +16929,10 @@ SOC2, ISO27001 evidence collection.
 ### Does LangWatch see my Anthropic OAuth token?
 
 No. Claude Code holds your Anthropic OAuth session locally; LangWatch never participates
-in that flow. The only credential LangWatch holds is the ingestion key (`ik-lw-…`) we
-mint for you, which is scoped to your personal project and write-only.
+in that flow. For this path the credential LangWatch holds is the ingestion key (`ik-lw-…`)
+we mint for you, which is scoped to your personal project and write-only. Device approval
+mints no virtual key. If you later send traffic through the AI Gateway, that first call
+issues a personal virtual key (`vk-lw-…`) as well.
 
 ### What happens if I rotate the ingestion key?
 
@@ -30868,10 +30878,12 @@ export OTEL_LOG_TOOL_CONTENT=1
 export OTEL_LOG_RAW_API_BODIES=1
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
 export OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel
-export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer your-langwatch-api-key"
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ik-lw-your-ingest-key"
 export OTEL_RESOURCE_ATTRIBUTES="service.name=claude-code"
 claude
 ```
+
+The header takes an ingest key (`ik-lw-…`), which can create traces and nothing else. Keep a full project API key (`sk-lw-…`) out of the configuration of a coding agent: it can read and change your project data, and a coding agent has no use for that.
 
 For a self-hosted instance, replace the endpoint with the address of your instance followed by `/api/otel`. Claude Code appends `/v1/traces`, `/v1/logs` and `/v1/metrics` on its own. Never write the per-signal path yourself.
 
@@ -30897,7 +30909,7 @@ Claude Code reads the same variables from the `env` block of `~/.claude/settings
     "OTEL_LOG_RAW_API_BODIES": "1",
     "OTEL_EXPORTER_OTLP_PROTOCOL": "http/json",
     "OTEL_EXPORTER_OTLP_ENDPOINT": "https://app.langwatch.ai/api/otel",
-    "OTEL_EXPORTER_OTLP_HEADERS": "Authorization=Bearer your-langwatch-api-key",
+    "OTEL_EXPORTER_OTLP_HEADERS": "Authorization=Bearer ik-lw-your-ingest-key",
     "OTEL_RESOURCE_ATTRIBUTES": "service.name=claude-code"
   }
 }
@@ -31174,10 +31186,12 @@ export OTEL_TRACES_EXPORTER=otlp
 export OTEL_METRICS_EXPORTER=otlp
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
 export OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel
-export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer your-langwatch-api-key"
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ik-lw-your-ingest-key"
 export OTEL_RESOURCE_ATTRIBUTES="service.name=copilot-cli"
 copilot
 ```
+
+The header takes an ingest key (`ik-lw-…`), which can create traces and nothing else. Keep a full project API key (`sk-lw-…`) out of the configuration of a coding agent: it can read and change your project data, and a coding agent has no use for that.
 
 Copilot reports spans and metrics, and no separate log records, so there is no logs exporter to set. It sends over HTTP only: a `grpc` protocol value is accepted and then ignored.
 
@@ -31192,7 +31206,7 @@ export OTEL_TRACES_EXPORTER=otlp
 export OTEL_METRICS_EXPORTER=otlp
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
 export OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel
-export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer your-langwatch-api-key"
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ik-lw-your-ingest-key"
 export OTEL_RESOURCE_ATTRIBUTES="service.name=copilot-chat"
 code
 ```
@@ -31202,16 +31216,24 @@ code
 For a self-hosted instance, replace the endpoint with the address of your instance followed by `/api/otel`. Copilot appends `/v1/traces` and `/v1/metrics` on its own. Never write the per-signal path yourself.
 
 <Warning>
-  A plain `export` applies the key to every program the shell starts, and Visual Studio Code passes its own environment to every integrated terminal. To keep the key to one tool, put the variables in a shell function:
+  A plain `export` applies the key to every program the shell starts, and Visual Studio Code passes its own environment to every integrated terminal. To keep the key to one tool, put the variables in a shell function. This is the function `langwatch instrument copilot` writes to your shell rc file:
 
   ```bash
   copilot() {
       COPILOT_OTEL_ENABLED=true \
+      COPILOT_OTEL_EXPORTER_TYPE=otlp-http \
+      OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true \
+      OTEL_TRACES_EXPORTER=otlp \
+      OTEL_METRICS_EXPORTER=otlp \
+      OTEL_EXPORTER_OTLP_PROTOCOL=http/json \
       OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel \
-      OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer your-langwatch-api-key" \
+      OTEL_EXPORTER_OTLP_HEADERS='Authorization=Bearer ik-lw-your-ingest-key' \
+      OTEL_RESOURCE_ATTRIBUTES=service.name=copilot-cli \
       command copilot "$@"
   }
   ```
+
+  `langwatch instrument code` writes the same function for `code`, without `COPILOT_OTEL_EXPORTER_TYPE` and with `service.name=copilot-chat`. On fish, both are a function with `set -lx` for each variable.
 </Warning>
 
 ---
@@ -31348,11 +31370,11 @@ Your agent can read all of this back. See [Explore your usage with your own agen
 
 ## Content and privacy
 
-Codex never puts conversation content on the wire. Its own OpenTelemetry export carries the tokens, the model and the timing, and it drops the prompt, the tool calls and the answer before it exports. No Codex setting turns that content on.
+Codex never puts conversation content on the wire. Its own OpenTelemetry export carries two signals. The trace exporter reports each turn with the model, the tokens and the timing. The event exporter reports the facts of the session: each tool run with its name, duration and result, each prompt as a length without its text, tool approvals and denials, and the time to the first token. LangWatch enables both, and the session view is built from them. The prompt text, the tool output and the answer never ride either signal, and no Codex setting turns that content on.
 
 Codex does write the whole conversation to a transcript on your machine, and each turn there records the trace that Codex reported it under. `langwatch codex` and `langwatch instrument codex` register a small program on the Codex `notify` setting, which Codex runs after each completed turn. That program reads the turn from the transcript and records it against the same trace, so a session you started with a plain `codex` still shows what was said. A `notify` program of your own keeps running: LangWatch calls it after its own.
 
-To collect the usage numbers and no content, remove the `notify` setting from `~/.codex/config.toml` and keep the `[otel]` block. Tokens, cost, model and timing continue.
+To collect the usage numbers and no content, remove the `notify` setting from `~/.codex/config.toml` and keep the `[otel]` block. Tokens, cost, model, timing, tool counts and prompt lengths continue.
 
 <Warning>
   The `[otel]` block holds an ingest key on the `Authorization` header, because Codex reads that header on every run and that is what makes a plain `codex` report. LangWatch writes the file with owner-only permissions (`0600`). Keep those permissions if you edit the file by hand, and never commit it.
@@ -31373,12 +31395,12 @@ To collect the usage numbers and no content, remove the `notify` setting from `~
     If it reports that your Codex configuration already runs a program of its own after every turn and cannot be moved safely, remove the `notify` setting from `~/.codex/config.toml` and run the command again.
   </Accordion>
 
-  <Accordion title="Codex 0.137 and later ignores the exporter">
-    Codex separates the span exporter from the log exporter. Write the block as `[otel.trace_exporter.otlp-http]`. The older `[otel.exporter.otlp-http]` form is accepted and then ignored for spans, so nothing arrives.
+  <Accordion title="Traces arrive but the session shows no tools or prompts">
+    Codex separates the exporters by signal: `[otel.trace_exporter.otlp-http]` sends the spans and `[otel.exporter.otlp-http]` sends the events that carry the tool runs and the prompt lengths. A configuration written before the event exporter was part of the block only has the first one. Run `langwatch instrument codex` again to write both.
   </Accordion>
 
   <Accordion title="The endpoint returns 404">
-    Codex does not append the signal path to the endpoint, unlike most OpenTelemetry libraries. Write the full path: `https://app.langwatch.ai/api/otel/v1/traces`.
+    Codex does not append the signal path to the endpoint, unlike most OpenTelemetry libraries. Write the full path per exporter: `https://app.langwatch.ai/api/otel/v1/traces` on the trace exporter and `https://app.langwatch.ai/api/otel/v1/logs` on the event exporter.
   </Accordion>
 
   <Accordion title="The telemetry goes to the wrong workspace">
@@ -31407,8 +31429,15 @@ environment = "your-organization"
 [otel.trace_exporter.otlp-http]
 endpoint = "https://app.langwatch.ai/api/otel/v1/traces"
 protocol = "json"
-headers = { "Authorization" = "Bearer your-langwatch-api-key" }
+headers = { "Authorization" = "Bearer ik-lw-your-ingest-key" }
+
+[otel.exporter.otlp-http]
+endpoint = "https://app.langwatch.ai/api/otel/v1/logs"
+protocol = "json"
+headers = { "Authorization" = "Bearer ik-lw-your-ingest-key" }
 ```
+
+The header takes an ingest key (`ik-lw-…`), which can create traces and nothing else. Keep a full project API key (`sk-lw-…`) out of the configuration of a coding agent: it can read and change your project data, and a coding agent has no use for that.
 
 Then set the file to owner-only permissions, because it holds a key:
 
@@ -31416,13 +31445,13 @@ Then set the file to owner-only permissions, because it holds a key:
 chmod 600 ~/.codex/config.toml
 ```
 
-For a self-hosted instance, replace the host with the address of your instance and keep the `/api/otel/v1/traces` path.
+For a self-hosted instance, replace the host with the address of your instance and keep the `/api/otel/v1/traces` and `/api/otel/v1/logs` paths.
 
 <Note>
   The `environment` value is a free label. It arrives on every trace, so a name such as your organization or your team makes the traces easier to filter.
 </Note>
 
-A manual block reports the tokens, the model and the timing of each turn. It does not report the conversation, because Codex exports no content. The conversation needs the turn program that `langwatch instrument codex` installs.
+A manual block reports the tokens, the model and the timing of each turn, and with the event exporter also the tool runs, the prompt lengths and the time to first token. It does not report the conversation, because Codex exports no content. The conversation needs the turn program that `langwatch instrument codex` installs.
 
 ---
 
@@ -31620,24 +31649,32 @@ export OTEL_LOGS_EXPORTER=otlp
 export OTEL_METRICS_EXPORTER=otlp
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
 export OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel
-export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer your-langwatch-api-key"
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ik-lw-your-ingest-key"
 export OTEL_RESOURCE_ATTRIBUTES="service.name=opencode"
 opencode
 ```
 
+The header takes an ingest key (`ik-lw-…`), which can create traces and nothing else. Keep a full project API key (`sk-lw-…`) out of the configuration of a coding agent: it can read and change your project data, and a coding agent has no use for that.
+
 For a self-hosted instance, replace the endpoint with the address of your instance followed by `/api/otel`. opencode appends `/v1/traces`, `/v1/logs` and `/v1/metrics` on its own. Never write the per-signal path yourself.
 
 <Warning>
-  A plain `export` applies the key to every program the shell starts, not to opencode alone. To keep it to opencode, put the variables in a shell function:
+  A plain `export` applies the key to every program the shell starts, not to opencode alone. To keep it to opencode, put the variables in a shell function. This is the function `langwatch instrument opencode` writes to your shell rc file:
 
   ```bash
   opencode() {
       OTEL_TRACES_EXPORTER=otlp \
+      OTEL_LOGS_EXPORTER=otlp \
+      OTEL_METRICS_EXPORTER=otlp \
+      OTEL_EXPORTER_OTLP_PROTOCOL=http/json \
       OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel \
-      OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer your-langwatch-api-key" \
+      OTEL_EXPORTER_OTLP_HEADERS='Authorization=Bearer ik-lw-your-ingest-key' \
+      OTEL_RESOURCE_ATTRIBUTES=service.name=opencode \
       command opencode "$@"
   }
   ```
+
+  On fish, the same block is a function with `set -lx` for each variable.
 </Warning>
 
 ---

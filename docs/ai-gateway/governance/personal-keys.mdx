@@ -201,13 +201,17 @@ $ langwatch claude
    Admin: platform-team@your-company.com
 
    Need urgent access? Request an increase:
-     https://app.langwatch.ai/me/budget/request
+     https://app.langwatch.ai/me/budget/request?scope=user&scope_id=user_2a1f&limit_usd=500.00&spent_usd=500.00
 ```
 
-The link opens your dashboard at the budget-request page. It carries
-your user, your limit and your spend as signed parameters, so the admin
-sees the request with full context and can change your budget at once.
-No token re-issuance is required.
+The server builds that link and returns it with the budget response. It
+carries the blocked scope, the scope id, the limit and the spend as query
+parameters, so the budget-request page opens with the context already
+filled in and the admin can change your limit at once. On an older server
+that returns no link, the CLI prints the plain
+`https://app.langwatch.ai/me/budget/request` page instead, and the
+dashboard reads the same context from your signed-in session. No token
+re-issuance is required.
 
 Budgets reset on the period your admin configured (monthly or
 weekly).

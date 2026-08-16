@@ -272,7 +272,8 @@ The current branch (PR #3524) implements Tier 1 end-to-end:
   cursor/gemini`, `langwatch instrument <tool>`, `langwatch whoami`,
   `langwatch me`, `langwatch logout`).
 - ✅ **Personal Workspace** (Team + Project with `isPersonal` flag).
-- ✅ **Personal Virtual Keys** (issued via the device-flow exchange).
+- ✅ **Personal Virtual Keys** (issued on the first gateway call, not at
+  device approval).
 - ✅ **Routing Policies** (Org/Team/Project hierarchy, provider-cred
   validation).
 - ✅ **`/me` + `/me/settings`** dashboards (web app, gated behind the

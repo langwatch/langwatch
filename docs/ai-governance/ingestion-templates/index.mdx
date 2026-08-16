@@ -16,9 +16,12 @@ You install a template, paste an **ingestion key** into your tool's OTLP exporte
 traces land at `/me/traces` already shaped into the canonical `gen_ai.*` form, cost,
 tokens, and model populated automatically. An ingestion key is one
 [API key](/platform/api-keys) row with an `ik-lw-…` prefix, scoped to one project with a
-write-only, ingest-only role: it can create traces and nothing else, so it's safe to
-spray into an agent's environment. Full-access keys carry the `sk-lw-…` prefix instead,
-so you can tell the two apart at a glance.
+write-only, ingest-only role: it can create traces and nothing else. That is a much
+smaller blast radius than a full project key (`sk-lw-…`), which can read and change your
+project data, so the prefix tells you which one you are holding at a glance. An ingestion
+key is still a secret: the traces it writes carry your prompts and your tool content, and
+anyone who holds the key can write into your project. Protect it the same way you protect
+any other credential.
 
 ---
 
@@ -370,8 +373,10 @@ SOC2, ISO27001 evidence collection.
 ### Does LangWatch see my Anthropic OAuth token?
 
 No. Claude Code holds your Anthropic OAuth session locally; LangWatch never participates
-in that flow. The only credential LangWatch holds is the ingestion key (`ik-lw-…`) we
-mint for you, which is scoped to your personal project and write-only.
+in that flow. For this path the credential LangWatch holds is the ingestion key (`ik-lw-…`)
+we mint for you, which is scoped to your personal project and write-only. Device approval
+mints no virtual key. If you later send traffic through the AI Gateway, that first call
+issues a personal virtual key (`vk-lw-…`) as well.
 
 ### What happens if I rotate the ingestion key?
 
