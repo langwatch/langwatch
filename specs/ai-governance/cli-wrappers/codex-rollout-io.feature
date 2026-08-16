@@ -120,3 +120,31 @@ Feature: Codex Path B recovers the full request body from the rollout transcript
       Given a streamer that has already streamed the turn for trace_id "t-one"
       When a later turn for trace_id "t-two" completes and the streamer harvests
       Then it posts only "t-two", never re-posting "t-one"
+
+  Rule: the harvest reports the repository the session worked on
+
+    Codex records the session's directory, branch and remote once, in the
+    rollout's session_meta line, and exports none of them over telemetry. The
+    harvest reads them back and posts one session-context record, the same
+    record the claude hook sends, so a codex session names its repository and
+    branch (which is what links it to its pull request) with no hooks.json
+    entry and no per-hook trust grant.
+
+    @unit
+    Scenario: The harvest reports the repository the session worked on
+      Given a rollout whose session_meta names a remote and a branch
+      When the completed turn is harvested
+      Then one session-context record posts beside the conversation
+      And the codex session gains its repository and branch
+
+    @unit
+    Scenario: A notify that fires after every turn posts the repository once
+      Given a session whose context was already posted
+      When the next turn completes and the harvest runs again
+      Then no second session-context record posts while the context is unchanged
+
+    @unit
+    Scenario: A session outside any repository posts its conversation and no context
+      Given a rollout whose session_meta names no remote
+      When the completed turn is harvested
+      Then the conversation posts and no session-context record does

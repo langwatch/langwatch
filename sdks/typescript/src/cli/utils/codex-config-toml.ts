@@ -202,6 +202,32 @@ export function codexOtelBlockEndpoint(
 }
 
 /**
+ * The log-signal endpoint from the langwatch `[otel]` block: the `endpoint`
+ * line whose URL ends in `/v1/logs` (the events exporter's). Null on a block
+ * written before the events exporter existed, which is the caller's cue that
+ * there is no log endpoint to post to rather than a URL to guess.
+ */
+export function codexOtelBlockLogsEndpoint(
+	filePath: string = defaultCodexConfigPath(),
+): string | null {
+	let content: string;
+	try {
+		content = fs.readFileSync(filePath, "utf8");
+	} catch {
+		return null;
+	}
+	const begin = content.indexOf(BEGIN);
+	const end = content.indexOf(END);
+	if (begin === -1 || end === -1 || end < begin) return null;
+	const block = content.slice(begin, end);
+	for (const match of block.matchAll(/^\s*endpoint\s*=\s*"([^"]*)"/gm)) {
+		const url = match[1];
+		if (url?.endsWith("/v1/logs")) return url;
+	}
+	return null;
+}
+
+/**
  * The ingest token inlined on the langwatch `[otel]` block's `headers` entry,
  * or null when the block carries no persisted header.
  *

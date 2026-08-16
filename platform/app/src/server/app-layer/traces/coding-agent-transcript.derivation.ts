@@ -190,7 +190,23 @@ export function buildCodingAgentTranscript({
   const fromSpans = collectSpanEntries(spans, codexToolLogs);
   const fromLogs = collectLogEntries(logs, fromSpans.claimedToolCalls);
 
-  const entries = [...fromSpans.entries, ...fromLogs.entries];
+  // Prompts recovered from a content span carry the user's words verbatim, so
+  // a withheld-text prompt EVENT on the same trace (codex substitutes the
+  // literal redaction sentinel for the words) is the same prompt again with
+  // less in it. Only the withheld stubs defer: an agent that puts the text on
+  // the event has no span twin, and a trace with no recovered conversation
+  // keeps its stubs — they are the only record a prompt happened at all.
+  const hasRecoveredPrompts = fromSpans.entries.some(
+    (entry) => entry.kind === "user_prompt",
+  );
+  const logEntries = hasRecoveredPrompts
+    ? fromLogs.entries.filter(
+        (entry) =>
+          !(entry.kind === "user_prompt" && isWithheldPromptText(entry.text)),
+      )
+    : fromLogs.entries;
+
+  const entries = [...fromSpans.entries, ...logEntries];
 
   // Replies derived from span OUTPUT are held apart: when the same CALL also
   // has a reply-bearing LOG event (gemini emits both an llm_call span and an
@@ -242,6 +258,18 @@ export function buildCodingAgentTranscript({
  * couple of seconds). Kept tight: the NEXT turn's reply must never fall in.
  */
 const LOG_REPLY_FLUSH_SLACK_MS = 2_000;
+
+/**
+ * The literal codex substitutes for prompt text it withholds
+ * (`log_user_prompt` off, the default). The stub still reports the real
+ * length on `prompt_length`.
+ */
+const CODEX_WITHHELD_PROMPT_TEXT = "[REDACTED]";
+
+/** Whether a prompt entry's text is absent or the withheld-text sentinel. */
+function isWithheldPromptText(text: string | null): boolean {
+  return text === null || text === CODEX_WITHHELD_PROMPT_TEXT;
+}
 
 /** A span-derived reply plus the call window a log duplicate would land in. */
 interface SpanReply {
@@ -835,12 +863,13 @@ function logToEntry({
   switch (event) {
     case "user_prompt": {
       const text = readString(attrs, "prompt");
-      return {
-        kind: "user_prompt",
-        atMs,
-        text,
-        chars: text?.length ?? readNumber(attrs, "prompt_length") ?? 0,
-      };
+      // A withheld prompt's chars come from prompt_length: the sentinel's own
+      // length says nothing about what the user typed.
+      const chars =
+        text !== null && text !== CODEX_WITHHELD_PROMPT_TEXT
+          ? text.length
+          : (readNumber(attrs, "prompt_length") ?? 0);
+      return { kind: "user_prompt", atMs, text, chars };
     }
 
     case "assistant_response":

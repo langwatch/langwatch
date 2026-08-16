@@ -42,7 +42,7 @@ import { deviceLabelForThisMachine } from "./device-label";
 import { warnIfGeminiOAuthSelected } from "./gemini-settings-preflight";
 import { buildOtelEnvBlock, SOURCE_TYPE_BY_TOOL } from "./otel-env-block";
 import { resolvePlatformToolPolicy } from "./platform-tool-policy";
-import { SHELL_FUNCTION_TOOLS } from "./shell-rc";
+import { SHELL_FUNCTION_TOOLS, assertCodexTurnHarvest } from "./shell-rc";
 import {
 	type ClaudeProjectPinResult,
 	ensureClaudeProjectTelemetryPin,
@@ -521,11 +521,10 @@ export async function resolveWrapperMode(
 
 	let codexConfigPath: string | undefined;
 	if (tool === "codex") {
-		// codex's OTLP/HTTP exporter sends every signal to the configured
-		// endpoint verbatim - it does NOT append `/v1/traces` the way the
-		// OTel SDKs in Node/Python/Go do. Spell the trace-signal suffix
-		// out here so the POST lands on the real handler. codex only
-		// emits traces today (no logs/metrics), so one suffix suffices.
+		// codex's OTLP/HTTP exporters send each signal to the configured
+		// endpoint verbatim - they do NOT append `/v1/traces` / `/v1/logs`
+		// the way the OTel SDKs in Node/Python/Go do, so the block writer
+		// spells both signal suffixes out (spans and events exporters).
 		//
 		// The Authorization header is persisted inline: config.toml is the
 		// only wiring codex reads on a plain (unwrapped) run, and it is a
@@ -541,6 +540,9 @@ export async function resolveWrapperMode(
 			{ persistAuthHeader: true },
 		);
 		codexConfigPath = result.path;
+		// The exporters carry no conversation; the turn harvest is what
+		// recovers it, so the two are wired (and healed) together.
+		assertCodexTurnHarvest();
 	}
 
 	if (tool === "opencode") {

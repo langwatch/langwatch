@@ -33,7 +33,7 @@ describe("parseCodexRollout", () => {
     describe("when it is parsed", () => {
       /** @scenario "A single-turn rollout yields the request body as chat messages on the turn's trace" */
       it("produces one turn carrying the turn's trace_id, request messages, and output", () => {
-        const turns = parseCodexRollout(
+        const { turns } = parseCodexRollout(
           rollout(
             taskStarted("abc123", "t1"),
             turnContext("t1"),
@@ -60,7 +60,7 @@ describe("parseCodexRollout", () => {
     describe("when it is parsed", () => {
       /** @scenario "The developer message becomes the system prompt in the request body" */
       it("maps the developer role to a system message at the head of input", () => {
-        const turns = parseCodexRollout(
+        const { turns } = parseCodexRollout(
           rollout(
             taskStarted("abc123", "t1"),
             developerMsg("You are codex. Use the tools."),
@@ -82,7 +82,7 @@ describe("parseCodexRollout", () => {
     describe("when it is parsed", () => {
       /** @scenario "The environment_context is preserved in the request body but the prompt is the headline" */
       it("keeps the environment_context as a message while the last user message is the real prompt", () => {
-        const turns = parseCodexRollout(
+        const { turns } = parseCodexRollout(
           rollout(
             taskStarted("abc123", "t1"),
             userMsg("<environment_context>\n  <cwd>/tmp</cwd>\n</environment_context>"),
@@ -105,7 +105,7 @@ describe("parseCodexRollout", () => {
     describe("when it is parsed", () => {
       /** @scenario "A multi-turn rollout accumulates prior turns into each turn's request body" */
       it("produces one turn per task_started trace_id and folds prior turns into the next input", () => {
-        const turns = parseCodexRollout(
+        const { turns } = parseCodexRollout(
           rollout(
             taskStarted("t-one", "turn1"),
             userMsg("first question"),
@@ -136,7 +136,7 @@ describe("parseCodexRollout", () => {
     describe("when it is parsed", () => {
       /** @scenario "Tool calls and their results are captured in the request body" */
       it("records the function_call as an assistant tool_call and the output as a tool message", () => {
-        const turns = parseCodexRollout(
+        const { turns } = parseCodexRollout(
           rollout(
             taskStarted("abc123", "t1"),
             userMsg("run ls"),
@@ -177,7 +177,7 @@ describe("parseCodexRollout", () => {
       // still producing a perfectly healthy-looking turn.
       /** @scenario "Tool calls are captured whichever way codex spelled them" */
       it("records a custom_tool_call the same way as a function_call", () => {
-        const turns = parseCodexRollout(
+        const { turns } = parseCodexRollout(
           rollout(
             taskStarted("abc123", "t1"),
             userMsg("run echo"),
@@ -226,7 +226,7 @@ describe("parseCodexRollout", () => {
 
       /** @scenario "A tool result returned as content blocks reads as its text" */
       it("reads the printed output rather than serialising the blocks", () => {
-        const turns = parseCodexRollout(
+        const { turns } = parseCodexRollout(
           rollout(
             taskStarted("abc123", "t1"),
             userMsg("run echo"),
@@ -267,7 +267,7 @@ describe("parseCodexRollout", () => {
     describe("when it is parsed", () => {
       /** @scenario "An id-less tool call and its output share one synthetic id so they still pair" */
       it("mints one stable id for the call and reuses it on the output", () => {
-        const turns = parseCodexRollout(
+        const { turns } = parseCodexRollout(
           rollout(
             taskStarted("abc123", "t1"),
             userMsg("run ls"),
@@ -304,7 +304,7 @@ describe("parseCodexRollout", () => {
     describe("when a later turn has its own id-less tool output", () => {
       /** @scenario "A synthetic tool-call id does not leak across the turn boundary" */
       it("does not pair the later output to the previous turn's orphaned call", () => {
-        const turns = parseCodexRollout(
+        const { turns } = parseCodexRollout(
           rollout(
             taskStarted("trace-1", "t1"),
             userMsg("first"),
@@ -344,7 +344,7 @@ describe("parseCodexRollout", () => {
     describe("when it is parsed", () => {
       /** @scenario "The assistant final answer is taken from the agent_message when present" */
       it("prefers the agent_message final answer and keeps it out of the input", () => {
-        const turns = parseCodexRollout(
+        const { turns } = parseCodexRollout(
           rollout(
             taskStarted("abc123", "t1"),
             userMsg("hi"),
@@ -365,11 +365,59 @@ describe("parseCodexRollout", () => {
     describe("when it is parsed", () => {
       /** @scenario "A turn with no assistant reply is dropped rather than emitting an empty span" */
       it("drops the turn entirely", () => {
-        const turns = parseCodexRollout(
+        const { turns } = parseCodexRollout(
           rollout(taskStarted("abc123", "t1"), userMsg("are you there?")),
         );
 
         expect(turns).toHaveLength(0);
+      });
+    });
+  });
+
+  describe("given a session_meta line carrying the session's git identity", () => {
+    describe("when it is parsed", () => {
+      it("yields the session id, directory, branch and remote beside the turns", () => {
+        const { meta } = parseCodexRollout(
+          rollout({
+            type: "session_meta",
+            payload: {
+              id: "019ff127-4a7c-7bc0-af13-de3b1a7f94cb",
+              cwd: "/home/dev/acme-app",
+              git: {
+                commit_hash: "f40dfb14fe962ff5c0e662de43424943ba44ae3e",
+                branch: "feat/pricing",
+                repository_url: "https://github.com/acme/acme-app.git",
+              },
+            },
+          }),
+        );
+
+        expect(meta).toEqual({
+          sessionId: "019ff127-4a7c-7bc0-af13-de3b1a7f94cb",
+          cwd: "/home/dev/acme-app",
+          gitBranch: "feat/pricing",
+          gitRepositoryUrl: "https://github.com/acme/acme-app.git",
+        });
+      });
+    });
+  });
+
+  describe("given a session_meta line from a codex too old to record git", () => {
+    describe("when it is parsed", () => {
+      it("yields the identity it has and null for the rest", () => {
+        const { meta } = parseCodexRollout(
+          rollout({
+            type: "session_meta",
+            payload: { id: "019ff127-0000-0000-0000-000000000000", cwd: "/w" },
+          }),
+        );
+
+        expect(meta).toEqual({
+          sessionId: "019ff127-0000-0000-0000-000000000000",
+          cwd: "/w",
+          gitBranch: null,
+          gitRepositoryUrl: null,
+        });
       });
     });
   });

@@ -1332,6 +1332,65 @@ describe("given a codex trace whose recovered conversation and tool spans descri
   });
 });
 
+describe("given a codex trace whose recovered conversation and prompt event describe the same prompt", () => {
+  // Codex withholds the prompt text on its user_prompt event by design: the
+  // literal "[REDACTED]" rides the prompt attribute and only the length is
+  // real. The recovered conversation carries the words.
+  const redactedPromptEvent = () =>
+    log(
+      {
+        "event.name": "codex.user_prompt",
+        prompt: "[REDACTED]",
+        prompt_length: "34",
+        "conversation.id": "conv-1",
+      },
+      1_042,
+    );
+
+  describe("when the session transcript is derived", () => {
+    /** @scenario "A prompt recovered from the transcript is not shown again as its redacted event" */
+    it("shows the prompt once, with its text", () => {
+      const transcript = buildCodingAgentTranscript({
+        spans: [
+          recoveredCodexTurn({
+            atMs: 1_000,
+            messages: [
+              { role: "system", content: "You are codex." },
+              { role: "user", content: "echo papaya and tell me the output" },
+            ],
+            output: "It printed papaya.",
+          }),
+        ],
+        logs: [redactedPromptEvent()],
+      });
+
+      const prompts = transcript.entries.filter(
+        (entry) => entry.kind === "user_prompt",
+      );
+      expect(prompts).toHaveLength(1);
+      expect(prompts[0]).toMatchObject({
+        text: "echo papaya and tell me the output",
+      });
+    });
+
+    /** @scenario "A prompt recovered from the transcript is not shown again as its redacted event" */
+    it("keeps the redacted event when no conversation was recovered", () => {
+      const transcript = buildCodingAgentTranscript({
+        spans: [],
+        logs: [redactedPromptEvent()],
+      });
+
+      const prompts = transcript.entries.filter(
+        (entry) => entry.kind === "user_prompt",
+      );
+      expect(prompts).toHaveLength(1);
+      // The sentinel stays visible (it is the only record a prompt happened)
+      // and the chars are the prompt's real length, not the sentinel's.
+      expect(prompts[0]).toMatchObject({ text: "[REDACTED]", chars: 34 });
+    });
+  });
+});
+
 describe("given a prompt pasting tens of thousands of unclosed tags", () => {
   describe("when the session transcript is derived", () => {
     /** @scenario "A prompt full of unclosed tags is read without stalling the server" */

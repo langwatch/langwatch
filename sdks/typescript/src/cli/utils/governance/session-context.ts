@@ -1,9 +1,12 @@
 /**
- * The pure half of `langwatch ingest hook <tool>`: everything needed to turn
- * a git checkout plus a hook payload into one OTLP log record, with no
- * process, filesystem or network access of its own.
+ * The pure session-context vocabulary: everything needed to turn a git
+ * identity plus a session id into one OTLP log record, with no process,
+ * filesystem or network access of its own. Two seams build the same record
+ * from it: `langwatch ingest hook <tool>` (a hook payload plus a live `git`
+ * run) and the codex rollout harvest (the identity codex wrote into its own
+ * transcript).
  *
- * Kept separate from the command so each piece is directly testable, the
+ * Kept separate from those seams so each piece is directly testable, the
  * remote-URL grammar in particular, which has to cope with every shape a
  * user's `origin` can take (scp-like ssh, ssh:// with a port, https with
  * credentials, nested GitLab groups, a `.git` suffix or none).

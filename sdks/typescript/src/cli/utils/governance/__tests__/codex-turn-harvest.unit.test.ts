@@ -18,6 +18,7 @@ import {
 	findRolloutForThread,
 	harvestCodexThread,
 } from "../codex-rollout-otlp";
+import { assertCodexTurnHarvest } from "../shell-rc";
 
 const THREAD = "019fc156-02e3-76a1-b462-14c38b450cb6";
 const TRACE = "add81f7dde443979dde88487bd7fb454";
@@ -69,14 +70,25 @@ const agentFinal = (message: string) => ({
 	payload: { type: "agent_message", message, phase: "final_answer" },
 });
 
-/** A fetch double that records the OTLP bodies it was handed. */
+const sessionMeta = (git?: Record<string, unknown>) => ({
+	type: "session_meta",
+	payload: {
+		id: THREAD,
+		cwd: "/home/dev/acme-app",
+		...(git ? { git } : {}),
+	},
+});
+
+/** A fetch double that records the OTLP bodies (and URLs) it was handed. */
 function recordingFetch() {
 	const bodies: any[] = [];
-	const impl = vi.fn(async (_url: string, init?: any) => {
+	const urls: string[] = [];
+	const impl = vi.fn(async (url: string, init?: any) => {
+		urls.push(String(url));
 		bodies.push(JSON.parse(init.body));
 		return { ok: true, status: 200 } as any;
 	});
-	return { bodies, impl: impl as unknown as typeof fetch };
+	return { bodies, urls, impl: impl as unknown as typeof fetch };
 }
 
 const spansOf = (bodies: any[]) =>
@@ -105,6 +117,7 @@ describe("harvestCodexThread", () => {
 					threadId: THREAD,
 					nowMs: 1785654950000,
 					endpoint: "https://app.langwatch.ai/api/otel/v1/traces",
+					logsEndpoint: null,
 					token: "sk-lw-test",
 					sessionsRoot: root,
 					fetchImpl: impl,
@@ -127,6 +140,7 @@ describe("harvestCodexThread", () => {
 					threadId: THREAD,
 					nowMs: 1785654950000,
 					endpoint: "https://app.langwatch.ai/api/otel/v1/traces",
+					logsEndpoint: null,
 					token: "sk-lw-test",
 					sessionsRoot: root,
 					fetchImpl: impl,
@@ -169,6 +183,7 @@ describe("harvestCodexThread", () => {
 					threadId: THREAD,
 					nowMs: 1785654950000,
 					endpoint: "https://e/v1/traces",
+					logsEndpoint: null,
 					token: "sk-lw-test",
 					sessionsRoot: root,
 					fetchImpl: impl,
@@ -197,6 +212,7 @@ describe("harvestCodexThread", () => {
 					threadId: THREAD,
 					nowMs: 1785654950000,
 					endpoint: "https://e/v1/traces",
+					logsEndpoint: null,
 					token: "sk-lw-test",
 					sessionsRoot: root,
 					fetchImpl: impl,
@@ -224,6 +240,7 @@ describe("harvestCodexThread", () => {
 					threadId: THREAD,
 					nowMs: 1785654950000,
 					endpoint: "https://e/v1/traces",
+					logsEndpoint: null,
 					token: "sk-lw-test",
 					sessionsRoot: root,
 					fetchImpl: impl,
@@ -261,6 +278,7 @@ describe("harvestCodexThread", () => {
 					threadId: THREAD,
 					nowMs: 1785654950000,
 					endpoint: "https://e/v1/traces",
+					logsEndpoint: null,
 					token: "sk-lw-test",
 					sessionsRoot: root,
 					fetchImpl: impl,
@@ -269,6 +287,115 @@ describe("harvestCodexThread", () => {
 				const spans = spansOf(bodies);
 				expect(spans).toHaveLength(1);
 				expect(attrOf(spans[0], "langwatch.output")).toBe("mine reply");
+			});
+		});
+	});
+
+	describe("given a session whose transcript records its repository", () => {
+		const GIT = {
+			branch: "feat/pricing",
+			repository_url: "https://github.com/acme/acme-app.git",
+			commit_hash: "f40dfb14fe962ff5c0e662de43424943ba44ae3e",
+		};
+		let stateDir: string;
+
+		beforeEach(() => {
+			stateDir = mkdtempSync(join(tmpdir(), "lw-codex-state-"));
+		});
+
+		afterEach(() => {
+			rmSync(stateDir, { recursive: true, force: true });
+		});
+
+		describe("when the session is harvested", () => {
+			/** @scenario "The harvest reports the repository the session worked on" */
+			it("posts one session-context record beside the conversation", async () => {
+				writeRollout(THREAD, [
+					sessionMeta(GIT),
+					taskStarted(TRACE),
+					userMessage("hi"),
+					agentFinal("hello"),
+				]);
+				const { bodies, urls, impl } = recordingFetch();
+
+				await harvestCodexThread({
+					threadId: THREAD,
+					nowMs: 1785654950000,
+					endpoint: "https://e/v1/traces",
+					logsEndpoint: "https://e/v1/logs",
+					token: "sk-lw-test",
+					sessionsRoot: root,
+					stateDir,
+					fetchImpl: impl,
+				});
+
+				const log =
+					bodies[urls.indexOf("https://e/v1/logs")].resourceLogs[0]
+						.scopeLogs[0].logRecords[0];
+				const attr = (key: string) =>
+					log.attributes.find((a: any) => a.key === key)?.value?.stringValue;
+				expect(attr("event.name")).toBe("langwatch.session_context");
+				expect(attr("session.id")).toBe(THREAD);
+				expect(attr("coding_agent.name")).toBe("codex");
+				expect(attr("vcs.repository.host")).toBe("github.com");
+				expect(attr("vcs.repository.owner")).toBe("acme");
+				expect(attr("vcs.repository.name")).toBe("acme-app");
+				expect(attr("vcs.ref.head.name")).toBe("feat/pricing");
+				expect(urls).toContain("https://e/v1/traces");
+			});
+
+			/** @scenario "A notify that fires after every turn posts the repository once" */
+			it("does not re-post an unchanged context on the next turn", async () => {
+				writeRollout(THREAD, [
+					sessionMeta(GIT),
+					taskStarted(TRACE),
+					userMessage("hi"),
+					agentFinal("hello"),
+				]);
+				const { urls, impl } = recordingFetch();
+				const args = {
+					threadId: THREAD,
+					nowMs: 1785654950000,
+					endpoint: "https://e/v1/traces",
+					logsEndpoint: "https://e/v1/logs",
+					token: "sk-lw-test",
+					sessionsRoot: root,
+					stateDir,
+					fetchImpl: impl,
+				};
+
+				await harvestCodexThread(args);
+				await harvestCodexThread(args);
+
+				expect(urls.filter((u) => u === "https://e/v1/logs")).toHaveLength(1);
+				expect(urls.filter((u) => u === "https://e/v1/traces")).toHaveLength(2);
+			});
+		});
+	});
+
+	describe("given a session with no repository in its transcript", () => {
+		describe("when the session is harvested", () => {
+			/** @scenario "A session outside any repository posts its conversation and no context" */
+			it("posts the conversation and no context record", async () => {
+				writeRollout(THREAD, [
+					sessionMeta(),
+					taskStarted(TRACE),
+					userMessage("hi"),
+					agentFinal("hello"),
+				]);
+				const { urls, impl } = recordingFetch();
+
+				await harvestCodexThread({
+					threadId: THREAD,
+					nowMs: 1785654950000,
+					endpoint: "https://e/v1/traces",
+					logsEndpoint: "https://e/v1/logs",
+					token: "sk-lw-test",
+					sessionsRoot: root,
+					fetchImpl: impl,
+				});
+
+				expect(urls).toEqual(["https://e/v1/traces"]);
 			});
 		});
 	});
@@ -282,6 +409,7 @@ describe("harvestCodexThread", () => {
 					threadId: "019fc000-0000-0000-0000-000000000000",
 					nowMs: 1785654950000,
 					endpoint: "https://e/v1/traces",
+					logsEndpoint: null,
 					token: "sk-lw-test",
 					sessionsRoot: root,
 					fetchImpl: impl,
@@ -290,6 +418,60 @@ describe("harvestCodexThread", () => {
 				expect(turns).toBe(0);
 				expect(bodies).toHaveLength(0);
 			});
+		});
+	});
+});
+
+describe("assertCodexTurnHarvest", () => {
+	let codexHome: string;
+	let originalCodexHome: string | undefined;
+	let logSpy: ReturnType<typeof vi.spyOn>;
+
+	beforeEach(() => {
+		codexHome = mkdtempSync(join(tmpdir(), "lw-codex-home-"));
+		originalCodexHome = process.env.CODEX_HOME;
+		process.env.CODEX_HOME = codexHome;
+		logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+	});
+
+	afterEach(() => {
+		logSpy.mockRestore();
+		if (originalCodexHome === undefined) delete process.env.CODEX_HOME;
+		else process.env.CODEX_HOME = originalCodexHome;
+		rmSync(codexHome, { recursive: true, force: true });
+	});
+
+	describe("when the harvest is wired for the first time", () => {
+		it("announces the install and how to recover earlier sessions", () => {
+			assertCodexTurnHarvest();
+
+			const printed = logSpy.mock.calls.flat().join("\n");
+			expect(printed).toContain("record each turn's conversation");
+			expect(printed).toContain("langwatch ingest codex");
+		});
+	});
+
+	describe("when it is asserted again with nothing to change", () => {
+		it("stays silent", () => {
+			assertCodexTurnHarvest();
+			logSpy.mockClear();
+
+			assertCodexTurnHarvest();
+
+			expect(logSpy).not.toHaveBeenCalled();
+		});
+	});
+
+	describe("when the config cannot be written", () => {
+		/** @scenario "A harvest that cannot be wired is reported, never silent" */
+		it("says the harvest is not wired instead of returning silently", () => {
+			rmSync(codexHome, { recursive: true, force: true });
+			writeFileSync(codexHome, "a file where the directory should be");
+
+			assertCodexTurnHarvest();
+
+			const printed = logSpy.mock.calls.flat().join("\n");
+			expect(printed).toContain("Could not wire the codex turn harvest");
 		});
 	});
 });

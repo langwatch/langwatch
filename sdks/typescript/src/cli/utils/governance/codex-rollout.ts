@@ -20,8 +20,8 @@
  * turns a `/v1/messages` body into `gen_ai.input.messages`, so a codex trace
  * renders the same full conversation a claude trace does.
  *
- * Rollout line shapes this parser relies on (codex 0.137):
- * - `{"type":"session_meta","payload":{"base_instructions":"...","cwd":"..."}}`
+ * Rollout line shapes this parser relies on (codex 0.137; `git` since 0.14x):
+ * - `{"type":"session_meta","payload":{"id":"<threadId>","base_instructions":"...","cwd":"...","git":{"branch":"...","repository_url":"..."}}}`
  * - `{"type":"turn_context","payload":{"model":"gpt-5.5"}}`
  * - `{"type":"event_msg","payload":{"type":"task_started","turn_id":"...","trace_id":"<hex32>"}}`
  * - `{"type":"response_item","payload":{"type":"message","role":"developer|user|assistant","content":[{"type":"input_text|output_text","text":"..."}]}}`
@@ -69,6 +69,26 @@ export interface CodexTurnIO {
   output: string;
   /** Turn start in unix ms, for a sane span start time (best-effort). */
   startedAtMs: number | null;
+}
+
+/**
+ * Session-level identity from the rollout's `session_meta` line: which session
+ * this transcript belongs to and which repository, branch and directory it ran
+ * in. Codex records these once at session start (`id`, `cwd`, `git.branch`,
+ * `git.repository_url`) and exports none of them over telemetry, so this line
+ * is the only repository identity a plain codex run reports anywhere.
+ */
+export interface CodexRolloutMeta {
+  sessionId: string | null;
+  cwd: string | null;
+  gitBranch: string | null;
+  gitRepositoryUrl: string | null;
+}
+
+/** Everything one rollout parse yields: the turns, plus the session identity. */
+export interface ParsedCodexRollout {
+  turns: CodexTurnIO[];
+  meta: CodexRolloutMeta | null;
 }
 
 function truncate(text: string, max: number): string {
@@ -143,6 +163,11 @@ interface RolloutLine {
   payload?: Record<string, unknown>;
 }
 
+/** The value when it is a non-empty string, else null. */
+function nonEmptyString(value: unknown): string | null {
+  return typeof value === "string" && value ? value : null;
+}
+
 /** The tool call's explicit id (`call_id`, then `id`), or null if codex omitted both. */
 function explicitToolCallId(payload: Record<string, unknown>): string | null {
   if (typeof payload.call_id === "string" && payload.call_id) {
@@ -162,6 +187,8 @@ function explicitToolCallId(payload: Record<string, unknown>): string | null {
 class CodexTurnAccumulator {
   /** Emitted turns, in rollout order. */
   private readonly turns: CodexTurnIO[] = [];
+  /** Session identity from the `session_meta` line, when one was present. */
+  private meta: CodexRolloutMeta | null = null;
   /** Accumulating conversation across the whole rollout (claude-style). */
   private readonly history: CodexChatMessage[] = [];
   private sessionModel: string | null = null;
@@ -198,10 +225,10 @@ class CodexTurnAccumulator {
     }
   }
 
-  /** Close the trailing open turn and return every emitted turn. */
-  finish(): CodexTurnIO[] {
+  /** Close the trailing open turn and return everything the rollout yielded. */
+  finish(): ParsedCodexRollout {
     this.closeTurn();
-    return this.turns;
+    return { turns: this.turns, meta: this.meta };
   }
 
   private onSessionMeta(payload: Record<string, unknown>): void {
@@ -209,6 +236,16 @@ class CodexTurnAccumulator {
     if (typeof bi === "string" && bi.trim()) {
       this.history.push({ role: "system", content: bi.trim() });
     }
+    const git =
+      payload.git && typeof payload.git === "object"
+        ? (payload.git as Record<string, unknown>)
+        : {};
+    this.meta = {
+      sessionId: nonEmptyString(payload.id) ?? nonEmptyString(payload.session_id),
+      cwd: nonEmptyString(payload.cwd),
+      gitBranch: nonEmptyString(git.branch),
+      gitRepositoryUrl: nonEmptyString(git.repository_url),
+    };
   }
 
   private onTurnContext(payload: Record<string, unknown>): void {
@@ -375,9 +412,10 @@ class CodexTurnAccumulator {
 
 /**
  * Parse a codex rollout JSONL into one chat-message request/reply record per
- * turn. Turns with no assistant reply are dropped (an empty span helps no one).
+ * turn, plus the session identity its `session_meta` line carries. Turns with
+ * no assistant reply are dropped (an empty span helps no one).
  */
-export function parseCodexRollout(content: string): CodexTurnIO[] {
+export function parseCodexRollout(content: string): ParsedCodexRollout {
   const acc = new CodexTurnAccumulator();
   for (const line of content.split("\n")) {
     const trimmed = line.trim();

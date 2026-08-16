@@ -211,6 +211,12 @@ Feature: Codex conversation capture without the LangWatch wrapper
     Then the call shown carries the duration and the failure the span recorded
 
   @unit
+  Scenario: A prompt recovered from the transcript is not shown again as its redacted event
+    Given a codex trace whose recovered conversation and prompt event describe the same prompt
+    When the session transcript is derived
+    Then the prompt is shown once, with its text, and the text-less event stays only where nothing was recovered
+
+  @unit
   Scenario: A prompt full of unclosed tags is read without stalling the server
     Given a recovered codex turn whose prompt pastes tens of thousands of unclosed tags
     When the session transcript is derived

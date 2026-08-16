@@ -564,17 +564,39 @@ export function assertCodexTurnHarvest(): void {
 	let outcome: CodexTurnHarvestOutcome;
 	try {
 		outcome = installCodexTurnHarvest();
-	} catch {
+	} catch (err) {
+		// Never silent: with the exporters in and the harvest out, plain codex
+		// reports tokens but no conversation, and the user has no way to know.
+		console.log(
+			chalk.yellow(
+				`  ! Could not wire the codex turn harvest: ${(err as Error).message}\n` +
+					"    Plain codex runs will report tokens but no conversation until it is wired.",
+			),
+		);
 		return;
 	}
 	if (outcome.status === "blocked") {
 		console.log(chalk.yellow(`  ! ${CODEX_TURN_HARVEST_BLOCKED_MESSAGE}`));
 		return;
 	}
+	if (outcome.status === "skipped") {
+		console.log(
+			chalk.yellow(
+				"  ! Could not determine the langwatch entry to run the codex turn harvest.\n" +
+					"    Reinstall the CLI (npm i -g langwatch), then run `langwatch instrument codex` again.",
+			),
+		);
+		return;
+	}
 	if (outcome.status !== "installed") return;
 	console.log(
 		chalk.green(
 			"  ✓ Codex will record each turn's conversation as it completes",
+		),
+	);
+	console.log(
+		chalk.dim(
+			"    Sessions from before this install: `langwatch ingest codex` recovers them.",
 		),
 	);
 	if (outcome.chained) {

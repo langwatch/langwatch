@@ -83,6 +83,7 @@ import { resolvePlatformToolPolicy } from "./platform-tool-policy";
 import {
 	buildScopedToolFunction,
 	type DetectedShell,
+	assertCodexTurnHarvest,
 	persistBlockToRc,
 	rcHasLangwatchBlock,
 	rcPath,
@@ -368,6 +369,10 @@ export function refreshCodexOtelBlockTo({
 		ingestionToken: token,
 		environment,
 	});
+	// The exporters carry no conversation; the harvest recovers it, so a
+	// refresh that keeps the exporters healthy heals the harvest wiring too
+	// (idempotent and quiet while the notify block is already in place).
+	assertCodexTurnHarvest();
 	if (result.action === "unchanged") return null;
 	return `codex [otel] block (${displayCodexConfigPath()})`;
 }

@@ -59,6 +59,7 @@ describe("createCodexIOStreamer", () => {
     createCodexIOStreamer({
       sinceMs: 0,
       endpoint: "http://collector.test/v1/traces",
+      logsEndpoint: null,
       token: "sk-lw-test",
       sessionsRoot: root,
       fetchImpl,

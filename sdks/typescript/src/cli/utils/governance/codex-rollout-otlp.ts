@@ -9,8 +9,25 @@ import { createHash } from "node:crypto";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
 import { GovernanceCliError } from "./cli-api";
-import { type CodexTurnIO, parseCodexRollout } from "./codex-rollout";
+import {
+  type CodexRolloutMeta,
+  type CodexTurnIO,
+  parseCodexRollout,
+} from "./codex-rollout";
+import {
+  defaultStateDir,
+  readFingerprint,
+  stateFilePath,
+  writeFingerprint,
+} from "./hook-state";
+import {
+  buildSessionContextLogPayload,
+  parseGitRemoteUrl,
+  type SessionContext,
+  sessionContextFingerprint,
+} from "./session-context";
 
 /** Deterministic 16-hex span id derived from the turn's trace_id. */
 function ioSpanId(traceId: string): string {
@@ -188,29 +205,40 @@ export async function harvestCodexThread(args: {
   threadId: string;
   nowMs: number;
   endpoint: string;
+  logsEndpoint: string | null;
   token: string;
   sessionsRoot?: string;
+  stateDir?: string;
   fetchImpl?: typeof fetch;
 }): Promise<number> {
   const root = args.sessionsRoot ?? defaultCodexSessionsRoot();
   const file = await findRolloutForThread(args.threadId, root);
   if (!file) return 0;
-  let parsed: CodexTurnIO[];
+  let turns: CodexTurnIO[];
+  let meta: CodexRolloutMeta | null;
   try {
-    parsed = parseCodexRollout(await readFile(file, "utf8"));
+    ({ turns, meta } = parseCodexRollout(await readFile(file, "utf8")));
   } catch {
     return 0;
   }
-  const turns = parsed.slice(-RECENT_TURN_WINDOW);
-  if (turns.length === 0) return 0;
+  await postCodexSessionContext({
+    meta,
+    nowMs: args.nowMs,
+    logsEndpoint: args.logsEndpoint,
+    token: args.token,
+    stateDir: args.stateDir,
+    fetchImpl: args.fetchImpl,
+  });
+  const recent = turns.slice(-RECENT_TURN_WINDOW);
+  if (recent.length === 0) return 0;
   await postCodexTurns({
-    turns,
+    turns: recent,
     nowMs: args.nowMs,
     endpoint: args.endpoint,
     token: args.token,
     fetchImpl: args.fetchImpl,
   });
-  return turns.length;
+  return recent.length;
 }
 
 /**
@@ -236,21 +264,24 @@ export async function findRecentRollouts(
   return out;
 }
 
-/** Read + parse every in-window rollout into one flat turn list. */
-async function readRolloutTurns(
+/** Read + parse every in-window rollout: one flat turn list, one meta per session. */
+async function readRollouts(
   sinceMs: number,
   sessionsRoot: string,
-): Promise<CodexTurnIO[]> {
+): Promise<{ turns: CodexTurnIO[]; metas: CodexRolloutMeta[] }> {
   const files = await findRecentRollouts(sinceMs, sessionsRoot);
   const turns: CodexTurnIO[] = [];
+  const metas: CodexRolloutMeta[] = [];
   for (const file of files) {
     try {
-      turns.push(...parseCodexRollout(await readFile(file, "utf8")));
+      const parsed = parseCodexRollout(await readFile(file, "utf8"));
+      turns.push(...parsed.turns);
+      if (parsed.meta) metas.push(parsed.meta);
     } catch {
       /* skip unreadable rollout */
     }
   }
-  return turns;
+  return { turns, metas };
 }
 
 /**
@@ -315,6 +346,78 @@ async function postCodexTurns(args: {
 }
 
 /**
+ * POST the session's repository identity as one `langwatch.session_context`
+ * log record, the same record the command hooks send for claude, built here
+ * from the rollout's `session_meta` line instead of a hook payload: codex
+ * needs no hooks.json entry (and no per-hook trust grant) for its sessions to
+ * say which repository and branch they worked on, because the rollout already
+ * records both and the harvest is already trusted to run.
+ *
+ * Deduped through the same fingerprint state the hooks use, so a device
+ * carrying both seams posts the context once per session, and a notify that
+ * fires after every turn re-posts nothing while the context is unchanged.
+ * Best-effort by construction: a session without git identity, a remote URL
+ * the grammar cannot read, or a refused POST emits nothing and reports false,
+ * because the content spans riding beside this are worth posting either way.
+ */
+export async function postCodexSessionContext(args: {
+  meta: CodexRolloutMeta | null;
+  nowMs: number;
+  logsEndpoint: string | null;
+  token: string;
+  stateDir?: string;
+  fetchImpl?: typeof fetch;
+}): Promise<boolean> {
+  const { meta, nowMs, logsEndpoint, token, stateDir, fetchImpl } = args;
+  if (!logsEndpoint) return false;
+  if (!meta?.sessionId || !meta.gitRepositoryUrl) return false;
+  const repository = parseGitRemoteUrl(meta.gitRepositoryUrl);
+  if (!repository) return false;
+  const context: SessionContext = {
+    repository,
+    ...(meta.gitBranch ? { branch: meta.gitBranch } : {}),
+  };
+  const fingerprint = sessionContextFingerprint(context);
+  const stateFile = stateFilePath({
+    stateDir: stateDir ?? defaultStateDir(),
+    agent: "codex",
+    sessionId: meta.sessionId,
+  });
+  if (readFingerprint(stateFile) === fingerprint) return false;
+  const payload = buildSessionContextLogPayload({
+    sessionId: meta.sessionId,
+    agent: "codex",
+    context,
+    timeUnixNano: `${nowMs}000000`,
+    scopeVersion: LANGWATCH_SDK_VERSION,
+  });
+  const doFetch = fetchImpl ?? fetch;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5_000);
+  let response: Response;
+  try {
+    response = await doFetch(logsEndpoint, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
+  if (!response.ok) return false;
+  // Written only after the server took it, so a failed POST retries on the
+  // next turn instead of assuming the context landed.
+  writeFingerprint({ stateFile, fingerprint, now: () => nowMs });
+  return true;
+}
+
+/**
  * Recover codex turn I/O from rollouts written during this session and POST it
  * as OTLP spans. Returns the number of turns emitted (0 when nothing was
  * found), and rejects when the upload did not land, so a caller that reports a
@@ -324,15 +427,36 @@ export async function harvestAndEmitCodexIO(args: {
   sinceMs: number;
   nowMs: number;
   endpoint: string;
+  logsEndpoint: string | null;
   token: string;
   sessionsRoot?: string;
+  stateDir?: string;
   fetchImpl?: typeof fetch;
 }): Promise<number> {
-  const { sinceMs, nowMs, endpoint, token, sessionsRoot, fetchImpl } = args;
-  const turns = await readRolloutTurns(
+  const {
+    sinceMs,
+    nowMs,
+    endpoint,
+    logsEndpoint,
+    token,
+    sessionsRoot,
+    stateDir,
+    fetchImpl,
+  } = args;
+  const { turns, metas } = await readRollouts(
     sinceMs,
     sessionsRoot ?? defaultCodexSessionsRoot(),
   );
+  for (const meta of metas) {
+    await postCodexSessionContext({
+      meta,
+      nowMs,
+      logsEndpoint,
+      token,
+      stateDir,
+      fetchImpl,
+    });
+  }
   if (turns.length === 0) return 0;
   await postCodexTurns({ turns, nowMs, endpoint, token, fetchImpl });
   return turns.length;
@@ -351,15 +475,29 @@ export async function harvestAndEmitCodexIO(args: {
 export function createCodexIOStreamer(args: {
   sinceMs: number;
   endpoint: string;
+  logsEndpoint: string | null;
   token: string;
   sessionsRoot?: string;
+  stateDir?: string;
   fetchImpl?: typeof fetch;
 }): { harvest: (nowMs: number) => Promise<number> } {
   const root = args.sessionsRoot ?? defaultCodexSessionsRoot();
   const emitted = new Set<string>();
   return {
     async harvest(nowMs: number): Promise<number> {
-      const turns = await readRolloutTurns(args.sinceMs, root);
+      const { turns, metas } = await readRollouts(args.sinceMs, root);
+      // The fingerprint state dedups across ticks (and across the notify
+      // seam), so re-offering every in-window session each tick posts once.
+      for (const meta of metas) {
+        await postCodexSessionContext({
+          meta,
+          nowMs,
+          logsEndpoint: args.logsEndpoint,
+          token: args.token,
+          stateDir: args.stateDir,
+          fetchImpl: args.fetchImpl,
+        });
+      }
       const fresh = turns.filter((t) => t.traceId && !emitted.has(t.traceId));
       if (fresh.length === 0) return 0;
       await postCodexTurns({

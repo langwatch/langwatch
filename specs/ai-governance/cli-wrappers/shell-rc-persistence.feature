@@ -140,6 +140,21 @@ Feature: Persist the OTLP telemetry exports so `<tool>` captures automatically
       And config the user authored outside the langwatch marker pair
         is preserved verbatim
 
+    @unit @cli-wrappers @shell-rc @codex
+    Scenario: Every seam that persists the codex exporters wires the turn harvest
+      Given codex telemetry wiring is persisted or refreshed, by the wrapper,
+        by `langwatch instrument codex`, or by a login refresh
+      When the [otel] block is written
+      Then the turn-completion harvest is asserted beside it
+      And a device whose wiring predates the harvest gains it on the next refresh
+
+    @unit @cli-wrappers @shell-rc @codex
+    Scenario: A harvest that cannot be wired is reported, never silent
+      Given a codex config the harvest install cannot write
+      When the wiring is persisted
+      Then the failure is printed, naming what stays missing
+      And the exporters stay in place
+
   Rule: Tools without a config-file env target install a scoped shell function
 
     Scenario Outline: Accept Y — write a scoped `<tool>` wrapper function

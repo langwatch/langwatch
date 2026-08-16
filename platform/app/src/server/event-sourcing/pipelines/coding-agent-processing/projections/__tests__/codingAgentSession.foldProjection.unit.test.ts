@@ -1569,6 +1569,34 @@ describe("coding-agent session fold, codex", () => {
     });
   });
 
+  describe("when the rollout harvest reports the session's checkout", () => {
+    /** @scenario "The harvest reports the repository the session worked on" */
+    it("gives the codex session its repository and branch", () => {
+      const projection = makeProjection();
+
+      const state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          agent: "codex",
+          facts: {
+            "event.name": "langwatch.session_context",
+            "coding_agent.name": "codex",
+            "vcs.repository.host": "github.com",
+            "vcs.repository.owner": "acme",
+            "vcs.repository.name": "acme-app",
+            "vcs.ref.head.name": "feat/pricing",
+          },
+        }),
+        initStateOf(projection),
+      );
+
+      expect(state.repositoryHost).toBe("github.com");
+      expect(state.repositoryOwner).toBe("acme");
+      expect(state.repositoryName).toBe("acme-app");
+      expect(state.gitBranch).toBe("feat/pricing");
+      expect(state.gitBranches).toEqual(["feat/pricing"]);
+    });
+  });
+
   describe("the span gate for codex's bare-named spans", () => {
     it("admits the turn span on the codex scope and declines it elsewhere", () => {
       expect(
