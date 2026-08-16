@@ -7,6 +7,11 @@ export const projectRoutes = {
     path: "/[project]/analytics",
     title: "Analytics",
   },
+  analytics_custom_query: {
+    path: "/[project]/analytics/query",
+    title: "Custom query",
+    parent: "analytics",
+  },
   workflows: {
     path: "/[project]/workflows",
     title: "Workflows",
@@ -31,6 +36,14 @@ export const projectRoutes = {
   online_evaluations: {
     path: "/[project]/online-evaluations",
     title: "Online Evaluations",
+  },
+  coding_agent_sessions: {
+    path: "/[project]/sessions",
+    title: "Sessions",
+  },
+  coding_agent_pull_requests: {
+    path: "/[project]/pull-requests",
+    title: "Pull requests",
   },
   evaluations_new_choose: {
     path: "/[project]/evaluations/new/choose",

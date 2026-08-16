@@ -27,6 +27,7 @@ func watchOrch(sys *fakeSystem, tel ProcTelemetry) *Orchestrator {
 		cfg:     Config{Tsgo: domain.DefaultTsgoLimits(18 << 30)},
 		sys:     sys,
 		procTel: tel,
+		store:   &fakeStore{},
 		log:     zap.NewNop(),
 	}
 }

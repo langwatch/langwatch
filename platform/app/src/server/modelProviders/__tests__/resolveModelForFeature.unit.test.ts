@@ -254,7 +254,7 @@ describe("resolveModelForFeature (unit)", () => {
     expect(fast.scope).toBe("organization");
   });
 
-  /** @scenario Two configs attached to the same project resolve by created-at DESC */
+  /** @scenario Legacy duplicate configs at the same scope resolve by created-at DESC */
   it("two configs at the same scope: newest createdAt wins", async () => {
     const prisma = fakePrisma({
       project: PROJECT,

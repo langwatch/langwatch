@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 
+import { isMappableGithubHost } from "~/server/app-layer/github/githubHost";
 import type {
   ReactorContext,
   ReactorDefinition,
@@ -56,11 +57,10 @@ export function shouldMapPullRequests(
     "repositoryHost" | "repositoryOwner" | "repositoryName" | "gitBranch"
   >,
 ): boolean {
-  // Case-folded: a session records whatever casing its git remote carries, and
-  // a host is case insensitive, so a literal comparison drops `GitHub.com` and
-  // that session's branch is never mapped.
-  const host = (state.repositoryHost ?? "").toLowerCase();
-  if (host !== "" && host !== "github.com") return false;
+  // The same host rule the mapping service applies, read from the one place
+  // that knows which GitHub this instance is bound to. Applying it here as well
+  // is what keeps a job off the queue that the service would only drop.
+  if (!isMappableGithubHost(state.repositoryHost ?? "")) return false;
   return Boolean(
     state.repositoryOwner &&
       state.repositoryName &&
@@ -75,10 +75,10 @@ export function shouldMapPullRequests(
  * The dedup id: one job per (project, repository, branch).
  *
  * The host is deliberately absent, and that is safe rather than an oversight:
- * `shouldMapPullRequests` only lets `""` and `"github.com"` through, and both
- * normalize to the same host at the service, so two folds sharing this key
- * always name the same repository. Which is what makes collapsing them into one
- * job the same answer rather than a guess.
+ * `shouldMapPullRequests` only lets `""` and the instance's own GitHub host
+ * through, and both normalize to that one host at the service, so two folds
+ * sharing this key always name the same repository. Which is what makes
+ * collapsing them into one job the same answer rather than a guess.
  *
  * The owner and the name are folded, which is the other half of that same
  * argument. A session records whatever casing its git remote carries, and

@@ -159,6 +159,19 @@ export class TriggerService {
     return this.repo.isSendClaimed(params);
   }
 
+  /**
+   * Batched `isSendClaimed`: the subset of `traceIds` already claimed for
+   * this trigger, in one read. A paged persist dispatch filters its whole
+   * page against prior claims at once instead of one round trip per trace.
+   */
+  async filterSendClaimed(params: {
+    triggerId: string;
+    traceIds: string[];
+    projectId: string;
+  }): Promise<Set<string>> {
+    return this.repo.findClaimedTraceIds(params);
+  }
+
   async updateLastRunAt(triggerId: string, projectId: string): Promise<void> {
     return this.repo.updateLastRunAt(triggerId, projectId);
   }

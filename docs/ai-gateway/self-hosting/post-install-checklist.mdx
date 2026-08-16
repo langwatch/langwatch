@@ -3,10 +3,10 @@ title: Post-install checklist
 description: What to do after `helm install` to get personal keys, the AI Gateway, and the unified `langwatch` CLI working end-to-end.
 ---
 
-This page is the operational counterpart to the post-install
-`NOTES.txt` that `helm install langwatch ...` prints, extra depth on
-each step plus the `kubectl` probes self-hosters typically run to
-verify the install.
+`helm install langwatch ...` prints a post-install `NOTES.txt` with
+the short form of these steps. Each step below adds the detail plus
+the `kubectl` probes self-hosters typically run to verify the
+install.
 
 If you haven't installed yet, start with [helm](./helm) and come back
 here once the chart deploys cleanly.
@@ -50,7 +50,7 @@ password, bind it to your existing secret-management workflow.
 
 In the UI: **Settings → Routing Policies → New policy**, scope =
 `organization`. Mark it default. Pick the providers from step 2 in
-your preferred fallback order. Optionally add a model allowlist —
+your preferred fallback order. Optionally add a model allowlist,
 e.g. `claude-3-5-*` and `gpt-4o*`, to keep personal keys out of the
 expensive frontier models.
 
@@ -105,7 +105,7 @@ container. **Without it, the control plane returns
 `http://localhost:5563` to CLI users** and every `langwatch claude` /
 `langwatch codex` call from a developer laptop fails with
 `Cannot reach AI Gateway ... fetch failed`. Do NOT reuse
-`LW_GATEWAY_BASE_URL` for this — that variable is the internal
+`LW_GATEWAY_BASE_URL` for this: that variable is the internal
 control-plane URL the Go gateway dials back on, a different direction.
 
 Verify it landed:

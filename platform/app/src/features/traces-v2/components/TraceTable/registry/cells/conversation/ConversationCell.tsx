@@ -1,11 +1,5 @@
 import { Box, Circle, chakra, HStack, Icon, Text } from "@chakra-ui/react";
-import {
-  AlertTriangle,
-  ChevronDown,
-  ChevronRight,
-  GitBranch,
-  Zap,
-} from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronRight, Zap } from "lucide-react";
 import type React from "react";
 import { useFilterStore } from "../../../../../stores/filterStore";
 import { useViewStore } from "../../../../../stores/viewStore";
@@ -27,10 +21,9 @@ function conversationIO(group: ConversationGroup): ConversationIO {
 }
 
 /**
- * Chevron affordance for the inline turns expansion. The row itself also
- * toggles expansion, but the chevron makes the action discoverable; it stops
- * propagation so a click on it toggles exactly once rather than also firing
- * the row handler.
+ * Expands the conversation's turns inline. The rest of the row opens the
+ * conversation's latest trace in the drawer, so the chevron is what expanding
+ * goes through; its click stops propagating rather than doing both at once.
  */
 const ExpandToggle: React.FC<{
   isExpanded: boolean;
@@ -62,9 +55,9 @@ const ExpandToggle: React.FC<{
 );
 
 /**
- * What the row calls the session: the agent's own title when there is one the
- * viewer may read, otherwise the shortened conversation id. `titleRedacted`
- * is decided server-side and only read here.
+ * What the row calls the conversation: the agent's own title when there is one
+ * the viewer may read, otherwise the shortened conversation id.
+ * `titleRedacted` is decided server-side and only read here.
  */
 export function sessionLabelOf(group: ConversationGroup): string {
   if (group.title && !group.titleRedacted) return group.title;
@@ -72,10 +65,11 @@ export function sessionLabelOf(group: ConversationGroup): string {
 }
 
 /**
- * The session's label, rendered as a link that scopes the All lens to just
- * this conversation. The label IS the filter affordance (the rest of the row
- * opens the drawer), so its click stops propagation; the blue colour plus a
- * hover underline and tooltip signal it acts differently from the row.
+ * The conversation's label, a button styled as a link that scopes the All lens
+ * to just this conversation. It filters rather than navigates, so it is a
+ * button and not an anchor. The label IS the filter affordance (the rest of
+ * the row opens the drawer), so its click stops propagation; the blue colour
+ * plus a hover underline and tooltip signal it acts differently from the row.
  */
 const ConversationIdLabel: React.FC<{
   conversationId: string;
@@ -97,8 +91,8 @@ const ConversationIdLabel: React.FC<{
   return (
     <chakra.button
       type="button"
-      aria-label="Filter to this session"
-      title="Show all traces in this session"
+      aria-label="Filter to this conversation"
+      title="Show all traces in this conversation"
       onClick={filterToConversation}
       cursor="pointer"
       flexShrink={0}
@@ -123,7 +117,7 @@ const ConversationIdLabel: React.FC<{
 
 export const ConversationCell: CellDef<ConversationGroup> = {
   id: "conversation",
-  label: "Session",
+  label: "Conversation",
   render: ({ row, isExpanded, actions }) => {
     const io = conversationIO(row);
     return (
@@ -216,14 +210,6 @@ const ConversationSummaryChips: React.FC<{ group: ConversationGroup }> = ({
         <Text>
           {group.evalsPassedCount}/{group.totalEvals}
         </Text>
-      </HStack>
-    )}
-    {group.totalSpans > 0 && (
-      <HStack gap={0.5}>
-        <Icon boxSize="10px">
-          <GitBranch />
-        </Icon>
-        <Text>{group.totalSpans}</Text>
       </HStack>
     )}
   </HStack>

@@ -1,5 +1,11 @@
-import { LOGS_ONLY_AGENT_IDS } from "../agents";
 import {
+  CODING_AGENT_REGISTRY,
+  EVENTS_FOLD_TOOL_RUNS_AGENT_IDS,
+  LOGS_ONLY_AGENT_IDS,
+  WRAPPER_TOOL_NAMES_BY_AGENT_ID,
+} from "../agents";
+import {
+  detectCodingAgent,
   normalizeEventName,
   normalizeMetricName,
   parseMcpToolName,
@@ -31,13 +37,13 @@ import type {
  * lift, and what arrives here is a contribution's scalar facts. The gates
  * therefore live with the dispatchers; everything here is application.
  *
- * AGENT-GENERIC in shape, CLAUDE CODE ONLY in span coverage today. Every
- * coding agent has a finish reason, tools, sub-agents, an approval mode,
- * retries, compaction: the columns are generic, and what differs is only
- * WHERE each fact is read from, which lives in the {@link CLAUDE} adapter
- * below. Telemetry from the other agents the vocabulary layer recognises
- * flows through the gates but produces no span-fed session facts until its
- * adapter is written — do not point product claims at them.
+ * AGENT-GENERIC in shape; span coverage is per adapter. Every coding agent
+ * has a finish reason, tools, sub-agents, an approval mode, retries,
+ * compaction: the columns are generic, and what differs is only WHERE each
+ * fact is read from, which lives in the {@link CLAUDE} and {@link CODEX}
+ * adapters below. Telemetry from the other agents the vocabulary layer
+ * recognises flows through the gates but produces no span-fed session facts
+ * until its adapter is written — do not point product claims at them.
  *
  * PURE, LIGHT and BOUNDED — see `coding-agent-session.types.ts`.
  */
@@ -92,6 +98,43 @@ const CLAUDE = {
 } as const;
 
 /**
+ * The Codex adapter, the second span-bearing agent. Everything here comes
+ * from codex-rs 0.147 and live capture:
+ *
+ *   - `session_task.turn` is the one span worth folding: the turn's token
+ *     totals (`gen_ai.usage.*`), the model, and the session key
+ *     (`gen_ai.conversation.id`). One fold per turn — a turn that looped
+ *     several API calls still counts once, which undercounts `modelCalls`
+ *     against Claude's per-call grain but never double-counts tokens.
+ *   - `handle_responses` repeats the same token counts and stamps a tokio
+ *     `thread.id` that the session-key resolution would read as the session
+ *     (`'10'`, shared by every span on that worker thread) — never fold it.
+ *   - The turn span's wall time INCLUDES tool execution, so it does not feed
+ *     `modelCallMs` (zero reads as "not measured"); TTFT arrives on the
+ *     `codex.turn_ttft` EVENT instead, and tool runs on `tool_result` events
+ *     (`foldsToolRunsFromEvents` on the definition — codex has no tool span).
+ *   - `gen_ai.usage.input_tokens` INCLUDES the cache buckets, unlike the
+ *     disjoint claude spellings — {@link codexTurnTokenFacts} re-derives the
+ *     disjoint input before the shared fold runs.
+ */
+const CODEX = {
+  SPAN: {
+    TURN: "session_task.turn",
+  },
+  EVENT: {
+    TURN_TTFT: "turn_ttft",
+  },
+  ATTR: {
+    INPUT_TOKENS: "gen_ai.usage.input_tokens",
+    OUTPUT_TOKENS: "gen_ai.usage.output_tokens",
+    CACHE_READ_TOKENS: "gen_ai.usage.cache_read.input_tokens",
+    CACHE_CREATION_TOKENS: "gen_ai.usage.cache_creation.input_tokens",
+    NON_CACHED_INPUT_TOKENS: "codex.turn.token_usage.non_cached_input_tokens",
+    RESPONSE_MODEL: "gen_ai.response.model",
+  },
+} as const;
+
+/**
  * The LangWatch vocabulary, the sibling of the {@link CLAUDE} adapter for the
  * facts no vendor emits: the companion event carrying the session's git
  * identity, and the keys it and the derived title ride on. Agent-generic by
@@ -113,19 +156,52 @@ const LANGWATCH = {
 } as const;
 
 /**
- * The span names this derivation reads. Exported so the DISPATCHER (the
- * subscriber on trace-processing) can decide whether a span is worth
- * normalizing at all: every span in the project flows past that gate, and
- * normalizing one runs the whole canonicalisation registry. One set lookup
- * instead.
+ * Claude's span names carry their own namespace, so the name alone is the
+ * whole gate for them.
  */
-export const CODING_AGENT_SPAN_NAMES: ReadonlySet<string> = new Set([
+const SELF_NAMESPACED_SPAN_NAMES: ReadonlySet<string> = new Set([
   CLAUDE.SPAN.LLM_REQUEST,
   CLAUDE.SPAN.TOOL,
   CLAUDE.SPAN.TOOL_EXECUTION,
   CLAUDE.SPAN.BLOCKED_ON_USER,
   CLAUDE.SPAN.SUBAGENT_SPAWN,
 ]);
+
+/**
+ * Span names an agent DECLARES on its registry definition. These are bare
+ * (codex's `session_task.turn` carries no vendor namespace), so membership is
+ * necessary but not sufficient — see {@link isCodingAgentSessionSpan}.
+ */
+const DECLARED_SPAN_NAMES: ReadonlySet<string> = new Set(
+  CODING_AGENT_REGISTRY.flatMap((agent) => agent.sessionSpanNames ?? []),
+);
+
+/**
+ * Whether one span belongs in the session fold — the DISPATCHER's gate (the
+ * subscriber on trace-processing). Every span in the project flows past it,
+ * and normalizing one runs the whole canonicalisation registry, so the gate
+ * must answer from the raw record alone.
+ *
+ * Two tiers, because the two kinds of name carry different evidence. A
+ * self-namespaced name (`claude_code.tool`) is admitted on the name alone —
+ * one set lookup for the whole firehose. A DECLARED name
+ * (`session_task.turn`) is bare — any instrumentation could reuse it — so it
+ * is admitted only when agent detection can actually name the agent from the
+ * record's scope, keeping a foreign span with a colliding name from minting
+ * garbage sessions. The detection runs only for names already in the set, so
+ * the firehose never pays for it.
+ */
+export function isCodingAgentSessionSpan({
+  name,
+  scopeName,
+}: {
+  name: string;
+  scopeName?: string | null;
+}): boolean {
+  if (SELF_NAMESPACED_SPAN_NAMES.has(name)) return true;
+  if (!DECLARED_SPAN_NAMES.has(name)) return false;
+  return detectCodingAgent({ recordName: name, scopeName }) !== "unknown";
+}
 
 /** HTTP 429 — the one failure worth telling apart from every other failure. */
 const RATE_LIMIT_STATUS = "429";
@@ -166,6 +242,7 @@ export function createInitCodingAgentSession(): CodingAgentSessionData {
     repositoryOwner: null,
     repositoryName: null,
     gitBranch: null,
+    gitBranches: [],
     gitWorktree: null,
     title: null,
 
@@ -494,6 +571,39 @@ function foldModelCall(
   };
 }
 
+/**
+ * Codex's turn tokens, respelled into the disjoint claude vocabulary
+ * {@link foldModelCall} reads — one fold, one convention.
+ *
+ * The re-derivation is the point: codex's `gen_ai.usage.input_tokens` is the
+ * WHOLE input, cache included (13944 = 11008 cache-read + 2936 non-cached on
+ * a live turn), while the shared fold's `input_tokens` is the disjoint
+ * non-cached bucket. Codex's own non-cached count is preferred; when a build
+ * omits it, the subtraction recovers it from the gen_ai buckets.
+ */
+function codexTurnTokenFacts(
+  attrs: Record<string, unknown>,
+): Record<string, unknown> {
+  const cacheRead = num(attrs[CODEX.ATTR.CACHE_READ_TOKENS]);
+  const cacheCreation = num(attrs[CODEX.ATTR.CACHE_CREATION_TOKENS]);
+  const wholeInput = num(attrs[CODEX.ATTR.INPUT_TOKENS]);
+  const nonCachedInput =
+    attrs[CODEX.ATTR.NON_CACHED_INPUT_TOKENS] !== undefined
+      ? num(attrs[CODEX.ATTR.NON_CACHED_INPUT_TOKENS])
+      : Math.max(0, wholeInput - cacheRead - cacheCreation);
+
+  return {
+    ...attrs,
+    input_tokens: nonCachedInput,
+    output_tokens: num(attrs[CODEX.ATTR.OUTPUT_TOKENS]),
+    cache_read_tokens: cacheRead,
+    cache_creation_tokens: cacheCreation,
+    model:
+      str(attrs["gen_ai.request.model"]) ??
+      str(attrs[CODEX.ATTR.RESPONSE_MODEL]),
+  };
+}
+
 /** The compact span view a span-facts contribution carries. */
 export interface SpanFactsView {
   name: string;
@@ -536,6 +646,20 @@ export function applySpanToCodingAgentSession({
       : foldModelCall(withIdentity(state, attrs), attrs, durationMs);
   }
 
+  if (span.name === CODEX.SPAN.TURN) {
+    // The contribution's own label gates the fold: the dispatcher already
+    // declined foreign spans reusing this bare name, and one that still
+    // arrives labeled as another agent contributes identity only.
+    if (agent !== "codex" || isLogsOnly) return withIdentity(state, attrs);
+    // Fallback duration 0, not the span's: the turn's wall time includes the
+    // tools that ran inside it, and zero reads honestly as "not measured".
+    return foldModelCall(
+      withIdentity(state, attrs),
+      codexTurnTokenFacts(attrs),
+      0,
+    );
+  }
+
   if (span.name === CLAUDE.SPAN.SUBAGENT_SPAWN) {
     const next = withIdentity(state, attrs);
     const agentType = str(attrs.agent_type) ?? str(attrs.subagent_type);
@@ -562,9 +686,12 @@ export function applySpanToCodingAgentSession({
 
   if (span.name !== CLAUDE.SPAN.TOOL) return state;
 
-  // Same gate as the model call above: a logs-only agent folds its tool runs
-  // from `tool_result`, so the tool span would be the second count.
-  if (isLogsOnly) return withIdentity(state, attrs);
+  // Same gate as the model call above, widened to every agent whose tool
+  // runs fold from `tool_result` events — for them the tool span would be
+  // the second count, whether their telemetry is events-only or not.
+  const foldsToolRunsFromEvents =
+    agent !== undefined && EVENTS_FOLD_TOOL_RUNS_AGENT_IDS.has(agent);
+  if (foldsToolRunsFromEvents) return withIdentity(state, attrs);
 
   return foldToolInvocation(withIdentity(state, attrs), {
     attrs,
@@ -649,7 +776,13 @@ function foldToolInvocation(
   // emit those attributes on the tool span. So parse the name first and treat the
   // attributes as a bonus for agents that DO send them.
   const fromName = parseMcpToolName(toolName);
-  const mcpServer = str(attrs["mcp_server.name"]) ?? fromName?.server ?? null;
+  // Codex spells the server as a bare `mcp_server` on its tool_result events
+  // (empty string for a builtin tool, which str() already reads as absent).
+  const mcpServer =
+    str(attrs["mcp_server.name"]) ??
+    str(attrs.mcp_server) ??
+    fromName?.server ??
+    null;
   if (mcpServer !== null) {
     withTool.mcpServers = addToBoundedSet(next.mcpServers, mcpServer);
   }
@@ -746,7 +879,9 @@ export function applyLogToCodingAgentSession({
       // Repository identity and worktree are once-set: a session is one
       // checkout, so the first answer stands. The branch is the exception:
       // it moves during a session, and the branch a session ENDS on is the
-      // one its pull request comes from.
+      // one its pull request comes from. Every branch it passed through joins
+      // the set as well, because a session that moves on has still driven the
+      // branch it left, and the pull request it opened there.
       const branch = str(attrs[LANGWATCH.ATTR.BRANCH]);
       return {
         ...base,
@@ -758,6 +893,10 @@ export function applyLogToCodingAgentSession({
           base.repositoryName ?? str(attrs[LANGWATCH.ATTR.REPOSITORY_NAME]),
         gitWorktree: base.gitWorktree ?? str(attrs[LANGWATCH.ATTR.WORKTREE]),
         gitBranch: branch ?? base.gitBranch,
+        gitBranches:
+          branch !== null
+            ? addToBoundedSet(base.gitBranches, branch)
+            : base.gitBranches,
       };
     }
 
@@ -775,9 +914,23 @@ export function applyLogToCodingAgentSession({
             ? bump(base.errorTypes, errorType)
             : base.errorTypes,
       };
-      // For a logs-only agent this event IS the tool run — name, duration,
-      // outcome — which span-bearing agents fold from the tool span.
-      return isLogsOnly
+      // A wrapper tool (codex's code-mode `exec`) carries OTHER dispatches:
+      // each tool the script inside it invokes re-enters the agent's
+      // registry and reports its own result event, so counting the wrapper
+      // too would count every carried command twice. Its bytes still fold —
+      // it is the run that is declined, not the record.
+      const wrapperNames =
+        agent !== undefined
+          ? WRAPPER_TOOL_NAMES_BY_AGENT_ID.get(agent)
+          : undefined;
+      const wrapped = wrapperNames?.has(str(attrs.tool_name) ?? "") === true;
+      // For an agent whose tool runs live on events — every logs-only agent,
+      // and codex, which has no tool span — this event IS the tool run:
+      // name, duration, outcome, which span-bearing agents fold from the
+      // tool span instead.
+      return !wrapped &&
+        agent !== undefined &&
+        EVENTS_FOLD_TOOL_RUNS_AGENT_IDS.has(agent)
         ? foldToolInvocation(withBytes, {
             attrs,
             failed: scalarStr(attrs.success) === "false",
@@ -788,12 +941,21 @@ export function applyLogToCodingAgentSession({
     }
 
     case CLAUDE.EVENT.TOOL_DECISION: {
-      if (str(attrs.decision) !== "reject") return base;
-      const source = str(attrs.source) ?? "";
+      // Claude spells a refusal `reject`; codex spells it `denied` (and
+      // `denied_with_network_policy_deny`). Codex also puts the walk-away on
+      // the DECISION itself — `abort`, or `timed_out` for a prompt left to
+      // expire — where claude reports it as `reject` + `source: user_abort`.
+      const decision = str(attrs.decision) ?? "";
+      const rejected = decision === "reject" || decision.startsWith("denied");
+      const walkedAway =
+        decision === "abort" ||
+        decision === "timed_out" ||
+        ABORTED_SOURCES.has(str(attrs.source) ?? "");
+      if (!rejected && !walkedAway) return base;
       // An ABORT (the human walked away from the prompt) is a different act from
       // a refusal, and NEITHER is a tool that broke. Counting them as failures
       // would report the human's judgement as the agent's fault.
-      return ABORTED_SOURCES.has(source)
+      return walkedAway
         ? { ...base, toolsAborted: base.toolsAborted + 1 }
         : { ...base, toolsDenied: base.toolsDenied + 1 };
     }
@@ -890,6 +1052,20 @@ export function applyLogToCodingAgentSession({
 
     case CLAUDE.EVENT.AT_MENTION:
       return { ...base, atMentions: base.atMentions + 1 };
+
+    case CODEX.EVENT.TURN_TTFT: {
+      // Codex reports TTFT as its own event; claude carries it on the
+      // llm_request span. Both land in the same sum + count, and a zero is
+      // "not measured", never a sample.
+      const ttftMs = num(attrs.duration_ms);
+      return ttftMs > 0
+        ? {
+            ...base,
+            ttftMsTotal: base.ttftMsTotal + ttftMs,
+            ttftSamples: base.ttftSamples + 1,
+          }
+        : base;
+    }
 
     case CLAUDE.EVENT.INTERNAL_ERROR:
       return { ...base, internalErrors: base.internalErrors + 1 };

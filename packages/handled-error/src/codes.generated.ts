@@ -243,6 +243,16 @@ export const goErrorCodes = {
    */
   model_not_allowed: { service: "aigateway", httpStatus: 400 },
   /**
+   * ErrProviderNotBound — means the request names a provider (explicit
+   * "provider/model" prefix or alias) that has no credential slot on this VK.
+   * Dispatching anyway would hand a mismatched credential to the provider
+   * selected by the model prefix, which surfaces as opaque provider-config
+   * errors ("deployments not set", HTML error pages).
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  model_provider_not_bound: { service: "aigateway", httpStatus: 400 },
+  /**
    * ErrNoFreeUID — signals every UID slot in the per-worker range is in use.
    * With 60_000 slots and a default MAX_WORKERS of 20 this cannot happen in
    * practice; surfaced rather than silently colliding when an operator raises
@@ -323,6 +333,11 @@ export const goErrorCodes = {
    * ErrSSRFBlocked — signals an HTTP block tried to reach a destination
    * disallowed by the SSRF policy (loopback, private, link-local, metadata).
    *
+   * Also produced as a workflow NodeError type, so this one entry is the copy
+   * for both the HTTP failure and the node error event. Its node sites are
+   * among the @source files below.
+   *
+   * @source services/nlpgo/app/engine/engine.go
    * @source services/nlpgo/domain/errors.go
    */
   ssrf_blocked: { service: "nlpgo", httpStatus: 400 },

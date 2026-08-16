@@ -60,7 +60,10 @@ import {
   evaluatorsSchema,
   type SingleEvaluationResult,
 } from "~/server/evaluations/evaluators";
-import { getEvaluatorDefaultSettings } from "~/server/evaluations/getEvaluator";
+import {
+  type CustomEvaluatorDefinition,
+  getEvaluatorDefaultSettings,
+} from "~/server/evaluations/getEvaluator";
 import {
   type DataForEvaluation,
   runEvaluation,
@@ -989,14 +992,15 @@ export const getEvaluatorIncludingCustom = async (
   projectId: string,
   checkType: EvaluatorTypes,
 ): Promise<
-  EvaluatorDefinition<keyof typeof AVAILABLE_EVALUATORS> | undefined
+  | EvaluatorDefinition<keyof typeof AVAILABLE_EVALUATORS>
+  | CustomEvaluatorDefinition
+  | undefined
 > => {
   const availableCustomEvaluators = await getCustomEvaluators({
     projectId,
   });
 
-  const customEntries: [string, { name: string; requiredFields: string[] }][] =
-    [];
+  const customEntries: [string, CustomEvaluatorDefinition][] = [];
   for (const evaluator of availableCustomEvaluators ?? []) {
     const dsl = evaluator.versions[0]?.dsl;
     if (!dsl) {
@@ -1280,9 +1284,12 @@ async function handleEvaluatorCall(
     // flips silently on reroute. Narrow enough (and low-impact enough) to
     // document rather than special-case.
     const mergedSettings = {
+      // Custom evaluator definitions have no `settings` to derive defaults
+      // from — getEvaluatorDefaultSettings returns {} for that arm instead of
+      // crashing. (Workflow evaluators never reach it: this branch.)
       ...(!workflowEvaluatorDef
         ? getEvaluatorDefaultSettings(
-            evaluatorDefinition as any,
+            evaluatorDefinition,
             await resolveEvaluatorSettingsDefaults(project.id),
           )
         : {}),

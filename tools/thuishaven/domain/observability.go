@@ -109,11 +109,14 @@ type ObservabilityLimits struct {
 // at all and the ceiling is what keeps it from competing with the dev stack it
 // exists to observe.
 func DefaultObservabilityLimits(totalRAMBytes uint64, numCPU int) ObservabilityLimits {
-	// A seventh of the machine rather than the old eighth, and half a core more
-	// at the top: with two stacks feeding it the bundle sat pinned at its 2-CPU
-	// cap, which shows up as laggy dashboards exactly when you are debugging.
-	memMB := clampInt(int(totalRAMBytes/(1<<20))/7, 1536, 3072)
-	cpus := clampFloat(float64(numCPU)/4, 1, 2.5)
+	// A sixth of the machine and up to three cores. The previous seventh/2.5
+	// was sized for logs, traces and metrics; Pyroscope now also ingests
+	// continuous CPU and heap profiles from every worktree's app process, and
+	// profile heads plus flame-graph queries are exactly the load that pinned
+	// the old caps — a starved bundle shows up as laggy dashboards at the
+	// moment you are debugging.
+	memMB := clampInt(int(totalRAMBytes/(1<<20))/6, 2048, 4096)
+	cpus := clampFloat(float64(numCPU)/3, 1, 3)
 	return ObservabilityLimits{
 		MemoryMB:        memMB,
 		CPUs:            cpus,

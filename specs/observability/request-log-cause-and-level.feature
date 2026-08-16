@@ -37,6 +37,34 @@ Feature: Request log level and where the cause is attached
     Then the record is logged at error level
 
   # ---------------------------------------------------------------------------
+  # A failure with nothing attached
+  #
+  # A route can answer 5xx without an error ever reaching the middleware —
+  # returning the response rather than throwing. The record is then logged at
+  # error level, because the status says so, while the message still reads
+  # `request handled` and no cause is attached to it. It is indistinguishable
+  # from a success except by reading the status field.
+  #
+  # That is not hypothetical. In one hour on 2026-08-13 production logged
+  # 12,367 such records, every one of them a 500, and between them they said
+  # nothing at all about what had failed. A record that cannot be told apart
+  # from a healthy one is worse than no record: it is found only by whoever
+  # already suspected it was there.
+  # ---------------------------------------------------------------------------
+
+  @unit @regression
+  Scenario: A server error with no cause attached says so
+    When the response is a server error and no cause reached the logger
+    Then the record does not claim the request was handled
+    And the record states that no cause was attached
+    And the record is logged at error level
+
+  @unit @regression
+  Scenario: A successful request is still reported as handled
+    When the response succeeds
+    Then the record reports the request as handled
+
+  # ---------------------------------------------------------------------------
   # Where the cause goes
   # ---------------------------------------------------------------------------
 

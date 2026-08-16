@@ -154,6 +154,13 @@ export const FEATURE_FLAGS = [
 
   // ----- PRODUCT -----
   {
+    key: "release_governed_sql_workbench",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Gates the whole governed SQL surface — the Custom query workbench UI and the analytics.governedSql tRPC endpoints — while it is experimental. Off by default; enable per project or organization via a targeting rule, or globally via the operator store.",
+  },
+  {
     key: "release_ui_ai_gateway_menu_enabled",
     scope: "PRODUCT",
     defaultValue: true,
@@ -252,6 +259,15 @@ export const FEATURE_FLAGS = [
     family: "Langy",
     description:
       "Opens the Langy in-product assistant, and is the only lever that does — there is no staff or other identity bypass, so this is a true kill switch. Default off, so Langy is dark until someone is explicitly opted in. Managed only from the internal flag store: toggle it, or add per-project/per-org targeting rules, via /ops/feature-flags. PostHog and the RELEASE_LANGY_ENABLED env var are deliberately not consulted. For local dev use FEATURE_FLAG_FORCE_ENABLE=release_langy_enabled.",
+  },
+  {
+    key: "release_langy_api_key_turns_enabled",
+    scope: "SYSTEM",
+    defaultValue: false,
+    envOverridable: false,
+    family: "Langy",
+    description:
+      "Lets a project API key start and continue Langy turns over the public REST surface (spec: specs/langy/langy-api-key-turns.feature). Strictly narrower than release_langy_enabled and ANDed with it: this flag opens a new way in for an actor who already has Langy, and never grants Langy itself. Off = the REST surface 404s and only the browser can start a turn, which is the rollback position — turning it off cannot break the in-product assistant. Internal flag store only, so the /ops/feature-flags toggle is the one lever.",
   },
   {
     key: "release_langy_promo_enabled",

@@ -58,6 +58,11 @@ Document **important technical and architectural decisions** — context, trade-
 | [077](./077-langy-dual-stream.md)                                 | Langy dual-stream — raw token fast-path alongside the durable event-sourced stream          | Accepted                                          |
 | [078](./078-langy-user-turn-controls.md)                          | Langy user-initiated turn controls — stop for real, continue, resume-on-refresh             | Accepted                                          |
 | [079](./079-card-selection-is-deterministic.md)                   | Card selection is deterministic — the model supplies data, never presentation (amended 2026-07-22) | Accepted                                          |
+| [081](./081-governed-sql-table-function-and-ssrf-policy.md)       | Governed analytics SQL blocks user-supplied table functions, by AST policy and by grants     | Accepted                                          |
+| [082](./082-governed-analytics-views-invoker-column-grants-final-dedup.md) | The governed `analytics.*` schema is invoker-rights views, column grants, and `FINAL`  | Accepted                                          |
+| [083](./083-governed-sql-diagnostics-read-the-single-parse.md)    | Governed SQL diagnostics read the validator's single parse, never a second one               | Accepted                                          |
+| [084](./084-governed-sql-postgres-mapping-tenant-predicate.md)    | PostgreSQL-resident data is reached through an approved view, a policed engine table, and a view-carried tenant predicate | Accepted                      |
+| [085](./085-governed-chart-runtime-without-eval.md)               | The governed chart runtime runs without `eval` — ahead-of-time schema validator, interpreted expressions, injected data   | Accepted                      |
 
 ## When to Write an ADR
 

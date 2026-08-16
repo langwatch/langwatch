@@ -19,6 +19,7 @@ import {
   type SessionGroupPayloadItem,
 } from "../../../utils/mapSessionGroupsPayload";
 import type { ConversationGroup } from "../conversationGroups";
+import { ConversationSummaryDetail } from "../registry/addons/conversation/ConversationSummary";
 import { conversationCells } from "../registry/cells/conversation";
 import { sessionLabelOf } from "../registry/cells/conversation/ConversationCell";
 import type { CellRenderContext } from "../registry/types";
@@ -70,6 +71,7 @@ function serverSession(
     errorCount: 0,
     warningCount: 0,
     totalSpans: 900,
+    lastTraceId: "trace-latest",
     input: "latest prompt",
     output: "latest answer",
     codingAgent: {
@@ -168,6 +170,27 @@ describe("sessions lens cells", () => {
       renderCell({ cellId: "compactions", row });
       // The shared dash placeholder glyph, same as every other empty cell.
       expect(screen.getAllByText("—")).toHaveLength(2);
+    });
+  });
+
+  // A number pinned to an icon and nothing else is a riddle: readers took the
+  // span count for a pull request number. The counts that survive carry the
+  // word that says what they count.
+  describe("given a conversation row rolling up many spans", () => {
+    /** @scenario A conversation row carries no bare icon counters */
+    it("shows no unlabelled span count on the row, and keeps the counted words in the expanded summary", () => {
+      const row = serverSession();
+
+      renderCell({ cellId: "conversation", row });
+      expect(screen.queryByText("900")).not.toBeInTheDocument();
+
+      cleanup();
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <ConversationSummaryDetail group={row} />
+        </ChakraProvider>,
+      );
+      expect(screen.getByText("900 spans")).toBeInTheDocument();
     });
   });
 

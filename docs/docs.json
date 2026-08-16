@@ -75,6 +75,7 @@
             "pages": [
               "agent-simulations/introduction",
               "agent-simulations/getting-started",
+              "agent-simulations/scenario-parameters",
               "agent-simulations/authenticated-agents",
               "agent-simulations/voice-agents",
               "agent-simulations/red-teaming"
@@ -456,6 +457,9 @@
             "group": "Tools",
             "pages": [
               "integration/tools/integrations/claude-code",
+              "integration/tools/integrations/openai-codex",
+              "integration/tools/integrations/github-copilot-cli",
+              "integration/tools/integrations/opencode",
               "integration/openclaw"
             ]
           },
@@ -1483,7 +1487,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1786600824",
+      "source": "/ci/cache/busted/1786884294",
       "destination": "/"
     },
     {

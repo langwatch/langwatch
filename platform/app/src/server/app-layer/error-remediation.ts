@@ -61,6 +61,13 @@ const registry = {
       "Request fewer attribute/metadata fields",
     ],
   },
+  query_scan_limit_exceeded: {
+    tips: [
+      "Narrow the time range so fewer partitions are read",
+      "Add filters to reduce the amount of data scanned",
+      "Aggregate in the query rather than reading raw rows",
+    ],
+  },
   filter_parse_error: {
     tips: [
       "Check the filter syntax near the indicated position — filters are field:value pairs combined with AND/OR",
@@ -74,6 +81,75 @@ const registry = {
   },
   time_range_too_wide: {
     tips: ["Query in smaller windows and paginate through the results"],
+  },
+  governed_sql_unparseable: {
+    tips: [
+      "Read `meta.violations` — each entry carries the line and column the parser stopped at",
+      "The endpoint accepts native ClickHouse SQL; check for an unclosed quote, bracket, or parenthesis first",
+    ],
+  },
+  governed_sql_not_permitted: {
+    tips: [
+      "Read `meta.violations` — each entry names the rule (`code`) and the clause (`clause`) that was refused",
+      "Submit one read-only SELECT; writes, DDL, SETTINGS, FORMAT, INTO OUTFILE and table functions are all refused",
+      "Read only the datasets the schema endpoint lists for this key, and select fields by name rather than with `*`",
+    ],
+  },
+  governed_sql_parameter_missing: {
+    tips: [
+      "Read `meta.parameters` — it lists every parameter the SQL declares that the request left unset",
+      "Send a value for each under `parameters`, keyed by the name inside the braces: `{since:DateTime}` reads `parameters.since`",
+      "`period_start` and `period_end` are the exception — send them as `timeWindow: { start, end }`, never under `parameters`",
+    ],
+  },
+  governed_sql_reserved_parameter_supplied: {
+    tips: [
+      "Read `meta.parameters` — it lists the reserved names the request set for itself",
+      "`period_start` and `period_end` are supplied by the surface showing the chart; send `timeWindow: { start, end }` instead and drop them from `parameters`",
+    ],
+  },
+  governed_sql_reserved_parameter_type: {
+    tips: [
+      "Read `meta.parameters` — it lists the reserved names declared with the wrong type",
+      "Declare each as `DateTime` or `DateTime64`, for example `{period_start:DateTime}`; the interval they describe is half-open, `>= {period_start:DateTime} AND < {period_end:DateTime}`",
+    ],
+  },
+  governed_sql_not_enabled: {
+    tips: [
+      "The governed SQL feature is not enabled for this project — retrying will not help",
+      "Ask an administrator to enable the SQL workbench for this project",
+    ],
+  },
+  saved_workbench_chart_already_exists: {
+    tips: [
+      "A saved chart with this id already exists in this project",
+      "Retry with a different id, or omit the id to have the server mint one",
+    ],
+  },
+  saved_workbench_chart_not_found: {
+    tips: [
+      "Check the chart id — a chart saved in another project is not readable from this one",
+      "List the project's saved charts to see which ids exist",
+    ],
+  },
+  saved_workbench_chart_specification_refused: {
+    tips: [
+      "Read `meta.errors` — each entry names the rule (`rule`) and the JSON path (`path`) that was refused",
+      "A specification may only read the datasets the workbench registers, and may not load anything over the network",
+      "The same specification is refused when rendering, so saving it unchanged will not help",
+    ],
+  },
+  saved_workbench_chart_definition_invalid: {
+    tips: [
+      "This is a defect on our side — the stored chart cannot be read back and retrying will not help",
+      "Save the chart again from the workbench to replace the unreadable definition",
+    ],
+  },
+  governed_sql_unavailable: {
+    tips: [
+      "The governed analytics SQL API is not provisioned on this deployment — retrying will not help",
+      "Contact support to have it enabled for this workspace",
+    ],
   },
   page_too_deep: {
     tips: [
@@ -323,6 +399,39 @@ const registry = {
   langy_github_not_connected: {
     tips: [
       "Install the LangWatch GitHub App (Settings → Integrations) to let the agent open pull requests",
+    ],
+  },
+  langy_api_credential_missing: {
+    tips: [
+      "Send the project API key as X-Auth-Token, Authorization: Bearer <token>, or Authorization: Basic base64(projectId:token)",
+    ],
+    docsPath: "/api-reference/api-keys/overview",
+  },
+  langy_api_credential_invalid: {
+    tips: [
+      "The token did not resolve to a project — check it was copied whole and has not been revoked",
+    ],
+    docsPath: "/api-reference/api-keys/overview",
+  },
+  langy_api_key_unowned: {
+    tips: [
+      "This key has no owning user, so there is no one for the turn to act as — mint a personal API key and use that instead",
+    ],
+    docsPath: "/api-reference/api-keys/create-api-key",
+  },
+  langy_api_key_no_langy_access: {
+    tips: [
+      "The user who owns this key cannot use Langy in this project — ask a workspace admin to grant Langy access, then retry",
+    ],
+  },
+  langy_api_actor_missing: {
+    tips: [
+      "The user who owns this key no longer exists — mint a new key under a current user",
+    ],
+  },
+  langy_api_request_invalid: {
+    tips: [
+      "Read the `issues` array in `meta` — it names the field that failed and why",
     ],
   },
   langy_github_repo_not_accessible: {

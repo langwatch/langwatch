@@ -63,9 +63,15 @@ const (
 	ErrGuardrailUpstreamUnavailable = herr.Code("guardrail_upstream_unavailable")
 	ErrPolicyViolation              = herr.Code("policy_violation")
 	ErrModelNotAllowed              = herr.Code("model_not_allowed")
-	ErrProviderError                = herr.Code("provider_error")
-	ErrPayloadTooLarge              = herr.Code("payload_too_large")
-	ErrBadRequest                   = herr.Code("bad_request")
+	// ErrProviderNotBound means the request names a provider (explicit
+	// "provider/model" prefix or alias) that has no credential slot on
+	// this VK. Dispatching anyway would hand a mismatched credential to
+	// the provider selected by the model prefix, which surfaces as opaque
+	// provider-config errors ("deployments not set", HTML error pages).
+	ErrProviderNotBound = herr.Code("model_provider_not_bound")
+	ErrProviderError    = herr.Code("provider_error")
+	ErrPayloadTooLarge  = herr.Code("payload_too_large")
+	ErrBadRequest       = herr.Code("bad_request")
 	// ErrMissingModel is a request-shape error with its own stable identity so
 	// clients and rejection metrics do not have to infer it from prose.
 	ErrMissingModel    = herr.Code("missing_model")

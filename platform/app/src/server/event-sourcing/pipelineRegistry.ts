@@ -101,6 +101,7 @@ import { createBlobMaintenancePipeline } from "./pipelines/blob-maintenance/pipe
 import { createCodingAgentProcessingPipeline } from "./pipelines/coding-agent-processing/pipeline";
 import type { CodingAgentSessionState } from "./pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
 import { CodingAgentSessionStore } from "./pipelines/coding-agent-processing/projections/codingAgentSession.store";
+import { createCodingAgentSessionSeenTouch } from "./pipelines/coding-agent-processing/projections/codingAgentSessionSeen.touch";
 import {
   CodingAgentSessionEventsAppendStore,
   CodingAgentTraceSessionAppendStore,
@@ -377,11 +378,8 @@ export interface PipelineRegistryDeps {
   github?: {
     /** One recheck pass; returns how many branches were re-asked about. */
     recheckDueBranches: () => Promise<number>;
-    /** One retention pass over the two linkage tables. */
-    pruneStaleBranchLinkage: () => Promise<{
-      branchChecks: number;
-      pullRequests: number;
-    }>;
+    /** One retention pass over the branch bookkeeping. */
+    pruneStaleBranchLinkage: () => Promise<{ branchChecks: number }>;
   };
 }
 
@@ -890,6 +888,14 @@ export class PipelineRegistry {
         codingAgentSessionStore: this.cached<CodingAgentSessionState>(
           new CodingAgentSessionStore(
             this.deps.repositories.codingAgentSession,
+            {
+              // The Sessions-destination stamp, inline at the commit seam with
+              // its own per-process window — a read-model write, not a reactor.
+              onSessionsStored: createCodingAgentSessionSeenTouch({
+                touchCodingAgentSessionSeen: (params) =>
+                  this.deps.projects.touchCodingAgentSessionSeen(params),
+              }),
+            },
           ),
           "coding_agent_sessions",
         ),

@@ -75,6 +75,11 @@ const usage = (overrides: Record<string, number> = {}) => ({
   cache_read_input_tokens: 0,
   cache_creation_input_tokens: 0,
   reasoning_tokens: 0,
+  cache_creation_1h_tokens: 0,
+  input_audio_tokens: 0,
+  output_audio_tokens: 0,
+  input_chars: 0,
+  audio_ms: 0,
   ...overrides,
 });
 
@@ -259,6 +264,80 @@ describe("gateway debits process", () => {
       expect.objectContaining({ end_user_id: "", team_id: "team_1" }),
     );
     expect(logged.error).not.toHaveBeenCalled();
+  });
+
+  it("keeps a character-priced call that rated at zero", () => {
+    // A model with no rate confirms at $0 with 4000 real characters. Zero
+    // cost alone is not the drop test, or that call disappears from the
+    // budget's activity panel entirely.
+    const { result, writeDebits } = admitThen(
+      GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
+      outcomeData({ usage: usage({ input_chars: 4000 }), cost_nano_usd: 0 }),
+    );
+
+    expect(result.intents).toHaveLength(1);
+    expect(writeDebits).toHaveBeenCalledWith(
+      "debits:confirmed",
+      expect.objectContaining({ cost_nano_usd: 0 }),
+    );
+  });
+
+  it("keeps a call that only spent audio duration", () => {
+    const { result } = admitThen(
+      GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
+      outcomeData({ usage: usage({ audio_ms: 60_000 }), cost_nano_usd: 0 }),
+    );
+
+    expect(result.intents).toHaveLength(1);
+  });
+
+  it("still drops a rejection that moved no money and no quantity", () => {
+    const { result, writeDebits } = admitThen(
+      GATEWAY_SPEND_FAILED_EVENT_TYPE,
+      outcomeData({
+        usage: usage(),
+        cost_nano_usd: 0,
+        error: { type: "budget_exceeded", http_status: 429 },
+      }),
+    );
+
+    expect(result.intents).toBeUndefined();
+    expect(writeDebits).not.toHaveBeenCalled();
+  });
+
+  it("reads an intent payload written before the audio quantities existed", () => {
+    // An outbox row frozen by the previous build: the quantities it never
+    // knew about have to default rather than fail the parse, or the debit is
+    // retried eight times and lost.
+    const parsed = writeGatewayDebitsSchema.parse({
+      gateway_request_id: "req_old",
+      project_id: "proj_1",
+      organization_id: "org_1",
+      virtual_key_id: "vk_1",
+      model: "gpt-x",
+      model_provider_id: "mp_1",
+      usage: {
+        input_tokens: 10,
+        output_tokens: 5,
+        cache_read_input_tokens: 0,
+        cache_creation_input_tokens: 0,
+        reasoning_tokens: 0,
+      },
+      cost_nano_usd: 3_500,
+      rate_version: "catalog@2026-07-30",
+      status: "confirmed",
+      duration_ms: 120,
+      occurred_at: 1_753_800_000_000,
+    });
+
+    expect(parsed.usage).toMatchObject({
+      input_tokens: 10,
+      input_chars: 0,
+      audio_ms: 0,
+      input_audio_tokens: 0,
+      output_audio_tokens: 0,
+      cache_creation_1h_tokens: 0,
+    });
   });
 
   it("reads an intent payload written before the attribution fields existed", () => {

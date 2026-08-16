@@ -13,6 +13,7 @@
 
 import { createLogger } from "@langwatch/observability";
 import type { ChildProcess } from "child_process";
+import type { RunParameterValues } from "../parameters";
 
 const logger = createLogger("langwatch:scenarios:execution-pool");
 
@@ -28,6 +29,12 @@ export interface ExecutionJobData {
     type: "prompt" | "http" | "code" | "workflow";
     referenceId: string;
   };
+  /**
+   * The values the run resolved for this scenario, carried from the queued
+   * event. Absent for a run that resolved none, and for any event queued
+   * before parameters existed.
+   */
+  parameters?: RunParameterValues;
 }
 
 /** Function that spawns a child process for a scenario job. Returns when child exits. */

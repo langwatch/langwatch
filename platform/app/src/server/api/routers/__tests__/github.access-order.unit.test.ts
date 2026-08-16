@@ -29,6 +29,30 @@ const {
   permissionsAsked: [] as string[],
 }));
 
+// The install link is built from the App's own configuration, so the suite
+// controls whether this instance can start an installation at all.
+const { appConfig } = vi.hoisted(() => ({
+  appConfig: {
+    appId: "app-123",
+    privateKey: "dummy-pem",
+    webhookSecret: "whsecret",
+    appSlug: "langwatch-langy",
+    configured: true,
+  },
+}));
+vi.mock("~/server/app-layer/github/githubAppConfig", () => ({
+  getGithubAppConfig: () => appConfig,
+}));
+
+// The uninstall deep link is built from the GitHub host this instance is bound
+// to, so the suite controls that host as well.
+const { githubHost } = vi.hoisted(() => ({
+  githubHost: { webBase: "https://github.com" },
+}));
+vi.mock("~/server/app-layer/github/githubHost", () => ({
+  getGithubWebBase: () => githubHost.webBase,
+}));
+
 vi.mock("~/server/api/rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("~/server/api/rbac")>();
   return {
@@ -105,6 +129,52 @@ describe("githubRouter access gates", () => {
     getAllForOrganization.mockResolvedValue([]);
     listRepositoriesForOrganization.mockResolvedValue([]);
     hasOrgPermission.mockReturnValue(true);
+    appConfig.configured = true;
+    githubHost.webBase = "https://github.com";
+  });
+
+  describe("when the instance is bound to a GitHub Enterprise Server host", () => {
+    /** @scenario "The uninstall link points at the configured host" */
+    it("points the uninstall link at that host", async () => {
+      githubHost.webBase = "https://github.acme-corp.internal";
+      isOrganizationMember.mockResolvedValue(true);
+      getAllForOrganization.mockResolvedValue([installationRow()]);
+
+      const result = await caller().getConnectionStatus({
+        organizationId: "org-1",
+      });
+
+      expect(result.installations[0]?.uninstallUrl).toBe(
+        "https://github.acme-corp.internal/organizations/acme/settings/installations/555",
+      );
+    });
+
+    it("points it at github.com when no host is named", async () => {
+      isOrganizationMember.mockResolvedValue(true);
+      getAllForOrganization.mockResolvedValue([installationRow()]);
+
+      const result = await caller().getConnectionStatus({
+        organizationId: "org-1",
+      });
+
+      expect(result.installations[0]?.uninstallUrl).toBe(
+        "https://github.com/organizations/acme/settings/installations/555",
+      );
+    });
+  });
+
+  describe("when the instance cannot start an installation", () => {
+    /** @scenario "An instance that cannot start an installation offers no install link" */
+    it("hands back no install link", async () => {
+      appConfig.configured = false;
+      isOrganizationMember.mockResolvedValue(true);
+
+      const result = await caller().getConnectionStatus({
+        organizationId: "org-1",
+      });
+
+      expect(result.installUrl).toBeNull();
+    });
   });
 
   describe("when a member without management permission reads the status", () => {

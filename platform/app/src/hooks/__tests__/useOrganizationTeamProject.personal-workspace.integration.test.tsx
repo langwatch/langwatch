@@ -334,11 +334,11 @@ describe("useOrganizationTeamProject personal-workspace resolution", () => {
     });
   });
 
-  describe("given a personal sub-route (/me/devices) and nothing selected yet", () => {
+  describe("given a personal sub-route (/me/sessions) and nothing selected yet", () => {
     beforeEach(() => {
-      mockRouter.route = "/me/devices";
-      mockRouter.pathname = "/me/devices";
-      mockRouter.asPath = "/me/devices";
+      mockRouter.route = "/me/sessions";
+      mockRouter.pathname = "/me/sessions";
+      mockRouter.asPath = "/me/sessions";
     });
 
     /** @scenario Every personal-workspace sub-route gets the same treatment */

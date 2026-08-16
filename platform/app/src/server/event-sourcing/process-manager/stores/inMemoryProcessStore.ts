@@ -189,6 +189,7 @@ export class InMemoryProcessStore implements ProcessStore {
       if (message.leasedUntil > params.now) continue;
       message.leasedUntil = params.now + params.leaseDurationMs;
       message.leaseToken = nanoid();
+      message.attempts += 1;
       leased.push({ ...message, leaseToken: message.leaseToken });
     }
     return leased;
@@ -198,15 +199,17 @@ export class InMemoryProcessStore implements ProcessStore {
     identity: OutboxMessageIdentity;
     leaseToken: string;
     now: number;
-  }): Promise<void> {
+  }): Promise<{ applied: boolean }> {
     const message = this.messages.get(messageKeyOf(params.identity));
-    if (!message || message.leaseToken !== params.leaseToken) return;
+    if (!message || message.leaseToken !== params.leaseToken) {
+      return { applied: false };
+    }
     message.status = "dispatched";
-    message.attempts += 1;
     message.leasedUntil = 0;
     message.leaseToken = null;
     message.dispatchedAt = params.now;
     message.updatedAt = params.now;
+    return { applied: true };
   }
 
   async markFailed(params: {
@@ -215,15 +218,34 @@ export class InMemoryProcessStore implements ProcessStore {
     now: number;
     nextAttemptAt: number;
     dead: boolean;
-  }): Promise<void> {
+  }): Promise<{ applied: boolean }> {
     const message = this.messages.get(messageKeyOf(params.identity));
-    if (!message || message.leaseToken !== params.leaseToken) return;
-    message.attempts += 1;
+    if (!message || message.leaseToken !== params.leaseToken) {
+      return { applied: false };
+    }
     message.status = params.dead ? "dead" : "pending";
     message.nextAttemptAt = params.nextAttemptAt;
     message.leasedUntil = 0;
     message.leaseToken = null;
     message.updatedAt = params.now;
+    return { applied: true };
+  }
+
+  async releaseLease(params: {
+    identity: OutboxMessageIdentity;
+    leaseToken: string;
+    now: number;
+  }): Promise<{ applied: boolean }> {
+    const message = this.messages.get(messageKeyOf(params.identity));
+    if (!message || message.leaseToken !== params.leaseToken) {
+      return { applied: false };
+    }
+    // Hand back the attempt the lease charged: the delivery never started.
+    message.attempts -= 1;
+    message.leasedUntil = 0;
+    message.leaseToken = null;
+    message.updatedAt = params.now;
+    return { applied: true };
   }
 
   async findDueWakes(params: {

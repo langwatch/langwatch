@@ -172,10 +172,10 @@ const serveCliAuthEndpoints = () => {
       );
     }
     if (url.includes("/api/auth/cli/approve")) {
-      return new Response(
-        JSON.stringify({ ok: true, personal_vk_label: "default" }),
-        { status: 200, headers: { "content-type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
     }
     return new Response(JSON.stringify({}), {
       status: 200,

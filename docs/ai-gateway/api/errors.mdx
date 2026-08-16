@@ -67,7 +67,7 @@ Errors (like successes) always carry:
 
 - `X-LangWatch-Gateway-Request-Id: req_<hex>`, use this when filing support tickets. It is the same id that appears as `gateway_request_id` on spend events and webhook envelopes, so it joins a failing call to its billing records.
 - `X-LangWatch-Provider`, present when the error originated from an upstream provider (absent for gateway-internal errors).
-- `X-LangWatch-Handled-Error`, the top-level `error.code`, present on every LangWatch-authored error. A forwarded provider error is not LangWatch-authored, so this header is absent (or stripped, if the provider's own response happened to set it) on those responses — use it to tell the two apart rather than guessing from the body shape.
+- `X-LangWatch-Handled-Error`, the top-level `error.code`, present on every LangWatch-authored error. A forwarded provider error is not LangWatch-authored, so this header is absent (or stripped, if the provider's own response happened to set it) on those responses. Use it to tell the two apart rather than guessing from the body shape.
 
 ## Type enum
 
@@ -88,7 +88,7 @@ Errors (like successes) always carry:
 | `cache_override_not_implemented` | `400` | The `X-LangWatch-Cache` header was well-formed but named a mode deferred to v1.1 (`force` or `ttl=NNN`). `respect` and `disable` are the v1 modes. |
 | `provider_error` | `502` | An upstream provider returned a non-recoverable error and fallback (if any) was exhausted. |
 | `circuit_open` | `503` | Repeated upstream 5xx/timeout/network failures opened the credential's circuit breaker, so the gateway declined to dial the provider for this request. Retryable; the breaker probes the upstream again after its cooldown. Answered 4xx (rate limits, quota, bad requests) never open the breaker. |
-| `upstream_timeout` | `504` | An upstream provider exceeded `timeout_ms` and fallback (if any) was exhausted. |
+| `upstream_timeout` | `504` | An upstream provider timed out and fallback (if any) was exhausted. |
 | `bad_request` | `400` | Validation error on the incoming payload. |
 | `missing_model` | `400` | The request names no model. `message` and `meta.request_type` say where that endpoint expects one. |
 | `unsupported_parameter` | `400` | The parameter policy refused a request parameter for the target lane: either the request depends on it functionally and the lane cannot honor it, or `drop_tuning_params` is `false` and the lane has no mapping for it. The message names the parameter, the lane, and why. See [Parameter mapping](/ai-gateway/parameter-mapping). |

@@ -1,13 +1,12 @@
-import { KEY_CHECK, MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
+import { MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
+import { isSecretCredentialField } from "../../utils/modelProviderHelpers";
 
 /**
  * Whether a credential field holds a secret, by the same test the read path
  * masks with. That shared test is the point: a value the server never shows
  * back is one no caller can resend.
  */
-export function isSecretCredential(key: string): boolean {
-  return KEY_CHECK.some((marker) => key.includes(marker));
-}
+export const isSecretCredential = isSecretCredentialField;
 
 /**
  * The credential bag to store, given what a write carries and what the row

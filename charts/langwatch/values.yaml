@@ -1058,6 +1058,24 @@ langwatch_nlp:
   ## @param langwatch_nlp.service.port [default: 5561] Service port.
   service: { type: ClusterIP, port: 5561 }
 
+  # Where workflows are allowed to send HTTP requests. This is the service that
+  # runs HTTP agents and workflow HTTP nodes, so this is the setting that
+  # decides whether an agent can reach a service on your own network.
+  #
+  # Keep blockLocalHTTPCalls false for a self-hosted install whose agents are
+  # internal — the common case, and the default. Set it true for a
+  # multi-tenant deployment, where a workflow author is not necessarily
+  # someone you want reaching into the cluster, and list the internal hosts
+  # you do intend to reach in allowedProxyHosts.
+  #
+  # Cloud metadata endpoints are refused either way and cannot be allow-listed.
+  ## @extra langwatch_nlp.security Outbound request policy for workflow HTTP nodes.
+  ## @param langwatch_nlp.security.blockLocalHTTPCalls [default: false] Refuse workflow HTTP requests to private, loopback and link-local addresses. Keep false for self-hosted installs that call internal services; set true for multi-tenant deployments.
+  ## @param langwatch_nlp.security.allowedProxyHosts [array, default: []] Hostnames reachable even when blockLocalHTTPCalls is on. Matched literally, case-insensitive, port ignored. Cloud metadata is never allow-listed.
+  security:
+    blockLocalHTTPCalls: false
+    allowedProxyHosts: []
+
   # Resource requirements for the NLP service. The service is a lean static Go
   # binary (nlpgo) that only spawns a transient Python interpreter to sandbox
   # user code blocks, so it has a small footprint.

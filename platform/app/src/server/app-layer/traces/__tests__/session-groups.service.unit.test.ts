@@ -42,6 +42,7 @@ function makeRow(overrides: Partial<SessionGroupRow> = {}): SessionGroupRow {
     errorCount: 1,
     warningCount: 0,
     totalSpans: 12,
+    lastTraceId: "trace-latest",
     input: "fix the flaky test",
     output: "done, pushed",
     ...overrides,
@@ -292,6 +293,42 @@ describe("SessionGroupsService", () => {
       });
       expect(result.totalHits).toBe(1);
       expect(result.nextCursor).toBeNull();
+    });
+  });
+
+  describe("when a row names its latest trace", () => {
+    /** @scenario The session read carries the latest trace id onto the row */
+    it("carries that trace id onto the session", async () => {
+      const service = new SessionGroupsService({
+        repository: new FakeRepository([makeRow()], 1),
+        codingAgentSessions: lookupReturning({}),
+      });
+
+      const result = await service.getSessionGroups({
+        tenantId: TENANT,
+        timeRange: { from: 0, to: 2_000_000_000_000 },
+        pageSize: 10,
+      });
+
+      expect(result.sessions[0]?.lastTraceId).toBe("trace-latest");
+    });
+
+    // The rollup names a trace for every group it forms, so an empty id is a
+    // gap rather than a value. Handing "" to the row would open the drawer on
+    // a trace that does not exist.
+    it("reports an unnamed trace as absent", async () => {
+      const service = new SessionGroupsService({
+        repository: new FakeRepository([makeRow({ lastTraceId: "" })], 1),
+        codingAgentSessions: lookupReturning({}),
+      });
+
+      const result = await service.getSessionGroups({
+        tenantId: TENANT,
+        timeRange: { from: 0, to: 2_000_000_000_000 },
+        pageSize: 10,
+      });
+
+      expect(result.sessions[0]?.lastTraceId).toBeNull();
     });
   });
 

@@ -153,6 +153,19 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       Then the node's status is "error"
       And the error message contains "secrets"
 
+    # Stored stdout and stderr ride along on execution events, traces and
+    # logs exactly as node errors do, so a printed credential is exposed as
+    # widely as one echoed in an error message.
+    @unit
+    Scenario: Secret values are scrubbed from stored code node stdout and stderr
+      Given the workflow carries secret "API_TOKEN" = "sk-live-abc123"
+      And the run carries parameter "REGION" = "eu-central"
+      And a code node whose body prints both to stdout, and the secret to stderr
+      When the engine invokes the node
+      Then the stored stdout shows the secret value as "[redacted]"
+      And the stored stderr shows the secret value as "[redacted]"
+      And the stored stdout still contains "eu-central", because a run parameter is not a credential
+
   # The former "identical outputs on Go and Python" parity scenario was removed:
   # the Python langwatch_nlp engine has been removed (see _shared/contract.md —
   # nlpgo is the sole NLP engine), so /studio/execute_sync no longer exists and

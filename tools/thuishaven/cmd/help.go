@@ -30,7 +30,7 @@ COMMANDS
 EXAMPLES
     haven up                     # stack up in the background + attached log view
     haven up +langy              # add a service here, now and from now on
-    haven                        # the hub: every stack + actions (git/down/destroy)
+    haven                        # the hub: the whole machine + actions (git/cleanup/down/destroy)
     haven status                 # every stack + shared-server health, one shot
     haven logs nlp -t            # tail one service live
     haven db seed demo           # reseed in place, dropping nothing

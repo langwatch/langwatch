@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"time"
 
 	"go.uber.org/zap"
@@ -42,6 +43,7 @@ func (o *Orchestrator) governProcesses() {
 		if o.procTel != nil {
 			o.procTel.RecordKill("tsgo", k.Reason)
 		}
+		o.recordReap("tsgo", fmt.Sprintf("pid %d (%s, %s)", k.PID, k.Class, domain.HumanBytes(k.RSS)), k.Reason)
 		o.log.Warn("process governor reclaimed tsgo",
 			zap.Int("pid", k.PID),
 			zap.String("role", string(k.Class)),
