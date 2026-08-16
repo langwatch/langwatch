@@ -59,6 +59,10 @@ export function requiredPermissionForPurpose(
 const DENIAL_CODES: ReadonlySet<string> = new Set([
   "project_permission_denied",
   "lite_member_restricted",
+  // The ADR-092 engine's denial. A route that has migrated to
+  // `authz.authorize()` throws this instead of the legacy pair, and without
+  // it here the engine's 403 would surface as a 500.
+  "permission_denied",
 ]);
 
 /**

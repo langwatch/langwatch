@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import type { LocalPromptConfig } from "~/experiments-v3/types";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
-import { FieldMappingSchema } from "~/server/scenarios/execution/types";
+import { FieldMappingSchema } from "~/server/scenarios/field-mapping";
 import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";
 
 import { datasetColumnTypeSchema } from "../../server/datasets/types";

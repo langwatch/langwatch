@@ -61,7 +61,6 @@ import { OpsExplainService } from "~/server/ops/opsExplain.service";
 import { getPostHogInstance } from "~/server/posthog";
 import { PromptService } from "~/server/prompt-config/prompt.service";
 import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
-import { ClickHouseOrphanedRunFinder } from "~/server/scenarios/orphaned-run-reconciliation.clickhouse";
 import { StoredObjectOwnerClickHouseRepository } from "~/server/stored-objects/repositories/stored-object-owner.clickhouse.repository";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { getSaaSPlanProvider } from "../../../ee/billing";
@@ -94,6 +93,7 @@ import type { PipelineRepositories } from "../event-sourcing/pipelineRegistry";
 import {
   type AppCommands,
   PipelineRegistry,
+  type ScenarioExecutionPoolHolder,
 } from "../event-sourcing/pipelineRegistry";
 import { buildAutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.wiring";
 import { createExperimentRunItemAppendStore } from "../event-sourcing/pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
@@ -104,8 +104,9 @@ import {
   NullExperimentIdLookupRepository,
 } from "../event-sourcing/pipelines/experiment-run-processing/repositories";
 import { LangyAnalyticsEventAppendStore } from "../event-sourcing/pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.store";
-import type { ScenarioExecutionReactorHandle } from "../event-sourcing/pipelines/simulation-processing/reactors/scenarioExecution.reactor";
+import { SimulationRunMetricsAppendStore } from "../event-sourcing/pipelines/simulation-processing/projections";
 import {
+  SimulationRunMetricsRepositoryClickHouse,
   SimulationRunStateRepositoryClickHouse,
   SimulationRunStateRepositoryMemory,
 } from "../event-sourcing/pipelines/simulation-processing/repositories";
@@ -337,11 +338,12 @@ import { UsageService } from "./usage/usage.service";
 const redisLogger = createLogger("langwatch:redis");
 
 /**
- * Late-bound handle for the scenario execution reactor.
+ * Late-bound holder for this pod's scenario execution pool, read by the
+ * simulationRunExecution process manager's execute intent.
  * Stored on globalForApp to survive hot-reload in dev (same as the App instance).
  */
-export function getScenarioExecutionHandle(): ScenarioExecutionReactorHandle | null {
-  return (globalForApp as any).__scenarioExecutionHandle ?? null;
+export function getScenarioExecutionPool(): ScenarioExecutionPoolHolder | null {
+  return (globalForApp as any).__scenarioExecutionPool ?? null;
 }
 
 export function initializeWebApp(): App {
@@ -774,6 +776,19 @@ export function initializeDefaultApp(options?: {
     simulationRunState: clickhouseEnabled
       ? new SimulationRunStateRepositoryClickHouse(resolveClickHouseClient)
       : new SimulationRunStateRepositoryMemory(),
+    simulationRunMetricsStore: clickhouseEnabled
+      ? new SimulationRunMetricsAppendStore(
+          new SimulationRunMetricsRepositoryClickHouse(resolveClickHouseClient),
+        )
+      : // No ClickHouse → event sourcing is disabled; the append store is a noop.
+        {
+          append: async () => {
+            /* noop */
+          },
+          bulkAppend: async () => {
+            /* noop */
+          },
+        },
     experimentRunState: clickhouseEnabled
       ? new ExperimentRunStateRepositoryClickHouse(resolveClickHouseClient)
       : new ExperimentRunStateRepositoryMemory(),
@@ -1198,8 +1213,8 @@ export function initializeDefaultApp(options?: {
     governanceOcsfEventsSync,
   });
   const commands = registry.registerAll();
-  (globalForApp as any).__scenarioExecutionHandle =
-    commands.scenarioExecutionHandle;
+  (globalForApp as any).__scenarioExecutionPool =
+    commands.scenarioExecutionPool;
 
   if (roleRunsWorkers(config.processRole)) {
     // One-time background seeds on worker boot (ADR-051): topic-model
@@ -1680,17 +1695,6 @@ export function initializeDefaultApp(options?: {
         getClickHouseClientForOrganization,
       ),
     },
-    scenarios: {
-      // Boot-sweep-only: the two orphaned-run reconciliation sweeps read the
-      // shared (cross-tenant) client directly rather than a per-tenant
-      // repository — see clickhouse-queries.md's "boot-time system sweeps"
-      // carve-out. `sharedCh` is the same client `ops.eventExplorer` above
-      // was built from.
-      orphanReconciliation: {
-        client: sharedCh,
-        finder: sharedCh ? new ClickHouseOrphanedRunFinder(sharedCh) : null,
-      },
-    },
     governance: {
       ocsfEvents: governanceOcsfEventsRepository,
       traceActivity: governanceTraceActivityRepository,
@@ -2012,9 +2016,6 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         throw new Error("ClickHouse is not available in the test app");
       }),
     },
-    scenarios: {
-      orphanReconciliation: { client: null, finder: null },
-    },
     governance: {
       ocsfEvents: undefined,
       traceActivity: undefined,
@@ -2220,15 +2221,9 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       automations: {
         recordTriggerMatch: noop,
       } as AppCommands["automations"],
-      scenarioExecutionHandle: {
-        reactor: {
-          name: "scenarioExecution",
-          options: { runIn: ["worker"] },
-          handle: async () => {
-            /* noop */
-          },
-        },
-        setPool: () => {
+      scenarioExecutionPool: {
+        get: () => null,
+        set: () => {
           /* noop */
         },
       },

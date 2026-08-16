@@ -77,7 +77,6 @@ export class App {
   readonly redis: AppDependencies["redis"];
   readonly billing: AppDependencies["billing"];
   readonly usageStats: AppDependencies["usageStats"];
-  readonly scenarios: AppDependencies["scenarios"];
   readonly governance: AppDependencies["governance"];
   readonly billableEvents: AppDependencies["billableEvents"];
   readonly commands: AppCommands;
@@ -157,7 +156,6 @@ export class App {
     this.redis = deps.redis;
     this.billing = deps.billing;
     this.usageStats = deps.usageStats;
-    this.scenarios = deps.scenarios;
     this.governance = deps.governance;
     this.billableEvents = deps.billableEvents;
     this.commands = deps.commands;

@@ -6,6 +6,12 @@ Feature: Scoped role bindings
   Role bindings attach a principal (user or group) to a named role at a specific scope.
   The most specific scope always wins. Group bindings are expanded via group membership.
 
+  # ADR-092 supersedes the override behaviour described here: grants are an
+  # additive union, so a narrower binding adds and never subtracts. The
+  # scenarios this affects, and the premise sentence above, are named in the
+  # header of specs/rbac/unified-authorization-engine.feature. They are
+  # rewritten at stage C4; until then they describe the live resolver.
+
   Background:
     Given an organization "acme"
     And the following teams in "acme": "client-a", "client-b"

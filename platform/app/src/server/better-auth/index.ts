@@ -95,24 +95,70 @@ const redisEnv = {
 /**
  * The App's connection at the moment a storage callback runs.
  *
- * Null only where env advertises Redis but the App has none — a test app, or a
- * callback firing before boot completes. Degrading to a cache miss there is
- * right: better-auth re-reads from the database, whereas throwing would fail
- * the request outright.
+ * Null wherever env advertises Redis but the App has none, which is three
+ * states, not one: a test app, a callback firing before boot completes, and —
+ * for the whole life of the process — anything that never builds an App at all
+ * (a task, a bare `tsx scripts/*.ts`). `start.ts` boots before it listens, so
+ * the web entrypoint only ever sees the first two.
+ *
+ * Resolving per call rather than once at import is what makes this possible,
+ * and it is deliberate: the alternative needs a live client at module load.
+ * See the ADR's note on where the old singleton's behaviour is and is not
+ * reproduced.
  */
 const secondaryStorageConnection = () => tryGetApp()?.redis ?? null;
 
-const secondaryStorage: BetterAuthOptions["secondaryStorage"] =
+/**
+ * How many writes this process has dropped for want of a connection.
+ *
+ * Carried in the log line because the *first* drop and the ten-thousandth mean
+ * different things: one is a request that raced boot, a climbing count is a
+ * process serving auth with no secondary storage at all.
+ */
+let droppedSecondaryWrites = 0;
+
+/**
+ * Reports a write that went nowhere.
+ *
+ * A dropped read is a cache miss and better-auth recovers it from the database.
+ * A dropped WRITE has no such recovery, and one of its tenants is the
+ * credential sign-in rate-limit counter, which lives only in secondary storage:
+ * dropping the `set` is a rate limit that fails OPEN. That is a security-
+ * relevant degradation, so it does not get to be silent (#6950).
+ *
+ * The key is deliberately not logged. Better-auth keys secondary storage by
+ * session token, so the key IS a credential.
+ */
+const reportDroppedSecondaryWrite = (operation: "set" | "delete"): void => {
+  droppedSecondaryWrites += 1;
+  logger.warn(
+    { operation, droppedSecondaryWrites },
+    "better-auth secondary storage write dropped: Redis is configured but the application has no connection. Rate limiting and session revocation degrade to fail-open until it does.",
+  );
+};
+
+/**
+ * The storage better-auth is configured with — `undefined` when this deployment
+ * has no Redis, in which case sessions stay in the database.
+ *
+ * Exported for unit testing, the same way `isEmailPasswordEnabled` is: ADR-093
+ * moved this from "decided once against a live singleton" to "resolved per
+ * call", which opened a window where the callbacks run with no connection.
+ * That window is the contract now, so it is asserted rather than merely
+ * commented (#6950).
+ */
+export const secondaryStorage: BetterAuthOptions["secondaryStorage"] =
   new RedisConfigService().isConfigured(redisEnv)
     ? {
         get: async (key) => {
           const redis = secondaryStorageConnection();
+          // A miss, not a failure: better-auth falls through to the database.
           if (!redis) return null;
           return await redis.get(`better-auth:${key}`);
         },
         set: async (key, value, ttl) => {
           const redis = secondaryStorageConnection();
-          if (!redis) return;
+          if (!redis) return reportDroppedSecondaryWrite("set");
           if (ttl) {
             await redis.set(`better-auth:${key}`, value, "EX", ttl);
           } else {
@@ -121,7 +167,7 @@ const secondaryStorage: BetterAuthOptions["secondaryStorage"] =
         },
         delete: async (key) => {
           const redis = secondaryStorageConnection();
-          if (!redis) return;
+          if (!redis) return reportDroppedSecondaryWrite("delete");
           await redis.del(`better-auth:${key}`);
         },
       }

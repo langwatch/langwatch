@@ -14,9 +14,9 @@
 
 import type { AgentInput } from "@langwatch/scenario";
 import { Liquid } from "liquidjs";
+import type { FieldMapping } from "../field-mapping";
 import type { RunParameterValues } from "../parameters";
 import { resolveFieldMappings, sourceFieldOf } from "./resolve-field-mappings";
-import type { FieldMapping } from "./types";
 
 /**
  * Marks a context value as already-serialized JSON that must be interpolated

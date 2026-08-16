@@ -2,11 +2,9 @@
  * Router for cancelling scenario jobs and batch runs.
  *
  * Dispatches cancel_requested events via the event-sourcing pipeline.
- * The pipeline reactor broadcasts to all worker pods, and the worker
- * owning the scenario kills its child process.
- *
- * For queued jobs (not yet picked up), also dispatches finished(CANCELLED)
- * so they never execute.
+ * The simulationRunExecution process manager publishes the cancellation to
+ * all worker pods, and the worker owning the scenario kills its child
+ * process. Queued jobs are finished CANCELLED by the process manager itself.
  *
  * @see specs/features/suites/cancel-queued-running-jobs.feature
  */
@@ -56,19 +54,6 @@ function getService(): ScenarioCancellationService {
         await getApp().simulations.cancelRun({
           tenantId,
           scenarioRunId,
-          occurredAt,
-        });
-      },
-      dispatchFinishRun: async ({
-        tenantId,
-        scenarioRunId,
-        status,
-        occurredAt,
-      }) => {
-        await getApp().simulations.finishRun({
-          tenantId,
-          scenarioRunId,
-          status,
           occurredAt,
         });
       },
