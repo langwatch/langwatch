@@ -39,3 +39,21 @@ Feature: The device remembers the last product per organization
     Given the device remembers "gateway" for "org_1"
     When I visit another Gateway page in "org_1"
     Then no storage write happens
+
+  @integration
+  Scenario: Navigating the app keeps the memory current
+    Given I am in a new navigation mode
+    When I go from a Gateway page to a Governance page
+    Then the device remembers "governance" for my organization
+
+  @integration
+  Scenario: Legacy mode writes no product memory
+    Given I am in legacy mode
+    When I visit a Gateway page
+    Then the device remembers nothing
+
+  @integration
+  Scenario: Entering Settings captures where I came from
+    Given I am in a new navigation mode
+    When I go from a Gateway page to a Settings page
+    Then the Settings back entry points at that Gateway page

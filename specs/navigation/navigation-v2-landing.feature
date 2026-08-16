@@ -72,6 +72,33 @@ Feature: Landing in the new navigation modes
     When I use the back entry in the Settings sidebar
     Then I land on the Governance home
 
+  @integration
+  Scenario: The root address opens the remembered product in a new mode
+    Given I am in a new navigation mode
+    And the device remembers "gateway" for my organization
+    When I open "/"
+    Then I am sent to the Gateway home
+
+  @integration
+  Scenario: The root address keeps its current behavior in legacy mode
+    Given I am in legacy mode
+    When I open "/"
+    Then the current home resolution applies unchanged
+
+  @integration
+  Scenario: A member kept in an empty organization stays put in the new modes
+    Given my current organization has no project
+    And another organization of mine has one
+    When the app resolves my context in a new navigation mode
+    Then I am not sent to the other organization's project
+
+  @integration
+  Scenario: Legacy mode keeps sending the member to the other organization's project
+    Given my current organization has no project
+    And another organization of mine has one
+    When the app resolves my context in legacy mode
+    Then I am sent to the other organization's project as today
+
   @unit
   Scenario: Switching organization stays in the same product when possible
     Given I am in the Gateway product

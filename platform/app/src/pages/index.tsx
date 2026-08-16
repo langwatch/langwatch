@@ -1,5 +1,9 @@
 import { useEffect } from "react";
 import { useLocalStorage } from "usehooks-ts";
+import { readLastVisitedProduct } from "~/features/navigation/logic/productMemory";
+import { resolveLandingDestination } from "~/features/navigation/logic/resolveLandingDestination";
+import { useNavigationMode } from "~/features/navigation/useNavigationMode";
+import { useReachableProducts } from "~/features/navigation/useReachableProducts";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { resolveHomeDestination } from "~/utils/resolveHomeDestination";
@@ -38,7 +42,45 @@ export default function Index() {
     "",
   );
 
+  // Navigation-v2 landing: in the new modes the per-org product memory
+  // outranks the server resolver (the deliberate ADR-038 deviation).
+  // Legacy mode below stays bit-identical.
+  const navigationResolution = useNavigationMode();
+  const { reachableProducts, isLoading: isReachableLoading } =
+    useReachableProducts();
+  const isV2 =
+    navigationResolution.status === "ready" &&
+    navigationResolution.mode !== "legacy";
+
   useEffect(() => {
+    if (navigationResolution.status === "loading") return;
+    if (isV2) {
+      if (resolved.data && !isReachableLoading) {
+        const destination = resolveLandingDestination({
+          pinnedPath: resolved.data.isOverride
+            ? resolved.data.destination
+            : null,
+          rememberedProduct: organization
+            ? readLastVisitedProduct({ organizationId: organization.id })
+            : null,
+          reachableProducts,
+          serverHomeDestination: resolved.data.destination ?? null,
+          projectSlug: project && !project.isPersonal ? project.slug : null,
+        });
+        if (destination) {
+          void router.replace(destination);
+          return;
+        }
+      }
+      if (resolved.isError && project) {
+        void router.replace(`/${project.slug}`);
+        return;
+      }
+      if (!isLoading && !organization && (organizations?.length ?? 0) === 0) {
+        void router.replace("/onboarding/welcome");
+      }
+      return;
+    }
     if (resolved.data?.destination) {
       // The persona resolver picks the DEFAULT for a user with no history. On
       // top of that we honor the last-visited home so it sticks both ways: a
@@ -95,6 +137,10 @@ export default function Index() {
     isLoading,
     router,
     lastVisitedHomeKind,
+    navigationResolution.status,
+    isV2,
+    isReachableLoading,
+    reachableProducts,
   ]);
 
   return <LoadingScreen />;
