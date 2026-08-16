@@ -76,8 +76,8 @@ describe("createManagementService", () => {
       });
       app = service
         .version(MANAGEMENT_API_VERSION, (v) => {
-          v.get(
-            "/things",
+          v.rpc(
+            "/things.list",
             {
               ...guard("organization:manage"),
               output: z.object({ ok: z.boolean() }),
@@ -93,11 +93,11 @@ describe("createManagementService", () => {
     describe("when the service builds", () => {
       it("registers the declared policy for the dated, latest and bare mounts", () => {
         for (const path of [
-          `/api/toy-management/${MANAGEMENT_API_VERSION}/things`,
-          "/api/toy-management/latest/things",
-          "/api/toy-management/things",
+          `/api/toy-management/${MANAGEMENT_API_VERSION}/things.list`,
+          "/api/toy-management/latest/things.list",
+          "/api/toy-management/things.list",
         ]) {
-          const registered = getRoutePolicy("GET", path);
+          const registered = getRoutePolicy("POST", path);
           expect(registered, path).toBeDefined();
           expect(registered?.policy).toEqual({
             kind: "permission",
@@ -127,7 +127,9 @@ describe("createManagementService", () => {
       it("runs auth, then the permission check, then the plan gate, then the handler", async () => {
         executionOrder.length = 0;
 
-        const response = await app.request("/api/toy-management/things");
+        const response = await app.request("/api/toy-management/things.list", {
+          method: "POST",
+        });
 
         expect(response.status).toBe(200);
         expect(executionOrder).toEqual([
@@ -150,8 +152,8 @@ describe("createManagementService", () => {
       expect(() =>
         service
           .version(MANAGEMENT_API_VERSION, (v) => {
-            v.get(
-              "/things",
+            v.rpc(
+              "/things.list",
               { output: z.object({ ok: z.boolean() }) },
               async () => ({ ok: true }),
             );
@@ -184,8 +186,8 @@ describe("createManagementService", () => {
       };
       const app = service
         .version(MANAGEMENT_API_VERSION, (v) => {
-          v.get(
-            "/things",
+          v.rpc(
+            "/things.list",
             {
               ...guard("organization:manage", { extra: [ownMiddleware] }),
               output: z.object({ ok: z.boolean() }),
@@ -196,7 +198,9 @@ describe("createManagementService", () => {
         .build();
       executionOrder.length = 0;
 
-      const response = await app.request("/api/toy-extra/things");
+      const response = await app.request("/api/toy-extra/things.list", {
+        method: "POST",
+      });
 
       expect(response.status).toBe(200);
       expect(executionOrder).toEqual([
@@ -208,7 +212,7 @@ describe("createManagementService", () => {
     });
 
     it("still registers the declared policy", () => {
-      const registered = getRoutePolicy("GET", "/api/toy-extra/things");
+      const registered = getRoutePolicy("POST", "/api/toy-extra/things.list");
 
       expect(registered?.policy).toEqual({
         kind: "permission",
@@ -236,8 +240,8 @@ describe("createManagementService", () => {
       };
       service
         .version(MANAGEMENT_API_VERSION, (v) => {
-          v.get(
-            "/things",
+          v.rpc(
+            "/things.list",
             {
               ...guard("organization:manage"),
               middleware: [ownMiddleware],
@@ -253,6 +257,84 @@ describe("createManagementService", () => {
       expect(buildWithOverwrittenMiddleware).toThrow(
         /missing the permission and plan check/,
       );
+    });
+  });
+
+  /**
+   * `@langwatch/api` still exposes the resource-REST helpers — it is a general
+   * framework, and SSE plus the four pre-ADR-094 families need them. What makes
+   * RPC the only way to add a LangWatch management endpoint is this factory:
+   * it is the single product caller of `createService`, so a new family cannot
+   * reach the verb helpers without going through the check these pin.
+   */
+  describe("given a family added after the webhooks pilot", () => {
+    it("refuses a resource-REST route", () => {
+      const { service: svc, guard } = createManagementService({
+        name: "toy-rest-newcomer",
+        basePath: "/api/toy-rest-newcomer",
+        feature: "MANAGEMENT_API",
+      });
+
+      expect(() =>
+        svc
+          .version(MANAGEMENT_API_VERSION, (v) => {
+            v.get(
+              "/things",
+              {
+                ...guard("organization:manage"),
+                output: z.object({ ok: z.boolean() }),
+              },
+              async () => ({ ok: true }),
+            );
+          })
+          .build(),
+      ).toThrow(/is not RPC-named/);
+    });
+
+    it("names the legacy families it is not one of", () => {
+      const { service: svc, guard } = createManagementService({
+        name: "toy-rest-newcomer-2",
+        basePath: "/api/toy-rest-newcomer-2",
+        feature: "MANAGEMENT_API",
+      });
+
+      expect(() =>
+        svc
+          .version(MANAGEMENT_API_VERSION, (v) => {
+            v.delete(
+              "/things",
+              {
+                ...guard("organization:manage"),
+                output: z.object({ ok: z.boolean() }),
+              },
+              async () => ({ ok: true }),
+            );
+          })
+          .build(),
+      ).toThrow(/organization, role-bindings, roles, scim-tokens/);
+    });
+
+    it("admits an RPC operation", () => {
+      const { service: svc, guard } = createManagementService({
+        name: "toy-rpc-newcomer",
+        basePath: "/api/toy-rpc-newcomer",
+        feature: "MANAGEMENT_API",
+      });
+
+      expect(() =>
+        svc
+          .version(MANAGEMENT_API_VERSION, (v) => {
+            v.rpc(
+              "/things.list",
+              {
+                ...guard("organization:manage"),
+                output: z.object({ ok: z.boolean() }),
+              },
+              async () => ({ ok: true }),
+            );
+          })
+          .build(),
+      ).not.toThrow();
     });
   });
 });
