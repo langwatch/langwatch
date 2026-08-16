@@ -1,3 +1,4 @@
+import { setTimeout as sleep } from "node:timers/promises";
 import { slackDeliveryMethodOf } from "@langwatch/automations/providers/slack";
 import type { WebhookMethod } from "@langwatch/automations/providers/webhook";
 import { renderTriggerEmail } from "@langwatch/automations/templating/renderEmail";
@@ -804,21 +805,71 @@ interface PersistPageContext {
   brandedTenantId: ReturnType<typeof createTenantId>;
   claimBreachReport: () => boolean;
   /**
-   * A trace that dispatched but could not write its `TriggerSent` claim. The
-   * side effect landed and nothing records it, so the page must not be
-   * retried: see `throwIfPageShouldRetry`.
+   * A trace that dispatched but could not write its `TriggerSent` claim, not
+   * even after the short retries. Nothing records the side effect, so a page
+   * retry runs it a second time: see `throwIfPageShouldRetry`.
    */
   unclaimed: string[];
+}
+
+/** Waits before each extra attempt of a claim write, in milliseconds. */
+const CLAIM_RETRY_DELAYS_MS = [200, 500];
+
+/**
+ * Write the trace's `TriggerSent` claim, with short retries.
+ *
+ * The claim is the only record that stops a page retry from running the same
+ * side effect again, so a transient write failure is worth about a second of
+ * the page lease. This function never throws: the side effect already landed,
+ * so failing the trace here would report a success as a failure. A trace that
+ * cannot claim after every attempt is recorded as unclaimed instead.
+ */
+async function claimPersistDispatch(
+  page: PersistPageContext,
+  traceId: string,
+): Promise<void> {
+  const { deps, projectId, triggerId } = page;
+  const attempts = CLAIM_RETRY_DELAYS_MS.length + 1;
+
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    try {
+      await deps.triggers.claimSend({ triggerId, traceId, projectId });
+      return;
+    } catch (claimErr) {
+      const waitMs = CLAIM_RETRY_DELAYS_MS[attempt];
+      if (waitMs !== undefined) {
+        await sleep(waitMs);
+        continue;
+      }
+      page.unclaimed.push(traceId);
+      logger.warn(
+        {
+          projectId,
+          triggerId,
+          traceId,
+          attempts,
+          error:
+            claimErr instanceof Error ? claimErr.message : String(claimErr),
+        },
+        "claimSend failed on every attempt after a persist dispatch. The " +
+          "side effect landed and no claim records it, so a retry of the " +
+          "page runs it a second time.",
+      );
+      captureException(toError(claimErr), {
+        extra: {
+          projectId,
+          triggerId,
+          traceId,
+          phase: "claimSend-post-persist-dispatch",
+        },
+      });
+    }
+  }
 }
 
 /**
  * One trace of a persist page: confirm the match still holds, spend the daily
  * ceiling, run the action, then claim.
- *
- * The claim write is best-effort by design. The side effect already landed,
- * so throwing here would let the outbox retry and dispatch it twice. The
- * trace is recorded as unclaimed instead, which is what stops the page from
- * being retried underneath it.
  */
 async function dispatchOnePersistTrace(
   page: PersistPageContext,
@@ -881,29 +932,7 @@ async function dispatchOnePersistTrace(
     project,
   });
 
-  try {
-    await deps.triggers.claimSend({ triggerId, traceId, projectId });
-  } catch (claimErr) {
-    page.unclaimed.push(traceId);
-    logger.warn(
-      {
-        projectId,
-        triggerId,
-        traceId,
-        error: claimErr instanceof Error ? claimErr.message : String(claimErr),
-      },
-      "claimSend failed post-persist-dispatch — swallowing to avoid " +
-        "double-dispatch, and the page will not be retried",
-    );
-    captureException(toError(claimErr), {
-      extra: {
-        projectId,
-        triggerId,
-        traceId,
-        phase: "claimSend-post-persist-dispatch",
-      },
-    });
-  }
+  await claimPersistDispatch(page, traceId);
 }
 
 /**
@@ -941,15 +970,14 @@ function recordPersistTraceFailure(params: {
  * Decide whether the page may be retried, and rethrow one representative
  * retryable error if it may.
  *
- * A page retry re-runs every trace that has no `TriggerSent` claim. That is
- * exactly right when the claims are accurate, and wrong when they are not: a
- * trace that dispatched but failed to claim would run its side effect a
- * second time on the retry, triggered by an unrelated page-mate's failure.
- * One database blip produces both conditions at once, so when any claim write
- * failed the page gives up its retry. The traces that failed retryably lose
- * this settlement's attempt, which is the cheaper of the two losses: a
- * duplicate dataset row or annotation-queue item is customer-visible and
- * cannot be taken back.
+ * A page retry re-runs every trace that has no `TriggerSent` claim, so a
+ * trace that dispatched and could not claim runs its side effect a second
+ * time. Persist actions accept that duplicate, because the alternative is
+ * worse: a retryable failure that is never retried loses that dataset row or
+ * annotation-queue item for good, and a settled trace has no guaranteed next
+ * match. Persist dispatch is therefore at-least-once. A duplicate row is
+ * visible to the customer and can be removed; a lost row is not visible at
+ * all. The unclaimed traces are logged and reported before the page retries.
  */
 function throwIfPageShouldRetry(params: {
   projectId: string;
@@ -963,34 +991,35 @@ function throwIfPageShouldRetry(params: {
   if (retryableFailures.length === 0) return;
 
   if (unclaimed.length > 0) {
-    logger.error(
+    logger.warn(
       {
         projectId,
         triggerId,
         pageSize,
         failed: retryableFailures.length,
-        unclaimed: unclaimed.length,
-        error:
-          retryableFailures[0] instanceof Error
-            ? retryableFailures[0].message
-            : String(retryableFailures[0]),
+        unclaimed,
       },
-      "Persist page had retryable failures but also traces that dispatched " +
-        "without a claim — dropping the retry, because retrying would " +
-        "re-dispatch those traces. The failed traces re-settle on their next " +
-        "match.",
+      "Persist page retries with traces that dispatched but hold no claim. " +
+        "Those traces can run their side effect again on the retry, which " +
+        "is accepted so the traces that failed are not lost.",
     );
-    for (const failure of retryableFailures) {
-      captureException(toError(failure), {
-        extra: { projectId, triggerId, phase: "persist-page-retry-dropped" },
-      });
-    }
-    return;
+    captureException(
+      new Error("Persist page retry re-runs traces that hold no claim"),
+      {
+        extra: {
+          projectId,
+          triggerId,
+          pageSize,
+          unclaimed,
+          phase: "persist-page-retry-unclaimed",
+        },
+      },
+    );
   }
 
   logger.warn(
     { projectId, triggerId, failed: retryableFailures.length, pageSize },
-    "Persist page had retryable failures — retrying the page; claimed traces no-op on the retry",
+    "Persist page had retryable failures. Retrying the page; claimed traces no-op on the retry",
   );
   throw retryableFailures[0];
 }
@@ -999,9 +1028,10 @@ function throwIfPageShouldRetry(params: {
  * Persist-class dispatch (ADR-035, paged): one page of settled matches per
  * intent. The fixed per-dispatch reads (trigger row, prior claims, plan cap,
  * project) run once per page; the per-trace confirm and action run through a
- * small pool. `TriggerSent` claims keep each trace's side effect
- * at-most-once, written AFTER a successful dispatch, so a retry of the page
- * re-runs only the traces that never claimed.
+ * small pool. `TriggerSent` claims are written AFTER a successful dispatch,
+ * so a retry of the page re-runs only the traces that hold no claim. The
+ * claim write can itself fail, which makes persist dispatch at-least-once:
+ * see `claimPersistDispatch` and `throwIfPageShouldRetry`.
  */
 async function dispatchPersistMatchPage({
   deps,

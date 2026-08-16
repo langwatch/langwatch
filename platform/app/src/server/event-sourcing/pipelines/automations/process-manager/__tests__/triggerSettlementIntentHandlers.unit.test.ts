@@ -691,10 +691,11 @@ describe("trigger settlement intent handlers integration", () => {
       });
     });
 
-    it("drops the page retry when a dispatched trace could not write its claim", async () => {
+    /** @scenario "A failed claim write does not cancel a page-mate's retry" */
+    it("retries the page for the failed trace when a page-mate lost its claim write", async () => {
       const { deps, triggers, raw } = makeDeps(datasetTrigger());
-      // trace-1 dispatches and then loses its claim write; trace-2 fails in a
-      // way that would normally retry the whole page.
+      // trace-1 dispatches and then loses its claim write on every attempt;
+      // trace-2 fails in a way that must retry the whole page.
       triggers.claimSend.mockRejectedValue(new Error("claim write failed"));
       raw.addToDataset.mockImplementation(
         async ({ datasetRecords }: { datasetRecords: { id: string }[] }) => {
@@ -707,16 +708,74 @@ describe("trigger settlement intent handlers integration", () => {
         },
       );
 
-      // Retrying would re-dispatch trace-1, whose side effect already landed
-      // and which no claim can suppress. The page gives up its retry instead.
-      await expect(
-        createPersistMatchHandler(deps)(
-          { triggerId: "trigger-1", traceIds: ["trace-1", "trace-2"] },
-          context("process:trigger-1:persist:page-1"),
-        ),
-      ).resolves.toBeUndefined();
+      // The retry runs trace-1 again, because no claim suppresses it. That
+      // duplicate is accepted: dropping the retry would lose trace-2's
+      // dataset row for good, and a settled trace has no next match.
+      const thrown = await createPersistMatchHandler(deps)(
+        { triggerId: "trigger-1", traceIds: ["trace-1", "trace-2"] },
+        context("process:trigger-1:persist:page-1"),
+      ).catch((error: unknown) => error);
 
+      expect(isDispatchError(thrown)).toBe(true);
+      expect((thrown as DispatchError).retryable).toBe(true);
       expect(raw.addToDataset).toHaveBeenCalledTimes(2);
+      // Three attempts for one trace: the first write plus the two retries.
+      expect(triggers.claimSend).toHaveBeenCalledTimes(3);
+    });
+
+    it("claims on an inline retry so only the failed trace runs again", async () => {
+      const { deps, triggers, raw } = makeDeps(datasetTrigger());
+      let claimAttempts = 0;
+      triggers.claimSend.mockImplementation(async () => {
+        claimAttempts += 1;
+        if (claimAttempts === 1) throw new Error("claim write failed");
+      });
+      raw.addToDataset.mockImplementation(
+        async ({ datasetRecords }: { datasetRecords: { id: string }[] }) => {
+          if (datasetRecords[0]!.id.includes("trace-2")) {
+            throw new DispatchError({
+              message: "database unavailable",
+              retryable: true,
+            });
+          }
+        },
+      );
+
+      const payload = {
+        triggerId: "trigger-1",
+        traceIds: ["trace-1", "trace-2"],
+      };
+      const thrown = await createPersistMatchHandler(deps)(
+        payload,
+        context("process:trigger-1:persist:page-1"),
+      ).catch((error: unknown) => error);
+
+      // The claim landed on the second attempt, so the page still retries for
+      // trace-2 and trace-1 carries a claim into that retry.
+      expect(isDispatchError(thrown)).toBe(true);
+      expect(triggers.claimSend).toHaveBeenCalledTimes(2);
+      expect(triggers.claimSend).toHaveBeenLastCalledWith({
+        triggerId: "trigger-1",
+        traceId: "trace-1",
+        projectId: "project-1",
+      });
+
+      // The outbox redelivers the page: the claim filter now holds trace-1,
+      // so only trace-2 runs its action again.
+      triggers.filterSendClaimed.mockResolvedValue(new Set(["trace-1"]));
+      raw.addToDataset.mockClear();
+      raw.addToDataset.mockResolvedValue(undefined);
+      await createPersistMatchHandler(deps)(payload, {
+        ...context("process:trigger-1:persist:page-1"),
+        attempt: 2,
+      });
+
+      expect(raw.addToDataset).toHaveBeenCalledTimes(1);
+      expect(triggers.claimSend).toHaveBeenLastCalledWith({
+        triggerId: "trigger-1",
+        traceId: "trace-2",
+        projectId: "project-1",
+      });
     });
 
     it("still retries the page when every dispatched trace claimed", async () => {

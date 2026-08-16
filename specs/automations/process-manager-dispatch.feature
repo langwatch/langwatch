@@ -83,6 +83,19 @@ Feature: Automation dispatch on the process-manager substrate
     Then the other traces of the page still dispatch and claim
     And the failed trace is recorded and not retried
 
+  # A claim is written after the action, so a claim write that fails leaves a
+  # side effect that no claim can suppress. Persist dispatch accepts that
+  # duplicate: the page keeps its retry, because a retryable failure that is
+  # never retried loses a dataset row or an annotation-queue item for good,
+  # and a settled trace has no guaranteed next match.
+  @unit
+  Scenario: A failed claim write does not cancel a page-mate's retry
+    Given a page where one trace dispatches but its claim write fails
+    And another trace fails with a retryable error
+    When the page dispatches
+    Then the page is retried for the failed trace
+    And the dispatched trace can run again instead of being lost
+
   @unit
   Scenario: A daily-ceiling breach is reported once per page
     Given a page whose traces exceed the automation's daily ceiling
