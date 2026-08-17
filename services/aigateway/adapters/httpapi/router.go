@@ -27,6 +27,7 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaymetrics"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaytracer"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/ottlserver"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/upstreamhttp"
 	"github.com/langwatch/langwatch/services/aigateway/app"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
@@ -1129,7 +1130,7 @@ func writeError(logger *zap.Logger, w http.ResponseWriter, ctx context.Context, 
 	logWriteError(logger, ctx, err)
 	var ue *domain.UpstreamError
 	if errors.As(err, &ue) {
-		writeUpstreamError(w, ue)
+		upstreamhttp.WriteUpstreamError(w, ue)
 		return
 	}
 	var e herr.E
@@ -1138,70 +1139,6 @@ func writeError(logger *zap.Logger, w http.ResponseWriter, ctx context.Context, 
 		return
 	}
 	herr.WriteHTTP(w, herr.New(ctx, domain.ErrInternal, nil))
-}
-
-// writeUpstreamError forwards a provider's terminal response to the client.
-// The provider's native error body is written byte-for-byte when present, so
-// the client sees the exact upstream envelope under the upstream's real
-// status code (not a masked 502) and can tell terminal from retryable. When
-// the native body is unavailable, the minimal envelope still preserves the
-// error's identity: the provider's own error type/code (insufficient_quota,
-// overloaded_error, ...) when the adapter parsed them, and a generic
-// provider_error only when nothing better is known. The originating provider
-// rides a response header either way, since the verbatim body cannot be
-// tampered with to carry it.
-func writeUpstreamError(w http.ResponseWriter, ue *domain.UpstreamError) {
-	status := ue.StatusCode
-	if status <= 0 {
-		status = http.StatusBadGateway
-	}
-	// Forward the upstream's retry-signaling headers (Retry-After,
-	// x-should-retry) so the client can honor the provider's backoff and
-	// terminal-vs-retryable hint, not just the status code. Passthrough
-	// lanes forward the upstream's headers wholesale, including its exact
-	// Content-Type (e.g. Google's "application/json; charset=UTF-8"), so
-	// only default the Content-Type when the upstream did not provide one.
-	for k, v := range ue.Headers {
-		w.Header().Set(k, v)
-	}
-	// A provider must not be able to make its body look LangWatch-authored.
-	// herr.WriteHTTP sets this marker only for our handled envelopes.
-	w.Header().Del(herr.HandledErrorHeader)
-	if ue.Provider != "" {
-		w.Header().Set("X-LangWatch-Provider", ue.Provider)
-	}
-	if w.Header().Get("Content-Type") == "" {
-		w.Header().Set("Content-Type", "application/json")
-	}
-	w.WriteHeader(status)
-	if len(ue.Body) > 0 {
-		_, _ = w.Write(ue.Body)
-		return
-	}
-	errType := ue.ErrorType
-	if errType == "" {
-		errType = ue.ErrorCode
-	}
-	if errType == "" {
-		errType = "provider_error"
-	}
-	errCode := ue.ErrorCode
-	if errCode == "" {
-		errCode = errType
-	}
-	meta := map[string]any{"status": status}
-	if ue.Provider != "" {
-		meta["provider"] = ue.Provider
-	}
-	body, _ := sonic.Marshal(map[string]any{
-		"error": map[string]any{
-			"type":    errType,
-			"code":    errCode,
-			"message": ue.Message,
-			"meta":    meta,
-		},
-	})
-	_, _ = w.Write(body)
 }
 
 var errorsRegistered bool

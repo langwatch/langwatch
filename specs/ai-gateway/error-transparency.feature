@@ -86,6 +86,61 @@ Feature: AI Gateway — transparent upstream error forwarding
     And both response bodies match the upstream error body
 
   # ==========================================================================
+  # Every lane that fronts the dispatcher, not just the gateway's own router
+  # ==========================================================================
+  # "ALL providers and BOTH dispatch paths" also means all HTTP surfaces. The
+  # nlp service exposes a second one — /go/proxy/v1/* — which the optimization
+  # studio, the playground and the simulation runner all dial. It shipped
+  # without this contract: every dispatch failure became a 502
+  # "gateway_unavailable" whose meta said only "dispatcher_error", discarding
+  # the upstream status, message, error type and body.
+  #
+  # The cost, from a real 2026-08-17 incident: a provider verdict reached the
+  # simulation runner as an unexplained 502 from us. The AI SDK spent its three
+  # retries on it, the run died, and the only record said our gateway was
+  # unavailable — while the pod serving those requests was up throughout, with
+  # zero restarts, for the whole twelve-hour window. Two bugs (this mask, plus
+  # a log line that omitted the reason chain) made a provider-side error
+  # indistinguishable from an outage of our own.
+  #
+  # Both lanes now call one shared writer, so they cannot drift apart again.
+
+  @bdd @error-transparency @unit
+  Scenario: The nlp service's proxy lane forwards an upstream verdict verbatim
+    Given the upstream provider answers 429 insufficient_quota with Retry-After: 30
+    When a caller reaches the dispatcher through the /go/proxy lane
+    Then the response carries HTTP 429, not 502
+    And the response body is the provider's error body, unmodified
+    And the upstream retry-signalling headers are preserved
+    And the response never relabels the provider's verdict as "gateway_unavailable"
+
+  @bdd @error-transparency @unit
+  Scenario: The proxy lane's streaming and non-streaming paths agree
+    Given the upstream provider answers a terminal 400 before any stream opens
+    When a caller reaches the dispatcher through the /go/proxy lane with stream=true
+    Then the response carries HTTP 400, not 502
+    And the response body is the provider's error body, unmodified
+
+  @bdd @error-transparency @unit
+  Scenario: A failure that is genuinely ours still reads as ours
+    Given the dispatcher rejects a malformed request before dialing any provider
+    When a caller reaches the dispatcher through the /go/proxy lane
+    Then the response is our own "gateway_unavailable" envelope
+    So that forwarding upstream verdicts never hides a real fault of our own
+
+  # herr withholds a non-herr reason from the response body on purpose, so the
+  # log line is the ONLY place the cause survives. Omitting it left this class
+  # of failure undiagnosable: 49 production occurrences carried a full
+  # middleware stacktrace — identical every time, therefore worthless — and
+  # nothing at all about what had failed.
+  @bdd @error-transparency @unit
+  Scenario: A failed request logs the reason chain, not just the bucket it fell into
+    Given a request fails with an underlying cause the response body must not expose
+    When the failure is logged
+    Then the log line carries the underlying reason chain
+    And the response body still exposes no internals
+
+  # ==========================================================================
   # Mid-stream provider error EVENTS survive with their payload
   # ==========================================================================
   # An upstream can fail AFTER the stream is 200-established by emitting an

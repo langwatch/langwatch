@@ -27,6 +27,13 @@ export const ScenarioInfraErrorCode = {
   PlatformUnreachable: "scenario_platform_unreachable",
   /** The model provider rejected the request (bad key, unknown model, …). */
   ModelProviderError: "scenario_model_provider_error",
+  /**
+   * Our model gateway couldn't dispatch the call. Ours, not the customer's,
+   * and transient — the run is worth retrying unchanged.
+   */
+  ModelGatewayUnavailable: "scenario_model_gateway_unavailable",
+  /** The provider throttled us or the account is out of quota. */
+  ModelRateLimited: "scenario_model_rate_limited",
   /** The resolved model is licensed for the coding-assistant surfaces only and can't run this simulation. */
   ModelNotAllowedForSurface: "scenario_model_not_allowed_for_surface",
   /** The judge combined a forced function tool with incompatible reasoning. */
@@ -150,6 +157,14 @@ const INTERNALS_PATTERNS = [
   /(?:^|[\s'"(/\\])(?:dist|node_modules)[/\\]/,
   /\bscenario-child-process\b/,
   /\.cjs\b/,
+  // The `ai` SDK's own error class names (AI_RetryError, AI_APICallError,
+  // AI_NoObjectGeneratedError, …). These are the vocabulary of a library the
+  // customer never chose and cannot act on, and they arrive attached to the
+  // most common runner failures, so the generic bucket used to show them
+  // verbatim. A classification rule above is the right answer for any failure
+  // we can name; anything left over is better as a plain sentence than as the
+  // name of one of our dependencies' exception types.
+  /\bAI_[A-Za-z]+Error\b/,
 ] as const;
 
 /** True when a candidate message would expose our internals to the user. */
@@ -325,6 +340,54 @@ const CLASSIFICATION_RULES: ClassificationRule[] = [
     }),
   },
   {
+    // Our own model gateway could not dispatch the call at all. Distinct from
+    // every provider verdict below: nothing about the customer's scenario,
+    // model choice or key is wrong, and the same run usually succeeds on a
+    // retry. Kept ahead of the provider rule because the gateway's envelope
+    // also carries a `"message"` field that extractProviderMessage would
+    // happily lift — and that message is the literal string
+    // "gateway_unavailable", which tells a customer nothing.
+    //
+    // This went unclassified for as long as it existed: the provider rule
+    // below only ever knew the gateway's OTHER error type, `provider_error`,
+    // so a gateway failure fell to the generic bucket and showed the customer
+    // the raw runner text — "[UserSimulatorAgent] AI_RetryError: Failed after
+    // 3 attempts. Last error: gateway_unavailable" — with no hint and no
+    // indication the fault was ours.
+    needles: ["gateway_unavailable", "dispatcher_error"],
+    build: () => ({
+      code: ScenarioInfraErrorCode.ModelGatewayUnavailable,
+      message:
+        "The simulation couldn't reach the model because our model gateway was briefly unavailable.",
+      hint: "This is a fault on our side, not a problem with your scenario. Run the simulation again, and contact support if it keeps happening.",
+    }),
+  },
+  {
+    // The provider throttled us or the account has no quota left. Separated
+    // from the generic provider rejection because the action is different:
+    // waiting or raising a limit, not fixing a key or a model name. These
+    // reach us as the provider's own verbatim body now that the gateway
+    // forwards upstream errors instead of masking them
+    // (specs/ai-gateway/error-transparency.feature).
+    // Machine-readable provider codes only, never prose like "rate limit" or
+    // "Too Many Requests". Those words also appear when the CUSTOMER's agent
+    // reports being throttled by its own upstream, and that text is their data
+    // about their system — it passes through verbatim on purpose (see the
+    // internals guard). Only a provider's own error code identifies a throttle
+    // on the call WE made.
+    needles: ["insufficient_quota", "rate_limit_exceeded", "overloaded_error"],
+    build: (text) => {
+      const providerMessage = extractProviderMessage(text);
+      return {
+        code: ScenarioInfraErrorCode.ModelRateLimited,
+        message: providerMessage
+          ? `The model provider throttled the request: ${providerMessage}`
+          : "The model provider throttled the request while running the simulation.",
+        hint: "Wait and run the simulation again, or raise the rate limit or spending cap on the provider account.",
+      };
+    },
+  },
+  {
     // Model-provider rejection (bad key, unknown model, provider error).
     needles: [
       "provider_error",
@@ -332,6 +395,9 @@ const CLASSIFICATION_RULES: ClassificationRule[] = [
       "Incorrect API key",
       "invalid_api_key",
       "Model not found",
+      "model_not_found",
+      "invalid_request_error",
+      "context_length_exceeded",
     ],
     build: (text) => {
       const providerMessage = extractProviderMessage(text);
@@ -522,6 +588,10 @@ export function scenarioErrorTitle(code: ScenarioInfraErrorCode): string {
       return "Couldn't reach the endpoint";
     case ScenarioInfraErrorCode.ModelProviderError:
       return "Model provider error";
+    case ScenarioInfraErrorCode.ModelGatewayUnavailable:
+      return "Model gateway unavailable";
+    case ScenarioInfraErrorCode.ModelRateLimited:
+      return "Model provider rate limit reached";
     case ScenarioInfraErrorCode.ModelNotAllowedForSurface:
       return "Model not allowed for this simulation";
     case ScenarioInfraErrorCode.ModelToolReasoningConflict:

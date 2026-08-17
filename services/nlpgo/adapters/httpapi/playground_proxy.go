@@ -19,6 +19,7 @@ import (
 
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/herr"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/upstreamhttp"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/gatewayproxy"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/litellm"
@@ -302,9 +303,48 @@ func classifyPath(urlPath string) (domain.RequestType, string) {
 	}
 }
 
+// forwardUpstreamError forwards a provider-origin failure verbatim and reports
+// whether it did.
+//
+// Without this the /go/proxy lane answered EVERY dispatch failure with a 502
+// "gateway_unavailable" whose meta said only "dispatcher_error", discarding the
+// upstream status, message, error type and body. A provider answering 429
+// insufficient_quota therefore reached callers as an unexplained 502 from us:
+// the AI SDK's retry wrapper burned its three attempts on a terminal error, the
+// simulation runner died, and the logs read as though our gateway had gone
+// down. It had not — the pod serving those requests was up throughout.
+//
+// The gateway's own router (aigateway/adapters/httpapi/router.go) has always
+// unwrapped UpstreamError; this lane simply never did. Both now call the same
+// writer so they cannot disagree.
+//
+// @see specs/ai-gateway/error-transparency.feature
+func forwardUpstreamError(ctx context.Context, w http.ResponseWriter, err error) bool {
+	var ue *domain.UpstreamError
+	if !errors.As(err, &ue) {
+		return false
+	}
+	// Logged at the same choke point as every other failed request, and with
+	// the provider's own verdict on the line, so "which provider said what"
+	// is answerable from the log alone.
+	clog.Get(ctx).Info("upstream_error_forwarded",
+		zap.String("fault", "provider"),
+		zap.Int("upstream_status", ue.StatusCode),
+		zap.String("upstream_type", ue.ErrorType),
+		zap.String("upstream_code", ue.ErrorCode),
+		zap.String("provider", ue.Provider),
+		zap.String("upstream_message", ue.Message),
+	)
+	upstreamhttp.WriteUpstreamError(w, ue)
+	return true
+}
+
 func handleSync(ctx context.Context, w http.ResponseWriter, proxy PlaygroundProxy, req playgroundProxyRequest) {
 	resp, err := proxy.Dispatch(ctx, req)
 	if err != nil {
+		if forwardUpstreamError(ctx, w, err) {
+			return
+		}
 		writeHandlerError(ctx, w, herr.New(ctx, nlpgodomain.ErrGatewayUnavailable, herr.M{
 			"reason": "dispatcher_error",
 		}, err))
@@ -332,12 +372,27 @@ func handleSync(ctx context.Context, w http.ResponseWriter, proxy PlaygroundProx
 	_, _ = w.Write(resp.Body)
 }
 
+// writeStreamOpenFailure answers a stream that never opened.
+//
+// Nothing has been written yet, so this is still a plain HTTP failure and an
+// upstream refusal is forwarded under the upstream's own status rather than
+// framed as an SSE error event. error-transparency.feature requires the
+// streaming and non-streaming lanes to agree on exactly that, since a client
+// that reads only the status would otherwise retry a terminal error on one lane
+// and not the other.
+func writeStreamOpenFailure(ctx context.Context, w http.ResponseWriter, err error) {
+	if forwardUpstreamError(ctx, w, err) {
+		return
+	}
+	writeHandlerError(ctx, w, herr.New(ctx, nlpgodomain.ErrGatewayUnavailable, herr.M{
+		"reason": "dispatcher_stream_error",
+	}, err))
+}
+
 func handleStream(ctx context.Context, w http.ResponseWriter, proxy PlaygroundProxy, req playgroundProxyRequest) {
 	iter, err := proxy.DispatchStream(ctx, req)
 	if err != nil {
-		writeHandlerError(ctx, w, herr.New(ctx, nlpgodomain.ErrGatewayUnavailable, herr.M{
-			"reason": "dispatcher_stream_error",
-		}, err))
+		writeStreamOpenFailure(ctx, w, err)
 		return
 	}
 	defer func() { _ = iter.Close() }()

@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -48,6 +49,36 @@ func writeHandlerError(ctx context.Context, w http.ResponseWriter, e herr.E) {
 	if msg, ok := e.Meta["message"].(string); ok {
 		fields = append(fields, zap.String("message", msg))
 	}
+	// The reason chain is the ONLY place the underlying cause survives: herr's
+	// HTTP body deliberately collapses non-herr reasons to "unknown" so we
+	// never leak internals to a caller, and the code+reason pair above names
+	// only the bucket the failure landed in. Omitting it here meant a
+	// gateway_unavailable/dispatcher_error logged a full middleware stacktrace
+	// — identical on every occurrence, so worthless — and nothing whatsoever
+	// about what actually failed. A whole class of production failures was
+	// undiagnosable as a result.
+	if reasons := joinReasons(e.Reasons); reasons != "" {
+		fields = append(fields, zap.String("reasons", reasons))
+	}
 	clog.Get(ctx).Log(level, "request_failed", fields...)
 	herr.WriteHTTP(w, e)
+}
+
+// joinReasons renders the herr reason chain for the log line. Server-side only
+// — this is the text herr withholds from the response body on purpose.
+//
+// Returned as ONE joined string rather than a []string field because the log
+// agent destroys a bare string-valued `error` field in transit, and a slice of
+// them fares no better; a single named field survives.
+func joinReasons(reasons []error) string {
+	parts := make([]string, 0, len(reasons))
+	for _, reason := range reasons {
+		if reason == nil {
+			continue
+		}
+		if msg := reason.Error(); msg != "" {
+			parts = append(parts, msg)
+		}
+	}
+	return strings.Join(parts, "; ")
 }

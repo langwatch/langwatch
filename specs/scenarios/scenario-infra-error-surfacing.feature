@@ -16,6 +16,43 @@ Feature: Scenario infrastructure error surfacing and empty-response state
   # and anything under pkg/ssrf.
 
   # ============================================================================
+  # Flattening the thrown error chain into the one line that crosses the
+  # process boundary
+  # ============================================================================
+  # The child process reports a single line on stdout and exits. That line is
+  # the only description of the failure that survives, and the classifier below
+  # sees nothing else, so whatever the flattening drops or garbles is lost.
+
+  # Wrapping an error as `new Error(`[${name}] ${error}`, { cause: error })` is
+  # the common shape — @langwatch/scenario does it around every agent call — and
+  # it puts the cause's whole message inside the wrapper's own. Appending the
+  # cause again is what doubled the sentence customers read, and on a deeper
+  # chain it spends the length budget repeating the tail instead of reaching the
+  # useful end of it.
+  @unit
+  Scenario: A cause already quoted by its wrapper is stated once
+    Given a thrown error whose message already contains its cause's message
+    When the error chain is flattened for the parent process
+    Then the repeated text appears once
+
+  # `cause` is not the only link. The AI SDK's retry error leaves `cause` unset
+  # and keeps the failure that ended the run on `lastError`, with every attempt
+  # in `errors`. Following `cause` alone stopped one link short of the only link
+  # carrying the provider's status code and response body — exactly the text the
+  # classifier needs — so a provider verdict reached it as a single bare word.
+  @unit
+  Scenario: The chain follows an SDK aggregate past its empty cause
+    Given a thrown error whose real failure hangs off lastError rather than cause
+    When the error chain is flattened for the parent process
+    Then the flattened text includes the underlying provider failure
+
+  @unit
+  Scenario: A cyclic cause chain terminates
+    Given a thrown error whose cause chain points back at itself
+    When the error chain is flattened for the parent process
+    Then each error in the cycle appears once
+
+  # ============================================================================
   # Classifying the raw child-runner error into a handled error
   # ============================================================================
 
@@ -39,6 +76,66 @@ Feature: Scenario infrastructure error surfacing and empty-response state
     When the failure is classified
     Then the handled error code is "scenario_model_provider_error"
     And the message surfaces the provider's own message
+
+  # Our own model gateway failing to dispatch is neither a provider verdict nor
+  # anything the customer can fix, and it is usually gone by the next attempt.
+  # It went unclassified for as long as it existed, because the provider rule
+  # only knew the gateway's OTHER error type ("provider_error"). A real 2026-08-17
+  # incident therefore put this in front of customers, verbatim, as the whole
+  # explanation of a failed run:
+  #
+  #   [UserSimulatorAgent] AI_RetryError: Failed after 3 attempts. Last error:
+  #   gateway_unavailable: Failed after 3 attempts. Last error: gateway_unavailable
+  #
+  # Three faults in one line: our internal class names, a doubled sentence, and
+  # no statement that the fault was ours or that retrying would work.
+  @unit
+  Scenario: A model-gateway failure is named as ours and retryable
+    Given a scenario run failed because our model gateway could not dispatch the call
+    When the failure is classified
+    Then the handled error code is "scenario_model_gateway_unavailable"
+
+  @unit
+  Scenario: A model-gateway failure never shows internal names
+    Given a scenario run failed because our model gateway could not dispatch the call
+    When the failure is classified
+    Then the message names no internal class, library or error code
+
+  @unit
+  Scenario: A model-gateway failure tells the customer it is our fault
+    Given a scenario run failed because our model gateway could not dispatch the call
+    When the failure is classified
+    Then the message says the model gateway was unavailable
+    And the hint says the fault is on our side and the run is worth repeating
+
+  # A throttle is separated from a rejection because the action differs: wait or
+  # raise a limit, rather than fix a key or a model name. These only became
+  # visible to the classifier once the gateway stopped masking upstream errors
+  # (see specs/ai-gateway/error-transparency.feature).
+  @unit
+  Scenario: A provider throttle is named separately from a rejection
+    Given a scenario run failed with a provider error code for a throttle or exhausted quota
+    When the failure is classified
+    Then the handled error code is "scenario_model_rate_limited"
+    And the message surfaces the provider's own message
+    And the hint says to wait or raise the provider's limit
+
+  @unit
+  Scenario: Forwarded provider verdicts classify as provider errors
+    Given a scenario run failed with a forwarded provider error code for an unknown model or invalid request
+    When the failure is classified
+    Then the handled error code is "scenario_model_provider_error"
+
+  # The `ai` SDK's error class names are the vocabulary of a library the
+  # customer never chose and cannot act on. Any failure we can name gets a rule;
+  # what is left reads better as a plain sentence than as a dependency's
+  # exception type.
+  @unit
+  Scenario: An unnamed SDK failure degrades to a plain sentence
+    Given a scenario run failed with a raw error naming only an AI SDK error class
+    When the failure is classified
+    Then the handled error code is "scenario_infra_error"
+    And the message does not name an AI SDK error class
 
   @unit
   Scenario: A timeout becomes an execution-timeout error
