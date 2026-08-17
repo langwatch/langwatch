@@ -192,8 +192,13 @@ becomes the ledger. Bill of materials:
   legacy tables (`RoleBinding`/`CustomRole`/`TeamUser`) exactly as today; the
   `Grant`/`Role` head is written but read by nothing. The moment reads move
   is PR 3's, per cut-over org.
-- **Definition of done: the replay test** — replaying an org's stream produces
-  byte-identical rows to the imperative M1 writer, and
+- **Definition of done: the replay test** — the whole pure chain (emission
+  mapping → command handler → wire schemas → fold → row mappings) run twice
+  produces byte-identical rows, equivalent to the imperative M1 writer's
+  (`replayDeterminism.unit.test.ts`; "equivalent" because ids are now
+  deterministic and a custom binding's role column normalizes to CUSTOM —
+  neither can change a decision). The Prisma store converges by idempotent
+  upserts; a live-database round-trip test can ride PR 2 if wanted.
   `in-place-authz-migration.feature` passes unchanged.
 
 ### PR 2 — the ledger becomes the only writer (still dark)
@@ -329,18 +334,23 @@ two-headed Prisma store, the tenancy-guard entries, the ops rollback
 mutation + UI, and the shadow observability logging (announce / match info /
 mismatch warn / failure warn).
 
-Remaining for PR 1, in order:
+PR 1's remainder, all delivered 2026-08-17:
 
-1. `TeamUserBackfillMigration` emits batched `attachGrants`
-   (source backfill-b, backdated occurredAt, commandId `backfill-b:<rowId>`)
-   → awaits projection → parity proof → `proveMigrationParity`; epoch bump
-   stays (decision 19); `in-place-authz-migration.feature` passes unchanged.
-2. Runner lifecycle transitions as events; `SystemMigrationTenantState`
-   becomes their projection.
-3. The instant-enforcement revocation write as a ready seam (its caller is
-   PR 2's revoke/offboard move; the breaker is doctrine only).
-4. The replay-determinism test. (The Redis-down revocation test rides with
-   PR 2, where the revoke path it exercises first exists.)
+1. `TeamUserBackfillMigration` emits batched `attachGrants` (source
+   backfill-b, backdated occurredAt, deterministic commandIds) → waits for
+   the projection's compat rows → parity proof → `proveMigrationParity` on
+   a clean sweep only; epoch bump stays (decision 19); the feature file
+   passes unchanged.
+2. Runner lifecycle transitions witnessed as `migration_tenant_state_changed`
+   facts via a decorating state repository (synchronous write stays the
+   latch); the projection re-applies them under a monotonic `updatedAt`
+   guard, so replay rebuilds an empty table and can never regress a live one.
+3. `enforceGrantRevocation` on the projection repository — the one
+   sanctioned direct write, caller arrives in PR 2. Breaker is doctrine
+   (ADR-007), no processor.
+4. The replay-determinism test (`replayDeterminism.unit.test.ts`). The
+   Redis-down revocation test rides with PR 2, where the revoke path it
+   exercises first exists.
 
 The rollout after PR 1–2 merge is one organization at a time: cut an org
 over in one batch (its whole surface into `Grant`s via the ledger), then

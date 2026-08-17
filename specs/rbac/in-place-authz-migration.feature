@@ -216,6 +216,13 @@ Feature: In-place authorization data migration
   # table becomes their projection. These scenarios cover only what is new.
 
   @unit
+  Scenario: Replaying an organization's stream reproduces the writer's rows
+    Given the same legacy team rows for "acme"
+    When the emission, command, fold, and row mappings run twice
+    Then both runs produce byte-identical grant and binding rows
+    And each legacy row lands as an equivalent binding, identity keys intact
+
+  @unit
   Scenario: Runner lifecycle transitions are witnessed as ledger facts
     Given the runner records a state transition for "acme"
     When the state is written
