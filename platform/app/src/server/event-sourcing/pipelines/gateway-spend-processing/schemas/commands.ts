@@ -258,6 +258,18 @@ export const settleSpendCommandDataSchema = z.object({
    *  anonymous. */
   ...spendAttributionWireSchema.shape,
   ...spendControlPlaneAttributionSchema.shape,
+  /**
+   * The model identity ADMISSION requested. A settlement resolved no model
+   * of its own — that is what makes it a settlement — but the request still
+   * named one, and the settled envelope has always carried it.
+   *
+   * It rides the command rather than being recovered downstream because the
+   * consumer that builds the envelope no longer keeps the admission: it
+   * reads what the outcome states, and a settlement that stated no model
+   * would silently empty the field on every settled delivery.
+   */
+  model: z.string().max(512).default(""),
+  model_provider_id: z.string().max(256).default(""),
 });
 export type SettleSpendCommandData = z.infer<
   typeof settleSpendCommandDataSchema

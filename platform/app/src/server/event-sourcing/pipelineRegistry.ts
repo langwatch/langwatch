@@ -139,6 +139,7 @@ import type { ComputeExperimentRunMetricsCommandData } from "./pipelines/experim
 import { createGatewaySpendProcessingPipeline } from "./pipelines/gateway-spend-processing/pipeline";
 import type { GatewaySpendState } from "./pipelines/gateway-spend-processing/projections/gatewaySpend.foldProjection";
 import { GatewaySpendStore } from "./pipelines/gateway-spend-processing/projections/gatewaySpend.store";
+import type { OpenAdmission } from "./pipelines/gateway-spend-processing/repositories/openAdmissions.clickhouse.repository";
 import { getOpenAdmissionFindersByInstance } from "./pipelines/gateway-spend-processing/repositories/openAdmissions.clickhouse.repository";
 import { GATEWAY_SPEND_PIPELINE_NAME } from "./pipelines/gateway-spend-processing/schemas/constants";
 import { createGithubMaintenancePipeline } from "./pipelines/github-maintenance/pipeline";
@@ -907,12 +908,35 @@ export class PipelineRegistry {
           },
           // Every configured instance, shared and private alike: one sweeper
           // settles the whole install, so it cannot hold a single client.
+          //
+          // Settled per instance, never all-or-nothing. `Promise.all` is
+          // fail-fast, so one unreachable private ClickHouse would reject the
+          // whole read, fail the sweep intent, burn its attempts and keep
+          // failing every wake while that instance was down — taking the
+          // SHARED instance's open admissions with it. That contradicts the
+          // rule the sweep already states for a single tenant's failure, so
+          // it applies at the instance level too: the reachable instances
+          // settle, the unreachable one is reported and retried next sweep.
           findOpenAdmissions: async (params) => {
             const finders = await getOpenAdmissionFindersByInstance();
-            const perInstance = await Promise.all(
+            const results = await Promise.allSettled(
               finders.map(({ finder }) => finder.findOpenAdmissions(params)),
             );
-            return perInstance.flat();
+            const open: OpenAdmission[] = [];
+            results.forEach((result, index) => {
+              if (result.status === "fulfilled") {
+                open.push(...result.value);
+                return;
+              }
+              logger.warn(
+                {
+                  target: finders[index]?.target,
+                  error: result.reason,
+                },
+                "settlement sweep could not read one ClickHouse instance; its open admissions wait for the next sweep",
+              );
+            });
+            return open;
           },
         },
       }),

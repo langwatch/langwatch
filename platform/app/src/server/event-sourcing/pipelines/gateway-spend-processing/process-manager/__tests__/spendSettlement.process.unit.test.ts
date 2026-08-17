@@ -75,6 +75,8 @@ function openAdmission(overrides: Partial<OpenAdmission> = {}): OpenAdmission {
     labels: ["a"],
     metadata: "",
     admittedAtMs: T0,
+    model: "openai/gpt-5",
+    providerKey: "prov-1",
     ...overrides,
   };
 }
@@ -223,6 +225,11 @@ describe("spend settlement sweeper", () => {
           request_type: "chat",
           labels: ["a"],
           admitted_at: T0,
+          // Settlement resolved no model of its own, so it carries the one
+          // admission requested — without this a settled webhook envelope
+          // names no model at all.
+          model: "openai/gpt-5",
+          model_provider_id: "prov-1",
         }),
       );
     });

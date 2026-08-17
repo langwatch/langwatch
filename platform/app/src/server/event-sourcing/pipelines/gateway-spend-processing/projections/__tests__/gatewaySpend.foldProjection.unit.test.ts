@@ -160,6 +160,8 @@ const settled = () =>
       occurred_at: T0 + 600_000,
       tenantId: TENANT,
       reason: "confirmation_deadline_expired",
+      model: "",
+      model_provider_id: "",
       ...UNATTRIBUTED_OUTCOME,
     },
     T0 + 600_000,

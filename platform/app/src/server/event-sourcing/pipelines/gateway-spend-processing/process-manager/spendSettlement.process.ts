@@ -169,6 +169,12 @@ function runSweep(deps: SpendSettlementProcessDeps) {
           labels: admission.labels,
           metadata: admission.metadata,
           admitted_at: admission.admittedAtMs,
+          // The identity the request asked for. Settlement resolved none of
+          // its own, but the settled envelope has always named the requested
+          // one, and the delivery process now reads what the outcome states
+          // rather than remembering the admission.
+          model: admission.model,
+          model_provider_id: admission.providerKey,
         });
         settled++;
       } catch (error) {

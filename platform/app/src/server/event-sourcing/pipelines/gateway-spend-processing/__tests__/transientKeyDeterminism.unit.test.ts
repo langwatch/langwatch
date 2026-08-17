@@ -141,6 +141,8 @@ const settled = {
   tenantId: "proj_1",
   occurred_at: 3_000,
   reason: "confirmation_deadline_expired",
+  model: "openai/gpt-5",
+  model_provider_id: "prov_1",
   ...attribution,
 };
 

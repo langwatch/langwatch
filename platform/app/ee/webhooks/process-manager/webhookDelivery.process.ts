@@ -1021,11 +1021,12 @@ function attributionFromOutcome(
     virtual_key_id: data.virtual_key_id,
     principal_user_id: data.principal_user_id,
     end_user_id: data.end_user_id,
-    // A settlement priced nothing and resolved no model, so it states the
-    // identity admission requested rather than one it never learned.
-    model: "model" in data ? data.model : "",
-    model_provider_id:
-      "model_provider_id" in data ? data.model_provider_id : "",
+    // Every outcome states a model identity. A confirmation or failure
+    // states the one it RESOLVED; a settlement resolved none, so the
+    // sweeper copies the identity admission requested off the spend record
+    // — which is what a settled envelope has always named.
+    model: data.model,
+    model_provider_id: data.model_provider_id,
     trace_id: data.trace_id,
     request_type: data.request_type,
     labels: data.labels,

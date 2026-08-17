@@ -42,6 +42,10 @@ export interface OpenAdmission {
   labels: string[];
   metadata: string;
   admittedAtMs: number;
+  /** The identity the request ASKED for. A settlement resolved none of its
+   *  own, and the settled envelope has always named the requested one. */
+  model: string;
+  providerKey: string;
 }
 
 export interface OpenAdmissionFinder {
@@ -98,6 +102,8 @@ export class ClickHouseOpenAdmissionFinder implements OpenAdmissionFinder {
           RequestType AS requestType,
           Labels AS labels,
           Metadata AS metadata,
+          Model AS model,
+          ProviderKey AS providerKey,
           toUnixTimestamp64Milli(OccurredAt) AS admittedAtMs
         FROM ${TABLE_NAME}
         WHERE (TenantId, GatewayRequestId, EventTimestamp) IN (
