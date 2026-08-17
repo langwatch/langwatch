@@ -23,7 +23,17 @@ import type { PrismaClient } from "~/generated/prisma/client";
 
 const NEGATIVE_CACHE_TTL_MS = 5 * 60_000;
 
-const finalizedOrganizations = new Set<string>();
+/**
+ * Positive answers expire too - not because finalization wavers (it is a
+ * one-way latch in normal operation), but because the documented ROLLBACK
+ * for stage B is flipping the org's state row back off `finalized`. A
+ * forever-cached positive would keep every live pod on the switched path
+ * until the next deploy; this bound makes that rollback take effect
+ * fleet-wide within fifteen minutes, no restarts.
+ */
+const POSITIVE_CACHE_TTL_MS = 15 * 60_000;
+
+const finalizedAt = new Map<string, number>();
 const lastMissAt = new Map<string, number>();
 
 export async function legacyTeamFallbackDisabled({
@@ -33,7 +43,10 @@ export async function legacyTeamFallbackDisabled({
   prisma: Pick<PrismaClient, "systemMigrationTenantState">;
   organizationId: string;
 }): Promise<boolean> {
-  if (finalizedOrganizations.has(organizationId)) return true;
+  const hitAt = finalizedAt.get(organizationId);
+  if (hitAt !== undefined && Date.now() - hitAt < POSITIVE_CACHE_TTL_MS) {
+    return true;
+  }
   const missedAt = lastMissAt.get(organizationId);
   if (missedAt !== undefined && Date.now() - missedAt < NEGATIVE_CACHE_TTL_MS) {
     return false;
@@ -49,20 +62,22 @@ export async function legacyTeamFallbackDisabled({
       select: { status: true },
     });
     if (record?.status === "finalized") {
-      finalizedOrganizations.add(organizationId);
+      finalizedAt.set(organizationId, Date.now());
       lastMissAt.delete(organizationId);
       return true;
     }
   } catch {
     // Fail safe: an unreadable state table leaves the fallback on, which
-    // is today's behaviour.
+    // is today's behaviour - the delete below makes sure a read error
+    // never extends the switched path either.
   }
+  finalizedAt.delete(organizationId);
   lastMissAt.set(organizationId, Date.now());
   return false;
 }
 
 /** Both caches, dropped - for tests that finalize an org mid-suite. */
 export function resetLegacyFallbackGateForTesting(): void {
-  finalizedOrganizations.clear();
+  finalizedAt.clear();
   lastMissAt.clear();
 }

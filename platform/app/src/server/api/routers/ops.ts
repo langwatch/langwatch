@@ -1353,8 +1353,15 @@ export const opsRouter = createTRPCRouter({
       const { runSystemMigrationPass } = await import(
         "~/server/app-layer/system-migrations/runtime"
       );
-      void runSystemMigrationPass().catch(() => {
-        // The pass logs its own failures; the next boot retries.
+      const { createLogger } = await import("@langwatch/observability");
+      void runSystemMigrationPass().catch((error) => {
+        // Per-tenant failures park-and-log inside the pass; this catches
+        // the pass itself dying (state table or tenant source down). The
+        // next boot retries either way.
+        createLogger("langwatch:ops:system-migrations").error(
+          { error },
+          "operator-kicked migration pass failed",
+        );
       });
       return { started: true };
     }),
