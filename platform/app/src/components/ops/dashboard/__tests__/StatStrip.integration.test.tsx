@@ -15,17 +15,14 @@ import { StatStrip } from "../StatStrip";
 
 // The dead-letters tile reads the process-outbox side through the same query
 // the navigation badge uses; the strip itself is otherwise snapshot-driven.
+const outboxDeadQuery = vi.fn(() => ({
+  data: [{ processName: "webhookDelivery", count: 94, oldestUpdatedAt: 0 }] as
+    | Array<{ processName: string; count: number; oldestUpdatedAt: number }>
+    | undefined,
+}));
 vi.mock("~/utils/api", () => ({
   api: {
-    ops: {
-      listDeadLetterCounts: {
-        useQuery: () => ({
-          data: [
-            { processName: "webhookDelivery", count: 94, oldestUpdatedAt: 0 },
-          ],
-        }),
-      },
-    },
+    ops: { listDeadLetterCounts: { useQuery: () => outboxDeadQuery() } },
   },
 }));
 
@@ -146,6 +143,29 @@ describe("StatStrip", () => {
       expect(strip.textContent).toContain("Dead letters");
       expect(strip.textContent).toContain("100");
       expect(strip.textContent).toContain("6 queue · 94 outbox");
+    });
+
+    it("says the figure is unknown until the outbox count arrives", () => {
+      // Half the union is not the union: rendering the queue figure alone
+      // would state a wrong total, then jump and redden when the rest lands.
+      outboxDeadQuery.mockReturnValueOnce({ data: undefined });
+      renderStrip({
+        queues: [
+          {
+            name: "queue-a",
+            displayName: "Queue A",
+            pendingGroupCount: 0,
+            blockedGroupCount: 0,
+            activeGroupCount: 0,
+            totalPendingJobs: 0,
+            dlqCount: 6,
+            parkedGroupCount: 0,
+          },
+        ],
+      });
+      const strip = screen.getByTestId("ops-stat-strip");
+      expect(strip.textContent).toContain("counting");
+      expect(strip.textContent).not.toContain("6 queue");
     });
   });
 });

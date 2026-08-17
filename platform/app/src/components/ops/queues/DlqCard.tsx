@@ -189,6 +189,9 @@ function DlqToolbar({
             key={`c-${qn}`}
             variant="ghost"
             size="2xs"
+            // Every one of these reads "Go", so the queue has to come from the
+            // accessible name or a screen reader hears the same button twice.
+            aria-label={`Canary redrive from ${qn}`}
             onClick={() => onCanary(qn)}
           >
             Go

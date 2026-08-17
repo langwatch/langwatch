@@ -30,7 +30,7 @@ Feature: Dead-letter recovery
     Given a pending outbox message
     When an operator attempts to discard it
     Then the message is unchanged
-    And the refusal says the message is not dead
+    And the act reports that it did not apply
 
   @integration
   Scenario: Discarded messages leave the dead-letter count

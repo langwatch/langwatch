@@ -31,6 +31,9 @@ function traceIdFromCarrier(carrier: unknown): string | null {
  */
 const BULK_RECOVERY_LIMIT = 5_000;
 
+/** How many attempt entries one message's history returns. */
+const ATTEMPT_HISTORY_LIMIT = 200;
+
 /** Escape LIKE wildcards so a search term matches literally. */
 function escapeLike(term: string): string {
   return term.replace(/[\\%_]/g, (m) => `\\${m}`);
@@ -581,6 +584,10 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
       // ordering by it would interleave a message's second life with its
       // first. `id` breaks ties within a millisecond.
       orderBy: [{ occurredAt: "asc" }, { id: "asc" }],
+      // Bounded: this sits behind a tRPC query an operator can open on any
+      // message, and a message redriven repeatedly accumulates an attempt row
+      // per failure with no ceiling of its own.
+      take: ATTEMPT_HISTORY_LIMIT,
     });
     return rows.map((r) => ({
       id: r.id,
