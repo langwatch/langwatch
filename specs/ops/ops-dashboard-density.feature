@@ -197,6 +197,12 @@ Feature: Ops dashboard information density
     Then parking is described as a capacity limit rather than a failure
 
   @integration
+  Scenario: A bounded list says what it left out
+    Given more schedules are switched off than the panel lists
+    When the paused panel renders
+    Then it states how many of the total it is showing
+
+  @integration
   Scenario: The paused panel is absent when nothing is switched off
     Given no tenant is parked
     And no schedule is switched off

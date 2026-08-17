@@ -20,8 +20,11 @@ export interface PausedSchedule {
  */
 export function PausedSchedulesSection({
   schedules,
+  total,
 }: {
   schedules: PausedSchedule[];
+  /** Every switched-off schedule in the fleet; `schedules` is one page of it. */
+  total: number;
 }) {
   if (schedules.length === 0) return null;
 
@@ -31,6 +34,11 @@ export function PausedSchedulesSection({
         <Text textStyle="xs" fontWeight="medium" color="fg.muted">
           Switched-off schedules
         </Text>
+        {total > schedules.length && (
+          <Text textStyle="xs" color="fg.muted">
+            showing {schedules.length} of {total}
+          </Text>
+        )}
         <Text textStyle="xs" color="fg.muted">
           these will not fire until an operator turns them back on
         </Text>

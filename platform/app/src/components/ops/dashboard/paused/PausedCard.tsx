@@ -1,22 +1,9 @@
 import { Card, HStack, Separator, Text, VStack } from "@chakra-ui/react";
-import { useMemo } from "react";
 import type { DashboardData } from "~/server/app-layer/ops/types";
-import { api } from "~/utils/api";
 import { ParkedTenantsSection } from "./ParkedTenantsSection";
-import {
-  type PausedSchedule,
-  PausedSchedulesSection,
-} from "./PausedSchedulesSection";
+import { PausedSchedulesSection } from "./PausedSchedulesSection";
 import { PausedSubscribersSection } from "./PausedSubscribersSection";
-
-/**
- * How many schedules to read when counting the switched-off ones.
- *
- * The procedure caps at 500 and there is no server-side `active` filter, so
- * this reads a page and filters it. The count below states when the page was
- * full, because a silently truncated list reads as "that is all of them".
- */
-const SCHEDULE_PAGE_SIZE = 200;
+import { usePausedSchedules } from "./usePausedSchedules";
 
 /**
  * Everything that is deliberately not running.
@@ -42,49 +29,10 @@ export function PausedCard({
   parkedTenantsBound,
   pausedKeys,
 }: Pick<DashboardData, "parkedTenants" | "parkedTenantsBound" | "pausedKeys">) {
-  const schedulesQuery = api.ops.listScheduledJobs.useQuery(
-    { limit: SCHEDULE_PAGE_SIZE },
-    { refetchInterval: 30_000 },
-  );
+  const schedules = usePausedSchedules();
 
-  const jobs = schedulesQuery.data;
-  const pausedSchedules = useMemo<PausedSchedule[]>(
-    () =>
-      (jobs ?? [])
-        .filter((job) => !job.active)
-        .map((job) => ({
-          id: job.id,
-          targetType: job.targetType,
-          targetId: job.targetId,
-          cron: job.cron,
-        })),
-    [jobs],
-  );
-  const schedulePageWasFull = (jobs ?? []).length >= SCHEDULE_PAGE_SIZE;
-
-  const total =
-    parkedTenants.length + pausedSchedules.length + pausedKeys.length;
+  const total = parkedTenants.length + schedules.total + pausedKeys.length;
   if (total === 0) return null;
-
-  // Only the sections that have something to say, so the rules between them
-  // land between rendered content. Stack's own `separator` interleaves by
-  // CHILD COUNT, not by what those children render — a section returning null
-  // still counts, and the card ends in stray rules under its last table.
-  const sections = [
-    parkedTenants.length > 0 && (
-      <ParkedTenantsSection
-        key="parked"
-        parkedTenants={parkedTenants}
-        parkedTenantsBound={parkedTenantsBound}
-      />
-    ),
-    pausedSchedules.length > 0 && (
-      <PausedSchedulesSection key="schedules" schedules={pausedSchedules} />
-    ),
-    pausedKeys.length > 0 && (
-      <PausedSubscribersSection key="subscribers" pausedKeys={pausedKeys} />
-    ),
-  ].filter((section) => section !== false);
 
   return (
     <Card.Root overflow="hidden">
@@ -95,28 +43,60 @@ export function PausedCard({
         <Text textStyle="xs" color="fg.muted">
           {describe({
             parkedTenants: parkedTenants.length,
-            schedules: pausedSchedules.length,
+            schedules: schedules.total,
             subscribers: pausedKeys.length,
           })}
         </Text>
       </HStack>
       <VStack align="stretch" gap={0} separator={<Separator />}>
-        {sections}
+        {sectionsWithContent({
+          parkedTenants,
+          parkedTenantsBound,
+          schedules,
+          pausedKeys,
+        })}
       </VStack>
-      {schedulePageWasFull && (
-        <Text
-          paddingX={4}
-          paddingBottom={3}
-          paddingTop={2}
-          textStyle="xs"
-          color="fg.muted"
-        >
-          Counted against the {SCHEDULE_PAGE_SIZE} most recent schedules; there
-          may be more switched off beyond them.
-        </Text>
-      )}
     </Card.Root>
   );
+}
+
+/**
+ * Only the sections that have something to say.
+ *
+ * Stack's `separator` interleaves by CHILD COUNT, not by what those children
+ * render, so a section returning null still earns a rule and the card ends in
+ * stray lines under its last table.
+ */
+function sectionsWithContent({
+  parkedTenants,
+  parkedTenantsBound,
+  schedules,
+  pausedKeys,
+}: Pick<
+  DashboardData,
+  "parkedTenants" | "parkedTenantsBound" | "pausedKeys"
+> & {
+  schedules: ReturnType<typeof usePausedSchedules>;
+}) {
+  return [
+    parkedTenants.length > 0 && (
+      <ParkedTenantsSection
+        key="parked"
+        parkedTenants={parkedTenants}
+        parkedTenantsBound={parkedTenantsBound}
+      />
+    ),
+    schedules.total > 0 && (
+      <PausedSchedulesSection
+        key="schedules"
+        schedules={schedules.schedules}
+        total={schedules.total}
+      />
+    ),
+    pausedKeys.length > 0 && (
+      <PausedSubscribersSection key="subscribers" pausedKeys={pausedKeys} />
+    ),
+  ].filter((section) => section !== false);
 }
 
 /**
