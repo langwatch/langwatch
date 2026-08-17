@@ -21,9 +21,17 @@ import {
   AUTHZ_GRANTS_PIPELINE_NAME,
 } from "./schemas/constants";
 import type { AuthzGrantsEvent } from "./schemas/events";
+import {
+  type AuthzAuditTrailStore,
+  createAuthzAuditTrailSubscriber,
+} from "./subscribers/authzAuditTrail.subscriber";
 
 export interface AuthzGrantsPipelineDeps {
   authzGrantsProjectionStore: StateProjectionStore<AuthzGrantsFoldState>;
+  /** Insert-only sink for the audit trail (ADR-092 decision 17). An
+   *  interface with one method, so the pipeline never names a storage
+   *  engine — the Prisma implementation lives in the app layer. */
+  authzAuditTrailStore: AuthzAuditTrailStore;
 }
 
 /**
@@ -42,6 +50,12 @@ export function createAuthzGrantsPipeline(deps: AuthzGrantsPipelineDeps) {
       "authzGrantsState",
       new AuthzGrantsStateFoldProjection({
         store: deps.authzGrantsProjectionStore,
+      }),
+    )
+    .withSubscriber(
+      "auditTrail",
+      createAuthzAuditTrailSubscriber({
+        store: deps.authzAuditTrailStore,
       }),
     )
     .withCommand("attachGrants", AttachGrantsCommand)

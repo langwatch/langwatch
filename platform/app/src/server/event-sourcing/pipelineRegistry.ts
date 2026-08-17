@@ -99,6 +99,7 @@ import { mapCommands } from "./mapCommands";
 import type { StaticPipelineDefinition } from "./pipeline/staticBuilder.types";
 import { createAuthzGrantsPipeline } from "./pipelines/authz-grants/pipeline";
 import type { AuthzGrantsFoldState } from "./pipelines/authz-grants/projections/authzGrantsState.foldProjection";
+import type { AuthzAuditTrailStore } from "./pipelines/authz-grants/subscribers/authzAuditTrail.subscriber";
 import { createAutomationsPipeline } from "./pipelines/automations/pipeline";
 import { ReportUsageForMonthCommand } from "./pipelines/billing-reporting/commands/reportUsageForMonth.command";
 import {
@@ -349,6 +350,8 @@ export interface PipelineRepositories {
   langyTurnAdmission: LangyTurnAdmissionRepository;
   /** The grants ledger's two-headed Postgres projection (ADR-092 §13). */
   authzGrantsProjection: StateProjectionStore<AuthzGrantsFoldState>;
+  /** Insert-only audit sink for the grants ledger (ADR-092 decision 17). */
+  authzAuditTrail: AuthzAuditTrailStore;
 }
 
 export interface PipelineRegistryDeps {
@@ -638,6 +641,7 @@ export class PipelineRegistry {
       createAuthzGrantsPipeline({
         authzGrantsProjectionStore:
           this.deps.repositories.authzGrantsProjection,
+        authzAuditTrailStore: this.deps.repositories.authzAuditTrail,
       }),
     );
 

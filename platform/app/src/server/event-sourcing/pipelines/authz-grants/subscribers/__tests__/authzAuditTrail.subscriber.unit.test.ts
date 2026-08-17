@@ -1,0 +1,275 @@
+import { describe, expect, it } from "vitest";
+import { createTenantId } from "../../../..";
+import {
+  AUTHZ_GRANTS_AGGREGATE_TYPE,
+  AUTHZ_GRANTS_EVENT_VERSION_LATEST,
+  CUTOVER_COMPLETED_EVENT_TYPE,
+  GRANT_ATTACHED_EVENT_TYPE,
+  GRANT_REVOKED_EVENT_TYPE,
+  GRANT_ROLE_CHANGED_EVENT_TYPE,
+  MEMBER_OFFBOARDED_EVENT_TYPE,
+  ROLE_DEFINED_EVENT_TYPE,
+  ROLE_DELETED_EVENT_TYPE,
+  ROLE_PERMISSIONS_CHANGED_EVENT_TYPE,
+} from "../../schemas/constants";
+import type { AuthzGrantsEvent } from "../../schemas/events";
+import {
+  AUTHZ_AUDIT_EVENT_TYPES,
+  type AuthzAuditRow,
+  type AuthzAuditTrailStore,
+  createAuthzAuditTrailSubscriber,
+} from "../authzAuditTrail.subscriber";
+
+const ORG = "org_acme";
+const OCCURRED_AT = 1_700_000_000_000;
+const USER_ACTOR = { type: "user" as const, id: "user_admin" };
+const GENESIS_ACTOR = { type: "system" as const, id: "system:genesis-import" };
+
+function event(
+  type: string,
+  data: Record<string, unknown>,
+  overrides?: { id?: string; occurredAt?: number },
+): AuthzGrantsEvent {
+  return {
+    id: overrides?.id ?? "evt_2Zk",
+    aggregateId: ORG,
+    aggregateType: AUTHZ_GRANTS_AGGREGATE_TYPE,
+    tenantId: createTenantId(ORG),
+    createdAt: 1_800_000_000_000,
+    occurredAt: overrides?.occurredAt ?? OCCURRED_AT,
+    type,
+    version: AUTHZ_GRANTS_EVENT_VERSION_LATEST,
+    data,
+  } as unknown as AuthzGrantsEvent;
+}
+
+function attached(overrides?: Record<string, unknown>): AuthzGrantsEvent {
+  return event(GRANT_ATTACHED_EVENT_TYPE, {
+    grantId: "grant_1",
+    principal: { type: "user", id: "user_alice" },
+    roleKey: "member",
+    scope: { type: "TEAM", id: "team_client_a" },
+    source: "grants-service",
+    actor: USER_ACTOR,
+    ...overrides,
+  });
+}
+
+/** Records every insert, and mimics the store's ON CONFLICT DO NOTHING so a
+ *  repeated delivery is observable as "the table did not change". */
+function recordingStore(): AuthzAuditTrailStore & {
+  inserts: AuthzAuditRow[];
+  rows: Map<string, AuthzAuditRow>;
+} {
+  const inserts: AuthzAuditRow[] = [];
+  const rows = new Map<string, AuthzAuditRow>();
+  return {
+    inserts,
+    rows,
+    async insert(row) {
+      inserts.push(row);
+      if (!rows.has(row.id)) rows.set(row.id, row);
+    },
+  };
+}
+
+function deliver(
+  store: AuthzAuditTrailStore,
+  authzEvent: AuthzGrantsEvent,
+): Promise<void> {
+  const subscriber = createAuthzAuditTrailSubscriber({ store });
+  return subscriber.handler(authzEvent, {
+    tenantId: ORG,
+    aggregateId: ORG,
+    state: undefined,
+  });
+}
+
+describe("authz audit trail subscriber", () => {
+  describe("when registered", () => {
+    it("listens to the runtime family only", () => {
+      expect([...AUTHZ_AUDIT_EVENT_TYPES]).toEqual([
+        GRANT_ATTACHED_EVENT_TYPE,
+        GRANT_ROLE_CHANGED_EVENT_TYPE,
+        GRANT_REVOKED_EVENT_TYPE,
+        ROLE_DEFINED_EVENT_TYPE,
+        ROLE_PERMISSIONS_CHANGED_EVENT_TYPE,
+        ROLE_DELETED_EVENT_TYPE,
+        MEMBER_OFFBOARDED_EVENT_TYPE,
+      ]);
+      expect([...AUTHZ_AUDIT_EVENT_TYPES]).not.toContain(
+        CUTOVER_COMPLETED_EVENT_TYPE,
+      );
+    });
+  });
+
+  describe("when a grant is attached by a person", () => {
+    it("writes one row in the AuditLog shape", async () => {
+      const store = recordingStore();
+      await deliver(store, attached());
+
+      expect(store.inserts).toHaveLength(1);
+      expect(store.inserts[0]).toEqual({
+        id: "authz-evt-evt_2Zk",
+        createdAt: new Date(OCCURRED_AT),
+        userId: "user_admin",
+        organizationId: ORG,
+        action: "authz.grants.attach",
+        metadata: {
+          grantId: "grant_1",
+          principal: { type: "user", id: "user_alice" },
+          roleKey: "member",
+          scope: { type: "TEAM", id: "team_client_a" },
+          source: "grants-service",
+        },
+      });
+    });
+
+    it("keeps the actor out of the metadata, since the row already names them", async () => {
+      const store = recordingStore();
+      await deliver(store, attached());
+
+      expect(store.inserts[0]!.metadata).not.toHaveProperty("actor");
+    });
+  });
+
+  describe("when the actor is a system principal", () => {
+    it("leaves userId null rather than inventing a person", async () => {
+      const store = recordingStore();
+      await deliver(
+        store,
+        attached({
+          source: "scim",
+          actor: { type: "system", id: "system:scim" },
+        }),
+      );
+
+      expect(store.inserts[0]!.userId).toBeNull();
+      expect(store.inserts[0]!.organizationId).toBe(ORG);
+    });
+  });
+
+  describe("when the event carries a cutover source", () => {
+    it.each([
+      "genesis-import",
+      "backfill-b",
+      "read-through-mint",
+    ])("writes no row for %s", async (source) => {
+      const store = recordingStore();
+      await deliver(store, attached({ source }));
+
+      expect(store.inserts).toHaveLength(0);
+    });
+
+    it("still writes a row for a live source", async () => {
+      const store = recordingStore();
+      await deliver(store, attached({ source: "invite" }));
+
+      expect(store.inserts).toHaveLength(1);
+    });
+  });
+
+  describe("when a role event carries no source", () => {
+    it("skips the genesis import, recognised by its actor", async () => {
+      const store = recordingStore();
+      await deliver(
+        store,
+        event(ROLE_DEFINED_EVENT_TYPE, {
+          roleId: "role_1",
+          name: "Auditor",
+          permissions: ["traces.read"],
+          kind: "custom",
+          actor: GENESIS_ACTOR,
+        }),
+      );
+
+      expect(store.inserts).toHaveLength(0);
+    });
+
+    it("records a role a person defined", async () => {
+      const store = recordingStore();
+      await deliver(
+        store,
+        event(ROLE_DEFINED_EVENT_TYPE, {
+          roleId: "role_1",
+          name: "Auditor",
+          permissions: ["traces.read"],
+          kind: "custom",
+          actor: USER_ACTOR,
+        }),
+      );
+
+      expect(store.inserts[0]!.action).toBe("authz.grants.role_defined");
+      expect(store.inserts[0]!.metadata).toEqual({
+        roleId: "role_1",
+        name: "Auditor",
+        permissions: ["traces.read"],
+        kind: "custom",
+      });
+    });
+  });
+
+  describe("when each runtime event type arrives", () => {
+    it.each([
+      [GRANT_ATTACHED_EVENT_TYPE, "authz.grants.attach"],
+      [GRANT_ROLE_CHANGED_EVENT_TYPE, "authz.grants.role_change"],
+      [GRANT_REVOKED_EVENT_TYPE, "authz.grants.revoke"],
+      [ROLE_DEFINED_EVENT_TYPE, "authz.grants.role_defined"],
+      [
+        ROLE_PERMISSIONS_CHANGED_EVENT_TYPE,
+        "authz.grants.role_permissions_changed",
+      ],
+      [ROLE_DELETED_EVENT_TYPE, "authz.grants.role_deleted"],
+      [MEMBER_OFFBOARDED_EVENT_TYPE, "authz.grants.offboard"],
+    ])("maps %s onto the stable verb %s", async (type, action) => {
+      const store = recordingStore();
+      await deliver(store, event(type, { actor: USER_ACTOR }));
+
+      expect(store.inserts[0]!.action).toBe(action);
+    });
+  });
+
+  describe("when the same event is delivered twice", () => {
+    it("derives the same row id, so the second insert is dropped", async () => {
+      const store = recordingStore();
+      const redelivered = attached();
+      await deliver(store, redelivered);
+      await deliver(store, redelivered);
+
+      expect(store.inserts).toHaveLength(2);
+      expect(store.inserts[0]).toEqual(store.inserts[1]);
+      expect(store.rows.size).toBe(1);
+    });
+
+    it("keys the id off the event id, so two events never collide", async () => {
+      const store = recordingStore();
+      await deliver(store, attached());
+      await deliver(
+        store,
+        event(
+          GRANT_ATTACHED_EVENT_TYPE,
+          { grantId: "grant_2", source: "invite", actor: USER_ACTOR },
+          { id: "evt_2Zl", occurredAt: OCCURRED_AT + 1_000 },
+        ),
+      );
+
+      expect([...store.rows.keys()]).toEqual([
+        "authz-evt-evt_2Zk",
+        "authz-evt-evt_2Zl",
+      ]);
+    });
+  });
+
+  describe("when the pre-enqueue guard runs", () => {
+    it("agrees with the handler, so a skipped event never stages a job", () => {
+      const store = recordingStore();
+      const subscriber = createAuthzAuditTrailSubscriber({ store });
+      const context = { tenantId: ORG, aggregateId: ORG, state: undefined };
+
+      expect(
+        subscriber.when?.(attached({ source: "genesis-import" }), context),
+      ).toBe(false);
+      expect(subscriber.when?.(attached(), context)).toBe(true);
+    });
+  });
+});
