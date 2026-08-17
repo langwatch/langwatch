@@ -300,13 +300,14 @@ describe("spend-command ingest enrichment (real PG + internal route)", () => {
 
     expect(status).toBe(200);
     expect(appendedConfirms).toHaveLength(1);
-    // Nothing to join against, so nothing is invented. Those requests keep
-    // the admission-time join in the consuming process managers, which is
-    // what their admission's `outcome_carries_attribution` flag asks for.
-    expect(appendedConfirms[0]).toMatchObject({
-      principal_user_id: "",
-      team_id: "",
-    });
+    // Nothing to join against, so the seam does not touch the record at all
+    // — these stay ABSENT rather than being stamped empty, and the command
+    // schema's own defaults fill them when the pipeline parses it. Those
+    // requests keep the admission-time join in the consuming process
+    // managers, which is what their admission's
+    // `outcome_carries_attribution` flag asks for.
+    expect(appendedConfirms[0]).not.toHaveProperty("principal_user_id");
+    expect(appendedConfirms[0]).not.toHaveProperty("team_id");
   });
 
   /** @scenario A key in constant use is not written on every request */

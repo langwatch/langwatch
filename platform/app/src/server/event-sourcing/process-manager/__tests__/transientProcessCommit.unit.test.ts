@@ -23,8 +23,11 @@ import { InMemoryProcessStore } from "../stores/inMemoryProcessStore";
 
 const PROCESS_NAME = "transientProbe";
 const PROJECT = "project-1";
-const NOTED = "probe.noted";
-const REMEMBERED = "probe.remembered";
+/** The registry's one test event type; the probe branches on its payload
+ *  rather than declaring event types the pipeline schema does not know. */
+const PROBE_EVENT = "test.integration.event";
+
+type ProbeMode = "note" | "remember";
 
 interface ProbeState {
   remembered: string | null;
@@ -33,12 +36,20 @@ interface ProbeState {
 const INITIAL: ProbeState = { remembered: null };
 
 /**
- * A process with both shapes on purpose: `noted` emits an intent and keeps
- * the initial state (transient), `remembered` stores something (durable).
+ * A process with both shapes on purpose: a `note` emits an intent and keeps
+ * the initial state (transient), a `remember` stores something (durable).
  * That is exactly webhookDelivery's shape — per-request keys that hold
  * nothing, per-endpoint keys that hold a buffer.
  */
-function buildProbe(): ProcessDefinition<ProbeState> {
+function buildProbe(
+  handle: (
+    state: ProbeState,
+    data: { id: string; mode: ProbeMode },
+    ctx: {
+      intents: { act: (key: string, payload: { id: string }) => unknown };
+    },
+  ) => { state: ProbeState; intents?: unknown[] } = probeHandler,
+): ProcessDefinition<ProbeState> {
   return buildProcessDefinition(
     buildProcessManager<Event>({
       name: PROCESS_NAME,
@@ -46,34 +57,33 @@ function buildProbe(): ProcessDefinition<ProbeState> {
         pm
           .state<ProbeState>(INITIAL)
           .intent("act", z.object({ id: z.string() }), async () => undefined)
-          .on(NOTED, (state, data, ctx) => ({
-            state,
-            intents: [
-              ctx.intents.act("act:noted", {
-                id: String((data as { id: string }).id),
-              }),
-            ],
-          }))
-          .on(REMEMBERED, (state, data) => ({
-            state: { remembered: String((data as { id: string }).id) },
-          }))
+          .on(PROBE_EVENT, handle as never)
           .transient(),
     }).config,
   ) as ProcessDefinition<ProbeState>;
 }
 
+function probeHandler(
+  state: ProbeState,
+  data: { id: string; mode: ProbeMode },
+  ctx: { intents: { act: (key: string, payload: { id: string }) => unknown } },
+): { state: ProbeState; intents?: unknown[] } {
+  if (data.mode === "remember") return { state: { remembered: data.id } };
+  return { state, intents: [ctx.intents.act("act:noted", { id: data.id })] };
+}
+
 let store: InMemoryProcessStore;
 let service: ProcessManagerService<ProbeState>;
 
-function envelope(eventType: string, key: string): ProcessEventEnvelope {
+function envelope(mode: ProbeMode, key: string): ProcessEventEnvelope {
   return {
-    eventId: `${eventType}:${key}`,
-    eventType,
+    eventId: `${mode}:${key}`,
+    eventType: PROBE_EVENT,
     occurredAt: 1_000,
     tenantId: PROJECT,
     projectId: PROJECT,
     processKey: key,
-    payload: { id: key },
+    payload: { id: key, mode },
   };
 }
 
@@ -94,7 +104,7 @@ describe("transient process commits", () => {
     /** @scenario A transient evolution writes its intents and no process instance */
     it("enqueues the intent and writes no instance row", async () => {
       const result = await service.handleEvent({
-        envelope: envelope(NOTED, "req-1"),
+        envelope: envelope("note", "req-1"),
         now: 2_000,
       });
 
@@ -108,11 +118,11 @@ describe("transient process commits", () => {
     /** @scenario A redelivered event re-derives the same key and enqueues nothing new */
     it("suppresses a redelivery without an inbox marker", async () => {
       await service.handleEvent({
-        envelope: envelope(NOTED, "req-2"),
+        envelope: envelope("note", "req-2"),
         now: 2_000,
       });
       const second = await service.handleEvent({
-        envelope: envelope(NOTED, "req-2"),
+        envelope: envelope("note", "req-2"),
         now: 3_000,
       });
 
@@ -134,28 +144,15 @@ describe("transient process commits", () => {
 
     /** @scenario An evolution with nothing to say writes nothing at all */
     it("writes nothing when the evolution mints no intent", async () => {
-      const definition = buildProcessDefinition(
-        buildProcessManager<Event>({
-          name: PROCESS_NAME,
-          applier: (pm) =>
-            pm
-              .state<ProbeState>(INITIAL)
-              .intent(
-                "act",
-                z.object({ id: z.string() }),
-                async () => undefined,
-              )
-              .on(NOTED, (state) => ({ state }))
-              .transient(),
-        }).config,
-      ) as ProcessDefinition<ProbeState>;
       const silent = new ProcessManagerService<ProbeState>({
         store,
-        definition,
+        // Keeps the initial state AND mints nothing, so there is no inbox
+        // row, no instance row and no outbox row to write.
+        definition: buildProbe((state) => ({ state })),
       });
 
       await silent.handleEvent({
-        envelope: envelope(NOTED, "req-3"),
+        envelope: envelope("note", "req-3"),
         now: 2_000,
       });
 
@@ -170,7 +167,7 @@ describe("transient process commits", () => {
     /** @scenario A process manager may be transient for one key and durable for another */
     it("commits an instance row durably", async () => {
       await service.handleEvent({
-        envelope: envelope(REMEMBERED, "endpoint-1"),
+        envelope: envelope("remember", "endpoint-1"),
         now: 2_000,
       });
 
@@ -184,11 +181,11 @@ describe("transient process commits", () => {
     /** @scenario The durable path keeps its inbox marker, so a redelivery is a no-op */
     it("refuses a redelivered event on the durable path", async () => {
       await service.handleEvent({
-        envelope: envelope(REMEMBERED, "endpoint-2"),
+        envelope: envelope("remember", "endpoint-2"),
         now: 2_000,
       });
       const second = await service.handleEvent({
-        envelope: envelope(REMEMBERED, "endpoint-2"),
+        envelope: envelope("remember", "endpoint-2"),
         now: 3_000,
       });
 
@@ -210,7 +207,7 @@ describe("transient process commits", () => {
                 z.object({ id: z.string() }),
                 async () => undefined,
               )
-              .on(NOTED, (state) => ({ state }))
+              .on(PROBE_EVENT, (state) => ({ state }))
               .transient()
               .schedule({ everyMs: 1_000 }) as never,
         }),

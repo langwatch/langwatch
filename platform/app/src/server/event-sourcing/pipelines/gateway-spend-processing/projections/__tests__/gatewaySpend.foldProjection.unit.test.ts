@@ -49,10 +49,30 @@ function makeEvent<E extends { type: string; data: unknown }>(
   }) as unknown as E;
 }
 
+/**
+ * The attribution an outcome states about itself, as an emitter that does
+ * NOT repeat it leaves it. The fold takes its attribution from the
+ * admission, so these fixtures exercise the path where the outcome adds
+ * nothing — which is what an older gateway build sends.
+ */
+const UNATTRIBUTED_OUTCOME = {
+  organization_id: "",
+  virtual_key_id: "",
+  end_user_id: "",
+  trace_id: "",
+  request_type: "",
+  labels: [] as string[],
+  metadata: "",
+  admitted_at: 0,
+  principal_user_id: "",
+  team_id: "",
+};
+
 const admitted = () =>
   makeEvent<GatewaySpendAdmittedEvent>(
     GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
     {
+      outcome_carries_attribution: false,
       gateway_request_id: REQUEST,
       occurred_at: T0,
       organization_id: "org_1",
@@ -97,6 +117,7 @@ const confirmed = () =>
       cost_nano_usd: CONFIRMED_COST_NANO_USD,
       rate_version: "catalog@2026-07-26",
       duration_ms: 3878,
+      ...UNATTRIBUTED_OUTCOME,
     },
     T0 + 3800,
   );
@@ -126,6 +147,7 @@ const failed = () =>
       cost_nano_usd: FAILED_COST_NANO_USD,
       rate_version: "catalog@2026-07-26",
       duration_ms: 1509,
+      ...UNATTRIBUTED_OUTCOME,
     },
     T0 + 1500,
   );
@@ -138,6 +160,7 @@ const settled = () =>
       occurred_at: T0 + 600_000,
       tenantId: TENANT,
       reason: "confirmation_deadline_expired",
+      ...UNATTRIBUTED_OUTCOME,
     },
     T0 + 600_000,
   );
