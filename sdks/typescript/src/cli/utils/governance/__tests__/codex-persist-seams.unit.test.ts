@@ -8,6 +8,11 @@
  * test of the seams we already have can see. Two seams shipped without the
  * harvest exactly that way.
  *
+ * The pairing check is per file, not per call, so on its own it would prove
+ * "every file that writes also wires" rather than "every write is wired". The
+ * last check below closes that gap by holding each seam to a single write,
+ * which is the shape they all have.
+ *
  * Spec: specs/ai-governance/cli-wrappers/shell-rc-persistence.feature
  */
 import { readdirSync, readFileSync } from "node:fs";
@@ -19,6 +24,7 @@ import { describe, expect, it } from "vitest";
 const CLI_ROOT = resolve(__dirname, "..", "..", "..");
 
 const WRITES_EXPORTERS = /\bwriteCodexOtelBlock\s*\(/;
+const EVERY_WRITE = /\bwriteCodexOtelBlock\s*\(/g;
 const WIRES_HARVEST = /\b(?:assert|install)CodexTurnHarvest\s*\(/;
 /** The module the writer lives in is where it is declared, not a seam. */
 const DECLARES_WRITER = /\bfunction\s+writeCodexOtelBlock\b/;
@@ -58,6 +64,19 @@ describe("the seams that persist the codex exporters", () => {
 		// above passing over nothing at all.
 		it("finds the seams it is checking", () => {
 			expect(seams.length).toBeGreaterThanOrEqual(4);
+		});
+
+		// With one write per file, "this file wires the harvest" says the same
+		// thing as "this write is wired". A second write in a file the check
+		// already passes would not be looked at, so it has to land here first:
+		// wire the harvest for it, then let this list say so.
+		it("persists in one place per seam, so the pairing speaks for the write", () => {
+			const writesPerSeam = seams.map(({ path, source }) => ({
+				path,
+				writes: source.match(EVERY_WRITE)?.length ?? 0,
+			}));
+
+			expect(writesPerSeam.filter(({ writes }) => writes !== 1)).toEqual([]);
 		});
 	});
 });
