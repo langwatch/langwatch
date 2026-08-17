@@ -104,9 +104,14 @@ export function createSuiteRunSyncSubscriber(
       scenarioRunId: data.scenarioRunId,
       scenarioId: data.scenarioId,
       // Normalize before crossing the pipeline boundary: `data.status` is an
-      // unconstrained string on the event, so it can still carry the non-enum
-      // "FAILURE" written by older callers, while the suite fold's status
-      // ladder is written against `ScenarioRunStatus` members (#6834).
+      // unconstrained string on the event and the command schema, so it can
+      // still carry the non-enum "FAILURE" written by older callers (#6834).
+      // The suite fold's ladder matches "FAILURE" as a legacy alias, so this
+      // is not what keeps the counts right — it keeps the status *recorded*
+      // on SuiteRunItemCompletedEvent inside `ScenarioRunStatus`, so the
+      // alias stays a replay concession rather than a live input. Every enum
+      // member round-trips unchanged; `mapStatus` only rewrites "FAILURE",
+      // and falls back to IN_PROGRESS for a string it does not recognise.
       status: mapStatus(data.status),
       verdict: data.results?.verdict,
       durationMs: data.durationMs,
