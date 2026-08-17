@@ -189,7 +189,7 @@ vi.mock("../../features/traces-v2/components/GlobalTraceV2DrawerMount", () => ({
 vi.mock("../CurrentDrawer", () => ({ CurrentDrawer: () => null }));
 vi.mock("../AnnouncementBanner", () => ({ AnnouncementBanner: () => null }));
 vi.mock("../UpgradeModal", () => ({ GlobalUpgradeModal: () => null }));
-vi.mock("../messages/SavedViewsBar", () => ({ SavedViewsBar: () => null }));
+vi.mock("../SavedViewsBar", () => ({ SavedViewsBar: () => null }));
 vi.mock("../governance/AdminViewingAsBanner", () => ({
   AdminViewingAsBanner: () => null,
 }));

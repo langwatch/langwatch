@@ -18,6 +18,7 @@ import type { Context, Next } from "hono";
 
 import { RESOLVED_ERROR, type ResolvedError } from "./errors.js";
 import { getSSECompletion } from "./sse.js";
+import { ENDPOINT_ROUTE } from "./types.js";
 
 // ---------------------------------------------------------------------------
 // Tracer middleware
@@ -176,6 +177,13 @@ export function loggerMiddleware(options?: { name?: string }) {
 
           // This is the only error record written per failed request. The
           // error handler deliberately does not log its own copy.
+          // `url` is the path that arrived, so it carries ids and is a
+          // different value on every request. `route` is the endpoint that
+          // matched — `GET /things/:id` — which is what you group by when
+          // asking which endpoint is failing. Absent for anything that never
+          // reached an endpoint stack: a 404, or a version-namespace guard.
+          const route = c.get(ENDPOINT_ROUTE) as string | undefined;
+
           logHttpRequest(logger, {
             method: c.req.method,
             url: c.req.path,
@@ -183,9 +191,10 @@ export function loggerMiddleware(options?: { name?: string }) {
             duration,
             userAgent: c.req.header("user-agent") ?? null,
             error: requestError,
-            ...(resolved?.traceId
-              ? { extra: { traceId: resolved.traceId } }
-              : {}),
+            extra: {
+              ...(route ? { route } : {}),
+              ...(resolved?.traceId ? { traceId: resolved.traceId } : {}),
+            },
           });
         };
 

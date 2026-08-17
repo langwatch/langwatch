@@ -180,10 +180,6 @@ vi.mock("~/features/langy/stores/langyStore", () => ({
     }),
 }));
 
-vi.mock("~/components/messages/HeaderButtons", () => ({
-  useTableView: () => ({ isTableView: false }),
-}));
-
 vi.mock("~/utils/crispBubblePolicy", () => ({
   toggleSupportChat: vi.fn(),
 }));
@@ -247,7 +243,7 @@ vi.mock("~/components/AnnouncementBanner", () => ({
 vi.mock("~/components/UpgradeModal", () => ({
   GlobalUpgradeModal: () => null,
 }));
-vi.mock("~/components/messages/SavedViewsBar", () => ({
+vi.mock("~/components/SavedViewsBar", () => ({
   SavedViewsBar: () => null,
 }));
 vi.mock("~/components/governance/AdminViewingAsBanner", () => ({

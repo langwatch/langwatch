@@ -5,18 +5,17 @@
  * trace isolation. Each scenario runs in its own process with separate
  * LANGWATCH_API_KEY and LANGWATCH_ENDPOINT env vars.
  *
- * Execution is triggered by the scenarioExecution reactor (event-driven via
- * GroupQueue), NOT by BullMQ. The execution pool manages concurrency.
+ * Execution is triggered by the `simulation_run_execution` process manager's
+ * `execute` intent (event-driven via GroupQueue), NOT by BullMQ. The execution
+ * pool manages concurrency.
  *
  * @see specs/scenarios/simulation-runner.feature
  * @see specs/scenarios/event-driven-execution-prep.feature
  */
 
-import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
 import { type ChildProcess, spawn } from "child_process";
-import { env } from "~/env.mjs";
-import { getApp, tryGetApp } from "../app-layer/app";
+import { tryGetApp } from "../app-layer/app";
 import { resolveAppPackageRoot } from "../appPackageRoot";
 import {
   createContextFromJobData,
@@ -32,12 +31,8 @@ import {
   type CancellationMessage,
   subscribeToCancellations,
 } from "./cancellation-channel";
-import {
-  encodeScenarioLogContext,
-  SCENARIO_LOG_CONTEXT_ENV,
-} from "./execution/child-logger";
+import { buildChildEnvironment } from "./execution/child-environment";
 import { resolveChildProcessSpawn } from "./execution/child-process-spawn";
-import { resolveChildTlsEnv } from "./execution/child-tls-env";
 import {
   createDataPrefetcherDependencies,
   prefetchScenarioData,
@@ -50,20 +45,12 @@ import type {
   ChildProcessJobData,
   ScenarioExecutionResult,
 } from "./execution/types";
-import type { OrphanedRunFinder } from "./orphaned-run-reconciliation";
-import { reconcileOrphanedRunsOnBoot } from "./orphaned-run-reconciliation.clickhouse";
 import { CHILD_PROCESS, SCENARIO_WORKER } from "./scenario.constants";
 import { ScenarioService } from "./scenario.service";
 import {
   type FailureEventParams,
   ScenarioFailureHandler,
 } from "./scenario-failure-handler";
-import {
-  findQueuedRunCandidates,
-  LOOKBACK_MS,
-  ORPHAN_QUEUED_THRESHOLD_MS,
-  reconcileOrphanedQueuedRuns,
-} from "./scenario-orphan-reconciler";
 
 // ============================================================================
 // Dependency Interfaces (Dependency Inversion Principle)
@@ -86,18 +73,6 @@ export interface FailureEmitter {
 export interface ProcessorDependencies {
   scenarioLookup: ScenarioLookup;
   failureEmitter: FailureEmitter;
-  /**
-   * Cross-tenant boot-sweep dependencies for the two orphaned-run
-   * reconciliation sweeps (QUEUED and IN_PROGRESS), taken from
-   * `getApp().scenarios.orphanReconciliation`. Undefined skips both sweeps —
-   * the same behaviour as ClickHouse not being configured. Tests that
-   * construct `ProcessorDependencies` by hand and never exercise the boot
-   * sweeps can safely omit this.
-   */
-  orphanReconciliation?: {
-    sharedClickHouseClient: ClickHouseClient;
-    orphanedRunFinder: OrphanedRunFinder;
-  };
 }
 
 // ============================================================================
@@ -110,7 +85,6 @@ export interface ProcessorDependencies {
 export function createProcessorDependencies(): ProcessorDependencies {
   const scenarioService = ScenarioService.create(prisma);
   const failureHandler = ScenarioFailureHandler.create();
-  const { client, finder } = getApp().scenarios.orphanReconciliation;
 
   return {
     scenarioLookup: {
@@ -120,10 +94,6 @@ export function createProcessorDependencies(): ProcessorDependencies {
       ensureFailureEventsEmitted: (params) =>
         failureHandler.ensureFailureEventsEmitted(params),
     },
-    orphanReconciliation:
-      client && finder
-        ? { sharedClickHouseClient: client, orphanedRunFinder: finder }
-        : undefined,
   };
 }
 
@@ -251,49 +221,6 @@ function createScenarioLogger(jobData: ExecutionJobData) {
   });
 }
 
-/**
- * Build OTEL resource attributes string for scenario labels and platform source.
- * @internal Exported for testing
- */
-export function buildOtelResourceAttributes(labels: string[]): string {
-  const parts = ["langwatch.origin.source=platform"];
-  if (labels.length) {
-    const escapedLabels = labels.map((l) =>
-      l.replace(/\\/g, "\\\\").replace(/[,=]/g, "\\$&"),
-    );
-    parts.push(`scenario.labels=${escapedLabels.join(",")}`);
-  }
-  return parts.join(",");
-}
-
-/**
- * Build minimal env for child process - whitelist only what's needed.
- * @internal Exported for testing
- */
-export function buildChildProcessEnv(
-  scenarioVars: Record<string, string | undefined>,
-): NodeJS.ProcessEnv {
-  const vars: Record<string, string | undefined> = {
-    PATH: process.env.PATH,
-    HOME: process.env.HOME,
-    USER: process.env.USER,
-    SHELL: process.env.SHELL,
-    LANG: process.env.LANG,
-    LC_ALL: process.env.LC_ALL,
-    TERM: process.env.TERM,
-    NODE_ENV: process.env.NODE_ENV,
-    NODE_OPTIONS: process.env.NODE_OPTIONS,
-    SKIP_ENV_VALIDATION: "1",
-    COREPACK_ENABLE_DOWNLOAD_PROMPT:
-      process.env.COREPACK_ENABLE_DOWNLOAD_PROMPT,
-    ...scenarioVars,
-  };
-
-  return Object.fromEntries(
-    Object.entries(vars).filter(([, v]) => v !== undefined),
-  ) as NodeJS.ProcessEnv;
-}
-
 /** The runner's structured stdout result line. */
 export interface ChildProcessResult {
   success: boolean;
@@ -368,8 +295,8 @@ export async function executeScenarioRun(
     jobLogger.info("Processing scenario job");
 
     const prefetchDeps = createDataPrefetcherDependencies();
-    const prefetchResult = await prefetchScenarioData(
-      {
+    const prefetchResult = await prefetchScenarioData({
+      context: {
         projectId: jobData.projectId,
         scenarioId: jobData.scenarioId,
         setId: jobData.setId,
@@ -377,9 +304,9 @@ export async function executeScenarioRun(
         scenarioRunId: jobData.scenarioRunId,
         parameters: jobData.parameters,
       },
-      jobData.target,
-      prefetchDeps,
-    );
+      target: jobData.target,
+      deps: prefetchDeps,
+    });
 
     // Check if cancellation was requested while we were prefetching
     if (pool.wasCancelled(jobData.scenarioRunId)) {
@@ -476,32 +403,10 @@ async function spawnScenarioChildProcess(
       childLogger[level](extra ?? {}, message);
     };
 
-    const otelResourceAttrs = buildOtelResourceAttributes(
-      childProcessData.scenario.labels,
-    );
-    const logContext = encodeScenarioLogContext({
-      scenarioRunId: jobData.scenarioRunId,
-      batchRunId,
-      projectId,
-      scenarioId,
-      setId,
-    });
-    // TLS for the runner's own fetch stack (EventReporter → platform, and the
-    // model API call). Forwards haven's trusted local CA when present; only in
-    // local non-SaaS dev does it fall back to relaxing TLS. Never in SaaS/prod.
-    // See resolveChildTlsEnv for the gating.
-    const tlsEnv = resolveChildTlsEnv({
-      isSaaS: !!env.IS_SAAS,
-      nodeEnv: process.env.NODE_ENV,
-      nodeExtraCaCerts: process.env.NODE_EXTRA_CA_CERTS,
-    });
-    const childEnv = buildChildProcessEnv({
-      LANGWATCH_API_KEY: telemetry.apiKey,
-      LANGWATCH_ENDPOINT: telemetry.endpoint,
-      SCENARIO_HEADLESS: "true",
-      OTEL_RESOURCE_ATTRIBUTES: otelResourceAttrs,
-      [SCENARIO_LOG_CONTEXT_ENV]: logContext,
-      ...tlsEnv,
+    const childEnv = buildChildEnvironment({
+      jobData,
+      labels: childProcessData.scenario.labels,
+      telemetry,
     });
 
     const packageRoot = resolveAppPackageRoot();
@@ -638,7 +543,7 @@ async function spawnScenarioChildProcess(
  *
  * Sets up the cancel subscription (Redis pub/sub) and wires the execution
  * pool's spawn function. The actual job processing is triggered by the
- * scenarioExecution reactor via the GroupQueue.
+ * scenarioExecution subscriber via the GroupQueue.
  *
  * @returns A shutdown handle, or undefined if Redis is not available.
  */
@@ -657,10 +562,9 @@ export async function startScenarioProcessor({
     return undefined;
   }
 
-  // Resolved after the guard, never as a default parameter: defaults evaluate
-  // before the body runs, and `createProcessorDependencies` calls `getApp()`.
-  // As a default it would raise on an uninitialized App before the check above
-  // could answer "no Redis, skip" — the very outcome the guard exists to give.
+  // Resolved after the guard rather than as a default parameter, because
+  // defaults evaluate before the body runs: on the "no Redis, skip" path that
+  // would build the Prisma-backed services this immediately throws away.
   const deps = injectedDeps ?? createProcessorDependencies();
 
   // Wire the spawn function into the pool
@@ -682,7 +586,7 @@ export async function startScenarioProcessor({
     );
   });
 
-  // Subscribe to cancellation signals from the event-sourcing reactor
+  // Subscribe to cancellation signals from the event-sourcing subscriber
   const subscriber = connection.duplicate();
   const unsubscribe = await subscribeToCancellations({
     subscriber,
@@ -704,15 +608,6 @@ export async function startScenarioProcessor({
     "Scenario processor started (event-driven)",
   );
 
-  // Belt-and-braces for hard kills (OOM/SIGKILL) where the graceful drain
-  // above never ran: reconcile runs left orphaned at QUEUED by a previous
-  // worker. Fire-and-forget — a slow or failing cross-tenant ClickHouse scan
-  // must never wedge worker startup. Uses the shared (non-tenant) client
-  // because the scan is intentionally cross-tenant. `deps.orphanReconciliation`
-  // is undefined exactly when ClickHouse is not configured (see
-  // `getApp().scenarios.orphanReconciliation`), which both sweeps below skip.
-  startOrphanedRunSweeps(deps);
-
   return {
     close: async () => {
       // Emit a terminal failure for every in-flight run, then drain. This is
@@ -725,55 +620,4 @@ export async function startScenarioProcessor({
       );
     },
   };
-}
-
-/**
- * The two boot-time orphan sweeps, lifted out of `startScenarioProcessor`
- * so that function stays inside the house line limit.
- *
- * Both are cross-tenant by design and use the shared client; both are
- * fire-and-forget, because a reconciliation sweep must never wedge worker
- * startup.
- */
-function startOrphanedRunSweeps(deps: ProcessorDependencies): void {
-  if (!deps.orphanReconciliation) return;
-  const { sharedClickHouseClient, orphanedRunFinder } =
-    deps.orphanReconciliation;
-  const reconcilerNow = Date.now();
-  void reconcileOrphanedQueuedRuns({
-    findCandidates: () =>
-      findQueuedRunCandidates({
-        client: sharedClickHouseClient,
-        lookbackMs: LOOKBACK_MS,
-        now: reconcilerNow,
-        orphanThresholdMs: ORPHAN_QUEUED_THRESHOLD_MS,
-      }),
-    emitFailure: (candidate) =>
-      deps.failureEmitter.ensureFailureEventsEmitted({
-        projectId: candidate.projectId,
-        scenarioId: candidate.scenarioId,
-        setId: candidate.setId,
-        batchRunId: candidate.batchRunId,
-        scenarioRunId: candidate.scenarioRunId,
-        error:
-          "Reconciled: orphaned QUEUED run with no live worker (worker restart/crash)",
-      }),
-    now: reconcilerNow,
-    thresholdMs: ORPHAN_QUEUED_THRESHOLD_MS,
-  }).catch((err) => logger.warn({ err }, "orphan reconciler failed"));
-
-  // The sweep above only takes QUEUED runs terminal — a run nobody ever
-  // picked up. A run a dead worker had already STARTED is invisible to it
-  // and spins in the UI forever (#3195), so this second sweep takes the
-  // IN_PROGRESS orphans terminal. The two are disjoint by status and never
-  // touch the same run: queue wait cannot be read as worker death (nothing
-  // bounds it), while an idle IN_PROGRESS run past 2× the child timeout
-  // provably has no live worker. Fire-and-forget so a large/slow sweep
-  // never blocks worker startup.
-  void reconcileOrphanedRunsOnBoot({
-    failureEmitter: deps.failureEmitter,
-    finder: orphanedRunFinder,
-  }).catch((err: unknown) =>
-    logger.error({ err }, "Orphaned-run reconciliation failed on boot"),
-  );
 }

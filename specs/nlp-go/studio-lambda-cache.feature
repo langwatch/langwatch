@@ -2,7 +2,7 @@ Feature: getProjectLambdaArn — per-project ARN cache + single-flight
   As an operator running langwatch-workers under heavy per-tenant event load
   I want resolving a project's Lambda ARN to be cheap and burst-tolerant
   So that a single chatty tenant cannot exhaust the regional AWS Lambda API
-  quota and stall every fold/reactor for other tenants on the same pod.
+  quota and stall every fold/subscriber for other tenants on the same pod.
 
   # Background — why this exists
   #

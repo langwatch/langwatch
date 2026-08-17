@@ -142,7 +142,7 @@ type TurnResult struct {
 	ProjectID      string `json:"projectId"`
 	ConversationID string `json:"conversationId"`
 	// Status is "completed" or "failed". Only "completed" is posted today;
-	// failures are covered by the relay's error dispatch and the liveness reactor.
+	// failures are covered by the relay's error dispatch and the liveness subscriber.
 	Status    string          `json:"status"`
 	Text      string          `json:"text,omitempty"`
 	ToolCalls []FinalToolCall `json:"toolCalls,omitempty"`

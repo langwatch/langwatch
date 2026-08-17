@@ -326,7 +326,7 @@ LangWatch accepts OTLP/HTTP at two distinct URLs. They share **everything that m
 | **Auth** | LangWatch project API key, PAT, `X-Auth-Token` or `Authorization: Bearer <project-token>` | IngestionSource bearer secret (`lw_is_<...>`), minted once via the secret-reveal modal |
 | **Tenancy** | Project-scoped (data lives in the project's CH partition) | Org-scoped, routed through a hidden internal Governance Project per org (lazy-ensured on first IngestionSource mint; never user-visible) |
 | **Storage** | `recorded_spans` + `log_records`, the LangWatch trace pipeline | **Same `recorded_spans` + `log_records`**, distinguished by `langwatch.origin.kind = "ingestion_source"` attribute stamped at the receiver edge |
-| **Downstream consumers** | Trace viewer, evaluations, simulations, prompts, online evals, PII redaction, cost enrichment | Same trace viewer + log-detail pane (drill-down works regardless of origin) **plus** governance dashboard at `/governance`, anomaly detection reactor, OCSF/SIEM forwarding |
+| **Downstream consumers** | Trace viewer, evaluations, simulations, prompts, online evals, PII redaction, cost enrichment | Same trace viewer + log-detail pane (drill-down works regardless of origin) **plus** governance dashboard at `/governance`, anomaly detection, OCSF/SIEM forwarding |
 | **Plan accounting** | Counts against the project's trace allowance | Counts against the org's governance audit-event allowance |
 | **Source identity** | Whoever holds the project key (typically your own apps) | An IngestionSource the admin authored explicitly with per-platform config |
 | **Other shapes** | OTLP only | OTLP **plus** webhook envelope (`/api/ingest/webhook/:id` for Workato + s3_custom callback mode) and pull-mode workers for compliance feeds (OpenAI, Anthropic, Microsoft Copilot Studio) |
@@ -348,7 +348,7 @@ The two URLs are split for **auth + routing convenience**, not for architectural
 - **Same `recorded_spans` and `log_records` tables**, governance-ingested events land in the same ClickHouse storage that powers the rest of the platform. They're distinguished by reserved attribute namespaces stamped at the receiver edge:
   - `langwatch.origin.kind = "ingestion_source"`, discriminator
   - `langwatch.ingestion_source.{id, organization_id, source_type}`, source identity
-- **Same trace viewer**: open a span in `/messages`, the rendering is identical regardless of which URL it came from. The origin attributes appear as read-only system metadata.
+- **Same trace viewer**: open a span in `/traces`, the rendering is identical regardless of which URL it came from. The origin attributes appear as read-only system metadata.
 - **Same compliance + RBAC + multitenancy machinery**: all the controls that have been hardened over years of running OTel ingest at scale apply equally to governance data.
 
 The auth + tenancy split is what's actually different:
@@ -13674,7 +13674,7 @@ See [Self-Hosting → Config](/ai-gateway/self-hosting/config) for tuning the ca
 
 ---
 title: Anomaly rules
-description: Define detection rules that fire AnomalyAlerts when activity-event traffic crosses a threshold, what the reactor evaluates today, what is preview-only, and how to write a working rule.
+description: Define detection rules that fire AnomalyAlerts when activity-event traffic crosses a threshold, what the detector evaluates today, what is preview-only, and how to write a working rule.
 sidebarTitle: Anomaly rules
 ---
 
@@ -13682,15 +13682,15 @@ sidebarTitle: Anomaly rules
 
 <Note>**Available on Enterprise plans.** Non-enterprise organizations see an upgrade card on `/governance/anomaly-rules` instead of the composer. See [Open-core licensing](/ai-governance/overview#open-core-licensing) for the full Apache 2.0, Enterprise split.</Note>
 
-Anomaly rules are the "Detect" layer of the [governance control plane](/ai-governance/control-plane#tier-3--audit-log-ingest). The composer at `/governance/anomaly-rules` accepts a rule definition and persists it; the [event-sourcing reactor](/ai-gateway/governance/activity-monitor-event-sourcing) evaluates each rule against incoming events and produces an `AnomalyAlert` row when a violation is detected.
+Anomaly rules are the "Detect" layer of the [governance control plane](/ai-governance/control-plane#tier-3--audit-log-ingest). The composer at `/governance/anomaly-rules` accepts a rule definition and persists it; the [event-sourcing detector](/ai-gateway/governance/activity-monitor-event-sourcing) evaluates each rule against incoming events and produces an `AnomalyAlert` row when a violation is detected.
 
-This page documents what the reactor evaluates today and what is preview-only, so you don't author rules that look "active" in the list but never fire.
+This page documents what the detector evaluates today and what is preview-only, so you don't author rules that look "active" in the list but never fire.
 
 ## Rule-type coverage
 
-The composer's rule-type dropdown surfaces every shape the schema can hold; the reactor only evaluates one of them today.
+The composer's rule-type dropdown surfaces every shape the schema can hold; the detector only evaluates one of them today.
 
-| Rule type | Reactor coverage | What it detects | Threshold config keys |
+| Rule type | Detector coverage | What it detects | Threshold config keys |
 |-----------|------------------|------------------|------------------------|
 | **`spend_spike`** | ✅ Live | Cost-USD growth in a rolling window vs a baseline window | `windowSec`, `baselineOffsetSec`, `ratioVsBaseline`, `minBaselineUsd` |
 | `rate_limit` | ⏳ Preview | Volume of actions per actor per window | (config schema TBD) |
@@ -13700,7 +13700,7 @@ The composer's rule-type dropdown surfaces every shape the schema can hold; the 
 | `pii_leak` | ⏳ Preview | Outbound payload matches a PII regex set | (config schema TBD) |
 | `custom` | ⏳ Preview | User-defined CEL, SQL predicate | (config schema TBD) |
 
-**⏳ Preview** rules can be created and the row shows `active` in the list, but the reactor logs `debug` and skips them, no AnomalyAlert is produced. Until the reactor slice for each ships, treat them as "save the rule for the future, don't expect alerts."
+**⏳ Preview** rules can be created and the row shows `active` in the list, but the detector logs `debug` and skips them, no AnomalyAlert is produced. Until the detector slice for each ships, treat them as "save the rule for the future, don't expect alerts."
 
 If you need detection beyond `spend_spike` today, the recommended shape is one of:
 
@@ -13711,7 +13711,7 @@ If you need detection beyond `spend_spike` today, the recommended shape is one o
 
 Open `/governance/anomaly-rules` → click **New anomaly rule**.
 
-Fields the reactor reads:
+Fields the detector reads:
 
 | Field | Typical value | What it does |
 |-------|---------------|---------------|
@@ -13720,7 +13720,7 @@ Fields the reactor reads:
 | **Rule type** | `spend_spike` | Pick exactly this, see coverage table above. |
 | **Scope** | `organization`, `source_type`, `source` | Filters which IngestionSources the rule applies to (see Scope coverage below). |
 | **Scope ID** | (cuid) | Required when scope is `source_type` or `source`. The IngestionSource ID can be copied from `/governance/ingestion-sources/<id>` or the URL of the per-source detail page. |
-| **Threshold config** | (JSON object, see below) | The reactor's per-rule-type tuning knobs. |
+| **Threshold config** | (JSON object, see below) | The detector's per-rule-type tuning knobs. |
 | **Destination config** | `{}` (today) | Reserved for future Slack, PagerDuty, SIEM dispatch, see Dispatch coverage below. |
 
 ### Threshold config: `spend_spike`
@@ -13736,10 +13736,10 @@ Fields the reactor reads:
 
 | Key | Default | Meaning |
 |-----|---------|---------|
-| `windowSec` | `86400` (24 h) | The "current" window the reactor sums spend across, ending at the latest event timestamp. |
-| `baselineOffsetSec` | `604800` (7 d) | How far back from the current window the reactor pulls the baseline window from. With the defaults, the baseline is the same-shape 24-hour window from 7 days ago. |
-| `ratioVsBaseline` | `2.0` | Multiplier, the reactor fires when current spend ≥ baseline × ratio. `2.0` means "double the spend of last week's same-window." |
-| `minBaselineUsd` | `1.0` | Floor, the reactor skips evaluation when the baseline window is below this value. Prevents trivial alerts on cold sources where last week's spend was ~$0.01 and a 2× rise is meaningless. |
+| `windowSec` | `86400` (24 h) | The "current" window the detector sums spend across, ending at the latest event timestamp. |
+| `baselineOffsetSec` | `604800` (7 d) | How far back from the current window the detector pulls the baseline window from. With the defaults, the baseline is the same-shape 24-hour window from 7 days ago. |
+| `ratioVsBaseline` | `2.0` | Multiplier, the detector fires when current spend ≥ baseline × ratio. `2.0` means "double the spend of last week's same-window." |
+| `minBaselineUsd` | `1.0` | Floor, the detector skips evaluation when the baseline window is below this value. Prevents trivial alerts on cold sources where last week's spend was ~$0.01 and a 2× rise is meaningless. |
 
 Sensible starting values:
 
@@ -13751,17 +13751,17 @@ Sensible starting values:
 
 ## Scope coverage
 
-| Scope | Reactor coverage | Notes |
+| Scope | Detector coverage | Notes |
 |-------|------------------|-------|
 | `organization` | ✅ Evaluated | Fires on any IngestionSource in the org. Best default. |
 | `source_type` | ✅ Evaluated | Fires on every source whose `sourceType` matches (e.g. all `otel_generic` sources). |
 | `source` | ✅ Evaluated | Fires on a single named IngestionSource. |
-| `team` | ⏳ Preview | Persisted but not filtered by the reactor today. Don't rely on it. |
+| `team` | ⏳ Preview | Persisted but not filtered by the detector today. Don't rely on it. |
 | `project` | ⏳ Preview | Same. |
 
 ## Dispatch coverage (C3 in flight)
 
-The composer's **Destination config** field accepts a JSON object describing where to push the alert. Today the reactor's dispatch path is **log-only**: alerts surface on the `/governance` dashboard's "Recent anomalies" section but no Slack message, PagerDuty page, SIEM event is generated.
+The composer's **Destination config** field accepts a JSON object describing where to push the alert. Today the detector's dispatch path is **log-only**: alerts surface on the `/governance` dashboard's "Recent anomalies" section but no Slack message, PagerDuty page, SIEM event is generated.
 
 C3 (in flight on the [governance platform](https://github.com/langwatch/langwatch/pull/3524) branch) wires `triggerActionDispatch` so the destinationConfig values below start working:
 
@@ -13780,7 +13780,7 @@ Until C3 lands, leave destinationConfig empty (`{}`) and rely on the dashboard t
 
 Two angles, same data:
 
-**Web**: open `/governance` and look for the rule's name in the "Recent anomalies" section. Each fire creates one row keyed by `(ruleId, triggerWindowStart)` so the reactor doesn't double-alert on a single window.
+**Web**: open `/governance` and look for the rule's name in the "Recent anomalies" section. Each fire creates one row keyed by `(ruleId, triggerWindowStart)` so the detector doesn't double-alert on a single window.
 
 **CLI**: `langwatch governance status` shows `hasAnomalyRules: true` once at least one rule exists. The `recentAnomalies` query is wired into the same `api.activityMonitor.recentAnomalies` tRPC procedure the dashboard reads.
 
@@ -13794,7 +13794,7 @@ To verify it yourself, end to end:
 
 ## What's persisted vs what's evaluated
 
-A rule that's persisted but unevaluated is intentional, admins can pre-stage rules so when the reactor slice ships, no rework. But it's a real failure mode if you don't know which is which. The two coverage tables above are the source of truth: **only `spend_spike` + (`organization` | `source_type` | `source`) actually fires today**. Everything else is preview state.
+A rule that's persisted but unevaluated is intentional, admins can pre-stage rules so when the detector slice ships, no rework. But it's a real failure mode if you don't know which is which. The two coverage tables above are the source of truth: **only `spend_spike` + (`organization` | `source_type` | `source`) actually fires today**. Everything else is preview state.
 
 ---
 
@@ -14468,7 +14468,7 @@ description: How LangWatch AI Gateway governance underwrites SOC 2 Type II, ISO 
 sidebarTitle: Compliance architecture
 ---
 
-<Info>**Pairs with:** [AI Gateway → Audit](/ai-gateway/audit). The gateway emits the spans; governance reactors fold them into OCSF-mapped events for SIEM export.</Info>
+<Info>**Pairs with:** [AI Gateway → Audit](/ai-gateway/audit). The gateway emits the spans; governance processing folds them into OCSF-mapped events for SIEM export.</Info>
 
 <Note>**Available on Enterprise plans.** The OCSF/SIEM export, configurable retention, and tamper-evidence (post-GA follow-up) covered on this page require an Enterprise license. The Apache 2.0 floor still gives you a single trace store at the platform default retention window and an append-only event_log; the compliance underwriting documented below is the Enterprise extension. See [Open-core licensing](/ai-governance/overview#open-core-licensing) for the full Apache 2.0, Enterprise split.</Note>
 
@@ -14508,7 +14508,7 @@ This page maps each compliance framework you might need to the mechanisms in Lan
               │                  │           └────────────────────┘
               ▼                  ▼
      ┌─────────────────┐ ┌──────────────────────┐
-     │ Anomaly reactor │ │ OCSF read API        │
+     │ Anomaly detector│ │ OCSF read API        │
      │ /governance KPI │ │ (SIEM cron-pull,     │
      │     strip       │ │  Splunk/Datadog/etc.)│
      └─────────────────┘ └──────────────────────┘
@@ -14630,7 +14630,7 @@ description: Where the LangWatch CLI, AI Gateway, web app, and Activity Monitor 
 sidebarTitle: Control plane
 ---
 
-<Info>**Pairs with:** [AI Gateway → Overview](/ai-gateway/overview). The gateway is the data plane (request path); this page is the control plane (configuration + fold reactors) that sits next to it in the same compose stack and Helm chart.</Info>
+<Info>**Pairs with:** [AI Gateway → Overview](/ai-gateway/overview). The gateway is the data plane (request path); this page is the control plane (configuration + fold processing) that sits next to it in the same compose stack and Helm chart.</Info>
 
 LangWatch is a **control plane** above every AI tool an enterprise uses,
 including the ones whose API key path you do not own. The
@@ -15558,7 +15558,7 @@ The deep reference for budget shape, fallback semantics, and the WARN response t
 
 ## Step 8: Write your first anomaly rule
 
-Budgets enforce *at* the limit. [Anomaly rules](/ai-governance/anomaly-rules) detect *before* it, the patterns that precede a breach (spend spike, geo-mismatch, off-hours usage). The reactor evaluates `spend_spike` rules live today; other rule types are preview-only (the [coverage table](/ai-governance/anomaly-rules#rule-type-coverage) marks which is which).
+Budgets enforce *at* the limit. [Anomaly rules](/ai-governance/anomaly-rules) detect *before* it, the patterns that precede a breach (spend spike, geo-mismatch, off-hours usage). The detector evaluates `spend_spike` rules live today; other rule types are preview-only (the [coverage table](/ai-governance/anomaly-rules#rule-type-coverage) marks which is which).
 
 Write a starter `spend_spike` rule:
 
@@ -15580,7 +15580,7 @@ Write a starter `spend_spike` rule:
      ```
 4. Click **Create rule**.
 
-The reactor starts evaluating from the next ingest event. When today's 24h spend exceeds 2× last week's same-day baseline (and the baseline was at least \$1, to avoid noise on quiet days), the reactor writes an `AnomalyAlert` row visible in `/governance` and surfaces it in the [`activityMonitor.recentAnomalies`](/ai-governance/anomaly-rules) procedure.
+The detector starts evaluating from the next ingest event. When today's 24h spend exceeds 2× last week's same-day baseline (and the baseline was at least \$1, to avoid noise on quiet days), the detector writes an `AnomalyAlert` row visible in `/governance` and surfaces it in the [`activityMonitor.recentAnomalies`](/ai-governance/anomaly-rules) procedure.
 
 ## Where to next
 
@@ -18101,7 +18101,7 @@ override the default.
 |---------|------------------|-----------------|------------------|
 | **Org admin** (governance-relevant role on at least one org) | `RoleBinding` carries `organization:manage` OR `governance:view` | [`/governance`](/ai-governance/governance-dashboard): the bird-eye dashboard | Their job is org-wide oversight; first paint shows usage-by-team graphs, anomaly alerts, drill-in to per-team, per-user activity. Their own personal traces are secondary. |
 | **Personal-only user** (no project membership beyond their own personal workspace) | `OrganizationUser` role=member AND `Project.isPersonal=true` AND no `TeamUser` membership beyond personal | [`/me`](/ai-governance/personal-portal/end-user): the AI Tools Portal + Trace Ingest section | Their primary use case is *"sign in, install Claude Code, Cursor template, see my own usage"*. AI Tools Portal tile-grid + Trace Ingest catalog is the headline. |
-| **Project-only user** (LLMOps customer, no personal-workspace activity) | `TeamUser` membership exists with `Team.isPersonal=false` AND no traces in `Project.isPersonal` | `/<project>/messages`, the existing LLMOps trace explorer | Existing LLMOps customer story stays unchanged. First paint is the Messages explorer, not /me. |
+| **Project-only user** (LLMOps customer, no personal-workspace activity) | `TeamUser` membership exists with `Team.isPersonal=false` AND no traces in `Project.isPersonal` | `/<project>/traces`, the existing LLMOps trace explorer | Existing LLMOps customer story stays unchanged. First paint is the Trace Explorer, not /me. |
 | **Mixed** (personal + project membership) | Combination of above | [`/me`](/ai-governance/personal-portal/end-user) (default) OR last-touched (cookie-tracked) | Cookie remembers where the user last spent time. New mixed user lands at /me first paint to discover the AI Tools Portal, then uses the workspace switcher to flip to project work. |
 
 ## How detection works
@@ -18119,7 +18119,7 @@ and the resolver implementation:
    beyond their personal team? If yes, route to `/me`.
 3. **Project-only check**: does the user have NO personal-workspace
    activity (no traces in `Project.isPersonal=true` in the past 30 days)?
-   If yes, route to their default project's `/messages`.
+   If yes, route to their default project's `/traces`.
 4. **Fallback**: for mixed users, route to `/me` unless a cookie remembers
    they last spent time in a project.
 
@@ -18142,7 +18142,7 @@ Every user can override the persona-based default in
 - **Always /me**: always lands on the AI Tools Portal + Trace Ingest
   section, regardless of role.
 - **Always project home**: always lands on the user's last-active project's
-  `/messages`, regardless of role.
+  `/traces`, regardless of role.
 
 Override applies after the next sign-in.
 
@@ -57363,7 +57363,7 @@ Three things to know before flipping it on:
 
 1. **One Secret holds everything** (or use `autogen.enabled=true` and let the chart materialise it). Both `langwatch-app` and the AI gateway pod mount `LW_GATEWAY_INTERNAL_SECRET` + `LW_GATEWAY_JWT_SECRET` from the same `secrets.existingSecret` Secret (default `langwatch-app-secrets`) that also holds the app keys (`credentialsEncryptionKey`, `cronApiKey`, `nextAuthSecret`, `virtualKeyPepper`). The [Production Deployment](#production-deployment) section above shows the single `kubectl create secret generic` command. With `autogen.enabled=false` and any required key missing, the preflight Job aborts the install with a clear list of what is missing; under `autogen.enabled=true` the chart materialises the Secret on first install via lookup-or-rand.
 2. **Public ingress needs DNS + TLS.** The gateway is what your LLM clients hit, so it usually wants its own hostname (e.g. `gateway.your-corp.com`), separate cert, separate ingress rule. See [AI Gateway → Self-hosting → DNS & TLS](/ai-gateway/self-hosting/dns-and-tls).
-3. **Worker pods must be running.** Budget enforcement reads from a ClickHouse rollup that the trace-processing reactor folds into. If you deploy with `workers.enabled=false`, budgets stop accumulating spend and breach enforcement silently degrades. The default `workers.enabled=true` is correct for production.
+3. **Worker pods must be running.** Budget enforcement reads from a ClickHouse rollup that trace-processing folds into. If you deploy with `workers.enabled=false`, budgets stop accumulating spend and breach enforcement silently degrades. The default `workers.enabled=true` is correct for production.
 
 ## Upgrade
 
@@ -58992,7 +58992,7 @@ Press `e` or click the toggle to open a detailed JSON viewer in the right panel 
 
 ## Projection State
 
-The left panel lists all available **projections** and **reactors** for the aggregate type. Select a projection to compute its state at the current event position.
+The left panel lists all available **projections** and **subscribers** for the aggregate type. Select a projection to compute its state at the current event position.
 
 This is the core of the time-travel capability: you can step through events and watch how a projection's state evolves with each event.
 

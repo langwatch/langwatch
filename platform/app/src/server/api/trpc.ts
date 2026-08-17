@@ -37,6 +37,7 @@ interface CreateNextContextOptions {
 }
 
 import { auditLog } from "@ee/audit-log/auditLog";
+import type { AuthzPermission } from "@langwatch/authz";
 import { HandledError, ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { getLogLevelFromStatusCode } from "@langwatch/observability/request";
@@ -52,6 +53,7 @@ import { ModelProviderDisabledError } from "~/server/modelProviders/modelProvide
 import { createWarnThrottle } from "~/server/observability/warnThrottle";
 import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 import { captureException, toError } from "../../utils/posthogErrorCapture";
+import { checkPermissionV2 } from "../authz/trpc-middleware";
 import type { OpsScope, PermissionMiddleware } from "./rbac";
 
 const logger = createLogger("langwatch:trpc");
@@ -1203,6 +1205,23 @@ interface PendingPermissionProcedureBuilder<
     TOutputOut,
     TCaller
   >;
+  /**
+   * ADR-092 §5 sugar: declare the required permission and let the engine
+   * extract the scope (projectId / teamId / organizationId) from the
+   * validated input. New procedures prefer this over `.use(checkXxx…)`.
+   */
+  permission: (
+    permission: AuthzPermission,
+  ) => ProcedureBuilder<
+    TContext,
+    TMeta,
+    TContextOverrides,
+    TInputIn,
+    TInputOut,
+    TOutputIn,
+    TOutputOut,
+    TCaller
+  >;
 }
 
 const permissionProcedureBuilder = <
@@ -1235,6 +1254,22 @@ const permissionProcedureBuilder = <
   TOutputOut,
   TCaller
 > => {
+  /**
+   * The one chain both entry points build: the surrounding middlewares are
+   * identical and only the permission check in the middle differs, so
+   * `.use()` and `.permission()` cannot drift in what wraps them. Order is
+   * behaviour — the check must sit inside the error/tracing middlewares and
+   * before `enforcePermissionCheck`, which is what proves a check ran at all.
+   */
+  const withPermissionCheck = (check: unknown) =>
+    procedure
+      .use(tracerMiddleware as any)
+      .use(loggerMiddleware as any)
+      .use(handledErrorMiddleware as any)
+      .use(check as any)
+      .use(enforcePermissionCheck as any)
+      .use(auditLogMutations as any) as any;
+
   return {
     input: ((input: Parser) => {
       return permissionProcedureBuilder(procedure.input(input as any));
@@ -1248,15 +1283,9 @@ const permissionProcedureBuilder = <
       TOutputOut,
       TCaller
     >["input"],
-    use: (middleware) => {
-      return procedure
-        .use(tracerMiddleware as any)
-        .use(loggerMiddleware as any)
-        .use(handledErrorMiddleware as any)
-        .use(middleware as any)
-        .use(enforcePermissionCheck as any)
-        .use(auditLogMutations as any) as any;
-    },
+    use: (middleware) => withPermissionCheck(middleware),
+    permission: (permission) =>
+      withPermissionCheck(checkPermissionV2(permission)),
   };
 };
 

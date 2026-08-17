@@ -97,10 +97,6 @@ vi.mock("~/hooks/useOpsPermission", () => ({
   useOpsPermission: () => ({ hasAccess: false }),
 }));
 
-vi.mock("~/components/messages/HeaderButtons", () => ({
-  useTableView: () => ({ isTableView: false }),
-}));
-
 const toggleSupportChatMock = vi.fn();
 vi.mock("~/utils/crispBubblePolicy", () => ({
   toggleSupportChat: () => toggleSupportChatMock(),

@@ -2,6 +2,7 @@ import { Box, VStack } from "@chakra-ui/react";
 import {
   Activity,
   Anvil,
+  DatabaseZap,
   Flag,
   GitPullRequest,
   History,
@@ -19,7 +20,6 @@ import { usePublicEnv } from "../hooks/usePublicEnv";
 import { api } from "../utils/api";
 import { featureIcons } from "../utils/featureIcons";
 import { projectRoutes } from "../utils/routes";
-import { useTableView } from "./messages/HeaderButtons";
 import { CollapsibleMenuGroup } from "./sidebar/CollapsibleMenuGroup";
 import {
   CODING_AGENT_LINK_WINDOW_DAYS,
@@ -184,15 +184,6 @@ function ObserveSection({
         project={project}
         isActive={pathname.includes("/traces")}
         showLabel={showExpanded}
-      />
-      <PageMenuLink
-        path={projectRoutes.messages.path}
-        icon={featureIcons.traces.icon}
-        label={projectRoutes.messages.title}
-        project={project}
-        isActive={pathname.includes("/messages")}
-        showLabel={showExpanded}
-        legacy
       />
       <PageMenuLink
         path={projectRoutes.online_evaluations.path}
@@ -550,6 +541,13 @@ const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
         isActive={router.pathname.startsWith("/ops/feature-flags")}
         showLabel={showExpanded}
       />
+      <SideMenuLink
+        icon={DatabaseZap}
+        label="Migrations"
+        href="/ops/migrations"
+        isActive={router.pathname.startsWith("/ops/migrations")}
+        showLabel={showExpanded}
+      />
       {isAdminUser && (
         <SideMenuLink
           icon={Shield}
@@ -590,21 +588,13 @@ const PageMenuLink = ({
   legacy,
   legacyLabel,
 }: PageMenuLinkProps) => {
-  const { isTableView } = useTableView();
-
-  const viewModeQuery = path.includes("/messages")
-    ? isTableView
-      ? "?view=table"
-      : "?view=list"
-    : "";
-
   const destination = projectScopedDestination({ path, label, project });
 
   return (
     <SideMenuLink
       icon={icon}
       label={label}
-      href={destination.href && destination.href + viewModeQuery}
+      href={destination.href}
       unavailableReason={destination.unavailableReason}
       isActive={isActive}
       badgeNumber={badgeNumber}

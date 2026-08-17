@@ -255,4 +255,18 @@ export interface ScheduledJobRepository {
    * operator visibility — never a firing path.
    */
   listForOps(params: { limit: number }): Promise<ScheduledJobRecord[]>;
+
+  /**
+   * Cross-tenant read of the schedules that are switched OFF, with the total
+   * so a bounded page can say what it left out.
+   *
+   * Deliberately not a filter over `listForOps`: that read orders
+   * `active DESC`, which sorts inactive rows to the very end, so any caller
+   * filtering its bounded page client-side finds zero paused schedules the
+   * moment the fleet has more schedules than the page holds — while appearing
+   * to report on all of them.
+   */
+  listPausedForOps(params: {
+    limit: number;
+  }): Promise<{ rows: ScheduledJobRecord[]; total: number }>;
 }

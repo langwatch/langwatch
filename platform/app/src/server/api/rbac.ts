@@ -11,6 +11,8 @@ import {
   ProjectPermissionDeniedError,
 } from "~/server/app-layer/permissions/errors";
 import type { Session } from "~/server/auth";
+import { legacyTeamFallbackDisabled } from "~/server/authz/legacy-fallback-gate";
+import { authzShadowFor } from "~/server/authz/shadow";
 import { isAdmin } from "../../../ee/admin/isAdmin";
 import { CUSTOM_ROLE_KIND } from "../role/role-kind";
 
@@ -887,6 +889,11 @@ async function checkPermissionFromBindings({
 
   if (bindings.length === 0) {
     // Fall back to legacy TeamUser for users not yet migrated to RoleBindings
+    // - unless stage B's in-place migration finalized this organization, in
+    // which case bindings are the whole story (parity proven per org).
+    if (await legacyTeamFallbackDisabled({ prisma, organizationId })) {
+      return false;
+    }
     const teamScope = scopes.find(
       (s) => s.scopeType === RoleBindingScopeType.TEAM,
     );
@@ -1113,8 +1120,18 @@ export async function resolveProjectPermission(
     return { permitted: false, organizationRole: null };
   }
 
-  // Check demo project access
+  // Check demo project access. The comparison fires BEFORE the return: the
+  // engine carries its own demo-project rule, and an early return here used
+  // to hide the entire demo surface from shadow mode. The legacy answer is
+  // unchanged by it.
   if (isDemoProject(projectId, permission)) {
+    authzShadowFor(ctx.prisma).userPermissionCheck({
+      userId: ctx.session.user.id,
+      permission,
+      legacyAllowed: true,
+      projectId,
+      caller: "trpc.project",
+    });
     return { permitted: true, organizationRole: null };
   }
 
@@ -1132,6 +1149,16 @@ export async function resolveProjectPermission(
     }),
     organizationRole: context.organizationRole,
     permission,
+  });
+
+  // ADR-092 stage A4: engine shadow comparison — async, never affects the
+  // legacy answer.
+  authzShadowFor(ctx.prisma).userPermissionCheck({
+    userId: context.userId,
+    permission,
+    legacyAllowed: permitted,
+    projectId,
+    caller: "trpc.project",
   });
 
   return { permitted, organizationRole: context.organizationRole };
@@ -1153,8 +1180,22 @@ async function resolveProjectPermissionAny(
   }
 
   // The demo project grants its view permissions to everyone, so one of them
-  // being enough settles the question before anything is read.
-  if (permissions.some((permission) => isDemoProject(projectId, permission))) {
+  // being enough settles the question before anything is read. The comparison
+  // fires BEFORE the return, as in resolveProjectPermission: the engine
+  // carries its own demo-project rule, and an early return here used to hide
+  // the entire demo surface from shadow mode. Only the permission that
+  // matched is shadowed, because that is the only one legacy answered.
+  const demoPermission = permissions.find((permission) =>
+    isDemoProject(projectId, permission),
+  );
+  if (demoPermission !== undefined) {
+    authzShadowFor(ctx.prisma).userPermissionCheck({
+      userId: ctx.session.user.id,
+      permission: demoPermission,
+      legacyAllowed: true,
+      projectId,
+      caller: "trpc.projectAny",
+    });
     return { permitted: true, organizationRole: null };
   }
 
@@ -1175,6 +1216,18 @@ async function resolveProjectPermissionAny(
       organizationRole: context.organizationRole,
       permission,
     });
+
+    // ADR-092 stage A4: one comparison per candidate the legacy path
+    // actually evaluated - the loop stops at the first grant, so the
+    // shadowed set is exactly the set legacy answered.
+    authzShadowFor(ctx.prisma).userPermissionCheck({
+      userId: context.userId,
+      permission,
+      legacyAllowed: permitted,
+      projectId,
+      caller: "trpc.projectAny",
+    });
+
     if (permitted) {
       return { permitted: true, organizationRole: context.organizationRole };
     }
@@ -1245,6 +1298,15 @@ export async function resolveTeamPermission(
     permission,
   });
 
+  // ADR-092 stage A4: engine shadow comparison.
+  authzShadowFor(ctx.prisma).userPermissionCheck({
+    userId: ctx.session.user.id,
+    permission,
+    legacyAllowed: permitted,
+    teamId,
+    caller: "trpc.team",
+  });
+
   return { permitted, organizationRole };
 }
 
@@ -1264,6 +1326,29 @@ export async function hasTeamPermission(
  * Check if user has a specific permission for an organization
  */
 export async function hasOrganizationPermission(
+  ctx: { prisma: PrismaClient; session: Session },
+  organizationId: string,
+  permission: Permission,
+): Promise<boolean> {
+  const permitted = await hasOrganizationPermissionLegacy(
+    ctx,
+    organizationId,
+    permission,
+  );
+  // ADR-092 stage A4: engine shadow comparison.
+  if (ctx.session?.user) {
+    authzShadowFor(ctx.prisma).userPermissionCheck({
+      userId: ctx.session.user.id,
+      permission,
+      legacyAllowed: permitted,
+      organizationId,
+      caller: "trpc.organization",
+    });
+  }
+  return permitted;
+}
+
+async function hasOrganizationPermissionLegacy(
   ctx: { prisma: PrismaClient; session: Session },
   organizationId: string,
   permission: Permission,
@@ -1358,6 +1443,11 @@ export async function hasOrganizationPermission(
   // family) are never conferred through it — only an ORGANIZATION-scoped
   // binding can (ADR-021). Gateway/audit resources stay grantable here.
   if (!bindingScopeCanGrant(RoleBindingScopeType.TEAM, permission)) {
+    return false;
+  }
+  if (
+    await legacyTeamFallbackDisabled({ prisma: ctx.prisma, organizationId })
+  ) {
     return false;
   }
   const teamMemberships = await ctx.prisma.teamUser.findMany({
@@ -1524,8 +1614,13 @@ async function loadScopeResolution(
 
   // Legacy fallback: a user with NO RoleBindings anywhere in the org falls back
   // to their TeamUser role. Mirrored here so the batch paths keep exact parity
-  // with the per-call helpers.
-  const needsLegacyFallback = bindings.length === 0;
+  // with the per-call helpers - including the stage-B per-organization gate.
+  const needsLegacyFallback =
+    bindings.length === 0 &&
+    !(await legacyTeamFallbackDisabled({
+      prisma: ctx.prisma,
+      organizationId: args.organizationId,
+    }));
   const legacyTeamUser = needsLegacyFallback
     ? await ctx.prisma.teamUser.findMany({
         where: { userId, team: { organizationId: args.organizationId } },
@@ -1793,6 +1888,32 @@ export async function batchScopePermissions(
         args.permission,
       ),
     );
+  }
+
+  // ADR-092 stage A4: every verdict this batch produced is a real
+  // authorization answer, so each one is compared — through the batch entry
+  // point, which draws the sample once and collects grants once for the
+  // whole batch. Per-scope userPermissionCheck calls here would fan legacy's
+  // four flat queries into a detached collect per scope (the pool-starving
+  // fan-out api-key.service.ts documents), with the whole batch as the
+  // worst case at sample rate 1.
+  const userId = ctx.session?.user?.id;
+  if (userId) {
+    authzShadowFor(ctx.prisma).userBatchPermissionCheck({
+      userId,
+      permission: args.permission,
+      organizationId: args.organizationId,
+      teams: [...teamsMap].map(([teamId, legacyAllowed]) => ({
+        teamId,
+        legacyAllowed,
+      })),
+      projects: [...projectsMap].map(([projectId, legacyAllowed]) => ({
+        projectId,
+        teamId: args.projectTeamId[projectId],
+        legacyAllowed,
+      })),
+      caller: "trpc.batch",
+    });
   }
 
   return { teams: teamsMap, projects: projectsMap };

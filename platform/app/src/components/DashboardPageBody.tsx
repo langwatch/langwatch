@@ -28,7 +28,7 @@ import { trackEvent } from "../utils/tracking";
 import { AnnouncementBanner } from "./AnnouncementBanner";
 import { CurrentDrawer } from "./CurrentDrawer";
 import { AdminViewingAsBanner } from "./governance/AdminViewingAsBanner";
-import { SavedViewsBar } from "./messages/SavedViewsBar";
+import { SavedViewsBar } from "./SavedViewsBar";
 import { GlobalUpgradeModal } from "./UpgradeModal";
 import { Link } from "./ui/link";
 import { PageErrorFallback } from "./ui/PageErrorFallback";
@@ -153,10 +153,9 @@ export const DashboardPageBody = ({
     // have full team access - mirrors server-side org-scoped ADMIN RoleBinding logic.
     organizationRole === OrganizationUserRole.ADMIN;
 
-  const isTracesOrAnalyticsPage =
-    router.pathname.startsWith("/[project]/messages") ||
-    router.pathname.startsWith("/[project]/analytics");
-  const showSavedViews = isTracesOrAnalyticsPage;
+  // Analytics is the last surface on the v1 saved-views bar; the Trace
+  // Explorer carries its own view system.
+  const showSavedViews = router.pathname.startsWith("/[project]/analytics");
 
   return (
     <VStack width="full" gap={0} {...props}>

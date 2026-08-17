@@ -24,6 +24,7 @@ import { builtinModules } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
+import { OPTIONAL_EXTERNALS } from "./bundle-optional-externals.mjs";
 
 const APP = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const OUT_DIR = path.join(APP, "dist", "server");
@@ -71,20 +72,68 @@ const basePackage = (id) => {
   return id.startsWith("@") ? parts.slice(0, 2).join("/") : (parts[0] ?? id);
 };
 
-/** @type {import("esbuild").Plugin} */
-const externalize = {
+// Kept external even by an inlineAll entry, each for a reason that inlining
+// would break:
+//
+//   @opentelemetry/*  The child flushes spans at exit through the GLOBALLY
+//                     registered provider. A second inlined copy of the API
+//                     splits registration and flush across two registries, so
+//                     every span is dropped while the process still exits 0.
+//   @prisma/*         Native engines; cannot be inlined at all.
+//   pino / thread-stream
+//                     They start their log transport on a worker thread whose
+//                     script they locate with `join(__dirname, "worker.js")`.
+//                     Inlined, __dirname becomes dist/server and the lookup
+//                     misses, and thread-stream reports it by rethrowing on
+//                     nextTick — an UNCAUGHT exception that kills the child,
+//                     not something the transport's try/catch can swallow.
+//                     Every realistic configuration hits it: pretty console
+//                     logs (the dev default) and the OTel log transport both
+//                     create a transport.
+//
+// The rule of thumb for adding to this list: a package that resolves a FILE at
+// runtime relative to its own location cannot be inlined, because inlining is
+// exactly what moves that location.
+const NEVER_INLINED = [
+  /^@opentelemetry\//,
+  /^@prisma\//,
+  /^\.prisma(\/|$)/,
+  /^pino(-|$)/,
+  /^thread-stream$/,
+];
+
+/**
+ * Whether a specifier gets inlined into the bundle. First-party source always
+ * is; an `inlineAll` entry takes everything else with it except NEVER_INLINED.
+ *
+ * @param {string} id @param {boolean} inlineAll @returns {boolean}
+ */
+const isInlined = (id, inlineAll) => {
+  // Relative (./ ../), absolute (/) and tsconfig-alias (~/, @app/, @ee/)
+  // specifiers are first-party source. `.prisma/…` looks relative but is a
+  // bare specifier, so it falls through and stays external like the rest. A
+  // future tsconfig alias missing here fails the build loudly (the dependency
+  // check below names it as an undeclared package).
+  if (/^(\.\.?\/|\/|~\/|@app\/|@ee\/)/.test(id)) return true;
+  // Workspace packages ship raw TypeScript, so only bundling can resolve them.
+  // One inlined copy per process is the correct instance count anyway.
+  if (workspaceBundled.has(basePackage(id))) return true;
+  return inlineAll && !NEVER_INLINED.some((re) => re.test(id));
+};
+
+/**
+ * Entries default to bundling first-party code only. `inlineAll` flips that to
+ * bundling everything except NEVER_INLINED — used by the scenario child, which
+ * is a fresh process per run and so pays its whole module graph every time.
+ *
+ * @param {boolean} inlineAll
+ * @returns {import("esbuild").Plugin}
+ */
+const createExternalize = (inlineAll) => ({
   name: "externalize",
   setup(b) {
     b.onResolve({ filter: /.*/ }, (a) => {
-      // Relative (./ ../), absolute (/) and tsconfig-alias (~/, @app/, @ee/)
-      // specifiers are first-party source: bundle. `.prisma/…` looks relative
-      // but is a bare specifier, so it falls through and stays external like
-      // the rest. A future tsconfig alias missing here fails the build loudly
-      // (the dependency check below names it as an undeclared package).
-      if (/^(\.\.?\/|\/|~\/|@app\/|@ee\/)/.test(a.path)) return;
-      // Workspace packages ship raw TypeScript: bundle. One inlined copy per
-      // process is the correct instance count anyway.
-      if (workspaceBundled.has(basePackage(a.path))) return;
+      if (isInlined(a.path, inlineAll)) return;
       // Side-effect-only imports keep their side effects (no waiver), or the
       // import statement itself would be dropped.
       if (sideEffectImports.has(a.path)) {
@@ -101,7 +150,7 @@ const externalize = {
       return { path: a.path, external: true, sideEffects: false };
     });
   },
-};
+});
 
 // CommonJS output (like the scenario child-process bundle). CJS is deliberate:
 // `__dirname`/`__filename`/`require` are native (goose.ts's
@@ -134,11 +183,21 @@ const ENTRIES = [
   { name: "task", entry: "src/task.ts" },
   {
     // Spawned per scenario run (src/server/scenarios/execution/
-    // child-process-spawn.ts). Externals stay requires, so the shared
-    // singletons (@opentelemetry/api, @langwatch/scenario) resolve to the same
-    // instances as the parent. @see specs/scenarios/pre-compiled-child-process.feature
+    // child-process-spawn.ts), as a FRESH process every time, so whatever this
+    // entry resolves from disk at boot is paid once per simulation.
+    //
+    // That is why the scenario SDK is inlined here and nowhere else: left
+    // external it is the single largest startup cost, because requiring it
+    // walks its whole dependency graph across the pnpm symlink tree.
+    //
+    // @opentelemetry/* deliberately stays external. The child flushes spans at
+    // exit by reaching for the globally registered provider, so a second
+    // inlined copy of the OTEL API would split registration and flush across
+    // two registries and drop every span while still exiting 0.
+    // @see specs/scenarios/pre-compiled-child-process.feature
     name: "scenario-child-process",
     entry: "src/server/scenarios/execution/scenario-child-process.ts",
+    inlineAll: true,
   },
 ];
 
@@ -153,6 +212,7 @@ const builtins = new Set(builtinModules);
 // tokenizer's lazy `import("node-fetch-cache")` runs in production, and
 // leaving it undeclared would silently kill token counting.
 const devOnlyDynamicImports = new Set(["selfsigned"]);
+const optionalExternals = new Set(OPTIONAL_EXTERNALS);
 /** @type {Map<string, Set<string>>} package -> entry names that require it */
 const undeclared = new Map();
 const scannedSources = new Set();
@@ -161,7 +221,7 @@ const unlistedSideEffectImports = new Map();
 /** @type {Map<string, Set<string>>} specifier -> files importing JSON with no attribute */
 const jsonImportsWithoutAttribute = new Map();
 
-for (const { name, entry } of ENTRIES) {
+for (const { name, entry, inlineAll } of ENTRIES) {
   const result = await build({
     entryPoints: [path.join(APP, entry)],
     outfile: path.join(OUT_DIR, `${name}.cjs`),
@@ -178,7 +238,13 @@ for (const { name, entry } of ENTRIES) {
     banner,
     define,
     loader: { ".css": "empty", ".scss": "empty", ".sass": "empty" },
-    plugins: [externalize],
+    // Inlined packages are tree-shaken only if esbuild can see ESM: a CJS
+    // entry is opaque, so every branch of it (the voice stack included) would
+    // be kept. Entries that inline nothing keep the node default.
+    ...(inlineAll
+      ? { mainFields: ["module", "main"], conditions: ["import"] }
+      : {}),
+    plugins: [createExternalize(inlineAll ?? false)],
     metafile: true,
     // Linked source maps so production stack traces name real files/lines
     // instead of bundle offsets (the entrypoints run with --enable-source-maps).
@@ -196,6 +262,7 @@ for (const { name, entry } of ENTRIES) {
       if (id === ".prisma" || id.startsWith(".prisma/")) continue;
       const base = basePackage(id);
       if (declared.has(base)) continue;
+      if (optionalExternals.has(base)) continue;
       if (imp.kind === "dynamic-import" && devOnlyDynamicImports.has(base))
         continue;
       let entriesFor = undeclared.get(base);

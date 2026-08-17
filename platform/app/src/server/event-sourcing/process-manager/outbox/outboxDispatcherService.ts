@@ -98,8 +98,13 @@ export interface DispatchReport {
 const DEFAULT_MAX_ATTEMPTS = 10;
 export const DEFAULT_LEASE_DURATION_MS = 30_000;
 const SLOW_OUTBOX_DELIVERY_MS = 10_000;
-/** Never start a delivery with less lease budget left than this. */
-const LEASE_SAFETY_MARGIN_CAP_MS = 10_000;
+/**
+ * Fraction of the lease held back as the budget a delivery needs to fit
+ * before it may start. A domain sizes its lease to its slowest expected
+ * delivery, so the reserve must scale with the lease: a flat cap ceilinged
+ * the reserve of a 300s lease at 10s, which let a tail delivery start with
+ * 10s of budget against a 30s expected duration and fence anyway.
+ */
 const LEASE_SAFETY_MARGIN_FRACTION = 0.2;
 
 function identityOf(message: LeasedOutboxMessageRecord): OutboxMessageIdentity {
@@ -164,10 +169,8 @@ export class OutboxDispatcherService {
     this.processNames = options.processNames;
     this.concurrency = Math.max(1, options.concurrency ?? 1);
     this.clock = options.clock ?? Date.now;
-    this.leaseSafetyMarginMs = Math.min(
-      this.leaseDurationMs * LEASE_SAFETY_MARGIN_FRACTION,
-      LEASE_SAFETY_MARGIN_CAP_MS,
-    );
+    this.leaseSafetyMarginMs =
+      this.leaseDurationMs * LEASE_SAFETY_MARGIN_FRACTION;
     this.tracer =
       options.tracer ?? trace.getTracer("langwatch.process-manager");
     this.logger =
@@ -178,13 +181,17 @@ export class OutboxDispatcherService {
     now: number;
     limit?: number;
   }): Promise<DispatchReport> {
+    // The store anchors `leasedUntil` at `now`, which is captured BEFORE the
+    // lease query runs, so the budget clock starts before it too: a slow
+    // lease query (degraded Postgres is exactly when this matters) spends
+    // lease budget and must not be counted as free.
+    const leaseStartedAt = this.clock();
     const leased = await this.store.leaseDueMessages({
       now: params.now,
       limit: params.limit ?? 10,
       leaseDurationMs: this.leaseDurationMs,
       ...(this.processNames ? { processNames: this.processNames } : {}),
     });
-    const leaseStartedAt = this.clock();
 
     const report: DispatchReport = {
       dispatched: [],

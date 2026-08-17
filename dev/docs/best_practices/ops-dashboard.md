@@ -28,6 +28,39 @@ Two corollaries, both learned from the same page:
   observability — it is an alarm with the label torn off. Every headline number
   either links to what produced it or does not earn its place.
 
+## One question, one place
+
+**A question is answered on exactly one surface.** These pages accrete: each
+new mechanism arrives with its own card, and the reader is left to know which
+mechanism to suspect before they can look. That is backwards — an operator
+knows the *symptom*, not the machinery, so the page has to be organised by the
+question rather than by what implements it.
+
+Two questions were split across three surfaces each before this rule existed:
+
+```text
+"what has permanently stopped?"      "what is switched off?"
+  queue dead letters                   parked tenants     (dashboard)
+  process-manager outbox               paused schedules   (schedules page)
+                                       paused subscribers (subscribers page)
+```
+
+Merge the answer, keep the mechanisms distinguishable. A merged panel states
+the shared fact once and then keeps one section per mechanism, because the
+remedy differs — parking clears itself when capacity frees, a paused subscriber
+needs a human. Merging the *tables* would imply one action fits all three.
+
+Corollaries:
+
+- **A preview belongs with the thing it previews.** Upcoming timed work is a
+  read of the calendar, so it lives on the schedules page; replay history lives
+  beside the button that starts a replay. On the landing page each was a table
+  of things that are fine.
+- **Do not mount the same card on two pages.** If a second page needs it, that
+  page is the drill-down and the first one gets a summary line — or one of the
+  two pages should not exist. `/ops/queues` rendered five cards the dashboard
+  already had, component for component, and was retired to a redirect.
+
 ## Layout
 
 The dashboard reads top to bottom as: **strip → chart → structure → detail**.
@@ -35,6 +68,7 @@ The dashboard reads top to bottom as: **strip → chart → structure → detail
 ```text
 ┌ strip ─ one row, every headline number, no wrap ──────────────────┐
 ├ health ─ one line when clear; expands in place when not ──────────┤
+├ paused ─ everything deliberately off; absent when nothing is ─────┤
 ├ chart ─ shared gridlines, axis-labelled legend ───────────────────┤
 ├ structure ─ pipeline tree, idle folded away ──────────────────────┤
 └ detail ─ groups, clustered; drill-downs ──────────────────────────┘

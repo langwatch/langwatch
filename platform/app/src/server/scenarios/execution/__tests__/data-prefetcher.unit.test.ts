@@ -136,6 +136,79 @@ describe("prefetchScenarioData", () => {
     };
   }
 
+  describe("child environment readiness", () => {
+    const promptTarget: TargetConfig = {
+      type: "prompt",
+      referenceId: "prompt_123",
+    };
+
+    describe("when the scenario and project resolve", () => {
+      it("announces the labels and api key the child environment needs", async () => {
+        const deps = createMockDeps({
+          scenarioFetcher: {
+            getById: vi
+              .fn()
+              .mockResolvedValue({ ...defaultScenario, labels: ["smoke"] }),
+          },
+        });
+        const onChildEnvReady = vi.fn();
+
+        await prefetchScenarioData({
+          context: defaultContext,
+          target: promptTarget,
+          deps,
+          onChildEnvReady,
+        });
+
+        expect(onChildEnvReady).toHaveBeenCalledTimes(1);
+        expect(onChildEnvReady).toHaveBeenCalledWith(
+          expect.objectContaining({
+            labels: ["smoke"],
+            telemetry: expect.objectContaining({ apiKey: "test-api-key" }),
+          }),
+        );
+      });
+    });
+
+    describe("when the run is already doomed", () => {
+      // No child may be started for a run that is about to fail, so the
+      // signal has to stay silent rather than fire optimistically.
+      it("stays silent when the scenario does not exist", async () => {
+        const deps = createMockDeps({
+          scenarioFetcher: { getById: vi.fn().mockResolvedValue(null) },
+        });
+        const onChildEnvReady = vi.fn();
+
+        await prefetchScenarioData({
+          context: defaultContext,
+          target: promptTarget,
+          deps,
+          onChildEnvReady,
+        });
+
+        expect(onChildEnvReady).not.toHaveBeenCalled();
+      });
+
+      it("stays silent when the project has no api key", async () => {
+        const deps = createMockDeps({
+          projectFetcher: {
+            findUnique: vi.fn().mockResolvedValue({ apiKey: null }),
+          },
+        });
+        const onChildEnvReady = vi.fn();
+
+        await prefetchScenarioData({
+          context: defaultContext,
+          target: promptTarget,
+          deps,
+          onChildEnvReady,
+        });
+
+        expect(onChildEnvReady).not.toHaveBeenCalled();
+      });
+    });
+  });
+
   describe("model selection", () => {
     describe("given a prompt with a specific model configured", () => {
       const promptWithModel = {
@@ -165,7 +238,7 @@ describe("prefetchScenarioData", () => {
             referenceId: "prompt_123",
           };
 
-          await prefetchScenarioData(defaultContext, target, deps);
+          await prefetchScenarioData({ context: defaultContext, target, deps });
 
           expect(mockModelParamsProvider.prepare).toHaveBeenCalledWith(
             "proj_123",
@@ -181,14 +254,14 @@ describe("prefetchScenarioData", () => {
             },
           });
 
-          await prefetchScenarioData(
-            defaultContext,
-            {
+          await prefetchScenarioData({
+            context: defaultContext,
+            target: {
               type: "prompt",
               referenceId: "prompt_123",
             },
             deps,
-          );
+          });
 
           expect(deps.modelResolver.resolve).not.toHaveBeenCalledWith(
             "scenarios.agent_under_test",
@@ -230,7 +303,7 @@ describe("prefetchScenarioData", () => {
             referenceId: "prompt_123",
           };
 
-          await prefetchScenarioData(defaultContext, target, deps);
+          await prefetchScenarioData({ context: defaultContext, target, deps });
 
           expect(deps.modelResolver.resolve).toHaveBeenCalledWith(
             "scenarios.agent_under_test",
@@ -261,11 +334,11 @@ describe("prefetchScenarioData", () => {
             },
           });
 
-          await prefetchScenarioData(
-            defaultContext,
-            { type: "prompt", referenceId: "prompt_123" },
+          await prefetchScenarioData({
+            context: defaultContext,
+            target: { type: "prompt", referenceId: "prompt_123" },
             deps,
-          );
+          });
 
           const agentUnderTestCalls = (
             deps.modelResolver.resolve as ReturnType<typeof vi.fn>
@@ -285,11 +358,11 @@ describe("prefetchScenarioData", () => {
             },
           });
 
-          const result = await prefetchScenarioData(
-            defaultContext,
-            { type: "prompt", referenceId: "prompt_123" },
+          const result = await prefetchScenarioData({
+            context: defaultContext,
+            target: { type: "prompt", referenceId: "prompt_123" },
             deps,
-          );
+          });
 
           expect(result.success).toBe(true);
           expect(deps.modelParamsProvider.prepare).toHaveBeenCalledTimes(3);
@@ -388,7 +461,7 @@ describe("prefetchScenarioData", () => {
         it("never calls the agent-under-test resolver", async () => {
           const deps = depsFor();
 
-          await prefetchScenarioData(defaultContext, target, deps);
+          await prefetchScenarioData({ context: defaultContext, target, deps });
 
           expect(deps.modelResolver.resolve).not.toHaveBeenCalledWith(
             "scenarios.agent_under_test",
@@ -404,11 +477,11 @@ describe("prefetchScenarioData", () => {
         it("prepares model params exactly twice — simulator and judge only", async () => {
           const deps = depsFor();
 
-          const result = await prefetchScenarioData(
-            defaultContext,
+          const result = await prefetchScenarioData({
+            context: defaultContext,
             target,
             deps,
-          );
+          });
 
           expect(result.success).toBe(true);
           expect(deps.modelParamsProvider.prepare).toHaveBeenCalledTimes(2);
@@ -466,11 +539,11 @@ describe("prefetchScenarioData", () => {
             modelParamsProvider: echoingProvider(),
           });
 
-          const result = await prefetchScenarioData(
-            defaultContext,
-            httpTarget,
+          const result = await prefetchScenarioData({
+            context: defaultContext,
+            target: httpTarget,
             deps,
-          );
+          });
 
           expect(deps.modelResolver.resolve).toHaveBeenCalledWith(
             "scenarios.user_simulator",
@@ -509,11 +582,11 @@ describe("prefetchScenarioData", () => {
             modelParamsProvider: echoingProvider(),
           });
 
-          const result = await prefetchScenarioData(
-            defaultContext,
-            httpTarget,
+          const result = await prefetchScenarioData({
+            context: defaultContext,
+            target: httpTarget,
             deps,
-          );
+          });
 
           expect(result.success).toBe(true);
           if (result.success) {
@@ -544,11 +617,11 @@ describe("prefetchScenarioData", () => {
             modelParamsProvider: echoingProvider(),
           });
 
-          const result = await prefetchScenarioData(
-            defaultContext,
-            httpTarget,
+          const result = await prefetchScenarioData({
+            context: defaultContext,
+            target: httpTarget,
             deps,
-          );
+          });
 
           expect(result.success).toBe(true);
           if (result.success) {
@@ -578,11 +651,11 @@ describe("prefetchScenarioData", () => {
             modelParamsProvider: echoingProvider(),
           });
 
-          const result = await prefetchScenarioData(
-            defaultContext,
-            httpTarget,
+          const result = await prefetchScenarioData({
+            context: defaultContext,
+            target: httpTarget,
             deps,
-          );
+          });
 
           expect(result.success).toBe(true);
           if (result.success) {
@@ -613,11 +686,11 @@ describe("prefetchScenarioData", () => {
             modelParamsProvider: echoingProvider(),
           });
 
-          const result = await prefetchScenarioData(
-            defaultContext,
-            httpTarget,
+          const result = await prefetchScenarioData({
+            context: defaultContext,
+            target: httpTarget,
             deps,
-          );
+          });
 
           expect(result.success).toBe(true);
           if (result.success) {
@@ -647,11 +720,11 @@ describe("prefetchScenarioData", () => {
             type: "prompt",
             referenceId: "prompt_123",
           };
-          const result = await prefetchScenarioData(
-            defaultContext,
+          const result = await prefetchScenarioData({
+            context: defaultContext,
             target,
             deps,
-          );
+          });
 
           expect(result.success).toBe(false);
           if (!result.success) {
@@ -674,11 +747,11 @@ describe("prefetchScenarioData", () => {
             type: "prompt",
             referenceId: "prompt_123",
           };
-          const result = await prefetchScenarioData(
-            defaultContext,
+          const result = await prefetchScenarioData({
+            context: defaultContext,
             target,
             deps,
-          );
+          });
 
           expect(result.success).toBe(false);
           if (!result.success) {
@@ -701,11 +774,11 @@ describe("prefetchScenarioData", () => {
             type: "prompt",
             referenceId: "prompt_123",
           };
-          const result = await prefetchScenarioData(
-            defaultContext,
+          const result = await prefetchScenarioData({
+            context: defaultContext,
             target,
             deps,
-          );
+          });
 
           expect(result.success).toBe(false);
           if (!result.success) {
@@ -728,11 +801,11 @@ describe("prefetchScenarioData", () => {
             type: "http",
             referenceId: "agent_123",
           };
-          const result = await prefetchScenarioData(
-            defaultContext,
+          const result = await prefetchScenarioData({
+            context: defaultContext,
             target,
             deps,
-          );
+          });
 
           expect(result.success).toBe(false);
           if (!result.success) {
@@ -755,11 +828,11 @@ describe("prefetchScenarioData", () => {
             type: "code",
             referenceId: "agent_456",
           };
-          const result = await prefetchScenarioData(
-            defaultContext,
+          const result = await prefetchScenarioData({
+            context: defaultContext,
             target,
             deps,
-          );
+          });
 
           expect(result.success).toBe(false);
           if (!result.success) {
@@ -799,11 +872,11 @@ describe("prefetchScenarioData", () => {
             type: "code",
             referenceId: "agent_456",
           };
-          const result = await prefetchScenarioData(
-            defaultContext,
+          const result = await prefetchScenarioData({
+            context: defaultContext,
             target,
             deps,
-          );
+          });
 
           expect(result.success).toBe(false);
           if (!result.success) {
@@ -842,11 +915,11 @@ describe("prefetchScenarioData", () => {
             type: "prompt",
             referenceId: "prompt_123",
           };
-          const result = await prefetchScenarioData(
-            defaultContext,
+          const result = await prefetchScenarioData({
+            context: defaultContext,
             target,
             deps,
-          );
+          });
 
           expect(result.success).toBe(false);
           if (!result.success) {
@@ -896,11 +969,11 @@ describe("prefetchScenarioData", () => {
             type: "code",
             referenceId: "agent_456",
           };
-          const result = await prefetchScenarioData(
-            defaultContext,
+          const result = await prefetchScenarioData({
+            context: defaultContext,
             target,
             deps,
-          );
+          });
 
           expect(result.success).toBe(true);
           if (result.success) {
@@ -941,11 +1014,11 @@ describe("prefetchScenarioData", () => {
             type: "code",
             referenceId: "agent_456",
           };
-          const result = await prefetchScenarioData(
-            defaultContext,
+          const result = await prefetchScenarioData({
+            context: defaultContext,
             target,
             deps,
-          );
+          });
 
           expect(projectSecretsFetcher.getSecrets).toHaveBeenCalledWith(
             "proj_123",
@@ -993,11 +1066,11 @@ describe("prefetchScenarioData", () => {
             type: "prompt",
             referenceId: "prompt_123",
           };
-          const result = await prefetchScenarioData(
-            defaultContext,
+          const result = await prefetchScenarioData({
+            context: defaultContext,
             target,
             deps,
-          );
+          });
 
           expect(result.success).toBe(true);
           if (result.success) {
@@ -1097,11 +1170,11 @@ describe("prefetchScenarioData", () => {
           },
         });
 
-        const result = await prefetchScenarioData(
-          defaultContext,
-          workflowTarget,
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: workflowTarget,
           deps,
-        );
+        });
 
         expect(result.success).toBe(true);
         if (result.success) {
@@ -1141,11 +1214,11 @@ describe("prefetchScenarioData", () => {
           },
         });
 
-        const result = await prefetchScenarioData(
-          defaultContext,
-          workflowTarget,
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: workflowTarget,
           deps,
-        );
+        });
 
         expect(result.success).toBe(false);
         if (!result.success) {
@@ -1170,11 +1243,11 @@ describe("prefetchScenarioData", () => {
           },
         });
 
-        const result = await prefetchScenarioData(
-          defaultContext,
-          workflowTarget,
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: workflowTarget,
           deps,
-        );
+        });
 
         expect(result.success).toBe(false);
         if (!result.success) {
@@ -1275,11 +1348,11 @@ describe("prefetchScenarioData", () => {
           },
         });
 
-        const result = await prefetchScenarioData(
-          defaultContext,
-          workflowTarget,
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: workflowTarget,
           deps,
-        );
+        });
 
         expect(result.success).toBe(true);
         if (result.success && result.data.adapterData.type === "workflow") {
@@ -1361,11 +1434,11 @@ describe("prefetchScenarioData", () => {
           },
         });
 
-        const result = await prefetchScenarioData(
-          defaultContext,
-          workflowTarget,
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: workflowTarget,
           deps,
-        );
+        });
 
         expect(result.success).toBe(false);
         if (!result.success) {
@@ -1443,11 +1516,11 @@ describe("prefetchScenarioData", () => {
           modelParamsProvider: { prepare: modelAwarePrepare },
         });
 
-        const result = await prefetchScenarioData(
-          defaultContext,
-          workflowTarget,
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: workflowTarget,
           deps,
-        );
+        });
 
         expect(modelAwarePrepare).toHaveBeenCalledWith(
           defaultContext.projectId,
@@ -1519,11 +1592,11 @@ describe("prefetchScenarioData", () => {
           },
         });
 
-        const result = await prefetchScenarioData(
-          defaultContext,
-          workflowTarget,
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: workflowTarget,
           deps,
-        );
+        });
 
         // Two distinct models → prepare called exactly twice (once for LLM provider model params)
         // Note: prefetchScenarioData also calls prepare for the scenario-level model params
@@ -1597,7 +1670,11 @@ describe("prefetchScenarioData", () => {
           },
         });
 
-        await prefetchScenarioData(defaultContext, workflowTarget, deps);
+        await prefetchScenarioData({
+          context: defaultContext,
+          target: workflowTarget,
+          deps,
+        });
 
         // Both nodes share "openai/gpt-4o-mini" → prepare called exactly once for that model
         const workflowModelCalls = prepareFn.mock.calls
@@ -1654,11 +1731,11 @@ describe("prefetchScenarioData", () => {
           },
         });
 
-        const result = await prefetchScenarioData(
-          defaultContext,
-          workflowTarget,
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: workflowTarget,
           deps,
-        );
+        });
 
         // prepare must be called with DEFAULT_MODEL for the workflow node
         const workflowModelCall = prepareFn.mock.calls.find(
@@ -1733,11 +1810,11 @@ describe("prefetchScenarioData", () => {
           },
         });
 
-        const result = await prefetchScenarioData(
-          defaultContext,
-          workflowTarget,
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: workflowTarget,
           deps,
-        );
+        });
 
         expect(result.success).toBe(true);
         if (result.success && result.data.adapterData.type === "workflow") {
@@ -1806,11 +1883,11 @@ describe("prefetchScenarioData", () => {
       ])("does not inject DEFAULT_MODEL on a %s DSL with a modelless llm param", async (specVersion) => {
         const { deps, prepareFn } = setupFor(modellessDsl(specVersion));
 
-        const result = await prefetchScenarioData(
-          defaultContext,
-          workflowTarget,
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: workflowTarget,
           deps,
-        );
+        });
 
         expect(result.success).toBe(true);
         expect(
@@ -1823,11 +1900,11 @@ describe("prefetchScenarioData", () => {
       it("still falls back to DEFAULT_MODEL on a 1.4 DSL", async () => {
         const { deps, prepareFn } = setupFor(modellessDsl("1.4"));
 
-        const result = await prefetchScenarioData(
-          defaultContext,
-          workflowTarget,
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: workflowTarget,
           deps,
-        );
+        });
 
         expect(result.success).toBe(true);
         expect(
@@ -1874,11 +1951,14 @@ describe("prefetchScenarioData", () => {
       it("hands on a situation and criteria already rendered against the run's values", async () => {
         const deps = depsForScenario(parameterisedScenario);
 
-        const result = await prefetchScenarioData(
-          { ...defaultContext, parameters: { account_tier: "platinum" } },
-          promptTarget,
+        const result = await prefetchScenarioData({
+          context: {
+            ...defaultContext,
+            parameters: { account_tier: "platinum" },
+          },
+          target: promptTarget,
           deps,
-        );
+        });
 
         expect(result.success).toBe(true);
         if (!result.success) return;
@@ -1894,11 +1974,14 @@ describe("prefetchScenarioData", () => {
       it("carries the resolved values on the job", async () => {
         const deps = depsForScenario(parameterisedScenario);
 
-        const result = await prefetchScenarioData(
-          { ...defaultContext, parameters: { account_tier: "platinum" } },
-          promptTarget,
+        const result = await prefetchScenarioData({
+          context: {
+            ...defaultContext,
+            parameters: { account_tier: "platinum" },
+          },
+          target: promptTarget,
           deps,
-        );
+        });
 
         expect(result.success).toBe(true);
         if (!result.success) return;
@@ -1911,11 +1994,11 @@ describe("prefetchScenarioData", () => {
       it("falls back to the declared defaults when the job carries no values", async () => {
         const deps = depsForScenario(parameterisedScenario);
 
-        const result = await prefetchScenarioData(
-          defaultContext,
-          promptTarget,
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: promptTarget,
           deps,
-        );
+        });
 
         expect(result.success).toBe(true);
         if (!result.success) return;
@@ -1939,11 +2022,11 @@ describe("prefetchScenarioData", () => {
           criteria: ["Repeats {% verbatim"],
         });
 
-        const result = await prefetchScenarioData(
-          defaultContext,
-          promptTarget,
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: promptTarget,
           deps,
-        );
+        });
 
         expect(result.success).toBe(true);
         if (!result.success) return;
@@ -1962,7 +2045,11 @@ describe("prefetchScenarioData", () => {
         });
 
         await expect(
-          prefetchScenarioData(defaultContext, promptTarget, deps),
+          prefetchScenarioData({
+            context: defaultContext,
+            target: promptTarget,
+            deps,
+          }),
         ).rejects.toThrow(/could not be rendered/);
       });
     });
@@ -1984,11 +2071,11 @@ describe("prefetchScenarioData", () => {
         },
       });
 
-      const result = await prefetchScenarioData(
-        defaultContext,
-        { type: "http", referenceId: "agent_http" },
+      const result = await prefetchScenarioData({
+        context: defaultContext,
+        target: { type: "http", referenceId: "agent_http" },
         deps,
-      );
+      });
 
       expect(result.success).toBe(true);
       if (!result.success) return;

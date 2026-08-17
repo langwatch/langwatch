@@ -2,7 +2,6 @@ import { createLogger } from "@langwatch/observability";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
-import { fromZodError, type ZodError } from "zod-validation-error";
 import { badRequestSchema } from "~/app/api/shared/schemas";
 import { createProjectApp, requires } from "~/server/api/security";
 import {
@@ -19,6 +18,7 @@ import {
 } from "~/server/tracer/types";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
+import { zodErrorMessage } from "~/utils/zodErrorMessage";
 
 import { baseResponses } from "../../shared/base-responses";
 
@@ -77,8 +77,7 @@ secured.access(requires("traces:create")).post(
         "invalid event received",
       );
       captureException(toError(error));
-      const validationError = fromZodError(error as ZodError);
-      return c.json({ error: validationError.message }, 400);
+      return c.json({ error: zodErrorMessage(error) }, 400);
     }
 
     if (
@@ -95,8 +94,7 @@ secured.access(requires("traces:create")).post(
           "invalid event received",
         );
         captureException(toError(error));
-        const validationError = fromZodError(error as ZodError);
-        return c.json({ error: validationError.message }, 400);
+        return c.json({ error: zodErrorMessage(error) }, 400);
       }
     }
 

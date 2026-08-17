@@ -24,7 +24,7 @@ import {
 } from "react-router";
 
 // Route patterns for resolving pathname (Next.js-style)
-// This lets router.pathname return "/[project]/messages" instead of "/my-project/messages"
+// This lets router.pathname return "/[project]/traces" instead of "/my-project/traces"
 const ROUTE_PATTERNS = [
   "/auth/signin",
   "/auth/signup",
@@ -262,7 +262,7 @@ export function buildUrl(
 
   // Resolve Next.js-style [param] and [[...param]] in pathname using query values.
   // Components do router.push({ pathname: router.pathname, query: {...} }) where
-  // router.pathname is "/[project]/messages". We need to replace [project] with
+  // router.pathname is "/[project]/traces". We need to replace [project] with
   // the actual value from query before navigating.
   const resolvedKeys = new Set<string>();
   if (query && pathname.includes("[")) {

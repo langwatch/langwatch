@@ -139,7 +139,7 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
       const firstRow = ocsfInsert.mock.calls[0]![0];
       expect(firstRow).toMatchObject({
         // TenantId is the org's hidden internal_governance Project ID,
-        // resolved by the worker — same key as the trace-fold reactor +
+        // resolved by the worker — same key as the trace-fold subscriber +
         // OCSF export service. Org id is NOT used.
         tenantId: "gov-proj-1",
         eventId: `http_polling:${sourceId}:evt-1`,

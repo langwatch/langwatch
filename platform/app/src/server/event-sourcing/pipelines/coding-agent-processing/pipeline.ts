@@ -1,7 +1,8 @@
 import { definePipeline } from "../..";
+import type { TriggerContext } from "../../pipeline/processManagerDefinition";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
 import type { AppendStore } from "../../projections/mapProjection.types";
-import type { ReactorDefinition } from "../../reactors/reactor.types";
+import { throttledWindow } from "../../subscribers/throttleWindow";
 import { ContributeLogFactsCommand } from "./commands/contributeLogFactsCommand";
 import { ContributeMetricFactsCommand } from "./commands/contributeMetricFactsCommand";
 import { ContributeSpanFactsCommand } from "./commands/contributeSpanFactsCommand";
@@ -23,6 +24,12 @@ import {
 } from "./projections/sessionMetricSeries.mapProjection";
 import { CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH } from "./schemas/constants";
 import type { CodingAgentProcessingEvent } from "./schemas/events";
+import {
+  PULL_REQUEST_MAPPING_WINDOW_MS,
+  pullRequestMappingGroupKey,
+  pullRequestMappingJobId,
+  shouldMapPullRequests,
+} from "./subscribers/pullRequestMapping.subscriber";
 
 export interface CodingAgentProcessingPipelineDeps {
   /** Redis-cached at registration — see the fold store's no-read-back note. */
@@ -33,12 +40,12 @@ export interface CodingAgentProcessingPipelineDeps {
   /**
    * Asks the organization's GitHub connection which pull requests a folded
    * session's branch has hosted. Absent where there is no GitHub connection to
-   * ask (the test app), in which case the pipeline mounts no reactor at all.
+   * ask (the test app), in which case the pipeline mounts no subscriber at all.
    */
-  pullRequestMappingReactor?: ReactorDefinition<
-    CodingAgentProcessingEvent,
-    CodingAgentSessionState
-  >;
+  pullRequestMappingHandler?: (
+    event: CodingAgentProcessingEvent,
+    context: TriggerContext<CodingAgentSessionState>,
+  ) => Promise<void>;
 }
 
 /**
@@ -65,11 +72,11 @@ export interface CodingAgentProcessingPipelineDeps {
  *   per session event (model call, compaction, rate limit, tool run, …),
  *   the per-call sequence the session fold's converged totals erase
  *
- * Consumption is subscribers + projections, plus one reactor on the session
+ * Consumption is subscribers + projections, plus one subscriber on the session
  * fold: pullRequestMapping, which asks the organization's GitHub connection
  * about the session's branch once the row is committed — a genuine side
  * effect that earns the queue hop. Recording on the project that a session
- * ran at all is NOT a reactor: the fold store stamps it inline after a commit
+ * ran at all is NOT a subscriber: the fold store stamps it inline after a commit
  * (`codingAgentSessionSeen.touch.ts`), the same seam-level throttled write the
  * gateway spend pipeline uses for virtual-key lastUsedAt. Commands default to
  * per-aggregate grouping, so one session's contributions apply in order.
@@ -127,12 +134,44 @@ export function createCodingAgentProcessingPipeline(
     });
 
   return (
-    deps.pullRequestMappingReactor
-      ? builder.withReactor(
-          "codingAgentSession",
-          "pullRequestMapping",
-          deps.pullRequestMappingReactor,
-        )
+    deps.pullRequestMappingHandler
+      ? builder.withSubscriber("pullRequestMapping", {
+          fold: "codingAgentSession",
+          runIn: ["worker"],
+          when: (_event, context) => shouldMapPullRequests(context.state),
+          groupKeyFn: (event, state) =>
+            pullRequestMappingGroupKey({
+              tenantId: event.tenantId,
+              state: state as CodingAgentSessionState,
+            }),
+          // The window is the collapse for a live burst; the TTL is the
+          // throttle for everything else. A subscriber's ready score is the
+          // event's own `createdAt`, so a group draining a backlog stages jobs
+          // whose `createdAt + delay` deadline has already passed: they
+          // dispatch immediately and the window collapses nothing. Honoring
+          // the still-live TTL past dispatch is what keeps that case to one
+          // GitHub call.
+          //
+          // Safe against the level-triggered objection, which is why
+          // `shouldSurviveDispatch` defaults to false: what it discards is a
+          // re-trigger arriving within THIRTY SECONDS of a call that asked
+          // GitHub the identical question about the identical branch. Nothing
+          // a reader could act on changes inside that window, and the durable
+          // bookkeeping refuses to re-ask about a freshly mapped branch for
+          // fifteen minutes anyway, so the dropped trigger would have been
+          // skipped by the service one layer down.
+          ...throttledWindow<CodingAgentProcessingEvent>({
+            makeId: (event, state) =>
+              pullRequestMappingJobId({
+                tenantId: event.tenantId,
+                state: state as CodingAgentSessionState,
+              }),
+            windowMs: PULL_REQUEST_MAPPING_WINDOW_MS,
+            shouldSurviveDispatch: true,
+          }),
+          handler: (event, context) =>
+            deps.pullRequestMappingHandler!(event, context),
+        })
       : builder
   ).build();
 }

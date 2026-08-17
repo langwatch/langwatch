@@ -43,7 +43,9 @@ function parseEntityUrl(path: string, projectSlug: string): EntityMatch | null {
     };
   }
 
-  // Span page: /[project]/messages/[traceId]/[tab]/[spanId]
+  // Legacy span page: /[project]/messages/[traceId]/[tab]/[spanId]. That path
+  // now redirects, but history entries recorded before the redirect landed
+  // still name it.
   const spanMatch = relativePath.match(
     /^\/messages\/([^/]+)\/([^/]+)\/([^/]+)$/,
   );

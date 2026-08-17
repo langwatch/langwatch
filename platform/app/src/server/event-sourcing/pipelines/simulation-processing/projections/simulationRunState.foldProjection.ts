@@ -175,9 +175,9 @@ export interface SimulationRunState extends Projection<SimulationRunStateData> {
  * client-supplied `occurredAt` is AFTER the reconciliation time, the event
  * applies in-order (the executor only re-folds when occurredAt is STRICTLY
  * less than what we've already seen) and would otherwise clobber Status back to
- * a non-terminal value while FinishedAt stays set — an unrecoverable zombie the
- * read-time stall path can no longer rescue (it only resolves runs with no
- * FinishedAt).
+ * a non-terminal value while FinishedAt stays set — an unrecoverable zombie:
+ * stored status is the only truth at read time, and the stall watchdog has
+ * already gone terminal for the run.
  *
  * Once FinishedAt is set, Status stays terminal. Three things hold that line
  * together, and all three are load-bearing:
@@ -523,7 +523,7 @@ export class SimulationRunStateFoldProjection
   ): SimulationRunStateData {
     // A run finishes exactly once. A second `finished` — a child that outlived
     // the parent this run's orphan reconciliation already failed — must not
-    // rewrite a terminal record the downstream reactors have already acted on,
+    // rewrite a terminal record the downstream subscribers have already acted on,
     // nor split it (an ERROR Status carrying the late child's SUCCESS Verdict).
     if (state.FinishedAt != null) return state;
 
@@ -536,7 +536,7 @@ export class SimulationRunStateFoldProjection
     // non-terminal members included. Taking it at face value would write a
     // non-terminal Status alongside FinishedAt below, which is the one state
     // nothing can recover: the orphan reconciler skips it (FinishedAt IS NULL)
-    // and read-time stall detection skips it (it only resolves unfinished runs).
+    // and no read-time status derivation remains to mask it.
     let status: string;
     const explicit = event.data.status?.toUpperCase();
     if (explicit && isTerminalStatus(explicit)) {
@@ -558,7 +558,19 @@ export class SimulationRunStateFoldProjection
       MetCriteria: results?.metCriteria ?? [],
       UnmetCriteria: results?.unmetCriteria ?? [],
       Error: results?.error ?? null,
-      DurationMs: event.data.durationMs ?? null,
+      // Derived when the event does not carry it, which is every real run:
+      // the SDK ingest path dispatches finishRun with results and status only.
+      // Left underived, DurationMs was null for every run a customer actually
+      // executed, and populated only for runs seeded with a synthetic event.
+      //
+      // The fold already holds both ends, so this needs no new field on the
+      // wire. A supplied value still wins — the runner knows its own elapsed
+      // time better than two projected timestamps do.
+      DurationMs:
+        event.data.durationMs ??
+        (state.StartedAt !== null && event.occurredAt >= state.StartedAt
+          ? event.occurredAt - state.StartedAt
+          : null),
       FinishedAt: event.occurredAt,
     };
   }
