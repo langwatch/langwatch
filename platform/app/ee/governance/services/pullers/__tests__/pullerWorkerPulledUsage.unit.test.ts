@@ -247,28 +247,6 @@ describe("the pull effect's pulled-usage emit seam", () => {
       // cost on the money path to decide nothing.
       expect(isEnabled).toHaveBeenCalledTimes(1);
     });
-
-    it("fails closed when the flag cannot be resolved", async () => {
-      isEnabled.mockRejectedValue(new Error("flag store unreachable"));
-      runOnce.mockResolvedValue({
-        events: [usageEvent()],
-        cursor: null,
-        errorCount: 0,
-      });
-      const recordPulledUsage = vi.fn();
-
-      const result = await runIngestionPull({
-        sourceId: "src_1",
-        cursor: null,
-        pulledUsage: { recordPulledUsage },
-      });
-
-      // A flag outage must not fail an otherwise healthy pull, and must not
-      // silently start writing money either.
-      expect(result.eventCount).toBe(1);
-      expect(insertEvent).toHaveBeenCalledTimes(1);
-      expect(recordPulledUsage).not.toHaveBeenCalled();
-    });
   });
 
   describe("when the pulled-usage pipeline is not wired", () => {
@@ -289,11 +267,13 @@ describe("the pull effect's pulled-usage emit seam", () => {
     });
   });
 
-  describe("when recording one item's cost fails", () => {
-    it("does not fail the run, so one bad row cannot wedge the cursor", async () => {
+  describe("when one item cannot be mapped to a usage record", () => {
+    it("swallows it, so a malformed row cannot wedge the cursor behind it", async () => {
       runOnce.mockResolvedValue({
         events: [
-          usageEvent(),
+          // Unparseable bucket timestamp: this row will never map, on this
+          // pull or any later one.
+          { ...usageEvent(), event_timestamp: "not-a-timestamp" },
           usageEvent(
             { dimensions: { workspaceId: "ws_2" } },
             "usage:2026-08-01:ws_2",
@@ -302,10 +282,7 @@ describe("the pull effect's pulled-usage emit seam", () => {
         cursor: "next",
         errorCount: 0,
       });
-      const recordPulledUsage = vi
-        .fn()
-        .mockRejectedValueOnce(new Error("append failed"))
-        .mockResolvedValue(undefined);
+      const recordPulledUsage = vi.fn().mockResolvedValue(undefined);
 
       const result = await runIngestionPull({
         sourceId: "src_1",
@@ -314,9 +291,54 @@ describe("the pull effect's pulled-usage emit seam", () => {
       });
 
       expect(result.nextCursor).toBe("next");
-      // The failure is per item: the next one is still recorded.
-      expect(recordPulledUsage).toHaveBeenCalledTimes(2);
+      // The failure is per item: only the mappable one is priced.
+      expect(recordPulledUsage).toHaveBeenCalledTimes(1);
+      // Both audit rows still landed, so the fact survives without a price.
       expect(insertEvent).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("when appending a usage record fails", () => {
+    it("fails the run, so the cursor holds and the window is retried", async () => {
+      runOnce.mockResolvedValue({
+        events: [usageEvent()],
+        cursor: "next",
+        errorCount: 0,
+      });
+      // A transient event-store outage, not a bad row: it heals by itself, and
+      // advancing past it would lose this window's cost with nothing to retry.
+      const recordPulledUsage = vi
+        .fn()
+        .mockRejectedValue(new Error("ECONNRESET"));
+
+      await expect(
+        runIngestionPull({
+          sourceId: "src_1",
+          cursor: null,
+          pulledUsage: { recordPulledUsage },
+        }),
+      ).rejects.toThrow("ECONNRESET");
+    });
+  });
+
+  describe("when the cost flag cannot be resolved", () => {
+    it("fails the run rather than filing the whole window at no cost", async () => {
+      isEnabled.mockRejectedValue(new Error("flag service unreachable"));
+      runOnce.mockResolvedValue({
+        events: [usageEvent()],
+        cursor: "next",
+        errorCount: 0,
+      });
+      const recordPulledUsage = vi.fn().mockResolvedValue(undefined);
+
+      await expect(
+        runIngestionPull({
+          sourceId: "src_1",
+          cursor: null,
+          pulledUsage: { recordPulledUsage },
+        }),
+      ).rejects.toThrow("flag service unreachable");
+      expect(recordPulledUsage).not.toHaveBeenCalled();
     });
   });
 });

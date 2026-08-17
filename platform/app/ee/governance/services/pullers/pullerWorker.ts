@@ -328,24 +328,19 @@ async function writePulledEvents({
  * default). Keyed on the organization because pulled usage is attributed at
  * org/team and has no project of its own until ADR-088's Decision 4 lands.
  *
- * A flag lookup that throws must not fail a pull run that was otherwise fine,
- * and it must not silently start writing money either — so it fails CLOSED.
+ * A lookup that throws must not silently start writing money, and it must not
+ * silently stop either. Answering false on an error would do the second: the
+ * run completes, the cursor advances, and the whole window is filed at no cost
+ * with nothing left to retry it. So the error propagates and the run is
+ * retried, the one outcome that neither invents a price nor loses one.
  */
 async function pulledUsageCostEnabled(
   organizationId: string,
 ): Promise<boolean> {
-  try {
-    return await featureFlagService.isEnabled(
-      "release_pulled_usage_cost_enabled",
-      { distinctId: organizationId, organizationId },
-    );
-  } catch (error) {
-    logger.warn(
-      { organizationId, error },
-      "could not resolve the pulled-usage cost flag; recording no cost this run",
-    );
-    return false;
-  }
+  return await featureFlagService.isEnabled(
+    "release_pulled_usage_cost_enabled",
+    { distinctId: organizationId, organizationId },
+  );
 }
 
 /**
@@ -357,12 +352,24 @@ async function pulledUsageCostEnabled(
  * team ride the record itself, and a null project says unattributed rather
  * than quietly naming the governance project (ADR-088 Decision 4).
  *
- * A failure here is logged and swallowed rather than thrown, and the choice is
- * a real tradeoff. Throwing would fail the run, hold the cursor, and re-pull
- * the same window forever behind one malformed row — a poison pill that stops
- * every later record too. Swallowing costs this one record its price while the
- * OCSF audit row it was mapped from still landed, so the fact is preserved and
- * only the cost is missing. Loud, and recoverable by a re-pull once fixed.
+ * The two failures here are not the same failure, so they are not handled the
+ * same way.
+ *
+ * Mapping the item is deterministic: a row that cannot be built will never
+ * build, and throwing would re-pull the same window forever behind one
+ * malformed row — a poison pill that stops every later item too. That one is
+ * logged and swallowed. The OCSF audit row it was mapped from already landed,
+ * so the fact survives and only its price is missing.
+ *
+ * Appending the record is I/O, and its failure is usually transient. Swallowing
+ * that one would advance the cursor past a window whose cost was never written
+ * and would never be retried, losing real money to an outage that heals by
+ * itself. So it propagates, matching every other failure in this worker: the
+ * run fails, the cursor holds, and the effect retries the window.
+ *
+ * Retrying a partly-recorded window does not double-count. An unchanged
+ * observation writes no ledger row — `insertPulledUsageRows` drops it via
+ * `pulledRowsThatChanged` — and the OCSF rows collapse on `(TenantId, EventId)`.
  */
 async function recordPulledUsageFor({
   event,
@@ -378,8 +385,10 @@ async function recordPulledUsageFor({
   pulledUsage?: PulledUsageDispatcher;
 }): Promise<void> {
   if (!pulledUsage) return;
+
+  let record: ReturnType<typeof buildPulledUsageRecord>;
   try {
-    const record = buildPulledUsageRecord({
+    record = buildPulledUsageRecord({
       event,
       source: {
         ingestionSourceId: source.id,
@@ -389,14 +398,6 @@ async function recordPulledUsageFor({
       },
       observedAt,
     });
-    // Not a usage item — an ordinary audit event, and there was never a cost.
-    if (!record) return;
-
-    await pulledUsage.recordPulledUsage({
-      ...record,
-      tenantId: govProjectId,
-      occurredAt: record.occurredAtMs,
-    });
   } catch (error) {
     logger.error(
       {
@@ -404,14 +405,24 @@ async function recordPulledUsageFor({
         sourceEventId: event.source_event_id,
         error,
       },
-      "failed to record pulled usage cost; the audit row landed but this item has no price",
+      "could not map a pulled item to a usage record; the audit row landed but this item has no price",
     );
     await withScope(async (scope) => {
       scope.setTag?.("worker", "ingestionPuller");
       scope.setExtra?.("ingestionSourceId", source.id);
       captureException(toError(error));
     });
+    return;
   }
+
+  // Not a usage item — an ordinary audit event, and there was never a cost.
+  if (!record) return;
+
+  await pulledUsage.recordPulledUsage({
+    ...record,
+    tenantId: govProjectId,
+    occurredAt: record.occurredAtMs,
+  });
 }
 
 /**

@@ -60,6 +60,12 @@ beforeEach(() => {
   vi.doMock("~/utils/ssrfProtection", () => ({
     ssrfSafeFetch: fetchStub,
   }));
+  // This test is about audit rows, not cost. The real service would reach for
+  // Redis through the App and throw, and a flag lookup that cannot answer now
+  // fails the run rather than filing the window at no cost.
+  vi.doMock("~/server/featureFlag", () => ({
+    featureFlagService: { isEnabled: async () => false },
+  }));
 });
 
 afterEach(() => {
