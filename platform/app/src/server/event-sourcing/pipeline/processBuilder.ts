@@ -79,6 +79,7 @@ export interface ProcessManagerIntentStage<
     everyMs: number;
   }): ProcessManagerIntentStage<E, State, Intents>;
   outbox(options: OutboxOptions): ProcessManagerIntentStage<E, State, Intents>;
+  transient(): ProcessManagerIntentStage<E, State, Intents>;
   toPayload(
     map: (event: E) => ProcessEventEnvelope["payload"],
   ): ProcessManagerIntentStage<E, State, Intents>;
@@ -100,6 +101,7 @@ export interface ProcessManagerHandledStage<
     everyMs: number;
   }): ProcessManagerHandledStage<E, State, Intents>;
   outbox(options: OutboxOptions): ProcessManagerHandledStage<E, State, Intents>;
+  transient(): ProcessManagerHandledStage<E, State, Intents>;
   toPayload(
     map: (event: E) => ProcessEventEnvelope["payload"],
   ): ProcessManagerHandledStage<E, State, Intents>;
@@ -117,6 +119,7 @@ class ProcessManagerBuilder<E extends Event> {
   private wakeHandler: WakeHandler<any, any> | undefined;
   private outboxOptions: OutboxOptions | undefined;
   private scheduleOptions: { everyMs: number } | undefined;
+  private transientOption = false;
   private payloadMapper:
     | ((event: E) => ProcessEventEnvelope["payload"])
     | undefined;
@@ -171,6 +174,26 @@ class ProcessManagerBuilder<E extends Event> {
   }
 
   /**
+   * Declares that evolutions keeping the initial state and arming no wake
+   * may commit their intents alone — see `ProcessManagerConfig.transient`.
+   *
+   * Refuses a schedule: a scheduled process is armed by writing a wake onto
+   * its instance row, so a transient one would have nowhere to be armed and
+   * would silently never run.
+   */
+  transient(): this {
+    if (this.scheduleOptions) {
+      throw new ConfigurationError(
+        "ProcessManagerBuilder",
+        `Process manager "${this.name}" cannot be transient and scheduled: a schedule is armed on the instance row a transient evolution declines to write`,
+        { name: this.name },
+      );
+    }
+    this.transientOption = true;
+    return this;
+  }
+
+  /**
    * The content boundary (ADR-052): narrows a committed event to the payload
    * the process may see. The payload is persisted verbatim into process
    * state and outbox rows, so any domain whose events carry customer
@@ -194,6 +217,13 @@ class ProcessManagerBuilder<E extends Event> {
         "ProcessManagerBuilder",
         `Process manager "${this.name}" schedule everyMs must be a positive finite number`,
         { name: this.name, everyMs: options.everyMs },
+      );
+    }
+    if (this.transientOption) {
+      throw new ConfigurationError(
+        "ProcessManagerBuilder",
+        `Process manager "${this.name}" cannot be transient and scheduled: a schedule is armed on the instance row a transient evolution declines to write`,
+        { name: this.name },
       );
     }
     this.scheduleOptions = options;
@@ -220,6 +250,7 @@ class ProcessManagerBuilder<E extends Event> {
       intents: this.intents,
       outbox: this.outboxOptions,
       schedule: this.scheduleOptions,
+      transient: this.transientOption,
     });
   }
 }

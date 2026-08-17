@@ -40,6 +40,35 @@ export type HandleResult =
 
 const SLOW_PROCESS_MANAGER_OPERATION_MS = 1_000;
 
+/**
+ * Structural equality over process state, which is JSON by contract.
+ *
+ * Key ORDER must not decide this: handlers build their result by spreading
+ * the previous state, and a spread that reaches the same values by a
+ * different insertion order is the same state. A serialise-and-compare would
+ * call those different and quietly write an instance row per event, which is
+ * the exact cost the transient path exists to avoid.
+ */
+function isDeepJsonEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a !== typeof b || a === null || b === null) return false;
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) {
+      return false;
+    }
+    return a.every((item, index) => isDeepJsonEqual(item, b[index]));
+  }
+  if (typeof a !== "object") return false;
+  const left = a as Record<string, unknown>;
+  const right = b as Record<string, unknown>;
+  const leftKeys = Object.keys(left);
+  if (leftKeys.length !== Object.keys(right).length) return false;
+  return leftKeys.every(
+    (key) =>
+      Object.hasOwn(right, key) && isDeepJsonEqual(left[key], right[key]),
+  );
+}
+
 export interface ProcessManagerServiceOptions<State> {
   definition: ProcessDefinition<State>;
   store: ProcessStore;
@@ -104,10 +133,37 @@ export class ProcessManagerService<State> {
         ...(envelope.userId ? { "user.id": envelope.userId } : {}),
       },
       run: async () => {
+        const input = { kind: "event" as const, event: envelope, now };
+
+        if (this.definition.transient) {
+          // Speculate on the initial state. A handler that needed anything
+          // it did not have returns non-initial state (it stashes), so an
+          // evolution that comes back initial-and-wakeless provably did not
+          // read the store — which is what makes skipping the read sound.
+          const speculative = this.definition.evolve({
+            previousState: this.definition.initialState,
+            input,
+            ref,
+          });
+          if (this.isTransientEvolution(speculative)) {
+            return await this.appendIntents({
+              ref,
+              tenantId: envelope.tenantId,
+              userId: envelope.userId,
+              sourceEventId: envelope.eventId,
+              evolution: speculative,
+              now,
+            });
+          }
+          // It kept something, so fall through and redo the evolution
+          // against the real previous state. `evolve` is pure, so the
+          // discarded speculation costs nothing but the call.
+        }
+
         const existing = await this.store.findByRef<State>({ ref });
         const evolution = this.definition.evolve({
           previousState: existing?.state ?? this.definition.initialState,
-          input: { kind: "event", event: envelope, now },
+          input,
           ref,
         });
 
@@ -170,6 +226,91 @@ export class ProcessManagerService<State> {
         });
       },
     });
+  }
+
+  /**
+   * Whether this evolution left nothing behind worth reading back: still the
+   * initial state, and no wake armed. Such an evolution's only output is its
+   * intents, so it needs neither an instance row nor the transaction that
+   * would keep one consistent with an inbox marker.
+   */
+  private isTransientEvolution(
+    evolution: ReturnType<ProcessDefinition<State>["evolve"]>,
+  ): boolean {
+    return (
+      evolution.nextWakeAt === null &&
+      isDeepJsonEqual(evolution.state, this.definition.initialState)
+    );
+  }
+
+  /**
+   * The transient commit: intents only, no transaction. Mirrors
+   * {@link commitEvolution}'s reporting so callers cannot tell which path a
+   * process took, beyond the revision staying at 0 because nothing persisted.
+   */
+  private async appendIntents(params: {
+    ref: ProcessRef;
+    tenantId: string;
+    userId?: string;
+    sourceEventId: string;
+    evolution: ReturnType<ProcessDefinition<State>["evolve"]>;
+    now: number;
+  }): Promise<HandleResult> {
+    const traceCarrier = this.captureTraceCarrier();
+    const messages: NewOutboxMessage[] = params.evolution.intents.map(
+      (intent) => {
+        ensureJsonSafe(intent.payload);
+        return {
+          messageKey: intent.messageKey,
+          intentType: intent.intentType,
+          payload: intent.payload,
+          traceCarrier,
+          ...(params.userId ? { userId: params.userId } : {}),
+        };
+      },
+    );
+
+    const result = await this.store.appendIntents({
+      ref: params.ref,
+      tenantId: params.tenantId,
+      ...(params.userId ? { userId: params.userId } : {}),
+      sourceEventId: params.sourceEventId,
+      messages,
+      now: params.now,
+    });
+
+    if (result.duplicateMessageKeys.length > 0) {
+      incrementEsProcessIntentsSuppressed({
+        processName: params.ref.processName,
+        count: result.duplicateMessageKeys.length,
+      });
+      // On this path a duplicate is the EXPECTED shape of a redelivery — it
+      // is the suppression standing in for the inbox marker that is not
+      // written. Still logged, for the same reason the durable path logs it:
+      // a process that believes work is in flight while nothing was enqueued
+      // looks identical from the outside.
+      this.logger.info(
+        {
+          processName: params.ref.processName,
+          processKey: params.ref.processKey,
+          projectId: params.ref.projectId,
+          tenantId: params.tenantId,
+          sourceEventId: params.sourceEventId,
+          duplicateMessageKeys: result.duplicateMessageKeys,
+          insertedCount: result.insertedMessageKeys.length,
+        },
+        "Transient process append suppressed already-enqueued intents",
+      );
+    }
+
+    return {
+      outcome: "committed",
+      // Nothing was persisted, so there is no revision to report. Zero is the
+      // same value a first-time reader of this key would compute.
+      revision: 0,
+      insertedMessageKeys: result.insertedMessageKeys,
+      duplicateMessageKeys: result.duplicateMessageKeys,
+    };
   }
 
   private async commitEvolution(params: {

@@ -88,6 +88,7 @@ export function buildProcessDefinition(
   return {
     name: config.name,
     initialState: config.state,
+    ...(config.transient ? { transient: true } : {}),
     evolve: ({ previousState, input, ref }) => {
       const factories = buildIntentFactories(config.intents, {
         processKey: ref.processKey,

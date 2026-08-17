@@ -165,6 +165,23 @@ export interface ProcessManagerConfig<
    */
   toPayload?: (event: E) => ProcessEventEnvelope["payload"];
   intents: Intents;
+  /**
+   * Opt in to the transient path: an event whose evolution keeps the initial
+   * state and arms no wake commits its intents alone — no
+   * `ProcessManagerInstance` row, no inbox row, and no transaction (see
+   * `AppendIntentsResult`).
+   *
+   * It is a property of the EVOLUTION, not of the process manager, so a
+   * process may be transient for the keys that hold nothing and still durable
+   * for the keys that hold a buffer or a deadline. `webhookDelivery` is
+   * exactly that shape: per-request keys write nothing, per-endpoint streams
+   * keep their state and their wake.
+   *
+   * Declaring it asserts that every `messageKey` this process mints is a pure
+   * function of the event. That is the contract the absent transaction rests
+   * on, and it is enforced by test rather than by comment.
+   */
+  transient?: boolean;
   outbox?: {
     maxAttempts?: number;
     leaseDurationMs?: number;
