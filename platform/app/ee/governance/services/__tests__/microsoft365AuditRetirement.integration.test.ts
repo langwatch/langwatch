@@ -20,36 +20,37 @@
  */
 
 import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
+import { FREE_PLAN } from "@ee/licensing/constants";
+import type { PlanInfo } from "@ee/licensing/planInfo";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { getApp, resetApp } from "~/server/app-layer/app";
-import { initializeDefaultApp } from "~/server/app-layer/presets";
+import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { createTestApp } from "~/server/app-layer/presets";
+import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
 
 const RETIRED_REASON = "[retired] Polled an Entra directory-change feed";
 
 const createdOrgIds: string[] = [];
+const enterprisePlan: PlanInfo = { ...FREE_PLAN, type: "ENTERPRISE" };
 
-/**
- * Only true when THIS file booted the composition root. The datastore lane can
- * share a module registry across files, so tearing down an app a sibling file
- * booted would break that sibling rather than this one.
- */
-let bootedApp = false;
-
-beforeAll(() => {
-  // createSource() resolves the encryptor through getApp(), which throws
-  // unless the composition root has been booted.
-  try {
-    getApp();
-  } catch {
-    initializeDefaultApp();
-    bootedApp = true;
-  }
+beforeAll(async () => {
+  // createSource() reads getApp().planProvider to enforce the source cap, so
+  // this file needs a composition root. createTestApp is the one to use:
+  // initializeDefaultApp boots the trace-processing pipeline too, which
+  // `require`s ~/server/db and cannot resolve that alias in this lane.
+  // Enterprise, because m365 audit ingestion is an enterprise-tier surface
+  // and the cap is not what these tests are about.
+  await resetApp();
+  globalForApp.__langwatch_app = createTestApp({
+    planProvider: PlanProviderService.create({
+      getActivePlan: async () => enterprisePlan,
+    }),
+  });
 });
 
 afterAll(async () => {
-  if (bootedApp) await resetApp();
+  await resetApp();
   if (createdOrgIds.length > 0) {
     await prisma.ingestionSource.deleteMany({
       where: { organizationId: { in: createdOrgIds } },
