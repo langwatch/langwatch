@@ -408,7 +408,7 @@ describe("Microsoft365AuditPuller window advance", () => {
     expect(span).toBeGreaterThan(0);
   });
 
-  /** @scenario A window the run never listed is not advanced past */
+  /** @scenario Completion is reported by the run, not inferred from cursor shape */
   it("leaves the window in place when the run was out of time before it started", async () => {
     const puller = await loadPuller();
     seedBlobs(3);
@@ -416,8 +416,10 @@ describe("Microsoft365AuditPuller window advance", () => {
     const t0 = Date.parse("2026-05-03T12:00:00.000Z");
     vi.spyOn(Date, "now").mockImplementation(() => t0);
 
-    // A job that sat in a backed-up queue: its deadline had already passed by
-    // the time it ran.
+    // Constructed, not reachable: the worker computes its deadline inline at
+    // the call site (pullerWorker.ts), so no production run is out of time on
+    // entry. The invariant is what matters — completion is a fact the run
+    // reports, never one the caller reads off the cursor's shape.
     const run = await puller.runOnce(
       { cursor: null, deadlineMs: t0 - 1_000 },
       CONFIG,
