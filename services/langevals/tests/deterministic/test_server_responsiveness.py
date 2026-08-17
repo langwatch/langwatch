@@ -25,10 +25,24 @@ import time
 import httpx
 import pytest
 
+# `langevals.server` reads sys.argv and DISABLE_EVALUATORS_PRELOAD while it is
+# imported, to decide which evaluators to register and whether to preload their
+# models, so both have to be set before the import. They are put back straight
+# afterwards: pytest imports every test module during collection, so leaving
+# them changed would hand fake command-line arguments and a disabled preload to
+# every other test in the session.
+_original_argv = sys.argv
+_original_preload = os.environ.get("DISABLE_EVALUATORS_PRELOAD")
 sys.argv = ["server.py", "--only", "langevals,ragas"]
 os.environ["DISABLE_EVALUATORS_PRELOAD"] = "1"
-
-from langevals import server
+try:
+    from langevals import server
+finally:
+    sys.argv = _original_argv
+    if _original_preload is None:
+        os.environ.pop("DISABLE_EVALUATORS_PRELOAD", None)
+    else:
+        os.environ["DISABLE_EVALUATORS_PRELOAD"] = _original_preload
 
 
 def big_text(kb: int, seed: int) -> str:
