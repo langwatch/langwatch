@@ -9,6 +9,10 @@ on:
     branches:
       - main
   pull_request:
+    # ready_for_review is NOT a default pull_request activity type. Without
+    # it, taking a PR out of draft fires no event at all, so the jobs gated
+    # on `heavy` below would never get their first non-draft run.
+    types: [opened, synchronize, reopened, ready_for_review]
   pull_request_target:
     types: [labeled]
   merge_group:
@@ -26,6 +30,9 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       relevant: ${{ steps.detect.outputs.relevant }}
+      # Draft PRs keep the cheap signal and release the runner slots;
+      # everything heavy returns on ready_for_review and in the merge queue.
+      heavy: ${{ steps.detect.outputs.heavy }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
@@ -48,7 +55,7 @@ jobs:
   lint:
     needs: changes
     if: >
-      needs.changes.outputs.relevant == 'true'
+      needs.changes.outputs.relevant == 'true' && needs.changes.outputs.heavy == 'true'
       && (github.event_name != 'pull_request_target'
           || github.event.label.name == 'approved-ci')
     runs-on: ubuntu-latest
@@ -60,7 +67,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Setup UV
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
           cache-dependency-glob: "services/langevals/uv.lock"
@@ -76,7 +83,7 @@ jobs:
   test:
     needs: changes
     if: >
-      needs.changes.outputs.relevant == 'true'
+      needs.changes.outputs.relevant == 'true' && needs.changes.outputs.heavy == 'true'
       && (github.event_name != 'pull_request_target'
           || github.event.label.name == 'approved-ci')
     runs-on: ubuntu-latest
@@ -88,7 +95,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Setup UV
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
           cache-dependency-glob: "services/langevals/uv.lock"
@@ -127,7 +134,7 @@ jobs:
   docker-build:
     needs: changes
     if: >
-      needs.changes.outputs.relevant == 'true'
+      needs.changes.outputs.relevant == 'true' && needs.changes.outputs.heavy == 'true'
       && (github.event_name != 'pull_request_target'
           || github.event.label.name == 'approved-ci')
     runs-on: ubuntu-latest

@@ -106,6 +106,7 @@ export const APP_ERROR_CODES = [
   "governed_sql_reserved_parameter_type",
   "governed_sql_unavailable",
   "governed_sql_unparseable",
+  "grant_validation_failed",
   "group_member_already_added",
   "group_not_found",
   "group_not_in_organization",
@@ -193,11 +194,13 @@ export const APP_ERROR_CODES = [
   // from a session that is no longer an admin.
   "not_found",
   "notification_delivery_error",
+  "offboard_incomplete",
   "org_exclusive_permission_scope",
   "organization_not_found",
   "organization_not_found_for_team",
   "organization_slug_taken",
   "page_too_deep",
+  "permission_denied",
   "personal_project_key_required",
   "personal_usage_key_mismatch",
   "personal_workspace_not_managed_here",
@@ -289,6 +292,7 @@ export const APP_ERROR_CODES = [
   // `ValidationError` (and `ValidationError.fromZodError`, which the tRPC
   // boundary uses to promote input ZodErrors onto the handled channel).
   "validation_error",
+  "virtual_key_expiry_in_past",
   "virtual_key_not_found",
   // The webhook platform names its two endpoint failures itself, in
   // `~/app/api/webhooks/[[...route]]/error-handler`, rather than deriving

@@ -53,6 +53,18 @@ Feature: CI checkouts leave the marketing media on the server
     And it is not required to name the media exclusions
 
   @unit
+  Scenario: A checkout that names the files it wants is already lean
+    Given a checkout step declares a sparse-checkout that names only paths it wants
+    And it names no whole-tree entry and no exclusion
+    Then it is not required to name the media exclusions
+    # An allowlist cannot pull the media: anything it does not name is never
+    # checked out. The shard-durations job takes one file — the committed
+    # vitest.durations.json — and requiring three negations there would be
+    # asserting the absence of directories it never asked for. Only a
+    # denylist, which starts from the whole tree, can pull the media by
+    # accident.
+
+  @unit
   Scenario: Cone mode is refused because it would drop a new top-level directory
     Given a checkout step that excludes the media
     Then it does not use cone mode

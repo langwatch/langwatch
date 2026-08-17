@@ -35,6 +35,22 @@ export function isDateVersion(value: string): value is DateVersion {
 
 export type HttpMethod = "get" | "post" | "put" | "delete" | "patch";
 
+/**
+ * Context key holding the endpoint a request matched, as `METHOD /path`.
+ *
+ * The REGISTERED path, not the URL that arrived: `GET /things/:id` rather than
+ * `GET /things/th_01J9Z...`. That is the difference between a field you can
+ * group by and one with a distinct value per request — the request log already
+ * carries the concrete `url`, and what it lacked was the endpoint identity to
+ * aggregate on.
+ *
+ * Set by the version-context middleware, which is first in every endpoint's
+ * stack, so it is present for anything downstream of routing: the request log,
+ * and the output-validation failure in `response.ts`, which could otherwise say
+ * only that *an* endpoint returned the wrong shape.
+ */
+export const ENDPOINT_ROUTE = "endpointRoute" as const;
+
 // ---------------------------------------------------------------------------
 // Base app context
 // ---------------------------------------------------------------------------

@@ -13,6 +13,7 @@
 
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import { describe, expect, it } from "vitest";
+import type { FieldMapping } from "../../field-mapping";
 import {
   buildTemplateContext,
   renderBodyTemplate,
@@ -20,7 +21,6 @@ import {
   renderUrlTemplate,
   TemplateRenderError,
 } from "../http-template-engine";
-import type { FieldMapping } from "../types";
 
 function inputWith(content: string | unknown[]): AgentInput {
   return {

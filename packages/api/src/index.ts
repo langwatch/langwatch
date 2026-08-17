@@ -3,6 +3,8 @@
 // ---------------------------------------------------------------------------
 
 export { createService, ServiceBuilder, VersionBuilder } from "./builder.js";
+export { isRpcPath } from "./version-builder.js";
+export type { RpcConfig, RpcPath } from "./version-builder.js";
 export { createErrorHandler, formatError } from "./errors.js";
 export { loggerMiddleware, tracerMiddleware } from "./middleware.js";
 

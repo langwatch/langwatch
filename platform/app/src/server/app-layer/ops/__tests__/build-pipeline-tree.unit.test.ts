@@ -215,7 +215,7 @@ describe("buildPipelineTree", () => {
       expect(tree[0]!.children[0]!.name).toBe("fold");
     });
 
-    it("normalizes 'reaction' to 'reactor'", () => {
+    it("normalizes 'reaction' to the kept 'reactor' jobType", () => {
       const queue = createQueue({
         groups: [
           createGroup({ pipelineName: "p", jobType: "reaction", jobName: "n" }),

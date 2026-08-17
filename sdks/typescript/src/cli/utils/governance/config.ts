@@ -60,7 +60,7 @@ export interface GovernanceConfig {
    * `/api/auth/cli/governance/ingestion-key`), keyed by the tool's
    * source_type slug (`claude_code` / `codex` / `gemini` / `opencode`).
    * One key per source so different wrapped tools surface as their own
-   * ingestion source in /me + /messages.
+   * ingestion source in /me + /traces.
    *
    * When the right key is present for a wrapped tool, the
    * `langwatch <tool>` wrapper injects the standard OTEL_*_EXPORTER

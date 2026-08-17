@@ -6,7 +6,7 @@
  */
 
 import { z } from "zod";
-import { FieldMappingSchema } from "../scenarios/execution/types";
+import { FieldMappingSchema } from "../scenarios/field-mapping";
 
 const suiteTargetFields = z.object({
   type: z.enum(["prompt", "http", "code", "workflow"]),

@@ -27,19 +27,33 @@ describe("buildProjectSwitchHref", () => {
     it("swaps the slug and keeps the same sub-route", () => {
       expect(
         buildProjectSwitchHref({
-          routePattern: "/[project]/messages",
-          resolvedPathname: "/acme/messages",
+          routePattern: "/[project]/traces",
+          resolvedPathname: "/acme/traces",
           currentProjectSlug: "acme",
           targetSlug: "globex",
           homeFallback: "plain",
         }),
-      ).toBe("/globex/messages");
+      ).toBe("/globex/traces");
     });
 
     /** @scenario Picking a project from a route with extra dynamic segments */
     it("drops to the parent list route when the route has a second dynamic segment", () => {
       // A trace id can't exist in another project, so the switch lands on the
-      // target project's messages list rather than a 404ing per-trace URL.
+      // target project's trace list rather than a 404ing per-trace URL.
+      expect(
+        buildProjectSwitchHref({
+          routePattern: "/[project]/traces/[trace]",
+          resolvedPathname: "/acme/traces/trace_abc",
+          currentProjectSlug: "acme",
+          targetSlug: "globex",
+          homeFallback: "plain",
+        }),
+      ).toBe("/globex/traces");
+    });
+
+    it("drops a legacy trace path to the Trace Explorer in the target project", () => {
+      // The legacy path still resolves (it redirects), and it parents onto the
+      // Trace Explorer rather than the list page that no longer exists.
       expect(
         buildProjectSwitchHref({
           routePattern: "/[project]/messages/[trace]",
@@ -48,7 +62,36 @@ describe("buildProjectSwitchHref", () => {
           targetSlug: "globex",
           homeFallback: "plain",
         }),
-      ).toBe("/globex/messages");
+      ).toBe("/globex/traces");
+    });
+
+    // `findCurrentRoute` matches on exact path equality, so the dynamic
+    // segment has to be spelled the way the router spells it. These two
+    // carried `[opentab]` against the router's `[openTab]`, which matched
+    // nothing: the switch fell through to the literal-slug branch and kept
+    // the reader on a legacy `/messages/...` URL in the target project.
+    it("drops a legacy open-tab deep link to the Trace Explorer", () => {
+      expect(
+        buildProjectSwitchHref({
+          routePattern: "/[project]/messages/[trace]/[openTab]",
+          resolvedPathname: "/acme/messages/trace_abc/traceDetails",
+          currentProjectSlug: "acme",
+          targetSlug: "globex",
+          homeFallback: "plain",
+        }),
+      ).toBe("/globex/traces");
+    });
+
+    it("drops a legacy span deep link to the Trace Explorer", () => {
+      expect(
+        buildProjectSwitchHref({
+          routePattern: "/[project]/messages/[trace]/[openTab]/[span]",
+          resolvedPathname: "/acme/messages/trace_abc/traceDetails/span_1",
+          currentProjectSlug: "acme",
+          targetSlug: "globex",
+          homeFallback: "plain",
+        }),
+      ).toBe("/globex/traces");
     });
 
     it("preserves the home route itself when on /[project]", () => {

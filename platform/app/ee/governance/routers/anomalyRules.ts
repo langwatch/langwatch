@@ -23,7 +23,7 @@ import {
   SUPPORTED_SCOPES,
   SUPPORTED_SEVERITIES,
 } from "@ee/governance/services/activity-monitor/anomalyRule.service";
-import { ValidationError } from "@langwatch/handled-error";
+import { isZodLikeError, ValidationError } from "@langwatch/handled-error";
 import { z } from "zod";
 
 import {
@@ -58,12 +58,19 @@ const enterpriseGate = requireEnterprisePlan(
  * `ValidationError` from `thresholdConfig.schema.ts`, so it falls through the
  * re-throw below and the boundary serialises it with its own `meta`.
  * Anything else re-throws unchanged so genuine internal errors stay visible.
+ *
+ * `isZodLikeError`, not `instanceof z.ZodError`: the two schemas this gate
+ * catches are on different zod majors — `thresholdConfig.schema.ts` is on
+ * `zod/v4`, `destinationConfig.schema.ts` still on v3 — and each major throws
+ * its own `ZodError` class. An `instanceof` against either one silently stops
+ * recognising the other's failures, which then leave here as unnamed 500s
+ * instead of the 422 the admin can act on.
  */
 function translateConfigValidationError(
   err: unknown,
   ruleType?: string,
 ): never {
-  if (err instanceof z.ZodError) {
+  if (isZodLikeError(err)) {
     // Detect which config the issues belong to so the error message
     // points the admin at the right field. Both threshold-config and
     // destination-config (Phase 2C C3) validation produce ZodError;

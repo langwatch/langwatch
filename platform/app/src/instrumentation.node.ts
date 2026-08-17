@@ -13,6 +13,7 @@ import {
   redisInstrumentationConfig,
 } from "./instrumentation.redis";
 // Dependency-free by design — safe on the boot path, before the app graph.
+import { startProfiling } from "./server/profiling/startProfiling";
 import { registerTelemetryFlush } from "./server/shutdown/telemetry";
 
 const isEnvTrue = (value: string | undefined) => value === "true";
@@ -146,6 +147,22 @@ if (explicitEndpoint || langwatchTracingEnabled) {
     ],
   });
 
+  // Which spans are being kept. The SDK reads OTEL_TRACES_SAMPLER and
+  // OTEL_TRACES_SAMPLER_ARG itself and falls back to parentbased_always_on, so
+  // nothing here parses them — but an unset variable and a misspelled one
+  // produce the same silence and the same full-rate export, and the cost of
+  // that lands on the collector rather than anywhere obvious. One line at boot
+  // is the answer to "is this fleet sampling or not?" without reading a chart.
+  console.log(
+    `[observability] trace sampling: ${
+      process.env.OTEL_TRACES_SAMPLER ?? "parentbased_always_on (default)"
+    }${
+      process.env.OTEL_TRACES_SAMPLER_ARG
+        ? ` at ${process.env.OTEL_TRACES_SAMPLER_ARG}`
+        : ""
+    }`,
+  );
+
   // Replaces the exit-on-flush the SDK does by default (disabled above): the
   // same flush, run as the last phase of the one graceful-shutdown sequence,
   // with no opinion about when the process should end.
@@ -220,6 +237,45 @@ if (explicitEndpoint && isEnvTrue(process.env.OTEL_METRICS_ENABLED)) {
     name: "metrics",
     run: async () => {
       await meterProvider.forceFlush();
+    },
+  });
+}
+
+// Continuous profiling. Gated on its own endpoint rather than on the OTLP one:
+// profiles go to Pyroscope over Pyroscope's own protocol, not through the
+// collector, so the two can be configured — and fail — independently. In local
+// development haven writes PYROSCOPE_SERVER_ADDRESS into .env.portless whenever
+// the shared observability stack is up; in production it names the in-cluster
+// Pyroscope service.
+//
+// The identity is read from the OTel variables on purpose. A flame graph that
+// cannot be lined up with the trace beside it is a curiosity, and a second set
+// of name/environment variables would drift the first time someone renamed one.
+//
+// NODE_ENV is the fallback rather than the source. ENVIRONMENT is what every
+// other service in the repo reads for "which install is this", and it is what
+// our own deployment sets — but the Helm chart only emits NODE_ENV, so without
+// this a chart install would push profiles with no environment label at all and
+// nothing would fail. NODE_ENV answers a coarser question (which runtime mode,
+// so "production" in most staging installs), which is a worse label than
+// ENVIRONMENT and a much better one than none.
+//
+// Deliberately not fixed by teaching the chart to emit ENVIRONMENT: that
+// variable also feeds @langwatch/ksuid, which prefixes every generated ID with
+// it unless it reads exactly "prod". Injecting it chart-wide would silently
+// move every self-hosted install's new IDs from `local_…` to `production_…` on
+// upgrade, which is a far larger change than labelling a flame graph.
+const profiler = startProfiling({
+  serverAddress: process.env.PYROSCOPE_SERVER_ADDRESS,
+  appName: process.env.OTEL_SERVICE_NAME ?? "langwatch-app",
+  environment: process.env.ENVIRONMENT ?? process.env.NODE_ENV,
+  resourceAttributes: process.env.OTEL_RESOURCE_ATTRIBUTES,
+});
+if (profiler) {
+  registerTelemetryFlush({
+    name: "profiling",
+    run: async () => {
+      await profiler.stop();
     },
   });
 }

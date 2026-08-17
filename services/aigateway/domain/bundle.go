@@ -21,6 +21,24 @@ type Bundle struct {
 
 	// ExpiresAt is when this bundle's JWT expires (for cache refresh).
 	ExpiresAt time.Time
+
+	// VirtualKeyExpiresAt is the terminal validity instant of the KEY itself,
+	// from the vk_expires_at claim. Unlike ExpiresAt, which is a refresh
+	// boundary a grace window may be built on, nothing extends this one: past
+	// it the key is finished and the request is refused. The zero value means
+	// the key has no expiration date and never runs out.
+	VirtualKeyExpiresAt time.Time
+}
+
+// KeyExpired reports whether the virtual key's own expiration date has passed
+// at instant now. A bundle carrying no date never expires.
+//
+// The date itself counts as expired, which is why this asks "not before"
+// rather than "after": the control plane refuses the key when expiresAt is at
+// or below the current time, and a cache that served the exact boundary
+// instant would answer a request the control plane rejects.
+func (b *Bundle) KeyExpired(now time.Time) bool {
+	return !b.VirtualKeyExpiresAt.IsZero() && !now.Before(b.VirtualKeyExpiresAt)
 }
 
 // BundleConfig holds the policy knobs configured per virtual key.
@@ -187,6 +205,24 @@ type ConfigFetchResult struct {
 	// NotModified is the control plane confirming the caller's ETag is still
 	// current, so the caller keeps the config it already has.
 	NotModified bool
+
+	// VirtualKeyExpiresAt is the key's own expiration date as this response
+	// reports it, and is meaningful only when VirtualKeyExpiryKnown is set.
+	// Read together with that flag it is a tri-state: known with a value is the
+	// date the key stops, known and zero is a key with no date that never runs
+	// out, and not known is a response that said nothing about expiry.
+	//
+	// The endpoint's ETag covers this field, so a date an admin changes brings
+	// the whole config back with it (contract §4.2) and the caller learns the
+	// new date on the same revalidation that brings the new credentials.
+	VirtualKeyExpiresAt time.Time
+
+	// VirtualKeyExpiryKnown reports whether the response carried the expiry
+	// field at all. A control plane older than the field omits it, and a caller
+	// must then keep the date its bundle already holds. Absent must never be
+	// read as "this key never expires": a refresh against an older control
+	// plane would then lift the cap off a key whose own token says it expires.
+	VirtualKeyExpiryKnown bool
 }
 
 // Routing modes carried on the bundle wire (contract §4.2 routing_mode).

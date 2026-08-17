@@ -2655,6 +2655,14 @@ model VirtualKey {
   disabledAt     DateTime?
   disabledReason String?
 
+  // The moment the key stops serving, or null for a key that never
+  // expires. Read at resolve time and compared with now, the same way
+  // ApiKey.expiresAt is: the status column stays ACTIVE, so extending the
+  // date is an ordinary edit and no sweeper has to run for the key to
+  // stop. Unindexed on purpose: the check rides a lookup by secret hash
+  // that already resolves one row.
+  expiresAt DateTime?
+
   // Credential material. Full secret format:
   //   vk-lw-<26-char-crockford-ulid>  (32 chars total)
   // Only the hashed form and a short display prefix are kept after
@@ -3935,4 +3943,29 @@ model IdempotencyReceipt {
 
   @@unique([scopeId, key])
   @@index([expiresAt])
+}
+
+// One record per (migration, tenant) for the in-place system migrations
+// runner (@langwatch/system-migrations): one-time data migrations the
+// system performs on itself at worker boot, organization by organization.
+// "Pending" is the absence of a record. `status` is the package's
+// TenantMigrationStatus ("migrated" | "finalized" | "parked"); "finalized"
+// is a one-way latch hot paths read through an in-process cache (a tenant
+// may only leave its legacy path once its record says finalized). `report`
+// carries the migration's own evidence: parity diffs for a held tenant,
+// the error for a parked one, counts for a finalized one. `tenantId` is an
+// Organization id as a plain column ref (no FK) - the runner is generic
+// over tenants and survives organization deletion trivially. First rider:
+// the ADR-092 stage-B TeamUser backfill (@langwatch/authz-server). Spec:
+// specs/rbac/in-place-authz-migration.feature.
+model SystemMigrationTenantState {
+  migrationName String
+  tenantId      String
+  status        String
+  report        Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
+
+  @@id([migrationName, tenantId])
+  @@index([migrationName, status])
 }

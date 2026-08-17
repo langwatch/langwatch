@@ -1353,7 +1353,7 @@ export class QueueRedisRepository implements QueueRepository {
   // must contain in addition to starting with `<tenantId>/`. Use this to
   // scope a drain to part of a tenant's groups — for example:
   //   - "/fold/traceSummary/" → drop only that fold's groups
-  //   - "/reactor/customEvaluationSync/" → drop only this reactor's groups
+  //   - "/reactor/customEvaluationSync/" → drop only this subscriber's groups
   //   - "/map/spanStorage/" → drop only the span-storage map groups
   // Honest substring semantics (matches the operator's mental model of
   // what they see in the Groups table): no fancy resolution to pipeline

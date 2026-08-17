@@ -167,6 +167,25 @@ describe("resolveWrapperMode", () => {
 			);
 		});
 
+		/** @scenario "Every seam that persists the codex exporters wires the turn harvest" */
+		it("wires the turn harvest beside the exporters it persisted", async () => {
+			const { resolveWrapperMode } = await import("../wrapper-mode.js");
+			(cliApi.mintIngestionKey as ReturnType<typeof vi.fn>).mockResolvedValue({
+				token: "sk-lw-test-token",
+				prefix: "sk-lw-test",
+				endpoint: "http://app.example.com/api/otel",
+			});
+
+			const out = await resolveWrapperMode(baseCfg(), "codex", {});
+
+			// The exporters carry tokens and timing but no conversation; the
+			// notify harvest is what recovers it, so persisting one without the
+			// other leaves plain codex runs with nothing to read.
+			const contents = fs.readFileSync(out.codexConfigPath!, "utf8");
+			expect(contents).toContain("langwatch codex notify begin");
+			expect(contents).toContain('"ingest", "codex"');
+		});
+
 		it("reuses the cached key rather than minting again when one is already stored", async () => {
 			const { resolveWrapperMode } = await import("../wrapper-mode.js");
 

@@ -321,10 +321,10 @@ const CustomGraph_ = React.memo(
               : String(params.endDate);
         }
 
-        // Navigate to messages page with filter
+        // Navigate to the Trace Explorer with filter
         void router.push(
           {
-            pathname: `/${project.slug}/messages`,
+            pathname: `/${project.slug}/traces`,
             query: filterParams,
           },
           undefined,

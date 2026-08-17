@@ -21,6 +21,7 @@ import {
   resolveSpanConversationKey,
   resolveToolName,
   SESSION_CONTEXT_EVENT_NAME,
+  sessionTitleFromPrompt,
 } from "../coding-agent-normalization";
 
 describe("detectCodingAgent", () => {
@@ -512,5 +513,33 @@ describe("isCodingAgentMetricName", () => {
     expect(isCodingAgentMetricName("http.server.duration")).toBe(false);
     // A coding agent's metric we have no mapping for is also not worth folding.
     expect(isCodingAgentMetricName("codex.websocket.request")).toBe(false);
+  });
+});
+
+describe("sessionTitleFromPrompt", () => {
+  describe("given the first thing a user typed", () => {
+    /** @scenario A session with no generated title is named by the first thing the user asked */
+    it("names the session by the prompt's first line, whitespace collapsed", () => {
+      expect(
+        sessionTitleFromPrompt(
+          "Fix the retry loop   in the outbox worker\nIt spins on lease loss.",
+        ),
+      ).toBe("Fix the retry loop in the outbox worker");
+    });
+
+    it("caps a run-on prompt", () => {
+      expect(sessionTitleFromPrompt("a".repeat(500))).toHaveLength(120);
+    });
+  });
+
+  describe("given text that is not the user's own words", () => {
+    /** @scenario A machine-injected first prompt does not name the session */
+    it("answers null for machine-injected turns, withheld text, and nothing", () => {
+      expect(
+        sessionTitleFromPrompt("<task-notification>\n<task-id>a</task-id>"),
+      ).toBeNull();
+      expect(sessionTitleFromPrompt("[REDACTED]")).toBeNull();
+      expect(sessionTitleFromPrompt("   \n  ")).toBeNull();
+    });
   });
 });

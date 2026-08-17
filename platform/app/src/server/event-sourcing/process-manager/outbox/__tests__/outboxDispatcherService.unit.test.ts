@@ -423,6 +423,81 @@ describe("OutboxDispatcherService", () => {
     });
   });
 
+  describe("given a domain whose slow deliveries earn it a large lease", () => {
+    describe("when a delivery would start with less than the scaled margin", () => {
+      it("scales the safety margin with the lease instead of capping it", async () => {
+        for (let index = 0; index < 2; index++) {
+          await service.handleEvent({
+            envelope: pilotEvent({
+              eventId: `evt_large_${index}`,
+              processKey: `conv_large_${index}`,
+              payload: { turnId: `turn_large_${index}` },
+            }),
+            now: T0,
+          });
+        }
+        let elapsed = 0;
+        const handler = vi.fn().mockImplementation(async () => {
+          elapsed += 85_000;
+        });
+        const dispatcher = new OutboxDispatcherService({
+          store,
+          handlers: { "worker-dispatch": handler },
+          leaseDurationMs: 100_000,
+          clock: () => elapsed,
+        });
+
+        // Margin is 20_000ms (20% of the lease). After the first delivery
+        // 15_000ms remain: under a flat 10_000ms cap the second delivery
+        // would start and outlive the lease; the scaled margin releases it.
+        const report = await dispatcher.runOnce({ now: T0 + 1 });
+
+        expect(report.dispatched).toHaveLength(1);
+        expect(report.released).toHaveLength(1);
+        expect(handler).toHaveBeenCalledTimes(1);
+      });
+    });
+  });
+
+  describe("given a lease query slowed by the same degraded store", () => {
+    describe("when the query consumes most of the lease before any delivery", () => {
+      it("counts the query time against the lease budget", async () => {
+        await commitStartedTurn();
+        let elapsed = 0;
+        const slowLeasingStore = new Proxy(store, {
+          get(target, property, receiver) {
+            if (property !== "leaseDueMessages") {
+              return Reflect.get(target, property, receiver);
+            }
+            return async (
+              params: Parameters<typeof store.leaseDueMessages>[0],
+            ) => {
+              // The store anchors leasedUntil before the query runs, so a
+              // slow query burns real lease time before any delivery starts.
+              elapsed += 900;
+              return target.leaseDueMessages(params);
+            };
+          },
+        });
+        const handler = vi.fn().mockResolvedValue(undefined);
+        const dispatcher = new OutboxDispatcherService({
+          store: slowLeasingStore,
+          handlers: { "worker-dispatch": handler },
+          leaseDurationMs: 1_000,
+          clock: () => elapsed,
+        });
+
+        // 900ms of the 1_000ms lease went to the query; 100ms remain, under
+        // the 200ms margin, so the delivery must not start.
+        const report = await dispatcher.runOnce({ now: T0 + 1 });
+
+        expect(report.dispatched).toHaveLength(0);
+        expect(report.released).toHaveLength(1);
+        expect(handler).not.toHaveBeenCalled();
+      });
+    });
+  });
+
   describe("given a message whose leases keep lapsing without any acknowledgement", () => {
     beforeEach(commitStartedTurn);
 

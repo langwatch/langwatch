@@ -1137,6 +1137,37 @@ const presentations = {
         : "Ask an organization admin to grant you access to this project.";
     },
   },
+  permission_denied: {
+    // The ADR-092 engine's one denial code (authorize() / .permission()). Names
+    // the permission when the server sent one, same reasoning as
+    // `project_permission_denied`: the exact grant can be forwarded as-is.
+    // Lite-member denials carry their own client modal via the middleware's
+    // cause; this copy is what everyone else reads.
+    title: "You don't have permission to do this",
+    describe: (error) => {
+      const permission = str(error, "permission", "");
+      return permission
+        ? `Ask an organization admin to grant you "${permission}".`
+        : "Ask an organization admin for access.";
+    },
+  },
+  grant_validation_failed: {
+    // The engine's grant write surface (attach/update/revoke/replace) rejects
+    // duplicates, cross-organization role references, and bindings at scopes
+    // that can't hold them. The wire meta varies per rejection, so the copy
+    // stays general; the admin UI narrates specifics inline (stage D).
+    title: "That role change isn't valid",
+    describe: () =>
+      "Check the role, the scope, and whether an equivalent binding already exists, then try again.",
+  },
+  offboard_incomplete: {
+    // The offboarding transaction proves the member's access resolves to
+    // nothing before committing; when the proof fails everything rolls back,
+    // so nothing was half-removed.
+    title: "Offboarding didn't finish",
+    describe: () =>
+      "Nothing was changed — the removal was rolled back. Try again, and contact support if it keeps failing.",
+  },
   cannot_impersonate_admin: {
     // A deliberate denial, not a mistake to correct: admin-to-admin
     // impersonation is refused so the audit trail stays attached to whoever
@@ -1843,6 +1874,13 @@ const presentations = {
     describe: () =>
       "An administrator can re-enable it; the key itself is unchanged.",
   },
+  virtual_key_expired: {
+    // Distinct from revoked on purpose: the key material is intact, so the
+    // cheap fix is a new date rather than a new secret in every client.
+    title: "This key has expired",
+    describe: () =>
+      "Extend its expiration date in settings, or create a new key.",
+  },
   rate_limited: {
     title: "Too many requests",
     describe: () => "Slow down for a moment, then try again.",
@@ -1978,6 +2016,13 @@ const presentations = {
     title: "Virtual key not found",
     describe: () =>
       "It may have been deleted, or it isn't shared with you. Reload to see the keys you can open.",
+  },
+  virtual_key_expiry_in_past: {
+    // Says what to do rather than what was wrong: the date is still in the
+    // field, so the only useful sentence is the one that gets it saved.
+    title: "That expiration date has already passed",
+    describe: () =>
+      "Pick a date in the future, or choose Never so the key does not expire.",
   },
   gateway_budget_not_found: {
     title: "Budget not found",

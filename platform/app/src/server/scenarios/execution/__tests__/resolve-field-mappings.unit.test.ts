@@ -4,11 +4,11 @@
 
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import { describe, expect, it } from "vitest";
+import type { FieldMapping } from "../../field-mapping";
 import {
   computeBestMatchMappings,
   resolveFieldMappings,
 } from "../resolve-field-mappings";
-import type { FieldMapping } from "../types";
 
 const makeAgentInput = (overrides: Partial<AgentInput> = {}): AgentInput => ({
   threadId: "thread-1",
