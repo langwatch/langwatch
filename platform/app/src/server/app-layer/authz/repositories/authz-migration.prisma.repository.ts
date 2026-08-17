@@ -1,24 +1,31 @@
 import type {
+  AuthzCutoverRepository,
   AuthzGenesisRepository,
   AuthzMigrationRepository,
   ExistingTeamBinding,
+  ExternalMemberFact,
   LegacyBindingRow,
   LegacyRoleRow,
   LegacyTeamRow,
   OrganizationMemberFact,
   OrganizationScopeInventory,
+  PlatformAdminUserFact,
+  ProjectCredentialFact,
+  ResourceGrantRow,
   RoleHeadRow,
+  ShareLinkFactRow,
   TeamBindingWrite,
 } from "@langwatch/authz-server";
 import type { PrismaClient } from "~/generated/prisma/client";
 
 /**
- * ADR-092 stage B - storage for the in-place TeamUser backfill. Facts and
- * batch writes only; equivalence, parity and finalization live in
- * `TeamUserBackfillMigration` (@langwatch/authz-server).
+ * ADR-092 stage B - storage for the in-place TeamUser backfill, the genesis
+ * import and the per-organization cutover. Facts and batch writes only;
+ * equivalence, parity and finalization live in the migrations themselves
+ * (@langwatch/authz-server).
  */
 export class PrismaAuthzMigrationRepository
-  implements AuthzMigrationRepository, AuthzGenesisRepository
+  implements AuthzMigrationRepository, AuthzGenesisRepository, AuthzCutoverRepository
 {
   constructor(private readonly prisma: PrismaClient) {}
 
@@ -232,5 +239,208 @@ export class PrismaAuthzMigrationRepository
         team.projects.map((project) => ({ id: project.id, teamId: team.id })),
       ),
     };
+  }
+
+  async findMigrationTenantStatuses({
+    tenantId,
+    migrationNames,
+  }: {
+    tenantId: string;
+    migrationNames: readonly string[];
+  }): Promise<Record<string, string | null>> {
+    const rows = await this.prisma.systemMigrationTenantState.findMany({
+      where: { tenantId, migrationName: { in: [...migrationNames] } },
+      select: { migrationName: true, status: true },
+    });
+    const stored = new Map(rows.map((row) => [row.migrationName, row.status]));
+    // Every asked-for name is answered, so the caller reads "never ran" as
+    // the null it is rather than as a missing key.
+    return Object.fromEntries(
+      migrationNames.map((name) => [name, stored.get(name) ?? null]),
+    );
+  }
+
+  async findShareLinkRows({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<ShareLinkFactRow[]> {
+    // ShareLink's tenancy is its project, and the multitenancy guard holds
+    // every query on it to a projectId (ADR-057) - a relation walk through
+    // the team would be rejected. So the organization's projects are
+    // resolved first and the links are read by that finite set.
+    const projects = await this.prisma.project.findMany({
+      where: { team: { organizationId } },
+      select: { id: true },
+    });
+    if (projects.length === 0) return [];
+    const rows = await this.prisma.shareLink.findMany({
+      where: { projectId: { in: projects.map((project) => project.id) } },
+      select: {
+        id: true,
+        token: true,
+        resourceType: true,
+        resourceId: true,
+        projectId: true,
+        userId: true,
+        visibility: true,
+        expiresAt: true,
+        maxViews: true,
+        createdAt: true,
+      },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      token: row.token,
+      resourceType: row.resourceType,
+      resourceId: row.resourceId,
+      projectId: row.projectId,
+      userId: row.userId,
+      visibility: row.visibility,
+      expiresAtMs: row.expiresAt?.getTime() ?? null,
+      maxViews: row.maxViews,
+      createdAtMs: row.createdAt.getTime(),
+    }));
+  }
+
+  async findExternalMemberFacts({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<ExternalMemberFact[]> {
+    const rows = await this.prisma.organizationUser.findMany({
+      where: { organizationId, role: "EXTERNAL" },
+      select: { userId: true, createdAt: true },
+    });
+    return rows.map((row) => ({
+      userId: row.userId,
+      createdAtMs: row.createdAt.getTime(),
+    }));
+  }
+
+  async findProjectCredentialFacts({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<ProjectCredentialFact[]> {
+    // `Project.apiKey` is a non-null column, so in practice every project
+    // carries the legacy credential; the empty-string guard is what keeps
+    // "has a credential" the predicate rather than "is a project", should a
+    // future project be minted without one.
+    const rows = await this.prisma.project.findMany({
+      where: { team: { organizationId }, apiKey: { not: "" } },
+      select: { id: true, createdAt: true },
+    });
+    return rows.map((row) => ({
+      projectId: row.id,
+      createdAtMs: row.createdAt.getTime(),
+    }));
+  }
+
+  async findUsersByEmail({
+    emails,
+  }: {
+    emails: readonly string[];
+  }): Promise<PlatformAdminUserFact[]> {
+    if (emails.length === 0) return [];
+    // Case-insensitive, exactly as the live admin check compares: a stored
+    // address that differs only in case is the same operator.
+    const rows = await this.prisma.user.findMany({
+      where: {
+        OR: emails.map((email) => ({
+          email: { equals: email, mode: "insensitive" as const },
+        })),
+      },
+      select: { id: true, email: true, createdAt: true },
+    });
+    return rows.flatMap((row) =>
+      row.email === null
+        ? []
+        : [
+            {
+              userId: row.id,
+              email: row.email.toLowerCase(),
+              createdAtMs: row.createdAt.getTime(),
+            },
+          ],
+    );
+  }
+
+  async findResourceGrantRows({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<ResourceGrantRow[]> {
+    const rows = await this.prisma.grant.findMany({
+      where: { organizationId, scopeType: "RESOURCE" },
+      select: {
+        id: true,
+        token: true,
+        resourceKind: true,
+        scopeId: true,
+        projectId: true,
+        principalType: true,
+        principalId: true,
+        expiresAt: true,
+        maxViews: true,
+      },
+    });
+    return rows.map((row) => ({
+      grantId: row.id,
+      token: row.token,
+      resourceKind: row.resourceKind,
+      resourceId: row.scopeId,
+      projectId: row.projectId,
+      principalType: row.principalType,
+      principalId: row.principalId,
+      expiresAtMs: row.expiresAt?.getTime() ?? null,
+      maxViews: row.maxViews,
+    }));
+  }
+
+  async findOrganizationTeamAndProjectIds({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<OrganizationScopeInventory> {
+    return this.findOrganizationScopeInventory({ organizationId });
+  }
+
+  async findOrganizationMemberIds({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<string[]> {
+    const rows = await this.prisma.organizationUser.findMany({
+      where: { organizationId },
+      select: { userId: true },
+    });
+    return rows.map((row) => row.userId);
+  }
+
+  async findOrganizationApiKeyIds({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<string[]> {
+    // Revoked keys are excluded: they authorize nothing on either head, so
+    // sweeping them would only spend round trips.
+    const rows = await this.prisma.apiKey.findMany({
+      where: { organizationId, revokedAt: null },
+      select: { id: true },
+    });
+    return rows.map((row) => row.id);
+  }
+
+  async findCutoverOnEngine({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<boolean> {
+    const row = await this.prisma.authzCutoverProjection.findUnique({
+      where: { organizationId },
+      select: { onEngine: true },
+    });
+    return row?.onEngine === true;
   }
 }

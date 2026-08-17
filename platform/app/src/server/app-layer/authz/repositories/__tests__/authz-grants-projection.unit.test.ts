@@ -226,6 +226,27 @@ function prismaConflict(code: string) {
 }
 
 describe("PrismaAuthzGrantsProjectionRepository", () => {
+  describe("when an operator rolls a cut-over organization back", () => {
+    /** @scenario "Rolling back a cutover takes effect without a deploy, even with the queue stopped" */
+    it("writes onEngine false on the row the request-path gate reads", async () => {
+      const upsert = vi.fn(async () => ({}));
+      const repository = new PrismaAuthzGrantsProjectionRepository({
+        authzCutoverProjection: { upsert },
+      } as unknown as PrismaClient);
+
+      await repository.enforceCutoverRollback({ organizationId: "org_1" });
+
+      expect(upsert).toHaveBeenCalledWith({
+        where: { organizationId: "org_1" },
+        // The create half covers an organization with no projection row yet;
+        // the update half is the flip itself. Neither touches anything else,
+        // which is what keeps this write deny-only.
+        create: { organizationId: "org_1", onEngine: false },
+        update: { onEngine: false },
+      });
+    });
+  });
+
   describe("when a revocation is enforced on the calling path", () => {
     it("deletes both heads keyed by organization and the named grant ids only", async () => {
       const prisma = makePrisma({ revokedProjectIds: [null, null] });

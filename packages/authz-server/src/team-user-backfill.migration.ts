@@ -140,6 +140,21 @@ export type GrantsLedgerEmitter = {
     diffs: string[];
     occurredAtMs: number;
   }) => Promise<void>;
+  /**
+   * The cutover's last emission: the organization is served by the engine
+   * from the moment the fold lands this fact on its projection. It is a
+   * plain queued send like the others — the migration observes the flip
+   * through the repository, never through this return. Its counterpart,
+   * `rollBackCutover`, is deliberately NOT here: rolling back is an
+   * operator action, wired to the ops rollback path, not something a
+   * migration may decide.
+   */
+  completeCutover: (args: {
+    organizationId: string;
+    commandId: string;
+    actor: GrantsLedgerActor;
+    occurredAtMs: number;
+  }) => Promise<void>;
 };
 
 export type TeamUserBackfillDeps = {

@@ -69,6 +69,19 @@ export class SystemMigrationsService {
       state: SystemMigrationStateReader;
       migrationNames: () => string[];
       runPass: () => Promise<MigrationPassSummary | null>;
+      /**
+       * What else a rollback has to DO, per migration name. The generic
+       * rollback is a state write; a migration whose finalization changed
+       * how the running fleet behaves needs that change undone too, and
+       * only the migration's own composition knows how (for the authz
+       * cutover: a `cutover_rolled_back` fact, the projection flipped off
+       * synchronously, the epoch bumped). Migrations with nothing to undo
+       * simply have no entry.
+       */
+      rollbackEffects?: Record<
+        string,
+        (args: { tenantId: string; actorUserId: string }) => Promise<void>
+      >;
     },
   ) {}
 
@@ -158,5 +171,16 @@ export class SystemMigrationsService {
       { migrationName, tenantId, actorUserId, priorStatus: record.status },
       "operator rolled a migrated or finalized tenant back to its legacy path",
     );
+    // The pin FIRST, its effects after — deliberately in that order. The
+    // stored `rolled_back` status is what stops the next pass re-finalizing
+    // the tenant, so it must land even if the effect cannot. An effect that
+    // throws therefore leaves the pin standing and propagates to the
+    // operator, who sees a rollback that was recorded but not fully applied
+    // and can retry it; the reverse order could leave a tenant the runner
+    // re-finalizes minutes later.
+    await this.deps.rollbackEffects?.[migrationName]?.({
+      tenantId,
+      actorUserId,
+    });
   }
 }

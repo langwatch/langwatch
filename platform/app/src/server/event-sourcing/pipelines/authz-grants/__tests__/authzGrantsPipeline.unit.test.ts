@@ -11,12 +11,13 @@ import {
   RollBackCutoverCommand,
 } from "../commands/grantsLedgerCommands";
 import { AuthzGrantsStateFoldProjection } from "../projections/authzGrantsState.foldProjection";
-import type {
-  AttachGrantsCommandData,
-  ChangeGrantRoleCommandData,
-  DefineRolesCommandData,
-  DeleteRoleCommandData,
-  OffboardMemberCommandData,
+import {
+  type AttachGrantsCommandData,
+  attachGrantsCommandDataSchema,
+  type ChangeGrantRoleCommandData,
+  type DefineRolesCommandData,
+  type DeleteRoleCommandData,
+  type OffboardMemberCommandData,
 } from "../schemas/commands";
 import {
   AUTHZ_GRANTS_AGGREGATE_TYPE,
@@ -108,6 +109,56 @@ describe("attachGrants command", () => {
         command<AttachGrantsCommandData>({ ...data, commandId: "cmd_2" }),
       );
       expect(repeat[0]!.idempotencyKey).not.toBe(first[0]!.idempotencyKey);
+    });
+
+    /** @scenario "Cutover imports the legacy facts that only exist outside bindings" */
+    it("carries a cutover-imported share link's whole terms through to the event", async () => {
+      // The command schema embeds the shared resource-terms schema, so the
+      // cutover's emission rides it without a mapping of its own; validate
+      // through the schema the pipeline registers, then through the handler.
+      const entry = attachEntry({
+        grantId: "share_1",
+        principal: { type: "anyone" as const, id: null },
+        roleKey: null,
+        scope: { type: "RESOURCE" as const, id: "trace_1" },
+        source: "cutover-import" as const,
+        resource: {
+          kind: "trace" as const,
+          projectId: "proj_chatbot",
+          token: "tok_abc",
+          permission: "traces:view",
+          createdByUserId: "user_sam",
+          expiresAtMs: 1_700_000_600_000,
+          maxViews: 5,
+        },
+      });
+      const data = {
+        tenantId: ORG,
+        organizationId: ORG,
+        commandId: "cutover:share-links:org_acme:0",
+        grants: [entry],
+      };
+      expect(() => attachGrantsCommandDataSchema.parse(data)).not.toThrow();
+
+      const [event] = await new AttachGrantsCommand().handle(
+        command<AttachGrantsCommandData>(data),
+      );
+
+      expect(event!.data).toMatchObject({
+        grantId: "share_1",
+        roleKey: null,
+        scope: { type: "RESOURCE", id: "trace_1" },
+        source: "cutover-import",
+        resource: {
+          kind: "trace",
+          projectId: "proj_chatbot",
+          token: "tok_abc",
+          permission: "traces:view",
+          createdByUserId: "user_sam",
+          expiresAtMs: 1_700_000_600_000,
+          maxViews: 5,
+        },
+      });
     });
 
     it("keeps business time out of the payload — it rides the envelope only", async () => {

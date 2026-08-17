@@ -323,6 +323,37 @@ export class PrismaAuthzGrantsProjectionRepository
     }
   }
 
+  /**
+   * The cutover rollback's instant-enforcement write — the same revocation
+   * class as above (decision 7), applied to the flip itself. An operator
+   * rolling an organization back sends `cutover_rolled_back` and then calls
+   * this, so the projection the request-path gate reads says "legacy"
+   * before the operator's call returns, with the queue stopped or not. The
+   * fold applies the identical event later and converges on the same row.
+   *
+   * Shaped so it can only ever move the organization back onto the legacy
+   * path: `onEngine` is written false and nothing else. The upsert's create
+   * half is for an organization whose projection row does not exist yet —
+   * that is already "off", and writing the row makes the answer explicit
+   * rather than inferred.
+   *
+   * What bounds the fleet: the cutover gate's 60s TTL. Pods holding a
+   * positive answer stop honouring it within that window, which is the
+   * spec's "within the gate's cache window" and the reason the positive
+   * bound is short.
+   */
+  async enforceCutoverRollback({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<void> {
+    await this.prisma.authzCutoverProjection.upsert({
+      where: { organizationId },
+      create: { organizationId, onEngine: false },
+      update: { onEngine: false },
+    });
+  }
+
   async store(
     projection: StoredProjection<AuthzGrantsFoldState>,
     context: ProjectionStoreContext,

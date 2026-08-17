@@ -119,6 +119,11 @@ class FakeLedger implements GrantsLedgerEmitter {
   }): Promise<void> {
     this.parityCalls.push(args);
   }
+
+  /** The cutover's verb; the backfill never flips anything itself. */
+  async completeCutover(): Promise<void> {
+    throw new Error("the backfill completes no cutover");
+  }
 }
 
 /** Grants as the real collector would assemble them AFTER the backfill:

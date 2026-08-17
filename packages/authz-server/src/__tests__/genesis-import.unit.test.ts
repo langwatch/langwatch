@@ -162,6 +162,10 @@ class FakeLedger implements GrantsLedgerEmitter {
   async proveMigrationParity(): Promise<void> {
     throw new Error("the genesis import proves nothing to the ledger");
   }
+
+  async completeCutover(): Promise<void> {
+    throw new Error("the genesis import cuts nothing over");
+  }
 }
 
 function bindingRow(overrides: Partial<LegacyBindingRow> = {}): LegacyBindingRow {

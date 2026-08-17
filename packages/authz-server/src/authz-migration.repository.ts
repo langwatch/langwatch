@@ -117,6 +117,117 @@ export interface AuthzGenesisRepository {
   findRoleHeads(args: { organizationId: string }): Promise<RoleHeadRow[]>;
 }
 
+/** One ADR-057 `ShareLink` row as stored — the cutover's resource-fact
+ *  inventory and its import proof both speak this shape. The row's own id
+ *  becomes the grant id (adoption), so the compat head converges onto this
+ *  very row and the token customers already hold keeps working. */
+export type ShareLinkFactRow = {
+  id: string;
+  token: string;
+  /** The stored column's spelling, which the ledger's terms lowercase. */
+  resourceType: "TRACE" | "THREAD";
+  resourceId: string;
+  projectId: string;
+  /** Whoever minted the link; null for rows nobody minted by hand. */
+  userId: string | null;
+  visibility: "PUBLIC" | "ORGANIZATION" | "PROJECT";
+  expiresAtMs: number | null;
+  maxViews: number | null;
+  createdAtMs: number;
+};
+
+/** An `OrganizationUser.role = EXTERNAL` membership: the lite-member fact
+ *  the legacy schema stored as a membership column rather than a grant. */
+export type ExternalMemberFact = {
+  userId: string;
+  createdAtMs: number;
+};
+
+/** A project carrying the legacy per-project credential (`Project.apiKey`):
+ *  the fact behind an ingestion call that names no key row at all. */
+export type ProjectCredentialFact = {
+  projectId: string;
+  createdAtMs: number;
+};
+
+/** A user matched from the platform-admin email list. */
+export type PlatformAdminUserFact = {
+  userId: string;
+  /** Normalized (lowercased) — the migration reports the emails it could
+   *  not match, and matching is what decides that. */
+  email: string;
+  createdAtMs: number;
+};
+
+/** One RESOURCE-scope `Grant` head row, re-read for the import proof.
+ *  Columns as stored: `principalType` and `resourceKind` keep the database's
+ *  uppercase spellings, and the proof is where they meet the source row's. */
+export type ResourceGrantRow = {
+  grantId: string;
+  token: string | null;
+  resourceKind: string | null;
+  /** The RESOURCE scope's id: the shared resource itself. */
+  resourceId: string;
+  projectId: string | null;
+  principalType: string;
+  principalId: string | null;
+  expiresAtMs: number | null;
+  maxViews: number | null;
+};
+
+/**
+ * ADR-092 delivery plan PR 3 — the composite cutover migration's storage
+ * port: the legacy facts that live OUTSIDE bindings (share links, EXTERNAL
+ * memberships, per-project credentials, platform operators), the heads its
+ * proofs re-read, and the two lifecycle reads that decide when it may run
+ * at all. What any of it MEANS lives in ./cutover.migration.ts.
+ */
+export interface AuthzCutoverRepository
+  extends Pick<AuthzGenesisRepository, "findGrantHeadIds"> {
+  /**
+   * The stored status of each named migration for one tenant — `null` for a
+   * migration that has never run it. The cutover's prerequisite is that the
+   * backfill and the genesis import both finalized: it imports what is left
+   * over, and there is nothing to be left over from until they are done.
+   */
+  findMigrationTenantStatuses(args: {
+    tenantId: string;
+    migrationNames: readonly string[];
+  }): Promise<Record<string, string | null>>;
+
+  findShareLinkRows(args: {
+    organizationId: string;
+  }): Promise<ShareLinkFactRow[]>;
+  findExternalMemberFacts(args: {
+    organizationId: string;
+  }): Promise<ExternalMemberFact[]>;
+  findProjectCredentialFacts(args: {
+    organizationId: string;
+  }): Promise<ProjectCredentialFact[]>;
+  /** Users behind the platform-admin email list, matched case-insensitively
+   *  the way the live admin check matches them. */
+  findUsersByEmail(args: {
+    emails: readonly string[];
+  }): Promise<PlatformAdminUserFact[]>;
+
+  /** The RESOURCE heads, for the import proof. */
+  findResourceGrantRows(args: {
+    organizationId: string;
+  }): Promise<ResourceGrantRow[]>;
+
+  /** Every scope the decision-parity proof decides over. */
+  findOrganizationTeamAndProjectIds(args: {
+    organizationId: string;
+  }): Promise<OrganizationScopeInventory>;
+  /** Every principal the decision-parity proof decides for. */
+  findOrganizationMemberIds(args: { organizationId: string }): Promise<string[]>;
+  findOrganizationApiKeyIds(args: { organizationId: string }): Promise<string[]>;
+
+  /** The cutover projection's own answer — what the request-path gate reads,
+   *  observed here to know the flip actually landed. */
+  findCutoverOnEngine(args: { organizationId: string }): Promise<boolean>;
+}
+
 export interface AuthzMigrationRepository {
   findLegacyTeamRows(args: {
     organizationId: string;

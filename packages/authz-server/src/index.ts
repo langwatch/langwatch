@@ -45,15 +45,21 @@ export type {
   ForkedDecision,
 } from "./authz-fork.service";
 export type {
+  AuthzCutoverRepository,
   AuthzGenesisRepository,
   AuthzMigrationRepository,
   ExistingTeamBinding,
+  ExternalMemberFact,
   LegacyBindingRow,
   LegacyRoleRow,
   LegacyTeamRow,
   OrganizationMemberFact,
   OrganizationScopeInventory,
+  PlatformAdminUserFact,
+  ProjectCredentialFact,
+  ResourceGrantRow,
   RoleHeadRow,
+  ShareLinkFactRow,
   TeamBindingWrite,
 } from "./authz-migration.repository";
 export { AuthzShadowService } from "./authz-shadow.service";
