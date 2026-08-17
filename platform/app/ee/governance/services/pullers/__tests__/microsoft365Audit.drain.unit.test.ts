@@ -371,11 +371,12 @@ describe("Microsoft365AuditPuller drain", () => {
     seedBlobs(4);
 
     const t0 = 1_000_000;
-    let calls = 0;
-    vi.spyOn(Date, "now").mockImplementation(() => {
-      calls += 1;
-      return calls > 7 ? t0 + 10_000 : t0;
-    });
+    // Keyed on work actually done, per the rule stated above: the deadline
+    // passes once two blobs have been fetched, whatever number of clock reads
+    // it took the adapter to get there.
+    vi.spyOn(Date, "now").mockImplementation(() =>
+      fx.blobFetches.length >= 2 ? t0 + 10_000 : t0,
+    );
 
     const result = await puller.runOnce(
       { cursor: null, deadlineMs: t0 + 5_000 },
@@ -395,10 +396,9 @@ describe("Microsoft365AuditPuller window advance", () => {
     const puller = await loadPuller();
     const listedWindows: string[] = [];
 
-    // Capture the window each listing asks for.
-    const originalBlobs = fx.blobs;
+    // Nothing to drain: this test is about which window gets listed, not
+    // about blob contents.
     fx.listing = [];
-    void originalBlobs;
 
     const t0 = Date.parse("2026-05-03T12:00:00.000Z");
     vi.spyOn(Date, "now").mockImplementation(() => t0);

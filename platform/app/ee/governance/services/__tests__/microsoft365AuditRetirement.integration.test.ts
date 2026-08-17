@@ -21,7 +21,7 @@
 
 import { readFile } from "node:fs/promises";
 import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
-import { FREE_PLAN } from "@ee/licensing/constants";
+import { UNLIMITED_PLAN } from "@ee/licensing/constants";
 import type { PlanInfo } from "@ee/licensing/planInfo";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -33,7 +33,20 @@ import { prisma } from "~/server/db";
 const RETIRED_REASON = "[retired] Polled an Entra directory-change feed";
 
 const createdOrgIds: string[] = [];
-const enterprisePlan: PlanInfo = { ...FREE_PLAN, type: "ENTERPRISE" };
+/**
+ * Built from UNLIMITED_PLAN rather than FREE_PLAN, and with every tier-defining
+ * field overridden. Spreading FREE_PLAN and setting only `type` leaves
+ * `free: true` and `planSource: "free"` in place, so anything that branches on
+ * those — rather than on `type` — takes the free path while the fixture claims
+ * to be enterprise.
+ */
+const enterprisePlan: PlanInfo = {
+  ...UNLIMITED_PLAN,
+  type: "ENTERPRISE",
+  name: "Enterprise",
+  free: false,
+  planSource: "license",
+};
 
 beforeAll(async () => {
   // createSource() reads getApp().planProvider to enforce the source cap, so

@@ -28,7 +28,14 @@
 --    SET "status" = 'awaiting_first_event',
 --        "description" = NULLIF(
 --          regexp_replace("description", E'\n?\\[retired\\][^\n]*', '', 'g'), '')
---  WHERE "sourceType" = 'copilot_studio';
+--  WHERE "sourceType" = 'copilot_studio'
+--    AND "description" LIKE '%[retired] Polled an Entra directory-change feed%';
+--
+-- That second condition is not optional. The forward migration deliberately
+-- skips rows an admin had already disabled, so filtering on "sourceType"
+-- alone would sweep those up too and re-enable something a human switched
+-- off on purpose. The appended marker is the only record of which rows this
+-- migration actually changed, so it is what the rollback keys on.
 
 UPDATE "IngestionSource"
    SET "status" = 'disabled',
