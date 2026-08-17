@@ -20,7 +20,7 @@
  *
  * Spec: specs/ai-gateway/governance/anomaly-rule-threshold-schema.feature
  */
-import { z } from "zod";
+import { z } from "zod/v4";
 
 import { unsupportedValue } from "./unsupportedValue";
 

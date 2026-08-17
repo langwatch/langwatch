@@ -16,7 +16,7 @@
  */
 
 import { ActivityMonitorService } from "@ee/governance/services/activity-monitor/activityMonitor.service";
-import { z } from "zod";
+import { z } from "zod/v4";
 
 import {
   ENTERPRISE_FEATURE_ERRORS,

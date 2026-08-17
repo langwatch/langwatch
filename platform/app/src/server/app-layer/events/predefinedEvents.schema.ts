@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "zod/v4";
 
 /**
  * Predefined tracked-event schemas, isolated from the ingestion service so
