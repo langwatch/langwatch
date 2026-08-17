@@ -41,7 +41,7 @@ dispatch. The exact value a predicate sees at enqueue time is the value
 can change between the two, so a decision made at dispatch cannot be
 invalidated by execution-time drift.
 
-See [specs/event-sourcing/reactors.feature](../../../specs/event-sourcing/reactors.feature)
+See [specs/event-sourcing/post-event-work.feature](../../../specs/event-sourcing/post-event-work.feature)
 for the behavioural contract this decision supports.
 
 ## Decision
@@ -142,4 +142,4 @@ that condition belongs in `handle()`.
   state, so predicates reading `foldState.attributes` see the same values
   the handler does even on cache-rehydrated paths; ADR-021 held this
   before being superseded)
-- Spec: [specs/event-sourcing/reactors.feature](../../../specs/event-sourcing/reactors.feature)
+- Spec: [specs/event-sourcing/post-event-work.feature](../../../specs/event-sourcing/post-event-work.feature)

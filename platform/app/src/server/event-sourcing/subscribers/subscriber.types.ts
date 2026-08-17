@@ -56,7 +56,8 @@ export interface SubscriberDispatchOptions {
  * predicate filters the event out before enqueue.
  * Downstream commands handle their own dedup via makeJobId + delay.
  *
- * See dev/docs/adr/026-subscriber-should-react-predicate.md.
+ * See dev/docs/adr/026-reactor-should-react-predicate.md (the predicate's
+ * contract, unchanged; ADR-098 renamed its vocabulary).
  */
 export interface SubscriberDispatchDefinition<
   E extends Event = Event,
