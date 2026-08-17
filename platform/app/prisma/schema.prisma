@@ -142,6 +142,30 @@ enum RoleBindingScopeType {
   PROJECT
 }
 
+// The grants ledger (ADR-092 §13) - scope levels for Grant. Five tiers:
+// the three RoleBinding knows, plus RESOURCE (share-link heritage) and
+// PLATFORM (operator access, minted from ADMIN_EMAILS at cutover).
+enum GrantScopeType {
+  ORGANIZATION
+  TEAM
+  PROJECT
+  RESOURCE
+  PLATFORM
+}
+
+// WHO can hold a grant. Collectives (team, organization) are principals -
+// membership is expanded at check time, never copied per member. project
+// and anyone are valid at the resource tier only.
+enum GrantPrincipalType {
+  USER
+  API_KEY
+  GROUP
+  TEAM
+  ORGANIZATION
+  PROJECT
+  ANYONE
+}
+
 enum OrganizationUserRole {
   ADMIN
   MEMBER
@@ -2380,6 +2404,91 @@ model RoleBinding {
   @@index([groupId])
   @@index([apiKeyId])
   @@index([scopeType, scopeId])
+}
+
+// The grants ledger's operational projection (ADR-092 §13). One row per
+// access fact, fed exclusively by the authz_grants fold - application code
+// never writes here, with ONE named exception: revocation enforcement
+// deletes rows on the calling path ahead of the fold (deny-early only; the
+// fold's later apply of the same event is a no-op). Ids are deterministic
+// KSUIDs derived from event content, which is what makes every upsert
+// idempotent. Principal and scope are plain columns, not foreign keys: rows
+// are facts derived from the ledger, and five scope types point at five
+// different kinds of thing.
+model Grant {
+  id             String @id
+  organizationId String // plain column, never a relation: projection rows are
+  // facts derived from the ledger and must not presume any other row exists
+  // mid-replay or mid-migration
+
+  principalType GrantPrincipalType
+  principalId   String? // null only for ANYONE (resource tier)
+
+  roleKey String? // admin | member | viewer | lite-member | custom:<id>; null on RESOURCE rows
+
+  scopeType GrantScopeType
+  scopeId   String
+
+  // Resource-tier FACT columns (ShareLink heritage, ADR-057 possession
+  // intact; null on every other tier). All four are set by the mint event
+  // and owned by the fold like every other column here. View-consumption
+  // accounting (viewCount) deliberately does NOT live on this table - it
+  // has a different writer (ShareService) and lands as its own accounting
+  // row when ShareService moves onto the ledger.
+  token      String?   @unique
+  permission String?
+  expiresAt  DateTime?
+  maxViews   Int?
+
+  occurredAt DateTime // business time of the fact (backfills carry the legacy row's createdAt)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
+
+  // A partial index excluding RESOURCE rows (the collector's principal-scan
+  // hot path) lands in migration SQL with the engine read path - Prisma has
+  // no partial indexes.
+  @@index([organizationId, principalType, principalId])
+  @@index([organizationId, scopeType, scopeId])
+}
+
+// The grants ledger's role projection - CustomRole's successor, fed by the
+// same fold. Imported roles keep their CustomRole id, so custom:<id>
+// roleKeys stay stable across the cutover.
+model Role {
+  id             String   @id
+  organizationId String // plain column, never a relation (see Grant)
+  name           String
+  description    String?
+  permissions    Json // registry permission strings only; empty grants nothing
+  kind           String   @default("custom") // "custom" | "system_api_key"
+  occurredAt     DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+}
+
+// One row per organization: how far the authz_grants fold has applied.
+// Advanced by the projection writer itself - the write IS the version bump,
+// so no write path can skip it. Replaces the hand-bumped epoch at contract.
+model AuthzProjectionCursor {
+  organizationId    String   @id
+  lastEventId       String
+  acceptedAt        DateTime
+  occurredAt        DateTime
+  projectionVersion String
+  updatedAt         DateTime @default(now()) @updatedAt
+}
+
+// Projected from the ledger's cutover_* process events. What the per-org
+// permission fork and the legacy-fallback gate read.
+model AuthzCutoverProjection {
+  organizationId String   @id
+  onEngine       Boolean  @default(false)
+  provedAt       DateTime?
+  parityDiffs    Json?
+  updatedAt      DateTime @default(now()) @updatedAt
 }
 
 model ApiKey {
