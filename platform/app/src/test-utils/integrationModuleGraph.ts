@@ -1,65 +1,151 @@
 /**
- * Whether the integration suite reuses one module graph across its files, and
- * the teardown rule that makes that safe.
+ * Splits the datastore lane again, by whether a file can tolerate a shared
+ * module registry.
  *
- * Import is the largest single line item in this suite. Measured across the CI
- * shards it is ~216s against ~203s of actual test execution — 42% of the lane's
- * runner time, roughly 1.6s per file spent rebuilding the same Prisma client
- * and the same server graph. Sharing the registry reclaims most of it.
+ * Import is the largest single line item in this suite: ~216s against ~203s of
+ * actual test execution on a CI shard, 42% of the lane's runner time, roughly
+ * 1.6s per file rebuilding the same Prisma client and the same server graph.
+ * `isolate: false` reclaims most of it. Measured against native local services:
  *
- * The reason it could not simply be switched on is the teardown, not the
- * sharing. `setup.ts` is a SETUP FILE, so its `afterAll` runs once per test
- * FILE, and that hook disconnects Prisma and quits the app-layer Redis — the
- * two singletons the shared graph is meant to keep. With a fresh registry per
- * file that is correct and necessary: the sockets would otherwise pin the
- * worker open past the last test and the CI step would hit its job cap. With a
- * shared registry it is exactly wrong, because the singletons outlive the file
- * that closed them, and the next file resolves a disconnected client. That is
- * the "first file's teardown takes the next file's client with it" failure —
- * ECONNREFUSED, "Cannot resolve ClickHouse client", "App not initialized".
+ *   src/app/api    (49 files)  138.8s -> 43.9s   import 72.1s -> 11.9s  (-84%)
+ *   ee/governance  (23 files)   44.1s -> 17.3s   import 23.1s ->  9.9s  (-57%)
  *
- * So the two settings are one decision and live here together:
+ * Two things stood in the way, and only one of them was the one everybody
+ * assumed.
  *
- *   shared graph  →  per-file teardown resets ONLY the App (whose lifecycle
- *                    genuinely is per file), and the process-wide singletons
- *                    are closed once, when the worker is finishing.
- *   fresh graph   →  per-file teardown closes everything, as before.
+ * The teardown, which is fixed rather than partitioned around: `setup.ts` is a
+ * setup FILE, so its `afterAll` runs once per test FILE, and it disconnected
+ * Prisma and quit the app-layer Redis — the two singletons a shared graph
+ * exists to keep. With a fresh registry that is correct and load-bearing, since
+ * those sockets would otherwise pin the worker open past the last test. With a
+ * shared one it hands the next file a dead client. That is the "first file's
+ * teardown takes the next file's client with it" failure.
  *
- * `fileParallelism` is a separate decision with a separate reason — shared
- * ClickHouse and Redis INSTANCES rather than shared module state — and lives in
- * integrationFileConcurrency.ts. Files still run one at a time either way.
+ * `vi.mock`, which no teardown reaches and which this file exists for. Vitest
+ * hoists a module mock per test file and applies it while building THAT FILE's
+ * registry. Share the registry and a module an earlier file already
+ * instantiated stays unmocked, so the test calls the real collaborator. The
+ * symptom is `ECONNREFUSED` and `expected 500 to be 200` — nothing about
+ * containers or clients, which is exactly what sends people looking in the
+ * wrong place. 123 of the 414 integration files mock a module, so this is not a
+ * set to rewrite and not a single `isolate` for the whole lane.
+ *
+ * So it is a partition, on the same terms as the component/datastore split in
+ * integrationLanes.ts:
+ *
+ *   mocking lane — calls `vi.mock`. Fresh registry per file, exactly as today.
+ *   shared lane  — does not. One registry for the whole shard.
+ *
+ * The default is the MOCKING lane, and the rule is conservative in the same
+ * direction as the one it nests inside: a file leaves only by positively
+ * containing no `vi.mock`. A misjudgement costs time, never correctness.
  */
+import fs from "node:fs";
+import path from "node:path";
 
 /**
- * OFF, and the reason is `vi.mock` rather than anything above.
+ * A call to vitest's module mocker, in any of the spellings that hoist.
  *
- * The teardown described above is real and is implemented — it was the blocker
- * everyone assumed, and with it in place the sharing works and the numbers are
- * large. Measured on this branch against native local services:
+ * `vi.mock` and `vi.doMock` are the two that replace a module in the registry.
+ * `vi.hoisted` is included because its whole purpose is to run before the
+ * imports a mock factory closes over, so a file using it is a file whose
+ * mocking is registry-shaped even when the `vi.mock` sits behind an alias.
  *
- *   src/app/api (49 files)   138.8s -> 43.9s   import 72.1s -> 11.9s  (-84%)
- *   ee/governance (23 files)  44.1s -> 17.3s   import 23.1s ->  9.9s  (-57%)
- *
- * But eight files in the app/api slice fail with the graph shared, and each one
- * PASSES ALONE. They are not broken; they are contaminated. The cause is
- * `vi.mock`: vitest hoists a module mock per test file and applies it while
- * building that file's registry, so when the registry is shared and an earlier
- * file already instantiated the real module, the mock never takes. The test
- * then calls the real collaborator — which is why the failures are
- * `ECONNREFUSED ::1:5560` and `expected 500 to be 200` rather than anything
- * about containers or clients.
- *
- * 123 of the 414 integration files call `vi.mock`. That is not a set to
- * rewrite, and no teardown fixes it, so a single `isolate` for the whole lane
- * cannot be the answer.
- *
- * The shape that would work is a partition, exactly like the component and
- * datastore lanes in integrationLanes.ts: files that call `vi.mock` keep a
- * fresh registry, files that do not share one. That is ~291 files getting the
- * speedup above and ~123 keeping today's behaviour, and it needs a second
- * vitest project plus its own CI lane — a real change, and a separate one.
- *
- * Left wired up rather than deleted so the next attempt starts from the
- * measurement rather than from the assumption this file used to record.
+ * A shallow read of the file's own source, not of its import graph — the same
+ * soundness argument as DATASTORE_MARKERS: a file that mocks only through a
+ * helper cannot pass in the shared lane, so it fails loudly on the first run
+ * rather than passing for the wrong reason.
  */
-export const INTEGRATION_FILES_SHARE_MODULE_GRAPH = false;
+const MODULE_MOCK_PATTERN = /\bvi\s*\.\s*(mock|doMock|hoisted)\s*\(/;
+
+export type GraphLane = "mocking" | "shared";
+
+/**
+ * Which graph lane a single file belongs to, given its source.
+ *
+ * Exported for the guard test: the decision has to be inspectable on a string
+ * without a filesystem behind it, or it cannot be tested at the level it is
+ * made.
+ */
+export function graphLaneForSource(source: string): GraphLane {
+  return MODULE_MOCK_PATTERN.test(source) ? "mocking" : "shared";
+}
+
+export interface GraphPartition {
+  /** Relative paths that mock a module and so need a fresh registry. */
+  mocking: string[];
+  /** Relative paths that do not, and can share one. */
+  shared: string[];
+}
+
+/**
+ * Partition already-selected datastore files by graph lane.
+ *
+ * Takes the file list rather than walking the tree, so this composes with
+ * partitionIntegrationFiles instead of duplicating its walk — and so the two
+ * partitions cannot disagree about which files exist.
+ */
+export function partitionByModuleGraph({
+  root,
+  files,
+}: {
+  root: string;
+  files: string[];
+}): GraphPartition {
+  const mocking: string[] = [];
+  const shared: string[] = [];
+
+  for (const relative of files) {
+    let source: string;
+    try {
+      source = fs.readFileSync(path.join(root, relative), "utf8");
+    } catch {
+      // Unreadable is not evidence that sharing is safe. Send it to the lane
+      // that behaves as today and let the run report the real problem.
+      mocking.push(relative);
+      continue;
+    }
+    (graphLaneForSource(source) === "shared" ? shared : mocking).push(relative);
+  }
+
+  return { mocking, shared };
+}
+
+/**
+ * The lane this process was asked to run, or null for "both".
+ *
+ * Null is the local default and runs every datastore file with a fresh
+ * registry — identical to the behaviour before this split, so a plain
+ * `pnpm test:integration <path>` on a laptop is unchanged and no one has to
+ * know the lane exists. CI sets the variable and gets the two lanes.
+ */
+export function selectedGraphLane(env: NodeJS.ProcessEnv): GraphLane | null {
+  const value = env.INTEGRATION_GRAPH_LANE;
+  if (value === "mocking" || value === "shared") return value;
+  return null;
+}
+
+/**
+ * The files to run, and whether they may share a registry.
+ *
+ * One function so `include` and `isolate` are derived from the same decision.
+ * Splitting them is how a lane ends up running the mocking files with a shared
+ * graph, which is the failure this whole file exists to prevent.
+ */
+export function graphLaneSelection({
+  root,
+  datastoreFiles,
+  env,
+}: {
+  root: string;
+  datastoreFiles: string[];
+  env: NodeJS.ProcessEnv;
+}): { files: string[]; isolate: boolean } {
+  const lane = selectedGraphLane(env);
+  if (lane === null) return { files: datastoreFiles, isolate: true };
+
+  const partition = partitionByModuleGraph({ root, files: datastoreFiles });
+  return lane === "shared"
+    ? { files: partition.shared, isolate: false }
+    : { files: partition.mocking, isolate: true };
+}

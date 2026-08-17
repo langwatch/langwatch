@@ -51,7 +51,17 @@ try {
 
 // Now safe to import application code
 import { afterAll, beforeAll } from "vitest";
-import { INTEGRATION_FILES_SHARE_MODULE_GRAPH } from "../../../../test-utils/integrationModuleGraph";
+import { selectedGraphLane } from "../../../../test-utils/integrationModuleGraph";
+
+/**
+ * Whether this worker is running the shared-registry lane.
+ *
+ * Read from the same environment the config reads, rather than passed through
+ * vitest, because a setup file has no access to the resolved config. The two
+ * must agree — a shared registry with per-file singleton teardown is exactly
+ * the broken combination — so both go through selectedGraphLane().
+ */
+const SHARES_MODULE_GRAPH = selectedGraphLane(process.env) === "shared";
 import { resetApp, tryGetApp } from "../../../app-layer/app";
 import { startTestContainers, stopTestContainers } from "./testContainers";
 
@@ -60,7 +70,7 @@ import { startTestContainers, stopTestContainers } from "./testContainers";
  * Connects to containers (env vars already set at module load time).
  */
 export async function setup(): Promise<void> {
-  if (INTEGRATION_FILES_SHARE_MODULE_GRAPH) registerWorkerExitClose();
+  if (SHARES_MODULE_GRAPH) registerWorkerExitClose();
   try {
     await startTestContainers();
   } catch (error) {
@@ -149,7 +159,7 @@ export async function teardown(): Promise<void> {
   // was tried. The App container IS per-file state, so it still gets reset;
   // the process-wide clients are closed once, by the exit hook below.
   // See src/test-utils/integrationModuleGraph.ts.
-  if (INTEGRATION_FILES_SHARE_MODULE_GRAPH) {
+  if (SHARES_MODULE_GRAPH) {
     await resetApp();
     return;
   }
