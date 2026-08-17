@@ -11,8 +11,9 @@ Feature: SCIM Group Mapping
   #
   # SCIM is a RECONCILER (delivery plan decision 18): the IdP pushes
   # declarative state, the handler diffs it against the current projection
-  # and emits only the difference. Removals are applied with the immediate
-  # discipline - an IdP deprovision is the fired-employee case.
+  # and emits only the difference. Removals carry instant enforcement -
+  # an IdP deprovision is the fired-employee case, so the deny effect
+  # holds before the push returns, queue or no queue.
 
   # Parity status: 4 of 24 scenarios bound to existing tests.
   # The remaining are tracked under #3458:

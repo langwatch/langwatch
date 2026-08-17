@@ -246,10 +246,10 @@ Feature: Unified authorization engine
     When an admin revokes that binding
     Then alice's next permission check on "chatbot" is denied
 
-  # The grants ledger's immediate discipline (ADR-092 §13): a revocation is
-  # applied inline on the calling path after the ledger append is accepted.
-  # Redis is never involved - not as a fallback, by design - so the
-  # guarantee below must hold with Redis stopped entirely.
+  # The grants ledger's instant enforcement (ADR-092 §13): after the ledger
+  # append is accepted, a revocation applies the deny effect synchronously
+  # on the calling path, without waiting for the queued fold. Redis never
+  # gates it, so the guarantee below must hold with Redis stopped entirely.
   @integration @unimplemented
   Scenario: A revocation holds before the revoke call returns, with Redis stopped
     Given user "alice" has role "member" bound at project "chatbot"

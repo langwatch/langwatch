@@ -818,7 +818,7 @@ await grants.attach({ who: group(secEngId), role: "member",           where: tea
 await grants.attach({ who: apiKey(keyId),   role: customRole(sreId),  where: org(acmeId) });
 
 await grants.update({ grantId, role: "member" });
-await grants.revoke({ grantId });                 // immediate discipline (§13)
+await grants.revoke({ grantId });                 // instant enforcement (§13)
 await grants.replace({ who: user(aliceId), from: org(acmeId),   // the REDUCE
                        to: team(teamAId), role: "member" });    // verb
 
@@ -828,7 +828,7 @@ await grants.replace({ who: user(aliceId), from: org(acmeId),   // the REDUCE
 // rows today (member add, invites, SCIM, groups, API keys, project creation,
 // role editor, better-auth hooks) all route through grants.* — SCIM as a
 // reconciler: diff the IdP's declared state against the projection, emit
-// only the difference (removals immediate).
+// only the difference (removals carry instant enforcement).
 ```
 
 tRPC and Hono sugar stays declarative -
@@ -941,15 +941,30 @@ authz check reads. Checks **never** read ClickHouse.
   Grant, Role, RoleBinding, CustomRole, or grant AuditLog rows directly.
 ```
 
-**Two dispatch disciplines, declared per command.** `queued` (the default):
-append → GroupQueue (per-org FIFO) → fold → Postgres. `immediate` (revoke,
-offboard, cutover rollback, SCIM removals): append → apply inline on the
-calling path → Postgres — Redis is never involved, even when healthy; the
-normal queue fan-out still runs and the cursor guard makes the second apply
-a no-op. `immediate` is a scoped amendment to ADR-007's "web only dispatches
-to queues" (inline processing in the web role, this pipeline only; grant
-writes per day, not traces per second). It is a *discipline*, not
-circuit-breaker degradation: a revocation never depends on Redis by design.
+**Dispatch: the queue, best-effort FIFO.** Every command appends (waited) and folds
+through the GroupQueue in per-org FIFO. The ordering authority is the append
+itself — `(acceptedAt, eventId)` is the ledger's order, the projection
+follows it, and we accept that order as **best-effort FIFO**: it is the
+order ClickHouse accepted the events, which is the only order the system
+has. No fold ever runs inline, so ADR-007's web-role rule needs no
+amendment. If Redis is down, a circuit breaker scoped to this pipeline (for
+now) processes commands directly until it returns — degradation, accepted
+under best-effort FIFO.
+
+**Revocation is instant anyway — as enforcement, not as a fold.** For
+`grants.revoke`, `member_offboarded`, and `cutover_rolled_back`, after the
+append is accepted the service synchronously applies the *deny effect* on
+the calling path: it deletes the affected `Grant` projection rows right
+there, without waiting for the queue. The fold later applies the same event
+in its FIFO position; deleting an absent row is a no-op, so early
+enforcement and ordered convergence coexist. Redis never gates a
+revocation: with the queue down, the append and the enforcement still
+happen and the fold catches up when the queue returns. This is the **one
+sanctioned direct projection write** by application code — the "one writer"
+doctrine's single named exception — and it is shaped so it can only make
+*deny* true early, never grant. Known edge, accepted: revoking a grant
+whose attach event is still queued deletes nothing (no row yet); the attach
+then the revoke apply in order and the state converges to revoked.
 
 **Doctrines** (nothing else backs these; this ADR does):
 
@@ -985,7 +1000,7 @@ fork at the ten existing seams (7 in `rbac.ts`, 3 in
 `role-binding-resolver.ts`) flips that org to engine-primary with legacy as
 reverse-shadow. Any parity diff **holds** the org - behaviour unchanged,
 diffs in the report, re-proved next pass; `held` is a designed steady
-state, not failure. Rollback is `cutover_rolled_back` (immediate), live
+state, not failure. Rollback is `cutover_rolled_back` (instant enforcement), live
 within the gate's cache TTL, no deploy. Our own org first, in production,
 end to end; then the cohort widens self-service-first. Every deletion -
 the legacy resolvers, the quirk branches, the compat projection, the old
@@ -1137,8 +1152,8 @@ deliberately out of scope.
   until an org's cutover imports the rows into `Grant` (§8, §13); its
   possession-not-existence invariant is preserved by the collector either way.
 - The ledger's lineage (all §13): [ADR-007](./007-event-sourcing-architecture.md)
-  (the pipeline architecture; `immediate` is a scoped amendment to its
-  web-role rule), [ADR-022](./022-event-log-source-of-truth.md) (*event_log
+  (the pipeline architecture; its web-role rule holds unchanged — the
+  instant-enforcement write is a service write, not inline processing), [ADR-022](./022-event-log-source-of-truth.md) (*event_log
   as single source of truth* - cite by title, two files share the number;
   the waited `async_insert` append is its pattern; `leanForProjection`
   conformance is a no-op here, no heavy fields),
@@ -1147,7 +1162,7 @@ deliberately out of scope.
   [ADR-098](./098-post-event-work-subscribers-and-process-managers.md)
   (subscriber vocabulary; subscribers excluded from replay - what makes the
   insert-only audit subscriber safe), [ADR-093](./093-redis-is-an-owned-client.md)
-  (Redis ownership; the `immediate` discipline never touches it),
+  (Redis ownership; instant enforcement never touches it),
   [ADR-049](./049-langy-projection-independent-reactions.md)
   (store-before-dispatch, preserved verbatim by waiting the append).
 - Related: [ADR-070](./070-modular-package-architecture.md) (bounded-context

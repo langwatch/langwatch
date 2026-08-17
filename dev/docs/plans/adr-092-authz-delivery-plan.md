@@ -3,8 +3,8 @@
 **Companion to:** `dev/docs/adr/092-unified-authorization-engine.md` (the decision
 model: the walk, union semantics, possession, the owner ceiling — all still in
 force). **No new ADR**: ADR-092's storage and rollout sections are rewritten in
-place to the design below, and ADR-007 gains a scoped amendment section for the
-`immediate` discipline (the ADR-004 "Amendment: In-process workers" precedent).
+place to the design below. No ADR-007 amendment is needed —
+folds ride the queue (decision 7).
 ADR-001 flips to Superseded at contract. If genuinely new ground ever wants its
 own number, rebase off origin/main and take the next one — nothing more.
 Related ADRs the rewrite must cite: ADR-021 (the `(scopeType, scopeId)` house
@@ -30,8 +30,8 @@ work already merged (A = the engine #6894, B = the self-migration #7079).
 | 3 | **Vocabulary: permission = the what, scope = the where — everywhere.** Never call permissions "scopes" (collides with ScopeChipPicker's customer-facing meaning). The reductive behaviour on keys is the *owner ceiling*, which already has a name. |
 | 4 | **Build dark → per-org cutover → contract.** All code ships to production gated closed; an org cuts over all at once (never half); every deletion waits for 100 % of tenants finalized. |
 | 5 | **The fork replaces the codemod.** Ten call sites (7 in `rbac.ts`, 3 in `role-binding-resolver.ts`) already carry every legacy decision and already call `authzShadowFor`. They become a per-org fork: engine decides for a cut-over org, legacy for everyone else, the other runs as shadow either way. The `.permission()` codemod is cosmetic cleanup in the contract PR. |
-| 6 | **Grants are event-sourced** on the existing framework (ADR-049 shape). ClickHouse `event_log` is the single source of truth; the append is **waited on** for both disciplines; authz checks **never read ClickHouse** — Postgres projections only. |
-| 7 | **Two dispatch disciplines**, declared per command: `queued` (append → GroupQueue → projection; the default) and `immediate` (append → inline apply on the calling path, Redis never involved; for revoke/offboard). Both are commands producing events; the discipline is transport, not semantics. Distinct from circuit-breaker *degradation* (a queued command falling back when Redis is sick — that idea comes from the identity programme's D02, but our work lands first and depends on nothing in that PR; the framework's in-memory processor already exists on main). |
+| 6 | **Grants are event-sourced** on the existing framework (ADR-049 shape). ClickHouse `event_log` is the single source of truth; the append is **always waited on**; authz checks **never read ClickHouse** — Postgres projections only. |
+| 7 | **Dispatch is queued, best-effort FIFO — and revocation is instantly enforced.** Every command appends (waited) and folds through the GroupQueue in per-org FIFO; the ordering authority is the append order, `(acceptedAt, eventId)`. If Redis is down, a circuit breaker scoped to this pipeline (for now) processes commands directly until it returns — degradation, accepted under best-effort FIFO. Independently of Redis health, revoke/offboard/cutover-rollback apply the deny effect synchronously on the calling path before returning (delete the affected `Grant` rows); the fold later applies the same event in order, deleting an absent row is a no-op, so early enforcement and ordered convergence coexist. This is the ONE sanctioned direct projection write (the "one writer" doctrine's named exception), shaped so it can only make deny true early, never grant. Accepted edge: revoking a grant whose attach is still queued deletes nothing; both apply in order and converge to revoked. |
 | 8 | **Migration uses normal events.** The backfill emits plain `grant_attached` with `source: "backfill-b"` and `occurredAt` carried from the legacy row's `createdAt` (business time survives); `acceptedAt` is ledger time. One reducer path; replay exercises the live code. Only *process* facts get their own events: `migration_parity_proved`, `cutover_completed`, `cutover_rolled_back`. |
 | 9 | **Batched appends.** Migration events append in chunks per org (producer-append-coalescing already exists as a framework concept); efficiency comes from batching appends, not from fattening events. |
 | 10 | **`Grant` and `Role` are born as new, clean tables in PR 1** — never a rename of a live table, never hybrid columns on `RoleBinding`. During the transition the ledger is the single writer with two projections: events project into `Grant`/`Role` (the future) AND into legacy-shaped `RoleBinding`/`CustomRole` rows (the compat view the legacy path keeps reading). Contract deletes the compat projection and the old tables. Alex's mandate, stated 2026-08-17: this is the last rewrite of this flow — correct over expedient, everywhere the two diverge. |
@@ -40,9 +40,9 @@ work already merged (A = the engine #6894, B = the self-migration #7079).
 | 13 | **Platform grants minted from `ADMIN_EMAILS` by the cutover migration itself** — not manual insertion, because self-hosted operators never run anything (the in-place doctrine). The env var becomes bootstrap input, not live authority. |
 | 14 | **The projection cursor replaces `Organization.authzEpoch`.** The cursor is a monotonic per-org version written by the thing that writes the data, so it cannot drift. M7 is deleted from the runbook; stage-F passports key on the cursor. |
 | 15 | **Facts, not inference.** Every access is an explicit grant row; the four `LEGACY-QUIRK(C)` branches in `matchers.ts`/`walk.ts` exist because access is inferred today, and they die because it stops being. |
-| 16 | **ADRs are revised in place, not superseded by new numbers.** ADR-092's storage/rollout sections get rewritten; ADR-007 gains a scoped amendment; ADR-001 → Superseded at contract. New numbers only for genuinely new ground, taken after rebasing off origin/main. |
+| 16 | **ADRs are revised in place, not superseded by new numbers.** ADR-092's storage/rollout sections get rewritten; ADR-001 → Superseded at contract. New numbers only for genuinely new ground, taken after rebasing off origin/main. |
 | 17 | **The audit log is an insert-only event subscriber**, not a projection. Each runtime grant event inserts one `AuditLog` row in the existing shape — row id derived from the event id, `ON CONFLICT DO NOTHING`, never an update. A `when` guard skips `genesis-import` / `backfill-b` / `read-through-mint` sources so cutover never floods the audit page with backdated history. Subscribers are excluded from replay (ADR-098), so rebuilds can't touch it either. Grant write paths stop writing `AuditLog` directly when they become command emitters. The audit UI, table, and retention are untouched. |
-| 18 | **SCIM is a reconciler.** IdP pushes are declarative state; the handler diffs desired state against the Postgres projection and emits only the difference as `grants.*` commands (`source: "scim"`) — idempotent by construction, replayed pushes diff to nothing (the same diff-and-emit shape as the genesis import). SCIM **removals ride `immediate`** (an IdP deprovision is the fired-employee case); additions are queued. `scim-group-mapping.feature` is rewritten storage-neutral once, so it is true before and after cutover. |
+| 18 | **SCIM is a reconciler.** IdP pushes are declarative state; the handler diffs desired state against the Postgres projection and emits only the difference as `grants.*` commands (`source: "scim"`) — idempotent by construction, replayed pushes diff to nothing (the same diff-and-emit shape as the genesis import). SCIM **removals carry instant enforcement** (decision 7 — an IdP deprovision is the fired-employee case); additions are plain queued commands. `scim-group-mapping.feature` is rewritten storage-neutral once, so it is true before and after cutover. |
 | 19 | **The epoch stays until contract.** The Redis authz epoch store (`server/authz/epoch.ts`) is live, cheap, and spec-bound (`in-place-authz-migration.feature:112`, bound at `team-user-backfill.unit.test.ts:179`) — PR 1 keeps bumping it alongside the new cursor, which is what makes "passes unchanged" honestly true. The epoch dies in the contract PR, where its two spec scenarios are truthed-up to the cursor. (The `Organization.authzEpoch` *column* never shipped; the Redis store did.) |
 | 20 | **Per-user legacy ADMIN facts are in the import inventory.** `OrganizationUser.role = ADMIN` with zero bindings is a live fallback path (`specs/ai-gateway/rbac-legacy-admin-fallback.feature`); the floor row covers members only. The genesis import mints an org-scoped admin grant per such user, `occurredAt` from the row's `createdAt`. |
 | 21 | **Public REST names are frozen.** `/role-bindings`, the `bindings` wire shape, and `role_binding_already_exists` (409, `role-bindings-rest-api.feature:92`) are customer contracts — the no-sunset philosophy applies to API names exactly as to old keys. The Grant/Role rename never leaks to the wire; no `/grants` API until a customer need exists. |
@@ -118,19 +118,27 @@ process family:
 `occurredAt` = business time (backfilled grants carry the legacy row's
 `createdAt`); `acceptedAt` = ledger time. Appends are batched per org.
 
-### The dispatch disciplines
+### Dispatch (decision 7)
 
 ```text
-                    ┌─ ClickHouse append — WAITED, both paths ─┐
- queued (default):  └► GroupQueue (org FIFO) ► reducer ► PG    │ CH down ⇒ no
- immediate:         └► inline apply ► PG, then queue fan-out   │ grant writes;
-                       (cursor guard makes double-apply no-op) │ checks unaffected
- Redis down: queued stalls & drains · immediate DOESN'T NOTICE
+ every command:   ClickHouse append — WAITED — then
+                  └► GroupQueue (org FIFO) ► fold ► PG
+                     order = (acceptedAt, eventId) — best-effort FIFO
+
+ revoke / offboard / cutover-rollback, ADDITIONALLY, before returning:
+                  └► enforcement: DELETE affected Grant rows on the
+                     calling path (deny takes effect NOW; the fold
+                     re-applies the event later in order — deleting an
+                     absent row is a no-op, so it converges)
+
+ CH down    ⇒ no grant writes at all; checks unaffected (PG only)
+ Redis down ⇒ queued folds stall & drain; REVOCATION DOESN'T NOTICE
 ```
 
-`immediate` needs a scoped ADR-007 amendment (inline processing in the web
-role, this pipeline only, volume argument: grant writes per day, not traces
-per second). Written by us; no dependency on the identity PR.
+No ADR-007 amendment needed — no fold runs inline anywhere; the enforcement
+delete is a plain service write. It is the one sanctioned direct projection
+write (decision 7). The Redis-down circuit breaker is scoped to this
+pipeline for now. No dependency on the identity PR.
 
 ## The PR map (4 + 1)
 
@@ -148,7 +156,8 @@ becomes the ledger. Bill of materials:
   `RoleBinding`/`CustomRole` rows (the compat view; the mapping
   roleKey → `(role, customRoleId)` lives only here). One writer, two views —
   never a dual-write from application code.
-- The `immediate` discipline as a framework primitive + the ADR-007 amendment.
+- The instant-enforcement revocation path (a service-level write, decision 7)
+  and the pipeline-scoped Redis circuit breaker.
 - `AuthzProjectionCursor`.
 - `TeamUserBackfillMigration` refactored: emits batched `grant_attached`
   (source backfill-b, backdated occurredAt) → awaits projection → parity proof
@@ -180,9 +189,10 @@ becomes the ledger. Bill of materials:
 - All eight write paths (member add, invites, SCIM, groups, API keys, project
   creation, role editor, better-auth hooks) become `grants.*` command
   emitters and **stop writing tables directly** — both tables are
-  projection-fed from here on. `grants.revoke` / `offboard` are `immediate`.
+  projection-fed from here on. `grants.revoke` / `offboard` carry instant enforcement (decision 7).
   SCIM specifically becomes a reconciler (decision 18): diff desired IdP state
-  against the projection, emit only the difference; removals `immediate`.
+  against the projection, emit only the difference; removals carry instant
+  enforcement.
 - **The audit subscriber** (decision 17) lands here, in the same change that
   stops the write paths writing `AuditLog` directly: insert-only, row id from
   event id, `ON CONFLICT DO NOTHING`, `when` guard skipping genesis/backfill/
@@ -203,7 +213,7 @@ becomes the ledger. Bill of materials:
 - The fork at the 10 seams reads the cutover projection: engine primary for
   migrated orgs, legacy as reverse-shadow; unmigrated orgs unchanged, legacy
   primary, engine as shadow.
-- Rollback: `cutover_rolled_back` (immediate discipline), org back on legacy
+- Rollback: `cutover_rolled_back` (instant enforcement), org back on legacy
   within the gate's cache TTL, no deploy.
 - **Our own org first, in production, used end to end. Then widen the cohort
   self-service-first, watching the ops page.**
@@ -261,7 +271,7 @@ one scenario per failure mode, each bound to a spec scenario with
 overtesting:
 
 1. queued write converges to the projection (cursor advances once).
-2. **immediate revoke: Grant row gone before the call returns, with Redis
+2. **instant revoke: Grant row gone before the call returns, with Redis
    stopped.**
 3. crash mid-import: next pass finishes the stranded work (the `previous`
    contract).
