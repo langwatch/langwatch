@@ -144,6 +144,60 @@ describe("ActivityMonitorService pulled and pushed source events", () => {
     );
   });
 
+  it("shows a negative reported cost rather than zeroing it", async () => {
+    // The HTTP and S3 pollers resolve `cost_usd` from a customer-configured
+    // JSONPath, so a credit or adjustment line lands here verbatim. This view
+    // renders the stored OCSF row — the audit record — and must not show 0 for
+    // a figure the row plainly contains.
+    query.mockImplementation(async ({ query: sql }: { query: string }) => ({
+      json: async () =>
+        sql.includes("governance_ocsf_events")
+          ? [
+              {
+                eventId: "credit-line",
+                eventType: "http_polling",
+                actorUserId: "",
+                actorEmail: "pulled@example.com",
+                actorEnduserId: "",
+                action: "usage_report",
+                target: "claude-haiku-4-5",
+                occurredMs: "1786619820000",
+                createdMs: "1786619821000",
+                rawPayload: JSON.stringify({
+                  metadata: {
+                    extension: {
+                      cost_usd: -12.5,
+                      tokens_input: 8,
+                      tokens_output: 5,
+                    },
+                  },
+                }),
+              },
+            ]
+          : [],
+    }));
+
+    const prisma = {
+      project: { findFirst: vi.fn(async () => ({ id: "gov-project" })) },
+    };
+    const service = ActivityMonitorService.create(prisma as never);
+
+    const rows = await service.eventsForSource({
+      organizationId: "org",
+      sourceId: "source",
+      limit: 50,
+    });
+
+    expect(rows[0]).toEqual(
+      expect.objectContaining({
+        eventId: "credit-line",
+        costUsd: -12.5,
+        tokensInput: 8,
+        tokensOutput: 5,
+      }),
+    );
+  });
+
   it("includes pulled OCSF events in source health counts and last event", async () => {
     const prisma = {
       project: { findFirst: vi.fn(async () => ({ id: "gov-project" })) },

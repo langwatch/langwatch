@@ -278,14 +278,23 @@ function startOfUtcDay(ms: number): number {
  * the dashboard. Each field catches independently so one bad value does not
  * zero the other two, and the object catches so a non-object extension is a 0
  * rather than a throw.
+ *
+ * Deliberately NOT `.nonnegative()`. This reads the stored OCSF row, which is
+ * the audit record, and a view of an audit record must not quietly disagree
+ * with it: the generic HTTP and S3 pollers resolve `cost_usd` from a
+ * customer-configured JSONPath and carry a credit or adjustment line through
+ * verbatim, so a negative here is a figure someone actually reported, not
+ * corruption. Rendering it as 0 would hide money that the row plainly
+ * contains. Only unrepresentable values — `NaN`, `Infinity`, a string, an
+ * object — collapse to 0, because those have no figure to show.
  */
 const ZERO_PULLED_USAGE = { cost_usd: 0, tokens_input: 0, tokens_output: 0 };
 
 const pulledUsageExtensionSchema = z
   .object({
-    cost_usd: z.coerce.number().finite().nonnegative().catch(0),
-    tokens_input: z.coerce.number().finite().nonnegative().catch(0),
-    tokens_output: z.coerce.number().finite().nonnegative().catch(0),
+    cost_usd: z.coerce.number().finite().catch(0),
+    tokens_input: z.coerce.number().finite().catch(0),
+    tokens_output: z.coerce.number().finite().catch(0),
   })
   .catch(ZERO_PULLED_USAGE);
 
