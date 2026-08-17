@@ -299,12 +299,15 @@ describe("SimulationClickHouseRepository (integration)", () => {
       /** @scenario "An empty scenario set id still selects the default set" */
       it("keeps the default set filter instead of dropping it", async () => {
         const batchRunId = `batch-default-${nanoid()}`;
-        const defaultSetRunId = `run-default-${nanoid()}`;
+        // The default set holds both storage values: "" from rows written
+        // before the set id got its name, and "default" from rows after.
+        const legacyDefaultRunId = `run-legacy-default-${nanoid()}`;
+        const namedDefaultRunId = `run-named-default-${nanoid()}`;
 
         await insertRow(
           ch,
           makeInsertRow({
-            ScenarioRunId: defaultSetRunId,
+            ScenarioRunId: legacyDefaultRunId,
             BatchRunId: batchRunId,
             ScenarioSetId: "",
           }),
@@ -312,7 +315,15 @@ describe("SimulationClickHouseRepository (integration)", () => {
         await insertRow(
           ch,
           makeInsertRow({
-            ScenarioRunId: `run-named-${nanoid()}`,
+            ScenarioRunId: namedDefaultRunId,
+            BatchRunId: batchRunId,
+            ScenarioSetId: "default",
+          }),
+        );
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: `run-other-set-${nanoid()}`,
             BatchRunId: batchRunId,
             ScenarioSetId: `set-named-${nanoid()}`,
           }),
@@ -326,9 +337,11 @@ describe("SimulationClickHouseRepository (integration)", () => {
 
         expect(result.changed).toBe(true);
         if (!result.changed) throw new Error("expected changed");
-        expect(result.runs.map((r) => r.scenarioRunId)).toEqual([
-          defaultSetRunId,
-        ]);
+        // The two default rows share a CreatedAt, so their order is not
+        // decided; only membership is.
+        expect(result.runs.map((r) => r.scenarioRunId).sort()).toEqual(
+          [legacyDefaultRunId, namedDefaultRunId].sort(),
+        );
       });
     });
   });
