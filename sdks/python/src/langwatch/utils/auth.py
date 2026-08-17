@@ -13,7 +13,7 @@ Supports three token families that share the same HTTP surface:
    a project is configured. Without it the server can only infer a project
    when the key holds exactly one project-scoped role binding, and refuses the
    request otherwise. The two ``sk-lw-*`` families are told apart by body
-   shape, not by the presence of an underscore — see ``requires_project_id``.
+   shape, not by the presence of an underscore — see ``requires_project_header``.
 
 3. ``pat-lw-*`` — Personal Access Tokens. PATs are user-owned and must
    be paired with a ``project_id`` so the server can resolve the correct
@@ -46,7 +46,7 @@ def is_personal_access_token(token: str) -> bool:
     return bool(token) and token.startswith(PAT_PREFIX)
 
 
-def requires_project_id(token: str) -> bool:
+def requires_project_header(token: str) -> bool:
     """Returns ``True`` when ``token`` cannot identify its own project.
 
     New-format API keys (``sk-lw-{16}_{48}``) and ingestion keys (``ik-lw-*``)
@@ -100,8 +100,8 @@ def build_auth_headers(
             "X-Auth-Token": api_key,
         }
 
-    # Legacy sk-lw-* key: preserve dual-header shape for callers that
-    # read either header.
+    # Every non-PAT key (legacy sk-lw-*, new-format sk-lw-*, ik-lw-*) keeps the
+    # dual-header shape for callers that read either header.
     headers = {
         "Authorization": f"Bearer {api_key}",
         "X-Auth-Token": api_key,
@@ -110,7 +110,7 @@ def build_auth_headers(
     # New-format sk-lw-* and ik-lw-* keys carry no project of their own, so the
     # request has to name one. Legacy keys are left untouched: the server
     # resolves them from the token alone and ignores a supplied project.
-    if resolved_project_id and requires_project_id(api_key):
+    if resolved_project_id and requires_project_header(api_key):
         headers["X-Project-Id"] = resolved_project_id
 
     return headers
