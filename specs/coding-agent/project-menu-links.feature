@@ -76,6 +76,26 @@ Rule: The project rail grows its coding-agent destinations from recorded activit
     viewer may not read the project's traces
     Then the project rail offers neither coding-agent destination
 
+Rule: The project rail marks the coding-agent destination the reader is on
+
+  The rail decides what is open from the route pattern the router reports, so
+  a destination whose route the router cannot name reads as never open and the
+  rail marks nothing while the reader is standing on the page.
+
+  @integration
+  Scenario: The rail marks the Sessions destination while the Sessions page is open
+    Given a member reading the project's Sessions page
+    When the project rail is drawn
+    Then the Sessions destination is marked as the open one
+    And the Pull requests destination is not marked
+
+  @integration
+  Scenario: The rail marks the Pull requests destination while the Pull requests page is open
+    Given a member reading the project's Pull requests page
+    When the project rail is drawn
+    Then the Pull requests destination is marked as the open one
+    And the Sessions destination is not marked
+
 Rule: The destinations open onto this project's own work
 
   @integration
