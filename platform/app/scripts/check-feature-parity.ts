@@ -343,6 +343,14 @@ const LEGACY_INERT: string[] = [
   "specs/ai-governance/sessions/sessions-inventory.feature",
   "specs/analytics/dashboard-rest-api.feature",
   "specs/analytics/posthog-cost-control.feature",
+  // The annotation domain, written alongside the headless e2e tier. Every
+  // scenario is @unimplemented, which here means UNBOUND rather than unbuilt:
+  // most of this behaviour ships today and has tests, but none of them carries
+  // the `@scenario` annotation that would tie the two together. Tagging them
+  // @unit or @integration without doing that binding would report coverage
+  // these files do not have. Remove both entries as the bindings land.
+  "specs/annotations/annotation-queues.feature",
+  "specs/annotations/annotations.feature",
   "specs/audit-log/audit-log.feature",
   "specs/auth/auth-signin-flows.feature",
   "specs/auth/dev-port-origin-alignment.feature",
@@ -362,6 +370,12 @@ const LEGACY_INERT: string[] = [
   "specs/batch-evaluation-results/experiment-cost-folding.feature",
   "specs/batch-evaluation-results/run-comparison.feature",
   "specs/batch-evaluation-results/target-metadata-api.feature",
+  // What the e2e suite guarantees about ITSELF — per-test tenants, which tiers
+  // a pull request runs. tests/agentic-e2e asserts these, and cannot bind them:
+  // this checker scans `.test.ts` / `.test.tsx`, and Playwright specs are
+  // `.spec.ts` under a root it does not walk. Remove this entry when the
+  // checker learns to read Playwright specs.
+  "specs/ci/e2e-tiers.feature",
   "specs/ci/migration-order.feature",
   "specs/ci/no-committed-screenshots.feature",
   "specs/ci/no-docker-integration-tests.feature",
