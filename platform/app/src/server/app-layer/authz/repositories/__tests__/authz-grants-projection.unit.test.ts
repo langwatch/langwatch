@@ -12,10 +12,18 @@ import type { AuthzGrantsFoldState } from "~/server/event-sourcing/pipelines/aut
 import type { StoredProjection } from "~/server/event-sourcing/projections/stateProjection.types";
 import { PrismaAuthzGrantsProjectionRepository } from "../authz-grants-projection.prisma.repository";
 
-function makePrisma() {
+function makePrisma({
+  revokedProjectIds = [],
+}: { revokedProjectIds?: (string | null)[] } = {}) {
   return {
-    grant: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+    grant: {
+      findMany: vi.fn(async () =>
+        revokedProjectIds.map((projectId) => ({ projectId })),
+      ),
+      deleteMany: vi.fn(async () => ({ count: 0 })),
+    },
     roleBinding: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+    shareLink: { deleteMany: vi.fn(async () => ({ count: 0 })) },
   } as unknown as PrismaClient;
 }
 
@@ -45,6 +53,30 @@ function roleFact(overrides: Partial<RoleFact> = {}): RoleFact {
   };
 }
 
+function shareGrant({
+  grantId,
+  source,
+}: {
+  grantId: string;
+  source: GrantFact["source"];
+}): GrantFact {
+  return {
+    grantId,
+    principal: { type: "anyone", id: null },
+    roleKey: null,
+    scope: { type: "RESOURCE", id: "trace_t1" },
+    resource: {
+      kind: "trace",
+      projectId: "proj_chatbot",
+      token: `tok_${grantId}`,
+      permission: "traces:view",
+      createdByUserId: "user_sam",
+    },
+    source,
+    occurredAtMs: 1_690_000_000_000,
+  };
+}
+
 type MigrationRow = {
   migrationName: string;
   status: string;
@@ -69,6 +101,8 @@ function makeStorePrisma({
   roleBindingUpsert = vi.fn(async () => undefined),
   roleBindingUpdateMany = vi.fn(async () => ({ count: 1 })),
   customRoleUpsert = vi.fn(async () => undefined),
+  shareLinkUpsert = vi.fn(async () => undefined),
+  shareLinkUpdateMany = vi.fn(async () => ({ count: 0 })),
 }: {
   cursorPresent?: boolean;
   storedGrants?: GrantFact[];
@@ -80,6 +114,8 @@ function makeStorePrisma({
   roleBindingUpsert?: ReturnType<typeof vi.fn>;
   roleBindingUpdateMany?: ReturnType<typeof vi.fn>;
   customRoleUpsert?: ReturnType<typeof vi.fn>;
+  shareLinkUpsert?: ReturnType<typeof vi.fn>;
+  shareLinkUpdateMany?: ReturnType<typeof vi.fn>;
 } = {}) {
   return {
     authzProjectionCursor: {
@@ -116,6 +152,13 @@ function makeStorePrisma({
       findMany: vi.fn(async () =>
         teamUserReferences.map((assignedRoleId) => ({ assignedRoleId })),
       ),
+    },
+    shareLink: {
+      deleteMany: vi.fn(),
+      // Injected, because the share assertions read the payload back off the
+      // spy: the create and update halves must never carry a viewCount.
+      upsert: shareLinkUpsert,
+      updateMany: shareLinkUpdateMany,
     },
     customRole: { deleteMany: vi.fn(), upsert: customRoleUpsert },
     authzCutoverProjection: { upsert: vi.fn() },
@@ -185,7 +228,7 @@ function prismaConflict(code: string) {
 describe("PrismaAuthzGrantsProjectionRepository", () => {
   describe("when a revocation is enforced on the calling path", () => {
     it("deletes both heads keyed by organization and the named grant ids only", async () => {
-      const prisma = makePrisma();
+      const prisma = makePrisma({ revokedProjectIds: [null, null] });
       const repository = new PrismaAuthzGrantsProjectionRepository(prisma);
 
       await repository.enforceGrantRevocation({
@@ -200,6 +243,49 @@ describe("PrismaAuthzGrantsProjectionRepository", () => {
       // Compat rows share the grant id, so a legacy-authored binding can
       // never be collateral - its id is not a grant id.
       expect(prisma.roleBinding.deleteMany).toHaveBeenCalledWith(scoped);
+      // No resource grant among them, so no project to scope a share
+      // deletion by - and nothing to delete.
+      expect(prisma.shareLink.deleteMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the revocation names a resource grant", () => {
+    it("deletes the share row too, scoped by the project it read first", async () => {
+      const prisma = makePrisma({ revokedProjectIds: ["proj_chatbot"] });
+      const repository = new PrismaAuthzGrantsProjectionRepository(prisma);
+
+      await repository.enforceGrantRevocation({
+        organizationId: ORG,
+        grantIds: ["grant_share_1"],
+      });
+
+      // The projectId has to come off the Grant row before that row is
+      // deleted: ShareLink has no organizationId, and the multitenancy
+      // guard rejects a bulk delete that cannot name a project.
+      expect(prisma.grant.findMany).toHaveBeenCalledWith({
+        where: { organizationId: ORG, id: { in: ["grant_share_1"] } },
+        select: { projectId: true },
+      });
+      expect(prisma.shareLink.deleteMany).toHaveBeenCalledWith({
+        where: {
+          projectId: { in: ["proj_chatbot"] },
+          id: { in: ["grant_share_1"] },
+        },
+      });
+    });
+  });
+
+  describe("when the fold already applied the revocation", () => {
+    it("leaves the share rows alone, since the same pass removed them", async () => {
+      const prisma = makePrisma({ revokedProjectIds: [] });
+      const repository = new PrismaAuthzGrantsProjectionRepository(prisma);
+
+      await repository.enforceGrantRevocation({
+        organizationId: ORG,
+        grantIds: ["grant_share_1"],
+      });
+
+      expect(prisma.shareLink.deleteMany).not.toHaveBeenCalled();
     });
   });
 
@@ -338,6 +424,86 @@ describe("PrismaAuthzGrantsProjectionRepository", () => {
     });
   });
 
+  describe("when the fold stores a resource grant", () => {
+    it("writes the Grant head and the share link the legacy reads use", async () => {
+      const shareLinkUpsert = vi.fn(async () => undefined);
+      const prisma = makeStorePrisma({ shareLinkUpsert });
+      const repository = new PrismaAuthzGrantsProjectionRepository(prisma);
+
+      await repository.store(
+        storedProjection({
+          grants: [
+            shareGrant({ grantId: "grant_share_1", source: "grants-service" }),
+          ],
+        }),
+        CONTEXT,
+      );
+
+      expect(prisma.grant.upsert).toHaveBeenCalledTimes(1);
+      expect(prisma.shareLink.upsert).toHaveBeenCalledTimes(1);
+      // A resource fact has no legacy binding to be - only a share row.
+      expect(prisma.roleBinding.upsert).not.toHaveBeenCalled();
+
+      const call = shareLinkUpsert.mock.calls[0]?.[0];
+      expect(call).toEqual({
+        where: { projectId: "proj_chatbot", id: "grant_share_1" },
+        create: expect.objectContaining({
+          id: "grant_share_1",
+          token: "tok_grant_share_1",
+          resourceType: "TRACE",
+          resourceId: "trace_t1",
+          projectId: "proj_chatbot",
+          userId: "user_sam",
+          visibility: "PUBLIC",
+        }),
+        update: expect.objectContaining({ token: "tok_grant_share_1" }),
+      });
+    });
+
+    it("never names viewCount, so ShareService's accounting survives the pass", async () => {
+      const shareLinkUpsert = vi.fn(async () => undefined);
+      const prisma = makeStorePrisma({ shareLinkUpsert });
+      const repository = new PrismaAuthzGrantsProjectionRepository(prisma);
+
+      await repository.store(
+        storedProjection({
+          grants: [
+            shareGrant({ grantId: "grant_share_1", source: "grants-service" }),
+          ],
+        }),
+        CONTEXT,
+      );
+
+      const args = shareLinkUpsert.mock.calls[0]?.[0];
+      expect(Object.keys(args?.create ?? {})).not.toContain("viewCount");
+      expect(Object.keys(args?.update ?? {})).not.toContain("viewCount");
+    });
+  });
+
+  describe("when the fold stores a cutover-imported resource grant", () => {
+    it("updates the share row it adopted and never authors a new one", async () => {
+      const prisma = makeStorePrisma();
+      const repository = new PrismaAuthzGrantsProjectionRepository(prisma);
+
+      await repository.store(
+        storedProjection({
+          grants: [shareGrant({ grantId: "sl_1", source: "cutover-import" })],
+        }),
+        CONTEXT,
+      );
+
+      // The import adopts the ShareLink's own id, so the original row IS the
+      // compat row; a missing row means there is nothing to converge onto.
+      expect(prisma.shareLink.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { projectId: "proj_chatbot", id: "sl_1" },
+        }),
+      );
+      expect(prisma.shareLink.upsert).not.toHaveBeenCalled();
+      expect(prisma.grant.upsert).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("given a grant that left the folded state", () => {
     describe("when the state was reconstructed from storage", () => {
       it("deletes its head and its compat row, and nothing else", async () => {
@@ -360,6 +526,43 @@ describe("PrismaAuthzGrantsProjectionRepository", () => {
         // can never be collateral.
         expect(prisma.roleBinding.deleteMany).toHaveBeenCalledWith(scoped);
         expect(prisma.roleBinding.deleteMany).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when the departed fact is a resource fact", () => {
+      it("deletes the Grant row and the share row it authored", async () => {
+        const prisma = makeStorePrisma({
+          storedGrants: [
+            shareGrant({ grantId: "grant_share_1", source: "grants-service" }),
+          ],
+        });
+        const repository = new PrismaAuthzGrantsProjectionRepository(prisma);
+
+        await repository.store(storedProjection(), CONTEXT);
+
+        expect(prisma.grant.deleteMany).toHaveBeenCalledWith({
+          where: { organizationId: ORG, id: { in: ["grant_share_1"] } },
+        });
+        expect(prisma.shareLink.deleteMany).toHaveBeenCalledWith({
+          where: {
+            projectId: { in: ["proj_chatbot"] },
+            id: { in: ["grant_share_1"] },
+          },
+        });
+      });
+    });
+
+    describe("when no departed fact names a project", () => {
+      it("leaves the share table alone", async () => {
+        const prisma = makeStorePrisma({
+          storedGrants: [grantFact({ grantId: "grant_1" })],
+        });
+        const repository = new PrismaAuthzGrantsProjectionRepository(prisma);
+
+        await repository.store(storedProjection(), CONTEXT);
+
+        expect(prisma.grant.deleteMany).toHaveBeenCalledTimes(1);
+        expect(prisma.shareLink.deleteMany).not.toHaveBeenCalled();
       });
     });
 

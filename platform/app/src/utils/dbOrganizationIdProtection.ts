@@ -268,6 +268,16 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
     extraBound: ({ clause }) =>
       typeof clauseField(clause, "token") === "string",
   },
+  // ShareService's view accounting for resource grants (delivery-plan
+  // decision 22). Keyed by grantId - a ledger-derived id, globally unique
+  // and resolving to exactly one organization - which is also the only
+  // predicate the per-view increment can name, since the viewer arrives
+  // with a share token and nothing else.
+  GrantUsage: {
+    extraBound: ({ clause }) =>
+      typeof clauseField(clause, "grantId") === "string" ||
+      isNonEmptyStringList(clauseField(clause, "grantId")),
+  },
   Role: {},
   AuthzProjectionCursor: {},
   AuthzCutoverProjection: {},

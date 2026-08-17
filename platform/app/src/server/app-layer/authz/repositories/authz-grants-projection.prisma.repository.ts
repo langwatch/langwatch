@@ -1,9 +1,11 @@
 import {
   type CompatBindingRowShape,
+  type CompatShareLinkRowShape,
   type GrantEventSource,
   type GrantRowShape,
   type GrantsLedgerState,
   grantFactToCompatBinding,
+  grantFactToCompatShareLink,
   grantFactToRow,
   grantRowToFact,
   type LedgerMigrationStatus,
@@ -70,6 +72,13 @@ type RoleColumns = Omit<
   permissions: unknown;
 };
 
+/**
+ * Every column the fold owns on a `Grant` row, resource tier included. The
+ * resource identity columns are in here for the same reason the role ones
+ * are: a share link whose kind, project or author changed is a CHANGED fact,
+ * and a fingerprint blind to those columns would leave both the future head
+ * and its compat `ShareLink` row describing the previous link forever.
+ */
 function grantFingerprint(row: GrantColumns): string {
   return JSON.stringify([
     row.principalType,
@@ -81,6 +90,9 @@ function grantFingerprint(row: GrantColumns): string {
     row.scopeId,
     row.token,
     row.permission,
+    row.resourceKind,
+    row.projectId,
+    row.createdByUserId,
     row.expiresAt?.getTime() ?? null,
     row.maxViews,
     row.occurredAt.getTime(),
@@ -139,8 +151,9 @@ interface StoredHeads {
  * The grants ledger's two-headed Postgres store (ADR-092 §13, decision 10):
  * one writer, two views. `store()` materialises the folded state into
  * `Grant`/`Role` (the future head) AND legacy-shaped
- * `RoleBinding`/`CustomRole` rows (the compat head the legacy resolver
- * keeps reading), plus the per-org cursor and the cutover projection —
+ * `RoleBinding`/`CustomRole` rows — plus, for the resource tier, `ShareLink`
+ * rows (the compat head the legacy resolver and the share reads keep
+ * reading), plus the per-org cursor and the cutover projection —
  * every write idempotent by deterministic id, no transactions (decision 7):
  * a crash between writes re-runs under the queue's per-org lock and every
  * upsert converges.
@@ -159,8 +172,8 @@ interface StoredHeads {
  *     a lie on the ops page and an ordering hazard.
  *
  * Compat deletions are keyed by the grant ids that LEFT the state, never by
- * a diff of the whole table — so a legacy-authored `RoleBinding` row can
- * never be collateral: its id is not a grant id.
+ * a diff of the whole table — so a legacy-authored `RoleBinding` or
+ * `ShareLink` row can never be collateral: its id is not a grant id.
  *
  * Write ORDER is load-bearing twice over:
  *   • roles are upserted before the grant compat rows that reference them,
@@ -276,6 +289,22 @@ export class PrismaAuthzGrantsProjectionRepository
     grantIds: string[];
   }): Promise<void> {
     if (grantIds.length === 0) return;
+    // ShareLink's tenancy column is projectId, not organizationId, and the
+    // multitenancy guard requires it on every bulk write. The Grant rows are
+    // where that projectId lives, so it is read BEFORE they are deleted. No
+    // rows back means the fold already applied this revocation - and it
+    // deleted the share rows in the same pass, so there is nothing left to
+    // enforce early.
+    const revoked = await this.prisma.grant.findMany({
+      where: { organizationId, id: { in: grantIds } },
+      select: { projectId: true },
+    });
+    const projectIds = [
+      ...new Set(
+        revoked.flatMap((row) => (row.projectId ? [row.projectId] : [])),
+      ),
+    ];
+
     await this.prisma.grant.deleteMany({
       where: { organizationId, id: { in: grantIds } },
     });
@@ -284,6 +313,14 @@ export class PrismaAuthzGrantsProjectionRepository
     await this.prisma.roleBinding.deleteMany({
       where: { organizationId, id: { in: grantIds } },
     });
+    if (projectIds.length > 0) {
+      // Same id-sharing argument for the resource tier: an imported share
+      // link ADOPTS its own id as the grant id, so a row named here is one
+      // the ledger authored or adopted.
+      await this.prisma.shareLink.deleteMany({
+        where: { projectId: { in: projectIds }, id: { in: grantIds } },
+      });
+    }
   }
 
   async store(
@@ -348,18 +385,39 @@ export class PrismaAuthzGrantsProjectionRepository
     // batch's events. Everything else the organization owns would read as
     // "departed" and be deleted — both heads, in one pass.
     if (!heads.reconstructed) return;
-    const removedGrantIds = [...heads.grants.keys()].filter(
-      (id) => state.grants[id] === undefined,
+    const departed = [...heads.grants.entries()].filter(
+      ([id]) => state.grants[id] === undefined,
     );
+    const removedGrantIds = departed.map(([id]) => id);
     if (removedGrantIds.length === 0) return;
 
-    // Compat row first: the `Grant` row is the fact's commit marker, so a
+    // The resource tier's compat row is a `ShareLink`, whose tenancy column
+    // is projectId rather than organizationId — so the delete is scoped by
+    // the projectIds the departing rows themselves carried, read from the
+    // heads BEFORE the `Grant` rows go. Same id-sharing argument as the
+    // bindings: an imported link ADOPTS its own id as the grant id, so a row
+    // named here is one the ledger authored or adopted.
+    const departedProjectIds = [
+      ...new Set(
+        departed.flatMap(([, row]) => (row.projectId ? [row.projectId] : [])),
+      ),
+    ];
+
+    // Compat rows first: the `Grant` row is the fact's commit marker, so a
     // crash between the two leaves the marker in place and the re-run
     // deletes both. Compat rows share the grant id, so this can only ever
     // remove rows the ledger itself authored.
     await this.prisma.roleBinding.deleteMany({
       where: { organizationId, id: { in: removedGrantIds } },
     });
+    if (departedProjectIds.length > 0) {
+      await this.prisma.shareLink.deleteMany({
+        where: {
+          projectId: { in: departedProjectIds },
+          id: { in: removedGrantIds },
+        },
+      });
+    }
     await this.prisma.grant.deleteMany({
       where: { organizationId, id: { in: removedGrantIds } },
     });
@@ -465,14 +523,24 @@ export class PrismaAuthzGrantsProjectionRepository
 
     await inChunks(changed, async ({ grant, row }) => {
       // Compat first, head second: see the class docblock's commit-marker
-      // rule. The compat mapping returns null for facts the legacy tables
-      // cannot express (RESOURCE/PLATFORM scopes, collective principals,
-      // lite-member) - those live in the future head only.
+      // rule. Each compat mapping returns null for facts its legacy table
+      // cannot express - the binding mapping for RESOURCE/PLATFORM scopes,
+      // collective principals and lite-member; the share mapping for
+      // everything that is not a RESOURCE fact with terms and an audience
+      // `ShareVisibility` can name. Those live in the future head only.
       const compat = grantFactToCompatBinding({ grant, organizationId });
       if (compat) {
         await this.writeCompatBinding({
           organizationId,
           row: compat,
+          source: grant.source,
+        });
+      }
+      const compatShare = grantFactToCompatShareLink({ grant, organizationId });
+      if (compatShare) {
+        await this.writeCompatShareLink({
+          organizationId,
+          row: compatShare,
           source: grant.source,
         });
       }
@@ -540,6 +608,61 @@ export class PrismaAuthzGrantsProjectionRepository
       logger.warn(
         { organizationId, grantId: id, source, error },
         "grants projection could not write a compat binding; the future head still holds the grant",
+      );
+    }
+  }
+
+  /**
+   * The compat head for one resource grant — the same adoption rule as the
+   * bindings above, one tier down.
+   *
+   * `cutover-import` facts are UPDATE-ONLY: the import adopts the ShareLink
+   * row's own id, so the original row IS the compat row and an update
+   * converges it. A missing row means there is nothing to converge onto —
+   * the import never invents a link nobody minted — so the update matches
+   * nothing and that is the whole of the handling. Every other source is a
+   * live mint and upserts.
+   *
+   * `viewCount` appears in neither branch: the create leans on the column's
+   * own default (0) and the update never names it, so ShareService's
+   * accounting survives every projection pass (decision 22).
+   *
+   * A conflict is warned and stepped over, never raised — the same rule as
+   * the bindings. P2002: the token is unique platform-wide, so a link minted
+   * through the legacy path in the same instant occupies the slot this row
+   * wants. P2003: the project or the author behind a foreign key is gone.
+   * Neither is retryable, and a throw here escapes before `writeCursor` and
+   * parks the organization's whole lane. The `Grant` head is the authority;
+   * the share row is a view.
+   */
+  private async writeCompatShareLink({
+    organizationId,
+    row,
+    source,
+  }: {
+    organizationId: string;
+    row: CompatShareLinkRowShape;
+    source: GrantEventSource;
+  }): Promise<void> {
+    const { id, ...rest } = row;
+    try {
+      if (source === "cutover-import") {
+        await this.prisma.shareLink.updateMany({
+          where: { projectId: row.projectId, id },
+          data: rest,
+        });
+        return;
+      }
+      await this.prisma.shareLink.upsert({
+        where: { projectId: row.projectId, id },
+        create: row,
+        update: rest,
+      });
+    } catch (error) {
+      if (!isPrismaConflict(error, ["P2002", "P2003"])) throw error;
+      logger.warn(
+        { organizationId, grantId: id, source, error },
+        "grants projection could not write a compat share link; the future head still holds the grant",
       );
     }
   }

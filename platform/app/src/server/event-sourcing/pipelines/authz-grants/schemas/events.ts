@@ -88,6 +88,7 @@ export const grantEventSourceSchema = z.enum([
   "backfill-b",
   "genesis-import",
   "read-through-mint",
+  "cutover-import",
 ]);
 
 export const grantsLedgerActorSchema = z.object({
@@ -95,9 +96,17 @@ export const grantsLedgerActorSchema = z.object({
   id: z.string().nullable(),
 });
 
+/** `kind` and `projectId` are required, not optional-tolerant: nothing has
+ *  ever emitted resource terms, so there is no stored event these fields
+ *  could be missing from, and a resource fact without them cannot say which
+ *  thing it opens or where that thing lives. `createdByUserId` is genuinely
+ *  optional — a link nobody minted by hand has no author. */
 export const resourceGrantTermsSchema = z.object({
+  kind: z.enum(["trace", "thread"]),
+  projectId: z.string().min(1),
   token: z.string().min(1),
   permission: z.string().min(1),
+  createdByUserId: z.string().min(1).optional(),
   expiresAtMs: z.number().int().nonnegative().optional(),
   maxViews: z.number().int().nonnegative().optional(),
 });

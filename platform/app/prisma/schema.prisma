@@ -2434,21 +2434,28 @@ model Grant {
   // lets a projection reloaded from these rows reconstruct the fact rather
   // than a lossy copy. Null on everything ledger-born; retired at cutover.
   legacyRole String? // ADMIN | MEMBER | VIEWER | CUSTOM
-  source  String // which writer emitted the fact: grants-service | scim | invite | backfill-b | genesis-import | read-through-mint
+  source     String // which writer emitted the fact: grants-service | scim | invite | backfill-b | genesis-import | read-through-mint | cutover-import
 
   scopeType GrantScopeType
   scopeId   String
 
   // Resource-tier FACT columns (ShareLink heritage, ADR-057 possession
-  // intact; null on every other tier). All four are set by the mint event
+  // intact; null on every other tier). All of them are set by the mint event
   // and owned by the fold like every other column here. View-consumption
   // accounting (viewCount) deliberately does NOT live on this table - it
-  // has a different writer (ShareService) and lands as its own accounting
-  // row when ShareService moves onto the ledger.
-  token      String?   @unique
-  permission String?
-  expiresAt  DateTime?
-  maxViews   Int?
+  // has a different writer (ShareService) and lives in GrantUsage below.
+  //
+  // scopeId is the shared resource's id alone, so the row carries the rest
+  // of that resource's identity itself: resourceKind says what the id names
+  // (TRACE | THREAD, ShareLink's own spelling) and projectId says where it
+  // lives. createdByUserId is whoever minted the link.
+  token           String?   @unique
+  permission      String?
+  resourceKind    String?
+  projectId       String?
+  createdByUserId String?
+  expiresAt       DateTime?
+  maxViews        Int?
 
   occurredAt DateTime // business time of the fact (backfills carry the legacy row's createdAt)
   createdAt  DateTime @default(now())
@@ -2466,6 +2473,28 @@ model Grant {
   // The same migration adds "Grant_resource_terms_check", a both-or-neither
   // CHECK over (token, permission) that Prisma also cannot express.
   @@index([organizationId, scopeType, scopeId])
+  // The resource tier's own access shape: the compat/share write paths and
+  // the token-possession reads both fence on (project, kind, resource).
+  @@index([projectId, resourceKind, scopeId])
+}
+
+// ShareService-owned view accounting for resource grants (delivery-plan
+// decision 22). Split from Grant because it has a different writer: the fold
+// owns the fact columns, ShareService increments this row once per view. The
+// fold NEVER writes here - a projection pass that touched viewCount would
+// reset every share link's view budget.
+model GrantUsage {
+  grantId        String @id // the Grant row's id; deterministic, so this row is addressable before the view happens
+  organizationId String
+  projectId      String
+
+  viewCount    Int       @default(0)
+  lastViewedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@index([organizationId])
 }
 
 // The grants ledger's role projection - CustomRole's successor, fed by the

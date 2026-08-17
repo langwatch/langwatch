@@ -36,14 +36,18 @@ export type LedgerScopeType =
   | "PLATFORM";
 
 /** Which writer emitted the event. Backfill sources are skipped by the
- *  audit subscriber's when-guard; the reducer treats all sources alike. */
+ *  audit subscriber's when-guard; the reducer treats all sources alike.
+ *  `cutover-import` is the composite per-org cutover migration's source —
+ *  share links, lite members, project credentials and platform operators
+ *  arriving as backdated history, so it is skipped like the others. */
 export type GrantEventSource =
   | "grants-service"
   | "scim"
   | "invite"
   | "backfill-b"
   | "genesis-import"
-  | "read-through-mint";
+  | "read-through-mint"
+  | "cutover-import";
 
 export interface LedgerPrincipal {
   type: LedgerPrincipalType;
@@ -56,10 +60,25 @@ export interface LedgerScope {
   id: string;
 }
 
-/** Resource-tier columns (ShareLink heritage, ADR-057 possession intact). */
+/**
+ * Resource-tier columns (ShareLink heritage, ADR-057 possession intact).
+ *
+ * `scope.id` is the shared resource's id and nothing else, so the fact has
+ * to carry the rest of that resource's identity itself: which KIND of thing
+ * the id names, and which project it sits in. Both are what the compat
+ * ShareLink head projects into its own columns, and what the possession
+ * read fences on — a token resolves to one row, but the row still has to
+ * prove which project it belongs to. `createdByUserId` is the person who
+ * minted the link (absent when nobody did).
+ */
 export interface ResourceGrantTerms {
+  /** The ledger's lowercase spelling; the stored column keeps ShareLink's
+   *  uppercase one (TRACE / THREAD). */
+  kind: "trace" | "thread";
+  projectId: string;
   token: string;
   permission: string;
+  createdByUserId?: string;
   expiresAtMs?: number;
   maxViews?: number;
 }

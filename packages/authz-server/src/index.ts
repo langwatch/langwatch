@@ -68,6 +68,7 @@ export type { OffboardResult } from "./offboard";
 export { TEAM_USER_BACKFILL_MIGRATION_NAME } from "./team-user-backfill.name";
 export {
   grantFactToCompatBinding,
+  grantFactToCompatShareLink,
   grantFactToRow,
   grantRowToFact,
   roleFactToRow,
@@ -75,7 +76,9 @@ export {
 } from "./ledger/projection-mapping";
 export type {
   CompatBindingRowShape,
+  CompatShareLinkRowShape,
   GrantPrincipalTypeDb,
+  GrantResourceKindDb,
   GrantRowShape,
   GrantScopeTypeDb,
   RoleRowShape,

@@ -5,6 +5,7 @@ import type {
   LedgerPrincipalType,
   LedgerScopeType,
   LegacyBindingRole,
+  ResourceGrantTerms,
   RoleFact,
 } from "./grants-ledger.reducer";
 
@@ -53,6 +54,29 @@ const PRINCIPAL_FROM_DB: Record<GrantPrincipalTypeDb, LedgerPrincipalType> = {
   ANYONE: "anyone",
 };
 
+/** The Grant table's resource-kind vocabulary. Uppercase, because the
+ *  column restates ShareLink's own Prisma enum — same reasoning as
+ *  `ShareLinkRow.resourceType` in the read port: the stored spelling is the
+ *  stored spelling, and the mapping between it and the ledger's lowercase
+ *  one lives at exactly one seam. */
+export type GrantResourceKindDb = "TRACE" | "THREAD";
+
+const RESOURCE_KIND_TO_DB: Record<
+  ResourceGrantTerms["kind"],
+  GrantResourceKindDb
+> = {
+  trace: "TRACE",
+  thread: "THREAD",
+};
+
+const RESOURCE_KIND_FROM_DB: Record<
+  GrantResourceKindDb,
+  ResourceGrantTerms["kind"]
+> = {
+  TRACE: "trace",
+  THREAD: "thread",
+};
+
 export interface GrantRowShape {
   id: string;
   organizationId: string;
@@ -68,6 +92,9 @@ export interface GrantRowShape {
   scopeId: string;
   token: string | null;
   permission: string | null;
+  resourceKind: string | null;
+  projectId: string | null;
+  createdByUserId: string | null;
   expiresAt: Date | null;
   maxViews: number | null;
   occurredAt: Date;
@@ -93,6 +120,10 @@ export function grantFactToRow({
     scopeId: grant.scope.id,
     token: grant.resource?.token ?? null,
     permission: grant.resource?.permission ?? null,
+    resourceKind:
+      grant.resource != null ? RESOURCE_KIND_TO_DB[grant.resource.kind] : null,
+    projectId: grant.resource?.projectId ?? null,
+    createdByUserId: grant.resource?.createdByUserId ?? null,
     expiresAt:
       grant.resource?.expiresAtMs != null
         ? new Date(grant.resource.expiresAtMs)
@@ -111,11 +142,22 @@ export function grantRowToFact(row: GrantRowShape): GrantFact {
     ...(row.legacyRole != null
       ? { legacyRole: row.legacyRole as LegacyBindingRole }
       : {}),
-    ...(row.token != null && row.permission != null
+    // All four identity columns or none: a row missing one of them cannot
+    // describe a resource grant, and inventing a default would put a fact in
+    // front of the engine that names the wrong thing.
+    ...(row.token != null &&
+    row.permission != null &&
+    row.resourceKind != null &&
+    row.projectId != null
       ? {
           resource: {
+            kind: RESOURCE_KIND_FROM_DB[row.resourceKind as GrantResourceKindDb],
+            projectId: row.projectId,
             token: row.token,
             permission: row.permission,
+            ...(row.createdByUserId != null
+              ? { createdByUserId: row.createdByUserId }
+              : {}),
             ...(row.expiresAt != null
               ? { expiresAtMs: row.expiresAt.getTime() }
               : {}),
@@ -250,5 +292,79 @@ export function grantFactToCompatBinding({
     customRoleId,
     scopeType: scope.type,
     scopeId: scope.id,
+  };
+}
+
+/**
+ * The resource tier's compat head: a `ShareLink` row, minus the one column
+ * the fold does not own.
+ *
+ * `viewCount` is deliberately absent from the shape, not merely unset.
+ * View accounting has a different writer (ShareService, once per view) and
+ * lives in `GrantUsage` (delivery-plan decision 22); a fold that carried the
+ * column would reset every share's view budget on each projection pass, and
+ * a shape that merely defaulted it would make that one edit away. The
+ * column's own default (0) covers the create; the update never names it.
+ */
+export interface CompatShareLinkRowShape {
+  /** The grantId itself — the imported rows ADOPT their ShareLink id, so a
+   *  row this mapping names is one the ledger authored or adopted. */
+  id: string;
+  token: string;
+  resourceType: GrantResourceKindDb;
+  resourceId: string;
+  projectId: string;
+  userId: string | null;
+  visibility: "PUBLIC" | "ORGANIZATION" | "PROJECT";
+  expiresAt: Date | null;
+  maxViews: number | null;
+}
+
+/** Principal → the ShareLink audience the legacy column spells out. A
+ *  resource fact naming any other principal has no legacy audience to be,
+ *  so it stays future-head-only. */
+const SHARE_VISIBILITY_BY_PRINCIPAL: Partial<
+  Record<LedgerPrincipalType, CompatShareLinkRowShape["visibility"]>
+> = {
+  anyone: "PUBLIC",
+  organization: "ORGANIZATION",
+  project: "PROJECT",
+};
+
+/**
+ * RESOURCE facts only. A fact at any other scope, a resource fact carrying
+ * no terms, or one whose principal names an audience `ShareVisibility`
+ * cannot express maps to null — the caller skips it, silently: these are
+ * shapes the legacy table never held, not failures.
+ *
+ * `organizationId` is taken, not stored: `ShareLink` has no organization
+ * column (its tenancy is the project). It is here so the signature matches
+ * every other mapping in this file, and so a caller cannot project a row
+ * without having resolved the organization it belongs to.
+ */
+export function grantFactToCompatShareLink({
+  grant,
+  organizationId: _organizationId,
+}: {
+  grant: GrantFact;
+  organizationId: string;
+}): CompatShareLinkRowShape | null {
+  const { scope, principal, resource } = grant;
+  if (scope.type !== "RESOURCE") return null;
+  if (!resource) return null;
+  const visibility = SHARE_VISIBILITY_BY_PRINCIPAL[principal.type];
+  if (!visibility) return null;
+
+  return {
+    id: grant.grantId,
+    token: resource.token,
+    resourceType: RESOURCE_KIND_TO_DB[resource.kind],
+    resourceId: scope.id,
+    projectId: resource.projectId,
+    userId: resource.createdByUserId ?? null,
+    visibility,
+    expiresAt:
+      resource.expiresAtMs != null ? new Date(resource.expiresAtMs) : null,
+    maxViews: resource.maxViews ?? null,
   };
 }
