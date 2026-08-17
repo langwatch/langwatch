@@ -38,7 +38,11 @@ import type {
   PullResult,
   PullRunOptions,
 } from "./pullerAdapter";
-import { fetchWithRetry, RetryDeadlineExceededError } from "./shared/httpRetry";
+import {
+  fetchWithRetry,
+  HttpResponseError,
+  RetryDeadlineExceededError,
+} from "./shared/httpRetry";
 import {
   decodeCursor,
   encodeCursor,
@@ -57,6 +61,28 @@ export const COPILOT_INTERACTION_RECORD_TYPE = 261;
 
 export const MANAGEMENT_API_BASE = "https://manage.office.com/api/v1.0";
 export const MANAGEMENT_API_SCOPE = "https://manage.office.com/.default";
+
+/**
+ * The Management Activity API's code for "this subscription is already
+ * enabled", returned as a 400. It is the expected answer on every run after
+ * the first.
+ */
+const ALREADY_ENABLED_CODE = "AF20024";
+
+/**
+ * Whether a failed subscription start means "already running" rather than
+ * "broken".
+ *
+ * Matched on the response body, because the status code cannot carry the
+ * distinction: a missing tenant and an existing subscription are both 400.
+ */
+function isAlreadyEnabled(error: unknown): boolean {
+  return (
+    error instanceof HttpResponseError &&
+    error.status === 400 &&
+    error.bodyText.includes(ALREADY_ENABLED_CODE)
+  );
+}
 
 /**
  * How far back a first-ever run reaches. The API does not backfill beyond
@@ -120,7 +146,7 @@ export interface Microsoft365AuditRunStats {
   filteredOut: number;
   blobsDrained: number;
   /** True when the run stopped early and the cursor holds the remainder. */
-  stoppedEarly: boolean;
+  hasStoppedEarly: boolean;
 }
 
 function asString(value: unknown): string {
@@ -259,7 +285,7 @@ export class Microsoft365AuditPuller
     const stats: Microsoft365AuditRunStats = {
       filteredOut: 0,
       blobsDrained: 0,
-      stoppedEarly: false,
+      hasStoppedEarly: false,
     };
 
     try {
@@ -269,7 +295,7 @@ export class Microsoft365AuditPuller
       const events: NormalizedPullEvent[] = [];
       const working: Microsoft365AuditCursor = { ...cursor };
 
-      const { completed } = await this.pumpWindow({
+      const { isCompleted } = await this.pumpWindow({
         config,
         tokens,
         options,
@@ -278,13 +304,13 @@ export class Microsoft365AuditPuller
         stats,
       });
 
-      // `completed` is load-bearing, not belt-and-braces. A run that was out
+      // `isCompleted` is load-bearing, not belt-and-braces. A run that was out
       // of time before it listed anything leaves the cursor exactly as it
       // found it — queue empty, nothing deferred — which is indistinguishable
       // from a window worked to the end. Advancing on the cursor shape alone
       // skips that interval permanently: no later run asks for it again.
       const drained =
-        completed &&
+        isCompleted &&
         working.blobQueue.length === 0 &&
         working.nextPageUri === undefined;
 
@@ -298,7 +324,7 @@ export class Microsoft365AuditPuller
         // ingests nothing — the exact failure this adapter replaces.
         this.advanceWindow(working, now);
       } else {
-        stats.stoppedEarly = true;
+        stats.hasStoppedEarly = true;
       }
 
       logger.info(
@@ -362,11 +388,11 @@ export class Microsoft365AuditPuller
     cursor: Microsoft365AuditCursor;
     events: NormalizedPullEvent[];
     stats: Microsoft365AuditRunStats;
-  }): Promise<{ completed: boolean }> {
+  }): Promise<{ isCompleted: boolean }> {
     for (let round = 0; round < MAX_LIST_DRAIN_ROUNDS_PER_RUN; round += 1) {
       // Out of time before doing anything this round. Whatever is left of the
       // window is still ahead of us, so it is emphatically not complete.
-      if (this.outOfTime(options)) return { completed: false };
+      if (this.outOfTime(options)) return { isCompleted: false };
 
       if (cursor.phase === "listing" || cursor.nextPageUri !== undefined) {
         await this.listContent({ config, tokens, options, cursor });
@@ -379,13 +405,13 @@ export class Microsoft365AuditPuller
       // either way, going round again would not help.
       if (cursor.blobQueue.length > 0 || cursor.nextPageUri === undefined) {
         return {
-          completed:
+          isCompleted:
             cursor.blobQueue.length === 0 && cursor.nextPageUri === undefined,
         };
       }
     }
     // Round cap hit with work still deferred.
-    return { completed: false };
+    return { isCompleted: false };
   }
 
   /**
@@ -458,22 +484,21 @@ export class Microsoft365AuditPuller
       });
     } catch (error) {
       // AF20024 ("subscription is already enabled") is the expected answer on
-      // every run after the first, and it arrives as a 400. The retry helper
-      // does not surface the body, so this cannot distinguish it from a
-      // genuinely malformed request — it swallows both.
+      // every run after the first, and it arrives as a 400. It is the only
+      // 400 that means success.
       //
-      // That is tolerable only because it is not the last line of defence: if
-      // no subscription actually exists, the content listing below fails on
-      // its own and the run reports an error. Logging it means a
-      // misconfiguration that only ever manifests here is still visible
-      // rather than silent.
-      if (error instanceof Error && /HTTP 400/.test(error.message)) {
+      // Every other 400 is a real problem wearing the same status code — a
+      // tenant id that does not exist, a content type the tenant has not
+      // licensed, unified audit logging switched off. Swallowing those would
+      // leave a source that starts cleanly, lists nothing, and reports
+      // healthy: the failure this source type was created to stop happening.
+      if (isAlreadyEnabled(error)) {
         logger.debug(
           {
             ingestionSourceId: options.context?.ingestionSourceId,
             tenantId: config.tenantId,
           },
-          "microsoft_365_audit: subscription start returned 400 (expected once the subscription is enabled)",
+          "microsoft_365_audit: subscription already enabled (AF20024)",
         );
         return;
       }
