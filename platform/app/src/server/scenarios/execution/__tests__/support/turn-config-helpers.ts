@@ -63,6 +63,9 @@ export function createMockDepsForTurnConfig(overrides: {
         return map[featureKey] ?? "openai/fallback";
       }),
     },
+    traceWaitBudgetResolver: {
+      resolveTraceWaitTimeoutMs: vi.fn().mockResolvedValue(30_000),
+    },
     projectSecretsFetcher: {
       getSecrets: vi.fn().mockResolvedValue({}),
     },
