@@ -24,7 +24,7 @@
 		"tar": "^7.4.3"
 	},
 	"devDependencies": {
-		"@types/node": "^22.10.7",
+		"@types/node": "^26.2.0",
 		"@types/prompts": "^2.4.9",
 		"@types/tar": "^6.1.13",
 		"esbuild": "^0.28.1",
