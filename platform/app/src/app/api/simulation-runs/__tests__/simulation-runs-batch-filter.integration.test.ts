@@ -140,7 +140,7 @@ describe("Feature: simulation runs list filters by batch id alone", () => {
   const get = (path: string) =>
     app.request(path, { headers: { "X-Auth-Token": testApiKey } });
 
-  describe("When the list is requested with only a batchRunId", () => {
+  describe("when the list is requested with only a batchRunId", () => {
     /** @scenario "A batch id alone filters the list" */
     it("serves the batch's runs, never the whole project", async () => {
       const repository = withRepository();
@@ -163,7 +163,7 @@ describe("Feature: simulation runs list filters by batch id alone", () => {
     });
   });
 
-  describe("When the list is requested with both batchRunId and scenarioSetId", () => {
+  describe("when the list is requested with both batchRunId and scenarioSetId", () => {
     /** @scenario "A batch id with a scenario set id keeps working" */
     it("passes both filters through to the batch query", async () => {
       const repository = withRepository();

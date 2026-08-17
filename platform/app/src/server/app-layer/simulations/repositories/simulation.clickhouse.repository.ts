@@ -672,11 +672,17 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     }
 
     // The batch id identifies the batch within the tenant on its own; the
-    // scenario set id narrows the scan when the caller has it. The CLI's
-    // --wait polls with just the batch id.
-    const setFilter = scenarioSetId
-      ? "AND ScenarioSetId IN ({scenarioSetIds:Array(String)})"
-      : "";
+    // scenario set id narrows the scan when the caller sends one. The CLI's
+    // --wait polls with just the batch id. An empty string is a real value
+    // that selects the default set, so only an absent id drops the predicate.
+    const scenarioSetIds =
+      scenarioSetId === undefined
+        ? undefined
+        : expandSetIdFilter(scenarioSetId);
+    const setFilter = (alias: string) =>
+      scenarioSetIds
+        ? `AND ${alias}ScenarioSetId IN ({scenarioSetIds:Array(String)})`
+        : "";
     const rows = await this.queryRows<
       ClickHouseSimulationRunRow & { ExportSortKey: string }
     >(
@@ -684,23 +690,21 @@ export class SimulationClickHouseRepository implements SimulationRepository {
         toString(${EXPORT_SORT_KEY}) AS ExportSortKey
        FROM ${TABLE_NAME} AS t
        WHERE t.TenantId = {tenantId:String}
-         ${scenarioSetId ? "AND t.ScenarioSetId IN ({scenarioSetIds:Array(String)})" : ""}
+         ${setFilter("t.")}
          AND t.BatchRunId = {batchRunId:String}
          AND t.ArchivedAt IS NULL
          AND (t.TenantId, t.ScenarioSetId, t.BatchRunId, t.ScenarioRunId, t.UpdatedAt) IN (
            SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
            FROM ${TABLE_NAME}
            WHERE TenantId = {tenantId:String}
-             ${setFilter}
+             ${setFilter("")}
              AND BatchRunId = {batchRunId:String}
            GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
          )
        ORDER BY CreatedAt ASC`,
       {
         tenantId: projectId,
-        ...(scenarioSetId
-          ? { scenarioSetIds: expandSetIdFilter(scenarioSetId) }
-          : {}),
+        ...(scenarioSetIds ? { scenarioSetIds } : {}),
         batchRunId,
       },
     );

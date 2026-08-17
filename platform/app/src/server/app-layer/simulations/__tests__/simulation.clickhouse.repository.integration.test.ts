@@ -294,6 +294,43 @@ describe("SimulationClickHouseRepository (integration)", () => {
         expect(result.runs.map((r) => r.scenarioRunId)).toEqual([wantedRunId]);
       });
     });
+
+    describe("when the scenario set id is the empty string", () => {
+      /** @scenario "An empty scenario set id still selects the default set" */
+      it("keeps the default set filter instead of dropping it", async () => {
+        const batchRunId = `batch-default-${nanoid()}`;
+        const defaultSetRunId = `run-default-${nanoid()}`;
+
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: defaultSetRunId,
+            BatchRunId: batchRunId,
+            ScenarioSetId: "",
+          }),
+        );
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: `run-named-${nanoid()}`,
+            BatchRunId: batchRunId,
+            ScenarioSetId: `set-named-${nanoid()}`,
+          }),
+        );
+
+        const result = await repo.getRunDataForBatchRun({
+          projectId: tenantId,
+          scenarioSetId: "",
+          batchRunId,
+        });
+
+        expect(result.changed).toBe(true);
+        if (!result.changed) throw new Error("expected changed");
+        expect(result.runs.map((r) => r.scenarioRunId)).toEqual([
+          defaultSetRunId,
+        ]);
+      });
+    });
   });
 
   describe("getAllRunDataForScenarioSet()", () => {

@@ -18,3 +18,11 @@ Feature: Simulation runs list filters by batch id alone
     Given runs exist in a batch that belongs to a scenario set
     When the list is requested with both batchRunId and scenarioSetId
     Then the response contains the runs of that batch
+
+  # An empty scenario set id is a value, not an absent filter: it selects the
+  # default set, which holds rows written both before and after the set id
+  # got its "default" name.
+  Scenario: An empty scenario set id still selects the default set
+    Given a batch holds one run in the default set and one in a named set
+    When the runs are read with the batch id and an empty scenario set id
+    Then only the default set run is returned
