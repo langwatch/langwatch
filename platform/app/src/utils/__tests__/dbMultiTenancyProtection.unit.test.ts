@@ -454,6 +454,104 @@ describe("guardProjectId — SCOPED_MODELS (ModelProvider family)", () => {
   });
 });
 
+describe("guardProjectId — SCOPED_MODELS (SystemMigrationTenantState)", () => {
+  describe("findMany scoped to one migration across tenants", () => {
+    /** @scenario Migration-wide reads are the ops rollup and stay allowed */
+    it("does NOT throw — the ops dashboard lists one migration's tenants", async () => {
+      await expect(
+        runGuard({
+          model: "SystemMigrationTenantState",
+          action: "findMany",
+          args: { where: { migrationName: "authz-team-user-backfill" } },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("findUnique by the compound key", () => {
+    it("does NOT throw — one tenant's row", async () => {
+      await expect(
+        runGuard({
+          model: "SystemMigrationTenantState",
+          action: "findUnique",
+          args: {
+            where: {
+              migrationName_tenantId: {
+                migrationName: "authz-team-user-backfill",
+                tenantId: "org_acme",
+              },
+            },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("findMany with no predicate at all", () => {
+    it("THROWS — would walk every migration's every tenant", async () => {
+      await expect(
+        runGuard({
+          model: "SystemMigrationTenantState",
+          action: "findMany",
+          args: { where: {} },
+        }),
+      ).rejects.toThrow(/migrationName or tenantId/);
+    });
+  });
+
+  describe("deleteMany scoped only to a migration", () => {
+    /** @scenario A migration-wide bulk write is refused */
+    it("THROWS — dropping every finalized row would silently un-switch every organization", async () => {
+      await expect(
+        runGuard({
+          model: "SystemMigrationTenantState",
+          action: "deleteMany",
+          args: { where: { migrationName: "authz-team-user-backfill" } },
+        }),
+      ).rejects.toThrow(/bulk write/);
+    });
+  });
+
+  describe("updateMany scoped only to a migration", () => {
+    it("THROWS — would rewrite every tenant's state at once", async () => {
+      await expect(
+        runGuard({
+          model: "SystemMigrationTenantState",
+          action: "updateMany",
+          args: {
+            where: { migrationName: "authz-team-user-backfill" },
+            data: { status: "finalized" },
+          },
+        }),
+      ).rejects.toThrow(/bulk write/);
+    });
+  });
+
+  describe("deleteMany naming a tenant", () => {
+    it("does NOT throw — bounded to one organization", async () => {
+      await expect(
+        runGuard({
+          model: "SystemMigrationTenantState",
+          action: "deleteMany",
+          args: { where: { tenantId: "org_acme" } },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("create without both key parts", () => {
+    it("THROWS — a row without a tenant belongs to nobody", async () => {
+      await expect(
+        runGuard({
+          model: "SystemMigrationTenantState",
+          action: "create",
+          args: { data: { migrationName: "authz-team-user-backfill" } },
+        }),
+      ).rejects.toThrow(/migrationName and tenantId/);
+    });
+  });
+});
+
 describe("guardProjectId — SCOPED_MODELS (ModelDefaultConfig family)", () => {
   describe("ModelDefaultConfig.findMany without any tenancy predicate", () => {
     it("THROWS — would walk every tenant's defaults", async () => {

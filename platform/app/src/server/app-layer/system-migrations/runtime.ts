@@ -27,11 +27,22 @@ import { cohortIncludes } from "./cohort";
 import { RedisMigrationLeaseRepository } from "./repositories/migration-lease.redis.repository";
 import { PrismaOrganizationTenantSource } from "./repositories/organization-tenant-source.prisma.repository";
 import { PrismaSystemMigrationStateRepository } from "./repositories/system-migration-state.prisma.repository";
+import { SystemMigrationsService } from "./system-migrations.service";
 
-/** The composed state repository, shared with the ops router's readers. */
-export const systemMigrationState = new PrismaSystemMigrationStateRepository(
-  prisma,
-);
+/** The composed state repository. The runner uses it; routes must not - they
+ *  go through `systemMigrationsService` below. */
+const systemMigrationState = new PrismaSystemMigrationStateRepository(prisma);
+
+/**
+ * What the ops dashboard talks to. The route calls this and never the state
+ * repository, so the read model stays inside the app layer.
+ */
+export const systemMigrationsService = new SystemMigrationsService({
+  state: systemMigrationState,
+  migrationNames: () =>
+    registeredMigrations().map((migration) => migration.name),
+  runPass: () => runSystemMigrationPass(),
+});
 
 /** Every registered in-place migration, in the order they run per tenant. */
 export function registeredMigrations(): SystemMigration[] {

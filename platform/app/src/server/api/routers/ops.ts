@@ -1,5 +1,4 @@
 import { on } from "node:events";
-import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { checkOpsPermission } from "~/server/api/rbac";
@@ -10,11 +9,7 @@ import {
   type DashboardData,
   OPS_BLOB_SORTS,
 } from "~/server/app-layer/ops/types";
-import {
-  registeredMigrations,
-  runSystemMigrationPass,
-  systemMigrationState,
-} from "~/server/app-layer/system-migrations/runtime";
+import { systemMigrationsService } from "~/server/app-layer/system-migrations/runtime";
 import {
   resolveHotDays,
   TABLE_TTL_CONFIG,
@@ -39,8 +34,6 @@ import { AnomalyStateStore } from "~/server/observability/anomalyState";
 import { grafanaConfigFromEnv } from "~/utils/grafanaLinks";
 
 const opsViewPermission = checkOpsPermission({ permission: "ops:view" });
-
-const systemMigrationsLogger = createLogger("langwatch:ops:system-migrations");
 
 // Status-probe variant of the ops:view middleware — populates `ctx.opsScope`
 // (with `kind: "none"` for non-ops users) without throwing FORBIDDEN. Lets
@@ -1329,21 +1322,7 @@ export const opsRouter = createTRPCRouter({
    */
   listSystemMigrations: protectedProcedure
     .use(opsViewPermission)
-    .query(async () => {
-      return Promise.all(
-        registeredMigrations().map(async (migration) => ({
-          name: migration.name,
-          counts: await systemMigrationState.findStatusCounts({
-            migrationName: migration.name,
-          }),
-          attention: await systemMigrationState.findRecordsByStatus({
-            migrationName: migration.name,
-            statuses: ["migrated", "parked"],
-            limit: 50,
-          }),
-        })),
-      );
-    }),
+    .query(() => systemMigrationsService.getOverview()),
 
   /**
    * Kick a migration pass now instead of waiting for the next worker boot -
@@ -1354,16 +1333,8 @@ export const opsRouter = createTRPCRouter({
    */
   runSystemMigrationPass: protectedProcedure
     .use(opsManagePermission)
-    .mutation(async () => {
-      void runSystemMigrationPass().catch((error) => {
-        // Per-tenant failures park-and-log inside the pass; this catches
-        // the pass itself dying (state table or tenant source down). The
-        // next boot retries either way.
-        systemMigrationsLogger.error(
-          { error },
-          "operator-kicked migration pass failed",
-        );
-      });
+    .mutation(() => {
+      systemMigrationsService.startPass();
       return { started: true };
     }),
 });
