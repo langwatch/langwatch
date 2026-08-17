@@ -8,6 +8,13 @@ Feature: Toast notifications
   Toasts appear at the bottom center of the screen. The previous top-right
   position covered the close button of open drawers.
 
+  In light mode a status toast wears a solid fill, which is what Chakra gives
+  it: a white card on a light page reads as dead, and the status then has
+  nowhere to show. In dark mode it stays a panel with one hairline in the
+  status tone, where a solid fill is heavy. Whatever the surface, the status
+  icon, the title and the close button sit on one line, and the close button
+  keeps the same distance from the right edge as the icon keeps from the left.
+
   Background:
     Given the application renders the shared Toaster
 
@@ -32,3 +39,14 @@ Feature: Toast notifications
   Scenario: Toasts appear at the bottom center of the screen
     When any toast is created
     Then the toast region is placed at the bottom center of the viewport
+
+  @unit
+  Scenario: A filled toast drops the accent its panel would use
+    Given a status toast, which light mode fills with a solid colour
+    Then its action and its icon inherit the colour the fill sets
+    And on the dark panel they keep the status accent
+
+  @unit
+  Scenario: A toast that is a card in both modes keeps its accent
+    Given an info or loading toast, which no mode fills
+    Then its action keeps the accent, having no fill to sit on
