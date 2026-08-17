@@ -88,6 +88,6 @@
     "release:dry-run": "bash dev/scripts/pack-npm.sh && tar -tzf langwatch-server-*.tgz | head -50"
   },
   "devDependencies": {
-    "typescript": "^5.9.3"
+    "typescript": "^7.0.2"
   }
 }

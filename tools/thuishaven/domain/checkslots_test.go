@@ -50,11 +50,13 @@ func TestResolveCheckSlots(t *testing.T) {
 }
 
 func TestCheckGoMemLimit(t *testing.T) {
-	t.Run("half the machine, clamped to four and ten gibibytes", func(t *testing.T) {
+	// @scenario "The soft cap stays inside what a run can meet"
+	t.Run("half the machine, clamped to three and six gibibytes", func(t *testing.T) {
 		for ram, want := range map[uint64]string{
+			4 * checkGiB:  "3GiB",
 			8 * checkGiB:  "4GiB",
-			18 * checkGiB: "9GiB",
-			64 * checkGiB: "10GiB",
+			18 * checkGiB: "6GiB",
+			64 * checkGiB: "6GiB",
 		} {
 			if got := CheckGoMemLimit(ram, ""); got != want {
 				t.Fatalf("CheckGoMemLimit(%d) = %q, want %q", ram, got, want)

@@ -285,12 +285,18 @@ describe("check queue", () => {
       for (const name of [
         "typecheck",
         "typecheck:tests",
-        "typecheck:legacy",
         "lint",
         "lint:fix",
         "lint:plugins",
         "format",
       ]) {
+        // Named first, because a script that has been renamed or deleted
+        // reaches `toContain` as undefined and fails on the argument type
+        // rather than on the thing this test is about.
+        expect(
+          Object.keys(scripts),
+          `${name} is not a script any more`,
+        ).toContain(name);
         expect(scripts[name], `${name} bypasses the check queue`).toContain(
           "check-queue.mjs",
         );

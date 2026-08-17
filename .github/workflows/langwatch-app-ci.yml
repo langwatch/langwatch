@@ -204,7 +204,7 @@ jobs:
         working-directory: platform/app
         run: pnpm start:prepare:files
 
-      # tsgo (and tsc) write incremental .tsbuildinfo caches to explicit paths
+      # tsc writes incremental .tsbuildinfo caches to explicit paths
       # under node_modules/.cache/tsbuildinfo (see tsconfig.tsgo*.json). A warm
       # cache turns the full ~13-19s cold check into a ~1.5s revalidation of
       # only the files whose content changed. Restored after install so pnpm
