@@ -86,9 +86,6 @@ export function ExperimentsPage() {
         toaster.create({
           title: "Experiment deleted",
           type: "success",
-          meta: {
-            closable: true,
-          },
         });
       },
       onError: (error) => {
@@ -98,9 +95,6 @@ export function ExperimentsPage() {
           description:
             "Please try again. If the problem persists, contact support.",
           type: "error",
-          meta: {
-            closable: true,
-          },
         });
       },
     },

@@ -69,9 +69,6 @@ function AnnotationScorePage() {
             type: "error",
             description: "Failed to update score",
             duration: 6000,
-            meta: {
-              closable: true,
-            },
           });
         },
       },
@@ -95,9 +92,6 @@ function AnnotationScorePage() {
               type: "success",
               description: "Score deleted successfully",
               duration: 6000,
-              meta: {
-                closable: true,
-              },
             });
           },
           onError: (error) => {
@@ -107,9 +101,6 @@ function AnnotationScorePage() {
               type: "error",
               description: "Failed to delete score",
               duration: 6000,
-              meta: {
-                closable: true,
-              },
             });
           },
         },

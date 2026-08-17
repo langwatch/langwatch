@@ -187,9 +187,6 @@ export function TryItOut({
           title: "Invalid evaluator settings",
           description: "Please check your settings and try again.",
           type: "error",
-          meta: {
-            closable: true,
-          },
         });
         console.error(e);
         return;

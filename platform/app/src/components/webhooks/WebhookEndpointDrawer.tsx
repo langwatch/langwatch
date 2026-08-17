@@ -318,7 +318,6 @@ function ExternalIdField({ externalId }: { externalId: string }) {
         toaster.create({
           title: "Copy failed. Select the external id and copy it manually.",
           type: "error",
-          meta: { closable: true },
         });
       }
     })();

@@ -67,7 +67,6 @@ export function ChangePasswordDialog({
       toaster.create({
         title: "Password changed successfully",
         type: "success",
-        meta: { closable: true },
       });
       onClose();
     } catch (error) {

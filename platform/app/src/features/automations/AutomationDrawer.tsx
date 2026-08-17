@@ -819,7 +819,6 @@ export function AutomationDrawer({
                 : r.channel === "webhook"
                   ? `Your endpoint answered HTTP ${r.httpStatus ?? "2xx"}.`
                   : "Posted to Slack.",
-            meta: { closable: true },
           });
         },
         onError: (err) => {
@@ -905,7 +904,6 @@ export function AutomationDrawer({
           toaster.create({
             title: automationId ? labels.updatedToast : labels.createdToast,
             type: "success",
-            meta: { closable: true },
           });
           void queryClient.automation.getTriggers.invalidate();
           // The dashboard chart card reads its alert state off the graph, not

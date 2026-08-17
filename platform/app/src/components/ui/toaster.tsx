@@ -14,20 +14,29 @@ import { AlertCircle, CheckCircle2, Info, TriangleAlert } from "lucide-react";
 import { ErrorActions } from "~/features/errors/components/ErrorActions";
 
 const toaster_ = createToaster({
-  placement: "top-end",
+  placement: "bottom",
   pauseOnPageIdle: true,
 });
+
+/**
+ * `closable` is not an option: the Toaster renders the close button on every
+ * toast unconditionally, so no call site can create a toast the user cannot
+ * dismiss.
+ */
+type ToastCreateArgs = Omit<Parameters<typeof toaster_.create>[0], "meta"> & {
+  meta?: Record<string, unknown> & { closable?: never };
+};
 
 // Workaround for https://github.com/chakra-ui/chakra-ui/issues/9490#issuecomment-2601014577
 export const toaster = {
   ...toaster_,
-  create: (args: Parameters<typeof toaster_.create>[0]) => {
+  create: (args: ToastCreateArgs) => {
     return toaster_.create({
       duration: 5000,
       ...args,
       meta: {
         ...args.meta,
-        placement: "top-end",
+        placement: "bottom",
       },
     });
   },
@@ -150,14 +159,12 @@ export const Toaster = () => {
                 )}
               </Stack>
 
-              {toast.meta?.closable && (
-                <Toast.CloseTrigger
-                  position="static"
-                  flexShrink={0}
-                  color="fg.subtle"
-                  _hover={{ color: "fg" }}
-                />
-              )}
+              <Toast.CloseTrigger
+                position="static"
+                flexShrink={0}
+                color="fg.subtle"
+                _hover={{ color: "fg" }}
+              />
             </Toast.Root>
           );
         }}

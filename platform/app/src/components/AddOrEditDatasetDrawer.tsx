@@ -221,9 +221,6 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
               ? `Successfully updated ${data.name} dataset`
               : `Successfully created ${data.name} dataset`,
             type: "success",
-            meta: {
-              closable: true,
-            },
           });
           reset();
           onClose();

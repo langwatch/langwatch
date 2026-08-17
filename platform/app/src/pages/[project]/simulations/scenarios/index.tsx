@@ -82,7 +82,6 @@ function ScenarioLibraryPage() {
           title: "Some scenarios couldn't be archived",
           description: `${result.failed.length} failed. Please retry.`,
           type: "error",
-          meta: { closable: true },
         });
       }
       void utils.scenarios.getAll.invalidate();
