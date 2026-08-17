@@ -78,9 +78,9 @@ Rule: The project rail grows its coding-agent destinations from recorded activit
 
 Rule: The project rail marks the coding-agent destination the reader is on
 
-  The rail decides what is open from the route pattern the router reports, so
-  a destination whose route the router cannot name reads as never open and the
-  rail marks nothing while the reader is standing on the page.
+  A destination the reader is standing on is marked as the open one. A page
+  the rail does not recognise as a project destination marks neither, so a
+  reader on an unrecognised page sees no destination claimed for them.
 
   @integration
   Scenario: The rail marks the Sessions destination while the Sessions page is open

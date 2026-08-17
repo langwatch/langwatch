@@ -310,7 +310,24 @@ function withoutStubsOfRecoveredPrompts({
   return logEntries.filter((_entry, index) => !claimed.has(index));
 }
 
-/** The index of the closest unclaimed stub of the same length, if any. */
+/**
+ * How far apart a prompt event and the recovered span for the SAME turn may
+ * sit. The event fires as the turn starts and the span opens on the model call
+ * right after it, so the real gap is milliseconds; this is loose enough to
+ * absorb a slow start and tight enough that the next turn never falls in.
+ *
+ * Bounding it is what stops a recovered turn whose own event never arrived
+ * (the log read is capped) from claiming some older stub of the same length
+ * and deleting the one turn that stub was the only record of. Past the window
+ * nothing is claimed, so the cost of being wrong is a prompt shown twice
+ * rather than a turn lost.
+ */
+const PROMPT_STUB_SAME_TURN_MS = 2_000;
+
+/**
+ * The index of the closest unclaimed stub of the same length within the
+ * same-turn window, or null when no stub is near enough to be that turn's.
+ */
 function nearestUnclaimedStub({
   stubs,
   claimed,
@@ -326,6 +343,7 @@ function nearestUnclaimedStub({
     if (claimed.has(index)) continue;
     if (entry.chars !== prompt.chars) continue;
     const distanceMs = Math.abs(entry.atMs - prompt.atMs);
+    if (distanceMs > PROMPT_STUB_SAME_TURN_MS) continue;
     if (distanceMs < nearestDistanceMs) {
       nearestDistanceMs = distanceMs;
       nearestIndex = index;

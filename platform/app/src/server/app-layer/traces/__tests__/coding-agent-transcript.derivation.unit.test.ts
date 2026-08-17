@@ -1482,6 +1482,48 @@ describe("given a codex trace whose recovered conversation and prompt event desc
       expect(prompts[0]).toMatchObject({ atMs: 1_042 });
     });
   });
+
+  describe("when the recovered turn's own prompt event never arrived", () => {
+    /** @scenario "A redacted prompt with no recovered turn behind it is kept" */
+    it("leaves an older stub of the same length alone", () => {
+      // The log read is capped, so a recovered turn can arrive with no event
+      // of its own. Claiming the nearest same-length stub regardless of
+      // distance would take the earlier turn's event and delete the only
+      // record of it.
+      const prompt = "tell me about the second";
+
+      const transcript = buildCodingAgentTranscript({
+        spans: [
+          recoveredCodexTurn({
+            atMs: 600_000,
+            messages: [{ role: "user", content: prompt }],
+            output: "the second one.",
+          }),
+        ],
+        logs: [
+          log(
+            {
+              "event.name": "codex.user_prompt",
+              prompt: "[REDACTED]",
+              prompt_length: "24",
+              "conversation.id": "conv-1",
+            },
+            1_042,
+          ),
+        ],
+      });
+
+      const prompts = transcript.entries.filter(
+        (entry) => entry.kind === "user_prompt",
+      );
+      // Both survive: the old turn keeps its record, and the recovered turn
+      // is shown with its words.
+      expect(prompts.map((entry) => entry.text)).toEqual([
+        "[REDACTED]",
+        prompt,
+      ]);
+    });
+  });
 });
 
 describe("given a prompt pasting tens of thousands of unclosed tags", () => {

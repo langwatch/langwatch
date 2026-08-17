@@ -11,6 +11,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type * as NextRouterModule from "~/utils/compat/next-router";
 
 const state = vi.hoisted(() => ({
   project: {} as Record<string, unknown>,
@@ -21,9 +22,9 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock("~/utils/compat/next-router", async () => {
-  const actual = await vi.importActual<
-    typeof import("~/utils/compat/next-router")
-  >("~/utils/compat/next-router");
+  const actual = await vi.importActual<typeof NextRouterModule>(
+    "~/utils/compat/next-router",
+  );
   return {
     ...actual,
     // The real resolver rather than a hand-written route pattern: the rail
