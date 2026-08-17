@@ -47,13 +47,25 @@ jobs:
         id: detect
         with:
           filters: |
+            # `relevant` MUST be the union of the per-language filters below.
+            # It is the outer gate, so a path it omits skips CodeQL entirely no
+            # matter what the language filters say, and a path it includes with
+            # no matching language produces an empty matrix and skips just the
+            # same. Both failure modes are silent and both read green.
+            #
+            # `sdks/go/**` used to sit here and is deliberately gone: this
+            # workflow's matrix analyses javascript-typescript and python only,
+            # so a Go path could never produce a leg. It was buying nothing
+            # except a js+python scan triggered by a Go-only change. (Whether Go
+            # gets analysed at all is a separate question — see the note about
+            # the default code-scanning setup in the PR that added this.)
             relevant:
               - 'platform/app/**'
               - 'sdks/python/**'
               - 'sdks/typescript/**'
               - 'mcp/typescript/**'
               - 'services/langevals/**'
-              - 'sdks/go/**'
+              - 'packages/**'
               - '.github/workflows/codeql.yml'
             codeql-javascript:
               - 'platform/app/**'

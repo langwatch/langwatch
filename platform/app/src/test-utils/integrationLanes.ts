@@ -7,7 +7,7 @@
  * Postgres, ClickHouse and Redis, ran Prisma migrations, installed goose,
  * replayed the ClickHouse schema and set up Helm before running files that
  * render React into jsdom and never open a socket. Measured on the six shards:
- * 548 of 1024 files declared jsdom and named no datastore at all.
+ * 546 of 1024 files declared jsdom and named no datastore at all.
  *
  * So the lane is decided by what a file NEEDS, not by what it is called:
  *

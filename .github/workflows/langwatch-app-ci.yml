@@ -100,7 +100,7 @@ jobs:
       unit-shards: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '[1,2,3,4]' || '[1]' }}
       unit-shard-count: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '4' || '1' }}
       # Six became four when the component lane took the files that never
-      # needed a datastore. 548 of the 1024 integration files declare jsdom and
+      # needed a datastore. 546 of the 1024 integration files declare jsdom and
       # name no database, queue or cache; they now run on `test-component`
       # below, with no service containers at all. What is left here is ~476
       # files that genuinely talk to something, so the same per-shard file count
@@ -108,10 +108,11 @@ jobs:
       # which is its own win while every shard is queueing 5-10 minutes for one.
       integration-shards: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '[1,2,3,4]' || '[1]' }}
       integration-shard-count: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '4' || '1' }}
-      # The component lane is unit-shaped: forked VM workers, a reused module
-      # registry and concurrent files, so a shard gets through its files far
-      # faster than a datastore shard does. Two is enough for ~548 files at the
-      # unit lane's measured throughput.
+      # The component lane is unit-shaped: forked VM workers and concurrent
+      # files, with no service containers to wait on, so a shard gets through
+      # its files far faster than a datastore shard does. Two is enough for
+      # ~546 files. (It does NOT share a module registry the way the unit lane
+      # does — see the `isolate` note in vitest.component.config.ts.)
       component-shards: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '[1,2]' || '[1]' }}
       component-shard-count: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '2' || '1' }}
       # Coverage instrumentation costs ~45% of the run (measured: a unit subset
@@ -427,7 +428,7 @@ jobs:
 
   # The `.integration.test.*` files that need no datastore.
   #
-  # 548 of the app's 1024 integration files declare jsdom and name no database,
+  # 546 of the app's 1024 integration files declare jsdom and name no database,
   # queue or cache — they render a component and mock their boundaries. They
   # were running on `test-integration` below, which means every one of them paid
   # for a Postgres, a ClickHouse and a Redis container, a Prisma migration, a
@@ -517,6 +518,18 @@ jobs:
           name: shard-durations-component-${{ matrix.shard }}
           path: platform/app/vitest.durations.json
           if-no-files-found: ignore
+
+      # The sibling lanes both upload, so without this the instrumentation the
+      # `coverage` flag turns on for this lane would be computed and thrown
+      # away — ~45% of the run for output nobody reads.
+      - name: Upload component test coverage to Codecov
+        if: always() && hashFiles('platform/app/coverage/lcov.info') != ''
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v5
+        with:
+          files: platform/app/coverage/lcov.info
+          flags: component
+          name: component-tests-shard-${{ matrix.shard }}
+          fail_ci_if_error: false
 
       - name: Extract test failures
         if: failure()
@@ -1339,14 +1352,31 @@ jobs:
 
       - name: Merge into one manifest
         run: |
-          # Later keys win on collision, but no file appears in two lanes
-          # (integrationLanes.ts partitions them) and no file appears in two
-          # shards of a lane, so there is nothing to collide.
+          # `add` lets later keys win, and keys DO collide: the reporter merges
+          # over whatever manifest was committed, so every shard's artifact
+          # carries the whole existing manifest plus its own timings. That is
+          # safe because a colliding key holds the same committed value in every
+          # artifact, and the only differing values are the fresh measurements,
+          # each of which appears in exactly one artifact — the lanes partition
+          # the files (integrationLanes.ts) and a lane's shards partition its
+          # own.
           find shard-durations -name 'vitest.durations.json' -print0 |
             xargs -0 cat |
             jq -s 'add // {} | to_entries | sort_by(.key) | from_entries' \
               > vitest.durations.json
-          echo "Merged $(jq 'length' vitest.durations.json) file timings."
+
+          # An empty merge means no shard uploaded anything — every test job
+          # skipped, or all of them died before their upload step. Publishing
+          # `{}` would hand someone an artifact the instructions above say to
+          # commit, and committing it would delete every weight in the repo.
+          # Fail instead: an absent manifest is a safe state, a blank one is not.
+          count=$(jq 'length' vitest.durations.json)
+          if [ "$count" -eq 0 ]; then
+            echo "::error::No shard produced any timings — refusing to publish an empty manifest."
+            echo "::error::Committing it would remove every weight the sequencer has."
+            exit 1
+          fi
+          echo "Merged $count file timings."
 
       - name: Upload the manifest to commit
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

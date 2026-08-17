@@ -3,18 +3,24 @@ description: >-
   Runs platform/app's `start:prepare:files`, reusing a cached result when none
   of its inputs changed.
 
-# `start:prepare:files` is a chain of seven generators — the Prisma client, the
-# langevals evaluator types, the TypeScript SDK build, the MCP server build, the
-# langy skill catalogue and the task registry. It costs 30-35s and every test,
-# build and check job in this workflow pays it. Across the shards that was
-# several runner-minutes per push spent regenerating byte-identical output from
-# byte-identical committed inputs.
+# `start:prepare:files` is a chain of seven generators — the AI-gateway secrets
+# check, the langevals evaluator types, the Prisma client, the TypeScript SDK
+# build, the MCP server build, the langy skill catalogue and the task registry.
+# It costs 30-35s and every test, build and check job in this workflow pays it.
+# Across the shards that was several runner-minutes per push spent regenerating
+# byte-identical output from byte-identical committed inputs.
 #
 # Every one of those generators is a pure function of files in the repo, so the
 # cache key is a hash of those files. Miss the inputs in the key and a job gets
 # stale generated code, so the key is deliberately broad: whole source trees
 # rather than the handful of files that seem to matter, because "seem to" is how
 # a generated-code cache goes wrong.
+#
+# `pnpm-lock.yaml` is in the key for the same reason, and it is the input most
+# easily forgotten: the GENERATORS themselves are dependencies. Bump Prisma or
+# the SDK's bundler with no source change and every hashed source file is
+# identical, so a key without the lockfile would restore artifacts built by the
+# previous toolchain and skip the regeneration that was the point of the bump.
 #
 # On a miss the generators run and the result is saved. On a hit nothing runs.
 # Either way the outputs exist afterwards, which is the action's whole contract.
@@ -38,6 +44,7 @@ runs:
           mcp/typescript/dist
         key: >-
           ${{ runner.os }}-prepared-files-${{ hashFiles(
+            'pnpm-lock.yaml',
             'platform/app/prisma/schema.prisma',
             'platform/app/prisma/schema/**',
             'platform/app/package.json',

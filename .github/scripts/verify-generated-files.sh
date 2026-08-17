@@ -26,12 +26,23 @@ require_dir() {
 require_file "platform/app/src/server/evaluations/evaluators.generated.ts"
 require_file "platform/app/src/tasks.generated.ts"
 require_file "platform/app/src/shared/langy/langySkills.generated.json"
-require_dir "sdks/typescript/dist"
-require_dir "mcp/typescript/dist"
+
+# Name the ENTRYPOINTS, not just the directories that hold them. A directory
+# check passes for an empty or half-written one, so a partially restored cache
+# would clear this step and then fail minutes later inside a test worker — the
+# exact failure this script exists to pre-empt. These are the paths the
+# packages' own `main` / `exports` / `bin` fields point at, so if one is missing
+# the package is unusable regardless of what else survived.
+require_file "sdks/typescript/dist/index.js"
+require_file "sdks/typescript/dist/index.mjs"
+require_file "sdks/typescript/dist/index.d.ts"
+require_file "mcp/typescript/dist/index.js"
+
 # `generator client { output = "../src/generated/prisma" }` — this schema does
 # NOT use the default node_modules/.prisma location, and app code imports it as
 # `~/generated/prisma/client`.
 require_dir "platform/app/src/generated/prisma"
+require_file "platform/app/src/generated/prisma/client.ts"
 
 if [ ${#missing[@]} -gt 0 ]; then
   echo "::error::start:prepare:files did not produce these outputs:"

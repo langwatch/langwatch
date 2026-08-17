@@ -155,9 +155,13 @@ jobs:
 
   e2e:
     needs: changes
+    # `heavy` matters more here than on the sibling `ci` job: this one boots the
+    # application and three datastores, so a draft push was paying for the most
+    # expensive job in the workflow while the rest of it deferred.
     if: >
       (needs.changes.outputs.relevant == 'true'
        || needs.changes.outputs.ingest == 'true')
+      && needs.changes.outputs.heavy == 'true'
       && (github.event_name != 'pull_request_target'
           || github.event.label.name == 'approved-ci')
     runs-on: ubuntu-latest

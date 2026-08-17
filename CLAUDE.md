@@ -180,7 +180,7 @@ pnpm test:e2e         # E2E tests
 **`.integration.test.ts` files run in one of two lanes, chosen by their
 dependencies rather than by their name.** The suffix states a test LEVEL —
 renders a component, mocks its boundaries — and that is still the right name for
-such a test. But 548 of the 1024 integration files declare jsdom and name no
+such a test. But 546 of the 1024 integration files declare jsdom and name no
 database, queue or cache, and they were running on a shard that booted three
 datastores and migrated two schemas first. A file lands in the **component**
 lane when it declares `@vitest-environment jsdom` **and** mentions no datastore;

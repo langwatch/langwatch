@@ -1,7 +1,7 @@
 /**
  * The lane for `.integration.test.*` files that need no datastore.
  *
- * 548 of the app's 1024 integration files declare jsdom and name no database,
+ * 546 of the app's 1024 integration files declare jsdom and name no database,
  * queue or cache: they render a component and mock their boundaries. They were
  * running on the datastore lane — one serial fork worker on a 4-vCPU runner
  * that was simultaneously hosting Postgres, ClickHouse and Redis, after Prisma
