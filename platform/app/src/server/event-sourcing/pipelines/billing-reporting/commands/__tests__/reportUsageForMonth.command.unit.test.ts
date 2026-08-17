@@ -24,7 +24,6 @@ const {
   mockSelfDispatch,
   mockCaptureException,
   mockQueryBillableEventsTotal,
-  createMockLogger,
   mockLogger,
 } = vi.hoisted(() => {
   const mockReportUsageDelta = vi.fn();
@@ -64,7 +63,6 @@ const {
     mockSelfDispatch,
     mockCaptureException,
     mockQueryBillableEventsTotal,
-    createMockLogger,
     mockLogger,
   };
 });
