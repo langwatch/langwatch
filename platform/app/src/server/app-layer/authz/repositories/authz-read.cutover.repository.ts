@@ -1,0 +1,147 @@
+/**
+ * ADR-092 delivery-plan PR 3 — the collector's per-organization repoint. One
+ * `AuthzReadRepository` in front of two: the legacy compat heads
+ * (`RoleBinding` / `CustomRole` / `ShareLink`) and the ledger's own projection
+ * (`Grant` / `Role` / `GrantUsage`). Each call resolves the organization it is
+ * about, asks the cutover gate whether that organization is served by the
+ * engine, and delegates.
+ *
+ * The delegation table, in full:
+ *
+ *   findOrganizationRole   → legacy always (OrganizationUser; identical query)
+ *   findApiKeyOwner        → legacy always (ApiKey; identical query, no org)
+ *   findProjectLineage     → legacy always (Project→Team; identical query)
+ *   findTeamOrganization   → legacy always (Team; identical query)
+ *   findUserBindings       → gate(organizationId)
+ *   findGroupBindings      → gate(organizationId)
+ *   findApiKeyBindings     → gate(organizationId)
+ *   findLegacyTeamMemberships → gate(organizationId)
+ *   findCustomRolePermissions → gate(organizationId)
+ *   findShareLinks         → gate(org resolved from the project's lineage)
+ *
+ * The four "legacy always" rows are not an exception to the fork: membership
+ * and lineage are not grants and were never projected onto the ledger's head,
+ * so both implementations run the SAME query against the SAME table. Forking
+ * them would buy a caller nothing and cost a gate read per call.
+ *
+ * `findShareLinks` carries a project, not an organization - the port's shape,
+ * because ShareLink's tenancy is its project. The lineage read that resolves
+ * it is the one the collector performs anyway to build the resource scope.
+ * When the project is unknown there is no organization to ask about, so the
+ * call goes to legacy: an unresolvable scope must not be a silent head swap.
+ *
+ * Browser-safety: like everything else under ./authz, this composes from a
+ * caller-supplied Prisma handle and holds no module-scope storage.
+ */
+import type {
+  AuthzPrincipalRef,
+  CollectedBinding,
+  LegacyTeamMembership,
+  ShareableResourceKind,
+} from "@langwatch/authz";
+import type {
+  AuthzReadRepository,
+  CustomRolePermissionsRow,
+  OrganizationRole,
+  ShareLinkRow,
+} from "@langwatch/authz-server";
+import type { Prisma } from "~/generated/prisma/client";
+import { cutoverOnEngine } from "../cutover-gate";
+import { GrantsAuthzReadRepository } from "./authz-read.grants.repository";
+import { PrismaAuthzReadRepository } from "./authz-read.prisma.repository";
+
+export class CutoverAwareAuthzReadRepository implements AuthzReadRepository {
+  constructor(
+    private readonly prisma: Prisma.TransactionClient,
+    private readonly repositories: {
+      legacy: AuthzReadRepository;
+      grants: AuthzReadRepository;
+    } = {
+      legacy: new PrismaAuthzReadRepository(prisma),
+      grants: new GrantsAuthzReadRepository(prisma),
+    },
+  ) {}
+
+  async findOrganizationRole(args: {
+    userId: string;
+    organizationId: string;
+  }): Promise<OrganizationRole | null> {
+    return this.repositories.legacy.findOrganizationRole(args);
+  }
+
+  async findUserBindings(args: {
+    userId: string;
+    organizationId: string;
+  }): Promise<CollectedBinding[]> {
+    return (await this.readerFor(args.organizationId)).findUserBindings(args);
+  }
+
+  async findGroupBindings(args: {
+    userId: string;
+    organizationId: string;
+  }): Promise<CollectedBinding[]> {
+    return (await this.readerFor(args.organizationId)).findGroupBindings(args);
+  }
+
+  async findApiKeyBindings(args: {
+    apiKeyId: string;
+    organizationId: string;
+  }): Promise<CollectedBinding[]> {
+    return (await this.readerFor(args.organizationId)).findApiKeyBindings(args);
+  }
+
+  async findApiKeyOwner(
+    apiKeyId: string,
+  ): Promise<{ userId: string | null } | null> {
+    return this.repositories.legacy.findApiKeyOwner(apiKeyId);
+  }
+
+  async findLegacyTeamMemberships(args: {
+    userId: string;
+    organizationId: string;
+  }): Promise<LegacyTeamMembership[]> {
+    return (await this.readerFor(args.organizationId)).findLegacyTeamMemberships(
+      args,
+    );
+  }
+
+  async findCustomRolePermissions(args: {
+    organizationId: string;
+    principal: AuthzPrincipalRef;
+    customRoleIds: readonly string[];
+  }): Promise<CustomRolePermissionsRow[]> {
+    return (await this.readerFor(args.organizationId)).findCustomRolePermissions(
+      args,
+    );
+  }
+
+  async findShareLinks(args: {
+    projectId: string;
+    tokens: readonly string[];
+    links: ReadonlyArray<{ kind: ShareableResourceKind; id: string }>;
+  }): Promise<ShareLinkRow[]> {
+    const lineage = await this.repositories.legacy.findProjectLineage({
+      projectId: args.projectId,
+    });
+    if (!lineage) return this.repositories.legacy.findShareLinks(args);
+    return (await this.readerFor(lineage.organizationId)).findShareLinks(args);
+  }
+
+  async findProjectLineage(args: {
+    projectId: string;
+  }): Promise<{ teamId: string; organizationId: string } | null> {
+    return this.repositories.legacy.findProjectLineage(args);
+  }
+
+  async findTeamOrganization(args: {
+    teamId: string;
+  }): Promise<{ organizationId: string } | null> {
+    return this.repositories.legacy.findTeamOrganization(args);
+  }
+
+  private async readerFor(organizationId: string): Promise<AuthzReadRepository> {
+    return (await cutoverOnEngine({ prisma: this.prisma, organizationId }))
+      ? this.repositories.grants
+      : this.repositories.legacy;
+  }
+}

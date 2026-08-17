@@ -15,8 +15,9 @@
  * (`~/server/db`) or redis AT MODULE SCOPE, because that is the state whose
  * module-load side effects reach the browser. A repository CLASS constructed
  * over a handle the caller already holds carries no such state, so
- * PrismaAuthzReadRepository below is fine. The boundary is enforced as a
- * graph, not by review: src/server/__tests__/frontend-boundary.unit.test.ts.
+ * CutoverAwareAuthzReadRepository below - and the two repositories and the
+ * cutover gate it composes - is fine. The boundary is enforced as a graph, not
+ * by review: src/server/__tests__/frontend-boundary.unit.test.ts.
  *
  * The two env reads below are the whole of what it needs, and both are
  * functions the shadow service calls per check — runtime.ts imports
@@ -28,7 +29,7 @@ import {
   AuthzShadowService,
 } from "@langwatch/authz-server";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { PrismaAuthzReadRepository } from "./repositories/authz-read.prisma.repository";
+import { CutoverAwareAuthzReadRepository } from "./repositories/authz-read.cutover.repository";
 
 /**
  * `AUTHZ_V2_SHADOW` as a sample rate: "1"/"true" compares every check, a
@@ -60,7 +61,11 @@ export function demoProjectId(): string | undefined {
 
 export function authzShadowFor(prisma: PrismaClient): AuthzShadowService {
   return new AuthzShadowService(
-    new AuthzCollectorService(new PrismaAuthzReadRepository(prisma)),
+    // The same per-organization repository the composition root collects
+    // through (delivery-plan PR 3): a cut-over organization's shadow must
+    // compare against the head that organization is actually served from,
+    // or the comparison measures the wrong thing.
+    new AuthzCollectorService(new CutoverAwareAuthzReadRepository(prisma)),
     { sampleRate: parseShadowRate, demoProjectId },
   );
 }

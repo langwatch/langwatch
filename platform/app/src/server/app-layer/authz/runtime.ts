@@ -26,12 +26,17 @@ import { prisma } from "../../db";
 import { bumpAuthzEpoch, getAuthzEpoch } from "./epoch";
 import { grantsLedgerWriter } from "./ledger";
 import { LedgerAuthzGrantsRepository } from "./repositories/authz-grants.ledger.repository";
-import { PrismaAuthzReadRepository } from "./repositories/authz-read.prisma.repository";
+import { CutoverAwareAuthzReadRepository } from "./repositories/authz-read.cutover.repository";
 import { demoProjectId } from "./shadow";
 
-/** COLLECT policies over the Prisma read repository. */
+/**
+ * COLLECT policies over the read repository, which since delivery-plan PR 3
+ * is per-organization: a cut-over organization collects from the grants
+ * ledger's own projection, everyone else from the compat heads, decided per
+ * call by the cutover gate.
+ */
 export const authzCollector = new AuthzCollectorService(
-  new PrismaAuthzReadRepository(prisma),
+  new CutoverAwareAuthzReadRepository(prisma),
 );
 
 /**
