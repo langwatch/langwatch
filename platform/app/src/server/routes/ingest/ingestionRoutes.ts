@@ -785,6 +785,18 @@ secured
                 // an integer once, here, and every total downstream adds
                 // those integers rather than re-deriving from decimals.
                 const nano = usdToNanoUsd(event.costUsd);
+                const nanoNum = Number(nano);
+                if (!Number.isSafeInteger(nanoNum)) {
+                  logger.error(
+                    {
+                      costUsd: event.costUsd,
+                      nanoUsd: nano.toString(),
+                      requestId: event.requestId,
+                    },
+                    "budget: amountNanoUsd exceeds Number.MAX_SAFE_INTEGER, skipping debit row to avoid silent rounding",
+                  );
+                  continue;
+                }
                 const rows = budgets.map((b) => ({
                   tenantId: govProject.id,
                   budgetId: b.id,
@@ -793,7 +805,7 @@ secured
                   window: b.window,
                   virtualKeyId: sentinelVK,
                   gatewayRequestId: event.requestId,
-                  amountNanoUsd: Number(nano),
+                  amountNanoUsd: nanoNum,
                   tokensInput: event.inputTokens,
                   tokensOutput: event.outputTokens,
                   tokensCacheRead: event.cacheReadTokens,
