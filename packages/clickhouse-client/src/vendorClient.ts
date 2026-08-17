@@ -32,7 +32,6 @@ import {
   extractQueryType,
   extractTableName,
   inbandExceptionOf,
-  type VendorQueryType,
 } from "./statementShape";
 
 /**
@@ -299,7 +298,7 @@ export class VendorClientResilience {
     params: unknown;
   }): R {
     if (typeof result?.json !== "function") return result;
-    const queryType: VendorQueryType = extractQueryType(params);
+    const queryType = extractQueryType(params);
     const originalJson = result.json.bind(result);
     result.json = (async (...args: never[]) => {
       const rows = (await originalJson(...args)) as unknown;

@@ -295,8 +295,14 @@ export class StatementReporter {
    * recovered failure on a customer's private instance is indistinguishable
    * from one on the shared cluster.
    *
-   * Written to the notice sink, which is guarded, so this needs no `catch` of
-   * its own.
+   * The only reporting method with no `catch`, and the one place a log line
+   * was deliberately dropped. {@link failure} and {@link success} write to the
+   * outcome sink and report their own failure on the notice sink — two
+   * different sinks, so the second line is worth emitting. This method already
+   * writes to the notice sink, so the old fallback reported a broken sink
+   * through the sink that had just broken. It only ever produced output for a
+   * host whose `debug`/`warn` threw while its `error` still worked, and the
+   * guard now covers the failure either way.
    */
   retryNotice({
     operation,
