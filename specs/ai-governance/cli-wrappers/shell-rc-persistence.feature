@@ -148,6 +148,15 @@ Feature: Persist the OTLP telemetry exports so `<tool>` captures automatically
       Then the turn-completion harvest is asserted beside it
       And a device whose wiring predates the harvest gains it on the next refresh
 
+    # Naming the seams one by one is what let two of them ship with exporters
+    # and no harvest. The check reads the source, so a seam added later fails
+    # it instead of quietly capturing nothing.
+    @unit @cli-wrappers @shell-rc @codex
+    Scenario: A new seam that writes the exporters cannot ship without the harvest
+      Given the places in the CLI that write the codex [otel] block
+      When the persist seams are checked
+      Then each of them wires the turn harvest beside the write
+
     @unit @cli-wrappers @shell-rc @codex
     Scenario: A harvest that cannot be wired is reported, never silent
       Given a codex config the harvest install cannot write

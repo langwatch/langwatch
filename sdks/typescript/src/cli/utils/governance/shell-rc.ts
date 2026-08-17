@@ -34,12 +34,8 @@ import chalk from "chalk";
 import {
 	type CodexNotifyWriteResult,
 	codexNotifyCommandIsEphemeral,
-	codexOtelBlockHasAuthHeader,
-	defaultCodexConfigPath,
 	defaultCodexNotifyCommand,
-	displayCodexConfigPath,
 	writeCodexNotifyBlock,
-	writeCodexOtelBlock,
 } from "../codex-config-toml";
 import {
 	appEnvHasAllVars,
