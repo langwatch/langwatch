@@ -271,6 +271,29 @@ describe("SimulationClickHouseRepository (integration)", () => {
         expect(result.runs[0]!.metadata).toEqual(metadata);
       });
     });
+
+    describe("when no scenario set id is given", () => {
+      /** @scenario "A batch id alone filters the list" */
+      it("returns the batch's runs and no others", async () => {
+        const batchRunId = `batch-only-${nanoid()}`;
+        const wantedRunId = `run-only-${nanoid()}`;
+
+        await insertRow(
+          ch,
+          makeInsertRow({ ScenarioRunId: wantedRunId, BatchRunId: batchRunId }),
+        );
+        await insertRow(ch, makeInsertRow({ Status: "IN_PROGRESS" }));
+
+        const result = await repo.getRunDataForBatchRun({
+          projectId: tenantId,
+          batchRunId,
+        });
+
+        expect(result.changed).toBe(true);
+        if (!result.changed) throw new Error("expected changed");
+        expect(result.runs.map((r) => r.scenarioRunId)).toEqual([wantedRunId]);
+      });
+    });
   });
 
   describe("getAllRunDataForScenarioSet()", () => {

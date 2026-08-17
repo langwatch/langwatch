@@ -60,7 +60,7 @@ export interface SimulationRepository {
 
   getRunDataForBatchRun(params: {
     projectId: string;
-    scenarioSetId: string;
+    scenarioSetId?: string;
     batchRunId: string;
     sinceTimestamp?: number;
   }): Promise<BatchRunDataResult>;
