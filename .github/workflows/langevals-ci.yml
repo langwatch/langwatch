@@ -135,10 +135,13 @@ jobs:
         # `evaluators/langevals/tests/` is ignored by the step above because
         # its LLM-judged tests are non-deterministic. This file is not one of
         # them: it stubs the call to the provider, so it needs no key, makes no
-        # provider request and always gives the same answer. Naming it here is
-        # what makes it run, and it runs on forks too. It guards the dspy
-        # thread-affinity crash that broke every evaluation after the first one
-        # on a long-lived server.
+        # provider request and always gives the same answer. The step above also
+        # ignores `tests/`, which holds the same kind of test. Naming both paths
+        # here is what makes them run, and they run on forks too. They guard the
+        # dspy thread-affinity crash that broke every evaluation after the first
+        # one on a long-lived server, the event-loop block that made the health
+        # probe time out under load, and the worker-count detection that has to
+        # survive a bad value without stopping the boot.
         working-directory: services/langevals
         run: uv run pytest -x -v evaluators/langevals/tests/test_llm_answer_match_threading.py tests/deterministic/
 

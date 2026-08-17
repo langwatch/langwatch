@@ -11,6 +11,7 @@ export const FEATURE_SKILLS = [
   "online-evaluations",
   "evaluations",
   "scenarios",
+  "connect-agent",
   "prompts",
   "agent-performance",
   "agent-improve",

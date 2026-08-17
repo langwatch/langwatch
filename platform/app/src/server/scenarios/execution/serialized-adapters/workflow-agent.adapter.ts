@@ -18,6 +18,7 @@
  *   the first value, then to a stringified result.
  */
 
+import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentAdapter, AgentRole } from "@langwatch/scenario";
 import { randomBytes } from "crypto";
@@ -99,6 +100,24 @@ export class SerializedWorkflowAgentAdapter extends AgentAdapter {
   }
 
   /**
+   * The `params` namespace for one turn: the run's resolved values plus this
+   * turn's trace context, so a code node inside the workflow can forward
+   * `params.trace_id` or `params.traceparent` to whatever it calls. Captured
+   * per call, because every turn opens its own trace. `trace_id` and
+   * `traceparent` are reserved names: they win over a run parameter with the
+   * same name.
+   */
+  private turnParameters(): RunParameterValues {
+    const { headers, traceId } = injectTraceContextHeaders({ headers: {} });
+    const traceparent = headers.traceparent;
+    return {
+      ...this.parameters,
+      ...(traceId !== undefined && { trace_id: traceId }),
+      ...(traceparent !== undefined && { traceparent }),
+    };
+  }
+
+  /**
    * The run's parameters as entry inputs. Entry inputs are strings on the
    * wire, so a number or a boolean is coerced here; a code node that wants the
    * native value reads it from `params.NAME` instead.
@@ -171,7 +190,7 @@ export class SerializedWorkflowAgentAdapter extends AgentAdapter {
       ...this.config.workflow,
       api_key: this.projectApiKey,
       secrets: { ...existingSecrets, ...this.config.secrets },
-      params: this.parameters,
+      params: this.turnParameters(),
     };
 
     const event = {

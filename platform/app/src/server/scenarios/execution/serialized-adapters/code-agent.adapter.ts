@@ -9,6 +9,7 @@
  * as an execute_flow event.
  */
 
+import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentAdapter, AgentRole } from "@langwatch/scenario";
 import { SpanKind } from "@opentelemetry/api";
@@ -101,9 +102,27 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
 
   async call(input: AgentInput): Promise<string> {
     const inputRecord = this.resolveInputValues(input);
-    const workflow = this.buildWorkflow(inputRecord);
+    const workflow = this.buildWorkflow(inputRecord, this.turnParameters());
     const result = await this.executeOnNlpService(workflow, inputRecord);
     return result;
+  }
+
+  /**
+   * The `params` namespace for one turn: the run's resolved values plus this
+   * turn's trace context, so the code under test can forward
+   * `params.trace_id` or `params.traceparent` to whatever it calls. Captured
+   * per call, because every turn opens its own trace. `trace_id` and
+   * `traceparent` are reserved names: they win over a run parameter with the
+   * same name.
+   */
+  private turnParameters(): RunParameterValues {
+    const { headers, traceId } = injectTraceContextHeaders({ headers: {} });
+    const traceparent = headers.traceparent;
+    return {
+      ...this.parameters,
+      ...(traceId !== undefined && { trace_id: traceId }),
+      ...(traceparent !== undefined && { traceparent }),
+    };
   }
 
   /**
@@ -112,7 +131,10 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
    * The /studio/execute_sync endpoint returns result.get("end"), so we need
    * an end node to capture the code node's outputs.
    */
-  private buildWorkflow(resolvedValues: Record<string, string>) {
+  private buildWorkflow(
+    resolvedValues: Record<string, string>,
+    params: RunParameterValues,
+  ) {
     const { ENTRY_NODE_ID, CODE_NODE_ID, END_NODE_ID } =
       SerializedCodeAgentAdapter;
 
@@ -146,7 +168,7 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
       version: "1.0",
       template_adapter: "default" as const,
       secrets: this.config.secrets,
-      params: this.parameters,
+      params,
       nodes: [
         this.buildEntryNode(inputs),
         this.buildCodeNode(inputs, outputs),

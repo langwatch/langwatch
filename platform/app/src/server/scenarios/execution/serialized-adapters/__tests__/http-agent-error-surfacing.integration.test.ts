@@ -154,6 +154,7 @@ const baseInput: AgentInput = {
   messages: [{ role: "user", content: "hello" }],
   newMessages: [{ role: "user", content: "hello" }],
   requestedRole: AgentRole.AGENT,
+  propagationHeaders: {},
   scenarioState: {} as AgentInput["scenarioState"],
   scenarioConfig: {} as AgentInput["scenarioConfig"],
 };

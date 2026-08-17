@@ -275,6 +275,14 @@ const registry = {
     ],
   },
 
+  // ---- agent dev tunnel ----
+  agent_dev_tunnel_unreachable: {
+    tips: [
+      "Run `langwatch agent dev` again on the machine that started the tunnel; a new session repoints the agent automatically",
+      "If you are done developing locally, restore the agent's URL in its settings",
+    ],
+  },
+
   // ---- evaluations ----
   evaluation_not_found: {
     tips: [

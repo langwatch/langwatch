@@ -119,6 +119,7 @@ describe("HTTP agent body JSON safety (n8n regression)", () => {
       messages: [{ role: "user", content }],
       newMessages: [{ role: "user", content }],
       requestedRole: AgentRole.AGENT,
+      propagationHeaders: {},
       scenarioState: {} as AgentInput["scenarioState"],
       scenarioConfig: {} as AgentInput["scenarioConfig"],
     };

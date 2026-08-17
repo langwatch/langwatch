@@ -82,6 +82,113 @@ describe("ScenarioFailureHandler", () => {
     });
   });
 
+  describe("when the target is an HTTP agent carrying a devTunnel marker", () => {
+    const devTunnelParams = {
+      ...baseParams,
+      target: { type: "http", referenceId: "agent_dev1" },
+    };
+    const lookupWithDevTunnel = vi.fn().mockResolvedValue({
+      url: "https://gone.trycloudflare.com",
+      devTunnel: { previousUrl: "https://staging.example.com/agent" },
+    });
+
+    beforeEach(() => {
+      lookupWithDevTunnel.mockClear();
+      handler = ScenarioFailureHandler.create(lookupWithDevTunnel);
+    });
+
+    /** @scenario "A transport failure on a tunneled agent is named a dead dev tunnel" */
+    it("classifies a transport failure as a dead dev tunnel with a restart hint", async () => {
+      await handler.ensureFailureEventsEmitted({
+        ...devTunnelParams,
+        error: "TypeError: fetch failed (ECONNREFUSED)",
+      });
+
+      const results = (
+        mockFinishRun.mock.calls[0]?.[0] as { results: { error: string } }
+      ).results;
+      const decoded = decodeScenarioError(results.error);
+      expect(decoded?.code).toBe(
+        ScenarioInfraErrorCode.AgentDevTunnelUnreachable,
+      );
+      expect(decoded?.hint).toContain("langwatch agent dev");
+      expect(lookupWithDevTunnel).toHaveBeenCalledWith({
+        projectId: "proj_123",
+        agentId: "agent_dev1",
+      });
+    });
+
+    it("classifies the tunnel edge's HTTP 530 answer the same way", async () => {
+      await handler.ensureFailureEventsEmitted({
+        ...devTunnelParams,
+        error:
+          "HTTP 530: error from https://gone.trycloudflare.com (request-id: abc): error code: 1033",
+      });
+
+      const results = (
+        mockFinishRun.mock.calls[0]?.[0] as { results: { error: string } }
+      ).results;
+      expect(decodeScenarioError(results.error)?.code).toBe(
+        ScenarioInfraErrorCode.AgentDevTunnelUnreachable,
+      );
+    });
+
+    it("keeps the generic classification for a non-transport failure", async () => {
+      await handler.ensureFailureEventsEmitted({
+        ...devTunnelParams,
+        error: "provider_error: API key is invalid",
+      });
+
+      const results = (
+        mockFinishRun.mock.calls[0]?.[0] as { results: { error: string } }
+      ).results;
+      expect(decodeScenarioError(results.error)?.code).toBe(
+        ScenarioInfraErrorCode.ModelProviderError,
+      );
+      // The agent lookup is only paid for transport-level failures.
+      expect(lookupWithDevTunnel).not.toHaveBeenCalled();
+    });
+
+    it("degrades to the generic classification when the agent lookup fails", async () => {
+      lookupWithDevTunnel.mockRejectedValueOnce(new Error("db down"));
+
+      await handler.ensureFailureEventsEmitted({
+        ...devTunnelParams,
+        error: "TypeError: fetch failed",
+      });
+
+      const results = (
+        mockFinishRun.mock.calls[0]?.[0] as { results: { error: string } }
+      ).results;
+      expect(decodeScenarioError(results.error)?.code).toBe(
+        ScenarioInfraErrorCode.PlatformUnreachable,
+      );
+    });
+  });
+
+  describe("when the target is an HTTP agent without a devTunnel marker", () => {
+    /** @scenario "A transport failure on a regular agent keeps its generic classification" */
+    it("keeps the unreachable-endpoint classification", async () => {
+      const lookup = vi
+        .fn()
+        .mockResolvedValue({ url: "https://api.example.com" });
+      handler = ScenarioFailureHandler.create(lookup);
+
+      await handler.ensureFailureEventsEmitted({
+        ...baseParams,
+        target: { type: "http", referenceId: "agent_plain" },
+        error: "TypeError: fetch failed (ECONNREFUSED)",
+      });
+
+      const results = (
+        mockFinishRun.mock.calls[0]?.[0] as { results: { error: string } }
+      ).results;
+      expect(decodeScenarioError(results.error)?.code).toBe(
+        ScenarioInfraErrorCode.PlatformUnreachable,
+      );
+    });
+  });
+
   describe("when called with cancelled: true", () => {
     it("dispatches finishRun with CANCELLED status", async () => {
       await handler.ensureFailureEventsEmitted({

@@ -74,6 +74,9 @@
             "group": "Agent Simulations",
             "pages": [
               "agent-simulations/introduction",
+              "agent-simulations/connect-your-agent",
+              "agent-simulations/remote-traces",
+              "agent-simulations/local-development",
               "agent-simulations/getting-started",
               "agent-simulations/scenario-parameters",
               "agent-simulations/authenticated-agents",
@@ -1487,7 +1490,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1786969476",
+      "source": "/ci/cache/busted/1786976022",
       "destination": "/"
     },
     {
