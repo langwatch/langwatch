@@ -1,17 +1,10 @@
 package config
 
 import (
-	"context"
-	"errors"
-	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
 )
 
 const (
-	DefaultGracefulSeconds = 5
 	// DefaultMaxRequestBodyBytes caps inbound request bodies. The pipeline
 	// reads the body fully into memory (MaterializeBody) for policy,
 	// guardrail and cache inspection, so peak RAM scales with this cap
@@ -54,34 +47,18 @@ type Server struct {
 	DrainDelaySeconds int `env:"DRAIN_DELAY_SECONDS"`
 }
 
-// ListenAndServe starts the server and handles graceful shutdown on SIGTERM/SIGINT.
-func (cfg *Server) ListenAndServe(srv *http.Server) error {
-	if srv.Addr == "" {
-		srv.Addr = cfg.Addr
-	}
-	if cfg.GracefulSeconds == 0 {
-		cfg.GracefulSeconds = DefaultGracefulSeconds
-	}
-
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
-
-	errs := make(chan error, 1)
-	go func() {
-		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-			errs <- err
-		}
-	}()
-
-	select {
-	case err := <-errs:
-		return err
-	case <-stop:
-		if cfg.GracefulSeconds > 0 {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(cfg.GracefulSeconds)*time.Second)
-			defer cancel()
-			return srv.Shutdown(ctx)
-		}
-		return nil
-	}
-}
+// Serving and shutdown deliberately do NOT live here. pkg/lifecycle owns them,
+// and this file used to carry a second implementation — a `ListenAndServe` that
+// registered its own SIGTERM/SIGINT handler and, on a signal, closed the HTTP
+// server and nothing else: no draining flip, no drain delay, no teardown of
+// anything else the process had started.
+//
+// It had no callers; every service goes through pkg/lifecycle.Group. It is
+// removed rather than left in place because Go runs EVERY listener registered
+// for a signal, so the first service to reach for the more convenient-looking
+// helper would have got two shutdown sequences racing over one process, and
+// whichever finished first would decide when the process died — cutting the
+// other's drain short with no error and no log line saying so.
+//
+// The Server struct's fields remain: services read GracefulSeconds and
+// DrainDelaySeconds and pass them to lifecycle.WithGraceful / WithDrainDelay.

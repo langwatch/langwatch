@@ -46,8 +46,23 @@ type Option func(*Group)
 // WithGraceful sets how long services get to stop once the drain delay has
 // elapsed. It bounds the stop phase only; the drain delay is charged
 // separately, so the deadline a service's Stop sees is always the full d.
+//
+// A non-positive d is ignored and the default stands. Every caller computes
+// this from config — `WithGraceful(time.Duration(cfg.Server.GracefulSeconds) *
+// time.Second)` — so a GracefulSeconds that is unset, or zero from a config
+// path that forgot its own default, used to overwrite the default here with 0.
+// That does not mean "no limit": the stop phase would get a context that is
+// already expired, so every Stop would return DeadlineExceeded immediately and
+// nothing would drain at all, silently and with the shutdown still reporting
+// itself complete. Refusing the value is the difference between a
+// misconfiguration costing the drain and costing nothing.
 func WithGraceful(d time.Duration) Option {
-	return func(g *Group) { g.graceful = d }
+	return func(g *Group) {
+		if d <= 0 {
+			return
+		}
+		g.graceful = d
+	}
 }
 
 // WithDrainDelay sets the pause between marking draining and stopping services.

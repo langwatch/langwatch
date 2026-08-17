@@ -77,6 +77,51 @@ Feature: Gateway service — public HTTP surface and operational basics
       And the process exits cleanly within 15s
       And new requests during the drain window are rejected with 503
 
+  Rule: pkg/lifecycle is the sole owner of termination signals
+
+    # Go runs EVERY listener registered for a signal, so a second handler does
+    # not layer politely on top of the first — the two race, and whichever
+    # finishes first decides when the process dies, cutting the other's drain
+    # short with no error and no log line saying so.
+    #
+    # pkg/config used to carry exactly that second implementation: a
+    # `ListenAndServe` with its own signal.Notify that closed the HTTP server
+    # and nothing else — no draining flip, no drain delay, no teardown of
+    # anything else the process had started. It had no callers, so nothing was
+    # broken; it is gone because the first person to reach for the more
+    # convenient-looking helper would have been.
+
+    @unit
+    Scenario: Only pkg/lifecycle registers a termination-signal handler
+      Given the deployed Go packages under services/ and pkg/
+      When they are scanned for signal registrations naming SIGTERM, SIGINT or os.Interrupt
+      Then pkg/lifecycle is the only place one is registered
+      And a handler for a non-termination signal is still allowed
+      So that a stray handler cannot race the drain into an early exit
+
+  Rule: A misconfigured graceful budget costs nothing rather than the drain
+
+    # Every service computes the budget from config, so an unset or
+    # forgotten-default GracefulSeconds reaches the option as 0. A zero budget
+    # is not "no limit": the stop phase gets an already-expired context, every
+    # Stop returns DeadlineExceeded at once, nothing drains, and the shutdown
+    # still reports itself complete.
+
+    @unit
+    Scenario: A zero graceful budget falls back to the default
+      Given a service configured with a graceful budget of zero
+      When its lifecycle group is built
+      Then the default budget applies instead
+      And a service's Stop still sees time remaining on its deadline
+
+    # Unlike the budget, a zero drain delay is a documented, explicit "do not
+    # wait" for a service with nothing routing to it.
+    @unit
+    Scenario: An explicit zero drain delay is honored
+      Given a service configured with a drain delay of zero
+      When its lifecycle group is built
+      Then no drain delay is applied
+
   Rule: Structured JSON logs
 
     @unit @unimplemented
