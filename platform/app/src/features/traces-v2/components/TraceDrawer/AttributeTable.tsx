@@ -24,8 +24,8 @@ import {
 import { AttributeValue } from "./AttributeValue";
 import { AnchorCommentButton } from "./anchoredComments/AnchorCommentButton";
 import { sameAttributeValue } from "./attributeValueEquality";
+import { FormatSelect } from "./FormatSelect";
 import { PinnedAwareJsonView } from "./JsonHighlight";
-import { SegmentedToggle } from "./SegmentedToggle";
 
 const EM_DASH = "\u2014";
 
@@ -1423,10 +1423,11 @@ export function AttributeTable({
           _focus={{ borderColor: "border.emphasized" }}
         />
         {!editing && (
-          <SegmentedToggle
+          <FormatSelect
             value={viewMode}
             onChange={(m) => setViewMode(m as AttrViewMode)}
             options={VIEW_MODE_OPTIONS}
+            ariaLabel="Attributes view format"
           />
         )}
         <CopyAllButton payload={copyPayload} />

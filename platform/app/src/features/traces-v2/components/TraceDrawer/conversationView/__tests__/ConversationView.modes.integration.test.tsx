@@ -8,6 +8,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -82,17 +83,20 @@ afterEach(cleanup);
 
 describe("given the trace drawer is open on a conversation", () => {
   /** @scenario "The conversation offers no separate annotations mode" */
-  it("offers thread, bubbles, and markdown only", () => {
+  it("offers thread, bubbles, and markdown only", async () => {
+    const user = userEvent.setup();
     renderView();
 
-    expect(screen.getByRole("button", { name: "thread" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "bubbles" })).toBeInTheDocument();
+    const trigger = screen.getByRole("button", {
+      name: "Conversation view format",
+    });
+    expect(trigger).toHaveTextContent("Thread");
+
+    await user.click(trigger);
+    await screen.findByRole("menuitem", { name: "Thread" });
     expect(
-      screen.getByRole("button", { name: "markdown" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "annotations" }),
-    ).not.toBeInTheDocument();
+      screen.getAllByRole("menuitem").map((item) => item.textContent),
+    ).toEqual(["Thread", "Bubbles", "Markdown"]);
   });
 
   it("names the conversation it is showing", () => {

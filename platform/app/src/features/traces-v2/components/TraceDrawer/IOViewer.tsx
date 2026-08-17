@@ -1,5 +1,6 @@
-import { Box, Button, HStack, Icon, Text } from "@chakra-ui/react";
+import { Box, Button, Flex, HStack, Icon, Text } from "@chakra-ui/react";
 import { forwardRef, memo, useEffect, useMemo, useRef, useState } from "react";
+import type { IconType } from "react-icons";
 import {
   LuCheck,
   LuChevronDown,
@@ -17,14 +18,19 @@ import {
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useGoToSpanInPlaygroundTabUrlBuilder } from "~/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground";
 import { TRANSLATE_TEXT_MAX_CHARS } from "~/utils/constants";
-import type { TraceAnchor } from "../../hooks/useAnchoredAnnotations";
+import {
+  type TraceAnchor,
+  useAnchoredAnnotations,
+} from "../../hooks/useAnchoredAnnotations";
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
+import { useOverflowVisibility } from "../../hooks/useOverflowVisibility";
 import { useTextTranslation } from "../../hooks/useTextTranslation";
+import { OverflowMenu } from "../shared/OverflowMenu";
 import { FieldCommentButton } from "./anchoredComments/FieldCommentButton";
 import { AnnotationPopover } from "./conversationView/AnnotationPopover";
+import { FormatSelect } from "./FormatSelect";
 import { IOViewerBody } from "./IOViewerBody";
 import { safePrettyJson } from "./JsonHighlight";
-import { SegmentedToggle } from "./SegmentedToggle";
 import {
   applyChatTextLeaves,
   asMarkdownBody,
@@ -154,13 +160,7 @@ const ActionButton = forwardRef<
   );
 });
 
-function PlaygroundButton({ spanId }: { spanId: string }) {
-  const { buildUrl } = useGoToSpanInPlaygroundTabUrlBuilder();
-  // No explicit action — the playground loader auto-detects: opens the
-  // existing managed prompt at the traced version when one is linked,
-  // creates a fresh tab when not. One button, smart default.
-  const href = buildUrl(spanId)?.toString() ?? "";
-  if (!href) return null;
+function PlaygroundButton({ href }: { href: string }) {
   return (
     <Button
       asChild
@@ -194,9 +194,7 @@ function SuggestCorrectionButton({
   /** The field the suggestion corrects. */
   anchor: TraceAnchor;
 }) {
-  const { hasPermission } = useOrganizationTeamProject();
   const [open, setOpen] = useState(false);
-  if (!hasPermission("annotations:manage")) return null;
   return (
     <AnnotationPopover
       traceId={traceId}
@@ -264,6 +262,15 @@ function CopyButton({ text }: { text: string }) {
     </Button>
   );
 }
+
+/** One toolbar action: its inline rendering and its overflow-menu row. */
+type IOAction = {
+  id: string;
+  menuLabel: string;
+  menuIcon: IconType;
+  disabled?: boolean;
+  render: () => React.ReactNode;
+};
 
 export const IOViewer = memo(function IOViewer({
   label,
@@ -438,6 +445,115 @@ export const IOViewer = memo(function IOViewer({
     [canJson],
   );
 
+  const { hasPermission } = useOrganizationTeamProject();
+  const annotations = useAnchoredAnnotations();
+  const { buildUrl } = useGoToSpanInPlaygroundTabUrlBuilder();
+
+  const canAnnotate = hasPermission("annotations:manage");
+  // Mirrors AnchorCommentButton's own gate: writers always get the action,
+  // readers only when there is something to read.
+  const showComment =
+    fieldAnchor !== null &&
+    (canAnnotate || annotations.commentsAt(fieldAnchor).length > 0);
+  const showSuggest = fieldAnchor !== null && canAnnotate;
+  // No explicit playground action — the loader auto-detects: opens the
+  // existing managed prompt at the traced version when one is linked,
+  // creates a fresh tab when not. One button, smart default.
+  const playgroundHref =
+    spanType === "llm" && spanId && mode === "input"
+      ? (buildUrl(spanId)?.toString() ?? "")
+      : "";
+
+  // The toolbar actions, in render order. On a narrow drawer the ones that
+  // no longer fit collapse — suffix first — into the three-dot overflow
+  // menu, the same element the span tab strip uses. Each action keeps its
+  // real component mounted (collapsed to zero width) so popover wiring and
+  // permission gates live in one place; picking an action from the menu
+  // clicks the real control.
+  const actions = useMemo<IOAction[]>(() => {
+    const list: IOAction[] = [
+      {
+        id: "translate",
+        menuLabel: translation.isLoading
+          ? "Translating…"
+          : translation.isActive
+            ? "Show original"
+            : "Translate",
+        menuIcon: LuLanguages,
+        disabled: translation.isLoading,
+        render: () => (
+          <TranslateButton
+            isActive={translation.isActive}
+            isLoading={translation.isLoading}
+            onToggle={translation.toggle}
+          />
+        ),
+      },
+    ];
+    if (traceId && fieldAnchor && showComment) {
+      list.push({
+        id: "comment",
+        menuLabel: "Comment",
+        menuIcon: LuMessageSquare,
+        render: () => (
+          <FieldCommentButton traceId={traceId} anchor={fieldAnchor} />
+        ),
+      });
+    }
+    if (traceId && fieldAnchor && showSuggest) {
+      list.push({
+        id: "suggest",
+        menuLabel: "Suggest edit",
+        menuIcon: LuLightbulb,
+        // Every field this viewer shows is one a correction can replace,
+        // the trace's own input included. Corrections must be stored
+        // against the REAL text, never the translated variant the viewer
+        // happens to be showing.
+        render: () => (
+          <SuggestCorrectionButton
+            traceId={traceId}
+            output={originalContent}
+            anchor={fieldAnchor}
+          />
+        ),
+      });
+    }
+    if (playgroundHref) {
+      list.push({
+        id: "playground",
+        menuLabel: "Open in Playground",
+        menuIcon: LuPlay,
+        render: () => <PlaygroundButton href={playgroundHref} />,
+      });
+    }
+    return list;
+  }, [
+    translation.isActive,
+    translation.isLoading,
+    translation.toggle,
+    traceId,
+    fieldAnchor,
+    showComment,
+    showSuggest,
+    originalContent,
+    playgroundHref,
+  ]);
+
+  // Stable by VALUE, not reference: `actions` rebuilds on unrelated renders
+  // (translation state identity churns), and `useOverflowVisibility` resets
+  // its measurement whenever the items array changes reference — an unstable
+  // array here loops reset → render → reset forever.
+  const actionIdsKey = actions.map((a) => a.id).join(" ");
+  const actionIds = useMemo(() => actionIdsKey.split(" "), [actionIdsKey]);
+  const actionsScrollerRef = useRef<HTMLDivElement>(null);
+  const actionElsRef = useRef<Record<string, HTMLDivElement | null>>({});
+  const hiddenActionIds = useOverflowVisibility({
+    scrollerRef: actionsScrollerRef,
+    items: actionIds,
+    reservePx: 0,
+  });
+  const overflowActions = actions.filter((a) => hiddenActionIds.has(a.id));
+
   // When the virtualized chat list is active it owns its own scroll viewport;
   // the outer card must not impose its own overflow/maxHeight or we'd end up
   // with nested scroll containers.
@@ -504,7 +620,8 @@ export const IOViewer = memo(function IOViewer({
         </Button>
         <HStack
           gap={2}
-          flex={1}
+          flex={collapsed ? 1 : undefined}
+          flexShrink={0}
           cursor="pointer"
           onClick={() => setCollapsed((c) => !c)}
         >
@@ -524,9 +641,10 @@ export const IOViewer = memo(function IOViewer({
           )}
         </HStack>
         {!collapsed && (
-          <SegmentedToggle
+          <FormatSelect
             value={format}
             onChange={(f) => setFormat(f as ViewFormat)}
+            ariaLabel={`${label} view format`}
             options={formatOptions.map((opt) => {
               // Both layouts (thread / bubbles) are available for any
               // chat-shaped content — input *or* output. Even with a
@@ -584,29 +702,64 @@ export const IOViewer = memo(function IOViewer({
             })}
           />
         )}
-        {!collapsed && (
-          <TranslateButton
-            isActive={translation.isActive}
-            isLoading={translation.isLoading}
-            onToggle={translation.toggle}
+        {/* Stays mounted while the panel is collapsed so its ResizeObserver
+            keeps watching the same element — going through display:none and
+            back re-measures on its own. */}
+        <HStack
+          ref={actionsScrollerRef}
+          display={collapsed ? "none" : "flex"}
+          flex={1}
+          minWidth={0}
+          gap={0}
+          overflow="hidden"
+          flexWrap="nowrap"
+          align="center"
+        >
+          <Box flex={1} minWidth={0} />
+          {actions.map((action) => {
+            const hidden = hiddenActionIds.has(action.id);
+            return (
+              <Flex
+                key={action.id}
+                data-overflow-id={action.id}
+                ref={(el: HTMLDivElement | null) => {
+                  actionElsRef.current[action.id] = el;
+                }}
+                align="center"
+                flexShrink={0}
+                paddingLeft={2}
+                {...(hidden
+                  ? {
+                      width: 0,
+                      minWidth: 0,
+                      paddingLeft: 0,
+                      overflow: "hidden",
+                      visibility: "hidden",
+                    }
+                  : {})}
+              >
+                {action.render()}
+              </Flex>
+            );
+          })}
+        </HStack>
+        {!collapsed && overflowActions.length > 0 && (
+          <OverflowMenu
+            items={overflowActions.map((action) => ({
+              id: action.id,
+              label: action.menuLabel,
+              icon: <Icon as={action.menuIcon} boxSize={3.5} />,
+              disabled: action.disabled,
+            }))}
+            onSelect={(id) => {
+              // Route the selection through the real (zero-width) control so
+              // popover wiring and permission gates stay in one place.
+              actionElsRef.current[id]
+                ?.querySelector<HTMLElement>("button, a")
+                ?.click();
+            }}
+            ariaLabel="More actions"
           />
-        )}
-        {!collapsed && traceId && fieldAnchor && (
-          <FieldCommentButton traceId={traceId} anchor={fieldAnchor} />
-        )}
-        {!collapsed && traceId && fieldAnchor && (
-          // Every field this viewer shows is one a correction can replace,
-          // the trace's own input included. Corrections must be stored
-          // against the REAL text, never the translated variant the viewer
-          // happens to be showing.
-          <SuggestCorrectionButton
-            traceId={traceId}
-            output={originalContent}
-            anchor={fieldAnchor}
-          />
-        )}
-        {!collapsed && spanType === "llm" && spanId && mode === "input" && (
-          <PlaygroundButton spanId={spanId} />
         )}
         <CopyButton text={content} />
       </HStack>
