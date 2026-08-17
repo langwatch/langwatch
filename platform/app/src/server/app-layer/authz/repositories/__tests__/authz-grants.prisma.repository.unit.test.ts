@@ -35,6 +35,8 @@ const row = (overrides: Partial<RoleBindingWrite> = {}): RoleBindingWrite => ({
   ...overrides,
 });
 
+const actor = { type: "user", id: "actor-1" } as const;
+
 describe("PrismaAuthzGrantsRepository", () => {
   describe("createBinding", () => {
     it("writes the principal union onto exactly one of the three columns", async () => {
@@ -45,6 +47,7 @@ describe("PrismaAuthzGrantsRepository", () => {
 
       await new PrismaAuthzGrantsRepository(prisma).createBinding(
         row({ principal: { apiKeyId: "key-1" } }),
+        { actor },
       );
 
       expect(create).toHaveBeenCalledWith({
@@ -71,7 +74,9 @@ describe("PrismaAuthzGrantsRepository", () => {
         } as unknown as PrismaClient;
 
         await expect(
-          new PrismaAuthzGrantsRepository(prisma).createBinding(row()),
+          new PrismaAuthzGrantsRepository(prisma).createBinding(row(), {
+            actor,
+          }),
         ).rejects.toBeInstanceOf(DuplicateBindingError);
       });
     });
@@ -84,7 +89,9 @@ describe("PrismaAuthzGrantsRepository", () => {
         } as unknown as PrismaClient;
 
         await expect(
-          new PrismaAuthzGrantsRepository(prisma).createBinding(row()),
+          new PrismaAuthzGrantsRepository(prisma).createBinding(row(), {
+            actor,
+          }),
         ).rejects.toBe(failure);
       });
     });
@@ -102,8 +109,10 @@ describe("PrismaAuthzGrantsRepository", () => {
         await expect(
           new PrismaAuthzGrantsRepository(prisma).updateBindingRole({
             bindingId: "binding-1",
+            organizationId: "org-1",
             role: "ADMIN",
             customRoleId: null,
+            actor,
           }),
         ).rejects.toBeInstanceOf(BindingMissingError);
       });
@@ -120,8 +129,10 @@ describe("PrismaAuthzGrantsRepository", () => {
         await expect(
           new PrismaAuthzGrantsRepository(prisma).updateBindingRole({
             bindingId: "binding-1",
+            organizationId: "org-1",
             role: "ADMIN",
             customRoleId: null,
+            actor,
           }),
         ).rejects.toBeInstanceOf(DuplicateBindingError);
       });
@@ -140,6 +151,8 @@ describe("PrismaAuthzGrantsRepository", () => {
         await expect(
           new PrismaAuthzGrantsRepository(prisma).deleteBinding({
             bindingId: "binding-1",
+            organizationId: "org-1",
+            actor,
           }),
         ).rejects.toBeInstanceOf(BindingMissingError);
       });
@@ -174,6 +187,7 @@ describe("PrismaAuthzGrantsRepository", () => {
           principal: { userId: "alice" },
         },
         create: row(),
+        actor,
       });
 
       // The order is the REDUCE verb's whole point: a create that landed
@@ -214,6 +228,7 @@ describe("PrismaAuthzGrantsRepository", () => {
               principal: { groupId: "group-1" },
             },
             create: row(),
+            actor,
           }),
         ).rejects.toBeInstanceOf(BindingMissingError);
         expect(create).not.toHaveBeenCalled();
@@ -261,6 +276,7 @@ describe("PrismaAuthzGrantsRepository", () => {
         {
           userId: "alice",
           organizationId: "org-1",
+          actor,
           prove,
         },
       );
@@ -319,6 +335,7 @@ describe("PrismaAuthzGrantsRepository", () => {
           new PrismaAuthzGrantsRepository(prisma).offboardUser({
             userId: "alice",
             organizationId: "org-1",
+            actor,
             prove: () => Promise.reject(incomplete),
           }),
         ).rejects.toBe(incomplete);
@@ -347,6 +364,7 @@ describe("PrismaAuthzGrantsRepository", () => {
         {
           userId: "alice",
           organizationId: "org-1",
+          actor,
           prove: () => Promise.resolve(),
         },
       );
