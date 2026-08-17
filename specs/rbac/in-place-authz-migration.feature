@@ -5,8 +5,9 @@ Feature: In-place authorization data migration
   So that self-hosted installations migrate silently in the background and
   cloud rollout is paced by us, with no operator ever running a script
 
-  # Stage B of ADR-092 (see dev/docs/plans/adr-092-authz-delivery-plan.md,
-  # runbook rows M1/M2). The migration is IN-PLACE: a runner hosted in the
+  # Stage B of ADR-092, now the head of the grants-ledger delivery
+  # (see dev/docs/plans/adr-092-authz-delivery-plan.md, "The PR map").
+  # The migration is IN-PLACE: a runner hosted in the
   # worker process performs the one-time backfill when the system boots.
   # Nothing here has a customer-facing failure surface by design - every
   # failure parks the organization on the legacy path, which keeps behaving
@@ -177,3 +178,36 @@ Feature: In-place authorization data migration
     And an admin later grants that permission through a binding
     When a later migration pass verifies "acme"
     Then "acme" is finalized without any manual state change
+
+  # ============================================================================
+  # The cutover as ledger facts (ADR-092 §13 - the grants ledger)
+  # ============================================================================
+  # The state machine above is unchanged; what changes underneath is that
+  # its transitions become process events in the ledger, and the state
+  # table becomes their projection. These scenarios cover only what is new.
+
+  @integration @unimplemented
+  Scenario: A clean parity proof and the cutover are recorded as facts
+    Given the migration verified "acme" with no disagreement
+    When "acme" is cut over
+    Then the ledger records the parity proof with its empty diff list
+    And the ledger records the cutover with its actor
+    And the projection the permission fork reads marks "acme" as on the engine
+
+  @integration @unimplemented
+  Scenario: Rolling back a cutover takes effect without a deploy, even with the queue stopped
+    Given "acme" was cut over and is served by the engine
+    And the queue infrastructure is stopped
+    When an operator rolls "acme" back
+    Then the rollback is recorded and applied before the call returns
+    And permission checks in "acme" consult the legacy path within the gate's cache window
+
+  @integration @unimplemented
+  Scenario: Cutover imports the legacy facts that only exist outside bindings
+    Given "acme" has a member whose only admin fact is a legacy organization ADMIN row
+    And "acme" has a share link and an operator listed in the platform admin list
+    When "acme" is cut over
+    Then the legacy admin holds an organization-scoped admin grant
+    And the share link is a resource-scope grant with its token and expiry intact
+    And the operator holds a platform-scope grant
+    And every imported grant carries the business time of the fact it came from
