@@ -25,15 +25,21 @@ export interface ProcessAuditSink {
   append(entry: {
     actorUserId: string;
     action: ProcessControlAction;
-    processName: string;
-    projectId: string;
-    processKey: string;
+    /** Null for a fleet-scoped act, which belongs to no one process. */
+    processName: string | null;
+    /** Null for a cross-tenant act. Never a placeholder: a made-up id in
+     *  this column reads as a real project to everything that queries it. */
+    projectId: string | null;
+    processKey: string | null;
     metadata?: Record<string, unknown>;
   }): Promise<void>;
   listRecent(params: { limit: number }): Promise<ProcessAuditEntryView[]>;
 }
 
 const TARGET_KIND = "process_instance";
+
+/** Target of an act that names no single instance; the scope is in metadata. */
+const FLEET_TARGET_ID = "fleet";
 
 /** For app presets that run without Postgres. */
 export class NullProcessAuditSink implements ProcessAuditSink {
@@ -57,9 +63,9 @@ export class ProcessAuditRepository implements ProcessAuditSink {
   async append(entry: {
     actorUserId: string;
     action: ProcessControlAction;
-    processName: string;
-    projectId: string;
-    processKey: string;
+    processName: string | null;
+    projectId: string | null;
+    processKey: string | null;
     metadata?: Record<string, unknown>;
   }): Promise<void> {
     await this.prisma.auditLog.create({
@@ -67,11 +73,16 @@ export class ProcessAuditRepository implements ProcessAuditSink {
         userId: entry.actorUserId,
         // Scheduled singletons run under the `__global__` pseudo-project; the
         // audit row records the ref verbatim rather than inventing a scope.
+        // A fleet-scoped act has no project at all and records null, the same
+        // as the queue sink: a placeholder here would read as a real project
+        // to every query over this column.
         projectId: entry.projectId,
         organizationId: null,
         action: entry.action,
         targetKind: TARGET_KIND,
-        targetId: `${entry.processName}/${entry.projectId}/${entry.processKey}`,
+        targetId: entry.processName
+          ? `${entry.processName}/${entry.projectId}/${entry.processKey}`
+          : FLEET_TARGET_ID,
         metadata: (entry.metadata ?? {}) as Prisma.InputJsonValue,
       },
     });

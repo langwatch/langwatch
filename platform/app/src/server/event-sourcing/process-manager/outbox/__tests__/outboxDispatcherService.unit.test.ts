@@ -171,6 +171,7 @@ describe("OutboxDispatcherService", () => {
         // DispatchError's shape: a deliberately-written delivery diagnostic,
         // which the attempt log preserves verbatim.
         const transient = Object.assign(new Error("receiver returned 503"), {
+          name: "DispatchError",
           retryable: true,
         });
         const handler = vi.fn().mockRejectedValue(transient);
@@ -202,6 +203,29 @@ describe("OutboxDispatcherService", () => {
         const dispatcher = new OutboxDispatcherService({
           store,
           handlers: { "worker-dispatch": handler },
+          retryDelayMs: () => 1_000,
+          maxAttempts: 2,
+        });
+
+        await dispatcher.runOnce({ now: T0 + 1 });
+
+        const attempts = store.findFailedAttempts({
+          processName: pilotRef.processName,
+          projectId: pilotRef.projectId,
+          messageKey: "dispatch:turn_1:1",
+        });
+        expect(attempts[0]?.errorMessage).not.toContain("sk-secret");
+      });
+
+      it("redacts an error that merely claims to be retryable", async () => {
+        // `retryable` alone is not proof of provenance: anything can carry it,
+        // and only our own class stamps the DispatchError name.
+        const impostor = Object.assign(new Error("raw payload: sk-secret"), {
+          retryable: true,
+        });
+        const dispatcher = new OutboxDispatcherService({
+          store,
+          handlers: { "worker-dispatch": vi.fn().mockRejectedValue(impostor) },
           retryDelayMs: () => 1_000,
           maxAttempts: 2,
         });

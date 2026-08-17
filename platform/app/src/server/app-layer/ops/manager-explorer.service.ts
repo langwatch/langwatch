@@ -346,10 +346,12 @@ export class ManagerExplorerService {
       await this.audit.append({
         actorUserId: params.actorUserId,
         action: "process_redrive_dead_letters",
-        processName: params.processName ?? "__all__",
-        projectId: "__fleet__",
-        processKey: "__all__",
-        metadata: { redriven },
+        // No single process, and no single project: the scope this act ran
+        // under is the metadata, not a placeholder in the identity columns.
+        processName: params.processName ?? null,
+        projectId: null,
+        processKey: null,
+        metadata: { redriven, scope: params.processName ?? "every process" },
       });
     }
     return { redriven };
@@ -368,10 +370,10 @@ export class ManagerExplorerService {
       await this.audit.append({
         actorUserId: params.actorUserId,
         action: "process_discard_dead_letters",
-        processName: params.processName ?? "__all__",
-        projectId: "__fleet__",
-        processKey: "__all__",
-        metadata: { discarded },
+        processName: params.processName ?? null,
+        projectId: null,
+        processKey: null,
+        metadata: { discarded, scope: params.processName ?? "every process" },
       });
     }
     return { discarded };

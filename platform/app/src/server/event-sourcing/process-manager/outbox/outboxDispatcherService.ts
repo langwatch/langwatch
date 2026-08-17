@@ -150,8 +150,14 @@ function isTerminalError(error: unknown): boolean {
  * is the delivery diagnostic our own dispatch endpoints assembled on purpose
  * (ADR-027), and the attempt log is the admin-gated ops surface such a
  * diagnostic exists for — redacting it there would leave the operator with
- * "Operation failed" eight times over. Same duck-typed shape as
- * `isTerminalError`, since a boundary may have stripped the class.
+ * "Operation failed" eight times over.
+ *
+ * The gate is the stable `name`, not the `retryable` field alone. Anything can
+ * carry a boolean `retryable`; only our own class stamps `DispatchError` in
+ * its constructor. Checked by name rather than `instanceof` because the error
+ * may have crossed a worker or serialisation boundary that stripped the
+ * prototype, which is the same reason the house rule prefers a code to a
+ * class check.
  */
 function toAttemptDiagnostic(error: unknown): {
   errorType: string;
@@ -159,6 +165,7 @@ function toAttemptDiagnostic(error: unknown): {
 } {
   if (
     error instanceof Error &&
+    error.name === "DispatchError" &&
     typeof Reflect.get(error, "retryable") === "boolean"
   ) {
     return { errorType: error.name, errorMessage: error.message };
