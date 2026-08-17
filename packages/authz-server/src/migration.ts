@@ -8,6 +8,12 @@
  * service classes. Grant identity derivation is not (`node:crypto`, KSUID),
  * so the migration that needs it lives behind this server-only subpath.
  */
+export { GRANTS_GENESIS_IMPORT_MIGRATION_NAME } from "./genesis-import.name";
+export { GrantsGenesisImportMigration } from "./genesis-import.migration";
+export type {
+  GenesisDiff,
+  GenesisImportDeps,
+} from "./genesis-import.migration";
 export { deriveGrantId } from "./ledger/grant-identity";
 export { TeamUserBackfillMigration } from "./team-user-backfill.migration";
 export type {

@@ -94,6 +94,11 @@ class FakeLedger implements GrantsLedgerEmitter {
     }
   }
 
+  /** The backfill defines no roles; the genesis import is what uses this. */
+  async defineRoles(): Promise<void> {
+    throw new Error("the backfill defines no roles");
+  }
+
   async proveMigrationParity(args: {
     organizationId: string;
     commandId: string;

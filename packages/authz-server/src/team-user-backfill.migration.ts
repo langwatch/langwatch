@@ -47,7 +47,11 @@ import type {
 } from "./authz-migration.repository";
 import type { AuthzAuditWriter, AuthzEpochBumper } from "./grants.service";
 import { deriveGrantId } from "./ledger/grant-identity";
-import type { GrantFact, GrantsLedgerActor } from "./ledger/grants-ledger.reducer";
+import type {
+  GrantFact,
+  GrantsLedgerActor,
+  RoleFact,
+} from "./ledger/grants-ledger.reducer";
 import { TEAM_USER_BACKFILL_MIGRATION_NAME } from "./team-user-backfill.name";
 
 /** The audit trail's actor for writes no human performed. */
@@ -84,6 +88,18 @@ export type GrantsLedgerEmitter = {
     organizationId: string;
     commandId: string;
     grants: BackfillGrantEmission[];
+  }) => Promise<void>;
+  /**
+   * Role definitions for one organization. A `RoleFact` IS the command's
+   * role entry (same six fields), so the app maps the batch straight onto
+   * the payload. The actor rides at the command level here rather than per
+   * entry, because that is where the `role_defined` command carries it.
+   */
+  defineRoles: (args: {
+    organizationId: string;
+    commandId: string;
+    roles: RoleFact[];
+    actor: GrantsLedgerActor;
   }) => Promise<void>;
   proveMigrationParity: (args: {
     organizationId: string;

@@ -67,6 +67,7 @@ function makeStorePrisma({
   bindingReferences = [],
   teamUserReferences = [],
   roleBindingUpsert = vi.fn(async () => undefined),
+  roleBindingUpdateMany = vi.fn(async () => ({ count: 1 })),
   customRoleUpsert = vi.fn(async () => undefined),
 }: {
   cursorPresent?: boolean;
@@ -77,6 +78,7 @@ function makeStorePrisma({
   bindingReferences?: string[];
   teamUserReferences?: string[];
   roleBindingUpsert?: ReturnType<typeof vi.fn>;
+  roleBindingUpdateMany?: ReturnType<typeof vi.fn>;
   customRoleUpsert?: ReturnType<typeof vi.fn>;
 } = {}) {
   return {
@@ -108,6 +110,7 @@ function makeStorePrisma({
       ),
       deleteMany: vi.fn(),
       upsert: roleBindingUpsert,
+      updateMany: roleBindingUpdateMany,
     },
     teamUser: {
       findMany: vi.fn(async () =>
@@ -288,6 +291,50 @@ describe("PrismaAuthzGrantsProjectionRepository", () => {
           vi.mocked(prisma.grant.upsert).mock.invocationCallOrder[0]!,
         );
       });
+    });
+  });
+
+  describe("given a grant the genesis import adopted from a legacy row", () => {
+    /** @scenario "An imported grant updates the row it adopted and never authors a new one" */
+    it("updates the adopted binding row and never authors a new one", async () => {
+      const prisma = makeStorePrisma();
+      const repository = new PrismaAuthzGrantsProjectionRepository(prisma);
+
+      await repository.store(
+        storedProjection({
+          grants: [grantFact({ grantId: "rb_1", source: "genesis-import" })],
+        }),
+        CONTEXT,
+      );
+
+      // The import adopts ids that already exist; a row that is absent is a
+      // fact the legacy schema never stored (the floor row, the admin
+      // fallback), and creating one here would put a new legacy-visible
+      // binding in front of the resolver while the organization is dark.
+      expect(prisma.roleBinding.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { organizationId: ORG, id: "rb_1" } }),
+      );
+      expect(prisma.roleBinding.upsert).not.toHaveBeenCalled();
+      // The Grant head is written for every source, always as an upsert.
+      expect(prisma.grant.upsert).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("given a grant from any other source", () => {
+    /** @scenario "The compat rows are authored by the fold alone" */
+    it("keeps writing the compat row through the upsert", async () => {
+      const prisma = makeStorePrisma();
+      const repository = new PrismaAuthzGrantsProjectionRepository(prisma);
+
+      await repository.store(
+        storedProjection({
+          grants: [grantFact({ grantId: "grant_1", source: "grants-service" })],
+        }),
+        CONTEXT,
+      );
+
+      expect(prisma.roleBinding.upsert).toHaveBeenCalledTimes(1);
+      expect(prisma.roleBinding.updateMany).not.toHaveBeenCalled();
     });
   });
 

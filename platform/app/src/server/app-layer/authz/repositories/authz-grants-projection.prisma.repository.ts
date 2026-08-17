@@ -1,4 +1,6 @@
 import {
+  type CompatBindingRowShape,
+  type GrantEventSource,
   type GrantRowShape,
   type GrantsLedgerState,
   grantFactToCompatBinding,
@@ -147,7 +149,8 @@ interface StoredHeads {
  * and writes only the facts the fold actually changed. Re-upserting every
  * grant on every event was not merely wasteful:
  *   • it resurrected compat rows the legacy write paths had deleted or
- *     edited (they still own those rows until PR 2),
+ *     edited (they still own those rows for every organization that has not
+ *     forked onto the ledger),
  *   • a member removed and re-added at the same role gets a fresh grant id,
  *     and re-upserting the OLD id's compat row then violates
  *     `RoleBinding_user_builtin_role_scope_key` — a P2002 thrown before
@@ -467,27 +470,11 @@ export class PrismaAuthzGrantsProjectionRepository
       // lite-member) - those live in the future head only.
       const compat = grantFactToCompatBinding({ grant, organizationId });
       if (compat) {
-        const { id, ...rest } = compat;
-        try {
-          await this.prisma.roleBinding.upsert({
-            where: { organizationId, id },
-            create: compat,
-            update: rest,
-          });
-        } catch (error) {
-          // A legacy-authored row already occupies this principal's slot
-          // under one of RoleBinding's partial unique indexes (the classic
-          // case: a member removed and re-added, so the same person holds
-          // the same role at the same scope under a different id). Retrying
-          // cannot resolve it, and throwing would park the organization's
-          // whole lane, so the future head still lands and the conflict is
-          // named in the log.
-          if (!isPrismaConflict(error, ["P2002", "P2003"])) throw error;
-          logger.warn(
-            { organizationId, grantId: id, error },
-            "grants projection could not write a compat binding; the future head still holds the grant",
-          );
-        }
+        await this.writeCompatBinding({
+          organizationId,
+          row: compat,
+          source: grant.source,
+        });
       }
       const { id, ...rest } = row;
       await this.prisma.grant.upsert({
@@ -496,6 +483,59 @@ export class PrismaAuthzGrantsProjectionRepository
         update: rest,
       });
     });
+  }
+
+  /**
+   * The compat head for one grant.
+   *
+   * Genesis-imported facts are UPDATE-ONLY: the import adopts the ids of
+   * rows that already exist, so an update converges them and a missing row
+   * means the fact has no legacy row to be — the org-member floor row and
+   * the legacy-admin fallback grants (decisions 11 and 20) are inferences
+   * the schema never stored. Authoring one here would put a new,
+   * legacy-visible `RoleBinding` in front of the resolver, which is exactly
+   * what the dark period must not do. Those facts live in the `Grant` head
+   * alone; every other source keeps the upsert.
+   *
+   * A conflict is warned and stepped over, never raised. A legacy-authored
+   * row can already occupy this principal's slot under one of RoleBinding's
+   * partial unique indexes (the classic case: a member removed and re-added,
+   * so the same person holds the same role at the same scope under a
+   * different id), and the organization row behind a foreign key can be
+   * absent. Neither is retryable, and a throw here escapes before
+   * `writeCursor` and parks the organization's whole lane. The `Grant` head
+   * is the authority; the compat row is a view.
+   */
+  private async writeCompatBinding({
+    organizationId,
+    row,
+    source,
+  }: {
+    organizationId: string;
+    row: CompatBindingRowShape;
+    source: GrantEventSource;
+  }): Promise<void> {
+    const { id, ...rest } = row;
+    try {
+      if (source === "genesis-import") {
+        await this.prisma.roleBinding.updateMany({
+          where: { organizationId, id },
+          data: rest,
+        });
+        return;
+      }
+      await this.prisma.roleBinding.upsert({
+        where: { organizationId, id },
+        create: row,
+        update: rest,
+      });
+    } catch (error) {
+      if (!isPrismaConflict(error, ["P2002", "P2003"])) throw error;
+      logger.warn(
+        { organizationId, grantId: id, source, error },
+        "grants projection could not write a compat binding; the future head still holds the grant",
+      );
+    }
   }
 
   // Compat head for roles: the same fact under CustomRole's shape. Imported
