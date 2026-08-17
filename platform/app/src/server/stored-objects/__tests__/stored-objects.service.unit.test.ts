@@ -38,13 +38,18 @@ vi.mock("~/server/metrics", () => ({
   storedObjectReadFailureCounter: { inc: vi.fn() },
 }));
 
+// One shared instance rather than a fresh object per call: the module under
+// test keeps the logger it was handed at import time, so a per-call factory
+// leaves the test holding an object nothing ever writes to.
+const logger = vi.hoisted(() => ({
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+}));
+
 vi.mock("@langwatch/observability", () => ({
-  createLogger: () => ({
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-    debug: vi.fn(),
-  }),
+  createLogger: () => logger,
 }));
 
 // mintStorageUri calls getS3ConfigForProject to resolve the per-project
@@ -250,6 +255,48 @@ describe("storeFromBytes", () => {
       // Without it the bytes would orphan in S3/disk with no row pointing
       // to them — a measurable storage leak under retried 5xx scenarios.
       expect(registry.delete).toHaveBeenCalledWith(putUri);
+    });
+
+    describe("and the compensating delete fails too", () => {
+      /**
+       * Nothing above this point ever learns the bytes were orphaned: the
+       * insert error is what propagates, and the delete failure is swallowed
+       * so it cannot mask it. That makes this log the only record that the
+       * storage leak happened, which is what puts it at `error`.
+       */
+      /** @scenario "Work discarded without a throw is logged at error" */
+      it("reports the orphaned bytes at error level", async () => {
+        logger.error.mockClear();
+        const insertError = new Error("ClickHouse insert failed");
+        const deleteError = new Error("S3 delete refused");
+        vi.mocked(repo.insert).mockRejectedValueOnce(insertError);
+        vi.mocked(registry.delete).mockRejectedValueOnce(deleteError);
+
+        await expect(service.storeFromBytes(STORE_PARAMS)).rejects.toThrow(
+          "ClickHouse insert failed",
+        );
+
+        expect(logger.error).toHaveBeenCalledTimes(1);
+        expect(logger.error.mock.calls[0]?.[1]).toContain("orphaned");
+      });
+
+      /** @scenario "A layer that rethrows logs below error" */
+      it("keeps both errors, so neither failure hides the other", async () => {
+        logger.error.mockClear();
+        const insertError = new Error("ClickHouse insert failed");
+        const deleteError = new Error("S3 delete refused");
+        vi.mocked(repo.insert).mockRejectedValueOnce(insertError);
+        vi.mocked(registry.delete).mockRejectedValueOnce(deleteError);
+
+        await expect(service.storeFromBytes(STORE_PARAMS)).rejects.toThrow(
+          insertError,
+        );
+
+        expect(logger.error.mock.calls[0]?.[0]).toMatchObject({
+          insertError,
+          deleteError,
+        });
+      });
     });
   });
 

@@ -191,7 +191,7 @@ export class ProcessOutboxWorker {
       });
     } catch (error) {
       this.logger.warn(
-        { error: error instanceof Error ? error.message : String(error) },
+        { error },
         "ProcessOutboxWorker drain failed; the next poll will retry",
       );
     }

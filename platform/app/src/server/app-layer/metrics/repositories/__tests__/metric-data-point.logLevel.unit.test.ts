@@ -91,33 +91,35 @@ function refusingRepository() {
   });
 }
 
-describe("canonical metric point writes that ClickHouse refuses", () => {
-  describe("given the repository rethrows for the queue to retry", () => {
-    /** @scenario "A ClickHouse write failure beneath the queue is a warning" */
-    it("logs at warning level, not error", async () => {
-      logger.warn.mockClear();
-      logger.error.mockClear();
+describe("canonical metric point writes", () => {
+  describe("given a repository that rethrows for the queue to retry", () => {
+    describe("when ClickHouse refuses the write", () => {
+      /** @scenario "A ClickHouse write failure beneath the queue is a warning" */
+      it("logs at warning level, not error", async () => {
+        logger.warn.mockClear();
+        logger.error.mockClear();
 
-      await expect(
-        refusingRepository().ensureDataPoints({ points: [dataPoint()] }),
-      ).rejects.toThrow(REFUSED);
+        await expect(
+          refusingRepository().ensureDataPoints({ points: [dataPoint()] }),
+        ).rejects.toThrow(REFUSED);
 
-      expect(logger.error).not.toHaveBeenCalled();
-      expect(logger.warn).toHaveBeenCalledTimes(1);
-    });
+        expect(logger.error).not.toHaveBeenCalled();
+        expect(logger.warn).toHaveBeenCalledTimes(1);
+      });
 
-    /** @scenario "A layer that rethrows logs below error" */
-    it("keeps the identifiers only this layer holds", async () => {
-      logger.warn.mockClear();
+      /** @scenario "A layer that rethrows logs below error" */
+      it("keeps the identifiers only this layer holds", async () => {
+        logger.warn.mockClear();
 
-      await expect(
-        refusingRepository().ensureDataPoints({ points: [dataPoint()] }),
-      ).rejects.toThrow(REFUSED);
+        await expect(
+          refusingRepository().ensureDataPoints({ points: [dataPoint()] }),
+        ).rejects.toThrow(REFUSED);
 
-      expect(logger.warn.mock.calls[0]?.[0]).toMatchObject({
-        tenantId: "project-1",
-        pointCount: 1,
-        error: expect.any(Error),
+        expect(logger.warn.mock.calls[0]?.[0]).toMatchObject({
+          tenantId: "project-1",
+          pointCount: 1,
+          error: expect.any(Error),
+        });
       });
     });
   });

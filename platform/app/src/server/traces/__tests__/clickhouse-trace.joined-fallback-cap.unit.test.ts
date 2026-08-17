@@ -61,7 +61,13 @@ function summaryRow(traceId: string) {
   };
 }
 
-function spanRow(traceId: string, spanIndex: number) {
+function spanRow({
+  traceId,
+  spanIndex,
+}: {
+  traceId: string;
+  spanIndex: number;
+}) {
   return {
     SpanId: `${traceId}-span-${spanIndex}`,
     TraceId: traceId,
@@ -90,6 +96,13 @@ function spanRow(traceId: string, spanIndex: number) {
  * Refuses the first whole-list span read for memory — which is what triggers
  * the fallback — then serves each batched retry with `spansPerTrace` rows per
  * requested trace. Trace ids ride in query_params, not the SQL text.
+ *
+ * `max_result_rows` is honoured the way the server honours it, because that is
+ * the behaviour under test: the fallback's whole point is that an over-budget
+ * batch is refused BEFORE its rows are decoded, and a mock that hands back
+ * every row regardless cannot tell that apart from a cap checked afterwards.
+ * `spanRowsServed` records what actually crossed the socket, so a test can
+ * assert the heap never saw the rows.
  */
 function clickHouseThatOOMsThenBatches({
   spansPerTrace,
@@ -97,18 +110,44 @@ function clickHouseThatOOMsThenBatches({
   spansPerTrace: number;
 }) {
   let refusedOnce = false;
+  const spanReadSettings: Array<Record<string, unknown>> = [];
+  const served = { spanRowsServed: 0 };
+
   mockClickHouseQuery.mockImplementation(
-    async (args: { query: string; query_params?: { traceIds?: string[] } }) => {
+    async (args: {
+      query: string;
+      query_params?: { traceIds?: string[] };
+      clickhouse_settings?: Record<string, unknown>;
+    }) => {
       const ids = args.query_params?.traceIds ?? [];
       if (args.query.includes("FROM stored_spans")) {
         if (!refusedOnce) {
           refusedOnce = true;
           throw new Error("Code: 241. DB::Exception: MEMORY_LIMIT_EXCEEDED");
         }
+        spanReadSettings.push(args.clickhouse_settings ?? {});
+
+        const rowCount = ids.length * spansPerTrace;
+        const maxResultRows = Number(
+          args.clickhouse_settings?.max_result_rows ?? Number.POSITIVE_INFINITY,
+        );
+        if (
+          args.clickhouse_settings?.result_overflow_mode === "throw" &&
+          rowCount > maxResultRows
+        ) {
+          throw new Error(
+            "Code: 396. DB::Exception: Limit for result exceeded: " +
+              "TOO_MANY_ROWS_OR_BYTES",
+          );
+        }
+
+        served.spanRowsServed += rowCount;
         return {
           json: async () =>
-            ids.flatMap((id) =>
-              Array.from({ length: spansPerTrace }, (_, i) => spanRow(id, i)),
+            ids.flatMap((traceId) =>
+              Array.from({ length: spansPerTrace }, (_, spanIndex) =>
+                spanRow({ traceId, spanIndex }),
+              ),
             ),
         };
       }
@@ -118,6 +157,8 @@ function clickHouseThatOOMsThenBatches({
       return { json: async () => [] };
     },
   );
+
+  return { spanReadSettings, served };
 }
 
 /**
@@ -171,6 +212,48 @@ describe("the traces-with-spans memory-limit fallback", () => {
       );
 
       expect(chain).toMatch(/of 400 traces/);
+    });
+  });
+
+  describe("given a single batch alone would outgrow the span cap", () => {
+    /**
+     * The regression this guards: one batch is 25 traces at up to 10,000 spans
+     * each — 250,000 heavy rows, five times the cap — and the cap used to be
+     * checked only after `runBatch` had awaited `.json()` and built its maps.
+     * The batch that was supposed to be refused was therefore materialised
+     * first, which is the heap death the cap exists to prevent.
+     */
+    /** @scenario "A single over-budget batch is refused before it is materialised" */
+    it("never lets the over-budget batch reach this process", async () => {
+      // 25 traces per batch x 10,000 spans = 250,000 rows in the first batch.
+      const { served } = clickHouseThatOOMsThenBatches({
+        spansPerTrace: 10_000,
+      });
+      const service = new ClickHouseTraceService({} as never);
+
+      const chain = await rejectionChain(
+        service.getTracesWithSpans(PROJECT, traceIds(400), openProtections),
+      );
+
+      expect(chain).toMatch(/exceeded 50000 spans/);
+      expect(served.spanRowsServed).toBeLessThanOrEqual(50_000);
+    });
+
+    /** @scenario "A single over-budget batch is refused before it is materialised" */
+    it("bounds the span read to the budget it has left", async () => {
+      const { spanReadSettings } = clickHouseThatOOMsThenBatches({
+        spansPerTrace: 10_000,
+      });
+      const service = new ClickHouseTraceService({} as never);
+
+      await rejectionChain(
+        service.getTracesWithSpans(PROJECT, traceIds(400), openProtections),
+      );
+
+      expect(spanReadSettings[0]).toMatchObject({
+        max_result_rows: String(50_000 + 1),
+        result_overflow_mode: "throw",
+      });
     });
   });
 

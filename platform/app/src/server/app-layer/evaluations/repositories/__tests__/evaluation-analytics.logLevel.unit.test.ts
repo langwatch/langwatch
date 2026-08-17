@@ -55,57 +55,65 @@ function row() {
   } as never;
 }
 
-describe("evaluation analytics writes that ClickHouse refuses", () => {
-  describe("given the repository rethrows for the queue to retry", () => {
-    /** @scenario "An evaluation analytics write failure beneath the queue is a warning" */
-    it("logs at warning level, not error", async () => {
-      logger.warn.mockClear();
-      logger.error.mockClear();
+describe("evaluation analytics writes", () => {
+  describe("given a repository that rethrows for the queue to retry", () => {
+    describe("when ClickHouse refuses the single-row write", () => {
+      /** @scenario "An evaluation analytics write failure beneath the queue is a warning" */
+      it("logs at warning level, not error", async () => {
+        logger.warn.mockClear();
+        logger.error.mockClear();
 
-      await expect(refusingRepository().upsert(row())).rejects.toThrow(REFUSED);
+        await expect(refusingRepository().upsert(row())).rejects.toThrow(
+          REFUSED,
+        );
 
-      expect(logger.error).not.toHaveBeenCalled();
-      expect(logger.warn).toHaveBeenCalledTimes(1);
-    });
+        expect(logger.error).not.toHaveBeenCalled();
+        expect(logger.warn).toHaveBeenCalledTimes(1);
+      });
 
-    /** @scenario "A layer that rethrows logs below error" */
-    it("keeps the identifiers only this layer holds", async () => {
-      logger.warn.mockClear();
+      /** @scenario "A layer that rethrows logs below error" */
+      it("keeps the identifiers only this layer holds", async () => {
+        logger.warn.mockClear();
 
-      await expect(refusingRepository().upsert(row())).rejects.toThrow(REFUSED);
+        await expect(refusingRepository().upsert(row())).rejects.toThrow(
+          REFUSED,
+        );
 
-      expect(logger.warn.mock.calls[0]?.[0]).toMatchObject({
-        tenantId: TENANT_ID,
-        evaluationId: EVALUATION_ID,
+        expect(logger.warn.mock.calls[0]?.[0]).toMatchObject({
+          tenantId: TENANT_ID,
+          evaluationId: EVALUATION_ID,
+        });
+      });
+
+      // A bare string under `error` loses the stack, and the log collector drops
+      // the field outright (saas#1041). The Error instance has to reach pino.
+      /** @scenario "A layer that rethrows logs below error" */
+      it("passes the Error instance so the stack survives", async () => {
+        logger.warn.mockClear();
+
+        await expect(refusingRepository().upsert(row())).rejects.toThrow(
+          REFUSED,
+        );
+
+        expect(logger.warn.mock.calls[0]?.[0]).toMatchObject({
+          error: expect.any(Error),
+        });
       });
     });
 
-    // A bare string under `error` loses the stack, and the log collector drops
-    // the field outright (saas#1041). The Error instance has to reach pino.
-    /** @scenario "A layer that rethrows logs below error" */
-    it("passes the Error instance so the stack survives", async () => {
-      logger.warn.mockClear();
+    describe("when ClickHouse refuses the batch write", () => {
+      /** @scenario "An evaluation analytics write failure beneath the queue is a warning" */
+      it("logs at warning level, not error", async () => {
+        logger.warn.mockClear();
+        logger.error.mockClear();
 
-      await expect(refusingRepository().upsert(row())).rejects.toThrow(REFUSED);
+        await expect(
+          refusingRepository().upsertBatch([{ row: row() }]),
+        ).rejects.toThrow(REFUSED);
 
-      expect(logger.warn.mock.calls[0]?.[0]).toMatchObject({
-        error: expect.any(Error),
+        expect(logger.error).not.toHaveBeenCalled();
+        expect(logger.warn).toHaveBeenCalledTimes(1);
       });
-    });
-  });
-
-  describe("given a batch write the repository rethrows", () => {
-    /** @scenario "An evaluation analytics write failure beneath the queue is a warning" */
-    it("logs at warning level, not error", async () => {
-      logger.warn.mockClear();
-      logger.error.mockClear();
-
-      await expect(
-        refusingRepository().upsertBatch([{ row: row() }]),
-      ).rejects.toThrow(REFUSED);
-
-      expect(logger.error).not.toHaveBeenCalled();
-      expect(logger.warn).toHaveBeenCalledTimes(1);
     });
   });
 });

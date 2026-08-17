@@ -50,9 +50,9 @@ describe("EvaluationRunClickHouseRepository ScheduledAt resolver", () => {
     it("resolves from the windowed probe and never scans unbounded", async () => {
       const scheduledAtMs = Date.now() - 60_000;
       const { client, queries } = createCapturingClient([scheduledAtMs]);
-      const repo = new EvaluationRunClickHouseRepository(
-        async () => client as never,
-      );
+      const repo = new EvaluationRunClickHouseRepository({
+        resolveClient: async () => client as never,
+      });
 
       await repo.getByEvaluationId({
         tenantId: "project_test",
@@ -87,9 +87,9 @@ describe("EvaluationRunClickHouseRepository ScheduledAt resolver", () => {
         null,
         oldScheduledAtMs,
       ]);
-      const repo = new EvaluationRunClickHouseRepository(
-        async () => client as never,
-      );
+      const repo = new EvaluationRunClickHouseRepository({
+        resolveClient: async () => client as never,
+      });
 
       await repo.getByEvaluationId({
         tenantId: "project_test",
@@ -115,16 +115,61 @@ describe("EvaluationRunClickHouseRepository ScheduledAt resolver", () => {
       expect(heavyRead?.query).toContain("t.ScheduledAt >=");
     });
 
+    /**
+     * The resolver missing was the one path that left the heavy read with no
+     * ScheduledAt predicate at all — every weekly partition, cold S3 included,
+     * scanned for an evaluation that by definition is not there. Flooring it is
+     * safe precisely because it is a miss: the resolver has already searched
+     * `>= floor` with no upper bound and found nothing, so no row above the
+     * floor exists for the heavy read to find either.
+     */
+    /** @scenario "A fallback read is floored at the tenant's retention horizon" */
+    it("still bounds the heavy read when the resolver finds nothing", async () => {
+      // Both resolver phases miss: the evaluation is not in the table.
+      const { client, queries } = createCapturingClient([null, null]);
+      const repo = new EvaluationRunClickHouseRepository({
+        resolveClient: async () => client as never,
+      });
+
+      await repo.getByEvaluationId({
+        tenantId: "project_test",
+        evaluationId: "eval_missing",
+      });
+
+      const heavyRead = queries.find((q) => q.query.includes("PREWHERE"));
+      expect(heavyRead?.query).toContain("t.ScheduledAt >=");
+      expect(heavyRead?.query_params).toMatchObject({
+        scheduledAtFrom: expect.any(Number),
+      });
+    });
+
+    /** @scenario "A fallback read is floored at the tenant's retention horizon" */
+    it("leaves the miss open-ended above, so future-scheduled runs stay findable", async () => {
+      const { client, queries } = createCapturingClient([null, null]);
+      const repo = new EvaluationRunClickHouseRepository({
+        resolveClient: async () => client as never,
+      });
+
+      await repo.getByEvaluationId({
+        tenantId: "project_test",
+        evaluationId: "eval_missing",
+      });
+
+      const heavyRead = queries.find((q) => q.query.includes("PREWHERE"));
+      expect(heavyRead?.query).not.toContain("t.ScheduledAt <=");
+      expect(heavyRead?.query_params).not.toHaveProperty("scheduledAtTo");
+    });
+
     it("uses the tenant's own retention when a resolver is wired", async () => {
       const oldScheduledAtMs = Date.now() - 200 * 24 * 60 * 60 * 1000;
       const { client, queries } = createCapturingClient([
         null,
         oldScheduledAtMs,
       ]);
-      const repo = new EvaluationRunClickHouseRepository(
-        async () => client as never,
-        { resolve: async () => ({ traces: 400 }) as never },
-      );
+      const repo = new EvaluationRunClickHouseRepository({
+        resolveClient: async () => client as never,
+        retentionResolver: { resolve: async () => ({ traces: 400 }) as never },
+      });
 
       await repo.getByEvaluationId({
         tenantId: "project_test",

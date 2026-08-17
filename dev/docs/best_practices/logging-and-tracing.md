@@ -130,7 +130,7 @@ loop out of attempts, the boundary answering the caller — logs at `error`.**
 
 `GroupQueue` is the reference implementation:
 
-```
+```text
 repository catch     -> logger.warn  ... then rethrow      every attempt
 groupQueue.ts:1641   -> logger.warn  "Job attempt failed, re-staged with backoff"
 groupQueue.ts:2320   -> logger.error "Group blocked after exhausted retries"   once, on giving up

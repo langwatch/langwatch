@@ -75,6 +75,18 @@ Feature: A read that cannot be pruned must still be bounded
     And one tenant's answer is never served to another
     And what is remembered is bounded, so many tenants cannot grow it forever
 
+  # Remembering the ANSWER does nothing for the reads that arrive before there
+  # is an answer to remember. The worker fleet runs the same sweep at the same
+  # moment, so the first burst on a cold key is exactly when the cascade can
+  # least afford one query per read.
+  @unit
+  Scenario: A cold retention lookup is shared by everyone waiting on it
+    Given many reads for the same tenant and table arriving together
+    And no cached answer for that tenant yet
+    When their floors are resolved concurrently
+    Then the policy cascade is asked once, not once per waiting read
+    And every waiting read still receives a floor
+
   # ---------------------------------------------------------------------------
   # The ceiling
   #
@@ -97,6 +109,18 @@ Feature: A read that cannot be pruned must still be bounded
     When the retry runs
     Then it stops and reports how far it got against the cap
     And the process survives to run the next job
+
+  # A cap checked after the rows are decoded is not a cap. One batch is 25
+  # traces at up to 10,000 spans each — 250,000 heavy rows, five times the cap
+  # it is meant to enforce — so the batch that should have been refused is
+  # materialised first, which is the heap death the cap exists to prevent.
+  @unit @regression
+  Scenario: A single over-budget batch is refused before it is materialised
+    Given a joined trace read that ClickHouse refuses for memory
+    And one batch of the retry alone would exceed the remaining span budget
+    When that batch is read
+    Then the read is bounded by the budget that is left
+    And the over-budget rows never reach this process
 
   @unit @regression
   Scenario: A fallback that fits under the cap still returns every trace

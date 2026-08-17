@@ -100,6 +100,18 @@ export class RetentionFloorService {
     { days: number; expiresAtMs: number }
   >();
 
+  /**
+   * One provider call per key at a time; later arrivals await the first.
+   *
+   * The resolved-value cache is only written once the provider answers, so on a
+   * cold key it does nothing for the reads that arrive while that first lookup
+   * is still in flight — each of them misses and issues its own cascade query.
+   * That is the exact shape of the failure this file exists to bound: the
+   * worker fleet runs the same sweep at the same moment, so the first burst per
+   * tenant fans out to one cascade query per read rather than one in total.
+   */
+  private readonly inFlight = new Map<string, Promise<number>>();
+
   constructor({
     defaultRetentionDays,
     provider,
@@ -158,16 +170,60 @@ export class RetentionFloorService {
     const hit = this.cache.get(key);
     if (hit && hit.expiresAtMs > nowMs) return hit.days;
 
+    const pending = this.inFlight.get(key);
+    if (pending) return await pending;
+
+    const lookup = this.resolveAndRemember({
+      key,
+      tenantId,
+      table,
+      nowMs,
+      provider: this.provider,
+    });
+    this.inFlight.set(key, lookup);
+    try {
+      return await lookup;
+    } finally {
+      this.inFlight.delete(key);
+    }
+  }
+
+  /**
+   * Resolves one key and writes the answer to the cache. Never rejects: the
+   * provider's failure is already absorbed into the default below, so every
+   * waiter sharing an in-flight promise gets an answer rather than an error.
+   *
+   * The provider is passed in rather than read off `this` because the caller
+   * is where it was proven present.
+   */
+  private async resolveAndRemember({
+    key,
+    tenantId,
+    table,
+    nowMs,
+    provider,
+  }: {
+    key: string;
+    tenantId: string;
+    table: string;
+    nowMs: number;
+    provider: RetentionDaysProvider;
+  }): Promise<number> {
     let days: number;
     try {
-      const resolved = await this.provider.getRetentionDays({
+      const resolved = await provider.getRetentionDays({
         tenantId,
         table,
       });
       // A non-positive answer means the cascade could not resolve one, not
-      // that the tenant asked for zero-day retention.
+      // that the tenant asked for zero-day retention. Infinity is excluded
+      // explicitly: it passes `> 0`, and would render a lookback that turns
+      // the floor into an invalid ClickHouse timestamp parameter — an
+      // unbounded read by another name, which is what this exists to stop.
       days =
-        typeof resolved === "number" && resolved > 0
+        typeof resolved === "number" &&
+        Number.isFinite(resolved) &&
+        resolved > 0
           ? resolved
           : this.defaultRetentionDays;
     } catch (error) {
@@ -180,11 +236,19 @@ export class RetentionFloorService {
       days = this.defaultRetentionDays;
     }
 
-    this.remember(key, days, nowMs);
+    this.remember({ key, days, nowMs });
     return days;
   }
 
-  private remember(key: string, days: number, nowMs: number): void {
+  private remember({
+    key,
+    days,
+    nowMs,
+  }: {
+    key: string;
+    days: number;
+    nowMs: number;
+  }): void {
     // Refresh insertion order so an entry being rewritten is not also the
     // next one evicted.
     this.cache.delete(key);

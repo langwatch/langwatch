@@ -86,6 +86,84 @@ describe("resolving a retention floor for a read", () => {
 
       expect(NOW - floor).toBe(DEFAULT_LOOKBACK);
     });
+
+    /**
+     * `Infinity > 0` is true, so an infinite retention would sail through the
+     * positivity check and produce a floor of `-Infinity` — an unbounded read
+     * wearing a bound's clothes, and an invalid ClickHouse timestamp parameter
+     * on the way there.
+     */
+    /** @scenario "A retention lookup that fails falls back to the platform default" */
+    it("uses the default when the provider returns a non-finite number", async () => {
+      const floor = await serviceWith(
+        providerReturning(Number.POSITIVE_INFINITY),
+      ).getFloorMs({
+        table: "trace_summaries",
+        tenantId: "project_infinite",
+        nowMs: NOW,
+      });
+
+      expect(NOW - floor).toBe(DEFAULT_LOOKBACK);
+      expect(Number.isFinite(floor)).toBe(true);
+    });
+  });
+
+  describe("given many reads arrive on one cold key at once", () => {
+    /**
+     * The resolved-value cache is only written once the provider answers, so
+     * without in-flight memoisation it does nothing for the reads that arrive
+     * while the first lookup is still running. That is the shape of the failure
+     * this bounds: the worker fleet runs the same sweep at the same moment, so
+     * the first burst per tenant fans out one cascade query per read.
+     */
+    /** @scenario "A cold retention lookup is shared by everyone waiting on it" */
+    it("asks the policy cascade once, not once per waiting read", async () => {
+      let release!: () => void;
+      const inFlight = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const getRetentionDays = vi.fn(async () => {
+        await inFlight;
+        return 400;
+      });
+      const service = serviceWith({ getRetentionDays });
+
+      const reads = Array.from({ length: 20 }, () =>
+        service.getFloorMs({
+          table: "evaluation_runs",
+          tenantId: "project_stampede",
+          nowMs: NOW,
+        }),
+      );
+      release();
+      const floors = await Promise.all(reads);
+
+      expect(getRetentionDays).toHaveBeenCalledTimes(1);
+      expect(new Set(floors).size).toBe(1);
+    });
+
+    /** @scenario "A cold retention lookup is shared by everyone waiting on it" */
+    it("gives every waiter an answer when the shared lookup fails", async () => {
+      const getRetentionDays = vi.fn(async () => {
+        throw new Error("cascade down");
+      });
+      const service = serviceWith({ getRetentionDays });
+
+      const floors = await Promise.all(
+        Array.from({ length: 5 }, () =>
+          service.getFloorMs({
+            table: "evaluation_runs",
+            tenantId: "project_broken",
+            nowMs: NOW,
+          }),
+        ),
+      );
+
+      expect(getRetentionDays).toHaveBeenCalledTimes(1);
+      expect(floors.every((floor) => NOW - floor === DEFAULT_LOOKBACK)).toBe(
+        true,
+      );
+    });
   });
 
   describe("given no provider is wired", () => {

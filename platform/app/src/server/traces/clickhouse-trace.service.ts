@@ -3044,9 +3044,24 @@ export class ClickHouseTraceService {
         // which is how a 980-trace read became 50 V8 heap deaths across the worker
         // fleet. The merge is therefore capped too; see
         // {@link MAX_SPANS_PER_JOINED_FALLBACK}.
-        const runBatch = async (
-          batchTraceIds: string[],
-        ): Promise<
+        const runBatch = async ({
+          batchTraceIds,
+          maxSpanRows,
+        }: {
+          batchTraceIds: string[];
+          /**
+           * Rows the span read may return before ClickHouse refuses it.
+           *
+           * Set only by the OOM fallback below, which is the path with a heap
+           * budget to spend. Checking the merged total AFTER a batch is decoded
+           * is too late: one batch is `SUMMARY_BATCH_SIZE` traces at up to
+           * {@link MAX_SPANS_PER_TRACE} spans each — 250,000 heavy rows, five
+           * times the cap it is supposed to be enforcing — and materialising
+           * that is the heap death the cap exists to prevent. Bounding the
+           * query means the rows never cross the socket.
+           */
+          maxSpanRows?: number;
+        }): Promise<
           Map<string, { summary: TraceSummaryData; spans: NormalizedSpan[] }>
         > => {
           // When the caller knows the traces' approximate time, bound the
@@ -3247,7 +3262,7 @@ export class ClickHouseTraceService {
                   // can only widen. A project on a 400-day policy previously
                   // got 90 days here and simply could not see its own older
                   // spans; one on a short policy no longer pays for a reach it
-                  // has no rows in. See {@link resolveRetentionLookbackMs}.
+                  // has no rows in. See {@link SPAN_READ_FLOOR_LOOKBACK_MS}.
                   lookbackMs: await this.retentionFloor.getLookbackMs({
                     table: "stored_spans",
                     tenantId: projectId,
@@ -3312,7 +3327,20 @@ export class ClickHouseTraceService {
                   traceIds: batchTraceIds,
                   ...(window?.params ?? {}),
                 },
-                clickhouse_settings: JOINED_SPAN_READ_SETTINGS,
+                clickhouse_settings: {
+                  ...JOINED_SPAN_READ_SETTINGS,
+                  // `throw`, never `break`: `break` truncates the result and
+                  // returns it, which would silently hand back a partial span
+                  // list as if it were complete. One row of headroom so an
+                  // exactly-at-budget batch still succeeds and only a genuine
+                  // overrun trips it.
+                  ...(maxSpanRows !== undefined
+                    ? ({
+                        max_result_rows: String(maxSpanRows + 1),
+                        result_overflow_mode: "throw",
+                      } as const)
+                    : {}),
+                },
                 format: "JSONEachRow",
               });
               return (await spansResult.json()) as SpanRow[];
@@ -3362,7 +3390,7 @@ export class ClickHouseTraceService {
         };
 
         try {
-          return await runBatch(traceIds);
+          return await runBatch({ batchTraceIds: traceIds });
         } catch (error) {
           if (!isClickHouseMemoryLimitError(error)) {
             throw error;
@@ -3386,15 +3414,44 @@ export class ClickHouseTraceService {
               i,
               i + ClickHouseTraceService.SUMMARY_BATCH_SIZE,
             );
-            const batchMap = await runBatch(batch);
+
+            // Batching caps ClickHouse's peak memory, not ours — the merge
+            // rebuilds the whole result set here. Stop before the heap does,
+            // and stop at the QUERY rather than after decoding its rows: the
+            // budget goes into the read so an over-budget batch is refused by
+            // ClickHouse instead of arriving in this process first.
+            // See {@link MAX_SPANS_PER_JOINED_FALLBACK}.
+            const remainingSpanBudget =
+              MAX_SPANS_PER_JOINED_FALLBACK - mergedSpanCount;
+            let batchMap: Map<
+              string,
+              { summary: TraceSummaryData; spans: NormalizedSpan[] }
+            >;
+            try {
+              batchMap = await runBatch({
+                batchTraceIds: batch,
+                maxSpanRows: remainingSpanBudget,
+              });
+            } catch (batchError) {
+              if (!isClickHouseResultOverflowError(batchError))
+                throw batchError;
+              throw new Error(
+                `Traces-with-spans join fallback exceeded ${MAX_SPANS_PER_JOINED_FALLBACK} spans ` +
+                  `(${mergedSpanCount} already merged across ${merged.size} of ${traceIds.length} traces, ` +
+                  `and the next batch of ${batch.length} overran the remaining ${remainingSpanBudget}); ` +
+                  `refusing to materialise the rest`,
+                { cause: batchError },
+              );
+            }
+
             for (const [traceId, value] of batchMap) {
               merged.set(traceId, value);
               mergedSpanCount += value.spans.length;
             }
 
-            // Batching caps ClickHouse's peak memory, not ours — the merge
-            // rebuilds the whole result set here. Stop before the heap does.
-            // See {@link MAX_SPANS_PER_JOINED_FALLBACK}.
+            // Belt to the query's braces: the read is bounded per batch, so
+            // this only trips if a batch landed exactly on its budget and the
+            // total still cleared the cap.
             if (mergedSpanCount > MAX_SPANS_PER_JOINED_FALLBACK) {
               throw new Error(
                 `Traces-with-spans join fallback exceeded ${MAX_SPANS_PER_JOINED_FALLBACK} spans ` +
@@ -3654,6 +3711,29 @@ interface PromptStudioCandidateRow {
   ParentSpanId: string | null;
   SpanAttributes: Record<string, unknown>;
   StartTime: number;
+}
+
+/**
+ * ClickHouse refused a query because its result exceeded `max_result_rows`
+ * under `result_overflow_mode = 'throw'` (TOO_MANY_ROWS_OR_BYTES, code 396).
+ *
+ * That is a deliberate refusal on our side, not a fault: the joined-span
+ * fallback sets the limit from its own remaining heap budget so an over-budget
+ * batch never reaches this process. Matched by code and by name because the
+ * driver surfaces one or the other depending on how far the error has been
+ * wrapped.
+ */
+export function isClickHouseResultOverflowError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  if (HandledError.isHandled(error)) {
+    return (error.reasons ?? []).some(isClickHouseResultOverflowError);
+  }
+  return (
+    error.message.includes("TOO_MANY_ROWS_OR_BYTES") ||
+    (error as { type?: string }).type === "TOO_MANY_ROWS_OR_BYTES" ||
+    (error as { code?: string | number }).code === 396 ||
+    (error as { code?: string | number }).code === "396"
+  );
 }
 
 export function isClickHouseMemoryLimitError(error: unknown): boolean {

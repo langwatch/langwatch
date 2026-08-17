@@ -22,9 +22,20 @@ import { EventSourcing } from "../eventSourcing";
  * Drives the real `close()` against stubbed collaborators, recording the order
  * they are torn down in. Asserting on the sequence is the point: both closes
  * succeed either way, and only their order decides whether events are lost.
+ *
+ * The queue's close is held open until `finishQueueDrain()` is called. Stubs
+ * that both resolve immediately cannot tell the orders apart — a `close()` that
+ * fired both at once and merely happened to call the queue first would record
+ * the same sequence — and "at once" is precisely the bug: the registry must not
+ * release its router while the drain is still storing events.
  */
 function closeWithRecording() {
   const order: string[] = [];
+  let releaseQueueDrain: (() => void) | undefined;
+  const queueDrained = new Promise<void>((resolve) => {
+    releaseQueueDrain = resolve;
+  });
+
   const eventSourcing = Object.create(
     EventSourcing.prototype,
   ) as EventSourcing & Record<string, unknown>;
@@ -34,7 +45,9 @@ function closeWithRecording() {
     pipelines: new Map(),
     _globalQueue: {
       close: async () => {
-        order.push("globalQueue");
+        order.push("globalQueue:start");
+        await queueDrained;
+        order.push("globalQueue:done");
       },
     },
     projectionRegistry: {
@@ -45,18 +58,51 @@ function closeWithRecording() {
     },
   });
 
-  return { eventSourcing, order };
+  return {
+    eventSourcing,
+    order,
+    finishQueueDrain: () => releaseQueueDrain?.(),
+  };
 }
+
+/** Lets any already-scheduled microtasks run, so a premature close would show. */
+const settleMicrotasks = async () => {
+  for (let i = 0; i < 5; i++) await Promise.resolve();
+};
 
 describe("closing event sourcing", () => {
   describe("given an initialized projection registry", () => {
-    /** @scenario "The projection registry is closed after the queue that feeds it" */
-    it("closes the global queue before the projection registry", async () => {
-      const { eventSourcing, order } = closeWithRecording();
+    describe("when the queue drain is still in flight", () => {
+      /** @scenario "The projection registry is closed after the queue that feeds it" */
+      it("has not yet closed the projection registry", async () => {
+        const { eventSourcing, order, finishQueueDrain } = closeWithRecording();
 
-      await eventSourcing.close();
+        const closing = eventSourcing.close();
+        await settleMicrotasks();
 
-      expect(order).toEqual(["globalQueue", "projectionRegistry"]);
+        expect(order).toEqual(["globalQueue:start"]);
+
+        finishQueueDrain();
+        await closing;
+      });
+    });
+
+    describe("when close() runs to completion", () => {
+      /** @scenario "The projection registry is closed after the queue that feeds it" */
+      it("closes the global queue before the projection registry", async () => {
+        const { eventSourcing, order, finishQueueDrain } = closeWithRecording();
+
+        const closing = eventSourcing.close();
+        await settleMicrotasks();
+        finishQueueDrain();
+        await closing;
+
+        expect(order).toEqual([
+          "globalQueue:start",
+          "globalQueue:done",
+          "projectionRegistry",
+        ]);
+      });
     });
   });
 });
