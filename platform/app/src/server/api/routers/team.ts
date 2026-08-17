@@ -4,13 +4,14 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { grantsLedgerWriter } from "~/server/app-layer/authz/ledger";
 import {
   PERSONAL_TEAM_ARCHIVE_REFUSAL,
   PERSONAL_TEAM_MEMBERSHIP_REFUSAL,
   TeamLastAdminRequiredError,
 } from "~/server/app-layer/teams/team.service";
 import { assertUsersInOrganization } from "~/server/organizations/assertUsersInOrganization";
-import { computeEffectiveAdminUserIds } from "~/server/teams/effective-team-admins";
+import { projectAdminUserIdsAfterDirectEdit } from "~/server/teams/effective-team-admins";
 import { TEAM_ROLE_PRIORITY, TeamService } from "~/server/teams/team.service";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { slugify } from "~/utils/slugify";
@@ -282,15 +283,20 @@ export const teamRouter = createTRPCRouter({
         }
       }
 
-      return await prisma.$transaction(async (tx) => {
-        // ── Rename team ──
-        await tx.team.update({
+      // The team row is not a grant fact and keeps its imperative write; the
+      // member grants are commands, so the whole edit is decided (including
+      // the last-admin guard, held against the plan) before anything is
+      // emitted, and nothing is emitted if the guard refuses.
+      if (input.members.length === 0) {
+        await prisma.team.update({
           where: { id: input.teamId },
           data: { name: input.name },
         });
+        return { success: true };
+      }
 
-        if (input.members.length === 0) return { success: true };
-
+      return await (async () => {
+        const tx = prisma;
         const newMembersMap = new Map(input.members.map((m) => [m.userId, m]));
 
         // ── RoleBinding ──
@@ -378,29 +384,22 @@ export const teamRouter = createTRPCRouter({
           }
         }
 
-        if (idsToRemove.length > 0) {
-          await tx.roleBinding.deleteMany({
-            where: { id: { in: idsToRemove } },
-          });
-        }
-        for (const { id, role, customRoleId } of toUpdate) {
-          await tx.roleBinding.update({
-            where: { id },
-            data: { role, customRoleId },
-          });
+        // The direct-admin users the plan leaves behind, read off the plan
+        // rather than out of a half-written table.
+        const removedIds = new Set(idsToRemove);
+        const updatedById = new Map(toUpdate.map((u) => [u.id, u]));
+        const directAdminUserIdsAfter = new Set<string>();
+        for (const binding of currentBindings) {
+          if (removedIds.has(binding.id)) continue;
+          const role = updatedById.get(binding.id)?.role ?? binding.role;
+          if (role === TeamUserRole.ADMIN && binding.userId) {
+            directAdminUserIdsAfter.add(binding.userId);
+          }
         }
         for (const member of toCreate) {
-          await tx.roleBinding.create({
-            data: {
-              id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-              organizationId,
-              userId: member.userId,
-              role: targetRole(member),
-              customRoleId: targetCustomRoleId(member),
-              scopeType: RoleBindingScopeType.TEAM,
-              scopeId: input.teamId,
-            },
-          });
+          if (targetRole(member) === TeamUserRole.ADMIN) {
+            directAdminUserIdsAfter.add(member.userId);
+          }
         }
 
         // The same rule the per-member path enforces: a team-local save cannot
@@ -415,18 +414,58 @@ export const teamRouter = createTRPCRouter({
           (b) => b.role === TeamUserRole.ADMIN,
         );
         if (hadAdmin) {
-          const adminsAfter = await computeEffectiveAdminUserIds({
+          const adminsAfter = await projectAdminUserIdsAfterDirectEdit({
             tx,
             organizationId,
             teamId: input.teamId,
+            directAdminUserIdsAfter,
           });
           if (adminsAfter.size === 0) {
             throw new TeamLastAdminRequiredError(input.name);
           }
         }
 
+        await prisma.team.update({
+          where: { id: input.teamId },
+          data: { name: input.name },
+        });
+
+        const writer = grantsLedgerWriter();
+        const actor = { type: "user" as const, id: ctx.session.user.id };
+        if (idsToRemove.length > 0) {
+          await writer.revokeBindings({
+            organizationId,
+            bindingIds: idsToRemove,
+            actor,
+          });
+        }
+        for (const { id, role, customRoleId } of toUpdate) {
+          await writer.changeBindingRole({
+            organizationId,
+            bindingId: id,
+            role,
+            customRoleId,
+            actor,
+          });
+        }
+        if (toCreate.length > 0) {
+          await writer.attachBindings({
+            organizationId,
+            bindings: toCreate.map((member) => ({
+              bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+              principal: { userId: member.userId },
+              role: targetRole(member),
+              customRoleId: targetCustomRoleId(member),
+              scopeType: RoleBindingScopeType.TEAM,
+              scopeId: input.teamId,
+            })),
+            actor,
+            onDuplicate: "skip",
+          });
+        }
+
         return { success: true };
-      });
+      })();
     }),
   createTeamWithMembers: protectedProcedure
     .input(
@@ -464,82 +503,79 @@ export const teamRouter = createTRPCRouter({
         input.members.map((member) => member.userId),
       );
 
-      return await prisma.$transaction(async (tx) => {
-        const team = await tx.team.create({
-          data: {
-            id: teamId,
-            name: input.name,
-            slug: teamSlug,
-            organizationId: input.organizationId,
-          },
-        });
+      // Every member row is validated first, and the admin rule is decided on
+      // the request rather than counted back out of the table: a team born
+      // this second has no group bindings, so its admins are exactly the
+      // members named ADMIN here. Nothing is written until both pass.
+      const memberBindings = [];
+      for (const member of input.members) {
+        const memberIsCustomRole = isCustomRole(member.role);
 
-        for (const member of input.members) {
-          const memberIsCustomRole = isCustomRole(member.role);
+        if (memberIsCustomRole && !member.customRoleId) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `customRoleId is required when role is a custom role for user ${member.userId}`,
+          });
+        }
 
-          if (memberIsCustomRole && !member.customRoleId) {
+        const memberRole = memberIsCustomRole
+          ? TeamUserRole.CUSTOM
+          : (member.role as TeamUserRole);
+
+        if (memberIsCustomRole) {
+          // Verify the custom role belongs to the same organization and is user-assignable
+          const customRole = await prisma.customRole.findUnique({
+            where: { id: member.customRoleId! },
+            select: { organizationId: true, kind: true },
+          });
+
+          if (
+            customRole?.kind !== "custom" ||
+            customRole.organizationId !== input.organizationId
+          ) {
             throw new TRPCError({
               code: "BAD_REQUEST",
-              message: `customRoleId is required when role is a custom role for user ${member.userId}`,
+              message: `Custom role ${member.customRoleId} is invalid for this team`,
             });
           }
-
-          const memberRole = memberIsCustomRole
-            ? TeamUserRole.CUSTOM
-            : (member.role as TeamUserRole);
-
-          if (memberIsCustomRole) {
-            // Verify the custom role belongs to the same organization and is user-assignable
-            const customRole = await tx.customRole.findUnique({
-              where: { id: member.customRoleId! },
-              select: { organizationId: true, kind: true },
-            });
-
-            if (
-              customRole?.kind !== "custom" ||
-              customRole.organizationId !== team.organizationId
-            ) {
-              throw new TRPCError({
-                code: "BAD_REQUEST",
-                message: `Custom role ${member.customRoleId} is invalid for this team`,
-              });
-            }
-          }
-
-          await tx.roleBinding.create({
-            data: {
-              id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-              organizationId: input.organizationId,
-              userId: member.userId,
-              role: memberRole,
-              customRoleId: memberIsCustomRole
-                ? (member.customRoleId ?? null)
-                : null,
-              scopeType: RoleBindingScopeType.TEAM,
-              scopeId: team.id,
-            },
-          });
         }
 
-        // Post-creation validation: ensure we have at least one admin (direct user or group binding)
-        const finalAdminCount = await tx.roleBinding.count({
-          where: {
-            organizationId: input.organizationId,
-            scopeType: RoleBindingScopeType.TEAM,
-            scopeId: team.id,
-            role: TeamUserRole.ADMIN,
-          },
+        memberBindings.push({
+          bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+          principal: { userId: member.userId },
+          role: memberRole,
+          customRoleId: memberIsCustomRole
+            ? (member.customRoleId ?? null)
+            : null,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: teamId,
         });
+      }
 
-        if (finalAdminCount === 0) {
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: "Team must have at least one admin",
-          });
-        }
+      if (!memberBindings.some((b) => b.role === TeamUserRole.ADMIN)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Team must have at least one admin",
+        });
+      }
 
-        return team;
+      const team = await prisma.team.create({
+        data: {
+          id: teamId,
+          name: input.name,
+          slug: teamSlug,
+          organizationId: input.organizationId,
+        },
       });
+
+      await grantsLedgerWriter().attachBindings({
+        organizationId: input.organizationId,
+        bindings: memberBindings,
+        actor: { type: "user", id: ctx.session.user.id },
+        onDuplicate: "skip",
+      });
+
+      return team;
     }),
   archiveById: protectedProcedure
     .input(z.object({ teamId: z.string() }))

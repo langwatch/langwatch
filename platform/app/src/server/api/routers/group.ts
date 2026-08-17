@@ -6,6 +6,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { grantsLedgerWriter } from "~/server/app-layer/authz/ledger";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
 import { assertUsersInOrganization } from "~/server/organizations/assertUsersInOrganization";
 import { RoleService } from "~/server/role/role.service";
@@ -280,14 +281,24 @@ export const groupRouter = createTRPCRouter({
         }
       }
 
-      return ctx.prisma.$transaction(async (tx) => {
+      if (input.bindings?.length) {
+        await assertNoPersonalTeamScope({
+          client: ctx.prisma,
+          scopes: input.bindings,
+        });
+      }
+
+      // The group and its memberships are not grant facts, so they keep the
+      // transaction; the grants the group carries are emitted as one command
+      // after it commits.
+      const group = await ctx.prisma.$transaction(async (tx) => {
         const slug = await findUniqueGroupSlug(
           tx,
           input.organizationId,
           baseSlug,
         );
 
-        const group = await tx.group.create({
+        const created = await tx.group.create({
           data: {
             id: generate(KSUID_RESOURCES.GROUP).toString(),
             organizationId: input.organizationId,
@@ -296,38 +307,36 @@ export const groupRouter = createTRPCRouter({
           },
         });
 
-        if (input.bindings?.length) {
-          await assertNoPersonalTeamScope({
-            client: tx,
-            scopes: input.bindings,
-          });
-          await tx.roleBinding.createMany({
-            data: input.bindings.map((b) => ({
-              id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-              organizationId: input.organizationId,
-              groupId: group.id,
-              role: b.role,
-              customRoleId:
-                b.role === TeamUserRole.CUSTOM
-                  ? (b.customRoleId ?? null)
-                  : null,
-              scopeType: b.scopeType,
-              scopeId: b.scopeId,
-            })),
-          });
-        }
-
         if (input.memberIds?.length) {
           await tx.groupMembership.createMany({
             data: input.memberIds.map((userId) => ({
-              groupId: group.id,
+              groupId: created.id,
               userId,
             })),
           });
         }
 
-        return group;
+        return created;
       });
+
+      if (input.bindings?.length) {
+        await grantsLedgerWriter().attachBindings({
+          organizationId: input.organizationId,
+          bindings: input.bindings.map((b) => ({
+            bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+            principal: { groupId: group.id },
+            role: b.role,
+            customRoleId:
+              b.role === TeamUserRole.CUSTOM ? (b.customRoleId ?? null) : null,
+            scopeType: b.scopeType,
+            scopeId: b.scopeId,
+          })),
+          actor: { type: "user", id: ctx.session.user.id },
+          onDuplicate: "skip",
+        });
+      }
+
+      return group;
     }),
 
   /**
@@ -371,20 +380,26 @@ export const groupRouter = createTRPCRouter({
         });
       }
 
-      return ctx.prisma.roleBinding.create({
-        data: {
-          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-          organizationId: input.organizationId,
-          groupId: input.groupId,
-          role: input.role,
-          customRoleId:
-            input.role === TeamUserRole.CUSTOM
-              ? (input.customRoleId ?? null)
-              : null,
-          scopeType: input.scopeType,
-          scopeId: input.scopeId,
-        },
+      const bindingId = generate(KSUID_RESOURCES.ROLE_BINDING).toString();
+      await grantsLedgerWriter().attachBindings({
+        organizationId: input.organizationId,
+        bindings: [
+          {
+            bindingId,
+            principal: { groupId: input.groupId },
+            role: input.role,
+            customRoleId:
+              input.role === TeamUserRole.CUSTOM
+                ? (input.customRoleId ?? null)
+                : null,
+            scopeType: input.scopeType,
+            scopeId: input.scopeId,
+          },
+        ],
+        actor: { type: "user", id: ctx.session.user.id },
+        onDuplicate: "skip",
       });
+      return { id: bindingId };
     }),
 
   /**
@@ -412,7 +427,11 @@ export const groupRouter = createTRPCRouter({
         client: ctx.prisma,
         scopes: [binding],
       });
-      await ctx.prisma.roleBinding.delete({ where: { id: input.bindingId } });
+      await grantsLedgerWriter().revokeBindings({
+        organizationId: input.organizationId,
+        bindingIds: [input.bindingId],
+        actor: { type: "user", id: ctx.session.user.id },
+      });
       return { success: true };
     }),
 
@@ -473,10 +492,16 @@ export const groupRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "Group not found" });
       }
 
-      await ctx.prisma.groupMembership.deleteMany({
+      // The grants the group carries go first, so the deny is enforced before
+      // the group row disappears; the memberships and the group itself are
+      // not grant facts and stay imperative.
+      await grantsLedgerWriter().revokeBindingsWhere({
+        organizationId: input.organizationId,
         where: { groupId: input.groupId },
+        actor: { type: "user", id: ctx.session.user.id },
+        reason: "group deleted",
       });
-      await ctx.prisma.roleBinding.deleteMany({
+      await ctx.prisma.groupMembership.deleteMany({
         where: { groupId: input.groupId },
       });
       await ctx.prisma.group.delete({ where: { id: input.groupId } });

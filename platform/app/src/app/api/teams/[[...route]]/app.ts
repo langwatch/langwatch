@@ -1,6 +1,8 @@
+import { DuplicateBindingError } from "@langwatch/authz-server";
 import { generate } from "@langwatch/ksuid";
 import { describeRoute } from "hono-openapi";
 import { z } from "zod";
+import { orgRequestLedgerActor } from "~/app/api/shared/ledger-actor";
 import {
   type Organization,
   RoleBindingScopeType,
@@ -8,6 +10,7 @@ import {
 } from "~/generated/prisma/client";
 import { createOrgApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
+import { grantsLedgerWriter } from "~/server/app-layer/authz/ledger";
 import {
   PERSONAL_TEAM_MEMBERSHIP_REFUSAL,
   PersonalTeamProtectedError,
@@ -262,22 +265,23 @@ secured
       }
 
       try {
-        await prisma.roleBinding.create({
-          data: {
-            id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-            organizationId: organization.id,
-            userId: body.userId,
-            role: body.role,
-            scopeType: RoleBindingScopeType.TEAM,
-            scopeId: id,
-          },
+        await grantsLedgerWriter().attachBindings({
+          organizationId: organization.id,
+          bindings: [
+            {
+              bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+              principal: { userId: body.userId },
+              role: body.role,
+              customRoleId: null,
+              scopeType: RoleBindingScopeType.TEAM,
+              scopeId: id,
+            },
+          ],
+          actor: orgRequestLedgerActor(c),
+          onDuplicate: "reject",
         });
       } catch (error) {
-        if (
-          error instanceof Error &&
-          "code" in error &&
-          (error as { code: string }).code === "P2002"
-        ) {
+        if (error instanceof DuplicateBindingError) {
           throw new TeamMemberAlreadyAddedError(body.userId);
         }
         throw error;
@@ -314,15 +318,16 @@ secured
       // permissions at a scope are the union of the roles held there, so a
       // member granted both Member and Viewer would otherwise keep the team
       // through the binding the delete did not reach.
-      const removed = await prisma.roleBinding.deleteMany({
+      const removed = await grantsLedgerWriter().revokeBindingsWhere({
+        organizationId: organization.id,
         where: {
-          organizationId: organization.id,
           scopeType: RoleBindingScopeType.TEAM,
           scopeId: id,
           userId,
         },
+        actor: orgRequestLedgerActor(c),
       });
-      if (removed.count === 0) {
+      if (removed === 0) {
         throw new TeamMembershipNotFoundError(userId);
       }
 

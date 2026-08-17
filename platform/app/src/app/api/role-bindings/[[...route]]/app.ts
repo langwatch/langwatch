@@ -26,7 +26,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { managementLedgerActor } from "~/server/api/management/audit";
+import { orgRequestLedgerActor } from "~/app/api/shared/ledger-actor";
 import { createManagementService } from "~/server/api/management/managed-service";
 import { MANAGEMENT_API_VERSION } from "~/server/api/management/version";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
@@ -213,7 +213,7 @@ const createBindingHandler = async (
   const created = await app.roleBindings.create({
     organizationId: organization.id,
     ...input,
-    actor: managementLedgerActor(c),
+    actor: orgRequestLedgerActor(c),
   });
 
   const binding = await readBackBinding({
@@ -247,7 +247,7 @@ const updateBindingHandler = async (
     ...(input.customRoleId !== undefined
       ? { customRoleId: input.customRoleId }
       : {}),
-    actor: managementLedgerActor(c),
+    actor: orgRequestLedgerActor(c),
   });
   return readBackBinding({
     roleBindings: app.roleBindings,
@@ -270,7 +270,7 @@ const deleteBindingHandler = async (
   await app.roleBindings.delete({
     organizationId: organization.id,
     bindingId: params.id,
-    actor: managementLedgerActor(c),
+    actor: orgRequestLedgerActor(c),
   });
   return { success: true as const };
 };

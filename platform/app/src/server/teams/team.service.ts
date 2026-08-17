@@ -5,6 +5,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { grantsLedgerWriter } from "~/server/app-layer/authz/ledger";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
 import type {
   RoleBindingRepository,
@@ -548,7 +549,7 @@ export class TeamService {
     userId: string;
     currentUserId: string;
   }) {
-    return this.prisma.$transaction(
+    const removal = await this.prisma.$transaction(
       async (tx) => {
         // Validate that the team exists
         const team = await tx.team.findUnique({
@@ -617,39 +618,38 @@ export class TeamService {
           throw new TeamLastAdminRequiredError(team.name);
         }
 
-        // Remove RoleBinding and legacy TeamUser row (if any) atomically
-        await Promise.all([
-          tx.roleBinding.deleteMany({
-            where: {
-              organizationId: team.organizationId,
-              userId,
-              scopeType: RoleBindingScopeType.TEAM,
-              scopeId: teamId,
-            },
-          }),
-          tx.teamUser.deleteMany({
-            where: { userId, teamId },
-          }),
-        ]);
-
-        // Post-removal validation: ensure we still have at least one
-        // effective admin (direct or group-expanded).
-        const finalAdminUserIds = await computeEffectiveAdminUserIds({
-          tx,
-          organizationId: team.organizationId,
-          teamId,
+        // The legacy TeamUser row is a membership row, not a grant, so it
+        // stays imperative here. The team-scoped grants this member holds are
+        // ledger facts: their ids are collected under the same serializable
+        // read and revoked as a command once this commits. There is no
+        // post-removal re-read of the admin set — `projectedAdminUserIds`
+        // above IS that post-state, computed for exactly this removal.
+        const grantIds = await tx.roleBinding.findMany({
+          where: {
+            organizationId: team.organizationId,
+            userId,
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: teamId,
+          },
+          select: { id: true },
         });
-
-        if (finalAdminUserIds.size === 0) {
-          throw new TeamLastAdminRequiredError(team.name);
-        }
+        await tx.teamUser.deleteMany({ where: { userId, teamId } });
 
         return {
-          success: true,
-          removedUserId: userId,
+          organizationId: team.organizationId,
+          bindingIds: grantIds.map((row) => row.id),
         };
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
+
+    await grantsLedgerWriter().revokeBindings({
+      organizationId: removal.organizationId,
+      bindingIds: removal.bindingIds,
+      actor: { type: "user", id: currentUserId },
+      reason: "removed from team",
+    });
+
+    return { success: true, removedUserId: userId };
   }
 }

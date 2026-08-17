@@ -617,6 +617,7 @@ export class OrganizationService {
     return this.repo.deleteMember({
       organizationId: params.organizationId,
       userId: params.userId,
+      actingUserId: params.actingUserId ?? null,
     });
   }
 

@@ -2,10 +2,10 @@ import { generate } from "@langwatch/ksuid";
 import type {
   Group,
   GroupMembership,
-  RoleBinding,
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import type { LedgerActor } from "~/server/app-layer/authz/ledger";
 import { PersonalWorkspaceNotManagedHereError } from "~/server/app-layer/teams/team.service";
 import type { RoleService } from "~/server/role";
 import { RoleNotAssignableError } from "~/server/role/errors";
@@ -22,6 +22,7 @@ import {
   UserNotInOrganizationError,
 } from "./errors";
 import type {
+  CreatedBinding,
   GroupRepository,
   GroupWithDetails,
   GroupWithMembers,
@@ -144,9 +145,11 @@ export class GroupRestService {
     name,
     bindings,
     memberIds,
+    actor,
   }: {
     organizationId: string;
     name: string;
+    actor: LedgerActor;
     bindings?: Array<{
       role: TeamUserRole;
       customRoleId?: string;
@@ -206,6 +209,7 @@ export class GroupRestService {
       group: { id: groupId, organizationId, name, slug },
       bindings: bindingInputs,
       memberIds: memberIds ?? [],
+      actor,
     });
   }
 
@@ -239,9 +243,11 @@ export class GroupRestService {
   async delete({
     id,
     organizationId,
+    actor,
   }: {
     id: string;
     organizationId: string;
+    actor: LedgerActor;
   }): Promise<void> {
     const group = await this.repo.findGroupOnly({ id, organizationId });
     if (!group) throw new GroupNotFoundError();
@@ -252,8 +258,10 @@ export class GroupRestService {
       throw new ScimManagedGroupError(id);
     }
 
+    // The grants go first, so the deny is enforced before the group row
+    // that carries them disappears.
+    await this.repo.deleteAllBindings({ groupId: id, organizationId, actor });
     await this.repo.deleteAllMemberships({ groupId: id });
-    await this.repo.deleteAllBindings({ groupId: id });
     await this.repo.delete({ id, organizationId });
   }
 
@@ -335,6 +343,7 @@ export class GroupRestService {
     customRoleId,
     scopeType,
     scopeId,
+    actor,
   }: {
     groupId: string;
     organizationId: string;
@@ -342,7 +351,8 @@ export class GroupRestService {
     customRoleId?: string;
     scopeType: RoleBindingScopeType;
     scopeId: string;
-  }): Promise<RoleBinding> {
+    actor: LedgerActor;
+  }): Promise<CreatedBinding> {
     const group = await this.repo.findGroupOnly({
       id: groupId,
       organizationId,
@@ -366,24 +376,29 @@ export class GroupRestService {
     });
     await this.assertNoPersonalTeamScope([{ scopeType, scopeId }]);
 
-    return this.repo.createBinding({
-      id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-      organizationId,
-      groupId,
-      role,
-      customRoleId:
-        role === ("CUSTOM" as TeamUserRole) ? (customRoleId ?? null) : null,
-      scopeType,
-      scopeId,
-    });
+    return this.repo.createBinding(
+      {
+        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+        organizationId,
+        groupId,
+        role,
+        customRoleId:
+          role === ("CUSTOM" as TeamUserRole) ? (customRoleId ?? null) : null,
+        scopeType,
+        scopeId,
+      },
+      { actor },
+    );
   }
 
   async removeBinding({
     bindingId,
     organizationId,
+    actor,
   }: {
     bindingId: string;
     organizationId: string;
+    actor: LedgerActor;
   }): Promise<void> {
     const binding = await this.repo.findBinding({
       id: bindingId,
@@ -392,6 +407,6 @@ export class GroupRestService {
     if (!binding) throw new BindingNotFoundError();
     await this.assertNoPersonalTeamScope([binding]);
 
-    await this.repo.deleteBinding({ id: bindingId });
+    await this.repo.deleteBinding({ id: bindingId, organizationId, actor });
   }
 }

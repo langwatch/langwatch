@@ -5,9 +5,15 @@ import {
   type RoleBinding,
   RoleBindingScopeType,
 } from "~/generated/prisma/client";
+import {
+  type GrantsLedgerWriter,
+  grantsLedgerWriter,
+  type LedgerActor,
+} from "~/server/app-layer/authz/ledger";
 import { scopesTouchPersonalTeam } from "~/server/role-bindings/personal-team-scope";
 import type {
   CreateBindingInput,
+  CreatedBinding,
   CreateGroupInput,
   GroupRepository,
   GroupWithDetails,
@@ -15,8 +21,21 @@ import type {
   PaginatedResult,
 } from "./group.repository";
 
+/** The grant a group carries, as the ledger's attach shape reads it. */
+const attachFor = (binding: CreateBindingInput) => ({
+  bindingId: binding.id,
+  principal: { groupId: binding.groupId },
+  role: binding.role,
+  customRoleId: binding.customRoleId,
+  scopeType: binding.scopeType,
+  scopeId: binding.scopeId,
+});
+
 export class PrismaGroupRepository implements GroupRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
+  ) {}
 
   async findAllByOrganization({
     organizationId,
@@ -103,29 +122,41 @@ export class PrismaGroupRepository implements GroupRepository {
     group,
     bindings,
     memberIds,
+    actor,
   }: {
     group: CreateGroupInput;
     bindings: CreateBindingInput[];
     memberIds: string[];
+    actor: LedgerActor;
   }): Promise<Group> {
-    return this.prisma.$transaction(async (tx) => {
-      const created = await tx.group.create({ data: group });
-
-      if (bindings.length > 0) {
-        await tx.roleBinding.createMany({ data: bindings });
-      }
+    // The group row and its memberships are not grant facts, so they keep the
+    // transaction; the grants the group carries are one command after it
+    // commits, because the ledger is their only writer.
+    const created = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.group.create({ data: group });
 
       if (memberIds.length > 0) {
         await tx.groupMembership.createMany({
           data: memberIds.map((userId) => ({
-            groupId: created.id,
+            groupId: row.id,
             userId,
           })),
         });
       }
 
-      return created;
+      return row;
     });
+
+    if (bindings.length > 0) {
+      await this.writer.attachBindings({
+        organizationId: group.organizationId,
+        bindings: bindings.map(attachFor),
+        actor,
+        onDuplicate: "skip",
+      });
+    }
+
+    return created;
   }
 
   async rename({
@@ -198,8 +229,23 @@ export class PrismaGroupRepository implements GroupRepository {
     });
   }
 
-  async createBinding(data: CreateBindingInput): Promise<RoleBinding> {
-    return this.prisma.roleBinding.create({ data });
+  async createBinding(
+    data: CreateBindingInput,
+    { actor }: { actor: LedgerActor },
+  ): Promise<CreatedBinding> {
+    await this.writer.attachBindings({
+      organizationId: data.organizationId,
+      bindings: [attachFor(data)],
+      actor,
+      onDuplicate: "skip",
+    });
+    return {
+      id: data.id,
+      role: data.role,
+      customRoleId: data.customRoleId,
+      scopeType: data.scopeType,
+      scopeId: data.scopeId,
+    };
   }
 
   async findBinding({
@@ -214,16 +260,41 @@ export class PrismaGroupRepository implements GroupRepository {
     });
   }
 
-  async deleteBinding({ id }: { id: string }): Promise<void> {
-    await this.prisma.roleBinding.delete({ where: { id } });
+  async deleteBinding({
+    id,
+    organizationId,
+    actor,
+  }: {
+    id: string;
+    organizationId: string;
+    actor: LedgerActor;
+  }): Promise<void> {
+    await this.writer.revokeBindings({
+      organizationId,
+      bindingIds: [id],
+      actor,
+    });
   }
 
   async deleteAllMemberships({ groupId }: { groupId: string }): Promise<void> {
     await this.prisma.groupMembership.deleteMany({ where: { groupId } });
   }
 
-  async deleteAllBindings({ groupId }: { groupId: string }): Promise<void> {
-    await this.prisma.roleBinding.deleteMany({ where: { groupId } });
+  async deleteAllBindings({
+    groupId,
+    organizationId,
+    actor,
+  }: {
+    groupId: string;
+    organizationId: string;
+    actor: LedgerActor;
+  }): Promise<void> {
+    await this.writer.revokeBindingsWhere({
+      organizationId,
+      where: { groupId },
+      actor,
+      reason: "group deleted",
+    });
   }
 
   async isUserInOrganization({

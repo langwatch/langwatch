@@ -55,6 +55,50 @@ export async function computeEffectiveAdminUserIds({
   return userIds;
 }
 
+/**
+ * The effective admin set a planned edit to a team's DIRECT user bindings
+ * would leave behind.
+ *
+ * The team form's guard used to read the post-state back inside the
+ * transaction that had just written it. Bindings are ledger facts now
+ * (ADR-092), so the plan is decided before anything is emitted: the caller
+ * supplies the direct-admin users its plan leaves, and the group-derived
+ * admins — which this form cannot edit — still come from the projection.
+ */
+export async function projectAdminUserIdsAfterDirectEdit({
+  tx,
+  organizationId,
+  teamId,
+  directAdminUserIdsAfter,
+}: {
+  tx: TxClient;
+  organizationId: string;
+  teamId: string;
+  directAdminUserIdsAfter: Iterable<string>;
+}): Promise<Set<string>> {
+  const userIds = new Set<string>(directAdminUserIdsAfter);
+
+  const adminGroupBindings = await tx.roleBinding.findMany({
+    where: {
+      organizationId,
+      scopeType: RoleBindingScopeType.TEAM,
+      scopeId: teamId,
+      role: TeamUserRole.ADMIN,
+      groupId: { not: null },
+    },
+    select: { groupId: true },
+  });
+  if (adminGroupBindings.length === 0) return userIds;
+
+  const memberships = await tx.groupMembership.findMany({
+    where: { groupId: { in: adminGroupBindings.map((b) => b.groupId!) } },
+    select: { userId: true },
+  });
+  for (const m of memberships) userIds.add(m.userId);
+
+  return userIds;
+}
+
 export async function isUserAdminViaGroup({
   tx,
   organizationId,

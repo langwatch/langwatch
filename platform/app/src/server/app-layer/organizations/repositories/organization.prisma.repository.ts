@@ -12,6 +12,12 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import {
+  type GrantsLedgerWriter,
+  grantsLedgerWriter,
+  type LedgerActor,
+  type LedgerBindingAttach,
+} from "~/server/app-layer/authz/ledger";
 import { findSharedTeamIds } from "~/server/role-bindings/personal-team-scope";
 import { projectAdminUserIdsWithoutDirectRole } from "~/server/teams/effective-team-admins";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -223,7 +229,7 @@ function namesSlug(target: unknown): boolean {
  * correction. Several rows on one scope still collapse to the one this sync
  * sets, exactly as the delete and recreate always did.
  */
-async function setUserScopeBinding({
+async function planUserScopeBinding({
   tx,
   organizationId,
   userId,
@@ -239,7 +245,7 @@ async function setUserScopeBinding({
   scopeId: string;
   role: TeamUserRole;
   customRoleId: string | null;
-}): Promise<void> {
+}): Promise<ScopeBindingPlan> {
   const rows = await tx.roleBinding.findMany({
     where: { organizationId, userId, scopeType, scopeId },
     // id breaks createdAt ties so the same row is kept on every execution
@@ -247,33 +253,105 @@ async function setUserScopeBinding({
     select: { id: true },
   });
   const [keep, ...extras] = rows;
-  if (extras.length > 0) {
-    await tx.roleBinding.deleteMany({
-      where: { id: { in: extras.map((row) => row.id) } },
-    });
-  }
+  const revokeIds = extras.map((row) => row.id);
   if (keep) {
-    await tx.roleBinding.update({
-      where: { id: keep.id },
-      data: { role, customRoleId },
-    });
-    return;
+    return {
+      revokeIds,
+      change: { bindingId: keep.id, role, customRoleId },
+    };
   }
-  await tx.roleBinding.create({
-    data: {
-      id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-      organizationId,
-      userId,
+  return {
+    revokeIds,
+    attach: {
+      bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+      principal: { userId },
       role,
       customRoleId,
       scopeType,
       scopeId,
     },
-  });
+  };
+}
+
+/**
+ * What a scope-binding correction resolves to once the transaction has read
+ * the rows: the ids that collapse away, and either the role change on the row
+ * that stays or a fresh attach. Planned inside the transaction and emitted
+ * after it commits — bindings are ledger facts now, and the ledger is their
+ * only writer (ADR-092 delivery-plan PR 2).
+ */
+type ScopeBindingPlan = {
+  revokeIds: string[];
+  change?: {
+    bindingId: string;
+    role: TeamUserRole;
+    customRoleId: string | null;
+  };
+  attach?: LedgerBindingAttach;
+};
+
+/**
+ * Emit a batch of plans, revocations first: a crash mid-batch leaves the
+ * member with less access than the correction asked for, never more, and the
+ * retry converges. Revoking the collapsed siblings before the role change
+ * also keeps the surviving row's target role free of a duplicate.
+ */
+async function emitScopeBindingPlans({
+  writer,
+  organizationId,
+  plans,
+  actor,
+}: {
+  writer: GrantsLedgerWriter;
+  organizationId: string;
+  plans: ScopeBindingPlan[];
+  actor: LedgerActor;
+}): Promise<void> {
+  const revokeIds = plans.flatMap((plan) => plan.revokeIds);
+  if (revokeIds.length > 0) {
+    await writer.revokeBindings({
+      organizationId,
+      bindingIds: revokeIds,
+      actor,
+    });
+  }
+  for (const plan of plans) {
+    if (!plan.change) continue;
+    await writer.changeBindingRole({
+      organizationId,
+      bindingId: plan.change.bindingId,
+      role: plan.change.role,
+      customRoleId: plan.change.customRoleId,
+      actor,
+    });
+  }
+  const attaches = plans.flatMap((plan) => (plan.attach ? [plan.attach] : []));
+  if (attaches.length > 0) {
+    await writer.attachBindings({
+      organizationId,
+      bindings: attaches,
+      actor,
+      onDuplicate: "skip",
+    });
+  }
+}
+
+/**
+ * Who a membership write is attributed to. A service credential acts as
+ * nobody, so the organization service itself is named as the system
+ * principal rather than inventing a user.
+ */
+function ledgerActorFor(currentUserId: string | null | undefined): LedgerActor {
+  return currentUserId
+    ? { type: "user", id: currentUserId }
+    : { type: "system", id: "system:organization-service" };
 }
 
 export class PrismaOrganizationRepository implements OrganizationRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
+  ) {}
 
   getClient(): PrismaClient {
     return this.prisma;
@@ -466,7 +544,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
   async createAndAssign(
     input: CreateAndAssignInput,
   ): Promise<CreateAndAssignResult> {
-    return this.prisma.$transaction(async (tx) => {
+    const created = await this.prisma.$transaction(async (tx) => {
       const organization = await tx.organization.create({
         data: {
           id: input.orgId,
@@ -496,33 +574,40 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         },
       });
 
-      await tx.roleBinding.create({
-        data: {
-          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-          organizationId: organization.id,
-          userId: input.userId,
-          role: TeamUserRole.ADMIN,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
-          scopeId: organization.id,
-        },
-      });
-
-      await tx.roleBinding.create({
-        data: {
-          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-          organizationId: organization.id,
-          userId: input.userId,
-          role: TeamUserRole.ADMIN,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: team.id,
-        },
-      });
-
       return {
         organization: { id: organization.id, name: organization.name },
         team: { id: team.id, slug: team.slug, name: team.name },
       };
     });
+
+    // The organization, its membership row and its first team are not grant
+    // facts; the founder's two ADMIN grants are, so they are emitted once the
+    // scopes they point at exist.
+    await this.writer.attachBindings({
+      organizationId: created.organization.id,
+      bindings: [
+        {
+          bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+          principal: { userId: input.userId },
+          role: TeamUserRole.ADMIN,
+          customRoleId: null,
+          scopeType: RoleBindingScopeType.ORGANIZATION,
+          scopeId: created.organization.id,
+        },
+        {
+          bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+          principal: { userId: input.userId },
+          role: TeamUserRole.ADMIN,
+          customRoleId: null,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: created.team.id,
+        },
+      ],
+      actor: ledgerActorFor(input.userId),
+      onDuplicate: "skip",
+    });
+
+    return created;
   }
 
   async createForProvisioning(
@@ -568,6 +653,12 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
   }
 
   async deleteProvisionedOrganization(organizationId: string): Promise<void> {
+    // Deliberately imperative, and it stays that way: this is a tenant purge,
+    // not a grant write. The organization itself is going away, so there is no
+    // access left to describe and no stream left to append to — emitting
+    // revocations for rows whose aggregate is being deleted would only leave
+    // the ledger holding facts about a tenant that no longer exists.
+    //
     // Role bindings first: RoleBinding.apiKeyId restricts api-key deletion.
     await this.prisma.$transaction([
       this.prisma.roleBinding.deleteMany({ where: { organizationId } }),
@@ -914,7 +1005,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
    * from bricking that slot.
    */
   async deleteMember(input: DeleteMemberInput): Promise<void> {
-    const { organizationId, userId } = input;
+    const { organizationId, userId, actingUserId } = input;
 
     await this.prisma.$transaction(async (tx) => {
       const member = await tx.organizationUser.findUnique({
@@ -948,9 +1039,6 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           },
         },
       });
-      await tx.roleBinding.deleteMany({
-        where: { organizationId, userId },
-      });
 
       const archivedAt = new Date();
       const personalTeams = await tx.team.findMany({
@@ -983,6 +1071,17 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         where: { id: { in: personalTeamIds } },
         data: { archivedAt },
       });
+    });
+
+    // The membership and the personal workspace are not grant facts; the
+    // access this person held is, so it is revoked as a command once the
+    // membership transaction has committed. Revocation carries instant
+    // enforcement, so the deny holds before this call returns.
+    await this.writer.revokeBindingsWhere({
+      organizationId,
+      where: { userId },
+      actor: ledgerActorFor(actingUserId),
+      reason: "organization membership removed",
     });
   }
 
@@ -1037,6 +1136,10 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     // failure, and not silent either: the caller reports them to whoever made
     // the decision.
     const teamsLeftWithoutAdmin: Array<{ id: string; name: string }> = [];
+    // The seat change reads and corrects every scope the seat caps; the
+    // corrections are collected here and emitted as commands once the
+    // membership transaction has committed.
+    const plans: ScopeBindingPlan[] = [];
 
     await this.prisma.$transaction(async (tx) => {
       const currentMember = await tx.organizationUser.findUnique({
@@ -1084,27 +1187,31 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         data: { role },
       });
 
-      // Keep ORGANIZATION-scoped RoleBinding in sync (skip EXTERNAL)
+      // Keep the ORGANIZATION-scoped grant in sync (skip EXTERNAL)
       if (role !== OrganizationUserRole.EXTERNAL) {
-        await setUserScopeBinding({
-          tx,
-          organizationId,
-          userId,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
-          scopeId: organizationId,
-          role: role as unknown as TeamUserRole,
-          customRoleId: null,
-        });
+        plans.push(
+          await planUserScopeBinding({
+            tx,
+            organizationId,
+            userId,
+            scopeType: RoleBindingScopeType.ORGANIZATION,
+            scopeId: organizationId,
+            role: role as unknown as TeamUserRole,
+            customRoleId: null,
+          }),
+        );
       } else {
-        // EXTERNAL (Lite Member) users have no org-level binding
-        await tx.roleBinding.deleteMany({
+        // EXTERNAL (Lite Member) users have no org-level grant
+        const orgRows = await tx.roleBinding.findMany({
           where: {
             organizationId,
             userId,
             scopeType: RoleBindingScopeType.ORGANIZATION,
             scopeId: organizationId,
           },
+          select: { id: true },
         });
+        plans.push({ revokeIds: orgRows.map((row) => row.id) });
       }
 
       // Shared teams only, matching what the router resolved before it computed
@@ -1234,17 +1341,19 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
             : currentMembership.customRoleId === teamRoleUpdate.customRoleId);
         if (roleUnchanged) continue;
 
-        await setUserScopeBinding({
-          tx,
-          organizationId,
-          userId,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: teamId,
-          role: nextRole,
-          customRoleId: shouldClearCustomRole
-            ? null
-            : (teamRoleUpdate.customRoleId ?? null),
-        });
+        plans.push(
+          await planUserScopeBinding({
+            tx,
+            organizationId,
+            userId,
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: teamId,
+            role: nextRole,
+            customRoleId: shouldClearCustomRole
+              ? null
+              : (teamRoleUpdate.customRoleId ?? null),
+          }),
+        );
       }
 
       // The seat correction reaches everything the seat caps, and a member
@@ -1252,7 +1361,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       // projects only: the member's own personal workspace keeps its stored
       // rows and is capped at resolution, which is what makes re-promoting
       // them a no-op (personal-workspace-integrity.feature). Corrected
-      // through setUserScopeBinding so ids survive, several rows on one
+      // through planUserScopeBinding so ids survive, several rows on one
       // project collapse to one, and a pre-existing Viewer row cannot collide
       // with the correction on the partial unique index. Left alone on the
       // way back up: an upgrade grants nothing on its own.
@@ -1279,15 +1388,17 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
             select: { id: true },
           });
           for (const project of sharedProjects) {
-            await setUserScopeBinding({
-              tx,
-              organizationId,
-              userId,
-              scopeType: RoleBindingScopeType.PROJECT,
-              scopeId: project.id,
-              role: TeamUserRole.VIEWER,
-              customRoleId: null,
-            });
+            plans.push(
+              await planUserScopeBinding({
+                tx,
+                organizationId,
+                userId,
+                scopeType: RoleBindingScopeType.PROJECT,
+                scopeId: project.id,
+                role: TeamUserRole.VIEWER,
+                customRoleId: null,
+              }),
+            );
           }
         }
       }
@@ -1307,6 +1418,13 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       }
     });
 
+    await emitScopeBindingPlans({
+      writer: this.writer,
+      organizationId,
+      plans,
+      actor: ledgerActorFor(input.currentUserId),
+    });
+
     return { teamsLeftWithoutAdmin };
   }
 
@@ -1317,7 +1435,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     if (inputIsCustomRole && customRoleId) {
       const storedCustomRoleId = customRoleId;
 
-      await this.prisma.$transaction(async (tx) => {
+      const planned = await this.prisma.$transaction(async (tx) => {
         const team = await tx.team.findUnique({
           where: { id: teamId },
           select: { organizationId: true, name: true },
@@ -1396,18 +1514,27 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           }
         }
 
-        await setUserScopeBinding({
-          tx,
+        return {
           organizationId: team.organizationId,
-          userId,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: teamId,
-          role: TeamUserRole.CUSTOM,
-          customRoleId: storedCustomRoleId,
-        });
+          plan: await planUserScopeBinding({
+            tx,
+            organizationId: team.organizationId,
+            userId,
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: teamId,
+            role: TeamUserRole.CUSTOM,
+            customRoleId: storedCustomRoleId,
+          }),
+        };
+      });
+      await emitScopeBindingPlans({
+        writer: this.writer,
+        organizationId: planned.organizationId,
+        plans: [planned.plan],
+        actor: ledgerActorFor(currentUserId),
       });
     } else {
-      await this.prisma.$transaction(async (tx) => {
+      const planned = await this.prisma.$transaction(async (tx) => {
         const team = await tx.team.findUnique({
           where: { id: teamId },
           select: { organizationId: true, name: true },
@@ -1479,15 +1606,24 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           }
         }
 
-        await setUserScopeBinding({
-          tx,
+        return {
           organizationId: team.organizationId,
-          userId,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: teamId,
-          role: role as TeamUserRole,
-          customRoleId: null,
-        });
+          plan: await planUserScopeBinding({
+            tx,
+            organizationId: team.organizationId,
+            userId,
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: teamId,
+            role: role as TeamUserRole,
+            customRoleId: null,
+          }),
+        };
+      });
+      await emitScopeBindingPlans({
+        writer: this.writer,
+        organizationId: planned.organizationId,
+        plans: [planned.plan],
+        actor: ledgerActorFor(currentUserId),
       });
     }
   }

@@ -11,6 +11,7 @@ import {
 } from "~/generated/prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
+import { grantsLedgerWriter } from "~/server/app-layer/authz/ledger";
 import { provisionLangyVirtualKey } from "~/server/app-layer/langy/langyVirtualKey";
 import {
   personalWorkspaceArchiveViolation,
@@ -157,15 +158,20 @@ export const projectRouter = createTRPCRouter({
             organizationId: input.organizationId,
           },
         });
-        await prisma.roleBinding.create({
-          data: {
-            id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-            organizationId: input.organizationId,
-            userId: userId,
-            role: TeamUserRole.ADMIN,
-            scopeType: RoleBindingScopeType.TEAM,
-            scopeId: team.id,
-          },
+        await grantsLedgerWriter().attachBindings({
+          organizationId: input.organizationId,
+          bindings: [
+            {
+              bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+              principal: { userId },
+              role: TeamUserRole.ADMIN,
+              customRoleId: null,
+              scopeType: RoleBindingScopeType.TEAM,
+              scopeId: team.id,
+            },
+          ],
+          actor: { type: "user", id: userId },
+          onDuplicate: "skip",
         });
 
         teamId = team.id;
