@@ -145,7 +145,6 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
   );
 }
 
-
 /**
  * Re-seeds the form when the scenario being edited changes.
  *
