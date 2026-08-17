@@ -141,16 +141,22 @@ already carry `@ts-nocheck`, `models.ts` re-exports all 103 models, so the tree
 is reachable through any import of the client regardless.
 
 **Bytes are also the wrong unit.** Bytes are what gets parsed, which is cheap and
-linear; what costs is type instantiations, and the two come apart — Prisma 7
-briefly tripled instantiations across every schema (11.4M to 30.2M) by defaulting
-one generic to `undefined` and defeating the instantiation cache, without adding
-a byte of output (prisma/prisma#29011, fixed in 7.9.0; we are on 7.9.1 and the
-generated client carries the fix). So the next step here is a measurement rather
-than a change — `--extendedDiagnostics`, or `--generateTrace` for per-file
-attribution — and nothing so far establishes that this is the binding
-constraint. The sampling in [ADR-100](100-the-typecheck-memory-ceiling.md) is
-mild evidence against: the working set stayed in a 2.3–3.5 GB band at every
-ceiling, so the compiler never came close to needing what it had.
+linear; what costs is type instantiations, and the two come apart. One report
+against Prisma 7.2 measured a schema's instantiations at 30.2M where Prisma 6
+had taken 11.4M (prisma/prisma#29011); the fix was a one-line change to one
+generic's default, restoring `OmitOpts` so `tsc` could reuse cached
+instantiations (prisma/prisma#29592, `+1/-1`, shipped in 7.9.0). A one-line
+generic default barely moves the size of the generated tree; the gap it sat
+behind was 164%. That is one report on a schema that is not ours, so it bounds
+nothing here — it only shows that the two quantities are not the same quantity.
+We are on 7.9.1 and the generated client carries the fix.
+
+So the next step here is a measurement rather than a change —
+`--extendedDiagnostics`, or `--generateTrace` for per-file attribution — and
+nothing so far establishes that this is the binding constraint. The sampling in
+[ADR-100](100-the-typecheck-memory-ceiling.md) is mild evidence against: the
+working set stayed in a 2.3–3.5 GB band at every ceiling, so the compiler never
+came close to needing what it had.
 
 The two packages on `typescript@6` are a standing item, not a resting state.
 
