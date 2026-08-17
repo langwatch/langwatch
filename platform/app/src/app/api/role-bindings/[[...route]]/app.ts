@@ -12,6 +12,11 @@
  * membership reports `hasLegacyAccessNotice: true`: their first explicit binding
  * switches the team-derived fallback off, which is worth telling the operator
  * even though the write itself is exactly what they asked for.
+ *
+ * Every write here is a grants-ledger command (ADR-092 delivery-plan PR 2),
+ * so the audit trail is the pipeline's insert-only subscriber (decision 17):
+ * these handlers no longer emit `management.roleBinding.*` rows of their own,
+ * because that would record the same mutation twice.
  */
 import type { BaseApp, VersionBuilder } from "@langwatch/api";
 import type { Context } from "hono";
@@ -21,7 +26,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { emitManagementAudit } from "~/server/api/management/audit";
+import { managementLedgerActor } from "~/server/api/management/audit";
 import { createManagementService } from "~/server/api/management/managed-service";
 import { MANAGEMENT_API_VERSION } from "~/server/api/management/version";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
@@ -208,18 +213,7 @@ const createBindingHandler = async (
   const created = await app.roleBindings.create({
     organizationId: organization.id,
     ...input,
-  });
-
-  emitManagementAudit({
-    c,
-    organizationId: organization.id,
-    action: "management.roleBinding.create",
-    args: {
-      bindingId: created.id,
-      scopeType: input.scopeType,
-      scopeId: input.scopeId,
-      role: input.role,
-    },
+    actor: managementLedgerActor(c),
   });
 
   const binding = await readBackBinding({
@@ -253,12 +247,7 @@ const updateBindingHandler = async (
     ...(input.customRoleId !== undefined
       ? { customRoleId: input.customRoleId }
       : {}),
-  });
-  emitManagementAudit({
-    c,
-    organizationId: organization.id,
-    action: "management.roleBinding.update",
-    args: { bindingId: params.id, role: input.role },
+    actor: managementLedgerActor(c),
   });
   return readBackBinding({
     roleBindings: app.roleBindings,
@@ -281,12 +270,7 @@ const deleteBindingHandler = async (
   await app.roleBindings.delete({
     organizationId: organization.id,
     bindingId: params.id,
-  });
-  emitManagementAudit({
-    c,
-    organizationId: organization.id,
-    action: "management.roleBinding.delete",
-    args: { bindingId: params.id },
+    actor: managementLedgerActor(c),
   });
   return { success: true as const };
 };

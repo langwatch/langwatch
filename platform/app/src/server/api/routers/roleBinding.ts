@@ -88,6 +88,7 @@ export const roleBindingRouter = createTRPCRouter({
       const service = new RoleBindingService(ctx.prisma, repo, roleService);
       return service.create({
         organizationId: input.organizationId,
+        actor: { type: "user", id: ctx.session.user.id },
         userId: input.userId,
         groupId: input.groupId,
         role: input.role,
@@ -116,6 +117,7 @@ export const roleBindingRouter = createTRPCRouter({
       const service = new RoleBindingService(ctx.prisma, repo, roleService);
       return service.update({
         organizationId: input.organizationId,
+        actor: { type: "user", id: ctx.session.user.id },
         bindingId: input.bindingId,
         role: input.role,
         customRoleId: input.customRoleId,
@@ -139,6 +141,7 @@ export const roleBindingRouter = createTRPCRouter({
       const service = new RoleBindingService(ctx.prisma, repo, roleService);
       return service.delete({
         organizationId: input.organizationId,
+        actor: { type: "user", id: ctx.session.user.id },
         bindingId: input.bindingId,
       });
     }),
@@ -171,6 +174,7 @@ export const roleBindingRouter = createTRPCRouter({
       const service = new RoleBindingService(ctx.prisma, repo, roleService);
       return service.applyMemberBindings({
         organizationId: input.organizationId,
+        actor: { type: "user", id: ctx.session.user.id },
         userId: input.userId,
         bindingIdsToDelete: input.bindingIdsToDelete,
         bindingsToCreate: input.bindingsToCreate,

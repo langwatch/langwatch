@@ -114,6 +114,27 @@ const CONVERGENCE_TIMEOUT_MS = 8_000;
 
 export type LedgerBindingAttach = Omit<RoleBindingWrite, "organizationId">;
 
+/**
+ * The one principal a write names, in the port's exactly-one shape. Call
+ * sites carry three optional columns (the legacy row shape); the port carries
+ * a union that makes "two principals on one row" unrepresentable, and this is
+ * the single place the two meet.
+ */
+export function ledgerPrincipal({
+  userId,
+  groupId,
+  apiKeyId,
+}: {
+  userId?: string | null;
+  groupId?: string | null;
+  apiKeyId?: string | null;
+}): BindingPrincipalWhere {
+  if (userId) return { userId };
+  if (groupId) return { groupId };
+  if (apiKeyId) return { apiKeyId };
+  throw new Error("a binding write names no principal");
+}
+
 export type AttachOutcome = {
   /** Binding ids actually emitted (duplicates skipped when asked to). */
   attached: string[];

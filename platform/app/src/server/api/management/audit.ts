@@ -20,6 +20,20 @@ export function managementActor(c: Context): string {
   return `apikey:${c.get("apiKeyId") as string}`;
 }
 
+/**
+ * The same principal in the grants ledger's actor shape (ADR-092): a key
+ * acting for a person is that person, a service key acts as nobody and is
+ * recorded as the system principal the credential names.
+ */
+export function managementLedgerActor(c: Context): {
+  type: "user" | "system";
+  id: string | null;
+} {
+  const userId = c.get("apiKeyUserId") as string | null | undefined;
+  if (userId) return { type: "user", id: userId };
+  return { type: "system", id: `apikey:${c.get("apiKeyId") as string}` };
+}
+
 export function emitManagementAudit({
   c,
   organizationId,

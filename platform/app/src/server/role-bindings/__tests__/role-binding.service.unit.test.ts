@@ -6,13 +6,14 @@
  * binding.
  */
 
+import { DuplicateBindingError } from "@langwatch/authz-server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  Prisma,
   type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import type { GrantsLedgerWriter } from "~/server/app-layer/authz/ledger";
 import type { RoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
 import { RoleService } from "~/server/role/role.service";
 import { RoleBindingService } from "../role-binding.service";
@@ -22,9 +23,11 @@ const filterAssignableRoleIds = vi.fn();
 const organizationUserFindFirst = vi.fn();
 const groupFindFirst = vi.fn();
 const apiKeyFindFirst = vi.fn();
-const bindingCreate = vi.fn();
+const attachBindings = vi.fn();
+const changeBindingRole = vi.fn();
+const revokeBindings = vi.fn();
 const bindingFindFirst = vi.fn();
-const bindingUpdate = vi.fn();
+const bindingFindMany = vi.fn();
 const customRoleFindMany = vi.fn();
 const transaction = vi.fn();
 
@@ -36,13 +39,23 @@ const prisma = {
   team: { findFirst: vi.fn().mockResolvedValue(null) },
   project: { findFirst: vi.fn().mockResolvedValue(null) },
   roleBinding: {
-    create: bindingCreate,
     findFirst: bindingFindFirst,
-    update: bindingUpdate,
+    findMany: bindingFindMany,
   },
   customRole: { findMany: customRoleFindMany },
   $transaction: transaction,
 } as unknown as PrismaClient;
+
+/**
+ * Since delivery-plan PR 2 the service writes no tables: every binding
+ * mutation is a grants-ledger command, so the writer is the seam these tests
+ * observe and the rules under test are unchanged.
+ */
+const writer = {
+  attachBindings,
+  changeBindingRole,
+  revokeBindings,
+} as unknown as GrantsLedgerWriter;
 
 const repository = {
   validateScopeInOrg,
@@ -59,9 +72,11 @@ beforeEach(() => {
   organizationUserFindFirst.mockResolvedValue({ role: "MEMBER" });
   groupFindFirst.mockResolvedValue({ id: "group_1" });
   apiKeyFindFirst.mockResolvedValue({ id: "key_1" });
-  bindingCreate.mockResolvedValue({ id: "binding_1" });
+  attachBindings.mockResolvedValue({ attached: ["binding_1"], duplicates: [] });
+  changeBindingRole.mockResolvedValue(undefined);
+  revokeBindings.mockResolvedValue(undefined);
   bindingFindFirst.mockResolvedValue(null);
-  bindingUpdate.mockResolvedValue({ id: "binding_1" });
+  bindingFindMany.mockResolvedValue([]);
   customRoleFindMany.mockResolvedValue([]);
   // A real RoleService over the same mocked client: the org-exclusive scope
   // guard lives there and reads `customRole.findMany`, so a hand-written
@@ -70,11 +85,14 @@ beforeEach(() => {
   vi.spyOn(roleService, "filterAssignableRoleIds").mockImplementation(
     filterAssignableRoleIds as unknown as RoleService["filterAssignableRoleIds"],
   );
-  service = new RoleBindingService(prisma, repository, roleService);
+  service = new RoleBindingService(prisma, repository, roleService, writer);
 });
+
+const actor = { type: "user" as const, id: "user_admin" };
 
 const bindingInput = {
   organizationId: "org_1",
+  actor,
   role: TeamUserRole.MEMBER,
   scopeType: RoleBindingScopeType.TEAM,
   scopeId: "team_1",
@@ -86,7 +104,7 @@ describe("RoleBindingService create", () => {
       await expect(service.create({ ...bindingInput })).rejects.toMatchObject({
         code: "role_binding_principal_invalid",
       });
-      expect(bindingCreate).not.toHaveBeenCalled();
+      expect(attachBindings).not.toHaveBeenCalled();
     });
 
     it("rejects two principals at once", async () => {
@@ -97,7 +115,7 @@ describe("RoleBindingService create", () => {
           apiKeyId: "key_1",
         }),
       ).rejects.toMatchObject({ code: "role_binding_principal_invalid" });
-      expect(bindingCreate).not.toHaveBeenCalled();
+      expect(attachBindings).not.toHaveBeenCalled();
     });
   });
 
@@ -117,19 +135,19 @@ describe("RoleBindingService create", () => {
           where: { id: "foreign_key", organizationId: "org_1" },
         }),
       );
-      expect(bindingCreate).not.toHaveBeenCalled();
+      expect(attachBindings).not.toHaveBeenCalled();
     });
 
     it("stores the binding against the key", async () => {
       await service.create({ ...bindingInput, apiKeyId: "key_1" });
 
-      expect(bindingCreate).toHaveBeenCalledWith(
+      expect(attachBindings).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
-            apiKeyId: "key_1",
-            userId: null,
-            groupId: null,
-          }),
+          organizationId: "org_1",
+          bindings: [
+            expect.objectContaining({ principal: { apiKeyId: "key_1" } }),
+          ],
+          onDuplicate: "reject",
         }),
       );
     });
@@ -177,7 +195,7 @@ describe("RoleBindingService create", () => {
         meta: expect.objectContaining({ permission: "organization:manage" }),
       });
 
-      expect(bindingCreate).not.toHaveBeenCalled();
+      expect(attachBindings).not.toHaveBeenCalled();
     });
 
     it("allows the same custom role at organization scope", async () => {
@@ -190,30 +208,26 @@ describe("RoleBindingService create", () => {
         customRoleId: "cr_1",
         scopeType: RoleBindingScopeType.ORGANIZATION,
         scopeId: "org_1",
+        actor,
       });
 
       // No permission inspection is needed at organization scope.
       expect(customRoleFindMany).not.toHaveBeenCalled();
-      expect(bindingCreate).toHaveBeenCalled();
+      expect(attachBindings).toHaveBeenCalled();
     });
   });
 
   describe("when an identical binding already exists", () => {
-    it("maps the unique-constraint violation to a deterministic conflict", async () => {
-      bindingCreate.mockRejectedValue(
-        new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
-          code: "P2002",
-          clientVersion: "test",
-        }),
-      );
+    it("maps the ledger's duplicate signal to a deterministic conflict", async () => {
+      attachBindings.mockRejectedValue(new DuplicateBindingError());
 
       await expect(
         service.create({ ...bindingInput, userId: "user_1" }),
       ).rejects.toMatchObject({ code: "role_binding_already_exists" });
     });
 
-    it("does not swallow other database failures", async () => {
-      bindingCreate.mockRejectedValue(new Error("connection reset"));
+    it("does not swallow other write failures", async () => {
+      attachBindings.mockRejectedValue(new Error("connection reset"));
 
       await expect(
         service.create({ ...bindingInput, userId: "user_1" }),
@@ -231,6 +245,7 @@ describe("RoleBindingService update", () => {
         organizationId: "org_1",
         bindingId: "binding_ghost",
         role: TeamUserRole.MEMBER,
+        actor,
       }),
     ).rejects.toMatchObject({ code: "role_binding_not_found" });
   });
@@ -252,15 +267,16 @@ describe("RoleBindingService update", () => {
         bindingId: "binding_1",
         role: TeamUserRole.CUSTOM,
         customRoleId: "cr_1",
+        actor,
       }),
     ).rejects.toMatchObject({ code: "org_exclusive_permission_scope" });
 
-    expect(bindingUpdate).not.toHaveBeenCalled();
+    expect(changeBindingRole).not.toHaveBeenCalled();
   });
 });
 
 describe("RoleBindingService applyMemberBindings", () => {
-  it("refuses an organization-exclusive permission before opening the transaction", async () => {
+  it("refuses an organization-exclusive permission before emitting anything", async () => {
     filterAssignableRoleIds.mockResolvedValue(["cr_1"]);
     customRoleFindMany.mockResolvedValue([
       { id: "cr_1", permissions: ["organization:manage"] },
@@ -279,9 +295,11 @@ describe("RoleBindingService applyMemberBindings", () => {
             scopeId: "proj_1",
           },
         ],
+        actor,
       }),
     ).rejects.toMatchObject({ code: "org_exclusive_permission_scope" });
 
-    expect(transaction).not.toHaveBeenCalled();
+    expect(attachBindings).not.toHaveBeenCalled();
+    expect(revokeBindings).not.toHaveBeenCalled();
   });
 });

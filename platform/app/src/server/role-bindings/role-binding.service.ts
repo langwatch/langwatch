@@ -1,8 +1,8 @@
+import { DuplicateBindingError } from "@langwatch/authz-server";
 import { generate } from "@langwatch/ksuid";
 import { TRPCError } from "@trpc/server";
 import {
   OrganizationUserRole,
-  Prisma,
   type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
@@ -11,6 +11,13 @@ import {
   getOrganizationRolePermissions,
   getTeamRolePermissions,
 } from "~/server/api/rbac";
+import {
+  type GrantsLedgerWriter,
+  grantsLedgerWriter,
+  type LedgerActor,
+  type LedgerBindingAttach,
+  ledgerPrincipal,
+} from "~/server/app-layer/authz/ledger";
 import type { RoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
 import { LiteMemberViewerOnlyError } from "~/server/app-layer/teams/team.service";
 import type { RoleService } from "~/server/role/role.service";
@@ -29,15 +36,13 @@ import {
 import { assertNoPersonalTeamScope } from "./personal-team-scope";
 
 /**
- * The partial unique indexes on RoleBinding surface an identical binding as
- * Prisma's P2002; the write paths map it to the deterministic conflict code
+ * The ledger reports an identical declaration as `DuplicateBindingError` (the
+ * writer checks binding identity before it emits, so there is no P2002 to
+ * sniff any more); the write paths map it to the deterministic conflict code
  * a provisioning tool can treat as "already done".
  */
-function isUniqueConstraintViolation(error: unknown): boolean {
-  return (
-    error instanceof Prisma.PrismaClientKnownRequestError &&
-    error.code === "P2002"
-  );
+function isDuplicateBinding(error: unknown): boolean {
+  return error instanceof DuplicateBindingError;
 }
 
 type ScopeRows = {
@@ -87,6 +92,9 @@ export class RoleBindingService {
     private readonly prisma: PrismaClient,
     private readonly repo: RoleBindingRepository,
     private readonly roleService: RoleService,
+    // Since delivery-plan PR 2 every binding write on this service is a
+    // grants-ledger command; the tables it used to write are projections.
+    private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
   ) {}
 
   /**
@@ -632,6 +640,7 @@ export class RoleBindingService {
     customRoleId,
     scopeType,
     scopeId,
+    actor,
   }: {
     organizationId: string;
     userId?: string;
@@ -641,7 +650,8 @@ export class RoleBindingService {
     customRoleId?: string;
     scopeType: RoleBindingScopeType;
     scopeId: string;
-  }) {
+    actor: LedgerActor;
+  }): Promise<{ id: string }> {
     const principals = [userId, groupId, apiKeyId].filter(
       (principal) => principal != null && principal !== "",
     );
@@ -670,29 +680,35 @@ export class RoleBindingService {
       bindings: [{ role, scopeType, scopeId }],
     });
 
+    const bindingId = generate(KSUID_RESOURCES.ROLE_BINDING).toString();
     try {
-      return await this.prisma.roleBinding.create({
-        data: {
-          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-          organizationId,
-          userId: userId ?? null,
-          groupId: groupId ?? null,
-          apiKeyId: apiKeyId ?? null,
-          role,
-          customRoleId:
-            role === TeamUserRole.CUSTOM ? (customRoleId ?? null) : null,
-          scopeType,
-          scopeId,
-        },
+      await this.writer.attachBindings({
+        organizationId,
+        bindings: [
+          {
+            bindingId,
+            principal: ledgerPrincipal({ userId, groupId, apiKeyId }),
+            role,
+            customRoleId:
+              role === TeamUserRole.CUSTOM ? (customRoleId ?? null) : null,
+            scopeType,
+            scopeId,
+          },
+        ],
+        actor,
+        onDuplicate: "reject",
       });
     } catch (error) {
-      if (isUniqueConstraintViolation(error)) {
+      if (isDuplicateBinding(error)) {
         throw new RoleBindingAlreadyExistsError({
           meta: { scopeType, scopeId },
         });
       }
       throw error;
     }
+    // The command's own identity, not a row read: the fact is durable the
+    // moment the append lands, while the projection row follows the fold.
+    return { id: bindingId };
   }
 
   async update({
@@ -700,12 +716,14 @@ export class RoleBindingService {
     bindingId,
     role,
     customRoleId,
+    actor,
   }: {
     organizationId: string;
     bindingId: string;
     role: TeamUserRole;
     customRoleId?: string;
-  }) {
+    actor: LedgerActor;
+  }): Promise<{ id: string }> {
     const binding = await this.prisma.roleBinding.findFirst({
       where: { id: bindingId, organizationId },
     });
@@ -734,22 +752,34 @@ export class RoleBindingService {
         });
       }
     }
-    return this.prisma.roleBinding.update({
-      where: { id: bindingId },
-      data: {
+    try {
+      await this.writer.changeBindingRole({
+        organizationId,
+        bindingId,
         role,
         customRoleId:
           role === TeamUserRole.CUSTOM ? (customRoleId ?? null) : null,
-      },
-    });
+        actor,
+      });
+    } catch (error) {
+      if (isDuplicateBinding(error)) {
+        throw new RoleBindingAlreadyExistsError({
+          meta: { scopeType: binding.scopeType, scopeId: binding.scopeId },
+        });
+      }
+      throw error;
+    }
+    return { id: bindingId };
   }
 
   async delete({
     organizationId,
     bindingId,
+    actor,
   }: {
     organizationId: string;
     bindingId: string;
+    actor: LedgerActor;
   }) {
     const binding = await this.prisma.roleBinding.findFirst({
       where: { id: bindingId, organizationId },
@@ -758,20 +788,28 @@ export class RoleBindingService {
       throw new RoleBindingNotFoundError(bindingId);
     }
     await assertNoPersonalTeamScope({ client: this.prisma, scopes: [binding] });
-    await this.prisma.roleBinding.delete({ where: { id: bindingId } });
+    await this.writer.revokeBindings({
+      organizationId,
+      bindingIds: [bindingId],
+      actor,
+    });
     return { success: true };
   }
 
   /**
-   * Atomically apply a batch of binding deletes + creates for a single user.
-   * Used by MemberDetailDialog so a partial failure can never leave the user
-   * with some bindings deleted but others not added (or vice versa).
+   * Apply a batch of binding deletes + creates for a single user. Used by
+   * MemberDetailDialog. The whole batch is validated before anything is
+   * emitted, so a bad input writes nothing; the revoke goes first, so a crash
+   * between the two commands leaves the member with less access than asked
+   * for, never more, and the retry attaches cleanly (the ledger's fail-safe
+   * ordering, replacing the transaction the imperative writer used).
    */
   async applyMemberBindings({
     organizationId,
     userId,
     bindingIdsToDelete,
     bindingsToCreate,
+    actor,
   }: {
     organizationId: string;
     userId: string;
@@ -782,6 +820,7 @@ export class RoleBindingService {
       scopeType: RoleBindingScopeType;
       scopeId: string;
     }>;
+    actor: LedgerActor;
   }) {
     // Validate scopes and role assignability up front so a bad input fails
     // the whole batch before we open the transaction.
@@ -812,43 +851,41 @@ export class RoleBindingService {
       bindings: bindingsToCreate,
     });
 
-    return this.prisma.$transaction(async (tx) => {
-      if (bindingIdsToDelete.length > 0) {
-        await this.deleteMemberBindings({
-          tx,
-          organizationId,
-          userId,
-          bindingIdsToDelete,
-        });
-      }
+    if (bindingIdsToDelete.length > 0) {
+      await this.revokeMemberBindings({
+        organizationId,
+        userId,
+        bindingIdsToDelete,
+        actor,
+      });
+    }
 
-      if (bindingsToCreate.length > 0) {
-        await this.createMemberBindings({
-          tx,
-          organizationId,
-          userId,
-          bindingsToCreate,
-        });
-      }
+    if (bindingsToCreate.length > 0) {
+      await this.attachMemberBindings({
+        organizationId,
+        userId,
+        bindingsToCreate,
+        actor,
+      });
+    }
 
-      return { success: true };
-    });
+    return { success: true };
   }
 
   /**
-   * Deletes exactly these bindings within the transaction: every id must
-   * exist in the organization, and none may point at a personal workspace.
+   * Revokes exactly these bindings: every id must exist in the organization,
+   * and none may point at a personal workspace.
    */
-  private async deleteMemberBindings({
-    tx,
+  private async revokeMemberBindings({
     organizationId,
     userId,
     bindingIdsToDelete,
+    actor,
   }: {
-    tx: Prisma.TransactionClient;
     organizationId: string;
     userId: string;
     bindingIdsToDelete: string[];
+    actor: LedgerActor;
   }): Promise<void> {
     // The batch describes the state the admin wants this member's access to be
     // in, so an id that no longer exists is already in that state: a seat
@@ -856,7 +893,7 @@ export class RoleBindingService {
     // and a row another admin removed concurrently is equally gone. Only the
     // member's own direct rows are deletable through their edit, so an id
     // resolving to another principal is skipped rather than deleted.
-    const existing = await tx.roleBinding.findMany({
+    const existing = await this.prisma.roleBinding.findMany({
       where: {
         id: { in: bindingIdsToDelete },
         organizationId,
@@ -867,26 +904,27 @@ export class RoleBindingService {
     });
     if (existing.length === 0) return;
 
-    await assertNoPersonalTeamScope({ client: tx, scopes: existing });
-    await tx.roleBinding.deleteMany({
-      where: { id: { in: existing.map((binding) => binding.id) } },
+    await assertNoPersonalTeamScope({ client: this.prisma, scopes: existing });
+    await this.writer.revokeBindings({
+      organizationId,
+      bindingIds: existing.map((binding) => binding.id),
+      actor,
     });
   }
 
   /**
-   * Creates the user's new bindings within the transaction.
+   * Attaches the user's new bindings.
    *
    * Re-asserting a row the member already holds (or staging the same row
-   * twice) lands on the partial unique indexes; skipping the conflict leaves
-   * exactly the state the admin asked for, which is what this batch means.
+   * twice) is a duplicate the writer skips; skipping it leaves exactly the
+   * state the admin asked for, which is what this batch means.
    */
-  private async createMemberBindings({
-    tx,
+  private async attachMemberBindings({
     organizationId,
     userId,
     bindingsToCreate,
+    actor,
   }: {
-    tx: Prisma.TransactionClient;
     organizationId: string;
     userId: string;
     bindingsToCreate: Array<{
@@ -895,27 +933,30 @@ export class RoleBindingService {
       scopeType: RoleBindingScopeType;
       scopeId: string;
     }>;
+    actor: LedgerActor;
   }): Promise<void> {
-    await tx.roleBinding.createMany({
-      data: bindingsToCreate.map((b) => ({
-        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-        organizationId,
-        userId,
-        groupId: null,
+    await this.writer.attachBindings({
+      organizationId,
+      bindings: bindingsToCreate.map((b) => ({
+        bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+        principal: { userId },
         role: b.role,
         customRoleId:
           b.role === TeamUserRole.CUSTOM ? (b.customRoleId ?? null) : null,
         scopeType: b.scopeType,
         scopeId: b.scopeId,
       })),
-      skipDuplicates: true,
+      actor,
+      onDuplicate: "skip",
     });
   }
 
   /**
-   * Atomically apply a batch of edits to a group: rename, binding
-   * additions/removals, and member additions/removals. Wraps everything in a
-   * single transaction so the UI never observes a partial save.
+   * Apply a batch of edits to a group: rename, binding additions/removals,
+   * and member additions/removals. The rename and the membership rows are
+   * not grant facts, so they keep their transaction; the binding writes are
+   * commands emitted after it commits (revoke first, then attach — the
+   * fail-safe order).
    */
   async applyGroupEdits({
     organizationId,
@@ -925,6 +966,7 @@ export class RoleBindingService {
     bindingsToCreate,
     memberUserIdsToAdd,
     memberUserIdsToRemove,
+    actor,
   }: {
     organizationId: string;
     groupId: string;
@@ -938,6 +980,7 @@ export class RoleBindingService {
     }>;
     memberUserIdsToAdd: string[];
     memberUserIdsToRemove: string[];
+    actor: LedgerActor;
   }) {
     for (const b of bindingsToCreate) {
       await this.repo.validateScopeInOrg({
@@ -955,6 +998,64 @@ export class RoleBindingService {
       bindings: bindingsToCreate,
     });
 
+    const bindingIdsToRevoke = await this.applyGroupMembershipEdits({
+      organizationId,
+      groupId,
+      rename,
+      bindingIdsToDelete,
+      memberUserIdsToAdd,
+      memberUserIdsToRemove,
+    });
+
+    if (bindingIdsToRevoke.length > 0) {
+      await this.writer.revokeBindings({
+        organizationId,
+        bindingIds: bindingIdsToRevoke,
+        actor,
+      });
+    }
+    if (bindingsToCreate.length > 0) {
+      await this.writer.attachBindings({
+        organizationId,
+        bindings: bindingsToCreate.map(
+          (b): LedgerBindingAttach => ({
+            bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+            principal: { groupId },
+            role: b.role,
+            customRoleId:
+              b.role === TeamUserRole.CUSTOM ? (b.customRoleId ?? null) : null,
+            scopeType: b.scopeType,
+            scopeId: b.scopeId,
+          }),
+        ),
+        actor,
+        onDuplicate: "skip",
+      });
+    }
+
+    return { success: true };
+  }
+
+  /**
+   * The half of a group edit that is not a grant fact — the rename and the
+   * membership rows — in one transaction, plus the ids the caller's revoke
+   * command should carry. Nothing here writes a binding.
+   */
+  private async applyGroupMembershipEdits({
+    organizationId,
+    groupId,
+    rename,
+    bindingIdsToDelete,
+    memberUserIdsToAdd,
+    memberUserIdsToRemove,
+  }: {
+    organizationId: string;
+    groupId: string;
+    rename?: { name: string; slug: string } | null;
+    bindingIdsToDelete: string[];
+    memberUserIdsToAdd: string[];
+    memberUserIdsToRemove: string[];
+  }): Promise<string[]> {
     return this.prisma.$transaction(async (tx) => {
       const group = await tx.group.findFirst({
         where: { id: groupId, organizationId },
@@ -977,11 +1078,13 @@ export class RoleBindingService {
         });
       }
 
+      // Same desired-state rule as applyMemberBindings: an id another admin
+      // already removed is already in the state this edit asks for, and an id
+      // resolving to a different group's row is skipped, never deleted. The
+      // read stays in the transaction (its personal-scope guard reads scope
+      // rows too); the revoke command follows the commit.
+      let revokable: string[] = [];
       if (bindingIdsToDelete.length > 0) {
-        // Same desired-state rule as applyMemberBindings: an id another
-        // admin already removed is already in the state this edit asks for,
-        // and an id resolving to a different group's row is skipped, never
-        // deleted.
         const existing = await tx.roleBinding.findMany({
           where: {
             id: { in: bindingIdsToDelete },
@@ -992,27 +1095,8 @@ export class RoleBindingService {
         });
         if (existing.length > 0) {
           await assertNoPersonalTeamScope({ client: tx, scopes: existing });
-          await tx.roleBinding.deleteMany({
-            where: { id: { in: existing.map((b) => b.id) } },
-          });
+          revokable = existing.map((b) => b.id);
         }
-      }
-
-      if (bindingsToCreate.length > 0) {
-        await tx.roleBinding.createMany({
-          data: bindingsToCreate.map((b) => ({
-            id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-            organizationId,
-            userId: null,
-            groupId,
-            role: b.role,
-            customRoleId:
-              b.role === TeamUserRole.CUSTOM ? (b.customRoleId ?? null) : null,
-            scopeType: b.scopeType,
-            scopeId: b.scopeId,
-          })),
-          skipDuplicates: true,
-        });
       }
 
       if (memberUserIdsToRemove.length > 0) {
@@ -1054,7 +1138,7 @@ export class RoleBindingService {
         });
       }
 
-      return { success: true };
+      return revokable;
     });
   }
 }
