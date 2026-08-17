@@ -645,6 +645,10 @@ const routes: RouteObject[] = [
   },
   { path: "/ops/foundry", ...page(() => import("./pages/ops/foundry")) },
   {
+    path: "/ops/migrations",
+    ...page(() => import("./pages/ops/migrations")),
+  },
+  {
     path: "/ops/projections",
     ...page(() => import("./pages/ops/projections")),
   },

@@ -314,12 +314,12 @@ export const eventSourcingStoreDurationHistogram = new Histogram({
 });
 
 // ============================================================================
-// Event Sourcing Pipeline Metrics (command, fold, map, reactor)
+// Event Sourcing Pipeline Metrics (command, fold, map, subscriber)
 // ============================================================================
 
 type ESStatus = "completed" | "failed";
-/** Reactors additionally skip pre-enqueue when shouldReact returns false. */
-type ReactorStatus = ESStatus | "skipped";
+/** Subscribers additionally skip pre-enqueue when shouldDispatch returns false. */
+type SubscriberStatus = ESStatus | "skipped";
 
 // --- Unified projection metrics ---
 // Keep the existing kind-specific metrics below for backwards compatibility,
@@ -544,7 +544,7 @@ export const incrementEsFoldAbsentMissTrustedTotal = (
 register.removeSingleMetric("es_reactor_collapsed_total");
 const esReactorCollapsedTotal = new Counter({
   name: "es_reactor_collapsed_total",
-  help: "Reactor dispatches skipped by collapsing a coalesced batch to one send per deduplication id",
+  help: "Subscriber dispatches skipped by collapsing a coalesced batch to one send per deduplication id",
   labelNames: ["pipeline_name", "reactor_name"] as const,
 });
 
@@ -556,9 +556,9 @@ const esReactorCollapsedTotal = new Counter({
  */
 export const incrementEsReactorCollapsedTotal = (
   pipelineName: string,
-  reactorName: string,
+  subscriberName: string,
   skipped: number,
-) => esReactorCollapsedTotal.labels(pipelineName, reactorName).inc(skipped);
+) => esReactorCollapsedTotal.labels(pipelineName, subscriberName).inc(skipped);
 
 // --- Map projection metrics ---
 register.removeSingleMetric("es_map_projection_total");
@@ -652,33 +652,33 @@ export const observeEsMapProjectionDuration = ({
   });
 };
 
-// --- Reactor metrics ---
+// --- Subscriber metrics ---
 register.removeSingleMetric("es_reactor_total");
 const esReactorTotal = new Counter({
   name: "es_reactor_total",
-  help: "Total number of reactor executions",
+  help: "Total number of subscriber executions",
   labelNames: ["pipeline_name", "reactor_name", "status"] as const,
 });
 
 export const incrementEsReactorTotal = (
   pipelineName: string,
-  reactorName: string,
-  status: ReactorStatus,
-) => esReactorTotal.labels(pipelineName, reactorName, status).inc();
+  subscriberName: string,
+  status: SubscriberStatus,
+) => esReactorTotal.labels(pipelineName, subscriberName, status).inc();
 
 register.removeSingleMetric("es_reactor_duration_milliseconds");
 const esReactorDuration = new Histogram({
   name: "es_reactor_duration_milliseconds",
-  help: "Duration of reactor execution in milliseconds",
+  help: "Duration of subscriber execution in milliseconds",
   labelNames: ["pipeline_name", "reactor_name"] as const,
   buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000],
 });
 
 export const observeEsReactorDuration = (
   pipelineName: string,
-  reactorName: string,
+  subscriberName: string,
   durationMs: number,
-) => esReactorDuration.labels(pipelineName, reactorName).observe(durationMs);
+) => esReactorDuration.labels(pipelineName, subscriberName).observe(durationMs);
 
 // --- Event subscriber metrics ---
 register.removeSingleMetric("es_subscriber_total");
@@ -1347,7 +1347,7 @@ const esFoldPostStoreFailure = new Counter({
  * A fold threw *after* its state was already written durably.
  *
  * Queue delivery is at-least-once and the fold's state is stored before
- * reactors are dispatched, so anything that throws from that point fails the
+ * subscribers are dispatched, so anything that throws from that point fails the
  * job without un-writing it: the queue re-delivers events the store already
  * holds. Folds accumulate rather than being idempotent (trace summary does
  * `spanCount + 1` and sums cost), so the re-apply double-counts.

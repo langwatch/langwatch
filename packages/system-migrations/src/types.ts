@@ -1,0 +1,59 @@
+/**
+ * The per-tenant state machine for one in-place migration
+ * (specs/rbac/in-place-authz-migration.feature):
+ *
+ *   pending ──► migrated ──► finalized ──► rolled_back
+ *     │             ▲                          (operator only)
+ *     │             │ proof failed - work done, held on the legacy path
+ *     └──► parked ──┘ errored - retried on a later pass
+ *
+ * "Pending" is the absence of a record. Every stored status is re-entrant
+ * except `finalized`, which is the one-way latch consumers key behaviour
+ * changes on: a migration's legacy path may only be switched off for a
+ * tenant whose record says finalized.
+ *
+ * `rolled_back` is the operator's undo, and the only status the runner will
+ * not act on. Blanking a finalized row, or moving it back to `migrated`,
+ * does NOT roll a tenant back: the next pass re-runs a migration whose proof
+ * still passes and re-finalizes it within minutes. Writing `rolled_back`
+ * both returns the tenant to its legacy path (no consumer reads it as
+ * finalized) and pins it there until a human moves it again.
+ */
+export type TenantMigrationStatus =
+  | "migrated"
+  | "finalized"
+  | "parked"
+  | "rolled_back";
+
+export type TenantMigrationRecord = {
+  migrationName: string;
+  tenantId: string;
+  status: TenantMigrationStatus;
+  /** The migration's own evidence: parity diffs for a held tenant, the
+   *  error for a parked one, counts for a finalized one. Shape is owned by
+   *  the migration that wrote it. */
+  report: unknown;
+};
+
+/**
+ * What one pass over one tenant concluded.
+ *
+ * `migrated` is the held state: the work is done (and idempotent to redo)
+ * but the migration's own proof found disagreements, so the tenant must
+ * stay on its legacy path. The runner stores the report and re-runs the
+ * tenant on later passes - a held tenant heals itself once whatever the
+ * report names is fixed.
+ */
+export type TenantMigrationOutcome =
+  | { status: "finalized"; report?: unknown }
+  | { status: "migrated"; report: unknown }
+  | { status: "parked"; report: unknown };
+
+export type MigrationPassSummary = {
+  tenantsSeen: number;
+  finalized: number;
+  held: number;
+  parked: number;
+  /** Finalized or rolled back before this pass, or outside the cohort. */
+  skipped: number;
+};

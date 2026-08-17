@@ -99,6 +99,40 @@ export const EMPTY_SPEND_USAGE: SpendUsage = {
   audio_ms: 0,
 };
 
+/**
+ * Who a request is billed against, as the gateway itself knows it.
+ *
+ * Admission has always carried this. The outcomes carry it too, so a
+ * consumer that needs attribution to do its job can read it off the one
+ * event it is handling instead of keeping durable per-request state purely
+ * to join admission to outcome. `outcomeFor` in the Go emitter fills it from
+ * the same `call.Bundle` admission reads, so the two can never disagree.
+ *
+ * Every field defaults. These rows ride a bounded spool on the gateway and
+ * an outbox payload here, so a record written by the previous build is read
+ * back by this one, and a field without a default turns that record into a
+ * permanent parse failure rather than a billed request.
+ */
+export const spendAttributionWireSchema = z.object({
+  organization_id: z.string().max(256).default(""),
+  virtual_key_id: z.string().max(256).default(""),
+  end_user_id: z.string().max(256).default(""),
+  trace_id: z.string().max(128).default(""),
+  request_type: z.string().max(64).default(""),
+  labels: z.array(z.string().max(256)).max(64).default([]),
+  metadata: boundedMetadataJson,
+  /** Admission instant, unix ms; 0 when the emitter did not carry one. */
+  admitted_at: z.number().int().min(0).default(0),
+});
+
+/** What the ingest seam joins from the control plane, which the gateway
+ *  cannot see. Mirrored onto the outcomes so a consumer reading attribution
+ *  off an outcome gets the same shape admission gives it. */
+export const spendControlPlaneAttributionSchema = z.object({
+  principal_user_id: z.string().max(256).default(""),
+  team_id: z.string().max(256).default(""),
+});
+
 export const admitSpendWireSchema = z.object({
   gateway_request_id: boundedId,
   /** Request time, unix ms. Period placement anchors here, never ingest time. */
@@ -126,6 +160,21 @@ export const admitSpendWireSchema = z.object({
    *  gap detector: a hole in (pod_id, pod_seq) is an asserted loss. */
   pod_id: z.string().max(128).default(""),
   pod_seq: z.number().int().min(0).default(0),
+  /**
+   * The emitter that sent this admission will repeat the attribution on the
+   * outcome, so a consumer joining the two need not persist anything at
+   * admission time.
+   *
+   * It is the admission that declares this rather than the outcome, because
+   * the decision has to be made when the admission is handled — before the
+   * outcome exists. Both come from the same pod and the same build, so the
+   * pair is always self-consistent: an old build omits it and keeps the
+   * durable join, a new build sets it and skips it. That is what lets the
+   * gateway and the control plane roll in either order.
+   *
+   * Removable once no fleet runs a build that omits it.
+   */
+  outcome_carries_attribution: z.boolean().default(false),
 });
 
 /** What the ingest seam appends once it has joined the control-plane
@@ -153,14 +202,18 @@ export const confirmSpendWireSchema = z.object({
    *  seam stamp the registry version it priced with. */
   rate_version: z.string().max(128).default(""),
   duration_ms: z.number().int().min(0).default(0),
+  ...spendAttributionWireSchema.shape,
 });
 
 /** What the ingest seam appends once it has priced the outcome.
  *  `cost_nano_usd` is that price and `rate_version` the stamp of the
- *  rating that produced it; every consumer copies the pair. */
+ *  rating that produced it; every consumer copies the pair. The
+ *  control-plane attribution rides along for the same reason it rides on
+ *  admission: only the seam can see it. */
 export const confirmSpendCommandDataSchema = confirmSpendWireSchema.extend({
   cost_nano_usd: z.number().int().min(0),
   rate_version: z.string().min(1).max(128),
+  ...spendControlPlaneAttributionSchema.shape,
 });
 export type ConfirmSpendCommandData = z.infer<
   typeof confirmSpendCommandDataSchema
@@ -181,6 +234,7 @@ export const failSpendWireSchema = z.object({
   /** Partial usage when the failure happened after tokens were consumed. */
   usage: spendUsageSchema.default(EMPTY_SPEND_USAGE),
   duration_ms: z.number().int().min(0).default(0),
+  ...spendAttributionWireSchema.shape,
 });
 
 /** Partial usage still prices, so a failure carries the same priced pair a
@@ -188,6 +242,7 @@ export const failSpendWireSchema = z.object({
 export const failSpendCommandDataSchema = failSpendWireSchema.extend({
   cost_nano_usd: z.number().int().min(0),
   rate_version: z.string().min(1).max(128),
+  ...spendControlPlaneAttributionSchema.shape,
 });
 export type FailSpendCommandData = z.infer<typeof failSpendCommandDataSchema>;
 
@@ -197,6 +252,24 @@ export const settleSpendCommandDataSchema = z.object({
   tenantId: boundedId,
   /** Why settlement fired (e.g. confirmation_deadline_expired). */
   reason: z.string().min(1).max(128),
+  /** The settlement sweeper reads the open admission off the spend record,
+   *  which already holds its attribution, so a settled envelope names the
+   *  organization and key the request belonged to instead of arriving
+   *  anonymous. */
+  ...spendAttributionWireSchema.shape,
+  ...spendControlPlaneAttributionSchema.shape,
+  /**
+   * The model identity ADMISSION requested. A settlement resolved no model
+   * of its own — that is what makes it a settlement — but the request still
+   * named one, and the settled envelope has always carried it.
+   *
+   * It rides the command rather than being recovered downstream because the
+   * consumer that builds the envelope no longer keeps the admission: it
+   * reads what the outcome states, and a settlement that stated no model
+   * would silently empty the field on every settled delivery.
+   */
+  model: z.string().max(512).default(""),
+  model_provider_id: z.string().max(256).default(""),
 });
 export type SettleSpendCommandData = z.infer<
   typeof settleSpendCommandDataSchema

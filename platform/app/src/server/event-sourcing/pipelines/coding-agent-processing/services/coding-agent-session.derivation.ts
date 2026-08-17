@@ -10,6 +10,7 @@ import {
   normalizeMetricName,
   parseMcpToolName,
   SESSION_TITLE_FACT_KEY,
+  SESSION_TITLE_FALLBACK_FACT_KEY,
 } from "./coding-agent-normalization";
 import type {
   CodingAgentSessionData,
@@ -152,6 +153,7 @@ const LANGWATCH = {
     BRANCH: "vcs.ref.head.name",
     WORKTREE: "vcs.worktree.name",
     TITLE: SESSION_TITLE_FACT_KEY,
+    TITLE_FALLBACK: SESSION_TITLE_FALLBACK_FACT_KEY,
   },
 } as const;
 
@@ -842,6 +844,9 @@ export function applyLogToCodingAgentSession({
       const command = str(attrs.command_name);
       return {
         ...base,
+        // The first prompt names an unnamed session; a generated title
+        // (API_RESPONSE below) replaces it whenever one arrives.
+        title: base.title ?? str(attrs[LANGWATCH.ATTR.TITLE_FALLBACK]),
         prompts: base.prompts + 1,
         // The length, never the text.
         promptChars: base.promptChars + num(attrs.prompt_length),
@@ -897,6 +902,10 @@ export function applyLogToCodingAgentSession({
           branch !== null
             ? addToBoundedSet(base.gitBranches, branch)
             : base.gitBranches,
+        // The codex harvest names the session from its transcript (codex
+        // withholds prompt text from its own events). Fill-if-empty, same as
+        // the prompt-derived name: a generated title outranks it.
+        title: base.title ?? str(attrs[LANGWATCH.ATTR.TITLE]),
       };
     }
 

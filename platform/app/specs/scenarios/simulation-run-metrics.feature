@@ -5,7 +5,7 @@ Feature: Simulation Run Cost and Latency Metrics
   latency are accumulated in the traceSummary fold projection as spans arrive
   (using the langwatch.scenario.role attribute).
 
-  The trace-side reactor acts as an ECST (Event-Carried State Transfer)
+  The trace-side subscriber acts as an ECST (Event-Carried State Transfer)
   publisher: after a trace stabilises (60s of no new spans), it publishes
   the metrics to the simulation pipeline. The simulation-side subscriber
   (traceMetricsSync) on RunFinished handles the reverse ordering via
@@ -58,18 +58,18 @@ Feature: Simulation Run Cost and Latency Metrics
     And totalCost is computed normally from all spans
 
   # ---------------------------------------------------------------------------
-  # Trace-side reactor: ECST publisher
+  # Trace-side subscriber: ECST publisher
   # ---------------------------------------------------------------------------
 
   @integration
-  Scenario: Trace-side reactor publishes metrics via ECST after trace stabilises
+  Scenario: Trace-side subscriber publishes metrics via ECST after trace stabilises
     Given a trace with scenario.run_id "run-1" and role cost data
     When the trace stabilises (60s after last span)
-    Then the reactor dispatches computeRunMetrics with metrics in the payload
+    Then the subscriber dispatches computeRunMetrics with metrics in the payload
     And the simulation pipeline receives and applies the metrics
 
   @integration
-  Scenario: Trace-side reactor ignores non-scenario traces
+  Scenario: Trace-side subscriber ignores non-scenario traces
     Given a trace without scenario.run_id in its attributes
     When the traceSummary fold is updated
     Then no computeRunMetrics command is dispatched
@@ -139,7 +139,7 @@ Feature: Simulation Run Cost and Latency Metrics
   Scenario: Metrics computed regardless of arrival order — trace first
     Given trace "trace-abc" arrives and is processed before the simulation finishes
     When the trace stabilises (60s after last span)
-    Then the trace-side ECST reactor publishes metrics to the simulation run
+    Then the trace-side ECST subscriber publishes metrics to the simulation run
 
   @integration
   Scenario: Metrics computed regardless of arrival order — simulation first
@@ -173,7 +173,7 @@ Feature: Simulation Run Cost and Latency Metrics
     Given a simulation run with TraceIds ["trace-old"]
     And trace "trace-old" has spans WITHOUT "langwatch.scenario.role" attributes
     But the trace summary has totalCost 0.010
-    When the reactor computes metrics
+    When the subscriber computes metrics
     Then totalCost is 0.010
     And roleCosts is empty
     And roleLatencies is empty

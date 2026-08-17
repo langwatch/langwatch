@@ -326,7 +326,7 @@ LangWatch accepts OTLP/HTTP at two distinct URLs. They share **everything that m
 | **Auth** | LangWatch project API key, PAT, `X-Auth-Token` or `Authorization: Bearer <project-token>` | IngestionSource bearer secret (`lw_is_<...>`), minted once via the secret-reveal modal |
 | **Tenancy** | Project-scoped (data lives in the project's CH partition) | Org-scoped, routed through a hidden internal Governance Project per org (lazy-ensured on first IngestionSource mint; never user-visible) |
 | **Storage** | `recorded_spans` + `log_records`, the LangWatch trace pipeline | **Same `recorded_spans` + `log_records`**, distinguished by `langwatch.origin.kind = "ingestion_source"` attribute stamped at the receiver edge |
-| **Downstream consumers** | Trace viewer, evaluations, simulations, prompts, online evals, PII redaction, cost enrichment | Same trace viewer + log-detail pane (drill-down works regardless of origin) **plus** governance dashboard at `/governance`, anomaly detection reactor, OCSF/SIEM forwarding |
+| **Downstream consumers** | Trace viewer, evaluations, simulations, prompts, online evals, PII redaction, cost enrichment | Same trace viewer + log-detail pane (drill-down works regardless of origin) **plus** governance dashboard at `/governance`, anomaly detection, OCSF/SIEM forwarding |
 | **Plan accounting** | Counts against the project's trace allowance | Counts against the org's governance audit-event allowance |
 | **Source identity** | Whoever holds the project key (typically your own apps) | An IngestionSource the admin authored explicitly with per-platform config |
 | **Other shapes** | OTLP only | OTLP **plus** webhook envelope (`/api/ingest/webhook/:id` for Workato + s3_custom callback mode) and pull-mode workers for compliance feeds (OpenAI, Anthropic, Microsoft Copilot Studio) |
@@ -1926,6 +1926,7 @@ Errors (like successes) always carry:
 | `invalid_api_key` | `401` | The `Authorization: Bearer …`, `x-api-key`, `api-key` header is missing, malformed, or points to a non-existent virtual key. |
 | `virtual_key_revoked` | `403` | The VK exists but has been revoked. Terminal: revocation is one-way. |
 | `virtual_key_disabled` | `403` | The VK exists but is currently disabled, the **reversible** stop: an administrator can re-enable it and the same secret works again. Distinct from `virtual_key_revoked` so tenant tooling can branch on which one it is. |
+| `virtual_key_expired` | `403` | The VK carries an expiration date and that date has passed. The key material is intact and its status is still `active`, so extending `expires_at` puts it back in service without minting a new secret. |
 | `model_not_allowed` | `403` | The VK has a `models_allowed` allowlist and the requested model is not in it, **or** the model matched a `policy_rules.models` deny regex (or fell outside its allow regex). Also used when the model/alias doesn't resolve to any configured provider. |
 | `permission_denied` | `403` | The principal lacks the RBAC permission required for the endpoint. |
 | `budget_exceeded` | `402` | Any hard-cap budget scope that applies to this request is over its limit. `message` names the scope, and `error.meta` is machine-readable: `budget_id`, `budget_scope` (lowercase: `organization`, `team`, `project`, `virtual_key`, `principal`, `group`, `attributed_user`), `budget_window`, and `budget_provider` when a provider-filtered budget emptied the candidate chain. `budget_scope` distinguishes "this end user's cap" (`attributed_user`) from the tenant cap (`virtual_key`). See [Budgets → the breach catalog](/ai-gateway/budgets#breaches-warnings-and-budget-events). |
@@ -2257,7 +2258,8 @@ Response:
       "created_at": "2026-04-10T12:00:00Z",
       "updated_at": "2026-04-18T18:21:00Z",
       "last_used_at": "2026-04-18T21:03:12Z",
-      "revoked_at": null
+      "revoked_at": null,
+      "expires_at": null
     }
   ]
 }
@@ -2266,6 +2268,8 @@ Response:
 `purpose: "langy"` marks a product-managed key (auto-provisioned by LangWatch). Those rows appear in listings but refuse every mutation; filter on `purpose` when scripting bulk operations.
 
 `last_used_at` advances when the gateway resolves the key, which it does periodically rather than per request, because it serves traffic from a cached configuration in between. Read it as "this key has been in use recently", not as the timestamp of the last request. A revoked or disabled key never advances it, since the refusal happens before the bump, so the field is a reliable way to find keys with no recent use.
+
+`expires_at` is the date the key stops serving, or `null` for a key that never expires. `status` stays `active` past that date, so compare `expires_at` with the current time to tell an expired key apart.
 
 ### Create
 
@@ -2283,6 +2287,7 @@ Body (only `name` is required):
   "scopes": [{ "scope_type": "project", "scope_id": "proj_01HZ..." }],
   "routing_mode": "none",
   "routing_policy_id": null,
+  "expires_at": "2026-09-01T00:00:00.000Z",
   "budget": { "limit_usd": "25", "window": "month", "on_breach": "block" },
   "config": { "providersAllowed": ["mp_openai..."] }
 }
@@ -2294,6 +2299,7 @@ Body (only `name` is required):
 - `trace_project_archived` says the project the key traces into has been deleted. The key goes on sending its traces there, so the data stays whole and reappears if the project is restored, and traffic is never refused for it. Point the key somewhere else if that is not what you want.
 - `budget` creates a budget atomically with the key and manages exactly that row on later updates: the key can never exist without the cap you asked for. Windows: `day`, `week`, `month`.
 - `routing_mode` is one of `none` (default: no silent failover), `fallback_all`, or `policy` (requires `routing_policy_id`).
+- `expires_at` is when the key stops serving. Omit it and the key never expires. A date already in the past is refused with `virtual_key_expiry_in_past`. After the date, requests are refused with `virtual_key_expired` while `status` stays `active`, so read `expires_at` rather than the status to tell an expired key apart.
 
 Response `201`:
 
@@ -2338,12 +2344,13 @@ Body (all fields optional):
   "scopes": [{ "scope_type": "team", "scope_id": "team_..." }],
   "trace_project_id": "proj_01HZ...", // or null to re-resolve it
   "routing_mode": "fallback_all",
+  "expires_at": "2026-10-01T00:00:00.000Z", // or null so it never expires
   "budget": { "limit_usd": "50", "window": "month" },
   "config": { /* partial, merges with existing */ }
 }
 ```
 
-`scopes` replaces the whole visibility set and requires `virtualKeys:manage` at every NEW scope, and does not move where the key's traces and spend land. `trace_project_id` does: omitting it leaves the destination alone, a value moves it, and explicit `null` re-resolves it under the create-time rules rather than clearing it. `budget: null` archives the key's own cap (spend history is retained); omitting `budget` leaves it alone.
+`scopes` replaces the whole visibility set and requires `virtualKeys:manage` at every NEW scope, and does not move where the key's traces and spend land. `trace_project_id` does: omitting it leaves the destination alone, a value moves it, and explicit `null` re-resolves it under the create-time rules rather than clearing it. `budget: null` archives the key's own cap (spend history is retained); omitting `budget` leaves it alone. `expires_at` follows the same three-way rule: omitted leaves the date alone, `null` clears it, and a date moves it. An expired key accepts this patch like any other, which is how it goes back into service without a new secret.
 
 ### Rotate, disable, enable, revoke
 
@@ -13597,6 +13604,18 @@ Disabling a VK stops it without destroying anything: requests on the key are rej
 
 If you find yourself scheduling a revoke "in case the customer comes back", you want disable.
 
+## Expiration
+
+A VK can carry an expiration date. Requests presented after it are rejected with the distinct `virtual_key_expired` error (`403`). Use it for keys with a known end date: a contractor, a demo, a load test.
+
+- Set it in the create drawer (Never, 1 day, 7 days, 30 days, 6 months, 1 year, or a date you pick) or with `expires_at` on the API. A custom date runs to the end of that day, UTC.
+- The key stays `active` past the date. Expiry is read from `expires_at` on every resolve, so extending the date puts the key straight back in service with the same secret. The edit drawer and `PATCH` both change it, and `null` clears it.
+- The key stops at its date even while the control plane is unreachable. The gateway is told the date on the token it holds and on the key's config, and both of its cache deadlines stop there, so the stale-while-error grace (`LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS`, 6 hours by default) never carries a key past its own date.
+- A date you change reaches the gateway within 60 seconds through the change feed. If the change feed is unavailable, the key's config refresh brings the new date on the same 60-second clock, in both directions: a shortened date stops the key, and an extended one keeps it serving. A control plane the gateway cannot reach at all leaves the last date it was told in force.
+- Nothing else changes: budgets, scopes, configuration and rotation grace are untouched, and disable, enable, rotate and revoke behave exactly as they always did.
+
+The virtual keys list badges a key past its date as **expired**. The key detail page states the date, and how long is left while the key is still active.
+
 ## Revocation
 
 Revocation immediately invalidates the secret. There is **no grace period** on revoke, and it is one-way: re-activating means minting a new key. Revoking also archives the key's own budgets and discards any rotation grace.
@@ -13664,7 +13683,7 @@ This means:
 
 - **First request** on a cold cache: 2-4 ms of control-plane overhead.
 - **Warm request** after first: tens of microseconds of overhead.
-- **Control-plane offline**: gateway continues serving from warm cache until JWT TTL expires (15 min default); with bootstrap mode on, it can serve indefinitely.
+- **Control-plane offline**: gateway continues serving a warm key past its JWT TTL (15 min default) up to the auth-cache hard grace (6 hours by default), and never past the key's own expiration date. A key the pod has never resolved still fails, because the cache is per pod and starts empty.
 
 See [Self-Hosting → Config](/ai-gateway/self-hosting/config) for tuning the cache.
 
@@ -13674,7 +13693,7 @@ See [Self-Hosting → Config](/ai-gateway/self-hosting/config) for tuning the ca
 
 ---
 title: Anomaly rules
-description: Define detection rules that fire AnomalyAlerts when activity-event traffic crosses a threshold, what the reactor evaluates today, what is preview-only, and how to write a working rule.
+description: Define detection rules that fire AnomalyAlerts when activity-event traffic crosses a threshold, what the detector evaluates today, what is preview-only, and how to write a working rule.
 sidebarTitle: Anomaly rules
 ---
 
@@ -13682,15 +13701,15 @@ sidebarTitle: Anomaly rules
 
 <Note>**Available on Enterprise plans.** Non-enterprise organizations see an upgrade card on `/settings/governance/anomaly-rules` instead of the composer. See [Open-core licensing](/ai-governance/overview#open-core-licensing) for the full Apache 2.0, Enterprise split.</Note>
 
-Anomaly rules are the "Detect" layer of the [governance control plane](/ai-governance/control-plane#tier-3--audit-log-ingest). The composer at `/settings/governance/anomaly-rules` accepts a rule definition and persists it; the [event-sourcing reactor](/ai-gateway/governance/activity-monitor-event-sourcing) evaluates each rule against incoming events and produces an `AnomalyAlert` row when a violation is detected.
+Anomaly rules are the "Detect" layer of the [governance control plane](/ai-governance/control-plane#tier-3--audit-log-ingest). The composer at `/settings/governance/anomaly-rules` accepts a rule definition and persists it; the [event-sourcing detector](/ai-gateway/governance/activity-monitor-event-sourcing) evaluates each rule against incoming events and produces an `AnomalyAlert` row when a violation is detected.
 
-This page documents what the reactor evaluates today and what is preview-only, so you don't author rules that look "active" in the list but never fire.
+This page documents what the detector evaluates today and what is preview-only, so you don't author rules that look "active" in the list but never fire.
 
 ## Rule-type coverage
 
-The composer's rule-type dropdown surfaces every shape the schema can hold; the reactor only evaluates one of them today.
+The composer's rule-type dropdown surfaces every shape the schema can hold; the detector only evaluates one of them today.
 
-| Rule type | Reactor coverage | What it detects | Threshold config keys |
+| Rule type | Detector coverage | What it detects | Threshold config keys |
 |-----------|------------------|------------------|------------------------|
 | **`spend_spike`** | ✅ Live | Cost-USD growth in a rolling window vs a baseline window | `windowSec`, `baselineOffsetSec`, `ratioVsBaseline`, `minBaselineUsd` |
 | `rate_limit` | ⏳ Preview | Volume of actions per actor per window | (config schema TBD) |
@@ -13700,7 +13719,7 @@ The composer's rule-type dropdown surfaces every shape the schema can hold; the 
 | `pii_leak` | ⏳ Preview | Outbound payload matches a PII regex set | (config schema TBD) |
 | `custom` | ⏳ Preview | User-defined CEL, SQL predicate | (config schema TBD) |
 
-**⏳ Preview** rules can be created and the row shows `active` in the list, but the reactor logs `debug` and skips them, no AnomalyAlert is produced. Until the reactor slice for each ships, treat them as "save the rule for the future, don't expect alerts."
+**⏳ Preview** rules can be created and the row shows `active` in the list, but the detector logs `debug` and skips them, no AnomalyAlert is produced. Until the detector slice for each ships, treat them as "save the rule for the future, don't expect alerts."
 
 If you need detection beyond `spend_spike` today, the recommended shape is one of:
 
@@ -13711,7 +13730,7 @@ If you need detection beyond `spend_spike` today, the recommended shape is one o
 
 Open `/settings/governance/anomaly-rules` → click **New anomaly rule**.
 
-Fields the reactor reads:
+Fields the detector reads:
 
 | Field | Typical value | What it does |
 |-------|---------------|---------------|
@@ -13720,7 +13739,7 @@ Fields the reactor reads:
 | **Rule type** | `spend_spike` | Pick exactly this, see coverage table above. |
 | **Scope** | `organization`, `source_type`, `source` | Filters which IngestionSources the rule applies to (see Scope coverage below). |
 | **Scope ID** | (cuid) | Required when scope is `source_type` or `source`. The IngestionSource ID can be copied from `/settings/governance/ingestion-sources/<id>` or the URL of the per-source detail page. |
-| **Threshold config** | (JSON object, see below) | The reactor's per-rule-type tuning knobs. |
+| **Threshold config** | (JSON object, see below) | The detector's per-rule-type tuning knobs. |
 | **Destination config** | `{}` (today) | Reserved for future Slack, PagerDuty, SIEM dispatch, see Dispatch coverage below. |
 
 ### Threshold config: `spend_spike`
@@ -13736,10 +13755,10 @@ Fields the reactor reads:
 
 | Key | Default | Meaning |
 |-----|---------|---------|
-| `windowSec` | `86400` (24 h) | The "current" window the reactor sums spend across, ending at the latest event timestamp. |
-| `baselineOffsetSec` | `604800` (7 d) | How far back from the current window the reactor pulls the baseline window from. With the defaults, the baseline is the same-shape 24-hour window from 7 days ago. |
-| `ratioVsBaseline` | `2.0` | Multiplier, the reactor fires when current spend ≥ baseline × ratio. `2.0` means "double the spend of last week's same-window." |
-| `minBaselineUsd` | `1.0` | Floor, the reactor skips evaluation when the baseline window is below this value. Prevents trivial alerts on cold sources where last week's spend was ~$0.01 and a 2× rise is meaningless. |
+| `windowSec` | `86400` (24 h) | The "current" window the detector sums spend across, ending at the latest event timestamp. |
+| `baselineOffsetSec` | `604800` (7 d) | How far back from the current window the detector pulls the baseline window from. With the defaults, the baseline is the same-shape 24-hour window from 7 days ago. |
+| `ratioVsBaseline` | `2.0` | Multiplier, the detector fires when current spend ≥ baseline × ratio. `2.0` means "double the spend of last week's same-window." |
+| `minBaselineUsd` | `1.0` | Floor, the detector skips evaluation when the baseline window is below this value. Prevents trivial alerts on cold sources where last week's spend was ~$0.01 and a 2× rise is meaningless. |
 
 Sensible starting values:
 
@@ -13751,17 +13770,17 @@ Sensible starting values:
 
 ## Scope coverage
 
-| Scope | Reactor coverage | Notes |
+| Scope | Detector coverage | Notes |
 |-------|------------------|-------|
 | `organization` | ✅ Evaluated | Fires on any IngestionSource in the org. Best default. |
 | `source_type` | ✅ Evaluated | Fires on every source whose `sourceType` matches (e.g. all `otel_generic` sources). |
 | `source` | ✅ Evaluated | Fires on a single named IngestionSource. |
-| `team` | ⏳ Preview | Persisted but not filtered by the reactor today. Don't rely on it. |
+| `team` | ⏳ Preview | Persisted but not filtered by the detector today. Don't rely on it. |
 | `project` | ⏳ Preview | Same. |
 
 ## Dispatch coverage (C3 in flight)
 
-The composer's **Destination config** field accepts a JSON object describing where to push the alert. Today the reactor's dispatch path is **log-only**: alerts surface on the `/governance` dashboard's "Recent anomalies" section but no Slack message, PagerDuty page, SIEM event is generated.
+The composer's **Destination config** field accepts a JSON object describing where to push the alert. Today the detector's dispatch path is **log-only**: alerts surface on the `/governance` dashboard's "Recent anomalies" section but no Slack message, PagerDuty page, SIEM event is generated.
 
 C3 (in flight on the [governance platform](https://github.com/langwatch/langwatch/pull/3524) branch) wires `triggerActionDispatch` so the destinationConfig values below start working:
 
@@ -13780,7 +13799,7 @@ Until C3 lands, leave destinationConfig empty (`{}`) and rely on the dashboard t
 
 Two angles, same data:
 
-**Web**: open `/governance` and look for the rule's name in the "Recent anomalies" section. Each fire creates one row keyed by `(ruleId, triggerWindowStart)` so the reactor doesn't double-alert on a single window.
+**Web**: open `/governance` and look for the rule's name in the "Recent anomalies" section. Each fire creates one row keyed by `(ruleId, triggerWindowStart)` so the detector doesn't double-alert on a single window.
 
 **CLI**: `langwatch governance status` shows `hasAnomalyRules: true` once at least one rule exists. The `recentAnomalies` query is wired into the same `api.activityMonitor.recentAnomalies` tRPC procedure the dashboard reads.
 
@@ -13794,7 +13813,7 @@ To verify it yourself, end to end:
 
 ## What's persisted vs what's evaluated
 
-A rule that's persisted but unevaluated is intentional, admins can pre-stage rules so when the reactor slice ships, no rework. But it's a real failure mode if you don't know which is which. The two coverage tables above are the source of truth: **only `spend_spike` + (`organization` | `source_type` | `source`) actually fires today**. Everything else is preview state.
+A rule that's persisted but unevaluated is intentional, admins can pre-stage rules so when the detector slice ships, no rework. But it's a real failure mode if you don't know which is which. The two coverage tables above are the source of truth: **only `spend_spike` + (`organization` | `source_type` | `source`) actually fires today**. Everything else is preview state.
 
 ---
 
@@ -14468,7 +14487,7 @@ description: How LangWatch AI Gateway governance underwrites SOC 2 Type II, ISO 
 sidebarTitle: Compliance architecture
 ---
 
-<Info>**Pairs with:** [AI Gateway → Audit](/ai-gateway/audit). The gateway emits the spans; governance reactors fold them into OCSF-mapped events for SIEM export.</Info>
+<Info>**Pairs with:** [AI Gateway → Audit](/ai-gateway/audit). The gateway emits the spans; governance processing folds them into OCSF-mapped events for SIEM export.</Info>
 
 <Note>**Available on Enterprise plans.** The OCSF/SIEM export, configurable retention, and tamper-evidence (post-GA follow-up) covered on this page require an Enterprise license. The Apache 2.0 floor still gives you a single trace store at the platform default retention window and an append-only event_log; the compliance underwriting documented below is the Enterprise extension. See [Open-core licensing](/ai-governance/overview#open-core-licensing) for the full Apache 2.0, Enterprise split.</Note>
 
@@ -14508,7 +14527,7 @@ This page maps each compliance framework you might need to the mechanisms in Lan
               │                  │           └────────────────────┘
               ▼                  ▼
      ┌─────────────────┐ ┌──────────────────────┐
-     │ Anomaly reactor │ │ OCSF read API        │
+     │ Anomaly detector│ │ OCSF read API        │
      │ /governance KPI │ │ (SIEM cron-pull,     │
      │     strip       │ │  Splunk/Datadog/etc.)│
      └─────────────────┘ └──────────────────────┘
@@ -14630,7 +14649,7 @@ description: Where the LangWatch CLI, AI Gateway, web app, and Activity Monitor 
 sidebarTitle: Control plane
 ---
 
-<Info>**Pairs with:** [AI Gateway → Overview](/ai-gateway/overview). The gateway is the data plane (request path); this page is the control plane (configuration + fold reactors) that sits next to it in the same compose stack and Helm chart.</Info>
+<Info>**Pairs with:** [AI Gateway → Overview](/ai-gateway/overview). The gateway is the data plane (request path); this page is the control plane (configuration + fold processing) that sits next to it in the same compose stack and Helm chart.</Info>
 
 LangWatch is a **control plane** above every AI tool an enterprise uses,
 including the ones whose API key path you do not own. The
@@ -15559,7 +15578,7 @@ The deep reference for budget shape, fallback semantics, and the WARN response t
 
 ## Step 8: Write your first anomaly rule
 
-Budgets enforce *at* the limit. [Anomaly rules](/ai-governance/anomaly-rules) detect *before* it, the patterns that precede a breach (spend spike, geo-mismatch, off-hours usage). The reactor evaluates `spend_spike` rules live today; other rule types are preview-only (the [coverage table](/ai-governance/anomaly-rules#rule-type-coverage) marks which is which).
+Budgets enforce *at* the limit. [Anomaly rules](/ai-governance/anomaly-rules) detect *before* it, the patterns that precede a breach (spend spike, geo-mismatch, off-hours usage). The detector evaluates `spend_spike` rules live today; other rule types are preview-only (the [coverage table](/ai-governance/anomaly-rules#rule-type-coverage) marks which is which).
 
 Write a starter `spend_spike` rule:
 
@@ -15581,7 +15600,7 @@ Write a starter `spend_spike` rule:
      ```
 4. Click **Create rule**.
 
-The reactor starts evaluating from the next ingest event. When today's 24h spend exceeds 2× last week's same-day baseline (and the baseline was at least \$1, to avoid noise on quiet days), the reactor writes an `AnomalyAlert` row visible in `/governance` and surfaces it in the [`activityMonitor.recentAnomalies`](/ai-governance/anomaly-rules) procedure.
+The detector starts evaluating from the next ingest event. When today's 24h spend exceeds 2× last week's same-day baseline (and the baseline was at least \$1, to avoid noise on quiet days), the detector writes an `AnomalyAlert` row visible in `/governance` and surfaces it in the [`activityMonitor.recentAnomalies`](/ai-governance/anomaly-rules) procedure.
 
 ## Where to next
 
@@ -31374,7 +31393,7 @@ Content reaches LangWatch on one path only, and you can turn that path off. Code
 
 The OpenTelemetry export carries two signals. The trace exporter reports each turn with the model, the tokens and the timing. The event exporter reports the facts of the session: each tool run with its name, duration and result, each prompt as a length without its text, tool approvals and denials, and the time to the first token. LangWatch enables both, and the session view is built from them. The prompt text, the tool output and the answer never ride either signal, and no Codex setting turns that content on. So the `[otel]` block alone gives you usage numbers and nothing that was said.
 
-Codex does write the whole conversation to a transcript on your machine, and each turn there records the trace that Codex reported it under. `langwatch codex` and `langwatch instrument codex` register a small program on the Codex `notify` setting, which Codex runs after each completed turn. That program reads the turn from the transcript and records it against the same trace, so a session you started with a plain `codex` still shows what was said. This is the path that carries content, and LangWatch installs it unless you say otherwise. A `notify` program of your own keeps running: LangWatch calls it after its own.
+Codex does write the whole conversation to a transcript on your machine, and each turn there records the trace that Codex reported it under. `langwatch codex` and `langwatch instrument codex` register a small program on the Codex `notify` setting, which Codex runs after each completed turn. That program reads the turn from the transcript and records it against the same trace, so a session you started with a plain `codex` still shows what was said. It also reports the repository and branch the session worked in, read from the same transcript, which is what connects the session to its pull request. This is the path that carries content, and LangWatch installs it unless you say otherwise. A `notify` program of your own keeps running: LangWatch calls it after its own.
 
 To collect the usage numbers and no content, remove the `notify` setting from `~/.codex/config.toml` and keep the `[otel]` block. Tokens, cost, model, timing, tool counts and prompt lengths continue.
 
@@ -57364,7 +57383,7 @@ Three things to know before flipping it on:
 
 1. **One Secret holds everything** (or use `autogen.enabled=true` and let the chart materialise it). Both `langwatch-app` and the AI gateway pod mount `LW_GATEWAY_INTERNAL_SECRET` + `LW_GATEWAY_JWT_SECRET` from the same `secrets.existingSecret` Secret (default `langwatch-app-secrets`) that also holds the app keys (`credentialsEncryptionKey`, `cronApiKey`, `nextAuthSecret`, `virtualKeyPepper`). The [Production Deployment](#production-deployment) section above shows the single `kubectl create secret generic` command. With `autogen.enabled=false` and any required key missing, the preflight Job aborts the install with a clear list of what is missing; under `autogen.enabled=true` the chart materialises the Secret on first install via lookup-or-rand.
 2. **Public ingress needs DNS + TLS.** The gateway is what your LLM clients hit, so it usually wants its own hostname (e.g. `gateway.your-corp.com`), separate cert, separate ingress rule. See [AI Gateway → Self-hosting → DNS & TLS](/ai-gateway/self-hosting/dns-and-tls).
-3. **Worker pods must be running.** Budget enforcement reads from a ClickHouse rollup that the trace-processing reactor folds into. If you deploy with `workers.enabled=false`, budgets stop accumulating spend and breach enforcement silently degrades. The default `workers.enabled=true` is correct for production.
+3. **Worker pods must be running.** Budget enforcement reads from a ClickHouse rollup that trace-processing folds into. If you deploy with `workers.enabled=false`, budgets stop accumulating spend and breach enforcement silently degrades. The default `workers.enabled=true` is correct for production.
 
 ## Upgrade
 
@@ -58993,7 +59012,7 @@ Press `e` or click the toggle to open a detailed JSON viewer in the right panel 
 
 ## Projection State
 
-The left panel lists all available **projections** and **reactors** for the aggregate type. Select a projection to compute its state at the current event position.
+The left panel lists all available **projections** and **subscribers** for the aggregate type. Select a projection to compute its state at the current event position.
 
 This is the core of the time-travel capability: you can step through events and watch how a projection's state evolves with each event.
 

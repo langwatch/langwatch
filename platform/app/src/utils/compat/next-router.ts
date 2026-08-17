@@ -66,6 +66,8 @@ const ROUTE_PATTERNS = [
   // context and breaks the personal nav).
   "/me",
   "/me/configure",
+  "/me/sessions",
+  "/me/pull-requests",
   "/cli/auth",
   "/governance",
   "/:project/messages/:trace/:openTab/:span",
@@ -95,6 +97,10 @@ const ROUTE_PATTERNS = [
   "/:project/evaluations/:id/edit",
   "/:project/evaluations",
   "/:project/online-evaluations",
+  // Their personal-scope twins are listed above, because ":project" captures
+  // "me" and would otherwise resolve /me/sessions to /[project]/sessions.
+  "/:project/sessions",
+  "/:project/pull-requests",
   "/:project/experiments/workbench/:slug",
   "/:project/experiments/workbench",
   "/:project/experiments/:experiment",

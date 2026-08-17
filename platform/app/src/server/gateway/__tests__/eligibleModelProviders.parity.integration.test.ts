@@ -88,11 +88,11 @@ async function resolveAsTheDrawerWould() {
     ],
     ORG_ID,
   );
-  return resolveEligible(
-    [{ scopeType: "PROJECT", scopeId: PROJECT_ID }],
+  return resolveEligible({
+    scopes: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }],
     providers,
     hierarchy,
-  );
+  });
 }
 
 describe("eligible model providers - drawer / gateway parity on real PG", () => {
@@ -363,11 +363,11 @@ describe("eligible model providers - drawer / gateway parity on real PG", () => 
         ],
         ORG_ID,
       );
-      const drawerIds = resolveEligible(
-        [{ scopeType: "PROJECT", scopeId: PROJECT_ID }],
+      const drawerIds = resolveEligible({
+        scopes: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }],
         providers,
         hierarchy,
-      )
+      })
         .map((p) => p.id)
         .sort();
 

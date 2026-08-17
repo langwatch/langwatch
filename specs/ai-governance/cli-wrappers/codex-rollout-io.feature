@@ -120,3 +120,86 @@ Feature: Codex Path B recovers the full request body from the rollout transcript
       Given a streamer that has already streamed the turn for trace_id "t-one"
       When a later turn for trace_id "t-two" completes and the streamer harvests
       Then it posts only "t-two", never re-posting "t-one"
+
+    @unit
+    Scenario: A streaming session posts its repository once across ticks
+      Given a streamer watching a session whose session_meta names a remote
+      When the streamer harvests on two ticks
+      Then one session-context record posts in total
+      # The streamer re-offers every in-window session on every tick, so what
+      # keeps the second tick quiet is the stored fingerprint, not the offer.
+
+  Rule: the harvest reports the repository the session worked on
+
+    Codex records the session's directory, branch and remote once, in the
+    rollout's session_meta line, and exports none of them over telemetry. The
+    harvest reads them back and posts one session-context record, the same
+    record the claude hook sends, so a codex session names its repository and
+    branch (which is what links it to its pull request) with no hooks.json
+    entry and no per-hook trust grant.
+
+    @unit
+    Scenario: The harvest reports the repository the session worked on
+      Given a rollout whose session_meta names a remote and a branch
+      When the completed turn is harvested
+      Then one session-context record posts beside the conversation
+      And the codex session gains its repository and branch
+
+    @unit
+    Scenario: A notify that fires after every turn posts the repository once
+      Given a session whose context was already posted
+      When the next turn completes and the harvest runs again
+      Then no second session-context record posts while the context is unchanged
+
+    @unit
+    Scenario: A state directory that cannot be written still lets the conversation through
+      Given a device whose langwatch state directory cannot be written
+      When the completed turn is harvested
+      Then the conversation and the session-context record both post
+      # The stored fingerprint only saves a re-POST on the next turn, so
+      # losing it must never cost the conversation.
+
+    @unit
+    Scenario: A session outside any repository posts its conversation and no context
+      Given a rollout whose session_meta names no remote
+      When the completed turn is harvested
+      Then the conversation posts and no session-context record does
+
+  Rule: a slow logs endpoint does not hold the conversation back
+
+    The session-context records go out before the turn spans, because the
+    title they carry is first-write and has to reach the server before the
+    spans create the session row. That ordering makes a slow logs endpoint a
+    delay on the conversation itself, and posting the records one at a time
+    made the delay grow with the number of sessions: a backfill reads every
+    rollout on disk, and each one waited the full per-post timeout before the
+    next one started.
+
+    @unit
+    Scenario: A backfill of many sessions does not wait for them one by one
+      Given many recorded sessions and a logs endpoint that never answers
+      When the sessions are backfilled
+      Then the conversations still post, after a wait that does not grow
+        with the session count
+      # A session the batch gives up on keeps no fingerprint, so the next
+      # harvest offers its context again.
+
+  Rule: the harvest names the session
+
+    Codex generates no session title and its telemetry withholds prompt text,
+    so without the harvest every codex session reads as untitled. The rollout
+    records what the user typed as user_message events; the harvest puts the
+    first typed prompt on the session-context record and the platform names
+    the session from it.
+
+    @unit
+    Scenario: The harvest names the session by the first thing the user asked
+      Given a rollout whose first user_message is a typed prompt
+      When the completed turn is harvested
+      Then the session-context record carries the prompt's first line as the session title
+
+    @unit
+    Scenario: A machine-injected first prompt does not name the session
+      Given a rollout whose first user_message is injected context in a tag
+      When the completed turn is harvested
+      Then the session-context record carries no title

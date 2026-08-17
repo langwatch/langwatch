@@ -5,7 +5,7 @@ Feature: Billing Meter Dispatch
   # reporting worker (cross-project event aggregation, SaaS-mode skip,
   # crash recovery with two-phase checkpoint, transient-error retry,
   # event deduplication). Backend code lives in
-  # ee/billing/services/usageReportingService and the BillingDispatchReactor;
+  # ee/billing/services/usageReportingService and the billingMeterDispatch subscriber;
   # the integration-test fixture covers happy-path Stripe report submission
   # but not the worker-loop / recovery / dedup paths — all aspirational
   # pending the worker-test harness.
@@ -64,13 +64,13 @@ Feature: Billing Meter Dispatch
     Then the error is re-thrown for the worker to retry
 
   # ============================================================================
-  # Billing Dispatch Reactor — Post-Fold Side Effect
+  # Billing Dispatch Subscriber — Post-Fold Side Effect
   # ============================================================================
 
   @integration @unimplemented
   Scenario: Deduplicates concurrent events for the same organization
     Given multiple billable events for the same organization arrive rapidly
-    When the billing dispatch reactor processes them
+    When the billing dispatch subscriber processes them
     Then only one reporting job is active for the organization
 
   # ============================================================================

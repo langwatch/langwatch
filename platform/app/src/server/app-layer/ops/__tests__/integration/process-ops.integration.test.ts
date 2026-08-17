@@ -75,8 +75,20 @@ async function seedMessage(params: {
   return row.id;
 }
 
-/** A second process name, so the fleet-wide dead read has more than one. */
-const nsB = `${ns}.b`;
+/**
+ * The dead-letter block seeds under its own names.
+ *
+ * The fleet-count block seeds two dead rows (`dead-1`, `dead-2`) under plain
+ * `ns` to assert `deadMessages: 2`. Those rows are dead and the dead read is
+ * fleet-wide, so an assertion narrowing on `ns` counts them as well as its
+ * own — off by exactly the rows another block happened to need.
+ *
+ * That stayed invisible until the read actually reached Postgres (#7095):
+ * before that it threw before it could return a row, so these tests had never
+ * once run green.
+ */
+const nsDead = `${ns}.dl`;
+const nsDeadB = `${nsDead}.b`;
 
 /** Repeating-pattern trace id, not a credential: a realistic one is
  *  high-entropy enough for the secret scanner to read it as a generic API
@@ -116,11 +128,13 @@ async function seedDeadMessage(params: {
   return row.id;
 }
 
-/** This run's rows only. The dead read is fleet-wide by design, so every
- *  assertion narrows to the namespaces this file seeded rather than to
- *  totals another run could move. */
+/**
+ * This block's rows only. The dead read is fleet-wide by design, so every
+ * assertion narrows to what it seeded rather than to totals another run could
+ * move — and narrows on `nsDead`, not on `ns`, for the reason given there.
+ */
 function ours<T extends { processName: string }>(rows: T[]): T[] {
-  return rows.filter((row) => row.processName.startsWith(ns));
+  return rows.filter((row) => row.processName.startsWith(nsDead));
 }
 
 afterAll(async () => {
@@ -352,33 +366,35 @@ describe("process ops against a real Postgres", () => {
 
   describe("given dead messages spread across process names", () => {
     /**
-     * Seeded once for the whole block: three dead messages under `ns` and one
-     * under `nsB`, retired at distinct instants so ordering is observable.
+     * Seeded once for the whole block: three dead messages under `nsDead` and
+     * one under `nsDeadB`, retired at distinct instants so ordering is
+     * observable. Their own namespace, so the fleet-count block's dead rows
+     * cannot be mistaken for this block's.
      */
     const seeded = { oldest: "", middle: "", newest: "", other: "" };
 
     async function seedAll() {
       if (seeded.newest) return;
       seeded.oldest = await seedDeadMessage({
-        processName: ns,
+        processName: nsDead,
         processKey: "dl-1",
         messageKey: "dead-oldest",
         retiredAt: new Date(NOW - 3 * 60_000),
       });
       seeded.middle = await seedDeadMessage({
-        processName: ns,
+        processName: nsDead,
         processKey: "dl-2",
         messageKey: "dead-middle",
         retiredAt: new Date(NOW - 2 * 60_000),
       });
       seeded.newest = await seedDeadMessage({
-        processName: ns,
+        processName: nsDead,
         processKey: "dl-3",
         messageKey: "dead-newest",
         retiredAt: new Date(NOW - 60_000),
       });
       seeded.other = await seedDeadMessage({
-        processName: nsB,
+        processName: nsDeadB,
         processKey: "dl-other",
         messageKey: "dead-other",
         retiredAt: new Date(NOW - 90_000),
@@ -404,7 +420,7 @@ describe("process ops against a real Postgres", () => {
       // The whole point of the fleet read: a row can be redriven without the
       // operator first knowing which instance held it.
       const other = mine.find((m) => m.messageKey === "dead-other")!;
-      expect(other.processName).toBe(nsB);
+      expect(other.processName).toBe(nsDeadB);
       expect(other.projectId).toBe(PROJECT);
       expect(other.processKey).toBe("dl-other");
       expect(other.traceId).toBe(DEAD_TRACE_ID);
@@ -432,7 +448,7 @@ describe("process ops against a real Postgres", () => {
       await seedAll();
 
       const { messages, total } = await service.getDeadLetters({
-        processName: nsB,
+        processName: nsDeadB,
         page: 1,
         pageSize: 100,
       });
@@ -447,8 +463,8 @@ describe("process ops against a real Postgres", () => {
       await seedAll();
 
       const counts = ours(await service.getDeadLetterCounts());
-      const mine = counts.find((c) => c.processName === ns);
-      const other = counts.find((c) => c.processName === nsB);
+      const mine = counts.find((c) => c.processName === nsDead);
+      const other = counts.find((c) => c.processName === nsDeadB);
 
       expect(mine?.count).toBe(3);
       expect(other?.count).toBe(1);

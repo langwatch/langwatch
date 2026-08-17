@@ -308,7 +308,7 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
       : Prisma.empty;
 
     const [rows, totals] = await Promise.all([
-      this.prisma.$queryRaw <
+      this.prisma.$queryRaw<
         Array<
           Omit<
             DeadOutboxMessageView,
@@ -320,7 +320,8 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
             updatedAt: Date;
             traceCarrier: unknown;
           }
-        >(Prisma.sql`
+        >
+      >(Prisma.sql`
         -- @tenancy: cross-tenant ops dead-letter read; the surface is ops-gated
         SELECT "id", "processName", "projectId", "processKey", "messageKey",
                "intentType", "status", "attempts", "nextAttemptAt",

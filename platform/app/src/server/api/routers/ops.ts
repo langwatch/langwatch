@@ -9,6 +9,7 @@ import {
   type DashboardData,
   OPS_BLOB_SORTS,
 } from "~/server/app-layer/ops/types";
+import { systemMigrationsService } from "~/server/app-layer/system-migrations/runtime";
 import {
   resolveHotDays,
   TABLE_TTL_CONFIG,
@@ -195,6 +196,23 @@ export const opsRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const ops = requireOps();
       return ops.scheduler.listScheduledJobs({ limit: input.limit });
+    }),
+
+  /**
+   * Only the switched-off schedules, for the dashboard's "Switched off" panel.
+   * Its own read because `listScheduledJobs` sorts active first, so a client
+   * filtering that page would miss every paused row on a large fleet.
+   */
+  listPausedSchedules: protectedProcedure
+    .use(opsViewPermission)
+    .input(
+      z.object({
+        limit: z.number().int().min(1).max(200).default(50),
+      }),
+    )
+    .query(async ({ input }) => {
+      const ops = requireOps();
+      return ops.scheduler.listPausedSchedules({ limit: input.limit });
     }),
 
   /** Recent scheduler operator actions, so the page explains its own history. */
@@ -1311,5 +1329,29 @@ export const opsRouter = createTRPCRouter({
         // carrying PII into the log stream.
         requestedBy: ctx.session.user.id,
       });
+    }),
+
+  /**
+   * The in-place system migrations (@langwatch/system-migrations), per
+   * migration: status rollup plus the tenants needing attention - held
+   * (`migrated`, parity disagreements in the report) and `parked` (errored,
+   * retried next pass). Finalized tenants are a count, not a listing.
+   */
+  listSystemMigrations: protectedProcedure
+    .use(opsViewPermission)
+    .query(() => systemMigrationsService.getOverview()),
+
+  /**
+   * Kick a migration pass now instead of waiting for the next worker boot -
+   * the lever for widening a cloud cohort or re-verifying held tenants
+   * after remediation. Fire-and-forget: the fleet-wide lease already
+   * guarantees a single driver, so the worst case for a double click is a
+   * pass that stands down immediately.
+   */
+  runSystemMigrationPass: protectedProcedure
+    .use(opsManagePermission)
+    .mutation(() => {
+      systemMigrationsService.startPass();
+      return { started: true };
     }),
 });

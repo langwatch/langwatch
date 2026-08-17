@@ -76,6 +76,8 @@ export type CreateVirtualKeyData = {
   scopes: ScopeInput[];
   /** Explicit trace destination; grants no access (not a scope row). */
   traceProjectId?: string | null;
+  /** When the key stops serving. Absent or null means it never expires. */
+  expiresAt?: Date | null;
   routingPolicyId?: string | null;
   /**
    * Routing behaviour. Defaults to the column default (NONE: no
@@ -280,6 +282,7 @@ export class VirtualKeyRepository {
         displayPrefix: data.displayPrefix,
         principalUserId: data.principalUserId ?? null,
         traceProjectId: data.traceProjectId ?? null,
+        expiresAt: data.expiresAt ?? null,
         config: data.config,
         externalId: data.externalId ?? null,
         ...(data.metadata !== undefined ? { metadata: data.metadata } : {}),

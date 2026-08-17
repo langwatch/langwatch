@@ -152,7 +152,9 @@ async function personalTeamOwnerNames({
   const names = new Map<string, string>();
   for (const member of members) {
     if (names.has(member.teamId)) continue;
-    const label = member.user.name?.trim() || member.user.email?.trim();
+    // The schema has no foreign keys, so a membership row can outlive its
+    // user; a missing user names nothing rather than failing the read.
+    const label = member.user?.name?.trim() || member.user?.email?.trim();
     if (label) names.set(member.teamId, label);
   }
   return names;

@@ -6,7 +6,7 @@ import {
 } from "../../../../../utils/posthogErrorCapture";
 import type { ProjectService } from "../../../../app-layer/projects/project.service";
 import type { SubscriberSpec } from "../../../pipeline/processManagerDefinition";
-import { CIO_REACTOR_DEBOUNCE_TTL_MS } from "../../trace-processing/reactors/customerIoTraceSync.reactor";
+import { CIO_SYNC_DEBOUNCE_TTL_MS } from "../../trace-processing/subscribers/customerIoTraceSync.subscriber";
 import { SIMULATION_RUN_EVENT_TYPES } from "../schemas/constants";
 import type {
   SimulationProcessingEvent,
@@ -51,7 +51,7 @@ export function createCustomerIoSimulationSyncSubscriber(
     fold: "simulationRunState",
     events: [SIMULATION_RUN_EVENT_TYPES.FINISHED],
     dedupId: (event) => `cio-sim-sync-${event.tenantId}`,
-    ttl: CIO_REACTOR_DEBOUNCE_TTL_MS,
+    ttl: CIO_SYNC_DEBOUNCE_TTL_MS,
 
     async handler(event: SimulationProcessingEvent): Promise<void> {
       // Only sync on terminal events

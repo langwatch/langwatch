@@ -1087,7 +1087,7 @@ describe("simulationRunStateFoldProjection finalized-status guard", () => {
     });
 
     // A late child that outlived the parent this run's reconciliation already
-    // failed must not rewrite the terminal record the downstream reactors have
+    // failed must not rewrite the terminal record the downstream subscribers have
     // already acted on -- nor split it into an ERROR status carrying the late
     // child's SUCCESS verdict.
     describe("when a second finished event arrives", () => {

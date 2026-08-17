@@ -203,6 +203,66 @@ It is allowed to lead with `OrganizationId` **only** because all of these hold:
 
 A new table wanting this carve-out needs all six, plus a line here. Anything that merely *finds it convenient* to skip `TenantId` does not qualify.
 
+## JOINs — Prefer Not To, Then Prefer `IN`
+
+ClickHouse is not Postgres here. The planner streams the **right-hand** side into
+an in-memory hash structure and probes it with the left, and it does far less
+join reordering than a row store would. So the shape you write is close to the
+shape that runs, and a JOIN that looks harmless in SQL can be the thing that
+holds a query's whole memory budget.
+
+The rules, in the order you should reach for them:
+
+**1. Do the join at WRITE time if the domain allows it.** The gateway-spend
+pipeline is the worked example: admission and outcome are two events that need
+joining, and the fold collapses them into one `gateway_spend` row as they land.
+The read side then has no JOIN at all, and "which requests are still open" is a
+`WHERE Status = 'admitted'` rather than a self-join. That is why those read paths
+contain zero SQL JOINs — not restraint, design.
+
+**2. Use `IN` for existence checks.** If you only need to know that a key exists
+in another result, `IN` beats a JOIN: it builds a hash SET rather than a hash
+TABLE and never materialises the other side's columns. This is already the
+mandated dedup shape above — `WHERE (TenantId, Id, EventTimestamp) IN (SELECT
+... max(EventTimestamp) ... GROUP BY ...)` is a semi-join written as `IN` on
+purpose.
+
+**3. Put the smaller side on the RIGHT.** The right side is the one that gets
+hashed into memory. Getting this backwards on a fact-vs-dimension join is the
+difference between hashing a few thousand rows and hashing the fact table.
+
+**4. Filter BOTH sides before joining, never join raw tables.** Wrap each side
+in a CTE or subquery that applies its tenant predicate, its partition predicate
+and its dedup first. `gateway_budget_scope_totals` reconciliation
+(`00069`/`00070`) is the shape to copy: both sides are pre-aggregated to the same
+grain by the time they meet, so the JOIN sees two small results rather than two
+tables.
+
+**5. Match join-key types EXACTLY.** A cast in the join key runs per row and can
+break matching outright. `FixedString(N)` is null-padded, so it does **not**
+compare to `String` the way you would expect — and note that `IN` is more
+forgiving about this than a JOIN key is, so a filter that works is not evidence
+that a join will.
+
+If the types genuinely differ, cast the **parameter** side, not the column:
+
+```sql
+-- WRONG: casts the table column, per row, and takes it out of its native type
+INNER JOIN spans ON CAST(points.SeriesId AS String) = spans.SpanSeriesId
+
+-- RIGHT: normalise the bound parameter once, leave the column alone
+INNER JOIN spans ON points.SeriesId = CAST(spans.SpanSeriesId AS FixedString(64))
+```
+
+See issue #7097 for a live instance of the wrong form.
+
+**6. Dictionaries for star-schema lookups.** For a small dimension joined to a
+large fact table, a ClickHouse Dictionary turns the JOIN into a direct hash
+lookup (`dictGet`). Nothing in this repo uses one today — if you find yourself
+repeatedly joining a small, slow-changing lookup table onto a big one, a
+dictionary is the intended tool, and worth an ADR rather than a quiet
+introduction.
+
 ## Code Review Checklist
 
 When reviewing a PR that touches a `*.clickhouse.repository.ts` or any service hitting ClickHouse, scan for:
@@ -213,5 +273,10 @@ When reviewing a PR that touches a `*.clickhouse.repository.ts` or any service h
 - **Missing partition predicate** when a date range is available — every weekly-partitioned table (`trace_summaries`, `simulation_runs`, `stored_spans`, `evaluation_runs`, ...) needs a WHERE on its partition column to enable pruning.
 - **Heavy columns in dedup subqueries** — anything like `Messages.Content`, `Inputs`, `Details`, `ComputedInput`, `SpanAttributes`, `Examples`, `LlmCalls` belongs only in the outer SELECT, never in the dedup subquery.
 - **A range filter on a MOVABLE column inside a dedup subquery** — the previous check says to add a partition predicate; this one says where it may not go. If the partition column can change after the row is written (a fold taking `min`/`max` over business time — `coding_agent_sessions.StartedAt`, `trace_analytics.OccurredAt`, `evaluation_analytics.OccurredAt` all do), then range-filtering the inner `max(<version>)` scope drops the true latest version out of its own dedup group the moment it drifts past the window edge. The group resolves to a **stale in-window version** and the outer scope returns it — non-null, plausible, and no fallback catches it. **Bound the outer scope for pruning; leave the dedup scope unbounded on that column.** Not even an upper bound is safe: a read-back miss re-runs `init()` and can re-stamp the anchor *forwards*, so "the latest version holds the smallest value" does not hold. Only the **key** narrowing (`TenantId`) belongs in both scopes. Nothing else qualifies just by looking stable: `UserId` is written by the fold, is absent from spans, and returns to `null` whenever a read-back miss re-runs `init()`, so a later version can carry an empty value, hold `max(<version>)`, and hide the true latest from a `UserId`-filtered group — the same defect in a column that never moves in a range sense. Narrow on it in the outer scope only, and accept that a session whose newest version lost the value leaves the filtered list. See ADR-071 and `coding-agent-session.clickhouse.repository.ts` (`findManyRecent` / `findLatestRecord`), which document both the rule and its scan cost.
+
+- **A `CAST` inside a JOIN key** — cast the bound parameter instead, so the column keeps its declared type. `FixedString(N)` vs `String` is the usual culprit, and it can silently drop rows rather than just cost time.
+- **A JOIN against a raw table** — pre-filter each side in a CTE/subquery first (tenant, partition, dedup), so the hash side is a small result rather than a table.
+- **The larger side on the right** — the right side is hashed into memory; put the smaller result there.
+- **A JOIN used only to test existence** — rewrite as `IN`, which builds a hash set and never materialises the other side's columns.
 
 These checks belong in code review because they're query-shape problems, not type problems — typecheck and unit tests will not catch them. CI integration tests will pass while production grinds to a halt under merge backlog.

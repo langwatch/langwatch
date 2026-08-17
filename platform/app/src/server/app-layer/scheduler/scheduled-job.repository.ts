@@ -273,6 +273,36 @@ export class PrismaScheduledJobRepository implements ScheduledJobRepository {
     `;
   }
 
+  async listPausedForOps({
+    limit,
+  }: {
+    limit: number;
+  }): Promise<{ rows: ScheduledJobRecord[]; total: number }> {
+    // Its own query rather than a filter over `listForOps`: that one orders
+    // `active DESC`, and in Postgres `true > false`, so the inactive rows sort
+    // to the very end — precisely what its LIMIT drops. A caller filtering
+    // that page finds nothing the moment the fleet outgrows the page.
+    const [rows, totals] = await Promise.all([
+      this.prisma.$queryRaw<ScheduledJobRecord[]>`
+        SELECT "id", "projectId", "targetType", "targetId", "cron", "timezone",
+               "nextRunAt", "lastSlot", "currentSlot", "attempts", "lastError",
+               "active", "createdAt", "updatedAt"
+        FROM "ScheduledJob"
+        WHERE "active" = false
+        ORDER BY "nextRunAt" ASC
+        LIMIT ${limit}
+        -- @tenancy: scheduler cross-tenant ops read (system-owned, read-only)
+      `,
+      this.prisma.$queryRaw<Array<{ total: number }>>`
+        SELECT COUNT(*)::int AS "total"
+        FROM "ScheduledJob"
+        WHERE "active" = false
+        -- @tenancy: scheduler cross-tenant ops read (system-owned, read-only)
+      `,
+    ]);
+    return { rows, total: totals[0]?.total ?? 0 };
+  }
+
   // ── Operator control (ADR-091) ────────────────────────────────────────
 
   async findByIdForOps({
@@ -415,6 +445,12 @@ export class NullScheduledJobRepository implements ScheduledJobRepository {
   }
   async listForOps(): Promise<ScheduledJobRecord[]> {
     return [];
+  }
+  async listPausedForOps(): Promise<{
+    rows: ScheduledJobRecord[];
+    total: number;
+  }> {
+    return { rows: [], total: 0 };
   }
   async findByIdForOps(): Promise<ScheduledJobRecord | null> {
     return null;

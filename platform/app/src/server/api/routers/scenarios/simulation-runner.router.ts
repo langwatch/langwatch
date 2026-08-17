@@ -208,7 +208,7 @@ export const simulationRunnerRouter = createTRPCRouter({
         parameters,
       });
 
-      // No explicit job scheduling — the execution reactor picks up the queued
+      // No explicit job scheduling — the execution subscriber picks up the queued
       // event via the GroupQueue and spawns the child process.
       logger.info(
         { batchRunId, scenarioRunId },

@@ -195,7 +195,7 @@ export class SuiteRunService {
       ),
     );
 
-    // No explicit job scheduling — the execution reactor picks up queued events
+    // No explicit job scheduling — the execution subscriber picks up queued events
     // via the GroupQueue and spawns child processes in the execution pool.
 
     logger.debug(
