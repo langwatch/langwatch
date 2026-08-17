@@ -563,7 +563,7 @@ describe.skipIf(!hasTestcontainers)(
       // displaced a blob-backed payload but nothing reclaimed the displaced
       // blob, so ~280K orphans (~7.4 GB) accumulated until their 7-day TTL. The
       // `delay` keeps both sends in staging so the second squash-replaces the
-      // first in place (the production path: a reactor re-folding a turn).
+      // first in place (the production path: a subscriber re-folding a turn).
       describe("when a dedup squash displaces a large payload", () => {
         const bigPayload = (filler: string): TestPayload => ({
           id: "dup",
@@ -1279,12 +1279,12 @@ describe.skipIf(!hasTestcontainers)(
             processBatch: async (ps, delivery) => {
               deliveries.push(delivery);
               // The post-store window: the handler COMMITS and only then
-              // throws (a reactor failing after the fold stored). The commit
+              // throws (a subscriber failing after the fold stored). The commit
               // is the part that matters — a later sub-batch that replaces
               // the applied set erases what this call recorded.
               if (!rootFailed && ps.length > 1) {
                 rootFailed = true;
-                throw new Error("reactor failed after the fold was stored");
+                throw new Error("subscriber failed after the fold was stored");
               }
             },
             coalesceMaxBatch: () => 8,

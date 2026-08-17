@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
-import { CIO_REACTOR_DEBOUNCE_TTL_MS } from "~/server/event-sourcing/pipelines/trace-processing/reactors/customerIoTraceSync.reactor";
+import { CIO_SYNC_DEBOUNCE_TTL_MS } from "~/server/event-sourcing/pipelines/trace-processing/subscribers/customerIoTraceSync.subscriber";
 import type { NurturingService } from "../../../../../../../ee/billing/nurturing/nurturing.service";
 
 import { SIMULATION_RUN_EVENT_TYPES } from "../../schemas/constants";
@@ -101,7 +101,7 @@ describe("customerIoSimulationSync subscriber", () => {
       const event = createEvent({ tenantId: "project-42" });
 
       expect(subscriber.dedupId?.(event)).toBe("cio-sim-sync-project-42");
-      expect(subscriber.ttl).toBe(CIO_REACTOR_DEBOUNCE_TTL_MS);
+      expect(subscriber.ttl).toBe(CIO_SYNC_DEBOUNCE_TTL_MS);
     });
   });
 

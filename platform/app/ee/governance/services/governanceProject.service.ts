@@ -18,7 +18,7 @@ import { nanoid } from "nanoid";
  *     enforces the bulk of this; per-consumer assertions land in Layer 2.
  *
  * Lifecycle: lazily ensured on first need — typically the first
- * IngestionSource mint per org. Any later callsite (anomaly reactor,
+ * IngestionSource mint per org. Any later callsite (anomaly subscriber,
  * receiver, UI sub-route) calls the SAME helper. There is no other
  * lazy-create path. Feature-flag activation alone does NOT create a
  * Governance Project; the user must mint a real governance entity

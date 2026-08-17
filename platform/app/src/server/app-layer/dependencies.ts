@@ -247,7 +247,7 @@ export interface AppDependencies {
   /**
    * Governance's OCSF SIEM-export sink (`governance_ocsf_events`). One
    * repository for both directions — the puller worker, the workspace-view
-   * audit trail and the reactor sync write through it; the SIEM export
+   * audit trail and the subscriber sync write through it; the SIEM export
    * procedure reads through it. Undefined on a deployment without
    * ClickHouse.
    */

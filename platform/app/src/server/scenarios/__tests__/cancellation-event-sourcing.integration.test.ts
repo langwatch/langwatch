@@ -2,7 +2,7 @@
  * Integration tests for event-sourcing based scenario cancellation.
  *
  * Uses real Redis (via testContainers) to verify the full pub/sub flow:
- * - Publishing cancel signals from the reactor
+ * - Publishing cancel signals from the subscriber
  * - Workers subscribing and receiving targeted cancellations
  * - Multiple workers only killing their own children
  * - Batch cancellation reaching all workers
@@ -472,7 +472,7 @@ describe("Event-sourcing cancellation (real Redis)", () => {
 
       await waitFor(() => pool.wasCancelled("run-pre-cancel"));
 
-      // Step 2: Execution reactor submits the job
+      // Step 2: Execution subscriber submits the job
       pool.submit({
         projectId: "proj-1",
         scenarioId: "scen-1",

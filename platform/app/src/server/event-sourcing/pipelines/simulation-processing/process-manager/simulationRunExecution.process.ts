@@ -20,7 +20,7 @@ import {
  * The simulation run execution process (ADR-052), authored for the
  * `withProcessManager` builder: pure state logic only. One process instance
  * per scenario run (process key = scenarioRunId). It replaces the old
- * fire-and-forget execution reactor, the ephemeral Redis-only cancellation
+ * fire-and-forget execution subscriber, the ephemeral Redis-only cancellation
  * path, and read-time stall derivation with durable state: the outbox owns
  * dispatch retries, and the wake owns the stall and cancel-grace backstops.
  *

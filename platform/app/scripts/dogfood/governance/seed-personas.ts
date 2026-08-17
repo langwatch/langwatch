@@ -268,7 +268,7 @@ export async function runSeedPersonas(
     // Personal $1/month BLOCK budget so a live-fire loop (fire-completion
     // or `langwatch claude`) actually populates gateway_budget_ledger_events
     // out-of-box. Without this, traces ingest cleanly but the trace-fold
-    // reactor finds zero applicable budgets and skips the ledger insert.
+    // subscriber finds zero applicable budgets and skips the ledger insert.
     // Idempotent per (org, principal) — finds existing or creates.
     const existingBudget = await prisma.gatewayBudget.findFirst({
       where: {
