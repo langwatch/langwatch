@@ -322,5 +322,30 @@ describe("TenantGuard", () => {
         expect(onUnscoped).toHaveBeenCalledWith(unscoped);
       });
     });
+
+    describe("when the audit hook throws", () => {
+      it("still allows the statement the guard just approved", async () => {
+        // `onUnscoped` is host code — an audit log, a counter — and it runs on
+        // the branch where the guard has already decided to allow. Unguarded,
+        // a broken audit sink turns every declared-unscoped statement into a
+        // refusal, which is a reporting hook deciding policy.
+        const next = vi.fn(passthrough);
+        const execute = guardedBy(next, {
+          onUnscoped: () => {
+            throw new Error("audit sink is down");
+          },
+        });
+
+        await execute(
+          request({
+            sql: "SELECT count() FROM system.parts",
+            params: {},
+            unscoped: { reason: "operational part-count check" },
+          }),
+        );
+
+        expect(next).toHaveBeenCalledTimes(1);
+      });
+    });
   });
 });

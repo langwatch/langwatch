@@ -91,7 +91,13 @@ export class ConcurrencyLimiter {
   }
 
   /** Run `task` once a slot is free, releasing the slot when it settles. */
-  async run<T>(task: () => Promise<T>, signal?: AbortSignalLike): Promise<T> {
+  async run<T>({
+    task,
+    signal,
+  }: {
+    task: () => Promise<T>;
+    signal?: AbortSignalLike | undefined;
+  }): Promise<T> {
     await this.acquire(signal);
     try {
       return await task();

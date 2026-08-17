@@ -234,18 +234,21 @@ async function run({
   const wait = armWait({ limiter, maxConcurrent, signal, waitTimeoutMs });
 
   try {
-    return await limiter.run(() => {
-      admitted = true;
-      // The wait is over the moment the slot is taken; holding the timer past
-      // here would abort nothing and keep one alive per admitted statement.
-      wait.dispose();
-      observeClickHouseStatementWait(
-        instance,
-        operation,
-        (performance.now() - queuedAt) / 1000,
-      );
-      return task();
-    }, wait.signal);
+    return await limiter.run({
+      task: () => {
+        admitted = true;
+        // The wait is over the moment the slot is taken; holding the timer past
+        // here would abort nothing and keep one alive per admitted statement.
+        wait.dispose();
+        observeClickHouseStatementWait(
+          instance,
+          operation,
+          (performance.now() - queuedAt) / 1000,
+        );
+        return task();
+      },
+      signal: wait.signal,
+    });
   } catch (error) {
     // Only a refusal is translated. Once admitted, the statement's own errors
     // belong to the layers below - translating them here would relabel a

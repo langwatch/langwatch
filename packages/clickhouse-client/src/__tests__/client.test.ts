@@ -181,12 +181,12 @@ describe("ClickHouseQueryClient", () => {
 
         // Occupy the only slot so the next statement has to wait.
         let release: (() => void) | undefined;
-        const blocker = limiter.run(
-          () =>
+        const blocker = limiter.run({
+          task: () =>
             new Promise<void>((resolve) => {
               release = resolve;
             }),
-        );
+        });
         await vi.waitFor(() => expect(release).toBeDefined());
 
         const client = new ClickHouseQueryClient({

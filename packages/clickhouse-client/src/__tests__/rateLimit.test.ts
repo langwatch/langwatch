@@ -56,9 +56,9 @@ describe("ConcurrencyLimiter", () => {
         });
         const gate = deferred();
 
-        void limiter.run(() => gate.promise);
+        void limiter.run({ task: () => gate.promise });
 
-        await expect(limiter.run(async () => "second")).rejects.toBeInstanceOf(
+        await expect(limiter.run({ task: async () => "second" })).rejects.toBeInstanceOf(
           QueueFullError,
         );
         gate.resolve();
@@ -74,9 +74,11 @@ describe("ConcurrencyLimiter", () => {
         const started = [false, false, false];
 
         gates.forEach((gate, i) => {
-          void limiter.run(async () => {
-            started[i] = true;
-            await gate.promise;
+          void limiter.run({
+            task: async () => {
+              started[i] = true;
+              await gate.promise;
+            },
           });
         });
         await Promise.resolve();
@@ -92,9 +94,11 @@ describe("ConcurrencyLimiter", () => {
         const first = deferred();
         let secondStarted = false;
 
-        void limiter.run(() => first.promise);
-        const second = limiter.run(async () => {
-          secondStarted = true;
+        void limiter.run({ task: () => first.promise });
+        const second = limiter.run({
+          task: async () => {
+            secondStarted = true;
+          },
         });
         await Promise.resolve();
         expect(secondStarted).toBe(false);
@@ -113,13 +117,15 @@ describe("ConcurrencyLimiter", () => {
         const limiter = new ConcurrencyLimiter({ maxConcurrent: 1 });
 
         await expect(
-          limiter.run(async () => {
-            throw new Error("boom");
+          limiter.run({
+            task: async () => {
+              throw new Error("boom");
+            },
           }),
         ).rejects.toThrow("boom");
 
         expect(limiter.stats().inFlight).toBe(0);
-        await expect(limiter.run(async () => "ok")).resolves.toBe("ok");
+        await expect(limiter.run({ task: async () => "ok" })).resolves.toBe("ok");
       });
     });
   });
@@ -135,10 +141,10 @@ describe("ConcurrencyLimiter", () => {
         });
         const gate = deferred();
 
-        void limiter.run(() => gate.promise);
-        void limiter.run(() => gate.promise);
+        void limiter.run({ task: () => gate.promise });
+        void limiter.run({ task: () => gate.promise });
 
-        await expect(limiter.run(async () => "third")).rejects.toBeInstanceOf(
+        await expect(limiter.run({ task: async () => "third" })).rejects.toBeInstanceOf(
           QueueFullError,
         );
         gate.resolve();
@@ -153,8 +159,8 @@ describe("ConcurrencyLimiter", () => {
         const gate = deferred();
         const controller = new AbortController();
 
-        void limiter.run(() => gate.promise);
-        const waiting = limiter.run(async () => "never", controller.signal);
+        void limiter.run({ task: () => gate.promise });
+        const waiting = limiter.run({ task: async () => "never", signal: controller.signal });
         await Promise.resolve();
         expect(limiter.stats().queued).toBe(1);
 
@@ -173,7 +179,7 @@ describe("ConcurrencyLimiter", () => {
         controller.abort();
 
         await expect(
-          limiter.run(async () => "never", controller.signal),
+          limiter.run({ task: async () => "never", signal: controller.signal }),
         ).rejects.toBeInstanceOf(AcquireAbortedError);
         expect(limiter.stats().inFlight).toBe(0);
       });

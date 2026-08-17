@@ -88,10 +88,10 @@ export class ClickHouseQueryClient {
     const withSlot = () =>
       this.limiter === undefined
         ? withRetries()
-        : this.limiter.run(withRetries, request.signal);
+        : this.limiter.run({ task: withRetries, signal: request.signal });
 
     return this.tracer === undefined
       ? withSlot()
-      : this.tracer.trace(request, withSlot);
+      : this.tracer.trace({ request, task: withSlot });
   }
 }

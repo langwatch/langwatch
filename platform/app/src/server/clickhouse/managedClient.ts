@@ -81,13 +81,20 @@ export function createResilientClickHouseClient({
     baseDelayMs,
     maxDelayMs,
     transientMessageFragments: CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS,
+    // The package's ports take named arguments; these platform functions are
+    // older and positional, and both have callers of their own. Adapting here
+    // is this function's job — it is the seam between what the platform has and
+    // what the package asks for.
     metrics: {
-      observeDuration: observeClickHouseQueryDuration,
-      incrementCount: incrementClickHouseQueryCount,
+      observeDuration: ({ queryType, table, durationSeconds }) =>
+        observeClickHouseQueryDuration(queryType, table, durationSeconds),
+      incrementCount: ({ queryType, outcome }) =>
+        incrementClickHouseQueryCount(queryType, outcome),
     },
     noticeLogger: createLogger("langwatch:clickhouse:resilient"),
     outcomeLogger: createLogger("langwatch:clickhouse:query"),
-    translateQueryError: translateClickHouseQueryError,
+    translateQueryError: ({ error, durationMs }) =>
+      translateClickHouseQueryError(error, durationMs),
     detectColdScan,
   });
 

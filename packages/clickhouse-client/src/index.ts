@@ -78,12 +78,22 @@ export {
   UnknownTenantError,
 } from "./tenancy";
 export type { TenantGuardOptions, TenantScopeViolation } from "./tenantGuard";
+export { quietly } from "./observability";
 export type {
   StatementLogSink,
   StatementMetrics,
+  StatementOperation,
   StatementOutcome,
+  StatementReporterOptions,
+} from "./statementReporting";
+export {
+  guardedLogSink,
+  guardedMetrics,
+  StatementReporter,
+} from "./statementReporting";
+export type { VendorQueryMeta, VendorQueryType } from "./statementShape";
+export type {
   VendorClientResilienceOptions,
-  VendorQueryType,
   VendorStatementClient,
 } from "./vendorClient";
 export { VendorClientResilience } from "./vendorClient";

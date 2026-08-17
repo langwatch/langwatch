@@ -15,6 +15,7 @@
  * query; the text of it belongs in the code, where it already is.
  */
 
+import { quietly } from "./observability";
 import type { QueryRequest, QueryResult } from "./query";
 
 /**
@@ -88,24 +89,6 @@ export const SPAN_ATTRIBUTES = {
   bytesRead: "db.response.read_bytes",
 } as const;
 
-/**
- * Runs host observability code without letting it change the outcome.
- *
- * Everything this middleware calls - the tracer, the span, the completion
- * counter - is supplied by the host and runs on the query's own path. An
- * exception from any of it would surface to the caller as though the query had
- * failed, or would replace a real ClickHouse error with a telemetry one. A
- * span exporter that is misconfigured is a reporting problem; it must not
- * become an outage.
- */
-function quietly(report: () => void): void {
-  try {
-    report();
-  } catch {
-    // Deliberately swallowed. The only channel for reporting a telemetry
-    // failure is the telemetry that just failed.
-  }
-}
 
 /**
  * Records one span per statement.
@@ -137,10 +120,13 @@ export class QueryTracer {
   }
 
   /** Run `task` inside a span describing `request`. */
-  async trace<Row>(
-    request: QueryRequest,
-    task: () => Promise<QueryResult<Row>>,
-  ): Promise<QueryResult<Row>> {
+  async trace<Row>({
+    request,
+    task,
+  }: {
+    request: QueryRequest;
+    task: () => Promise<QueryResult<Row>>;
+  }): Promise<QueryResult<Row>> {
     let span: SpanPort | undefined;
     quietly(() => {
       span = this.tracer.startSpan(this.spanName);

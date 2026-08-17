@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
+import type {
+  StatementLogSink,
+  StatementMetrics,
+} from "../statementReporting";
 import {
-  type StatementLogSink,
-  type StatementMetrics,
   VendorClientResilience,
   type VendorStatementClient,
 } from "../vendorClient";
@@ -15,9 +17,9 @@ function recordingMetrics(): StatementMetrics & {
   return {
     durations,
     counts,
-    observeDuration: (queryType, table, seconds) =>
-      void durations.push([queryType, table, seconds]),
-    incrementCount: (queryType, outcome) =>
+    observeDuration: ({ queryType, table, durationSeconds }) =>
+      void durations.push([queryType, table, durationSeconds]),
+    incrementCount: ({ queryType, outcome }) =>
       void counts.push([queryType, outcome]),
   };
 }
@@ -143,6 +145,36 @@ describe("VendorClientResilience", () => {
       });
     });
 
+    describe("when a read fails with it and never recovers", () => {
+      it("tries once more than the configured retries, then gives up", async () => {
+        // `maxRetries` counts retries after the first try, and runWithRetry
+        // counts tries, so the class converts with `maxRetries + 1`. A test
+        // that only covers one failure followed by a success passes with that
+        // conversion off by one in either direction; exhaustion is the only
+        // shape that pins it.
+        const query = vi
+          .fn()
+          .mockRejectedValue(
+            new Error(
+              "Code: 202. DB::Exception: Too many simultaneous queries.",
+            ),
+          );
+
+        const client = new VendorClientResilience({
+          maxRetries: 2,
+          baseDelayMs: 1,
+          maxDelayMs: 1,
+          transientMessageFragments: ["Too many simultaneous queries"],
+        }).wrap({ query, insert: vi.fn() });
+
+        await expect(client.query({ query: "SELECT 1" })).rejects.toThrow(
+          /Too many simultaneous queries/,
+        );
+
+        expect(query).toHaveBeenCalledTimes(3);
+      });
+    });
+
     describe("when an insert fails with it", () => {
       it("does not retry and raises the error untranslated", async () => {
         const metrics = recordingMetrics();
@@ -199,10 +231,10 @@ describe("VendorClientResilience", () => {
         await expect(client.query({ query: "SELECT 1" })).rejects.toBe(
           translated,
         );
-        expect(translateQueryError).toHaveBeenCalledWith(
-          expect.any(Error),
-          expect.any(Number),
-        );
+        expect(translateQueryError).toHaveBeenCalledWith({
+          error: expect.any(Error),
+          durationMs: expect.any(Number),
+        });
         expect(metrics.counts).toEqual([["SELECT", "error"]]);
         expect(outcomes.lines).toEqual([
           expect.objectContaining({
@@ -219,7 +251,7 @@ describe("VendorClientResilience", () => {
     describe("when the rows are consumed", () => {
       it("throws through the translator under a dedicated outcome", async () => {
         const metrics = recordingMetrics();
-        const translateQueryError = vi.fn((error: unknown) => error);
+        const translateQueryError = vi.fn(({ error }: { error: unknown }) => error);
         const client = new VendorClientResilience({
           metrics,
           translateQueryError,
@@ -309,6 +341,126 @@ describe("VendorClientResilience", () => {
         expect(outcomes.lines).toEqual([
           expect.objectContaining({ level: "debug" }),
         ]);
+      });
+    });
+  });
+
+  // The rule these pin is stated on ../observability.ts: a port that only
+  // describes the work must not be able to change it. Every one of these
+  // reporting calls runs inside the `catch` of the wrapped statement, so an
+  // unguarded throw does not merely lose a metric — it replaces the ClickHouse
+  // error, and the caller never learns what actually failed.
+  describe("given a reporting port that throws", () => {
+    const boom = () => {
+      throw new Error("metrics backend is down");
+    };
+
+    describe("when the counter throws while a read is failing", () => {
+      it("raises the ClickHouse error, not the counter one", async () => {
+        const translated = new Error("Code: 241. Memory limit exceeded");
+        const client = new VendorClientResilience({
+          metrics: { observeDuration: boom, incrementCount: boom },
+          translateQueryError: ({ error }) => error,
+        }).wrap({
+          query: vi.fn().mockRejectedValue(translated),
+          insert: vi.fn(),
+        });
+
+        await expect(client.query({ query: "SELECT 1" })).rejects.toBe(
+          translated,
+        );
+      });
+    });
+
+    describe("when the counter throws while an insert is failing", () => {
+      it("raises the ClickHouse error, not the counter one", async () => {
+        const failure = new Error("Code: 252. Too many parts");
+        const client = new VendorClientResilience({
+          metrics: { observeDuration: boom, incrementCount: boom },
+        }).wrap({
+          query: vi.fn(),
+          insert: vi.fn().mockRejectedValue(failure),
+        });
+
+        await expect(client.insert({ table: "events" })).rejects.toBe(failure);
+      });
+    });
+
+    describe("when the counter throws on the success path", () => {
+      it("still returns the rows", async () => {
+        const client = new VendorClientResilience({
+          metrics: { observeDuration: boom, incrementCount: boom },
+        }).wrap({
+          query: vi.fn().mockResolvedValue({ ok: true }),
+          insert: vi.fn(),
+        });
+
+        await expect(client.query({ query: "SELECT 1" })).resolves.toEqual({
+          ok: true,
+        });
+      });
+    });
+
+    describe("when one broken metric sits beside a working one", () => {
+      it("still records the one that works", async () => {
+        const counts: [string, string][] = [];
+        const client = new VendorClientResilience({
+          metrics: {
+            observeDuration: boom,
+            incrementCount: ({ queryType, outcome }) =>
+              void counts.push([queryType, outcome]),
+          },
+        }).wrap({
+          query: vi.fn().mockResolvedValue({}),
+          insert: vi.fn(),
+        });
+
+        await client.query({ query: "SELECT 1" });
+
+        expect(counts).toEqual([["SELECT", "success"]]);
+      });
+    });
+
+    describe("when one broken logger is passed for both sinks", () => {
+      it("raises the ClickHouse error, not the second logging failure", async () => {
+        // The fallback that reports a failed outcome line writes to the notice
+        // sink. A host passing one logger for both has already broken the sink
+        // being asked to report the breakage, so the fallback throws too.
+        const broken: StatementLogSink = {
+          debug: boom,
+          warn: boom,
+          error: boom,
+        };
+        const failure = new Error("Code: 241. Memory limit exceeded");
+        const client = new VendorClientResilience({
+          noticeLogger: broken,
+          outcomeLogger: broken,
+          translateQueryError: ({ error }) => error,
+        }).wrap({
+          query: vi.fn().mockRejectedValue(failure),
+          insert: vi.fn(),
+        });
+
+        await expect(client.query({ query: "SELECT 1" })).rejects.toBe(failure);
+      });
+
+      it("still returns the rows when the success line throws", async () => {
+        const broken: StatementLogSink = {
+          debug: boom,
+          warn: boom,
+          error: boom,
+        };
+        const client = new VendorClientResilience({
+          noticeLogger: broken,
+          outcomeLogger: broken,
+        }).wrap({
+          query: vi.fn().mockResolvedValue({ ok: true }),
+          insert: vi.fn(),
+        });
+
+        await expect(client.query({ query: "SELECT 1" })).resolves.toEqual({
+          ok: true,
+        });
       });
     });
   });

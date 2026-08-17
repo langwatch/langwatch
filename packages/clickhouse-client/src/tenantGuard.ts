@@ -39,6 +39,7 @@
  * the caller claims to be acting for.
  */
 
+import { quietly } from "./observability";
 import type { QueryRequest } from "./query";
 
 export type TenantScopeViolation =
@@ -291,7 +292,13 @@ export class TenantGuard {
    */
   assert(request: QueryRequest): void {
     if (request.unscoped !== undefined) {
-      this.onUnscoped?.(request);
+      // Guarded because `onUnscoped` is host code - an audit log, a counter -
+      // and this branch is the one where the guard has already decided to
+      // allow. An exception from it would propagate out of `assert` and refuse
+      // a statement the guard just approved, which is a reporting hook
+      // deciding policy. Observability must not change what it observes; see
+      // ./observability.ts.
+      quietly(() => this.onUnscoped?.(request));
       return;
     }
 
