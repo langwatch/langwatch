@@ -171,7 +171,8 @@ describe("langy-conversation-processing pipeline shape", () => {
             subscriber,
           );
         }
-        // An independent subscriber is not smuggled in as a subscriber.
+        // A live event subscriber is not smuggled into either projection
+        // subscriber registry.
         expect(pipeline.foldSubscribers.size).toBe(0);
         expect(pipeline.mapSubscribers.size).toBe(0);
       });

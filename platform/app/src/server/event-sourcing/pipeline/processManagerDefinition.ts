@@ -51,8 +51,13 @@ export interface TriggerOptions<E extends Event = Event> {
    * state) should key by tenant so queued deliveries serialize in one lane
    * instead of stacking into a parallel storm (2026-07-31: ~85 concurrent
    * trigger sweeps for one tenant where the 5s debounce intended 0.2/s).
-   * The queue prefixes `<tenantId>/subscriber/<name>/` around this key, so
-   * tenant scoping holds regardless.
+   * The queue prefixes a tenant-scoped lane around this key, so tenant scoping
+   * holds regardless. Which lane depends on where the subscriber is attached:
+   * a pipeline-level one gets `<tenantId>/subscriber/<name>/`, while one
+   * attached to a projection keeps the pre-retirement job path,
+   * `<tenantId>/<fold|map>/<projection>/reactor/<name>/` — that path is the
+   * GroupQueue routing key, so ADR-098 left it spelled the old way rather
+   * than strand in-flight jobs across a rolling deploy.
    */
   groupKeyFn?: (event: E, state?: unknown) => string;
 }

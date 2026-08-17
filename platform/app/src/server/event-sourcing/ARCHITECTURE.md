@@ -77,6 +77,21 @@ A subscriber is tied to a specific fold projection. It fires **after** the fold'
 
 A subscriber fires on every fold completion unless it narrows itself: `events` restricts it to named event types, and `when` is a pure, synchronous predicate evaluated on the projection hot path **before** any job is enqueued, so a rejected event costs no serialize-and-queue (ADR-069). A throwing predicate is logged and treated as relevant — it fails open, never dropping a side effect. Downstream deduplication is handled via `dedupId`/`dedup` + `delay`.
 
+**Three places a subscriber can attach.** The contract above is the same in all
+three; what differs is what it waits for and which queue lane it lands in.
+
+| Attached to | Fires after | Receives as state | Queue lane |
+|---|---|---|---|
+| a fold projection | that fold's `apply + store` | the committed fold state | `<tenantId>/fold/<projection>/reactor/<name>/` |
+| a map projection | that map's write | the mapped record | `<tenantId>/map/<projection>/reactor/<name>/` |
+| the pipeline itself (a live event subscriber) | the event is committed to the log — it waits on no projection | no projection state | `<tenantId>/subscriber/<name>/` |
+
+The first two are *projection* subscribers, which is why the code spells them
+`projectionSubscriber*` where both families are in scope. The `reactor` segment
+in their job path is a deliberately kept name, not a missed rename — the path is
+the GroupQueue routing key, so ADR-098 left it alone rather than strand
+in-flight jobs across a rolling deploy.
+
 See: [`subscribers/subscriber.types.ts`](./subscribers/subscriber.types.ts)
 
 ## Architecture Overview

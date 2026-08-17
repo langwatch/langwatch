@@ -826,6 +826,12 @@ export class QueueManager<EventType extends Event = Event> {
         }),
       };
 
+      // The "reactor" jobType is a KEPT name, not a missed rename (ADR-098).
+      // It is the queue's routing key: it spells the `<tenantId>/<fold|map>/
+      // <projection>/reactor/<name>` job path and the pause keys ops sets
+      // against it. Renaming it strands every job a pod staged under the old
+      // spelling for the length of a rolling deploy, so it outlives the
+      // vocabulary it came from. Change it only behind a dual-read migration.
       const facade = this.createFacade<{
         event: EventType;
         foldState: unknown;

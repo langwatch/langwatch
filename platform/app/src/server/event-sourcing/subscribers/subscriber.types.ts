@@ -54,7 +54,12 @@ export interface SubscriberDispatchOptions {
  *
  * Subscribers fire on every fold completion unless a `shouldDispatch`
  * predicate filters the event out before enqueue.
- * Downstream commands handle their own dedup via makeJobId + delay.
+ *
+ * Dedup is opt-in and has two entry points that must agree: `deduplication`
+ * is the full GroupQueue contract (what `withSubscriber` builds), and
+ * `makeJobId` + `ttl` is the older pair the router's pre-staging batch
+ * collapse reads. `withSubscriber` points both at one key function so they
+ * cannot drift. A subscriber declaring neither dispatches one job per event.
  *
  * See dev/docs/adr/026-reactor-should-react-predicate.md (the predicate's
  * contract, unchanged; ADR-098 renamed its vocabulary).

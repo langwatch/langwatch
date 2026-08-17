@@ -751,7 +751,7 @@ export class ProjectionRouter<
               mapSubscribers.length > 0
             ) {
               await this.dispatchToSubscribers({
-                foldName: name,
+                projectionName: name,
                 subscribers: mapSubscribers,
                 deliveries: [{ event, foldState: record }],
               });
@@ -824,7 +824,7 @@ export class ProjectionRouter<
               // subscriber that reads one still sees the record its event
               // produced.
               await this.dispatchToSubscribers({
-                foldName: name,
+                projectionName: name,
                 subscribers: mapSubscribers,
                 deliveries: mapped.map(({ event, record }) => ({
                   event,
@@ -1261,7 +1261,7 @@ export class ProjectionRouter<
               mapSubscribers.length > 0
             ) {
               await this.dispatchToSubscribers({
-                foldName: name,
+                projectionName: name,
                 subscribers: mapSubscribers,
                 deliveries: [{ event, foldState: record }],
               });
@@ -1789,7 +1789,7 @@ export class ProjectionRouter<
 
     try {
       await this.dispatchToSubscribers({
-        foldName: projectionName,
+        projectionName,
         subscribers,
         deliveries: events.map((event) => ({ event, foldState })),
       });
@@ -2100,11 +2100,11 @@ export class ProjectionRouter<
    * rather than the last event in the batch.
    */
   private async dispatchToSubscribers({
-    foldName,
+    projectionName,
     subscribers,
     deliveries,
   }: {
-    foldName: string;
+    projectionName: string;
     subscribers: SubscriberDispatchDefinition<EventType>[];
     deliveries: SubscriberDelivery<EventType>[];
   }): Promise<void> {
@@ -2139,7 +2139,7 @@ export class ProjectionRouter<
         deliveries: relevant,
       })) {
         await this.dispatchOneToSubscriber({
-          foldName,
+          projectionName,
           subscriber,
           event,
           foldState,
@@ -2161,13 +2161,13 @@ export class ProjectionRouter<
    * a single bad subscriber can't skip the ones after it.
    */
   private async dispatchOneToSubscriber({
-    foldName,
+    projectionName,
     subscriber,
     event,
     foldState,
     errors,
   }: {
-    foldName: string;
+    projectionName: string;
     subscriber: SubscriberDispatchDefinition<EventType>;
     event: EventType;
     foldState: unknown;
@@ -2187,7 +2187,7 @@ export class ProjectionRouter<
           this.logger.error(
             {
               subscriberName: subscriber.name,
-              foldName,
+              projectionName,
               eventId: event.id,
               error: error instanceof Error ? error.message : String(error),
             },
@@ -2200,7 +2200,7 @@ export class ProjectionRouter<
         this.logger.warn(
           {
             subscriberName: subscriber.name,
-            foldName,
+            projectionName,
             eventId: event.id,
           },
           "Subscriber queue not found, falling back to inline execution",
@@ -2233,7 +2233,7 @@ export class ProjectionRouter<
           this.logger.error(
             {
               subscriberName: subscriber.name,
-              foldName,
+              projectionName,
               eventId: event.id,
               eventType: event.type,
               aggregateId: String(event.aggregateId),
@@ -2275,7 +2275,7 @@ export class ProjectionRouter<
         this.logger.error(
           {
             subscriberName: subscriber.name,
-            foldName,
+            projectionName,
             eventId: event.id,
             eventType: event.type,
             aggregateId: String(event.aggregateId),

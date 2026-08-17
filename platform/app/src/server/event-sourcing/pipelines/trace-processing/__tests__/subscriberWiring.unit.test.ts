@@ -15,7 +15,7 @@ import type { TraceProcessingEvent } from "../schemas/events";
  * asserts the `.withSubscriber("triggerMatch", ...)` /
  * `.withSubscriber("graphTriggerActivity", ...)` registrations at
  * pipeline.ts:224-241 carry the intended events/delay/ttl/dedup. These
- * debounce/dedup values previously lived on deleted subscribers' options and
+ * debounce/dedup values previously lived on deleted reactors' options and
  * were tested there (ADR-052) — this locks the replacement wiring in.
  * `build()` only stores references, so no store / subscriber is ever invoked.
  */

@@ -2563,7 +2563,7 @@ describe("GroupStagingScripts", () => {
             jobDataJson: makePausedJobData(),
           }),
         );
-        await scripts.addPauseKey("ingestion/subscriber");
+        await scripts.addPauseKey("ingestion/reactor");
 
         const result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
         expect(result).not.toBeNull();

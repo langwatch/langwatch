@@ -49,10 +49,10 @@ afterEach(cleanup);
 describe("LeftPanel", () => {
   describe("given an aggregate with subscribers", () => {
     describe("when the rail renders", () => {
-      it("lists event subscribers, not subscribers", () => {
+      it("lists event subscribers, never the retired reactor rail", () => {
         renderPanel();
         expect(screen.getByText("Event Subscribers")).toBeDefined();
-        expect(screen.queryByText("Subscribers")).toBeNull();
+        expect(screen.queryByText("Reactors")).toBeNull();
         expect(screen.getByText("graphTriggerActivity")).toBeDefined();
       });
 

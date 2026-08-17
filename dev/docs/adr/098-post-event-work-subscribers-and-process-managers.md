@@ -64,7 +64,7 @@ any pipeline, waiting on a counting strategy that never landed.
 We retire the reactor as a public concept. Post-event work has exactly two
 primitives:
 
-```
+```text
                          event committed to the log
                                    │
                      fold / map projection applies + stores

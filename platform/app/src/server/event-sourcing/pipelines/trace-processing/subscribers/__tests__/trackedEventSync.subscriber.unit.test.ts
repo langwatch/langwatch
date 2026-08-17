@@ -66,8 +66,9 @@ function makeOtlpSpan(feedbackEvents: FeedbackEvent[]): OtlpSpan {
  * Mirrors the span `recordTrackedEventSpan` ingests back into the same
  * trace-processing pipeline: named `TRACK_EVENT_SPAN_NAME`, carrying one span
  * event named after the recorded event type, whose attributes always include
- * `event.type`. With `eventType` set to `langwatch.event` this span is byte-for
- * -byte the shape this subscriber reacts to, which is the amplification loop.
+ * `event.type`. With `eventType` set to `langwatch.event` this span is
+ * byte-for-byte the shape this subscriber reacts to, which is the
+ * amplification loop.
  */
 function makeRecordedTrackEventSpan(eventType: string): OtlpSpan {
   const attributes = [

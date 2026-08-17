@@ -27,8 +27,9 @@ do not re-derive them.
   Terminal tab shortcut is not `M`.
 - **Codex ignores `OTEL_*` env** (needs `config.toml [otel]`); Codex
   `total` and Gemini `tool` token buckets are non-additive — never sum them.
-- **No subscribers** in the new pipeline: subscribers, projections, one process
-  manager. Origin gating is a predicate, not a gate subscriber.
+- **Post-event work is subscribers, projections and one process manager** in
+  the new pipeline — there is no third primitive (ADR-098). Origin gating is a
+  predicate, not a gate subscriber.
 - Per-repo rules that bite here: `projectId`/TenantId first in every query;
   repositories `findAll/findById`, services `getAll/getById`; no re-exports;
   no inline `import()`; focused tests over full typecheck.

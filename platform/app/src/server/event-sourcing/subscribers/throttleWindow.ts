@@ -59,7 +59,12 @@ export function throttledWindow<E extends Event>({
 }): {
   delay: number;
   dedup: {
-    makeId: (event: E) => string;
+    /**
+     * Keeps the caller's `(event, state?)` arity: `staticBuilder` forwards the
+     * committed fold state here, so narrowing this to `(event)` would make a
+     * direct consumer unable to pass what the builder already passes.
+     */
+    makeId: (event: E, state?: unknown) => string;
     ttlMs: number;
     extend: false;
     replace: true;

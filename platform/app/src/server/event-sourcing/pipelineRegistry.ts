@@ -448,8 +448,8 @@ export class PipelineRegistry {
     // registered — the counting strategy needs finalising (per-event
     // ClickHouse queries) before enabling. See
     // customerIoSimulationSync.subscriber.ts. Its trace and evaluation
-    // siblings were deleted with the subscriber retirement (ADR-098) and return
-    // as subscribers if nurturing sync expands again.
+    // siblings migrated with the reactor retirement (ADR-098) and are
+    // likewise implemented but unregistered, pending that same decision.
     const traceSummaryStore = this.cached<TraceSummaryData>(
       new TraceSummaryStore(this.deps.repositories.traceSummaryFold),
       "trace_summaries",

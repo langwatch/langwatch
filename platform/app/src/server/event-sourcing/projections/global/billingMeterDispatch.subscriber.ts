@@ -66,7 +66,8 @@ export function createBillingMeterDispatchSubscriber(deps: {
     options: {
       runIn: ["worker"],
       groupKeyFn: (payload) => billingMeterDispatchGroupKey(payload.event),
-      // Deliberately fires immediately, unlike the other level-triggered      // subscribers. `handle` decides which billing months to report by reading
+      // Deliberately fires immediately, unlike the other level-triggered
+      // subscribers. `handle` decides which billing months to report by reading
       // the WALL CLOCK at the moment it runs, not the event it was given, so
       // holding a trigger moves the decision as well as the work. A trigger
       // arriving in the last seconds of the third grace day would run on the
