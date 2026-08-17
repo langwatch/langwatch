@@ -168,6 +168,18 @@ Feature: Staged automation authoring drawer
       Then the user selects the target dataset
       And no template section is shown
 
+    # A project with no dataset has nothing to select, so the create
+    # affordance is the only way out of the section. It was rendered
+    # without a handler, which left the first add-to-dataset automation of
+    # every new project unfinishable from the drawer.
+    @integration
+    Scenario: Creating a dataset from the automation is offered and works
+      Given the user is configuring an add-to-dataset action
+      And the project has no dataset yet
+      When the user chooses to create a dataset
+      Then the dataset creation form opens
+      And the created dataset becomes the automation's target
+
   Rule: The Slack channel list never claims to be complete when it isn't
 
     The picker is populated from what the bot token can see, and there are

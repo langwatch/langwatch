@@ -91,14 +91,14 @@ Feature: Large trace payloads — event_log as single source of truth · transie
     And the winning input, output, and root span pointers are unchanged
 
   @integration @track1 @unimplemented
-  # Existing EvaluationTrigger reactor tests cover the trigger semantics.
-  # Reactors receive { event, foldState } from the projection queue, where
+  # Existing EvaluationTrigger subscriber tests cover the trigger semantics.
+  # Subscribers receive { event, foldState } from the projection queue, where
   # event is the lean shape produced by leanForProjection. Bind once an
   # integration test exercises trigger firing on a leaned event.
-  Scenario: EvaluationTrigger reactor fires correctly off the lean event
+  Scenario: EvaluationTrigger subscriber fires correctly off the lean event
     Given a trace folds to a state that satisfies an evaluation trigger
-    When the leaned event is dispatched to the reactor queue
-    Then the EvaluationTrigger reactor observes the trigger condition
+    When the leaned event is dispatched to the subscriber queue
+    Then the EvaluationTrigger subscriber observes the trigger condition
     And the evaluation is scheduled exactly as it is without the lean step
 
   # ===========================================================================
@@ -286,9 +286,9 @@ Feature: Large trace payloads — event_log as single source of truth · transie
   #   -> Scenario: Folding a trace with a 1 MB output keeps the Redis cache entry lean
   # AC T1.2: "Trace-detail full read returns byte-identical IO"
   #   -> Scenario: Trace-detail full read returns input and output byte-identical to ingestion
-  # AC T1.3: "Out-of-order refold + EvaluationTrigger reactor still produce correct state"
+  # AC T1.3: "Out-of-order refold + EvaluationTrigger subscriber still produce correct state"
   #   -> Scenario: Out-of-order folding converges on the same state as in-order folding
-  #   -> Scenario: EvaluationTrigger reactor fires correctly off the lean event
+  #   -> Scenario: EvaluationTrigger subscriber fires correctly off the lean event
   #
   # Track 2 — event_log as SoT + spool + SDKs + read resolution
   # AC T2.1: "SDKs and gateway transmit full IO without truncation"

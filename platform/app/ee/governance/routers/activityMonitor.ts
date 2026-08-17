@@ -16,7 +16,7 @@
  */
 
 import { ActivityMonitorService } from "@ee/governance/services/activity-monitor/activityMonitor.service";
-import { z } from "zod";
+import { z } from "zod/v4";
 
 import {
   ENTERPRISE_FEATURE_ERRORS,
@@ -185,10 +185,10 @@ export const activityMonitorRouter = createTRPCRouter({
     }),
 
   /**
-   * Recent anomaly alerts produced by the anomaly-detection reactor.
+   * Recent anomaly alerts produced by the anomaly-detection subscriber.
    * Service-routed read of `prisma.anomalyAlert` keyed by org, sorted
    * by detectedAt DESC. Returns [] when no rules have fired or when
-   * ClickHouse is disabled (the reactor short-circuits without CH).
+   * ClickHouse is disabled (the subscriber short-circuits without CH).
    */
   recentAnomalies: protectedProcedure
     .input(

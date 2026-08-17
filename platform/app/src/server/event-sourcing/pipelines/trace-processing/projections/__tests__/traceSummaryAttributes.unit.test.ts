@@ -232,7 +232,7 @@ describe("applySpanToSummary attribute forwarding", () => {
 
       const state = applySpanToSummary({ state: createInitState(), span });
 
-      // Shape the reactor's early-return check expects.
+      // Shape the subscriber's early-return check expects.
       expect(state.attributes["langwatch.virtual_key_id"]).toBeTruthy();
       expect(state.attributes["langwatch.gateway_request_id"]).toBeTruthy();
     });

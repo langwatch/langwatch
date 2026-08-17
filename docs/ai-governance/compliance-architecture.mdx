@@ -4,7 +4,7 @@ description: How LangWatch AI Gateway governance underwrites SOC 2 Type II, ISO 
 sidebarTitle: Compliance architecture
 ---
 
-<Info>**Pairs with:** [AI Gateway → Audit](/ai-gateway/audit). The gateway emits the spans; governance reactors fold them into OCSF-mapped events for SIEM export.</Info>
+<Info>**Pairs with:** [AI Gateway → Audit](/ai-gateway/audit). The gateway emits the spans; governance processing folds them into OCSF-mapped events for SIEM export.</Info>
 
 <Note>**Available on Enterprise plans.** The OCSF/SIEM export, configurable retention, and tamper-evidence (post-GA follow-up) covered on this page require an Enterprise license. The Apache 2.0 floor still gives you a single trace store at the platform default retention window and an append-only event_log; the compliance underwriting documented below is the Enterprise extension. See [Open-core licensing](/ai-governance/overview#open-core-licensing) for the full Apache 2.0, Enterprise split.</Note>
 
@@ -44,7 +44,7 @@ This page maps each compliance framework you might need to the mechanisms in Lan
               │                  │           └────────────────────┘
               ▼                  ▼
      ┌─────────────────┐ ┌──────────────────────┐
-     │ Anomaly reactor │ │ OCSF read API        │
+     │ Anomaly detector│ │ OCSF read API        │
      │ /governance KPI │ │ (SIEM cron-pull,     │
      │     strip       │ │  Splunk/Datadog/etc.)│
      └─────────────────┘ └──────────────────────┘

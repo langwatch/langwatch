@@ -48,10 +48,6 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-vi.mock("~/components/messages/HeaderButtons", () => ({
-  useTableView: () => ({ isTableView: false }),
-}));
-
 vi.mock("~/components/sidebar/CollapsibleMenuGroup", () => ({
   CollapsibleMenuGroup: ({ label }: { label: string }) => (
     <a href="/demo/simulations" aria-label={label}>
@@ -114,13 +110,23 @@ describe("<MainMenu /> navigation", () => {
       "Home",
       "Analytics",
       "Trace Explorer",
-      "Traces",
       "Online Evals",
       "Simulations",
       "Experiments",
       "Annotations",
       "Settings",
     ]);
+  });
+
+  /** @scenario "The sidebar no longer offers the legacy Traces page" */
+  it("offers Trace Explorer as the only traces destination", () => {
+    render(<MainMenu />, { wrapper: Wrapper });
+
+    const tracesLabels = visibleLinkLabels().filter((label) =>
+      /trace/i.test(label ?? ""),
+    );
+
+    expect(tracesLabels).toEqual(["Trace Explorer"]);
   });
 
   /** @scenario Use sensible section defaults without a saved preference */

@@ -1017,11 +1017,29 @@ function throwIfPageShouldRetry(params: {
     );
   }
 
+  const representative = retryableFailures[0];
   logger.warn(
-    { projectId, triggerId, failed: retryableFailures.length, pageSize },
+    {
+      projectId,
+      triggerId,
+      failed: retryableFailures.length,
+      pageSize,
+      // The cause, not only the count. A retryable failure is rethrown into
+      // the outbox, which redacts the message before it logs the attempt, so
+      // without this line a page that retries to its attempt ceiling reports
+      // "failed: 1" and nothing an operator can act on.
+      errorType:
+        representative instanceof Error
+          ? representative.name
+          : typeof representative,
+      errorMessage:
+        representative instanceof Error
+          ? representative.message
+          : String(representative),
+    },
     "Persist page had retryable failures. Retrying the page; claimed traces no-op on the retry",
   );
-  throw retryableFailures[0];
+  throw representative;
 }
 
 /**

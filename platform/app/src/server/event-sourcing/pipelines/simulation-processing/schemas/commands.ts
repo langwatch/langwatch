@@ -9,8 +9,8 @@ export const queueRunCommandDataSchema = z.object({
   scenarioSetId: z.string(),
   name: z.string().optional(),
   description: z.string().optional(),
-  metadata: z.record(z.unknown()).optional(),
-  /** Target for execution. Used by the execution reactor to spawn the right adapter. */
+  metadata: z.record(z.string(), z.unknown()).optional(),
+  /** Target for execution. Used by the process manager's execute intent to spawn the right adapter. */
   target: z
     .object({
       type: z.enum(["prompt", "http", "code", "workflow"]),
@@ -29,7 +29,7 @@ export const startRunCommandDataSchema = z.object({
   scenarioSetId: z.string(),
   name: z.string().optional(),
   description: z.string().optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
   occurredAt: z.number(),
 });
 export type StartRunCommandData = z.infer<typeof startRunCommandDataSchema>;
@@ -50,8 +50,25 @@ export const finishRunCommandDataSchema = z.object({
   tenantId: z.string(),
   scenarioRunId: z.string(),
   results: simulationResultsSchema.optional(),
+  /**
+   * Failure reason from infrastructure callers (the stall watchdog and
+   * cancel-grace intents) that have no judge verdict to report. When
+   * `results` is absent, FinishRunCommand synthesizes the failure-results
+   * envelope from this so the reason is recorded on the event instead of
+   * being dropped at the schema boundary. Ignored when `results` is given.
+   */
+  error: z.string().optional(),
   durationMs: z.number().optional(),
   status: z.string().optional(),
+  /**
+   * ECST fields for the RunFinished event. Optional: FinishRunCommand
+   * backfills any gap from the run's prior events (identity from RunQueued,
+   * traceIds from MessageSnapshot/TextMessageEnd) when omitted.
+   */
+  scenarioId: z.string().optional(),
+  batchRunId: z.string().optional(),
+  scenarioSetId: z.string().optional(),
+  traceIds: z.array(z.string()).optional(),
   occurredAt: z.number(),
 });
 export type FinishRunCommandData = z.infer<typeof finishRunCommandDataSchema>;
@@ -74,7 +91,7 @@ export const textMessageEndCommandDataSchema = z.object({
   messageId: z.string(),
   role: z.string(),
   content: z.string(),
-  message: z.record(z.unknown()).optional(),
+  message: z.record(z.string(), z.unknown()).optional(),
   traceId: z.string().optional(),
   messageIndex: z.number().optional(),
   occurredAt: z.number(),
@@ -87,7 +104,7 @@ export const computeRunMetricsCommandDataSchema = z.object({
   tenantId: z.string(),
   scenarioRunId: z.string(),
   traceId: z.string(),
-  /** ECST payload: metrics carried from trace-side reactor. Omitted in pull mode. */
+  /** ECST payload: metrics carried from trace-side subscriber. Omitted in pull mode. */
   metrics: z
     .object({
       totalCost: z.number(),

@@ -97,6 +97,7 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
+      - uses: ./.github/actions/go-build-cache
       - run: go mod verify
       - run: go build ./cmd/... ./tools/thuishaven/...
 
@@ -129,6 +130,14 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
+      # `race` keeps this cache separate from the plain one: race-instrumented
+      # objects are compiled differently, and restoring the wrong set would
+      # rebuild everything anyway. This is where the rotating key pays for
+      # itself — 164s of this job's 188s was `go test`, most of it recompiling
+      # under `-race` against a cache that could never update.
+      - uses: ./.github/actions/go-build-cache
+        with:
+          suffix: race
       - run: go test -count=1 -race ./services/aigateway/... ./services/nlpgo/... ./pkg/... ./tools/migrationorder/... ./tools/thuishaven/... ./tools/herrgen/... ./tools/linkcheck/... ./cmd/linkcheck/...
 
   lint:
@@ -208,6 +217,17 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
+      # `go vet` type-checks everything it inspects, so it benefits from the
+      # same build cache as `build`. Plain, not `race`: it compiles the same
+      # objects `build` does.
+      #
+      # This job overlaps heavily with `lint` — govet is one of golangci-lint's
+      # always-on defaults and `lint` covers every package below except
+      # tools/thuishaven. It is kept anyway: golangci-lint runs govet with its
+      # OWN default analyser set, and .golangci.yml has no `govet` block
+      # pinning that to what `go vet` runs, so "already covered" is likely but
+      # not guaranteed. A cheap job is the wrong thing to bet coverage on.
+      - uses: ./.github/actions/go-build-cache
       - run: go vet ./services/aigateway/... ./services/nlpgo/... ./pkg/... ./cmd/... ./tools/migrationorder/... ./tools/thuishaven/... ./tools/herrgen/... ./tools/linkcheck/...
 
   # packages/handled-error/src/codes.generated.ts mirrors the services' herr

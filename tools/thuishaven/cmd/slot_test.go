@@ -35,6 +35,7 @@ func TestParseSlotRun(t *testing.T) {
 }
 
 // @scenario "haven's slot run is transparent to the command"
+// @scenario "Queued whole-tree runs get a soft memory cap at spawn"
 func TestSlotRunIsTransparentToTheCommand(t *testing.T) {
 	sem := semaphore.New(t.TempDir())
 	t.Setenv("CHECK_SLOTS", "1")
@@ -69,6 +70,28 @@ func TestSlotRunIsTransparentToTheCommand(t *testing.T) {
 		fields := strings.Fields(string(env))
 		if len(fields) != 2 || fields[0] != "0" || !strings.HasSuffix(fields[1], "GiB") {
 			t.Fatalf("child env = %q, want CHECK_SLOTS=0 and a GiB GOMEMLIMIT", string(env))
+		}
+	})
+
+	// The scenario this test is bound to promises two things about the cap, and
+	// the subtest above only proves the first. An operator who set a limit did
+	// so to override the derived one, so a run that quietly replaced it would
+	// take away the only control they have.
+	t.Run("an operator's own GOMEMLIMIT reaches the child unchanged", func(t *testing.T) {
+		t.Setenv("GOMEMLIMIT", "2GiB")
+		out := filepath.Join(t.TempDir(), "env.txt")
+		job := &slotJob{sem: sem, label: "operator-limit", argv: []string{
+			"sh", "-c", `printf '%s' "$GOMEMLIMIT" > ` + out,
+		}, progress: &bytes.Buffer{}}
+		if code := job.run(context.Background()); code != 0 {
+			t.Fatalf("exit code = %d, want 0", code)
+		}
+		env, err := os.ReadFile(out)
+		if err != nil {
+			t.Fatalf("reading the child's env dump: %v", err)
+		}
+		if string(env) != "2GiB" {
+			t.Fatalf("child GOMEMLIMIT = %q, want the operator's 2GiB", string(env))
 		}
 	})
 }

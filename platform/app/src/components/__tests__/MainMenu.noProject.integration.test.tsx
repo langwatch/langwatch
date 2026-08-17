@@ -64,10 +64,6 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-vi.mock("~/components/messages/HeaderButtons", () => ({
-  useTableView: () => ({ isTableView: false }),
-}));
-
 vi.mock("~/components/sidebar/UsageIndicator", () => ({
   UsageIndicator: () => null,
 }));

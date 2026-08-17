@@ -1,11 +1,11 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { createResilientClickHouseClient } from "~/server/clickhouse/managedClient";
 import {
   startTestContainers,
   stopTestContainers,
 } from "../../../event-sourcing/__tests__/integration/testContainers";
-import { createResilientClickHouseClient } from "../../clients/clickhouse";
 import { SimulationClickHouseRepository } from "../repositories/simulation.clickhouse.repository";
 
 const tenantId = `test-sim-repo-${nanoid()}`;

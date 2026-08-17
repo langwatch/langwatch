@@ -6,7 +6,7 @@ import { createLogger } from "@langwatch/observability";
  * `governance_kpis` fold projection.
  *
  * Writes: `insertContribution` inserts ONE row keyed by (TenantId,
- * SourceId, HourBucket, TraceId) so reactor replays of the same trace
+ * SourceId, HourBucket, TraceId) so subscriber replays of the same trace
  * collapse at merge time.
  *
  * Reads: `findSpendTotals` serves the spend-spike anomaly evaluator's

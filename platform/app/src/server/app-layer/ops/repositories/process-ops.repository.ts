@@ -53,6 +53,34 @@ export interface ProcessOutboxMessageView {
   payload: unknown;
 }
 
+/**
+ * A retired message, with the identity needed to act on it.
+ *
+ * `findOutboxMessages` answers for one instance, which means an operator can
+ * only reach a dead message by already knowing which process key it belongs
+ * to — and the fleet table only ever showed them a count. This view is the
+ * fleet-wide read: it carries the full ref so a row can be redriven straight
+ * from the list, and the trace id so the operator can reach the failure
+ * itself. The outbox row does not store WHY a message died; the dispatcher
+ * records that on the span and the log line, and `traceId` is the join back
+ * to it.
+ */
+export interface DeadOutboxMessageView extends ProcessOutboxMessageView {
+  processName: string;
+  projectId: string;
+  processKey: string;
+  /** Last write to the row, which for a dead row is when it was retired. */
+  updatedAt: number;
+}
+
+/** One process's share of the dead total, for the fleet-level summary. */
+export interface DeadLetterCount {
+  processName: string;
+  count: number;
+  /** Oldest retirement in this group, so the operator can age the incident. */
+  oldestUpdatedAt: number;
+}
+
 export interface ProcessOpsRepository {
   countByProcessName(params: {
     now: number;
@@ -77,6 +105,19 @@ export interface ProcessOpsRepository {
     page: number;
     pageSize: number;
   }): Promise<{ messages: ProcessOutboxMessageView[]; total: number }>;
+
+  /**
+   * Every retired message across the fleet, newest retirement first.
+   * `processName` narrows to one process; omit it for everything.
+   */
+  findDeadMessages(params: {
+    processName?: string;
+    page: number;
+    pageSize: number;
+  }): Promise<{ messages: DeadOutboxMessageView[]; total: number }>;
+
+  /** Dead totals per process, for the summary and the navigation badge. */
+  countDeadByProcessName(): Promise<DeadLetterCount[]>;
 
   /**
    * Set the instance's next wake to now. Returns the previous wake time (for
@@ -125,6 +166,15 @@ export class NullProcessOpsRepository implements ProcessOpsRepository {
     return { instances: [], total: 0 };
   }
   async findUpcomingWakes(): Promise<ProcessWakeRow[]> {
+    return [];
+  }
+  async findDeadMessages(): Promise<{
+    messages: DeadOutboxMessageView[];
+    total: number;
+  }> {
+    return { messages: [], total: 0 };
+  }
+  async countDeadByProcessName(): Promise<DeadLetterCount[]> {
     return [];
   }
   async findOutboxMessages(): Promise<{

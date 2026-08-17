@@ -135,7 +135,7 @@ dev's CLI / agent  ──┐
                 │  - canonicalise attributes          │
                 │  - cost calc per token usage        │
                 │  - emit to ClickHouse               │
-                │  - emit to GatewayBudget reactor    │
+                │  - emit to GatewayBudget subscriber    │
                 └────────────────────────────────────┘
 ```
 

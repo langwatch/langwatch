@@ -105,7 +105,7 @@ describe("BillingEventsPage", () => {
     expect(table).toHaveTextContent("120 in / 40 out / 10 cr");
     expect(table).toHaveTextContent("$0.0042");
     const link = screen.getByRole("link", { name: /req_/ });
-    expect(link).toHaveAttribute("href", "/acme-project/messages/trace_1");
+    expect(link).toHaveAttribute("href", "/acme-project/traces/trace_1");
   });
 
   /** @scenario Changing a ledger filter resets pagination */

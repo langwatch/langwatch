@@ -233,7 +233,7 @@ export function isStorageAnchoredVersion(version: string | undefined): boolean {
   return (version ?? "") > TRACE_SUMMARY_PROJECTION_VERSION_PRE_STORAGE_ANCHOR;
 }
 
-/** Reactors skip traces older than this threshold to avoid re-processing during resyncs. */
+/** Subscribers skip traces older than this threshold to avoid re-processing during resyncs. */
 export const STALE_TRACE_THRESHOLD_MS = 60 * 60 * 1000; // 1 hour
 
 export const TRACE_SUMMARY_PROJECTION_VERSIONS = [

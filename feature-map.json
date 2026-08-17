@@ -39,7 +39,7 @@
               "docs": "https://langwatch.ai/docs/integration/overview.md"
             },
             "platform": {
-              "ui": "/messages",
+              "ui": "/traces",
               "mcp": [
                 "search_traces",
                 "get_trace"

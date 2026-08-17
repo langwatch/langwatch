@@ -12,6 +12,7 @@ import {
 import { useRef, useState } from "react";
 import { ConfirmDialog } from "~/components/ops/shared/ConfirmDialog";
 import { VirtualizedTableRows } from "~/components/ops/shared/VirtualizedTableRows";
+import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
@@ -20,12 +21,64 @@ import { api } from "~/utils/api";
 const DLQ_VIEWPORT_HEIGHT = 360;
 const DLQ_ROW_HEIGHT = 36;
 
+/**
+ * Process-manager intents that retired, under the same heading as the queue's
+ * dead letters.
+ *
+ * Two mechanisms, one question: an operator asking "what has stopped?" should
+ * not have to know that a GroupQueue job and a process-manager intent retire
+ * through different machinery. They still redrive from their own surfaces,
+ * because those actions genuinely differ — so this states the problem and
+ * links, rather than offering a control that would mean two things.
+ */
+function ProcessOutboxDeadRow({
+  byProcess,
+  total,
+  hasQueueGroups,
+}: {
+  byProcess: Array<{ processName: string; count: number }>;
+  total: number;
+  hasQueueGroups: boolean;
+}) {
+  if (total === 0) return null;
+  return (
+    <HStack
+      paddingX={4}
+      paddingY={2.5}
+      gap={2}
+      flexWrap="wrap"
+      borderBottom={hasQueueGroups ? "1px solid" : undefined}
+      borderBottomColor="border"
+    >
+      <Text textStyle="sm" fontWeight="medium" color="red.500">
+        Process outbox — {total} dead message{total !== 1 ? "s" : ""}
+      </Text>
+      <Text textStyle="xs" color="fg.muted">
+        {byProcess
+          .slice(0, 3)
+          .map((r) => `${r.processName} (${r.count})`)
+          .join(", ")}
+        {byProcess.length > 3 ? `, +${byProcess.length - 3} more` : ""}
+      </Text>
+      <Spacer />
+      <Button size="2xs" variant="outline" asChild>
+        <Link href="/ops/event-sourcing/dead-letters">Inspect</Link>
+      </Button>
+    </HStack>
+  );
+}
+
 export function DlqCard({ queueNames }: { queueNames: string[] }) {
   const { hasAccess } = useOpsPermission();
   const utils = api.useUtils();
 
   const dlqQuery = api.ops.listAllDlqGroups.useQuery(undefined, {
     refetchInterval: 10000,
+  });
+  /** Process-manager intents that retired. Different mechanism from a DLQ
+   *  group, same question for the reader: what has permanently stopped. */
+  const processDeadQuery = api.ops.listDeadLetterCounts.useQuery(undefined, {
+    refetchInterval: 30_000,
   });
 
   const [replayTarget, setReplayTarget] = useState<{
@@ -79,8 +132,24 @@ export function DlqCard({ queueNames }: { queueNames: string[] }) {
 
   const groups = dlqQuery.data ?? [];
   const dlqQueueNames = [...new Set(groups.map((g) => g.queueName))];
+  const processDead = processDeadQuery.data ?? [];
+  const processDeadTotal = processDead.reduce((sum, r) => sum + r.count, 0);
 
-  if (dlqQuery.isLoading || groups.length === 0) return null;
+  // Two mechanisms, one heading: an operator asking "what has stopped?" should
+  // not have to know that a GroupQueue job and a process-manager intent retire
+  // through different machinery. They still redrive from their own surfaces,
+  // because the actions genuinely differ.
+  // Both sources gate the render. Without the process-dead query in here the
+  // card mounts on the queue answer alone and then flips a red row in a
+  // moment later, which on an ops surface reads as a new incident rather than
+  // as the same page finishing loading.
+  if (
+    dlqQuery.isLoading ||
+    processDeadQuery.isLoading ||
+    (groups.length === 0 && processDeadTotal === 0)
+  ) {
+    return null;
+  }
 
   return (
     <>
@@ -94,10 +163,15 @@ export function DlqCard({ queueNames }: { queueNames: string[] }) {
             gap={2}
             flexWrap="wrap"
           >
-            <Text textStyle="sm" fontWeight="medium" color="orange.500">
-              Dead Letter Queue — {groups.length} group
-              {groups.length !== 1 ? "s" : ""}
-            </Text>
+            {/* The card now renders for either source, so the queue heading
+                stands down when the queue itself is clean rather than
+                printing "0 groups" above a red process-outbox count. */}
+            {groups.length > 0 && (
+              <Text textStyle="sm" fontWeight="medium" color="orange.500">
+                Dead Letter Queue — {groups.length} group
+                {groups.length !== 1 ? "s" : ""}
+              </Text>
+            )}
             <Spacer />
             {hasAccess && (
               <HStack gap={1.5} flexWrap="wrap">
@@ -151,10 +225,17 @@ export function DlqCard({ queueNames }: { queueNames: string[] }) {
             )}
           </HStack>
 
+          <ProcessOutboxDeadRow
+            byProcess={processDead}
+            total={processDeadTotal}
+            hasQueueGroups={groups.length > 0}
+          />
+
           <Box
             ref={scrollContainerRef}
             maxHeight={`${DLQ_VIEWPORT_HEIGHT}px`}
             overflowY="auto"
+            hidden={groups.length === 0}
           >
             <Table.Root
               size="sm"

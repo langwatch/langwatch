@@ -32,6 +32,7 @@ const makeService = (row: ScheduledJobRecord | null) => {
     releaseSlotForOps: vi.fn().mockResolvedValue(true),
     requestImmediateRunForOps: vi.fn().mockResolvedValue(true),
     listForOps: vi.fn().mockResolvedValue([]),
+    listPausedForOps: vi.fn().mockResolvedValue({ rows: [], total: 0 }),
   };
   const audit = { append: vi.fn().mockResolvedValue(undefined) };
   const wake = vi.fn();
