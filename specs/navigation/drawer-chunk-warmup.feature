@@ -36,6 +36,20 @@ Feature: A screen fetches a drawer's code before the person opens it
       When it is opened
       Then it renders at once
 
+    # Settling that record means waiting on the promise the drawer throws while
+    # it is still loading. Asking whether that value is a promise by its REALM
+    # rather than by its behaviour is the way to get this wrong: a promise made
+    # in another realm is a perfectly good promise that fails an `instanceof`
+    # check, and the warm-up then reports itself finished without having waited.
+    # A browser has one realm, so the mistake is invisible there and shows up
+    # only where code runs in more than one — which is why this is pinned.
+    @unit
+    Scenario: A warm-up waits on a promise made in another realm
+      Given a drawer that is still loading
+      And it reports itself pending with a promise from another realm
+      When the drawer is warmed
+      Then the warm-up waits for that promise before reporting itself finished
+
     # The data the person waits for comes first. A warm-up that starts with the
     # screen's own queries competes with them and makes the visible wait longer.
     @unit
