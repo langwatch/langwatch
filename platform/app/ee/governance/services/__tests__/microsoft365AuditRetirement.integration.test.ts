@@ -50,7 +50,7 @@ async function makeOrg(): Promise<string> {
 
 /**
  * The migration, expressed as the statement the .sql file runs. Kept in step
- * with prisma/migrations/20260817000002_disable_copilot_studio_ingestion_sources.
+ * with prisma/migrations/20260817120001_disable_copilot_studio_ingestion_sources.
  */
 async function runDisableMigration(): Promise<void> {
   await prisma.$executeRawUnsafe(`
