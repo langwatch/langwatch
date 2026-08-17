@@ -110,7 +110,7 @@ export class ClickHouseLegacyAnalyticsShim implements LegacyAnalyticsShim {
         timeScale: input.timeScale,
       });
     } catch (error) {
-      logger.error(
+      logger.warn(
         {
           tenantId: input.projectId,
           error: error instanceof Error ? error.message : String(error),

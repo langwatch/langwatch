@@ -110,7 +110,7 @@ export class ClickHouseLangyAnalyticsEventRepository
         },
       });
     } catch (error) {
-      logger.error(
+      logger.warn(
         {
           tenantId,
           eventCount: records.length,

@@ -383,7 +383,7 @@ export class CodingAgentSessionClickHouseRepository
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
     } catch (error) {
-      logger.error(
+      logger.warn(
         { error, tenantId: row.tenantId, sessionId: row.sessionId },
         "failed to upsert coding agent session",
       );
@@ -906,7 +906,7 @@ export class CodingAgentSessionClickHouseRepository
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
     } catch (error) {
-      logger.error(
+      logger.warn(
         { error, tenantId, count: entries.length },
         "failed to upsert coding agent session batch",
       );

@@ -370,7 +370,7 @@ export class LangyCredentialService {
         // in this project) — surface it verbatim as the 409 body.
         throw new LangyCredentialResolutionError(error.message);
       }
-      logger.error(
+      logger.warn(
         { error, projectId, userId: actorUserId },
         "failed to mint Langy session key",
       );

@@ -912,7 +912,7 @@ export class LangyTurnService {
           }),
         ]);
       } catch (error) {
-        logger.error(
+        logger.warn(
           { error, projectId, conversationId: conversation.id, turnId },
           "failed to prepare the langy turn",
         );
@@ -950,7 +950,7 @@ export class LangyTurnService {
             : {}),
         });
       } catch (error) {
-        logger.error(
+        logger.warn(
           { error, projectId, conversationId: conversation.id, turnId },
           "failed to commit langy AcceptAgentTurn",
         );

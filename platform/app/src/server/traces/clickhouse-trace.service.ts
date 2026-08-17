@@ -205,6 +205,27 @@ const JOINED_SPAN_READ_SETTINGS = {
 const SPAN_READ_FLOOR_LOOKBACK_MS = 90 * 24 * 60 * 60 * 1000;
 /** Per-trace cap on projected events (events are a small subset of spans). */
 const MAX_EVENTS_PER_TRACE = 1_000;
+
+/**
+ * How many spans the traces-with-spans OOM fallback will hold in memory before
+ * it gives up on the read.
+ *
+ * The fallback re-runs a memory-capped ClickHouse query in batches of 25 and
+ * merges every batch into one map. That bounds ClickHouse's peak memory and
+ * not ours: the same full result set is materialised, just on this side of the
+ * socket. On 2026-08-12..16 that turned a single MEMORY_LIMIT_EXCEEDED on a
+ * 980-trace read into 50 V8 heap deaths — the whole worker fleet, 16:48 UTC,
+ * every day, because every pod ran the same sweep at the same time.
+ *
+ * The read that triggers the fallback has ALREADY failed once in ClickHouse, so
+ * refusing it here costs that caller nothing it had: it fails either way. What
+ * it buys is that the failure stays inside one job instead of taking the
+ * process — a failed job is retried and visible, a dead pod is neither.
+ *
+ * Sized well above any legitimate trace-detail read (10k spans is one very
+ * large trace) and far below a heap-filling sweep.
+ */
+const MAX_SPANS_PER_JOINED_FALLBACK = 50_000;
 /** Bounds the bounded events stored_spans scan to the page's occurrence weeks. */
 const EVENT_PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
 
@@ -498,14 +519,19 @@ export class ClickHouseTraceService {
           // message and losing the mismatch.
           if (error instanceof TraceSpansBatchResolverContractError)
             throw error;
-          this.logger.error(
+          this.logger.warn(
             {
               projectId,
               error: error instanceof Error ? error.message : error,
             },
             "Failed to fetch traces from ClickHouse",
           );
-          throw new Error("Failed to fetch traces with spans");
+          // Keep the cause. Without it the only record of WHY this failed is
+          // the warn line above, so a caller that logs the throw — or a test
+          // that asserts on it — sees a message that could mean anything.
+          throw new Error("Failed to fetch traces with spans", {
+            cause: error,
+          });
         }
       },
     );
@@ -571,7 +597,7 @@ export class ClickHouseTraceService {
           const rows = (await result.json()) as Array<{ TraceId: string }>;
           return rows.map((r) => r.TraceId);
         } catch (error) {
-          this.logger.error(
+          this.logger.warn(
             {
               projectId,
               prefix,
@@ -641,7 +667,7 @@ export class ClickHouseTraceService {
           const rows = (await result.json()) as Array<{ TraceId: string }>;
           return rows.map((row) => row.TraceId);
         } catch (error) {
-          this.logger.error(
+          this.logger.warn(
             {
               projectId,
               traceIdCount: traceIds.length,
@@ -747,7 +773,7 @@ export class ClickHouseTraceService {
           // not a fetch failure — surface it verbatim.
           if (error instanceof TraceSpansBatchResolverContractError)
             throw error;
-          this.logger.error(
+          this.logger.warn(
             {
               projectId,
               threadId,
@@ -854,7 +880,7 @@ export class ClickHouseTraceService {
           // thread router and the evaluation-execution service.)
           if (error instanceof TraceSpansBatchResolverContractError)
             throw error;
-          this.logger.error(
+          this.logger.warn(
             {
               projectId,
               threadIds,
@@ -1222,7 +1248,7 @@ export class ClickHouseTraceService {
               : {}),
           };
         } catch (error) {
-          this.logger.error(
+          this.logger.warn(
             {
               projectId: input.projectId,
               error: error instanceof Error ? error.message : error,
@@ -1324,7 +1350,7 @@ export class ClickHouseTraceService {
             ),
           };
         } catch (error) {
-          this.logger.error(
+          this.logger.warn(
             {
               projectId: input.projectId,
               error: error instanceof Error ? error.message : error,
@@ -1435,7 +1461,7 @@ export class ClickHouseTraceService {
             labels: Array.from(labelsSet),
           };
         } catch (error) {
-          this.logger.error(
+          this.logger.warn(
             {
               projectId: input.projectId,
               error: error instanceof Error ? error.message : error,
@@ -1587,7 +1613,7 @@ export class ClickHouseTraceService {
 
           return result;
         } catch (error) {
-          this.logger.error(
+          this.logger.warn(
             {
               projectId,
               spanId,
@@ -1820,7 +1846,7 @@ export class ClickHouseTraceService {
 
           return { spanNames, metadataKeys, evaluationNames };
         } catch (error) {
-          this.logger.error(
+          this.logger.warn(
             {
               projectId,
               error: error instanceof Error ? error.message : error,
@@ -2999,7 +3025,13 @@ export class ClickHouseTraceService {
         // large list can exceed the per-query memory cap and fail with
         // MEMORY_LIMIT_EXCEEDED. Run the list as one query on the happy path, and
         // on OOM retry in fixed-size batches (same fallback as fetchTraceSummaryRows
-        // / fetchEvaluationRows) so peak memory is bounded without dropping data.
+        // / fetchEvaluationRows).
+        //
+        // That bounds CLICKHOUSE's peak memory only. The batches merge back into
+        // one map here, so this process still materialises the whole result set —
+        // which is how a 980-trace read became 50 V8 heap deaths across the worker
+        // fleet. The merge is therefore capped too; see
+        // {@link MAX_SPANS_PER_JOINED_FALLBACK}.
         const runBatch = async (
           batchTraceIds: string[],
         ): Promise<
@@ -3321,6 +3353,7 @@ export class ClickHouseTraceService {
             string,
             { summary: TraceSummaryData; spans: NormalizedSpan[] }
           >();
+          let mergedSpanCount = 0;
           for (
             let i = 0;
             i < traceIds.length;
@@ -3333,6 +3366,18 @@ export class ClickHouseTraceService {
             const batchMap = await runBatch(batch);
             for (const [traceId, value] of batchMap) {
               merged.set(traceId, value);
+              mergedSpanCount += value.spans.length;
+            }
+
+            // Batching caps ClickHouse's peak memory, not ours — the merge
+            // rebuilds the whole result set here. Stop before the heap does.
+            // See {@link MAX_SPANS_PER_JOINED_FALLBACK}.
+            if (mergedSpanCount > MAX_SPANS_PER_JOINED_FALLBACK) {
+              throw new Error(
+                `Traces-with-spans join fallback exceeded ${MAX_SPANS_PER_JOINED_FALLBACK} spans ` +
+                  `(${mergedSpanCount} across ${merged.size} of ${traceIds.length} traces); ` +
+                  `refusing to materialise the rest`,
+              );
             }
           }
           return merged;

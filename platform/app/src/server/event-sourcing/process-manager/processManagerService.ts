@@ -303,7 +303,7 @@ export class ProcessManagerService<State> {
             message: errorMessage,
           });
           span.setStatus({ code: SpanStatusCode.ERROR });
-          this.logger.error(
+          this.logger.warn(
             {
               processName: this.definition.name,
               inputKind: params.inputKind,

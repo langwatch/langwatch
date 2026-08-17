@@ -127,7 +127,7 @@ export class GatewayVirtualKeySpendRepository {
         requests: Number(r.Requests) || 0,
       }));
     } catch (error) {
-      logger.error(
+      logger.warn(
         { tenantIds, error },
         "failed to read per-virtual-key spend from trace summaries",
       );
@@ -226,7 +226,7 @@ export class GatewayVirtualKeySpendRepository {
         blockedRequests: Number(r.blockedRequests) || 0,
       }));
     } catch (error) {
-      logger.error(
+      logger.warn(
         { tenantIds, error },
         "failed to aggregate gateway usage from trace summaries",
       );
@@ -338,7 +338,7 @@ export class GatewayVirtualKeySpendRepository {
         blockedByGuardrail: Boolean(Number(r.blocked)),
       }));
     } catch (error) {
-      logger.error(
+      logger.warn(
         { tenantIds, error },
         "failed to read gateway traces from trace summaries",
       );

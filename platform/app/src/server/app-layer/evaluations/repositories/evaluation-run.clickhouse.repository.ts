@@ -1,8 +1,10 @@
 import { createLogger } from "@langwatch/observability";
+import { resolveRetentionFloorMs } from "~/server/app-layer/clients/clickhouse/retention-floor";
 import { RESOLVER_RECENT_WINDOW_MS } from "~/server/app-layer/clients/clickhouse/windowed-read";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
+import type { RetentionPolicyResolver } from "~/server/data-retention/retentionPolicyResolver";
 import { EVALUATION_PROJECTION_VERSIONS } from "~/server/event-sourcing/pipelines/evaluation-processing/schemas/constants";
 import { IdUtils } from "~/server/event-sourcing/pipelines/evaluation-processing/utils/id.utils";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
@@ -64,7 +66,15 @@ type ClickHouseEvaluationRunWriteRecord = WithDateWrites<
 export class EvaluationRunClickHouseRepository
   implements EvaluationRunRepository
 {
-  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
+  constructor(
+    private readonly resolveClient: ClickHouseClientResolver,
+    /**
+     * Bounds the ScheduledAt resolver's fallback to this tenant's own retention
+     * horizon. Optional so existing construction sites keep working on the
+     * platform default; see {@link resolveRetentionFloorMs}.
+     */
+    private readonly retentionResolver?: RetentionPolicyResolver,
+  ) {}
 
   async upsert(
     data: EvaluationRunData,
@@ -103,7 +113,7 @@ export class EvaluationRunClickHouseRepository
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      logger.error(
+      logger.warn(
         { tenantId, evaluationId: data.evaluationId, error: errorMessage },
         "Failed to store evaluation run in ClickHouse",
       );
@@ -155,7 +165,7 @@ export class EvaluationRunClickHouseRepository
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      logger.error(
+      logger.warn(
         { tenantId, count: entries.length, error: errorMessage },
         "Failed to batch store evaluation runs in ClickHouse",
       );
@@ -192,7 +202,21 @@ export class EvaluationRunClickHouseRepository
       sinceMs: Date.now() - RESOLVER_RECENT_WINDOW_MS,
     });
     if (recent !== undefined) return recent;
-    return this.queryScheduledAtMs({ tenantId, evaluationId });
+    // Floor the fallback at this tenant's retention horizon rather than leaving
+    // it unbounded. `evaluation_runs` is partitioned on ScheduledAt, so a query
+    // with no lower bound prunes nothing and walks every partition including
+    // cold S3 — which is why this was the single largest source of cold-scan
+    // queries in production. Nothing older than retention survives TTL, so the
+    // floor cannot hide a row the unbounded scan would have found.
+    return this.queryScheduledAtMs({
+      tenantId,
+      evaluationId,
+      sinceMs: await resolveRetentionFloorMs({
+        table: TABLE_NAME,
+        tenantId,
+        resolver: this.retentionResolver,
+      }),
+    });
   }
 
   private async queryScheduledAtMs({
@@ -354,7 +378,7 @@ export class EvaluationRunClickHouseRepository
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      logger.error(
+      logger.warn(
         { tenantId, evaluationId, error: errorMessage },
         "Failed to get evaluation run from ClickHouse",
       );
@@ -428,7 +452,7 @@ export class EvaluationRunClickHouseRepository
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      logger.error(
+      logger.warn(
         { tenantId, traceId, error: errorMessage },
         "Failed to find evaluation runs by trace ID in ClickHouse",
       );
@@ -528,7 +552,7 @@ export class EvaluationRunClickHouseRepository
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      logger.error(
+      logger.warn(
         { tenantId, traceIdCount: traceIds.length, error: errorMessage },
         "Failed to find evaluation summaries by trace IDs in ClickHouse",
       );
