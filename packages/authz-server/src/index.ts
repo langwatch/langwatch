@@ -59,7 +59,7 @@ export type {
 } from "./grants.service";
 export { OffboardIncompleteError } from "./offboard";
 export type { OffboardResult } from "./offboard";
-export { deriveGrantId } from "./ledger/grant-identity";
+export { TEAM_USER_BACKFILL_MIGRATION_NAME } from "./team-user-backfill.name";
 export {
   grantFactToCompatBinding,
   grantFactToRow,
@@ -94,13 +94,3 @@ export type {
   ResourceGrantTerms,
   RoleFact,
 } from "./ledger/grants-ledger.reducer";
-export {
-  TEAM_USER_BACKFILL_MIGRATION_NAME,
-  TeamUserBackfillMigration,
-} from "./team-user-backfill.migration";
-export type {
-  BackfillGrantEmission,
-  GrantsLedgerEmitter,
-  ParityDiff,
-  TeamUserBackfillDeps,
-} from "./team-user-backfill.migration";

@@ -47,8 +47,7 @@ import type {
 import type { AuthzAuditWriter, AuthzEpochBumper } from "./grants.service";
 import { deriveGrantId } from "./ledger/grant-identity";
 import type { GrantFact, GrantsLedgerActor } from "./ledger/grants-ledger.reducer";
-
-export const TEAM_USER_BACKFILL_MIGRATION_NAME = "authz-team-user-backfill";
+import { TEAM_USER_BACKFILL_MIGRATION_NAME } from "./team-user-backfill.name";
 
 /** The audit trail's actor for writes no human performed. */
 const SYSTEM_ACTOR = "system:authz-migration";

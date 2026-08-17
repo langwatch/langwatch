@@ -10,7 +10,7 @@ import { auditLog } from "@ee/audit-log/auditLog";
 import {
   type GrantsLedgerEmitter,
   TeamUserBackfillMigration,
-} from "@langwatch/authz-server";
+} from "@langwatch/authz-server/migration";
 import {
   type MigrationPassSummary,
   type SystemMigration,

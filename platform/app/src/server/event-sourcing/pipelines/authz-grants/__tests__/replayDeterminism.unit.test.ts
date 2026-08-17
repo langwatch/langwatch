@@ -1,13 +1,15 @@
 import {
   type AuthzMigrationRepository,
-  type BackfillGrantEmission,
   type ExistingTeamBinding,
-  type GrantsLedgerEmitter,
   grantFactToCompatBinding,
   grantFactToRow,
   type LegacyTeamRow,
-  TeamUserBackfillMigration,
 } from "@langwatch/authz-server";
+import {
+  type BackfillGrantEmission,
+  type GrantsLedgerEmitter,
+  TeamUserBackfillMigration,
+} from "@langwatch/authz-server/migration";
 import { describe, expect, it } from "vitest";
 import { createTenantId } from "../../..";
 import { AttachGrantsCommand } from "../commands/grantsLedgerCommands";
