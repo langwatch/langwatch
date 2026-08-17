@@ -314,13 +314,44 @@ Feature: microsoft_365_audit ingestion source (Office 365 Management Activity AP
     And the records from the first two blobs arrive twice
     And those duplicates collapse on their content-derived dedup key
 
+  # Replaces "Blob queue carried in the cursor is bounded", which asserted the
+  # queue was truncated to the cap on write. Nothing re-lists a dropped blob
+  # URI, so that was silent loss of audit records, and the window went on to
+  # look complete. The cap bounds how much more is listed, not what is kept.
+  @unit @regression
+  Scenario: A queue above the listing cap survives the round trip intact
+    Given a queue holding more blob URIs than the listing cap
+    When the cursor is written and read back
+    Then every queued URI is still present, in listing order
+    And no window is reported complete while URIs remain undrained
+
+  @unit @regression
+  Scenario: A queue above the corruption ceiling is rejected, not truncated
+    Given a cursor whose queue is larger than anything this adapter can write
+    When the cursor is read
+    Then it is rejected rather than trimmed to fit
+    And the run resumes from the watermark, re-listing the window
+
   @unit
-  Scenario: Blob queue carried in the cursor is bounded
-    Given a window whose listing yields more blobs than the queue cap
-    When the cursor is written
-    Then the queue holds at most the cap
-    And the remainder is recoverable via the recorded listing position
-    And the cursor does not grow unboundedly with tenant volume
+  Scenario: An already-enabled subscription is not an error
+    Given a subscription start that answers HTTP 400 with code AF20024
+    When the run starts
+    Then the run treats it as success and goes on to list the window
+
+  @unit
+  Scenario: A subscription failure that is not AF20024 fails the run
+    Given a subscription start that answers HTTP 400 for another reason
+    When the run starts
+    Then the run fails rather than reporting a healthy, silent source
+    And no content listing is attempted
+
+  @unit
+  Scenario: parserConfig cannot repoint a microsoft_365_audit source
+    Given a pullConfig carrying the composer's tenant id and content type
+    And a parserConfig carrying different values for both
+    When the two are merged
+    Then the composer's values win
+    And the overridden keys are reported as stripped
 
   @unit
   Scenario: Page cap is a resume point, not silent truncation

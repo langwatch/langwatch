@@ -41,6 +41,8 @@ interface Fixture {
   listingPages?: string[][];
   subscriptionStarts: number;
   subscriptionActive: boolean;
+  /** Forces subscription start to fail with this status and body. */
+  subscriptionFailure?: { status: number; body: unknown };
   blobFetches: string[];
   listingFetches: number;
 }
@@ -92,6 +94,11 @@ beforeEach(() => {
       // Subscription start
       if (url.includes("/subscriptions/start")) {
         fx.subscriptionStarts += 1;
+        if (fx.subscriptionFailure) {
+          return new Response(JSON.stringify(fx.subscriptionFailure.body), {
+            status: fx.subscriptionFailure.status,
+          });
+        }
         if (fx.subscriptionActive) {
           // The API answers an already-enabled subscription with a 400.
           return new Response(JSON.stringify({ error: "AF20024" }), {
@@ -158,6 +165,37 @@ function seedBlobs(count: number): string[] {
   fx.listing = uris;
   return uris;
 }
+
+describe("Microsoft365AuditPuller subscription", () => {
+  /** @scenario An already-enabled subscription is not an error */
+  it("treats the AF20024 400 as success and goes on to list the window", async () => {
+    const puller = await loadPuller();
+    fx.subscriptionActive = true; // start now answers 400 / AF20024
+    seedBlobs(2);
+
+    const result = await puller.runOnce({ cursor: null }, CONFIG);
+
+    expect(result.errorCount).toBe(0);
+    expect(result.events).toHaveLength(2);
+  });
+
+  /** @scenario A subscription failure that is not AF20024 fails the run */
+  it("fails the run on a 400 that is not AF20024, rather than reporting healthy", async () => {
+    const puller = await loadPuller();
+    // Same status code as the benign case, different meaning. Swallowing this
+    // is how a source ends up configured, silent, and green.
+    fx.subscriptionFailure = {
+      status: 400,
+      body: { error: { code: "AF20023", message: "Tenant does not exist" } },
+    };
+    seedBlobs(2);
+
+    await expect(puller.runOnce({ cursor: null }, CONFIG)).rejects.toThrow(
+      /HTTP 400/,
+    );
+    expect(fx.listingFetches).toBe(0);
+  });
+});
 
 describe("Microsoft365AuditPuller drain", () => {
   /** @scenario Happy-path drain over one window */
