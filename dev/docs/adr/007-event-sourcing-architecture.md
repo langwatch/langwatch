@@ -133,6 +133,22 @@ Command → CommandHandler → Event[] → EventStore.store()
                                   ProjectionRegistry.dispatch()  (global projections)
 ```
 
+## Amendment: Redis-loss circuit breaker for named pipelines (2026-08-17)
+
+The web-role rule ("only dispatches commands and events to queues") holds in
+normal operation for every pipeline. For **explicitly named low-volume
+pipelines**, a per-process circuit breaker may open when Redis staging is
+unhealthy; while open, that pipeline's commands process through the
+framework's in-memory processor in the calling process, and close-and-drain
+resumes normal queueing when Redis returns. Ordering during an open window
+is best-effort by declaration of the pipelines that opt in.
+
+Named pipelines: `authz_grants` (ADR-092 §13 — grant writes per day, not
+traces per second). The identity pipeline is expected to join under its own
+deliverable (identity programme D02), with its own volume analysis. No other
+pipeline gets this: high-volume pipelines stall and drain, which is the
+correct behavior for them.
+
 ## References
 
 - [ADR-002](./002-event-sourcing.md) — original event sourcing decision (superseded)

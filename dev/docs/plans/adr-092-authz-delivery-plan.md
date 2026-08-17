@@ -3,8 +3,9 @@
 **Companion to:** `dev/docs/adr/092-unified-authorization-engine.md` (the decision
 model: the walk, union semantics, possession, the owner ceiling — all still in
 force). **No new ADR**: ADR-092's storage and rollout sections are rewritten in
-place to the design below. No ADR-007 amendment is needed —
-folds ride the queue (decision 7).
+place to the design below. ADR-007 carries one shared amendment — the
+Redis-loss circuit breaker for named pipelines — which the identity
+programme's D02 joins later instead of writing its own.
 ADR-001 flips to Superseded at contract. If genuinely new ground ever wants its
 own number, rebase off origin/main and take the next one — nothing more.
 Related ADRs the rewrite must cite: ADR-021 (the `(scopeType, scopeId)` house
@@ -137,8 +138,10 @@ process family:
 
 No ADR-007 amendment needed — no fold runs inline anywhere; the enforcement
 delete is a plain service write. It is the one sanctioned direct projection
-write (decision 7). The Redis-down circuit breaker is scoped to this
-pipeline for now. No dependency on the identity PR.
+write (decision 7). The Redis-down circuit breaker is a framework
+primitive scoped per named pipeline (ADR-007's shared amendment): we build
+it in PR 1 for `authz_grants`; the identity programme's D02 productionizes
+the SAME primitive for its pipeline later. No dependency on the identity PR.
 
 ## The PR map (4 + 1)
 
@@ -308,3 +311,39 @@ its 2026-08-17 permission-vs-scope ruling.
    rollback scenario, not a parallel file). Rewrite
    `scim-group-mapping.feature` storage-neutral (decision 18).
 3. PR 1.
+
+## The identity platform (the next programme) — doors left open
+
+Reviewed 2026-08-17 against `origin/feat/sso-thinking`'s
+`dev/docs/identity-platform/` (D01-D13 + delivery-plan). Verdict: aligned —
+identity rides the same framework (its own pipeline, aggregate
+`user_identity`, CH log, PG projections) and treats authz as a hard
+precondition it consumes through a service API. Nothing to build for it
+now; these are the seams to keep clean:
+
+- **The circuit breaker is shared.** We build the per-pipeline breaker
+  primitive in PR 1 (ADR-007's "Redis-loss circuit breaker" amendment names
+  `authz_grants`); identity's D02 adds its pipeline to the same amendment
+  with its own volume analysis — one primitive, one amendment, two users.
+- **SCIM converges on `grants.*`.** Identity's D08 moves SCIM tokens
+  per-connection and requires "SCIM writes membership only through
+  `grants.*`" — exactly the reconciler (decision 18). When connections
+  exist, the reconciler's actor becomes the connection
+  (`actor: { type: "system", id: <connectionId> }`) — the event shape
+  already accommodates it, no schema change.
+- **Offboarding is a service seam, not event coupling.** Identity
+  deprovision paths call `GrantsService` (revoke/offboard, with the
+  empty-proof postcondition D08 asserts); no identity imports inside the
+  authz packages, no cross-pipeline event subscriptions.
+- **Their precondition checklist needs re-pointing** (their branch, their
+  edit): it names "authz stage D3" and gates Wave 3 on "rbac.ts deleted" —
+  under this plan the real requirement ("identity code must never call
+  rbac.ts/TeamUser") is satisfied from PR 2 onward, when every write goes
+  through `grants.*` and checks go through `authz.*`; rbac.ts deletion is
+  the contract PR and must NOT gate their Wave 3.
+- **No shared-ownership tables here.** Identity's D01 carves protocol vs
+  lifecycle column ownership on the shared `Account` table and must amend
+  ADR-022/015 for it. The grants ledger deliberately has no such carve-out:
+  `Grant`/`Role`/compat rows are wholly pipeline-owned, and the one direct
+  write (revocation enforcement) targets pipeline-owned rows and converges
+  under the fold. Keep it that way.

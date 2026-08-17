@@ -946,10 +946,12 @@ through the GroupQueue in per-org FIFO. The ordering authority is the append
 itself — `(acceptedAt, eventId)` is the ledger's order, the projection
 follows it, and we accept that order as **best-effort FIFO**: it is the
 order ClickHouse accepted the events, which is the only order the system
-has. No fold ever runs inline, so ADR-007's web-role rule needs no
-amendment. If Redis is down, a circuit breaker scoped to this pipeline (for
-now) processes commands directly until it returns — degradation, accepted
-under best-effort FIFO.
+has. In normal operation no fold ever runs inline. If Redis is down, a
+circuit breaker processes this pipeline's commands directly (the framework's
+in-memory processor, in the calling process) until Redis returns —
+degradation, accepted under best-effort FIFO, sanctioned by ADR-007's
+"Redis-loss circuit breaker" amendment, which names this pipeline and
+expects the identity pipeline to join it later (identity programme D02).
 
 **Revocation is instant anyway — as enforcement, not as a fold.** For
 `grants.revoke`, `member_offboarded`, and `cutover_rolled_back`, after the
