@@ -1,7 +1,11 @@
-import { HandledError, ValidationError } from "@langwatch/handled-error";
+import {
+  HandledError,
+  ValidationError,
+  isZodLikeError,
+} from "@langwatch/handled-error";
+import type { ZodLikeError } from "@langwatch/handled-error";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { ZodError } from "zod";
 
 import { httpStatusText } from "./types.js";
 
@@ -36,13 +40,20 @@ class SchemaFailure extends HandledError {
  * `getLogLevelForRequest`). A bare `ZodError` has neither `httpStatus` nor
  * `fault`, so it was logged as a 500 `error` while the response went out 422 —
  * validation noise landing in the 5xx error budget.
+ *
+ * Takes the structural type, not a zod class: the two zod builds in one package
+ * each have their own `ZodError`, and a route whose schema came from the other
+ * build would answer 500 for a body the caller can fix.
  */
-function validationErrorFromZod(err: ZodError): ValidationError {
+function validationErrorFromZod(err: ZodLikeError): ValidationError {
   return new ValidationError("Validation error", {
     reasons: err.issues.map(
       (issue) =>
         new SchemaFailure({
-          field: issue.path.join(".") || "(root)",
+          // Stringified per segment: a zod 4 path may hold a symbol (a record
+          // key), and Array.join would throw on one, inside the handler whose
+          // job is to stop a throw reaching the client.
+          field: issue.path.map(String).join(".") || "(root)",
           type: issue.code,
           message: issue.message,
         }),
@@ -152,7 +163,8 @@ function formatError({
   }
 
   // 2. ZodError -- promoted to a ValidationError so it travels the same path.
-  if (err instanceof ZodError) {
+  //    Recognised by shape; see isZodLikeError.
+  if (isZodLikeError(err)) {
     return handledErrorToResponse({
       err: validationErrorFromZod(err),
       isVersioned,
@@ -236,8 +248,7 @@ export function createErrorHandler(): (
     // Promote first so the response and the log agree on one error. Reporting
     // the raw ZodError would log it as unhandled, at `error`, against the 500
     // it no longer is.
-    const effective =
-      err instanceof ZodError ? validationErrorFromZod(err) : err;
+    const effective = isZodLikeError(err) ? validationErrorFromZod(err) : err;
     const { status, body } = formatError({ err: effective, isVersioned });
 
     const resolved: ResolvedError = {

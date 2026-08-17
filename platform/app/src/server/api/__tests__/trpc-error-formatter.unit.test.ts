@@ -7,6 +7,7 @@ import { StackContextManager } from "@opentelemetry/sdk-trace-web";
 import { TRPCError } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
+import { z as zodV4 } from "zod/v4";
 import { errorFormatter } from "../trpc";
 
 function format(error: TRPCError) {
@@ -31,6 +32,19 @@ function format(error: TRPCError) {
  * registered every trace-id assertion would pass or fail for the wrong reason —
  * there would simply never be a span. The app registers the same pair.
  */
+/**
+ * A real validation failure raised by the `zod/v4` build, so the case tests the
+ * error the other build actually throws rather than a hand-built stand-in of it.
+ */
+function zodV4ValidationFailure(): Error {
+  try {
+    zodV4.object({ name: zodV4.string().min(1) }).parse({ name: "" });
+  } catch (err) {
+    return err as Error;
+  }
+  throw new Error("the v4 schema was expected to reject an empty name");
+}
+
 function withActiveSpan<T>(fn: () => T): { result: T; traceId: string } {
   otelContext.setGlobalContextManager(new StackContextManager().enable());
   const provider = new BasicTracerProvider();
@@ -230,6 +244,32 @@ describe("tRPC error response boundary", () => {
         const formatted = format(error);
 
         expect(formatted.data).not.toHaveProperty("zodError");
+        expect(formatted.data.error).toMatchObject({
+          code: "validation_error",
+          meta: { fieldErrors: { name: expect.any(Array) } },
+        });
+      });
+
+      /** @scenario "Validation failures travel the one handled-error channel" */
+      it("promotes one raised by the other zod build too", () => {
+        // zod 3.25 ships two builds in one package, the classic export and the
+        // `zod/v4` subpath, each with its own ZodError class. The app imports
+        // the classic one and @langwatch/langy compiles against v4, so a schema
+        // built by v4 raises an error `instanceof ZodError` rejects. The
+        // boundary read that as unexpected and the customer got "unknown error"
+        // for a field they could have fixed.
+        const cause = zodV4ValidationFailure();
+
+        expect(cause instanceof ZodError).toBe(false);
+
+        const formatted = format(
+          new TRPCError({
+            code: "BAD_REQUEST",
+            message: cause.message,
+            cause,
+          }),
+        );
+
         expect(formatted.data.error).toMatchObject({
           code: "validation_error",
           meta: { fieldErrors: { name: expect.any(Array) } },

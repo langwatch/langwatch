@@ -37,11 +37,14 @@ interface CreateNextContextOptions {
 }
 
 import { auditLog } from "@ee/audit-log/auditLog";
-import { HandledError, ValidationError } from "@langwatch/handled-error";
+import {
+  HandledError,
+  isZodLikeError,
+  ValidationError,
+} from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { getLogLevelFromStatusCode } from "@langwatch/observability/request";
 import superjson from "superjson";
-import { ZodError } from "zod";
 import type { OrganizationUserRole } from "~/generated/prisma/client";
 import type { Session } from "~/server/auth";
 import { getServerAuthSession } from "~/server/auth";
@@ -239,9 +242,14 @@ export function errorFormatter({
   // `meta.fieldErrors` / `meta.formErrors`, which is where the contents of the
   // old sidecar `data.zodError` field now live. Mirrors what the Hono handler
   // already does (packages/api/src/errors.ts::validationErrorFromZod).
+  //
+  // Recognised by shape rather than by `instanceof`, because a schema built by
+  // the `zod/v4` build throws an error the classic build's class rejects, and
+  // the customer then reads "unknown error" for a field they can fix. See
+  // `isZodLikeError`.
   const handled = HandledError.isHandled(error.cause)
     ? error.cause
-    : error.cause instanceof ZodError
+    : isZodLikeError(error.cause)
       ? ValidationError.fromZodError(error.cause)
       : null;
 

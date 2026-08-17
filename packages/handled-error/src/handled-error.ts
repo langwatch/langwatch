@@ -416,6 +416,18 @@ export class NotFoundError extends HandledError {
 }
 
 /**
+ * One entry of a zod-like error's `issues`, in the fields zod 3 and zod 4 both
+ * carry. The two builds disagree on the rest: zod 4 adds `origin` to a range
+ * failure and drops `received` from a type failure, so a caller that reads
+ * anything outside these three works on one build only.
+ */
+export interface ZodLikeIssue {
+  path: readonly PropertyKey[];
+  message: string;
+  code: string;
+}
+
+/**
  * Structural stand-in for zod's `ZodError`. The package is consumed by the app
  * (zod 3.x classic), mcp-server (zod 4) and SDKs — importing `ZodError` from
  * any single zod version makes the other versions' errors unassignable. Any
@@ -423,10 +435,36 @@ export class NotFoundError extends HandledError {
  */
 export interface ZodLikeError {
   message: string;
+  readonly issues: readonly ZodLikeIssue[];
   flatten(): {
     formErrors: string[];
     fieldErrors: Record<string, string[] | undefined>;
   };
+}
+
+/**
+ * Whether an unknown value is a zod validation error, decided on shape rather
+ * than on class identity.
+ *
+ * `err instanceof ZodError` is the obvious test and it is wrong at every
+ * boundary in this repo. zod 3.25 ships two builds in one package: the classic
+ * export and the `zod/v4` subpath, each with its own `ZodError` class. The app
+ * imports the classic one and `@langwatch/langy` compiles against `zod/v4`, so
+ * a schema built by one build throws an error the other build's `instanceof`
+ * rejects. The check then falls through and a validation failure the customer
+ * caused is reported as an unnamed 500.
+ *
+ * Deduping the package does not fix it: `zod` and `zod/v4` are one package and
+ * two class identities, so there is nothing to dedupe. Both builds set
+ * `name` to "ZodError" and expose `issues` and `flatten()`, which is what every
+ * caller here reads, so shape is the durable test.
+ */
+export function isZodLikeError(err: unknown): err is ZodLikeError {
+  if (!(err instanceof Error) || err.name !== "ZodError") return false;
+  const candidate = err as unknown as Partial<ZodLikeError>;
+  return (
+    Array.isArray(candidate.issues) && typeof candidate.flatten === "function"
+  );
 }
 
 /**
