@@ -303,8 +303,8 @@ const pulledUsageExtensionSchema = z
     cost_usd: z
       .union([z.string(), z.number()])
       .transform((v) => {
-        const s = String(v);
-        return Number.isFinite(Number(s)) ? s : "0";
+        const s = String(v).trim();
+        return s !== "" && Number.isFinite(Number(s)) ? s : "0";
       })
       .catch("0"),
     tokens_input: z.coerce.number().finite().catch(0),

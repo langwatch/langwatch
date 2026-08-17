@@ -162,8 +162,10 @@ function numberOrNull(v: unknown): number | null {
 function costUsdStringOrNull(v: unknown): string | null {
   if (typeof v === "number" && Number.isFinite(v)) return String(v);
   if (typeof v === "string") {
-    const n = Number(v);
-    return Number.isFinite(n) ? v : null;
+    const trimmed = v.trim();
+    if (trimmed === "") return null;
+    const n = Number(trimmed);
+    return Number.isFinite(n) ? trimmed : null;
   }
   return null;
 }
