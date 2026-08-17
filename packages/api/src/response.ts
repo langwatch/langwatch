@@ -1,6 +1,6 @@
 import type { Context } from "hono";
 
-import type { EndpointConfig } from "./types.js";
+import { ENDPOINT_ROUTE, type EndpointConfig } from "./types.js";
 
 /** Validates and serializes the value returned by a regular endpoint handler. */
 export function serializeEndpointResult({
@@ -43,9 +43,20 @@ export function serializeEndpointResult({
 
   const validation = config.output.safeParse(result);
   if (!validation.success) {
-    throw new Error("Response failed output validation", {
-      cause: validation.error,
-    });
+    // Deliberately a plain `Error`, not a `HandledError`. We know the cause,
+    // but the caller cannot act on it — the handler returned something its own
+    // declared schema rejects, which is our bug. It degrades to "unknown" plus
+    // a trace id at the boundary, which is the correct outcome (ADR-045), and
+    // logs at 500/error because it carries no `httpStatus` or `fault`.
+    //
+    // The endpoint is named because the log line otherwise identified this
+    // only by the concrete URL, leaving "which endpoint breaks its own
+    // contract" a question you had to answer by hand.
+    const route = c.get(ENDPOINT_ROUTE) as string | undefined;
+    throw new Error(
+      `Response failed output validation${route ? ` for ${route}` : ""}`,
+      { cause: validation.error },
+    );
   }
 
   // Reachable only for a `z.void()` / `z.undefined()` output, because

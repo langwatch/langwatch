@@ -9,7 +9,7 @@
  * from the same module — three URLs, one document, by construction.
  */
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
-import { apiDocument as document } from "~/server/openapi/document";
+import { respondWithApiDocument } from "~/server/openapi/serve-document";
 
 const secured = createServiceApp({ basePath: "/api/gateway/v1" });
 
@@ -19,6 +19,6 @@ secured
       "the description of a public API, listing the endpoints and the credentials they want; a caller reads it to learn how to authenticate, so requiring authentication to read it would be circular, and it carries no tenant data",
     ),
   )
-  .get("/openapi.json", (c) => c.json(document));
+  .get("/openapi.json", respondWithApiDocument);
 
 export const app = secured.hono;

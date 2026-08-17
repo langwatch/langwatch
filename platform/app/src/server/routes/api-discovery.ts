@@ -41,28 +41,43 @@ import {
 } from "~/server/openapi/discovery-locations";
 import { apiDocument } from "~/server/openapi/document";
 import { buildRpcCatalogue } from "~/server/openapi/rpc-catalogue";
+import {
+  jsonBytesResponse,
+  respondWithApiDocument,
+} from "~/server/openapi/serve-document";
 
 const secured = createServiceApp({ basePath: "/api" });
 
 secured
   .access(publicEndpoint(WHY_DISCOVERY_IS_PUBLIC))
-  .get("/openapi.json", (c) => c.json(apiDocument));
+  .get("/openapi.json", respondWithApiDocument);
 
 /**
- * The catalogue is rebuilt per request from the document: a filter and a
- * reshape over 166 paths, not work worth caching, and caching it would
- * introduce exactly the staleness that projecting instead of registering exists
- * to avoid.
+ * Projected once, at module load.
+ *
+ * An earlier comment here claimed the catalogue was not worth caching because
+ * caching would introduce staleness. That was wrong on both halves: the
+ * document is a build artifact and cannot change while the process runs, so
+ * there is no staleness to introduce — and rebuilding it per request re-walked
+ * 166 paths and re-serialised the result every time, for an answer that is
+ * identical until the next deploy.
+ *
+ * This is still a projection rather than a registry. Nothing writes to it; it
+ * is derived from the document exactly as before, just once instead of per
+ * call.
  */
+const catalogueBytes: Uint8Array<ArrayBuffer> = Buffer.from(
+  JSON.stringify(
+    buildRpcCatalogue({
+      document: apiDocument,
+      openapiUrl: WELL_KNOWN_OPENAPI_PATH,
+    }),
+  ),
+  "utf8",
+);
+
 secured
   .access(publicEndpoint(WHY_DISCOVERY_IS_PUBLIC))
-  .post("/rpc.discover", (c) =>
-    c.json(
-      buildRpcCatalogue({
-        document: apiDocument,
-        openapiUrl: WELL_KNOWN_OPENAPI_PATH,
-      }),
-    ),
-  );
+  .post("/rpc.discover", () => jsonBytesResponse(catalogueBytes));
 
 export const app = secured.hono;
