@@ -1,7 +1,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createResilientClickHouseClient } from "../../../../../app-layer/clients/clickhouse";
+import { createResilientClickHouseClient } from "~/server/clickhouse/managedClient";
 import {
   startTestContainers,
   stopTestContainers,
