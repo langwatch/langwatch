@@ -28,7 +28,7 @@ import type { LangyConversationProcessingEvent } from "../schemas/events";
  * (ADR-046): the operational read models are two `withProjection` state folds
  * (conversation + turn) plus a Postgres message map; analytics is a SEPARATE
  * pure map; live subscribers are independent; and no Langy operational
- * projection carries a reactor/outbox contract.
+ * projection carries a subscriber/outbox contract.
  */
 
 /** Append-only store — deliberately no load/read/get, matching the map contract. */
@@ -150,17 +150,17 @@ describe("langy-conversation-processing pipeline shape", () => {
       });
     });
 
-    describe("when inspecting reactor and outbox attachments", () => {
-      it("attaches no reactor or outbox to any Langy operational projection", () => {
+    describe("when inspecting subscriber and outbox attachments", () => {
+      it("attaches no subscriber or outbox to any Langy operational projection", () => {
         const { pipeline } = buildPipeline();
 
-        expect(pipeline.foldReactors.size).toBe(0);
-        expect(pipeline.mapReactors.size).toBe(0);
+        expect(pipeline.foldSubscribers.size).toBe(0);
+        expect(pipeline.mapSubscribers.size).toBe(0);
       });
     });
 
     describe("when inspecting live event subscribers", () => {
-      it("keeps subscribers independent of projections and reactors", () => {
+      it("keeps subscribers independent of projections and subscribers", () => {
         const { pipeline, subscribers } = buildPipeline();
 
         expect([...pipeline.eventSubscribers.keys()].sort()).toEqual(
@@ -171,9 +171,9 @@ describe("langy-conversation-processing pipeline shape", () => {
             subscriber,
           );
         }
-        // An independent subscriber is not smuggled in as a reactor.
-        expect(pipeline.foldReactors.size).toBe(0);
-        expect(pipeline.mapReactors.size).toBe(0);
+        // An independent subscriber is not smuggled in as a subscriber.
+        expect(pipeline.foldSubscribers.size).toBe(0);
+        expect(pipeline.mapSubscribers.size).toBe(0);
       });
 
       it("builds without any subscribers wired", () => {

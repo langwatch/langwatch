@@ -62,7 +62,7 @@ export interface SimulationRunExecutionDispatchDeps {
  * The `execute` intent executor: submit the run to this pod's pool.
  *
  * A null pool THROWS instead of dropping the run silently (the old
- * reactor's failure mode): the outbox retries with backoff, so a run queued
+ * subscriber's failure mode): the outbox retries with backoff, so a run queued
  * while no worker is up is dispatched when one is, rather than vanishing.
  * If the pod genuinely never executes, the stall wake is the backstop.
  */

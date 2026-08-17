@@ -83,8 +83,8 @@ describe("StaticPipelineBuilder validations", () => {
       expect(pipeline.eventSubscribers.get("conversationProcess")).toBe(
         subscriber,
       );
-      expect(pipeline.foldReactors.size).toBe(0);
-      expect(pipeline.mapReactors.size).toBe(0);
+      expect(pipeline.foldSubscribers.size).toBe(0);
+      expect(pipeline.mapSubscribers.size).toBe(0);
     });
   });
 
@@ -114,7 +114,8 @@ describe("StaticPipelineBuilder validations", () => {
         .build();
 
       const deduplication =
-        pipeline.foldReactors.get("settle")?.definition.options?.deduplication;
+        pipeline.foldSubscribers.get("settle")?.definition.options
+          ?.deduplication;
       expect(deduplication).toMatchObject({
         ttlMs: 12_000,
         extend: false,
@@ -147,10 +148,10 @@ describe("StaticPipelineBuilder validations", () => {
       expect(options?.groupKeyFn?.(event)).toBe("lane:project-1");
     });
 
-    it("adapts a custom groupKeyFn onto a fold subscriber's reactor payload", () => {
+    it("adapts a custom groupKeyFn onto a fold subscriber's subscriber payload", () => {
       // Fold/map subscribers dispatch with a { event, foldState } payload;
       // the spec's event-shaped key must be adapted, not silently dropped —
-      // dropping it recreates the raw-subscriber gap on the reactor path.
+      // dropping it recreates the raw-subscriber gap on the subscriber path.
       const laneFn = (e: Event) => `lane:${e.tenantId}`;
       const fold = createMockFoldProjectionDefinition<Event>("summary");
       const pipeline = definePipeline<Event>()
@@ -165,9 +166,9 @@ describe("StaticPipelineBuilder validations", () => {
         })
         .build();
 
-      const reactorGroupKeyFn =
-        pipeline.foldReactors?.get("settle")?.definition.options?.groupKeyFn;
-      expect(reactorGroupKeyFn?.({ event, foldState: {} })).toBe(
+      const subscriberGroupKeyFn =
+        pipeline.foldSubscribers?.get("settle")?.definition.options?.groupKeyFn;
+      expect(subscriberGroupKeyFn?.({ event, foldState: {} })).toBe(
         "lane:project-1",
       );
     });
@@ -206,7 +207,7 @@ describe("StaticPipelineBuilder validations", () => {
   });
 
   describe("when a default state projection is registered", () => {
-    it("keeps it out of the legacy fold and reactor registries", () => {
+    it("keeps it out of the legacy fold and subscriber registries", () => {
       const projection =
         createMockStateProjectionDefinition<Event>("conversationState");
 
@@ -220,11 +221,11 @@ describe("StaticPipelineBuilder validations", () => {
         projection,
       );
       expect(pipeline.foldProjections.size).toBe(0);
-      expect(pipeline.foldReactors.size).toBe(0);
-      expect(pipeline.mapReactors.size).toBe(0);
+      expect(pipeline.foldSubscribers.size).toBe(0);
+      expect(pipeline.mapSubscribers.size).toBe(0);
     });
 
-    it("cannot be used as a reactor parent", () => {
+    it("cannot be used as a subscriber parent", () => {
       const projection =
         createMockStateProjectionDefinition<Event>("conversationState");
       expect(() =>
@@ -259,7 +260,7 @@ describe("StaticPipelineBuilder validations", () => {
   });
 
   describe("when a subscriber is registered on a fold projection", () => {
-    it("stores the registration in foldReactors", () => {
+    it("stores the registration in foldSubscribers", () => {
       const fold = createMockFoldProjectionDefinition<Event>("myFold");
 
       const pipeline = definePipeline<Event>()
@@ -272,16 +273,16 @@ describe("StaticPipelineBuilder validations", () => {
         })
         .build();
 
-      expect(pipeline.foldReactors.size).toBe(1);
-      expect(pipeline.mapReactors.size).toBe(0);
-      expect(pipeline.foldReactors.get("mySubscriber")?.projectionName).toBe(
+      expect(pipeline.foldSubscribers.size).toBe(1);
+      expect(pipeline.mapSubscribers.size).toBe(0);
+      expect(pipeline.foldSubscribers.get("mySubscriber")?.projectionName).toBe(
         "myFold",
       );
     });
   });
 
   describe("when a subscriber is registered on a map projection", () => {
-    it("stores the registration in mapReactors", () => {
+    it("stores the registration in mapSubscribers", () => {
       const mapProj = createMockMapProjectionDefinition<Event>("myMap");
 
       const pipeline = definePipeline<Event>()
@@ -294,9 +295,9 @@ describe("StaticPipelineBuilder validations", () => {
         })
         .build();
 
-      expect(pipeline.mapReactors.size).toBe(1);
-      expect(pipeline.foldReactors.size).toBe(0);
-      expect(pipeline.mapReactors.get("mySubscriber")?.projectionName).toBe(
+      expect(pipeline.mapSubscribers.size).toBe(1);
+      expect(pipeline.foldSubscribers.size).toBe(0);
+      expect(pipeline.mapSubscribers.get("mySubscriber")?.projectionName).toBe(
         "myMap",
       );
     });

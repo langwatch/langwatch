@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 /**
- * The governance reactors are registered on the trace_processing pipeline,
+ * The governance subscribers are registered on the trace_processing pipeline,
  * so they fan out on every trace fold completion, and each one only does
  * work for its own slice of traffic: ingestion-source traces.
  *
- * That relevance check belongs in `shouldReact`, which the router evaluates
+ * That relevance check belongs in `shouldDispatch`, which the router evaluates
  * BEFORE a job is packed and queued (ADR-026). A check that lives only
- * inside `handle` still passes a per-reactor test, because the handler
+ * inside `handle` still passes a per-subscriber test, because the handler
  * no-ops either way, while the job is serialized, queued, dispatched and
  * unpacked first, and counts as a success rather than a skip in
  * `es_reactor_total`.
  *
- * So the unit under test here is the router with the real reactors
+ * So the unit under test here is the router with the real subscribers
  * registered: no job enqueued, no handler run, and the skip counter moved.
  */
 
@@ -32,8 +32,6 @@ import type { Event } from "~/server/event-sourcing/domain/types";
 import { buildTraceDeps } from "~/server/event-sourcing/pipelines/trace-processing/__tests__/support/traceProcessingFixtures";
 import { createTraceProcessingPipeline } from "~/server/event-sourcing/pipelines/trace-processing/pipeline";
 import { ProjectionRouter } from "~/server/event-sourcing/projections/projectionRouter";
-import type { ReactorDefinition } from "~/server/event-sourcing/reactors/reactor.types";
-import { throttledWindow } from "~/server/event-sourcing/reactors/throttleWindow";
 import {
   createMockFoldProjectionDefinition,
   createMockFoldProjectionStore,
@@ -42,6 +40,8 @@ import {
   createTestTenantId,
   TEST_CONSTANTS,
 } from "~/server/event-sourcing/services/__tests__/testHelpers";
+import type { SubscriberDispatchDefinition } from "~/server/event-sourcing/subscribers/subscriber.types";
+import { throttledWindow } from "~/server/event-sourcing/subscribers/throttleWindow";
 import { incrementEsReactorTotal } from "~/server/metrics";
 
 vi.mock("~/server/metrics", async (importOriginal) => {
@@ -75,7 +75,7 @@ function createFoldState(attributes: Record<string, string>): TraceSummaryData {
  * the specs composed the way the registry composes them, so what the router
  * evaluates here is exactly what production registers.
  */
-function createGovernanceSubscriberDefinitions(): ReactorDefinition<Event>[] {
+function createGovernanceSubscriberDefinitions(): SubscriberDispatchDefinition<Event>[] {
   const pipeline = createTraceProcessingPipeline(
     buildTraceDeps({
       governanceKpisSync: {
@@ -103,16 +103,16 @@ function createGovernanceSubscriberDefinitions(): ReactorDefinition<Event>[] {
     }),
   );
   return [
-    pipeline.foldReactors.get("governanceKpisSync")!.definition,
-    pipeline.foldReactors.get("governanceOcsfEventsSync")!.definition,
-  ] as unknown as ReactorDefinition<Event>[];
+    pipeline.foldSubscribers.get("governanceKpisSync")!.definition,
+    pipeline.foldSubscribers.get("governanceOcsfEventsSync")!.definition,
+  ] as unknown as SubscriberDispatchDefinition<Event>[];
 }
 
-function createRouterWithGovernanceReactors(state: TraceSummaryData) {
+function createRouterWithGovernanceSubscribers(state: TraceSummaryData) {
   const send = vi.fn().mockResolvedValue(undefined);
   const queueManager = createMockQueueManager({
-    hasReactorQueues: true,
-    getReactorQueue: vi.fn().mockReturnValue({ send }),
+    hasProjectionSubscriberQueues: true,
+    getProjectionSubscriberQueue: vi.fn().mockReturnValue({ send }),
   });
   const router = new ProjectionRouter(
     TEST_CONSTANTS.AGGREGATE_TYPE,
@@ -130,14 +130,14 @@ function createRouterWithGovernanceReactors(state: TraceSummaryData) {
     }),
   );
 
-  for (const reactor of createGovernanceSubscriberDefinitions()) {
-    router.registerReactor(FOLD_NAME, reactor);
+  for (const subscriber of createGovernanceSubscriberDefinitions()) {
+    router.registerSubscriber(FOLD_NAME, subscriber);
   }
 
   return { router, send };
 }
 
-describe("governance reactors on the trace-processing router", () => {
+describe("governance subscribers on the trace-processing router", () => {
   const tenantId = createTestTenantId();
 
   beforeEach(() => {
@@ -146,8 +146,8 @@ describe("governance reactors on the trace-processing router", () => {
 
   describe("given a trace that is neither gateway nor governance traffic", () => {
     describe("when the fold completes", () => {
-      it("enqueues no reactor job", async () => {
-        const { router, send } = createRouterWithGovernanceReactors(
+      it("enqueues no subscriber job", async () => {
+        const { router, send } = createRouterWithGovernanceSubscribers(
           createFoldState({ "langwatch.origin": "app" }),
         );
 
@@ -165,8 +165,8 @@ describe("governance reactors on the trace-processing router", () => {
         expect(send).not.toHaveBeenCalled();
       });
 
-      it("counts each reactor as skipped rather than succeeded", async () => {
-        const { router } = createRouterWithGovernanceReactors(
+      it("counts each subscriber as skipped rather than succeeded", async () => {
+        const { router } = createRouterWithGovernanceSubscribers(
           createFoldState({ "langwatch.origin": "app" }),
         );
 
@@ -181,13 +181,13 @@ describe("governance reactors on the trace-processing router", () => {
           { tenantId },
         );
 
-        for (const reactorName of [
+        for (const subscriberName of [
           "governanceKpisSync",
           "governanceOcsfEventsSync",
         ]) {
           expect(incrementEsReactorTotal).toHaveBeenCalledWith(
             TEST_CONSTANTS.PIPELINE_NAME,
-            reactorName,
+            subscriberName,
             "skipped",
           );
         }
@@ -202,8 +202,8 @@ describe("governance reactors on the trace-processing router", () => {
 
   describe("given a governance-origin trace", () => {
     describe("when the fold completes", () => {
-      it("enqueues both governance reactors", async () => {
-        const { router, send } = createRouterWithGovernanceReactors(
+      it("enqueues both governance subscribers", async () => {
+        const { router, send } = createRouterWithGovernanceSubscribers(
           createFoldState({
             "langwatch.origin.kind": "ingestion_source",
             "langwatch.ingestion_source.id": "is-1",
@@ -228,8 +228,8 @@ describe("governance reactors on the trace-processing router", () => {
 
   describe("given a gateway trace", () => {
     describe("when the fold completes", () => {
-      it("declines both governance reactors", async () => {
-        const { router, send } = createRouterWithGovernanceReactors(
+      it("declines both governance subscribers", async () => {
+        const { router, send } = createRouterWithGovernanceSubscribers(
           createFoldState({
             "langwatch.virtual_key_id": "vk-1",
             "langwatch.gateway_request_id": "greq-1",
@@ -248,13 +248,13 @@ describe("governance reactors on the trace-processing router", () => {
         );
 
         expect(send).not.toHaveBeenCalled();
-        for (const reactorName of [
+        for (const subscriberName of [
           "governanceKpisSync",
           "governanceOcsfEventsSync",
         ]) {
           expect(incrementEsReactorTotal).toHaveBeenCalledWith(
             TEST_CONSTANTS.PIPELINE_NAME,
-            reactorName,
+            subscriberName,
             "skipped",
           );
         }

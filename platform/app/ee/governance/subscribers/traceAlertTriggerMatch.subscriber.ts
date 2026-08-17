@@ -21,8 +21,8 @@ export function createTraceAlertTriggerMatchHandler(deps: {
   ): Promise<void> => {
     if (!passesTraceOriginGuards(event, context.state)) return;
     // Events already committed with an empty aggregateId (see the traceId
-    // guard in originGate.reactor) would fail recordTriggerMatch validation
-    // and poison the reactor job. There is no trace to match a trigger
+    // guard in originGate.subscriber) would fail recordTriggerMatch validation
+    // and poison the subscriber job. There is no trace to match a trigger
     // against, so skip rather than throw.
     if (!context.aggregateId) return;
     const triggers = await deps.triggers.getActiveTraceTriggersForProject(

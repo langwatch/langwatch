@@ -11,7 +11,6 @@ vi.mock("~/server/metrics", async (importOriginal) => {
 });
 
 import type { Event } from "../../domain/types";
-import type { ReactorDefinition } from "../../reactors/reactor.types";
 import {
   createMockAppendStore,
   createMockFoldProjectionDefinition,
@@ -22,6 +21,7 @@ import {
   createTestTenantId,
   TEST_CONSTANTS,
 } from "../../services/__tests__/testHelpers";
+import type { SubscriberDispatchDefinition } from "../../subscribers/subscriber.types";
 import { ReplayDeferralError } from "../replayMarkerCheck";
 
 describe("ProjectionRouter", () => {
@@ -314,7 +314,7 @@ describe("ProjectionRouter", () => {
 
     describe("when a fold projection throws", () => {
       /** @scenario A projection failure prevents the side effect */
-      it("does not dispatch to reactors registered on that fold", async () => {
+      it("does not dispatch to subscribers registered on that fold", async () => {
         const queueManager = createMockQueueManager();
         const router = new ProjectionRouter(
           TEST_CONSTANTS.AGGREGATE_TYPE,
@@ -335,12 +335,12 @@ describe("ProjectionRouter", () => {
 
         router.registerFoldProjection(fold);
 
-        const reactorHandle = vi.fn().mockResolvedValue(undefined);
-        const reactor: ReactorDefinition<Event> = {
+        const subscriberHandle = vi.fn().mockResolvedValue(undefined);
+        const subscriber: SubscriberDispatchDefinition<Event> = {
           name: "should-not-fire",
-          handle: reactorHandle,
+          handle: subscriberHandle,
         };
-        router.registerReactor("exploding-fold", reactor);
+        router.registerSubscriber("exploding-fold", subscriber);
 
         const event = createTestEvent(
           TEST_CONSTANTS.AGGREGATE_ID,
@@ -352,7 +352,7 @@ describe("ProjectionRouter", () => {
           AggregateError,
         );
 
-        expect(reactorHandle).not.toHaveBeenCalled();
+        expect(subscriberHandle).not.toHaveBeenCalled();
       });
     });
 
@@ -400,7 +400,7 @@ describe("ProjectionRouter", () => {
       });
     });
 
-    describe("when a reactor fails inline", () => {
+    describe("when a subscriber fails inline", () => {
       it("throws AggregateError", async () => {
         const queueManager = createMockQueueManager();
         const router = new ProjectionRouter(
@@ -420,14 +420,14 @@ describe("ProjectionRouter", () => {
 
         router.registerFoldProjection(fold);
 
-        const reactorHandle = vi
+        const subscriberHandle = vi
           .fn()
-          .mockRejectedValue(new Error("reactor boom"));
-        const reactor: ReactorDefinition<Event> = {
-          name: "failing-reactor",
-          handle: reactorHandle,
+          .mockRejectedValue(new Error("subscriber boom"));
+        const subscriber: SubscriberDispatchDefinition<Event> = {
+          name: "failing-subscriber",
+          handle: subscriberHandle,
         };
-        router.registerReactor("my-fold", reactor);
+        router.registerSubscriber("my-fold", subscriber);
 
         const event = createTestEvent(
           TEST_CONSTANTS.AGGREGATE_ID,
@@ -439,11 +439,11 @@ describe("ProjectionRouter", () => {
           AggregateError,
         );
 
-        expect(reactorHandle).toHaveBeenCalled();
+        expect(subscriberHandle).toHaveBeenCalled();
       });
     });
 
-    describe("when a reactor declares a shouldReact predicate", () => {
+    describe("when a subscriber declares a shouldDispatch predicate", () => {
       const setupRouterWithFold = (
         queueManager: ReturnType<typeof createMockQueueManager>,
       ) => {
@@ -468,21 +468,23 @@ describe("ProjectionRouter", () => {
 
       describe("when the predicate returns false", () => {
         /** @scenario An irrelevant event is rejected before any job is queued */
-        it("does not enqueue a job for that reactor", async () => {
+        it("does not enqueue a job for that subscriber", async () => {
           const mockSend = vi.fn().mockResolvedValue(undefined);
           const queueManager = createMockQueueManager({
-            hasReactorQueues: true,
-            getReactorQueue: vi.fn().mockReturnValue({ send: mockSend }),
+            hasProjectionSubscriberQueues: true,
+            getProjectionSubscriberQueue: vi
+              .fn()
+              .mockReturnValue({ send: mockSend }),
           });
           const router = setupRouterWithFold(queueManager);
 
-          const reactorHandle = vi.fn().mockResolvedValue(undefined);
-          const reactor: ReactorDefinition<Event> = {
-            name: "filtered-reactor",
-            shouldReact: () => false,
-            handle: reactorHandle,
+          const subscriberHandle = vi.fn().mockResolvedValue(undefined);
+          const subscriber: SubscriberDispatchDefinition<Event> = {
+            name: "filtered-subscriber",
+            shouldDispatch: () => false,
+            handle: subscriberHandle,
           };
-          router.registerReactor("my-fold", reactor);
+          router.registerSubscriber("my-fold", subscriber);
 
           const event = createTestEvent(
             TEST_CONSTANTS.AGGREGATE_ID,
@@ -493,10 +495,10 @@ describe("ProjectionRouter", () => {
           await router.dispatch([event], { tenantId });
 
           expect(mockSend).not.toHaveBeenCalled();
-          expect(reactorHandle).not.toHaveBeenCalled();
+          expect(subscriberHandle).not.toHaveBeenCalled();
           expect(incrementEsReactorTotal).toHaveBeenCalledWith(
             TEST_CONSTANTS.PIPELINE_NAME,
-            "filtered-reactor",
+            "filtered-subscriber",
             "skipped",
           );
         });
@@ -505,13 +507,13 @@ describe("ProjectionRouter", () => {
           const queueManager = createMockQueueManager();
           const router = setupRouterWithFold(queueManager);
 
-          const reactorHandle = vi.fn().mockResolvedValue(undefined);
-          const reactor: ReactorDefinition<Event> = {
-            name: "filtered-inline-reactor",
-            shouldReact: () => false,
-            handle: reactorHandle,
+          const subscriberHandle = vi.fn().mockResolvedValue(undefined);
+          const subscriber: SubscriberDispatchDefinition<Event> = {
+            name: "filtered-inline-subscriber",
+            shouldDispatch: () => false,
+            handle: subscriberHandle,
           };
-          router.registerReactor("my-fold", reactor);
+          router.registerSubscriber("my-fold", subscriber);
 
           const event = createTestEvent(
             TEST_CONSTANTS.AGGREGATE_ID,
@@ -521,7 +523,7 @@ describe("ProjectionRouter", () => {
 
           await router.dispatch([event], { tenantId });
 
-          expect(reactorHandle).not.toHaveBeenCalled();
+          expect(subscriberHandle).not.toHaveBeenCalled();
         });
       });
 
@@ -530,18 +532,20 @@ describe("ProjectionRouter", () => {
         it("enqueues the job with the event and fold state", async () => {
           const mockSend = vi.fn().mockResolvedValue(undefined);
           const queueManager = createMockQueueManager({
-            hasReactorQueues: true,
-            getReactorQueue: vi.fn().mockReturnValue({ send: mockSend }),
+            hasProjectionSubscriberQueues: true,
+            getProjectionSubscriberQueue: vi
+              .fn()
+              .mockReturnValue({ send: mockSend }),
           });
           const router = setupRouterWithFold(queueManager);
 
-          const shouldReact = vi.fn().mockReturnValue(true);
-          const reactor: ReactorDefinition<Event> = {
-            name: "passing-reactor",
-            shouldReact,
+          const shouldDispatch = vi.fn().mockReturnValue(true);
+          const subscriber: SubscriberDispatchDefinition<Event> = {
+            name: "passing-subscriber",
+            shouldDispatch,
             handle: vi.fn(),
           };
-          router.registerReactor("my-fold", reactor);
+          router.registerSubscriber("my-fold", subscriber);
 
           const event = createTestEvent(
             TEST_CONSTANTS.AGGREGATE_ID,
@@ -551,7 +555,7 @@ describe("ProjectionRouter", () => {
 
           await router.dispatch([event], { tenantId });
 
-          expect(shouldReact).toHaveBeenCalledWith(
+          expect(shouldDispatch).toHaveBeenCalledWith(
             event,
             expect.objectContaining({
               tenantId,
@@ -571,19 +575,21 @@ describe("ProjectionRouter", () => {
         it("fails open and enqueues the job anyway", async () => {
           const mockSend = vi.fn().mockResolvedValue(undefined);
           const queueManager = createMockQueueManager({
-            hasReactorQueues: true,
-            getReactorQueue: vi.fn().mockReturnValue({ send: mockSend }),
+            hasProjectionSubscriberQueues: true,
+            getProjectionSubscriberQueue: vi
+              .fn()
+              .mockReturnValue({ send: mockSend }),
           });
           const router = setupRouterWithFold(queueManager);
 
-          const reactor: ReactorDefinition<Event> = {
-            name: "throwing-predicate-reactor",
-            shouldReact: () => {
+          const subscriber: SubscriberDispatchDefinition<Event> = {
+            name: "throwing-predicate-subscriber",
+            shouldDispatch: () => {
               throw new Error("predicate boom");
             },
             handle: vi.fn(),
           };
-          router.registerReactor("my-fold", reactor);
+          router.registerSubscriber("my-fold", subscriber);
 
           const event = createTestEvent(
             TEST_CONSTANTS.AGGREGATE_ID,
@@ -598,14 +604,16 @@ describe("ProjectionRouter", () => {
       });
     });
 
-    describe("when a reactor queue send fails", () => {
+    describe("when a subscriber queue send fails", () => {
       it("throws AggregateError", async () => {
         const mockSend = vi
           .fn()
           .mockRejectedValue(new Error("queue send failed"));
         const queueManager = createMockQueueManager({
-          hasReactorQueues: true,
-          getReactorQueue: vi.fn().mockReturnValue({ send: mockSend }),
+          hasProjectionSubscriberQueues: true,
+          getProjectionSubscriberQueue: vi
+            .fn()
+            .mockReturnValue({ send: mockSend }),
         });
         const router = new ProjectionRouter(
           TEST_CONSTANTS.AGGREGATE_TYPE,
@@ -624,11 +632,11 @@ describe("ProjectionRouter", () => {
 
         router.registerFoldProjection(fold);
 
-        const reactor: ReactorDefinition<Event> = {
-          name: "queue-reactor",
+        const subscriber: SubscriberDispatchDefinition<Event> = {
+          name: "queue-subscriber",
           handle: vi.fn(),
         };
-        router.registerReactor("my-fold", reactor);
+        router.registerSubscriber("my-fold", subscriber);
 
         const event = createTestEvent(
           TEST_CONSTANTS.AGGREGATE_ID,
@@ -642,11 +650,11 @@ describe("ProjectionRouter", () => {
       });
     });
 
-    describe("when reactor queue is missing (queue mode)", () => {
+    describe("when subscriber queue is missing (queue mode)", () => {
       it("falls back to inline execution", async () => {
         const queueManager = createMockQueueManager({
-          hasReactorQueues: true,
-          getReactorQueue: vi.fn().mockReturnValue(undefined),
+          hasProjectionSubscriberQueues: true,
+          getProjectionSubscriberQueue: vi.fn().mockReturnValue(undefined),
         });
         const router = new ProjectionRouter(
           TEST_CONSTANTS.AGGREGATE_TYPE,
@@ -665,12 +673,12 @@ describe("ProjectionRouter", () => {
 
         router.registerFoldProjection(fold);
 
-        const reactorHandle = vi.fn().mockResolvedValue(undefined);
-        const reactor: ReactorDefinition<Event> = {
-          name: "fallback-reactor",
-          handle: reactorHandle,
+        const subscriberHandle = vi.fn().mockResolvedValue(undefined);
+        const subscriber: SubscriberDispatchDefinition<Event> = {
+          name: "fallback-subscriber",
+          handle: subscriberHandle,
         };
-        router.registerReactor("my-fold", reactor);
+        router.registerSubscriber("my-fold", subscriber);
 
         const event = createTestEvent(
           TEST_CONSTANTS.AGGREGATE_ID,
@@ -680,15 +688,15 @@ describe("ProjectionRouter", () => {
 
         await router.dispatch([event], { tenantId });
 
-        expect(reactorHandle).toHaveBeenCalled();
+        expect(subscriberHandle).toHaveBeenCalled();
       });
     });
 
-    describe("when reactor queue is missing and inline fallback fails", () => {
+    describe("when subscriber queue is missing and inline fallback fails", () => {
       it("throws AggregateError", async () => {
         const queueManager = createMockQueueManager({
-          hasReactorQueues: true,
-          getReactorQueue: vi.fn().mockReturnValue(undefined),
+          hasProjectionSubscriberQueues: true,
+          getProjectionSubscriberQueue: vi.fn().mockReturnValue(undefined),
         });
         const router = new ProjectionRouter(
           TEST_CONSTANTS.AGGREGATE_TYPE,
@@ -707,14 +715,14 @@ describe("ProjectionRouter", () => {
 
         router.registerFoldProjection(fold);
 
-        const reactorHandle = vi
+        const subscriberHandle = vi
           .fn()
           .mockRejectedValue(new Error("inline fallback boom"));
-        const reactor: ReactorDefinition<Event> = {
-          name: "fallback-failing-reactor",
-          handle: reactorHandle,
+        const subscriber: SubscriberDispatchDefinition<Event> = {
+          name: "fallback-failing-subscriber",
+          handle: subscriberHandle,
         };
-        router.registerReactor("my-fold", reactor);
+        router.registerSubscriber("my-fold", subscriber);
 
         const event = createTestEvent(
           TEST_CONSTANTS.AGGREGATE_ID,
@@ -726,13 +734,13 @@ describe("ProjectionRouter", () => {
           AggregateError,
         );
 
-        expect(reactorHandle).toHaveBeenCalled();
+        expect(subscriberHandle).toHaveBeenCalled();
       });
     });
   });
 
-  describe("map reactors", () => {
-    describe("when a map reactor is registered on a map projection", () => {
+  describe("map subscribers", () => {
+    describe("when a map subscriber is registered on a map projection", () => {
       /** @scenario A subscriber without a relevance guard fires for every event */
       it("fires after map projection succeeds inline", async () => {
         const queueManager = createMockQueueManager();
@@ -750,12 +758,12 @@ describe("ProjectionRouter", () => {
 
         router.registerMapProjection(mapProj);
 
-        const reactorHandle = vi.fn().mockResolvedValue(undefined);
-        const reactor: ReactorDefinition<Event> = {
-          name: "map-reactor",
-          handle: reactorHandle,
+        const subscriberHandle = vi.fn().mockResolvedValue(undefined);
+        const subscriber: SubscriberDispatchDefinition<Event> = {
+          name: "map-subscriber",
+          handle: subscriberHandle,
         };
-        router.registerMapReactor("my-map", reactor);
+        router.registerMapSubscriber("my-map", subscriber);
 
         const event = createTestEvent(
           TEST_CONSTANTS.AGGREGATE_ID,
@@ -766,12 +774,12 @@ describe("ProjectionRouter", () => {
         await router.dispatch([event], { tenantId });
 
         expect(mapStore.append).toHaveBeenCalled();
-        expect(reactorHandle).toHaveBeenCalled();
+        expect(subscriberHandle).toHaveBeenCalled();
       });
     });
 
     describe("when a map projection fails", () => {
-      it("does not dispatch to map reactors", async () => {
+      it("does not dispatch to map subscribers", async () => {
         const queueManager = createMockQueueManager();
         const router = new ProjectionRouter(
           TEST_CONSTANTS.AGGREGATE_TYPE,
@@ -791,12 +799,12 @@ describe("ProjectionRouter", () => {
 
         router.registerMapProjection(mapProj);
 
-        const reactorHandle = vi.fn().mockResolvedValue(undefined);
-        const reactor: ReactorDefinition<Event> = {
+        const subscriberHandle = vi.fn().mockResolvedValue(undefined);
+        const subscriber: SubscriberDispatchDefinition<Event> = {
           name: "should-not-fire",
-          handle: reactorHandle,
+          handle: subscriberHandle,
         };
-        router.registerMapReactor("failing-map", reactor);
+        router.registerMapSubscriber("failing-map", subscriber);
 
         const event = createTestEvent(
           TEST_CONSTANTS.AGGREGATE_ID,
@@ -808,11 +816,11 @@ describe("ProjectionRouter", () => {
           AggregateError,
         );
 
-        expect(reactorHandle).not.toHaveBeenCalled();
+        expect(subscriberHandle).not.toHaveBeenCalled();
       });
     });
 
-    describe("when registering a map reactor on a non-existent map", () => {
+    describe("when registering a map subscriber on a non-existent map", () => {
       it("throws ConfigurationError", () => {
         const queueManager = createMockQueueManager();
         const router = new ProjectionRouter(
@@ -821,13 +829,13 @@ describe("ProjectionRouter", () => {
           queueManager,
         );
 
-        const reactor: ReactorDefinition<Event> = {
-          name: "orphan-reactor",
+        const subscriber: SubscriberDispatchDefinition<Event> = {
+          name: "orphan-subscriber",
           handle: vi.fn(),
         };
 
         expect(() =>
-          router.registerMapReactor("non-existent", reactor),
+          router.registerMapSubscriber("non-existent", subscriber),
         ).toThrow(/map "non-existent" — map not found/);
       });
     });
@@ -941,8 +949,8 @@ describe("ProjectionRouter", () => {
     }
 
     describe("when several events for one aggregate are coalesced", () => {
-      /** @scenario 'Coalescing still dispatches per-span reactors for every event' */
-      it("folds the batch once but fires reactors for every event", async () => {
+      /** @scenario 'Coalescing still dispatches per-span subscribers for every event' */
+      it("folds the batch once but fires subscribers for every event", async () => {
         const router = new ProjectionRouter(
           TEST_CONSTANTS.AGGREGATE_TYPE,
           TEST_CONSTANTS.PIPELINE_NAME,
@@ -954,13 +962,13 @@ describe("ProjectionRouter", () => {
         router.registerFoldProjection(fold);
 
         const seen: string[] = [];
-        const reactor: ReactorDefinition<Event> = {
+        const subscriber: SubscriberDispatchDefinition<Event> = {
           name: "per-span-spy",
           handle: async (event) => {
             seen.push(event.id);
           },
         };
-        router.registerReactor("my-fold", reactor);
+        router.registerSubscriber("my-fold", subscriber);
 
         const events = [
           makeBatchEvent("e1", 1000),
@@ -978,12 +986,12 @@ describe("ProjectionRouter", () => {
         // The expensive fold load/store happens once — the O(n) win.
         expect(store.get).toHaveBeenCalledTimes(1);
         expect(store.store).toHaveBeenCalledTimes(1);
-        // Per-span reactors (embedded-eval sync, evaluation triggers) must see
+        // Per-span subscribers (embedded-eval sync, evaluation triggers) must see
         // EVERY event, not just the last — otherwise N-1 spans are dropped.
         expect(seen).toEqual(["e1", "e2", "e3"]);
       });
 
-      it("evaluates shouldReact per coalesced event, not once per batch", async () => {
+      it("evaluates shouldDispatch per coalesced event, not once per batch", async () => {
         const router = new ProjectionRouter(
           TEST_CONSTANTS.AGGREGATE_TYPE,
           TEST_CONSTANTS.PIPELINE_NAME,
@@ -995,14 +1003,14 @@ describe("ProjectionRouter", () => {
         router.registerFoldProjection(fold);
 
         const seen: string[] = [];
-        const reactor: ReactorDefinition<Event> = {
+        const subscriber: SubscriberDispatchDefinition<Event> = {
           name: "selective-per-span-spy",
-          shouldReact: (event) => event.id !== "e2",
+          shouldDispatch: (event) => event.id !== "e2",
           handle: async (event) => {
             seen.push(event.id);
           },
         };
-        router.registerReactor("my-fold", reactor);
+        router.registerSubscriber("my-fold", subscriber);
 
         const events = [
           makeBatchEvent("e1", 1000),
@@ -1020,7 +1028,7 @@ describe("ProjectionRouter", () => {
         expect(seen).toEqual(["e1", "e3"]);
       });
 
-      it("dispatches reactors in occurredAt order even when events arrive shuffled", async () => {
+      it("dispatches subscribers in occurredAt order even when events arrive shuffled", async () => {
         const router = new ProjectionRouter(
           TEST_CONSTANTS.AGGREGATE_TYPE,
           TEST_CONSTANTS.PIPELINE_NAME,
@@ -1032,7 +1040,7 @@ describe("ProjectionRouter", () => {
         router.registerFoldProjection(fold);
 
         const seen: string[] = [];
-        router.registerReactor("my-fold", {
+        router.registerSubscriber("my-fold", {
           name: "spy",
           handle: async (event) => {
             seen.push(event.id);

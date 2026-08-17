@@ -1,16 +1,16 @@
 /**
- * Unit tests for the billing meter dispatch reactor.
+ * Unit tests for the billing meter dispatch subscriber.
  *
  * Mocks boundaries: Prisma (org resolution), command dispatch, and logger.
  *
- * @see specs/licensing/billing-meter-dispatch.feature "Billing Dispatch Reactor — Post-Fold Side Effect"
+ * @see specs/licensing/billing-meter-dispatch.feature "Billing Dispatch Subscriber — Post-Fold Side Effect"
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createTenantId } from "../../../domain/tenantId";
 import type { Event } from "../../../domain/types";
 import { SPAN_RECEIVED_EVENT_TYPE } from "../../../pipelines/trace-processing/schemas/constants";
-import type { ReactorContext } from "../../../reactors/reactor.types";
+import type { SubscriberDispatchContext } from "../../../subscribers/subscriber.types";
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks
@@ -64,7 +64,7 @@ function makeEvent(projectId: string): Event {
   };
 }
 
-function makeContext(projectId: string): ReactorContext {
+function makeContext(projectId: string): SubscriberDispatchContext {
   return {
     tenantId: projectId,
     aggregateId: `trace-${projectId}`,
@@ -76,7 +76,7 @@ function makeContext(projectId: string): ReactorContext {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("billingMeterDispatchReactor", () => {
+describe("billingMeterDispatchSubscriber", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     vi.resetModules();
@@ -93,7 +93,7 @@ describe("billingMeterDispatchReactor", () => {
       const { createBillingMeterDispatchSubscriber } = await import(
         "../billingMeterDispatch.subscriber"
       );
-      const reactor = createBillingMeterDispatchSubscriber({
+      const subscriber = createBillingMeterDispatchSubscriber({
         getDispatch: () => mockDispatch,
       });
 
@@ -103,7 +103,7 @@ describe("billingMeterDispatchReactor", () => {
 
       try {
         const event = makeEvent("proj-1");
-        await reactor.handle(event, makeContext("proj-1"));
+        await subscriber.handle(event, makeContext("proj-1"));
 
         expect(mockPrisma.project.findUnique).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -137,7 +137,7 @@ describe("billingMeterDispatchReactor", () => {
       const { createBillingMeterDispatchSubscriber } = await import(
         "../billingMeterDispatch.subscriber"
       );
-      const reactor = createBillingMeterDispatchSubscriber({
+      const subscriber = createBillingMeterDispatchSubscriber({
         getDispatch: () => mockDispatch,
       });
 
@@ -146,14 +146,14 @@ describe("billingMeterDispatchReactor", () => {
 
       try {
         // First call: populates cache
-        await reactor.handle(makeEvent("proj-1"), makeContext("proj-1"));
+        await subscriber.handle(makeEvent("proj-1"), makeContext("proj-1"));
 
         // Reset mock call counts after cache warm-up
         mockPrisma.project.findUnique.mockClear();
         mockDispatch.mockClear();
 
         // Second call: uses cache
-        await reactor.handle(makeEvent("proj-1"), makeContext("proj-1"));
+        await subscriber.handle(makeEvent("proj-1"), makeContext("proj-1"));
 
         expect(mockPrisma.project.findUnique).not.toHaveBeenCalled();
         expect(mockDispatch).toHaveBeenCalledWith(
@@ -176,11 +176,11 @@ describe("billingMeterDispatchReactor", () => {
       const { createBillingMeterDispatchSubscriber } = await import(
         "../billingMeterDispatch.subscriber"
       );
-      const reactor = createBillingMeterDispatchSubscriber({
+      const subscriber = createBillingMeterDispatchSubscriber({
         getDispatch: () => mockDispatch,
       });
 
-      await reactor.handle(
+      await subscriber.handle(
         makeEvent("orphan-proj"),
         makeContext("orphan-proj"),
       );
@@ -206,7 +206,7 @@ describe("billingMeterDispatchReactor", () => {
       const { createBillingMeterDispatchSubscriber } = await import(
         "../billingMeterDispatch.subscriber"
       );
-      const reactor = createBillingMeterDispatchSubscriber({
+      const subscriber = createBillingMeterDispatchSubscriber({
         getDispatch: () => mockDispatch,
       });
 
@@ -215,7 +215,7 @@ describe("billingMeterDispatchReactor", () => {
 
       try {
         await expect(
-          reactor.handle(makeEvent("proj-1"), makeContext("proj-1")),
+          subscriber.handle(makeEvent("proj-1"), makeContext("proj-1")),
         ).resolves.not.toThrow();
 
         expect(mockLoggerWarn).toHaveBeenCalledWith(
@@ -239,7 +239,7 @@ describe("billingMeterDispatchReactor", () => {
       const { createBillingMeterDispatchSubscriber } = await import(
         "../billingMeterDispatch.subscriber"
       );
-      const reactor = createBillingMeterDispatchSubscriber({
+      const subscriber = createBillingMeterDispatchSubscriber({
         getDispatch: () => mockDispatch,
       });
 
@@ -247,7 +247,7 @@ describe("billingMeterDispatchReactor", () => {
       vi.setSystemTime(new Date(Date.UTC(2026, 2, 1, 12, 0, 0))); // March 1, 2026
 
       try {
-        await reactor.handle(makeEvent("proj-1"), makeContext("proj-1"));
+        await subscriber.handle(makeEvent("proj-1"), makeContext("proj-1"));
 
         // Dispatched for both months
         expect(mockDispatch).toHaveBeenCalledTimes(2);
@@ -284,7 +284,7 @@ describe("billingMeterDispatchReactor", () => {
       const { createBillingMeterDispatchSubscriber } = await import(
         "../billingMeterDispatch.subscriber"
       );
-      const reactor = createBillingMeterDispatchSubscriber({
+      const subscriber = createBillingMeterDispatchSubscriber({
         getDispatch: () => mockDispatch,
       });
 
@@ -292,7 +292,7 @@ describe("billingMeterDispatchReactor", () => {
       vi.setSystemTime(new Date(Date.UTC(2026, 2, 3, 12, 0, 0))); // March 3, 2026
 
       try {
-        await reactor.handle(makeEvent("proj-1"), makeContext("proj-1"));
+        await subscriber.handle(makeEvent("proj-1"), makeContext("proj-1"));
         expect(mockDispatch).toHaveBeenCalledTimes(2);
       } finally {
         vi.useRealTimers();
@@ -311,7 +311,7 @@ describe("billingMeterDispatchReactor", () => {
       const { createBillingMeterDispatchSubscriber } = await import(
         "../billingMeterDispatch.subscriber"
       );
-      const reactor = createBillingMeterDispatchSubscriber({
+      const subscriber = createBillingMeterDispatchSubscriber({
         getDispatch: () => mockDispatch,
       });
 
@@ -319,7 +319,7 @@ describe("billingMeterDispatchReactor", () => {
       vi.setSystemTime(new Date(Date.UTC(2026, 2, 4, 12, 0, 0))); // March 4, 2026
 
       try {
-        await reactor.handle(makeEvent("proj-1"), makeContext("proj-1"));
+        await subscriber.handle(makeEvent("proj-1"), makeContext("proj-1"));
         expect(mockDispatch).toHaveBeenCalledTimes(1);
       } finally {
         vi.useRealTimers();
@@ -334,18 +334,18 @@ describe("billingMeterDispatchReactor", () => {
         createBillingMeterDispatchSubscriber,
       } = await import("../billingMeterDispatch.subscriber");
 
-      const reactor = createBillingMeterDispatchSubscriber({
+      const subscriber = createBillingMeterDispatchSubscriber({
         getDispatch: () => vi.fn(),
       });
 
-      expect(reactor.options?.runIn).toEqual(["worker"]);
+      expect(subscriber.options?.runIn).toEqual(["worker"]);
       // No delay: the handler derives its billing month from the clock, so
       // holding a trigger would move the decision along with the work.
-      expect(reactor.options?.delay ?? 0).toBe(0);
-      expect(reactor.options?.ttl).toBe(BILLING_METER_DISPATCH_SUPPRESS_MS);
+      expect(subscriber.options?.delay ?? 0).toBe(0);
+      expect(subscriber.options?.ttl).toBe(BILLING_METER_DISPATCH_SUPPRESS_MS);
 
       const payload = { event: makeEvent("proj-1"), foldState: {} };
-      expect(reactor.options?.makeJobId?.(payload)).toBe(
+      expect(subscriber.options?.makeJobId?.(payload)).toBe(
         "billing_dispatch_proj-1",
       );
     });

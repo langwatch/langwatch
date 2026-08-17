@@ -2,7 +2,7 @@ import { definePipeline } from "../..";
 import type { TriggerContext } from "../../pipeline/processManagerDefinition";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
 import type { AppendStore } from "../../projections/mapProjection.types";
-import { throttledWindow } from "../../reactors/throttleWindow";
+import { throttledWindow } from "../../subscribers/throttleWindow";
 import { ContributeLogFactsCommand } from "./commands/contributeLogFactsCommand";
 import { ContributeMetricFactsCommand } from "./commands/contributeMetricFactsCommand";
 import { ContributeSpanFactsCommand } from "./commands/contributeSpanFactsCommand";
@@ -72,11 +72,11 @@ export interface CodingAgentProcessingPipelineDeps {
  *   per session event (model call, compaction, rate limit, tool run, …),
  *   the per-call sequence the session fold's converged totals erase
  *
- * Consumption is subscribers + projections, plus one reactor on the session
+ * Consumption is subscribers + projections, plus one subscriber on the session
  * fold: pullRequestMapping, which asks the organization's GitHub connection
  * about the session's branch once the row is committed — a genuine side
  * effect that earns the queue hop. Recording on the project that a session
- * ran at all is NOT a reactor: the fold store stamps it inline after a commit
+ * ran at all is NOT a subscriber: the fold store stamps it inline after a commit
  * (`codingAgentSessionSeen.touch.ts`), the same seam-level throttled write the
  * gateway spend pipeline uses for virtual-key lastUsedAt. Commands default to
  * per-aggregate grouping, so one session's contributions apply in order.

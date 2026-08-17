@@ -47,7 +47,7 @@ export class FeatureFlagStorePostgres {
     CACHE_PREFIX,
   );
   // Per-pod in-process cache. Sits in front of Redis so the trace-
-  // processing reactor (called per event) does not generate a Redis GET
+  // processing subscriber (called per event) does not generate a Redis GET
   // per event.
   private readonly local = new Map<
     string,

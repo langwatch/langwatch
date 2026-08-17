@@ -2,7 +2,7 @@ import { z } from "zod";
 
 /**
  * Predefined tracked-event schemas, isolated from the ingestion service so
- * lightweight consumers (e.g. the trackedEventSync reactor) can validate a
+ * lightweight consumers (e.g. the trackedEventSync subscriber) can validate a
  * payload without pulling the app singleton + Prisma graph into their import
  * tree. The ingestion service and both `track`/`track_event` routes import
  * these directly.

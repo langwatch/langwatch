@@ -202,7 +202,7 @@ describe("detectCausalityLoop (pure)", () => {
   });
 });
 
-describe("evaluationTrigger reactor", () => {
+describe("evaluationTrigger subscriber", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(Date.now());
@@ -315,9 +315,9 @@ describe("evaluationTrigger reactor", () => {
 
   describe("when trace has origin=evaluation (no longer hardcoded skip)", () => {
     /** @scenario "Evaluation trigger dispatches for any known origin (preconditions filter)" */
-    it("dispatches normally — preconditions filter, not the reactor", async () => {
+    it("dispatches normally — preconditions filter, not the subscriber", async () => {
       // Per user direction post-2026-05-11 plan-mode debate: origin is a
-      // user-configurable precondition, not a hardcoded reactor guard.
+      // user-configurable precondition, not a hardcoded subscriber guard.
       // The depth signal (per-span) is the sole hard rule.
       const deps = createDeps();
       const subscriber = createEvaluationTriggerSubscriber(deps);
@@ -437,7 +437,7 @@ describe("evaluationTrigger reactor", () => {
 
       await subscriber.spec.handler(createOriginEvent(), createContext(state));
 
-      // The reactor can fire a second time after the command was already
+      // The subscriber can fire a second time after the command was already
       // dispatched (a late span, then the deferred OriginResolvedEvent). The
       // dedup key outlives dispatch (6-min TTL), so shouldSurviveDispatch must be set
       // for that second dispatch to be squashed instead of re-run as a duplicate.
@@ -559,7 +559,7 @@ describe("evaluationTrigger reactor", () => {
  * The guards below used to live inside `handle`, so every span of a 10k-span
  * trace was serialized, gzipped and blobbed into Redis before the queue's dedup
  * threw the job away. They are pure and read only the payload `handle` receives,
- * so `shouldReact` rejects them pre-enqueue instead (ADR-026). See
+ * so `shouldDispatch` rejects them pre-enqueue instead (ADR-026). See
  * specs/event-sourcing/hot-trace-fold-amplification.feature.
  */
 describe("evaluationTrigger relevance check", () => {
@@ -569,39 +569,41 @@ describe("evaluationTrigger relevance check", () => {
       ...overrides,
     });
 
-  const shouldReact = (
+  const shouldDispatch = (
     event: TraceProcessingEvent,
     state: TraceSummaryData,
   ): boolean => {
     const subscriber = createEvaluationTriggerSubscriber(createDeps());
-    // The reactor always declares one.
+    // The subscriber always declares one.
     return subscriber.spec.when!(event, createContext(state));
   };
 
   describe("given a trace with a resolved origin", () => {
     /** @scenario "The origin guard admits a genuine message event before enqueue" */
     it("agrees to react to a recent span event", () => {
-      expect(shouldReact(createSpanEvent(), withOrigin())).toBe(true);
+      expect(shouldDispatch(createSpanEvent(), withOrigin())).toBe(true);
     });
 
     /** @scenario "The origin guard filters a non-message event before enqueue" */
     it("declines a topic-assigned event", () => {
-      expect(shouldReact(createTopicAssignedEvent(), withOrigin())).toBe(false);
+      expect(shouldDispatch(createTopicAssignedEvent(), withOrigin())).toBe(
+        false,
+      );
     });
 
     /** @scenario "The evaluation trigger declines a synthetic span before enqueue" */
     it("declines a synthetic span", () => {
       const synthetic = createSpanEvent({ spanName: TRACK_EVENT_SPAN_NAME });
-      expect(shouldReact(synthetic, withOrigin())).toBe(false);
+      expect(shouldDispatch(synthetic, withOrigin())).toBe(false);
     });
 
     /** @scenario "The evaluation trigger dispatches nothing past the span processing cap" */
     it("dispatches no evaluation once the span count reaches the processing cap", async () => {
-      // The cap guard deliberately lives in handle, not shouldReact: shouldReact
+      // The cap guard deliberately lives in handle, not shouldDispatch: shouldDispatch
       // runs once per event of a coalesced batch and would multiply the
       // once-per-crossing warn by the batch size.
       const atCap = withOrigin({ spanCount: MAX_PROCESSED_SPANS });
-      expect(shouldReact(createSpanEvent(), atCap)).toBe(true);
+      expect(shouldDispatch(createSpanEvent(), atCap)).toBe(true);
 
       const deps = createDeps();
       const subscriber = createEvaluationTriggerSubscriber(deps);
@@ -633,7 +635,7 @@ describe("evaluationTrigger relevance check", () => {
   describe("given a trace whose origin is unresolved", () => {
     /** @scenario "The origin guard filters a trace with no resolved origin before enqueue" */
     it("declines a span event", () => {
-      expect(shouldReact(createSpanEvent(), createFoldState())).toBe(false);
+      expect(shouldDispatch(createSpanEvent(), createFoldState())).toBe(false);
     });
   });
 });

@@ -95,7 +95,7 @@ function createDeps(
   };
 }
 
-describe("evaluationTrigger reactor", () => {
+describe("evaluationTrigger subscriber", () => {
   describe("when monitor is trace-level (no threadIdleTimeout)", () => {
     it("sends with dedup TTL outlasting deferred origin window", async () => {
       const monitor = makeMonitor({ threadIdleTimeout: null });

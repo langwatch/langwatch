@@ -1,20 +1,20 @@
 import type { Event } from "../domain/types";
-import type { ReactorOptions } from "./reactor.types";
+import type { SubscriberDispatchOptions } from "./subscriber.types";
 
-/** The payload a reactor's job-id and group-key functions receive. */
-export type ReactorJobPayload = { event: Event; foldState: unknown };
+/** The payload a subscriber's job-id and group-key functions receive. */
+export type SubscriberJobPayload = { event: Event; foldState: unknown };
 
 /**
- * Options that make a reactor fire at most once per window per job id.
+ * Options that make a subscriber fire at most once per window per job id.
  *
- * A reactor that sets only `makeJobId` + `ttl` does NOT get a window. Its
+ * A subscriber that sets only `makeJobId` + `ttl` does NOT get a window. Its
  * `delay` is 0, so the job dispatches on the first event; dispatch takes the
  * job out of staging, the next event's dedup lookup therefore misses, and the
  * key is deleted and restaged. Every event gets its own job and the TTL never
  * bites. A window needs a `delay` — the dedup key is what collapses events,
  * but only for as long as the job is still waiting to dispatch.
  *
- * `extend: false` is the load-bearing choice. A reactor's queue score is the
+ * `extend: false` is the load-bearing choice. A subscriber's queue score is the
  * event's own `createdAt`, so dispatch lands at `createdAt + delay`. Extending
  * on every event would re-arm that deadline against the newest event and a
  * continuously-streaming aggregate would push its own job forward forever,
@@ -84,13 +84,13 @@ export function throttledPerWindow({
   dedupTtlMs = windowMs,
   shouldSurviveDispatch = false,
 }: {
-  makeJobId: (payload: ReactorJobPayload) => string;
+  makeJobId: (payload: SubscriberJobPayload) => string;
   /** How long to hold events before firing, and the default dedup TTL. */
   windowMs: number;
   /** Override when the suppression window must outlast the firing delay. */
   dedupTtlMs?: number;
   shouldSurviveDispatch?: boolean;
-}): Pick<ReactorOptions, "delay" | "makeJobId" | "deduplication"> {
+}): Pick<SubscriberDispatchOptions, "delay" | "makeJobId" | "deduplication"> {
   return {
     delay: windowMs,
     // Kept alongside `deduplication` on purpose: the queue reads the latter,

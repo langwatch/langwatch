@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { ReactorJobPayload } from "../throttleWindow";
+import type { SubscriberJobPayload } from "../throttleWindow";
 import { throttledPerWindow } from "../throttleWindow";
 
-const makeJobId = (payload: ReactorJobPayload) =>
+const makeJobId = (payload: SubscriberJobPayload) =>
   `job:${payload.event.tenantId}`;
 
 describe("throttledPerWindow", () => {
@@ -37,7 +37,7 @@ describe("throttledPerWindow", () => {
     it("pins the deadline to the event that opened the window", () => {
       // Extending would re-arm the deadline against each newer event, so an
       // aggregate receiving a continuous stream would defer its own job for
-      // as long as the stream lasts and the reactor would never fire.
+      // as long as the stream lasts and the subscriber would never fire.
       expect(
         throttledPerWindow({ makeJobId, windowMs: 5_000 }).deduplication
           ?.extend,

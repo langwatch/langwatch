@@ -22,7 +22,7 @@ import type {
  *
  *  - SYSTEM (kill switches, pipeline toggles): env override -> postgres
  *    store -> registry default. PostHog is never called. This is the
- *    path that exists specifically so hot-path event-sourcing reactors
+ *    path that exists specifically so hot-path event-sourcing subscribers
  *    don't generate per-tenant PostHog traffic.
  *
  *  - PRODUCT (UI features, A/B tests): env override -> postgres store

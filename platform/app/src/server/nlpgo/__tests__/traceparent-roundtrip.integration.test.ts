@@ -358,9 +358,9 @@ describe.skipIf(!shouldRun)(
       otlpDeliveries.length = 0;
       nlpgoStderrBuf = "";
 
-      // Clear reactor-job orphans from prior runs once, so they don't log
+      // Clear subscriber-job orphans from prior runs once, so they don't log
       // "Unknown job in global queue" noise (matches the
-      // loopPrevention.reactor.integration.test.ts pattern). Wrap in
+      // loopPrevention.subscriber.integration.test.ts pattern). Wrap in
       // a one-retry helper so a transient ETIMEDOUT on a saturated CI
       // runner doesn't kill the whole suite before the test even runs.
       //

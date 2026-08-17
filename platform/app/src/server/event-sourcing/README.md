@@ -107,7 +107,7 @@ interface AppendStore<T> {
 A reactor fires after a fold projection succeeds:
 
 ```typescript
-import type { ReactorDefinition } from "~/server/event-sourcing/reactors/reactor.types";
+import type { ReactorDefinition } from "~/server/event-sourcing/subscribers/subscriber.types";
 
 const notifyReactor: ReactorDefinition<MyEvent, SummaryState> = {
   name: "notify",

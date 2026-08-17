@@ -211,7 +211,7 @@ import { RedisCachedFoldStore } from "./projections/redisCachedFoldStore";
 import { RepositoryFoldStore } from "./projections/repositoryFoldStore";
 import type { StateProjectionStore } from "./projections/stateProjection.types";
 import { BlobSweeper } from "./queues/groupQueue/blobSweeper";
-import { throttledWindow } from "./reactors/throttleWindow";
+import { throttledWindow } from "./subscribers/throttleWindow";
 import {
   generateKillSwitchKey,
   type KillSwitchComponentType,
@@ -417,7 +417,7 @@ export interface PipelineRegistryDeps {
 /**
  * Composition root for all event-sourcing pipelines.
  *
- * Creates store adapters, builds reactors and command classes, then registers
+ * Creates store adapters, builds subscribers and command classes, then registers
  * all pipelines with the EventSourcing runtime. Pipelines receive only
  * store interfaces and pre-built artifacts — never raw deps like prisma or ClickHouse clients.
  */
@@ -425,7 +425,7 @@ export class PipelineRegistry {
   constructor(private readonly deps: PipelineRegistryDeps) {}
 
   /**
-   * ADR-051: the trace pipeline's projectMetadata reactor bootstraps a
+   * ADR-051: the trace pipeline's projectMetadata subscriber bootstraps a
    * project's clustering schedule on its first real trace, but the topic
    * clustering pipeline (whose command it dispatches) registers later —
    * late-bound like the other cross-pipeline dispatchers.
@@ -448,7 +448,7 @@ export class PipelineRegistry {
     // registered — the counting strategy needs finalising (per-event
     // ClickHouse queries) before enabling. See
     // customerIoSimulationSync.subscriber.ts. Its trace and evaluation
-    // siblings were deleted with the reactor retirement (ADR-098) and return
+    // siblings were deleted with the subscriber retirement (ADR-098) and return
     // as subscribers if nurturing sync expands again.
     const traceSummaryStore = this.cached<TraceSummaryData>(
       new TraceSummaryStore(this.deps.repositories.traceSummaryFold),
@@ -688,7 +688,7 @@ export class PipelineRegistry {
       recordClusteringRunFailed: (args) =>
         commands.recordClusteringRunFailed(args),
     };
-    // Level-triggered bootstrap: the projectMetadata reactor asks on every
+    // Level-triggered bootstrap: the projectMetadata subscriber asks on every
     // real ingest, and this claim keeps that to one commit per project per
     // window. See createRateLimitedBootstrap for why re-asking is safe.
     this.bootstrapTopicClustering.resolve(
@@ -921,7 +921,7 @@ export class PipelineRegistry {
             this.deps.repositories.codingAgentSession,
             {
               // The Sessions-destination stamp, inline at the commit seam with
-              // its own per-process window — a read-model write, not a reactor.
+              // its own per-process window — a read-model write, not a subscriber.
               onSessionsStored: createCodingAgentSessionSeenTouch({
                 touchCodingAgentSessionSeen: (params) =>
                   this.deps.projects.touchCodingAgentSessionSeen(params),
@@ -1135,7 +1135,7 @@ export class PipelineRegistry {
       computeRunMetrics: simComputeRunMetrics.fn,
     });
 
-    // Late-bound reference for experiment metrics sync reactor.
+    // Late-bound reference for experiment metrics sync subscriber.
     // The experiment pipeline is registered after the trace pipeline,
     // so computeExperimentRunMetrics is wired after experiment pipeline registration.
     let expComputeRunMetrics:
@@ -1242,7 +1242,7 @@ export class PipelineRegistry {
     resolveOrigin.resolve(traceCommands.resolveOrigin);
 
     // Wire the deferred origin resolution queue (GroupQueue-backed, survives process restart).
-    // After 5 min, dispatches resolveOrigin command → OriginResolvedEvent → fold → reactor.
+    // After 5 min, dispatches resolveOrigin command → OriginResolvedEvent → fold → subscriber.
     const deferredOriginHandler = createDeferredOriginHandler(resolveOrigin.fn);
     const deferredOriginQueue =
       tracePipeline.service.registerJob<DeferredOriginPayload>({
@@ -1278,7 +1278,7 @@ export class PipelineRegistry {
     }
 
     // ADR-032 D5: register the standalone `datasetNormalize` GroupQueue job
-    // (pure Postgres + S3, no fold/reactor). Per-group concurrency is inherent
+    // (pure Postgres + S3, no fold/subscriber). Per-group concurrency is inherent
     // and the group key is the datasetId (framework prepends tenantId=projectId)
     // → exactly one normalize in flight per dataset. The enqueue side is wired
     // into the dataset domain via `registerDatasetNormalizeEnqueue`; when the
@@ -1312,7 +1312,7 @@ export class PipelineRegistry {
       simComputeRunMetrics,
       /**
        * Wires late-bound experiment computeExperimentRunMetrics and
-       * lookupExperimentId into the trace-side experimentMetricsSync reactor.
+       * lookupExperimentId into the trace-side experimentMetricsSync subscriber.
        * Called after the experiment pipeline is registered.
        */
       wireExperimentDeps: (deps: {
@@ -1542,7 +1542,7 @@ export class PipelineRegistry {
       }),
     );
 
-    // Wire the trace-side experimentMetricsSync reactor's late-bound deps
+    // Wire the trace-side experimentMetricsSync subscriber's late-bound deps
     const expCommands = mapCommands(experimentRunPipeline.commands);
 
     // The experimentId lookup, pre-built at the composition root (presets.ts)
@@ -1592,8 +1592,8 @@ export interface ProjectionMetadata {
   kind: "fold" | "map";
 }
 
-export interface ReactorMetadata {
-  reactorName: string;
+export interface SubscriberMetadata {
+  subscriberName: string;
   pipelineName: string;
   aggregateType: string;
   afterProjection: string;
@@ -1649,12 +1649,12 @@ export function getProjectionMetadata(): ProjectionMetadata[] {
   });
 }
 
-export function getReactorMetadata(): ReactorMetadata[] {
+export function getSubscriberMetadata(): SubscriberMetadata[] {
   return getDefinitions().flatMap((def) => {
     const { name: pipelineName, aggregateType } = def.metadata;
-    return Array.from(def.foldReactors.values()).map(
+    return Array.from(def.foldSubscribers.values()).map(
       ({ projectionName, definition }) => ({
-        reactorName: definition.name,
+        subscriberName: definition.name,
         pipelineName,
         aggregateType,
         afterProjection: projectionName,

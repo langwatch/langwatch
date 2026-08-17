@@ -77,7 +77,7 @@ A reactor is tied to a specific fold projection. It fires **after** the fold's `
 
 Reactors fire on every fold completion (no `eventTypes` filter). Downstream deduplication is handled via `makeJobId` + `delay` in reactor options.
 
-See: [`reactors/reactor.types.ts`](./reactors/reactor.types.ts)
+See: [`subscribers/subscriber.types.ts`](./subscribers/subscriber.types.ts)
 
 ## Architecture Overview
 
@@ -193,7 +193,7 @@ All operations are scoped to `tenantId`. Events, projections, and stores enforce
 | Fold executor | [`projections/foldProjectionExecutor.ts`](./projections/foldProjectionExecutor.ts) |
 | Map executor | [`projections/mapProjectionExecutor.ts`](./projections/mapProjectionExecutor.ts) |
 | Projection router | [`projections/projectionRouter.ts`](./projections/projectionRouter.ts) |
-| Reactor types | [`reactors/reactor.types.ts`](./reactors/reactor.types.ts) |
+| Reactor types | [`subscribers/subscriber.types.ts`](./subscribers/subscriber.types.ts) |
 | GroupQueue (deep dive) | [`queues/groupQueue/ARCHITECTURE.md`](./queues/groupQueue/ARCHITECTURE.md) + [`queues/groupQueue/README.md`](./queues/groupQueue/README.md) |
 | GroupQueue (main class) | [`queues/groupQueue/groupQueue.ts`](./queues/groupQueue/groupQueue.ts) |
 | Event store (interface) | [`stores/eventStore.types.ts`](./stores/eventStore.types.ts) |

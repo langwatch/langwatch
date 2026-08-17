@@ -133,7 +133,7 @@ export class EventSourcing {
       this.projectionRegistry.registerMapProjection(
         orgBillableEventsMeterProjection,
       );
-      this.projectionRegistry.registerMapReactor(
+      this.projectionRegistry.registerMapSubscriber(
         "orgBillableEventsMeter",
         createBillingMeterDispatchSubscriber({
           getDispatch: () => {
@@ -737,22 +737,24 @@ function buildServiceOptions<
         }))
       : undefined;
 
-  const foldReactorList = Array.from(definition.foldReactors.values()).map(
-    (entry) => ({
-      foldName: entry.projectionName as string,
-      definition: entry.definition,
-    }),
-  );
+  const foldSubscriberList = Array.from(
+    definition.foldSubscribers.values(),
+  ).map((entry) => ({
+    foldName: entry.projectionName as string,
+    definition: entry.definition,
+  }));
 
-  const mapReactorList = Array.from(definition.mapReactors.values()).map(
+  const mapSubscriberList = Array.from(definition.mapSubscribers.values()).map(
     (entry) => ({
       mapName: entry.projectionName as string,
       definition: entry.definition,
     }),
   );
 
-  const reactors = foldReactorList.length > 0 ? foldReactorList : undefined;
-  const mapReactors = mapReactorList.length > 0 ? mapReactorList : undefined;
+  const foldSubscribers =
+    foldSubscriberList.length > 0 ? foldSubscriberList : undefined;
+  const mapSubscribers =
+    mapSubscriberList.length > 0 ? mapSubscriberList : undefined;
   const subscribers =
     definition.eventSubscribers.size > 0
       ? Array.from(definition.eventSubscribers.values())
@@ -764,8 +766,8 @@ function buildServiceOptions<
       stateProjections.length > 0 ? stateProjections : undefined,
     mapProjections: mapProjections.length > 0 ? mapProjections : undefined,
     commandRegistrations,
-    reactors,
-    mapReactors,
+    foldSubscribers,
+    mapSubscribers,
     subscribers,
   };
 }

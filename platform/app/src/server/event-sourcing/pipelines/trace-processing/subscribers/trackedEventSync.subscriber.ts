@@ -61,7 +61,7 @@ export interface ReconstructedTrackedEvent {
  * envelope's own wire name. `recordTrackedEventSpan` emits a span event named
  * after the recorded `event_type` and always stamps an `event.type` attribute,
  * so a tracked event typed `langwatch.event` would produce a span that matches
- * this reactor's own predicate — a self-feeding amplification loop that dedup
+ * this subscriber's own predicate — a self-feeding amplification loop that dedup
  * cannot break, because every hop mints a fresh span id.
  */
 function isRecordableEventType(value: unknown): value is string {
@@ -76,7 +76,7 @@ export interface TrackedEventSyncSubscriberDeps {
   /**
    * Records a tracked event through the same path as the REST
    * `POST /api/events/track` handler (see `recordTrackedEventSpan`). Wired in
-   * the composition root so the reactor stays free of the app singleton.
+   * the composition root so the subscriber stays free of the app singleton.
    */
   recordTrackedEvent: (params: {
     tenantId: string;
@@ -267,9 +267,9 @@ export function extractTrackedEventsFromSpan(
  * event carrying a recordable `event.type` string; full reconstruction and
  * validation stay in handle() off the hot path.
  *
- * Spans named `TRACK_EVENT_SPAN_NAME` are this reactor's own output, re-ingested
+ * Spans named `TRACK_EVENT_SPAN_NAME` are this subscriber's own output, re-ingested
  * through the trace-processing pipeline by `recordTrackedEventSpan`. Skipping
- * them by name is what stops the reactor reacting to itself, whatever event type
+ * them by name is what stops the subscriber reacting to itself, whatever event type
  * the caller supplied.
  */
 function spanHasFeedbackEvents(span: OtlpSpan): boolean {
@@ -289,8 +289,8 @@ function spanHasFeedbackEvents(span: OtlpSpan): boolean {
 }
 
 /**
- * Pure relevance guard shared by shouldReact (pre-enqueue) and handle: only
- * recent span events carrying `langwatch.event` feedback need this reactor.
+ * Pure relevance guard shared by shouldDispatch (pre-enqueue) and handle: only
+ * recent span events carrying `langwatch.event` feedback need this subscriber.
  */
 export function hasSyncableFeedback(event: TraceProcessingEvent): boolean {
   if (!isSpanReceivedEvent(event)) return false;

@@ -543,7 +543,7 @@ async function spawnScenarioChildProcess(
  *
  * Sets up the cancel subscription (Redis pub/sub) and wires the execution
  * pool's spawn function. The actual job processing is triggered by the
- * scenarioExecution reactor via the GroupQueue.
+ * scenarioExecution subscriber via the GroupQueue.
  *
  * @returns A shutdown handle, or undefined if Redis is not available.
  */
@@ -586,7 +586,7 @@ export async function startScenarioProcessor({
     );
   });
 
-  // Subscribe to cancellation signals from the event-sourcing reactor
+  // Subscribe to cancellation signals from the event-sourcing subscriber
   const subscriber = connection.duplicate();
   const unsubscribe = await subscribeToCancellations({
     subscriber,

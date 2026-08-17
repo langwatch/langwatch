@@ -101,21 +101,21 @@ describe("simulationMetricsSync subscriber (trace-side metrics publisher)", () =
   describe("when trace has scenario.run_id attribute", () => {
     it("dispatches computeRunMetrics in pull mode (role costs derived downstream)", async () => {
       const deps = createDeps();
-      const reactor = createSimulationMetricsSyncHandler(deps);
+      const subscriber = createSimulationMetricsSyncHandler(deps);
 
       const state = createTraceSummaryState({
         attributes: { "scenario.run_id": "run-1" },
         totalCost: 0.001,
       });
 
-      await reactor(createSpanReceivedEvent(), {
+      await subscriber(createSpanReceivedEvent(), {
         tenantId: TEST_TENANT_ID,
         aggregateId: "trace-1",
         state,
       });
 
       // No metrics carried: computeRunMetrics derives role cost/latency from
-      // stored_spans, so the reactor only identifies the trace to compute.
+      // stored_spans, so the subscriber only identifies the trace to compute.
       expect(deps.computeRunMetrics).toHaveBeenCalledWith({
         tenantId: TEST_TENANT_ID,
         scenarioRunId: "run-1",
@@ -129,13 +129,13 @@ describe("simulationMetricsSync subscriber (trace-side metrics publisher)", () =
   describe("when trace has no scenario.run_id attribute", () => {
     it("skips without dispatching", async () => {
       const deps = createDeps();
-      const reactor = createSimulationMetricsSyncHandler(deps);
+      const subscriber = createSimulationMetricsSyncHandler(deps);
 
       const state = createTraceSummaryState({
         attributes: { "langwatch.origin": "sdk" },
       });
 
-      await reactor(createSpanReceivedEvent(), {
+      await subscriber(createSpanReceivedEvent(), {
         tenantId: TEST_TENANT_ID,
         aggregateId: "trace-1",
         state,
@@ -148,7 +148,7 @@ describe("simulationMetricsSync subscriber (trace-side metrics publisher)", () =
   describe("when trace has no spans and no cost", () => {
     it("skips without dispatching", async () => {
       const deps = createDeps();
-      const reactor = createSimulationMetricsSyncHandler(deps);
+      const subscriber = createSimulationMetricsSyncHandler(deps);
 
       const state = createTraceSummaryState({
         attributes: { "scenario.run_id": "run-1" },
@@ -156,7 +156,7 @@ describe("simulationMetricsSync subscriber (trace-side metrics publisher)", () =
         totalCost: null,
       });
 
-      await reactor(createSpanReceivedEvent(), {
+      await subscriber(createSpanReceivedEvent(), {
         tenantId: TEST_TENANT_ID,
         aggregateId: "trace-1",
         state,
@@ -170,7 +170,7 @@ describe("simulationMetricsSync subscriber (trace-side metrics publisher)", () =
     it("logs warning and does not throw", async () => {
       const deps = createDeps();
       deps.computeRunMetrics.mockRejectedValue(new Error("Dispatch error"));
-      const reactor = createSimulationMetricsSyncHandler(deps);
+      const subscriber = createSimulationMetricsSyncHandler(deps);
 
       const state = createTraceSummaryState({
         attributes: { "scenario.run_id": "run-1" },
@@ -178,7 +178,7 @@ describe("simulationMetricsSync subscriber (trace-side metrics publisher)", () =
       });
 
       await expect(
-        reactor(createSpanReceivedEvent(), {
+        subscriber(createSpanReceivedEvent(), {
           tenantId: TEST_TENANT_ID,
           aggregateId: "trace-1",
           state,
@@ -224,7 +224,7 @@ describe("simulationMetricsSync subscriber (trace-side metrics publisher)", () =
   describe("when totalCost is zero but the trace has spans", () => {
     it("dispatches computeRunMetrics", async () => {
       const deps = createDeps();
-      const reactor = createSimulationMetricsSyncHandler(deps);
+      const subscriber = createSimulationMetricsSyncHandler(deps);
 
       const state = createTraceSummaryState({
         attributes: { "scenario.run_id": "run-1" },
@@ -232,7 +232,7 @@ describe("simulationMetricsSync subscriber (trace-side metrics publisher)", () =
         totalCost: 0,
       });
 
-      await reactor(createSpanReceivedEvent(), {
+      await subscriber(createSpanReceivedEvent(), {
         tenantId: TEST_TENANT_ID,
         aggregateId: "trace-1",
         state,

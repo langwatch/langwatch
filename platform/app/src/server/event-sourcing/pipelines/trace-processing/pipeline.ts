@@ -11,8 +11,8 @@ import type {
 } from "../../pipeline/processManagerDefinition";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
 import type { AppendStore } from "../../projections/mapProjection.types";
-import { throttledWindow } from "../../reactors/throttleWindow";
 import type { EventSubscriberDefinition } from "../../subscribers/eventSubscriber.types";
+import { throttledWindow } from "../../subscribers/throttleWindow";
 import {
   AddAnnotationCommand,
   BulkSyncAnnotationsCommand,
@@ -206,7 +206,7 @@ export function createTraceProcessingPipeline(
     .withSubscriber(deps.evaluationTrigger.name, deps.evaluationTrigger.spec)
     // Custom SDK evaluations reported on spans. Stake-sensitive but idempotent
     // (deterministic evaluation IDs), and the queue's redelivery covers the
-    // post-enqueue path; keeps the reactor-era name so jobs staged before a
+    // post-enqueue path; keeps the subscriber-era name so jobs staged before a
     // deploy dispatch into this registration after it.
     .withSubscriber("customEvaluationSync", {
       fold: "traceSummary",

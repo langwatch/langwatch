@@ -1,11 +1,11 @@
 /**
- * GovernanceKpisSyncReactor — unit tests with a mocked CH repository.
+ * GovernanceKpisSyncSubscriber — unit tests with a mocked CH repository.
  *
- * Sergey commit b54696d95 (step 3b-ii) shipped the reactor that
+ * Sergey commit b54696d95 (step 3b-ii) shipped the subscriber that
  * folds governance-origin trace fold-completions into per-trace
  * contribution rows in the governance_kpis ClickHouse table.
  *
- * This test exercises the reactor's decision logic with a stubbed
+ * This test exercises the subscriber's decision logic with a stubbed
  * repository — no testcontainers needed. Coverage:
  *
  *   - Skips traces with no `langwatch.origin.kind` attribute (not
@@ -135,10 +135,10 @@ describe("governanceKpisSync subscriber", () => {
   describe("when the trace has no governance origin attributes", () => {
     it("skips silently — application traces never reach the fold", async () => {
       const { deps, insertContribution } = mockDeps();
-      const reactor = createGovernanceKpisSyncHandler(deps);
+      const subscriber = createGovernanceKpisSyncHandler(deps);
       const state = createFoldState({});
 
-      await reactor(event, ctx(state));
+      await subscriber(event, ctx(state));
 
       expect(insertContribution).not.toHaveBeenCalled();
     });
@@ -147,12 +147,12 @@ describe("governanceKpisSync subscriber", () => {
   describe("when langwatch.origin.kind is not 'ingestion_source'", () => {
     it("skips — origin.kind is reserved for governance ingest only", async () => {
       const { deps, insertContribution } = mockDeps();
-      const reactor = createGovernanceKpisSyncHandler(deps);
+      const subscriber = createGovernanceKpisSyncHandler(deps);
       const state = createFoldState({
         "langwatch.origin.kind": "personal_workspace",
       });
 
-      await reactor(event, ctx(state));
+      await subscriber(event, ctx(state));
 
       expect(insertContribution).not.toHaveBeenCalled();
     });
@@ -161,12 +161,12 @@ describe("governanceKpisSync subscriber", () => {
   describe("when origin.kind is set but ingestion_source.id is missing", () => {
     it("warns + skips — defensive against malformed governance traffic", async () => {
       const { deps, insertContribution } = mockDeps();
-      const reactor = createGovernanceKpisSyncHandler(deps);
+      const subscriber = createGovernanceKpisSyncHandler(deps);
       const state = createFoldState({
         "langwatch.origin.kind": "ingestion_source",
       });
 
-      await reactor(event, ctx(state));
+      await subscriber(event, ctx(state));
 
       expect(insertContribution).not.toHaveBeenCalled();
     });
@@ -175,7 +175,7 @@ describe("governanceKpisSync subscriber", () => {
   describe("when occurredAt is the initial sentinel (0)", () => {
     it("skips — fold has not yet observed any spans", async () => {
       const { deps, insertContribution } = mockDeps();
-      const reactor = createGovernanceKpisSyncHandler(deps);
+      const subscriber = createGovernanceKpisSyncHandler(deps);
       const state = createFoldState(
         {
           "langwatch.origin.kind": "ingestion_source",
@@ -185,7 +185,7 @@ describe("governanceKpisSync subscriber", () => {
         { occurredAt: 0 },
       );
 
-      await reactor(event, ctx(state));
+      await subscriber(event, ctx(state));
 
       expect(insertContribution).not.toHaveBeenCalled();
     });
@@ -194,14 +194,14 @@ describe("governanceKpisSync subscriber", () => {
   describe("when origin attributes are fully present", () => {
     it("inserts a contribution row with all fields populated", async () => {
       const { deps, insertContribution } = mockDeps();
-      const reactor = createGovernanceKpisSyncHandler(deps);
+      const subscriber = createGovernanceKpisSyncHandler(deps);
       const state = createFoldState({
         "langwatch.origin.kind": "ingestion_source",
         "langwatch.ingestion_source.id": "is-1",
         "langwatch.ingestion_source.source_type": "claude_cowork",
       });
 
-      await reactor(event, ctx(state));
+      await subscriber(event, ctx(state));
 
       expect(insertContribution).toHaveBeenCalledTimes(1);
       const [row] = insertContribution.mock.calls[0]!;
@@ -220,13 +220,13 @@ describe("governanceKpisSync subscriber", () => {
 
     it("defaults sourceType to 'unknown' if attribute missing", async () => {
       const { deps, insertContribution } = mockDeps();
-      const reactor = createGovernanceKpisSyncHandler(deps);
+      const subscriber = createGovernanceKpisSyncHandler(deps);
       const state = createFoldState({
         "langwatch.origin.kind": "ingestion_source",
         "langwatch.ingestion_source.id": "is-2",
       });
 
-      await reactor(event, ctx(state));
+      await subscriber(event, ctx(state));
 
       expect(insertContribution).toHaveBeenCalledTimes(1);
       const [row] = insertContribution.mock.calls[0]!;
@@ -235,7 +235,7 @@ describe("governanceKpisSync subscriber", () => {
 
     it("computes hour bucket as floor-of-hour from occurredAt", async () => {
       const { deps, insertContribution } = mockDeps();
-      const reactor = createGovernanceKpisSyncHandler(deps);
+      const subscriber = createGovernanceKpisSyncHandler(deps);
       // 14:35:42 UTC of an arbitrary day — should floor to 14:00:00.
       const occurredAtMs = Date.UTC(2026, 3, 28, 14, 35, 42, 123);
       const expectedHourBucketMs = Date.UTC(2026, 3, 28, 14, 0, 0, 0);
@@ -248,7 +248,7 @@ describe("governanceKpisSync subscriber", () => {
         { occurredAt: occurredAtMs },
       );
 
-      await reactor(event, ctx(state));
+      await subscriber(event, ctx(state));
 
       const [row] = insertContribution.mock.calls[0]!;
       expect(row.hourBucket.getTime()).toBe(expectedHourBucketMs);
@@ -256,7 +256,7 @@ describe("governanceKpisSync subscriber", () => {
 
     it("propagates zero for spend / tokens when fold state has nulls", async () => {
       const { deps, insertContribution } = mockDeps();
-      const reactor = createGovernanceKpisSyncHandler(deps);
+      const subscriber = createGovernanceKpisSyncHandler(deps);
       const state = createFoldState(
         {
           "langwatch.origin.kind": "ingestion_source",
@@ -270,7 +270,7 @@ describe("governanceKpisSync subscriber", () => {
         },
       );
 
-      await reactor(event, ctx(state));
+      await subscriber(event, ctx(state));
 
       const [row] = insertContribution.mock.calls[0]!;
       expect(row.spendUsd).toBe(0);
@@ -280,7 +280,7 @@ describe("governanceKpisSync subscriber", () => {
   });
 
   describe("when the repository throws", () => {
-    it("captures the exception without rethrowing — reactor failures must not block the trace pipeline", async () => {
+    it("captures the exception without rethrowing — subscriber failures must not block the trace pipeline", async () => {
       const insertContribution = vi
         .fn()
         .mockRejectedValue(new Error("CH connection failed"));
@@ -289,14 +289,14 @@ describe("governanceKpisSync subscriber", () => {
           insertContribution,
         } as unknown as GovernanceKpisClickHouseRepository,
       };
-      const reactor = createGovernanceKpisSyncHandler(deps);
+      const subscriber = createGovernanceKpisSyncHandler(deps);
       const state = createFoldState({
         "langwatch.origin.kind": "ingestion_source",
         "langwatch.ingestion_source.id": "is-5",
         "langwatch.ingestion_source.source_type": "otel_generic",
       });
 
-      await expect(reactor(event, ctx(state))).resolves.toBeUndefined();
+      await expect(subscriber(event, ctx(state))).resolves.toBeUndefined();
       expect(insertContribution).toHaveBeenCalledTimes(1);
     });
   });

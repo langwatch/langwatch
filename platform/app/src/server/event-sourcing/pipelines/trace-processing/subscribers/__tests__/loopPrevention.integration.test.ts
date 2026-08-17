@@ -6,16 +6,16 @@
  *   - Drives recordSpan through the REAL EventSourcing pipeline,
  *     real TraceSummaryFoldProjection, real CH writes.
  *   - Reads fold state back from REAL ClickHouse.
- *   - Invokes the REAL evaluationTrigger reactor's handle() with a
+ *   - Invokes the REAL evaluationTrigger subscriber's handle() with a
  *     constructed event + state (read from CH) to assert on the
  *     loop-prevention behaviour.
  *
- *   The reactor's queue worker is NOT exercised in this test.
- *   That is harness plumbing, not feature behaviour, and other reactor
+ *   The subscriber's queue worker is NOT exercised in this test.
+ *   That is harness plumbing, not feature behaviour, and other subscriber
  *   integration tests in this codebase (e.g.
- *   customEvaluationSync.reactor.integration.test.ts) are `.skip`'d for
- *   the same reason — making reactor pickup reliable in the
- *   vitest harness is a separate problem from "does the reactor
+ *   customEvaluationSync.subscriber.integration.test.ts) are `.skip`'d for
+ *   the same reason — making subscriber pickup reliable in the
+ *   vitest harness is a separate problem from "does the subscriber
  *   correctly block depth>=1 spans against real fold state from real
  *   ClickHouse." This test answers the latter, which is the
  *   post-2026-05-11 incident question.
@@ -24,13 +24,13 @@
  *   1. recordSpan + the trace-processing pipeline + CH persistence
  *      survive a depth=0 span and produce a state with
  *      langwatch.origin resolved.
- *   2. The REAL evaluationTrigger reactor (createEvaluationTriggerSubscriber)
+ *   2. The REAL evaluationTrigger subscriber (createEvaluationTriggerSubscriber)
  *      against that REAL state DISPATCHES one executeEvaluation
  *      per enabled ON_MESSAGE monitor.
- *   3. The same reactor with a depth=1 span event BLOCKS dispatch
+ *   3. The same subscriber with a depth=1 span event BLOCKS dispatch
  *      and increments the `langwatch_evaluator_loop_blocked_total`
  *      counter with reason="depth_direct".
- *   4. The same reactor with a fresh depth=0 span on the same trace
+ *   4. The same subscriber with a fresh depth=0 span on the same trace
  *      DISPATCHES again. The guard is per-span, not per-trace —
  *      legitimate new app activity must still re-trigger evaluation.
  *   5. LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD=1 bypasses the depth
@@ -233,7 +233,7 @@ async function readBlockedCounter(reason: string): Promise<number> {
 // ---------------------------------------------------------------------------
 
 describe.skipIf(!hasTestcontainers)(
-  "evaluationTrigger reactor — loop prevention end-to-end through the real event-sourcing pipeline",
+  "evaluationTrigger subscriber — loop prevention end-to-end through the real event-sourcing pipeline",
   () => {
     let eventSourcing: EventSourcing;
     let tracePipeline: ReturnType<typeof createTracePipeline>;
@@ -314,7 +314,7 @@ describe.skipIf(!hasTestcontainers)(
 
     // Stale Redis jobs from prior test-file runs (different pipeline
     // names) cause "Unknown job in global queue" rejections that
-    // block this run's reactors from picking up work. Clear those once
+    // block this run's subscribers from picking up work. Clear those once
     // before any test in this suite executes.
     //
     // Scoped to the global queue's own keys, NOT flushdb(). flushdb empties
@@ -349,7 +349,7 @@ describe.skipIf(!hasTestcontainers)(
     /**
      * Push a span through the real GroupQueueProcessor pipeline.
      * Awaits the trace_summaries row landing in ClickHouse so the
-     * fold projection definitely ran before we move on. Reactor
+     * fold projection definitely ran before we move on. Subscriber
      * dispatch is asynchronous afterwards — assert on
      * `dispatcher.captured` directly in the tests.
      */
@@ -379,13 +379,13 @@ describe.skipIf(!hasTestcontainers)(
 
     /**
      * Quiet window after a span lands. The real evaluationTrigger
-     * reactor is dispatched asynchronously by the GroupQueueProcessor;
+     * subscriber is dispatched asynchronously by the GroupQueueProcessor;
      * `recordSpan` only awaits the fold. We need to give the worker a
-     * polling cycle to pick up the reactor job and either call dispatch
+     * polling cycle to pick up the subscriber job and either call dispatch
      * or block it. 1500ms is comfortably above the dispatcher's BRPOP
      * timeout cadence at signalTimeoutSec=5 with delay=0 jobs.
      */
-    async function quietReactorWindow(): Promise<void> {
+    async function quietSubscriberWindow(): Promise<void> {
       await new Promise((resolve) => setTimeout(resolve, 1500));
     }
 
@@ -403,7 +403,7 @@ describe.skipIf(!hasTestcontainers)(
           await recordSpan(span);
           await waitFor(() => dispatcher.captured.length >= 1, {
             timeoutMs: 20_000,
-            label: "reactor dispatched evaluation through the real queue",
+            label: "subscriber dispatched evaluation through the real queue",
           });
 
           expect(dispatcher.captured).toHaveLength(1);
@@ -423,7 +423,7 @@ describe.skipIf(!hasTestcontainers)(
           const traceId = generateId("trace");
 
           // Seed: app-origin depth=0 span establishes the trace's origin
-          // on the fold (required for the originGuardedReactor wrapper
+          // on the fold (required for the originGuardedSubscriber wrapper
           // to fire its inner handler at all).
           await recordSpan(
             buildAppOriginSpan({
@@ -441,7 +441,7 @@ describe.skipIf(!hasTestcontainers)(
           const dispatchesBefore = dispatcher.captured.length;
           const beforeBlocked = await readBlockedCounter("depth_direct");
 
-          // Eval-emitted span (depth=1) — must be blocked by the reactor.
+          // Eval-emitted span (depth=1) — must be blocked by the subscriber.
           await recordSpan(
             buildAppOriginSpan({
               traceId,
@@ -450,11 +450,11 @@ describe.skipIf(!hasTestcontainers)(
             }),
           );
           // Poll the prom counter instead of sleeping a fixed 1500ms. The
-          // reactor → queue → metric write chain can take longer than that
+          // subscriber → queue → metric write chain can take longer than that
           // under parallel CI load, which flaked this test (PR #4189 CI:
           // `expected 0 to be greater than or equal to 1`). The dispatch
           // assertion stays as a post-condition: by the time the blocked
-          // counter ticks the reactor has decided not to dispatch.
+          // counter ticks the subscriber has decided not to dispatch.
           await waitFor(
             async () =>
               (await readBlockedCounter("depth_direct")) > beforeBlocked,
@@ -493,7 +493,7 @@ describe.skipIf(!hasTestcontainers)(
           expect(dispatchesAfter1).toBe(1);
 
           // 2. Eval-emitted span on same trace (depth=1) — must NOT add a
-          //    dispatch. The reactor dedup window (30s makeJobId TTL) is
+          //    dispatch. The subscriber dedup window (30s makeJobId TTL) is
           //    irrelevant here because the depth check returns BEFORE the
           //    queue's dedup applies — that's exactly the guarantee.
           await recordSpan(
@@ -503,11 +503,11 @@ describe.skipIf(!hasTestcontainers)(
               depth: 1,
             }),
           );
-          await quietReactorWindow();
+          await quietSubscriberWindow();
           expect(dispatcher.captured.length).toBe(dispatchesAfter1);
 
           // 3. Fresh app-origin span (depth=0) later on SAME trace —
-          //    legitimate new activity, MUST dispatch again. The reactor
+          //    legitimate new activity, MUST dispatch again. The subscriber
           //    has `makeJobId(...) = eval-trigger:tenant:trace` plus a
           //    30s TTL — to bypass the queue-side dedup of this case we
           //    nuke the dedup keys for this trace before re-dispatching.

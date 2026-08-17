@@ -1,18 +1,18 @@
 /**
- * 2-reactor smoke evidence script.
+ * 2-subscriber smoke evidence script.
  *
- * Brings up BOTH governance reactors end-to-end:
- *   - governanceKpisSync.reactor → governance_kpis
- *   - governanceOcsfEventsSync.reactor → governance_ocsf_events
+ * Brings up BOTH governance subscribers end-to-end:
+ *   - governanceKpisSync.subscriber → governance_kpis
+ *   - governanceOcsfEventsSync.subscriber → governance_ocsf_events
  *
  * Strategy: bypass the live LLM call (which adds Bifrost provider-resolution
- * complexity that's tangential to reactor evidence) and instead POST a
+ * complexity that's tangential to subscriber evidence) and instead POST a
  * synthetic OTLP-shaped trace to /api/otel/v1/traces carrying the
- * ingestion-source markers both reactors gate on. The OTLP path is the
+ * ingestion-source markers both subscribers gate on. The OTLP path is the
  * production path. The REST collector doesn't accumulate generic
- * attributes into the fold state, so the reactors only fire on OTLP-fed
+ * attributes into the fold state, so the subscribers only fire on OTLP-fed
  * traces. This script proves the full pipeline (collector → fold →
- * reactors → ClickHouse) end-to-end.
+ * subscribers → ClickHouse) end-to-end.
  *
  * Budget debits are deliberately absent: they do not ride a trace at all.
  * The gateway emits spend commands and the debits process manager writes
@@ -26,11 +26,11 @@
  *      §Smoke evidence section
  *
  * Usage (host-side):
- *   pnpm tsx scripts/dogfood/governance/smoke-2-reactors.ts
+ *   pnpm tsx scripts/dogfood/governance/smoke-2-subscribers.ts
  *
  * Exit code:
- *   0: both reactors landed at least one row tied to the synthetic trace
- *   1: any reactor missing evidence after timeout
+ *   0: both subscribers landed at least one row tied to the synthetic trace
+ *   1: any subscriber missing evidence after timeout
  */
 
 import { createClient } from "@clickhouse/client";
@@ -117,17 +117,19 @@ function attrDouble(key: string, value: number) {
   return { key, value: { doubleValue: value } };
 }
 
-interface ReactorEvidence {
+interface SubscriberEvidence {
   table: string;
   rowCount: number;
   sample: unknown;
   landed: boolean;
 }
 
-async function pollClickHouse(projectId: string): Promise<ReactorEvidence[]> {
+async function pollClickHouse(
+  projectId: string,
+): Promise<SubscriberEvidence[]> {
   // CH `TenantId` column is the trace-processing tenant id, which is the
   // PROJECT id (not the organization id). Earlier smoke runs polled by
-  // org id and consistently returned 0 rows even though reactors had
+  // org id and consistently returned 0 rows even though subscribers had
   // written; that was the smoke-script bug, not a pipeline bug.
   const ch = createClient({ url: CLICKHOUSE_URL, database: "langwatch" });
   const deadline = Date.now() + POLL_TIMEOUT_MS;
@@ -142,7 +144,7 @@ async function pollClickHouse(projectId: string): Promise<ReactorEvidence[]> {
     },
   ];
   while (Date.now() < deadline) {
-    const out: ReactorEvidence[] = [];
+    const out: SubscriberEvidence[] = [];
     let allLanded = true;
     for (const t of tables) {
       const res = await ch.query({ query: t.query, format: "JSON" });
@@ -163,7 +165,7 @@ async function pollClickHouse(projectId: string): Promise<ReactorEvidence[]> {
     process.stdout.write(`.`);
     await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
   }
-  const out: ReactorEvidence[] = [];
+  const out: SubscriberEvidence[] = [];
   for (const t of tables) {
     const res = await ch.query({ query: t.query, format: "JSON" });
     const data = (await res.json()) as { data: unknown[] };
@@ -185,7 +187,7 @@ async function postSyntheticIngestionSourceTrace(
   // governanceKpisSync + governanceOcsfEventsSync gate on
   // langwatch.origin.kind=ingestion_source + langwatch.ingestion_source.id.
   // Without these markers they early-return — so the GATEWAY trace
-  // shape doesn't fire those two reactors. We need a SECOND synthetic
+  // shape doesn't fire those two subscribers. We need a SECOND synthetic
   // trace shaped like an ingestion-source puller event.
   const traceId = hexId(16);
   const spanId = hexId(8);
@@ -218,7 +220,7 @@ async function postSyntheticIngestionSourceTrace(
                 endTimeUnixNano,
                 attributes: [
                   // Governance ingestion-source markers required by the
-                  // governanceKpisSync + governanceOcsfEventsSync reactors
+                  // governanceKpisSync + governanceOcsfEventsSync subscribers
                   attrStr("langwatch.origin.kind", "ingestion_source"),
                   attrStr("langwatch.ingestion_source.id", ingestionSourceId),
                   attrStr(
@@ -274,7 +276,7 @@ async function main() {
   );
   const ingestionTraceId = await postSyntheticIngestionSourceTrace(seeded);
   console.log(
-    `[smoke] polling ClickHouse for reactor evidence (timeout ${POLL_TIMEOUT_MS / 1000}s)…`,
+    `[smoke] polling ClickHouse for subscriber evidence (timeout ${POLL_TIMEOUT_MS / 1000}s)…`,
   );
   const evidence = await pollClickHouse(seeded.project.id);
   console.log("\n");
@@ -286,7 +288,7 @@ async function main() {
     fired: {
       ingestionSourceTraceId: ingestionTraceId,
     },
-    reactors: evidence.map((e) => ({
+    subscribers: evidence.map((e) => ({
       table: e.table,
       landed: e.landed,
       rowCount: e.rowCount,

@@ -53,7 +53,7 @@ const SCHEMA = defineCommandSchema(
  * Command handler for computing simulation run metrics.
  *
  * Supports two modes:
- * 1. ECST mode: metrics provided in payload (from trace-side reactor) - emits event directly
+ * 1. ECST mode: metrics provided in payload (from trace-side subscriber) - emits event directly
  * 2. Pull mode: no metrics in payload (from simulation-side subscriber) - reads trace summary
  *
  * When a trace summary is not yet available, schedules a deferred retry.

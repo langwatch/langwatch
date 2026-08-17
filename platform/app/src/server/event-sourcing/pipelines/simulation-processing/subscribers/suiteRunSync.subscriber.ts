@@ -46,7 +46,7 @@ export interface SuiteRunSyncSubscriberDeps {
  * Uses isSuiteSetId() to filter — only processes simulation runs belonging to suites.
  *
  * Dispatch failures THROW so the GroupQueue retries (durable) — the old
- * reactor's warn-swallow could permanently lose a suite item update.
+ * subscriber's warn-swallow could permanently lose a suite item update.
  */
 export function createSuiteRunSyncSubscriber(
   deps: SuiteRunSyncSubscriberDeps,

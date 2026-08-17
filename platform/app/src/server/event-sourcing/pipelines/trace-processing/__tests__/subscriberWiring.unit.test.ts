@@ -15,9 +15,9 @@ import type { TraceProcessingEvent } from "../schemas/events";
  * asserts the `.withSubscriber("triggerMatch", ...)` /
  * `.withSubscriber("graphTriggerActivity", ...)` registrations at
  * pipeline.ts:224-241 carry the intended events/delay/ttl/dedup. These
- * debounce/dedup values previously lived on deleted reactors' options and
+ * debounce/dedup values previously lived on deleted subscribers' options and
  * were tested there (ADR-052) — this locks the replacement wiring in.
- * `build()` only stores references, so no store / reactor is ever invoked.
+ * `build()` only stores references, so no store / subscriber is ever invoked.
  */
 
 const handlerStub = () => vi.fn().mockResolvedValue(undefined);
@@ -76,7 +76,7 @@ function fakeEvent(
 describe("trace-processing pipeline subscriber wiring", () => {
   describe("given the triggerMatch subscriber", () => {
     const definition = createTraceProcessingPipeline(buildTraceDeps());
-    const triggerMatch = definition.foldReactors.get("triggerMatch");
+    const triggerMatch = definition.foldSubscribers.get("triggerMatch");
 
     it("attaches to the traceSummary fold with a 30s delay and matching dedup ttl", () => {
       expect(triggerMatch).toBeDefined();
@@ -88,16 +88,19 @@ describe("trace-processing pipeline subscriber wiring", () => {
     });
 
     it("reacts only to span_received and origin_resolved events", () => {
-      const shouldReact = triggerMatch!.definition.shouldReact!;
+      const shouldDispatch = triggerMatch!.definition.shouldDispatch!;
       const context = {} as never;
       expect(
-        shouldReact(fakeEvent({ type: SPAN_RECEIVED_EVENT_TYPE }), context),
+        shouldDispatch(fakeEvent({ type: SPAN_RECEIVED_EVENT_TYPE }), context),
       ).toBe(true);
       expect(
-        shouldReact(fakeEvent({ type: ORIGIN_RESOLVED_EVENT_TYPE }), context),
+        shouldDispatch(
+          fakeEvent({ type: ORIGIN_RESOLVED_EVENT_TYPE }),
+          context,
+        ),
       ).toBe(true);
       expect(
-        shouldReact(
+        shouldDispatch(
           fakeEvent({ type: "lw.obs.trace.something_else" }),
           context,
         ),
@@ -116,10 +119,11 @@ describe("trace-processing pipeline subscriber wiring", () => {
     it("delegates to automations.triggerMatchHandler with tenant/aggregate/fold state", async () => {
       const deps = buildTraceDeps();
       const pipeline = createTraceProcessingPipeline(deps);
-      const reactor = pipeline.foldReactors.get("triggerMatch")!.definition;
+      const subscriber =
+        pipeline.foldSubscribers.get("triggerMatch")!.definition;
       const event = fakeEvent({ tenantId: "project-2", aggregateId: "t-2" });
       const foldState = { traceId: "t-2" } as any;
-      await reactor.handle(event, {
+      await subscriber.handle(event, {
         tenantId: "project-2",
         aggregateId: "t-2",
         foldState,
@@ -134,11 +138,11 @@ describe("trace-processing pipeline subscriber wiring", () => {
 
   describe("given the customEvaluationSync subscriber", () => {
     const definition = createTraceProcessingPipeline(buildTraceDeps());
-    const customEvaluationSync = definition.foldReactors.get(
+    const customEvaluationSync = definition.foldSubscribers.get(
       "customEvaluationSync",
     );
 
-    it("attaches to the traceSummary fold with the reactor-era 5s delay and 30s dedup ttl", () => {
+    it("attaches to the traceSummary fold with the subscriber-era 5s delay and 30s dedup ttl", () => {
       expect(customEvaluationSync).toBeDefined();
       expect(customEvaluationSync!.projectionName).toBe("traceSummary");
       expect(customEvaluationSync!.definition.options?.delay).toBe(5_000);
@@ -162,20 +166,23 @@ describe("trace-processing pipeline subscriber wiring", () => {
     });
 
     it("rejects events without syncable evaluations before enqueue", () => {
-      const shouldReact = customEvaluationSync!.definition.shouldReact!;
+      const shouldDispatch = customEvaluationSync!.definition.shouldDispatch!;
       const context = {} as never;
       expect(
-        shouldReact(fakeEvent({ type: SPAN_RECEIVED_EVENT_TYPE }), context),
+        shouldDispatch(fakeEvent({ type: SPAN_RECEIVED_EVENT_TYPE }), context),
       ).toBe(false);
       expect(
-        shouldReact(fakeEvent({ type: ORIGIN_RESOLVED_EVENT_TYPE }), context),
+        shouldDispatch(
+          fakeEvent({ type: ORIGIN_RESOLVED_EVENT_TYPE }),
+          context,
+        ),
       ).toBe(false);
     });
   });
 
   describe("given the trackedEventSync subscriber", () => {
     const definition = createTraceProcessingPipeline(buildTraceDeps());
-    const trackedEventSync = definition.foldReactors.get("trackedEventSync");
+    const trackedEventSync = definition.foldSubscribers.get("trackedEventSync");
 
     it("attaches to the traceSummary fold", () => {
       expect(trackedEventSync).toBeDefined();

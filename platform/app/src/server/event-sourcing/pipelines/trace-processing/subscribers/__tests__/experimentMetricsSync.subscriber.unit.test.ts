@@ -105,14 +105,14 @@ describe("experimentMetricsSync subscriber (trace-side ECST publisher)", () => {
     /** @scenario evaluation.run_id is hoisted to trace-level attributes */
     it("dispatches computeExperimentRunMetrics with cost payload", async () => {
       const deps = createDeps();
-      const reactor = createExperimentMetricsSyncHandler(deps);
+      const subscriber = createExperimentMetricsSyncHandler(deps);
 
       const state = createTraceSummaryState({
         attributes: { "evaluation.run_id": "run-1" },
         totalCost: 0.003,
       });
 
-      await reactor(createSpanReceivedEvent(), {
+      await subscriber(createSpanReceivedEvent(), {
         tenantId: TEST_TENANT_ID,
         aggregateId: "trace-1",
         state,
@@ -134,16 +134,16 @@ describe("experimentMetricsSync subscriber (trace-side ECST publisher)", () => {
   });
 
   describe("when trace has no evaluation.run_id attribute", () => {
-    /** @scenario Reactor does not fire for traces without evaluation.run_id */
+    /** @scenario Subscriber does not fire for traces without evaluation.run_id */
     it("skips without dispatching", async () => {
       const deps = createDeps();
-      const reactor = createExperimentMetricsSyncHandler(deps);
+      const subscriber = createExperimentMetricsSyncHandler(deps);
 
       const state = createTraceSummaryState({
         attributes: { "langwatch.origin": "sdk" },
       });
 
-      await reactor(createSpanReceivedEvent(), {
+      await subscriber(createSpanReceivedEvent(), {
         tenantId: TEST_TENANT_ID,
         aggregateId: "trace-1",
         state,
@@ -154,17 +154,17 @@ describe("experimentMetricsSync subscriber (trace-side ECST publisher)", () => {
   });
 
   describe("when trace has no cost data", () => {
-    /** @scenario Reactor does not fire when trace has no cost data */
+    /** @scenario Subscriber does not fire when trace has no cost data */
     it("skips without dispatching when totalCost is null", async () => {
       const deps = createDeps();
-      const reactor = createExperimentMetricsSyncHandler(deps);
+      const subscriber = createExperimentMetricsSyncHandler(deps);
 
       const state = createTraceSummaryState({
         attributes: { "evaluation.run_id": "run-1" },
         totalCost: null,
       });
 
-      await reactor(createSpanReceivedEvent(), {
+      await subscriber(createSpanReceivedEvent(), {
         tenantId: TEST_TENANT_ID,
         aggregateId: "trace-1",
         state,
@@ -175,14 +175,14 @@ describe("experimentMetricsSync subscriber (trace-side ECST publisher)", () => {
 
     it("skips without dispatching when totalCost is zero", async () => {
       const deps = createDeps();
-      const reactor = createExperimentMetricsSyncHandler(deps);
+      const subscriber = createExperimentMetricsSyncHandler(deps);
 
       const state = createTraceSummaryState({
         attributes: { "evaluation.run_id": "run-1" },
         totalCost: 0,
       });
 
-      await reactor(createSpanReceivedEvent(), {
+      await subscriber(createSpanReceivedEvent(), {
         tenantId: TEST_TENANT_ID,
         aggregateId: "trace-1",
         state,
@@ -196,14 +196,14 @@ describe("experimentMetricsSync subscriber (trace-side ECST publisher)", () => {
     it("skips without dispatching", async () => {
       const deps = createDeps();
       deps.lookupExperimentId.mockResolvedValue(null);
-      const reactor = createExperimentMetricsSyncHandler(deps);
+      const subscriber = createExperimentMetricsSyncHandler(deps);
 
       const state = createTraceSummaryState({
         attributes: { "evaluation.run_id": "run-1" },
         totalCost: 0.003,
       });
 
-      await reactor(createSpanReceivedEvent(), {
+      await subscriber(createSpanReceivedEvent(), {
         tenantId: TEST_TENANT_ID,
         aggregateId: "trace-1",
         state,
@@ -219,7 +219,7 @@ describe("experimentMetricsSync subscriber (trace-side ECST publisher)", () => {
       deps.computeExperimentRunMetrics.mockRejectedValue(
         new Error("Dispatch error"),
       );
-      const reactor = createExperimentMetricsSyncHandler(deps);
+      const subscriber = createExperimentMetricsSyncHandler(deps);
 
       const state = createTraceSummaryState({
         attributes: { "evaluation.run_id": "run-1" },
@@ -227,7 +227,7 @@ describe("experimentMetricsSync subscriber (trace-side ECST publisher)", () => {
       });
 
       await expect(
-        reactor(createSpanReceivedEvent(), {
+        subscriber(createSpanReceivedEvent(), {
           tenantId: TEST_TENANT_ID,
           aggregateId: "trace-1",
           state,

@@ -19,7 +19,7 @@ function createMockSharedQueue(): EventSourcedQueueProcessor<any> {
   };
 }
 
-describe("QueueManager.initializeReactorQueues with hierarchical group keys", () => {
+describe("QueueManager.initializeProjectionSubscriberQueues with hierarchical group keys", () => {
   const aggregateType = createTestAggregateType();
   const tenantId = createTestTenantId();
 
@@ -33,7 +33,7 @@ describe("QueueManager.initializeReactorQueues with hierarchical group keys", ()
     vi.restoreAllMocks();
   });
 
-  describe("when reactor has fold parent", () => {
+  describe("when subscriber has fold parent", () => {
     /** @scenario A registration keeps its queue identity across the vocabulary change */
     it("includes parent fold name in hierarchical group key", () => {
       const mockQueueProcessor = createMockSharedQueue();
@@ -46,7 +46,7 @@ describe("QueueManager.initializeReactorQueues with hierarchical group keys", ()
         globalJobRegistry,
       });
 
-      manager.initializeReactorQueues(
+      manager.initializeProjectionSubscriberQueues(
         {
           evaluationTrigger: {
             name: "evaluationTrigger",
@@ -74,7 +74,7 @@ describe("QueueManager.initializeReactorQueues with hierarchical group keys", ()
     });
   });
 
-  describe("when reactor has map parent", () => {
+  describe("when subscriber has map parent", () => {
     it("includes parent map name in hierarchical group key", () => {
       const mockQueueProcessor = createMockSharedQueue();
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
@@ -86,7 +86,7 @@ describe("QueueManager.initializeReactorQueues with hierarchical group keys", ()
         globalJobRegistry,
       });
 
-      manager.initializeReactorQueues(
+      manager.initializeProjectionSubscriberQueues(
         {
           spanStorageBroadcast: {
             name: "spanStorageBroadcast",
@@ -114,7 +114,7 @@ describe("QueueManager.initializeReactorQueues with hierarchical group keys", ()
     });
   });
 
-  describe("when reactor has custom groupKeyFn", () => {
+  describe("when subscriber has custom groupKeyFn", () => {
     it("uses custom groupKeyFn for domain part of hierarchical key", () => {
       const mockQueueProcessor = createMockSharedQueue();
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
@@ -131,10 +131,10 @@ describe("QueueManager.initializeReactorQueues with hierarchical group keys", ()
         foldState: unknown;
       }) => `custom:${(payload.event as any).data?.runId}`;
 
-      manager.initializeReactorQueues(
+      manager.initializeProjectionSubscriberQueues(
         {
-          customReactor: {
-            name: "customReactor",
+          customSubscriber: {
+            name: "customSubscriber",
             parentProjection: "traceSummary",
             parentType: "fold" as const,
             handler: { handle: vi.fn().mockResolvedValue(void 0) },
@@ -145,7 +145,7 @@ describe("QueueManager.initializeReactorQueues with hierarchical group keys", ()
       );
 
       const entry = globalJobRegistry.get(
-        "test-pipeline:reactor:customReactor",
+        "test-pipeline:reactor:customSubscriber",
       );
       const event = {
         ...createTestEvent(
@@ -158,13 +158,13 @@ describe("QueueManager.initializeReactorQueues with hierarchical group keys", ()
 
       const groupKey = entry?.groupKeyFn({ event, foldState: {} });
       expect(groupKey).toBe(
-        `${tenantId}/fold/traceSummary/reactor/customReactor/custom:run-42`,
+        `${tenantId}/fold/traceSummary/reactor/customSubscriber/custom:run-42`,
       );
     });
   });
 
-  describe("when multiple reactors share a fold parent", () => {
-    it("produces different group keys for different reactors on same aggregate", () => {
+  describe("when multiple subscribers share a fold parent", () => {
+    it("produces different group keys for different subscribers on same aggregate", () => {
       const mockQueueProcessor = createMockSharedQueue();
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
@@ -175,7 +175,7 @@ describe("QueueManager.initializeReactorQueues with hierarchical group keys", ()
         globalJobRegistry,
       });
 
-      manager.initializeReactorQueues(
+      manager.initializeProjectionSubscriberQueues(
         {
           evaluationTrigger: {
             name: "evaluationTrigger",
@@ -210,7 +210,7 @@ describe("QueueManager.initializeReactorQueues with hierarchical group keys", ()
       const evalKey = evalTriggerEntry?.groupKeyFn(payload);
       const syncKey = customSyncEntry?.groupKeyFn(payload);
 
-      // Same aggregate, different reactors → different group keys (no FIFO contention)
+      // Same aggregate, different subscribers → different group keys (no FIFO contention)
       expect(evalKey).not.toBe(syncKey);
       expect(evalKey).toBe(
         `${tenantId}/fold/traceSummary/reactor/evaluationTrigger/${aggregateType}:${TEST_CONSTANTS.AGGREGATE_ID}`,

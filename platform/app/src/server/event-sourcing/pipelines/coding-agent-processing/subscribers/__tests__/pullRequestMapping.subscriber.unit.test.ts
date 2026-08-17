@@ -58,7 +58,7 @@ function registrationWith(
       requestBranchMapping: requestBranchMapping as never,
     }),
   } as unknown as CodingAgentProcessingPipelineDeps;
-  return createCodingAgentProcessingPipeline(deps).foldReactors.get(
+  return createCodingAgentProcessingPipeline(deps).foldSubscribers.get(
     "pullRequestMapping",
   )!.definition;
 }

@@ -908,7 +908,7 @@ export function initializeDefaultApp(options?: {
         }
       : undefined;
 
-  // Governance's KPI rollup. One instance for the whole App: the reactor
+  // Governance's KPI rollup. One instance for the whole App: the subscriber
   // sync writes through it, the spend-spike anomaly evaluator reads through
   // it — the same repository reference the process manager below takes and
   // `app.governance.kpis` hands out.
@@ -920,7 +920,7 @@ export function initializeDefaultApp(options?: {
     : undefined;
 
   // Governance's OCSF SIEM-export sink. One instance for the whole App: the
-  // reactor sync writes through it, the puller worker and the workspace-view
+  // subscriber sync writes through it, the puller worker and the workspace-view
   // audit trail write through it, and the SIEM export procedure reads
   // through it — the same repository reference the process manager below
   // takes and `app.governance.ocsfEvents` hands out.
@@ -1137,7 +1137,7 @@ export function initializeDefaultApp(options?: {
       });
   }
 
-  // The coding-agent pipeline's pull-request mapping reactor fires against a
+  // The coding-agent pipeline's pull-request mapping subscriber fires against a
   // service composed further down (it needs the GitHub connection, which needs
   // Redis and Prisma), so the registry is handed the callable proxy now and the
   // real implementation is wired once it exists.

@@ -151,7 +151,7 @@ describe("customerIoTraceSync subscriber", () => {
   });
 
   describe("dedupId", () => {
-    /** @scenario 'Trace sync reactor uses project-scoped job ID for debouncing' */
+    /** @scenario 'Trace sync subscriber uses project-scoped job ID for debouncing' */
     it("returns cio-trace-sync-{projectId}", () => {
       const deps = createDeps();
       const subscriber = createCustomerIoTraceSyncSubscriber(deps);

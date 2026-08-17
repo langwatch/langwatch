@@ -30,7 +30,6 @@ import type { AggregateType } from "../domain/aggregateType";
 import type { Event, Projection } from "../domain/types";
 import type { KillSwitchOptions } from "../pipeline/staticBuilder.types";
 import type { DeduplicationStrategy } from "../queues";
-import type { ReactorDefinition } from "../reactors/reactor.types";
 import {
   ConfigurationError,
   categorizeError,
@@ -40,6 +39,7 @@ import type { QueueManager } from "../services/queues/queueManager";
 import type { EventStoreReadContext } from "../stores/eventStore.types";
 import { TIME_LOCAL_AGGREGATE_TYPES } from "../stores/rehydrationWindow";
 import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types";
+import type { SubscriberDispatchDefinition } from "../subscribers/subscriber.types";
 import { EventUtils } from "../utils/event.utils";
 import { isComponentDisabled } from "../utils/killSwitch";
 import { MAX_APPLIED_EVENT_IDS } from "./foldCache/foldCacheEntry";
@@ -80,25 +80,25 @@ const SLOW_PROJECTION_OPERATION_MS = 5_000;
 const MAX_LOGGED_EVENT_IDS = 10;
 
 /**
- * The router only ever dispatches reactors on the live event path — the
+ * The router only ever dispatches subscribers on the live event path — the
  * replay service (`replay/replayService.ts`) rebuilds fold projections and
- * never invokes reactors, so no reactor context here can be a replay.
- * Named constant so the `isReplay` plumbing in `ReactorContext` is honestly
+ * never invokes subscribers, so no subscriber context here can be a replay.
+ * Named constant so the `isReplay` plumbing in `SubscriberDispatchContext` is honestly
  * "always false on this path" rather than looking like a forgotten TODO. If a
- * replay path that reaches reactors is ever added, it must thread a real
+ * replay path that reaches subscribers is ever added, it must thread a real
  * flag instead of this constant.
  */
 const LIVE_DISPATCH_IS_REPLAY = false;
 
 /**
- * One event paired with the projection state a reactor should see for it.
+ * One event paired with the projection state a subscriber should see for it.
  *
  * A fold repeats the same accumulated state across a batch; a map produces a
  * distinct record per event. Pairing them here lets both dispatch through one
  * path without a map batch having to pick a single record to stand for all of
  * its events. It is also exactly the queue job's payload shape.
  */
-type ReactorDelivery<E extends Event> = { event: E; foldState: unknown };
+type SubscriberDelivery<E extends Event> = { event: E; foldState: unknown };
 
 /**
  * Central router that registers fold and map projections and dispatches events.
@@ -135,13 +135,13 @@ export class ProjectionRouter<
     string,
     MapProjectionDefinition<any, EventType>
   >();
-  private readonly reactorsForFold = new Map<
+  private readonly subscribersForFold = new Map<
     string,
-    ReactorDefinition<EventType>[]
+    SubscriberDispatchDefinition<EventType>[]
   >();
-  private readonly reactorsForMap = new Map<
+  private readonly subscribersForMap = new Map<
     string,
-    ReactorDefinition<EventType>[]
+    SubscriberDispatchDefinition<EventType>[]
   >();
   private readonly eventSubscribers = new Map<
     string,
@@ -266,38 +266,38 @@ export class ProjectionRouter<
     this.mapProjections.set(projection.name, projection);
   }
 
-  registerReactor(
+  registerSubscriber(
     foldName: string,
-    reactor: ReactorDefinition<EventType>,
+    subscriber: SubscriberDispatchDefinition<EventType>,
   ): void {
     if (!this.foldProjections.has(foldName)) {
       throw new ConfigurationError(
         "ProjectionRouter",
-        `Cannot register reactor "${reactor.name}" on fold "${foldName}" — fold not found`,
-        { foldName, reactorName: reactor.name },
+        `Cannot register subscriber "${subscriber.name}" on fold "${foldName}" — fold not found`,
+        { foldName, subscriberName: subscriber.name },
       );
     }
 
-    const existing = this.reactorsForFold.get(foldName) ?? [];
-    existing.push(reactor);
-    this.reactorsForFold.set(foldName, existing);
+    const existing = this.subscribersForFold.get(foldName) ?? [];
+    existing.push(subscriber);
+    this.subscribersForFold.set(foldName, existing);
   }
 
-  registerMapReactor(
+  registerMapSubscriber(
     mapName: string,
-    reactor: ReactorDefinition<EventType>,
+    subscriber: SubscriberDispatchDefinition<EventType>,
   ): void {
     if (!this.mapProjections.has(mapName)) {
       throw new ConfigurationError(
         "ProjectionRouter",
-        `Cannot register reactor "${reactor.name}" on map "${mapName}" — map not found`,
-        { mapName, reactorName: reactor.name },
+        `Cannot register subscriber "${subscriber.name}" on map "${mapName}" — map not found`,
+        { mapName, subscriberName: subscriber.name },
       );
     }
 
-    const existing = this.reactorsForMap.get(mapName) ?? [];
-    existing.push(reactor);
-    this.reactorsForMap.set(mapName, existing);
+    const existing = this.subscribersForMap.get(mapName) ?? [];
+    existing.push(subscriber);
+    this.subscribersForMap.set(mapName, existing);
   }
 
   registerEventSubscriber(
@@ -373,14 +373,14 @@ export class ProjectionRouter<
   }
 
   /**
-   * Initialize queue processors for reactors.
-   * Each reactor gets a SimpleQueue for async dispatch.
+   * Initialize queue processors for projection subscribers.
+   * Each subscriber gets a SimpleQueue for async dispatch.
    */
-  initializeReactorQueues(): void {
-    if (this.reactorsForFold.size === 0 && this.reactorsForMap.size === 0)
+  initializeProjectionSubscriberQueues(): void {
+    if (this.subscribersForFold.size === 0 && this.subscribersForMap.size === 0)
       return;
 
-    const reactorDefs: Record<
+    const subscriberDefs: Record<
       string,
       {
         name: string;
@@ -408,11 +408,11 @@ export class ProjectionRouter<
       }
     > = {};
 
-    for (const [foldName, reactors] of this.reactorsForFold) {
-      for (const reactor of reactors) {
-        if (this.isReactorExcluded(reactor)) continue;
-        reactorDefs[reactor.name] = {
-          name: reactor.name,
+    for (const [foldName, subscribers] of this.subscribersForFold) {
+      for (const subscriber of subscribers) {
+        if (this.isSubscriberExcluded(subscriber)) continue;
+        subscriberDefs[subscriber.name] = {
+          name: subscriber.name,
           parentProjection: foldName,
           parentType: "fold" as const,
           handler: {
@@ -420,7 +420,7 @@ export class ProjectionRouter<
               event: EventType;
               foldState: unknown;
             }) => {
-              await reactor.handle(payload.event, {
+              await subscriber.handle(payload.event, {
                 tenantId: payload.event.tenantId,
                 aggregateId: String(payload.event.aggregateId),
                 foldState: payload.foldState,
@@ -428,17 +428,17 @@ export class ProjectionRouter<
               });
             },
           },
-          groupKeyFn: reactor.options?.groupKeyFn,
+          groupKeyFn: subscriber.options?.groupKeyFn,
           options: {
-            killSwitch: reactor.options?.killSwitch,
-            disabled: reactor.options?.disabled,
-            delay: reactor.options?.delay,
+            killSwitch: subscriber.options?.killSwitch,
+            disabled: subscriber.options?.disabled,
+            delay: subscriber.options?.delay,
             deduplication:
-              reactor.options?.deduplication ??
-              (reactor.options?.makeJobId
+              subscriber.options?.deduplication ??
+              (subscriber.options?.makeJobId
                 ? {
-                    makeId: reactor.options.makeJobId,
-                    ttlMs: reactor.options.ttl,
+                    makeId: subscriber.options.makeJobId,
+                    ttlMs: subscriber.options.ttl,
                   }
                 : undefined),
           },
@@ -446,11 +446,11 @@ export class ProjectionRouter<
       }
     }
 
-    for (const [mapName, reactors] of this.reactorsForMap) {
-      for (const reactor of reactors) {
-        if (this.isReactorExcluded(reactor)) continue;
-        reactorDefs[reactor.name] = {
-          name: reactor.name,
+    for (const [mapName, subscribers] of this.subscribersForMap) {
+      for (const subscriber of subscribers) {
+        if (this.isSubscriberExcluded(subscriber)) continue;
+        subscriberDefs[subscriber.name] = {
+          name: subscriber.name,
           parentProjection: mapName,
           parentType: "map" as const,
           handler: {
@@ -458,7 +458,7 @@ export class ProjectionRouter<
               event: EventType;
               foldState: unknown;
             }) => {
-              await reactor.handle(payload.event, {
+              await subscriber.handle(payload.event, {
                 tenantId: payload.event.tenantId,
                 aggregateId: String(payload.event.aggregateId),
                 foldState: payload.foldState,
@@ -466,17 +466,17 @@ export class ProjectionRouter<
               });
             },
           },
-          groupKeyFn: reactor.options?.groupKeyFn,
+          groupKeyFn: subscriber.options?.groupKeyFn,
           options: {
-            killSwitch: reactor.options?.killSwitch,
-            disabled: reactor.options?.disabled,
-            delay: reactor.options?.delay,
+            killSwitch: subscriber.options?.killSwitch,
+            disabled: subscriber.options?.disabled,
+            delay: subscriber.options?.delay,
             deduplication:
-              reactor.options?.deduplication ??
-              (reactor.options?.makeJobId
+              subscriber.options?.deduplication ??
+              (subscriber.options?.makeJobId
                 ? {
-                    makeId: reactor.options.makeJobId,
-                    ttlMs: reactor.options.ttl,
+                    makeId: subscriber.options.makeJobId,
+                    ttlMs: subscriber.options.ttl,
                   }
                 : undefined),
           },
@@ -484,30 +484,34 @@ export class ProjectionRouter<
       }
     }
 
-    this.queueManager.initializeReactorQueues(
-      reactorDefs,
-      async (reactorName, payload, _context) => {
-        const reactorDef = reactorDefs[reactorName];
-        if (!reactorDef) {
+    this.queueManager.initializeProjectionSubscriberQueues(
+      subscriberDefs,
+      async (subscriberName, payload, _context) => {
+        const subscriberDef = subscriberDefs[subscriberName];
+        if (!subscriberDef) {
           throw new ConfigurationError(
             "ProjectionRouter",
-            `Reactor "${reactorName}" not found`,
-            { reactorName },
+            `Subscriber "${subscriberName}" not found`,
+            { subscriberName },
           );
         }
         await withMetrics({
-          fn: () => reactorDef.handler.handle(payload),
+          fn: () => subscriberDef.handler.handle(payload),
           onComplete: (ms) => {
             incrementEsReactorTotal(
               this.pipelineName,
-              reactorName,
+              subscriberName,
               "completed",
             );
-            observeEsReactorDuration(this.pipelineName, reactorName, ms);
+            observeEsReactorDuration(this.pipelineName, subscriberName, ms);
           },
           onFail: (ms) => {
-            incrementEsReactorTotal(this.pipelineName, reactorName, "failed");
-            observeEsReactorDuration(this.pipelineName, reactorName, ms);
+            incrementEsReactorTotal(
+              this.pipelineName,
+              subscriberName,
+              "failed",
+            );
+            observeEsReactorDuration(this.pipelineName, subscriberName, ms);
           },
         });
       },
@@ -518,7 +522,7 @@ export class ProjectionRouter<
    * Initialize the default operational state projection lane.
    *
    * It shares the fold executor's pure load/apply/store mechanics, but the
-   * runtime never wires history loaders and never dispatches reactors from the
+   * runtime never wires history loaders and never dispatches subscribers from the
    * resulting state.
    */
   initializeStateProjectionQueues(): void {
@@ -612,11 +616,11 @@ export class ProjectionRouter<
         // keeps up). Safe for all folds because: the final folded state is
         // identical to applying events one at a time (pure left-fold, the
         // intermediate stores never affect the result); processFoldProjectionBatch
-        // still dispatches reactors per event, so event-sensitive reactors
+        // still dispatches subscribers per event, so event-sensitive subscribers
         // (per-span eval sync, evaluation/scenario triggers keyed on event type)
         // see every event; and out-of-order is handled identically to the
         // single-event path (executeBatch uses the fold's declared ordering and
-        // the same checkpoint policy). The only difference is reactors observe the final
+        // the same checkpoint policy). The only difference is subscribers observe the final
         // batch fold-state, which is the correct "current state" for a
         // react-after-fold side effect. A fold can opt out via
         // options.coalesceMaxBatch = 1.
@@ -739,12 +743,16 @@ export class ProjectionRouter<
               },
             });
 
-            // Dispatch to map reactors after map execute succeeds
-            const mapReactors = this.reactorsForMap.get(name);
-            if (record !== null && mapReactors && mapReactors.length > 0) {
-              await this.dispatchToReactors({
+            // Dispatch to map subscribers after map execute succeeds
+            const mapSubscribers = this.subscribersForMap.get(name);
+            if (
+              record !== null &&
+              mapSubscribers &&
+              mapSubscribers.length > 0
+            ) {
+              await this.dispatchToSubscribers({
                 foldName: name,
-                reactors: mapReactors,
+                subscribers: mapSubscribers,
                 deliveries: [{ event, foldState: record }],
               });
             }
@@ -805,19 +813,19 @@ export class ProjectionRouter<
               },
             });
 
-            const mapReactors = this.reactorsForMap.get(name);
-            if (mapReactors && mapReactors.length > 0) {
+            const mapSubscribers = this.subscribersForMap.get(name);
+            if (mapSubscribers && mapSubscribers.length > 0) {
               // One dispatch for the whole batch, not one per mapped event.
               // Dispatching per event put each send in its own call, so the
-              // per-reactor collapse only ever saw a single event and could
+              // per-subscriber collapse only ever saw a single event and could
               // never fire — a drained batch sent one job per event for
-              // reactors keyed on the aggregate, and the queue then squashed
+              // subscribers keyed on the aggregate, and the queue then squashed
               // all but the last. Each delivery keeps its own record, so a
-              // reactor that reads one still sees the record its event
+              // subscriber that reads one still sees the record its event
               // produced.
-              await this.dispatchToReactors({
+              await this.dispatchToSubscribers({
                 foldName: name,
-                reactors: mapReactors,
+                subscribers: mapSubscribers,
                 deliveries: mapped.map(({ event, record }) => ({
                   event,
                   foldState: record,
@@ -1245,12 +1253,16 @@ export class ProjectionRouter<
               },
             });
 
-            // Dispatch to map reactors after map execute succeeds
-            const mapReactors = this.reactorsForMap.get(name);
-            if (record !== null && mapReactors && mapReactors.length > 0) {
-              await this.dispatchToReactors({
+            // Dispatch to map subscribers after map execute succeeds
+            const mapSubscribers = this.subscribersForMap.get(name);
+            if (
+              record !== null &&
+              mapSubscribers &&
+              mapSubscribers.length > 0
+            ) {
+              await this.dispatchToSubscribers({
                 foldName: name,
-                reactors: mapReactors,
+                subscribers: mapSubscribers,
                 deliveries: [{ event, foldState: record }],
               });
             }
@@ -1743,10 +1755,10 @@ export class ProjectionRouter<
           },
         });
 
-        // After fold succeeds, dispatch to reactors for this fold. The fold
+        // After fold succeeds, dispatch to subscribers for this fold. The fold
         // state is durable by this point, so a throw from here redelivers
         // events the store already contains.
-        await this.dispatchReactorsAfterStore({
+        await this.dispatchSubscribersAfterStore({
           projectionName,
           events: [event],
           foldState,
@@ -1756,14 +1768,14 @@ export class ProjectionRouter<
   }
 
   /**
-   * Dispatches a fold's reactors once its state is already durable.
+   * Dispatches a fold's subscribers once its state is already durable.
    *
    * Anything that throws from here fails the job without un-writing the state,
    * so the queue redelivers events the store already holds — see
    * {@link recordPostStoreFailure}. Shared by the single-event and batch paths
    * so the two cannot drift on the exact path this counter measures.
    */
-  private async dispatchReactorsAfterStore({
+  private async dispatchSubscribersAfterStore({
     projectionName,
     events,
     foldState,
@@ -1772,13 +1784,13 @@ export class ProjectionRouter<
     events: EventType[];
     foldState: unknown;
   }): Promise<void> {
-    const reactors = this.reactorsForFold.get(projectionName);
-    if (!reactors || reactors.length === 0) return;
+    const subscribers = this.subscribersForFold.get(projectionName);
+    if (!subscribers || subscribers.length === 0) return;
 
     try {
-      await this.dispatchToReactors({
+      await this.dispatchToSubscribers({
         foldName: projectionName,
-        reactors,
+        subscribers,
         deliveries: events.map((event) => ({ event, foldState })),
       });
     } catch (error) {
@@ -1837,8 +1849,8 @@ export class ProjectionRouter<
    * GroupQueue's coalescing path when a group is backed up. All events share the
    * aggregate (and tenant), so kill-switch and store key are resolved once.
    *
-   * Reactors fire once with the final folded state (using the last event), which
-   * is the correct coalesced behavior for the trace's debounced reactors.
+   * Subscribers fire once with the final folded state (using the last event), which
+   * is the correct coalesced behavior for the trace's debounced subscribers.
    */
   private async processFoldProjectionBatch(
     projectionName: string,
@@ -1888,8 +1900,8 @@ export class ProjectionRouter<
         }
         if (toApply.length === 0) return;
 
-        // Apply (and dispatch reactors) in occurredAt order — the same order
-        // executeBatch folds in — so reactor metadata and the final state are
+        // Apply (and dispatch subscribers) in occurredAt order — the same order
+        // executeBatch folds in — so subscriber metadata and the final state are
         // consistent regardless of the order events were drained/dispatched in.
         toApply = [...toApply].sort(
           (a, b) =>
@@ -1934,19 +1946,19 @@ export class ProjectionRouter<
           },
         });
 
-        // Dispatch reactors for the whole batch, with the final fold state.
-        // Per-span reactors must see every event: customEvaluationSync reads
+        // Dispatch subscribers for the whole batch, with the final fold state.
+        // Per-span subscribers must see every event: customEvaluationSync reads
         // event.data.span to extract embedded SDK evals, and its makeJobId
-        // carries the event id, so it is dispatched once per event. Reactors
+        // carries the event id, so it is dispatched once per event. Subscribers
         // keyed on the aggregate (broadcast, metadata, alerts) would be squashed
-        // to one job by the queue's dedup anyway, so dispatchToReactors collapses
+        // to one job by the queue's dedup anyway, so dispatchToSubscribers collapses
         // them here instead of paying N serialize+gzip+blob round-trips to reach
         // the same state. See ProjectionRouter.collapseByJobId.
         //
         // A post-store failure is worse here than on the single-event path: the
         // whole coalesced batch is re-applied, so one failure can double-count
         // up to DEFAULT_FOLD_COALESCE_MAX_BATCH events against one aggregate.
-        await this.dispatchReactorsAfterStore({
+        await this.dispatchSubscribersAfterStore({
           projectionName,
           events: toApply,
           foldState,
@@ -1956,10 +1968,10 @@ export class ProjectionRouter<
   }
 
   /**
-   * Builds the context a reactor receives. Used for both shouldReact and
+   * Builds the context a subscriber receives. Used for both shouldDispatch and
    * handle so the predicate can never see a different shape than the handler.
    */
-  private buildReactorContext({
+  private buildSubscriberDispatchContext({
     event,
     foldState,
   }: {
@@ -1975,43 +1987,43 @@ export class ProjectionRouter<
   }
 
   /**
-   * Evaluates a reactor's optional shouldReact predicate. Fails open: a
+   * Evaluates a subscriber's optional shouldDispatch predicate. Fails open: a
    * thrown predicate is logged and treated as true so a predicate bug can
    * never drop a side effect (worst case is one redundant job).
    */
-  private reactorShouldReact(
-    reactor: ReactorDefinition<EventType>,
+  private subscriberShouldDispatch(
+    subscriber: SubscriberDispatchDefinition<EventType>,
     event: EventType,
     foldState: unknown,
   ): boolean {
-    if (!reactor.shouldReact) return true;
+    if (!subscriber.shouldDispatch) return true;
 
     try {
-      return reactor.shouldReact(
+      return subscriber.shouldDispatch(
         event,
-        this.buildReactorContext({ event, foldState }),
+        this.buildSubscriberDispatchContext({ event, foldState }),
       );
     } catch (error) {
       this.logger.error(
         {
-          reactorName: reactor.name,
+          subscriberName: subscriber.name,
           eventId: event.id,
           eventType: event.type,
           tenantId: event.tenantId,
           error: error instanceof Error ? error.message : String(error),
         },
-        "Reactor shouldReact predicate threw — failing open and dispatching",
+        "Subscriber shouldDispatch predicate threw — failing open and dispatching",
       );
       return true;
     }
   }
 
   /**
-   * The events a reactor must actually be sent for, out of a coalesced batch.
+   * The events a subscriber must actually be sent for, out of a coalesced batch.
    *
-   * A reactor's `makeJobId` IS its collapse key: the queue dedups on it, so N
+   * A subscriber's `makeJobId` IS its collapse key: the queue dedups on it, so N
    * sends carrying the same job id leave exactly one job behind — the last one,
-   * since staging replaces a squashed duplicate. Reactors keyed on the aggregate
+   * since staging replaces a squashed duplicate. Subscribers keyed on the aggregate
    * (`eval-trigger:${tenantId}:${aggregateId}`, `trace-update:…`) therefore
    * produce one job no matter how many events a backed-up group drains.
    *
@@ -2019,11 +2031,11 @@ export class ProjectionRouter<
    * gzips it, and — once past the envelope's inline ceiling — writes a
    * content-addressed blob into Redis that the ensuing dedup squash immediately
    * reclaims. On a 10k-span trace that was ~99 discarded round-trips per drained
-   * batch, per reactor. Collapsing here reaches the same queue state by the same
+   * batch, per subscriber. Collapsing here reaches the same queue state by the same
    * rule the queue itself would have applied, without the churn.
    *
-   * Reactors keyed per event (`…:${event.id}`) collapse to nothing and are
-   * dispatched for every event, as are reactors with no job id at all.
+   * Subscribers keyed per event (`…:${event.id}`) collapse to nothing and are
+   * dispatched for every event, as are subscribers with no job id at all.
    *
    * Each delivery carries its own state because a map batch has no single one:
    * a fold hands the same accumulated state to every event, but a map produces
@@ -2031,19 +2043,19 @@ export class ProjectionRouter<
    * actually paired with.
    */
   private collapseByJobId({
-    reactor,
+    subscriber,
     deliveries,
   }: {
-    reactor: ReactorDefinition<EventType>;
-    deliveries: ReactorDelivery<EventType>[];
-  }): ReactorDelivery<EventType>[] {
-    const makeJobId = reactor.options?.makeJobId;
+    subscriber: SubscriberDispatchDefinition<EventType>;
+    deliveries: SubscriberDelivery<EventType>[];
+  }): SubscriberDelivery<EventType>[] {
+    const makeJobId = subscriber.options?.makeJobId;
     if (!makeJobId || deliveries.length < 2) return deliveries;
 
     try {
       // Keep the LAST delivery per job id — the one the queue's dedup squash
       // would have left behind (STAGE_LUA overwrites the stored value when
-      // `shouldReplace`, which every reactor here defaults to).
+      // `shouldReplace`, which every subscriber here defaults to).
       //
       // A Map alone would order the survivors by each job id's FIRST
       // occurrence while holding its last value, so a batch carrying two job
@@ -2059,68 +2071,76 @@ export class ProjectionRouter<
 
       incrementEsReactorCollapsedTotal(
         this.pipelineName,
-        reactor.name,
+        subscriber.name,
         deliveries.length - survivors.length,
       );
       return survivors.map((index) => deliveries[index]!);
     } catch (error) {
-      // Fail open, like `shouldReact`: a throwing job-id function must never
+      // Fail open, like `shouldDispatch`: a throwing job-id function must never
       // drop a side effect. Worst case is the un-collapsed fan-out we had before.
       this.logger.error(
         {
-          reactorName: reactor.name,
+          subscriberName: subscriber.name,
           eventCount: deliveries.length,
           error: error instanceof Error ? error.message : String(error),
         },
-        "Reactor makeJobId threw while collapsing a batch — dispatching every event",
+        "Subscriber makeJobId threw while collapsing a batch — dispatching every event",
       );
       return deliveries;
     }
   }
 
   /**
-   * Dispatches a coalesced batch of same-aggregate events to reactors registered
-   * on a fold projection. In queued mode, sends to reactor queues. In inline
+   * Dispatches a coalesced batch of same-aggregate events to subscribers registered
+   * on a fold projection. In queued mode, sends to subscriber queues. In inline
    * mode, calls directly. A single event is just a batch of one.
    *
-   * Events are filtered by `shouldReact` BEFORE they are collapsed, so a reactor
+   * Events are filtered by `shouldDispatch` BEFORE they are collapsed, so a subscriber
    * keyed on the aggregate receives the last event it actually cared about
    * rather than the last event in the batch.
    */
-  private async dispatchToReactors({
+  private async dispatchToSubscribers({
     foldName,
-    reactors,
+    subscribers,
     deliveries,
   }: {
     foldName: string;
-    reactors: ReactorDefinition<EventType>[];
-    deliveries: ReactorDelivery<EventType>[];
+    subscribers: SubscriberDispatchDefinition<EventType>[];
+    deliveries: SubscriberDelivery<EventType>[];
   }): Promise<void> {
     const errors: Error[] = [];
 
-    for (const reactor of reactors) {
-      if (reactor.options?.disabled) continue;
-      if (this.isReactorExcluded(reactor)) continue;
+    for (const subscriber of subscribers) {
+      if (subscriber.options?.disabled) continue;
+      if (this.isSubscriberExcluded(subscriber)) continue;
 
-      const relevant: ReactorDelivery<EventType>[] = [];
+      const relevant: SubscriberDelivery<EventType>[] = [];
       for (const delivery of deliveries) {
         if (
-          this.reactorShouldReact(reactor, delivery.event, delivery.foldState)
+          this.subscriberShouldDispatch(
+            subscriber,
+            delivery.event,
+            delivery.foldState,
+          )
         ) {
           relevant.push(delivery);
         } else {
-          incrementEsReactorTotal(this.pipelineName, reactor.name, "skipped");
+          incrementEsReactorTotal(
+            this.pipelineName,
+            subscriber.name,
+            "skipped",
+          );
         }
       }
       if (relevant.length === 0) continue;
 
       for (const { event, foldState } of this.collapseByJobId({
-        reactor,
+        subscriber,
         deliveries: relevant,
       })) {
-        await this.dispatchOneToReactor({
+        await this.dispatchOneToSubscriber({
           foldName,
-          reactor,
+          subscriber,
           event,
           foldState,
           errors,
@@ -2131,44 +2151,47 @@ export class ProjectionRouter<
     if (errors.length > 0) {
       throw new AggregateError(
         errors,
-        `${errors.length} reactor(s) failed during dispatch`,
+        `${errors.length} subscriber(s) failed during dispatch`,
       );
     }
   }
 
   /**
-   * Sends one event to one reactor, collecting rather than throwing failures so
-   * a single bad reactor can't skip the ones after it.
+   * Sends one event to one subscriber, collecting rather than throwing failures so
+   * a single bad subscriber can't skip the ones after it.
    */
-  private async dispatchOneToReactor({
+  private async dispatchOneToSubscriber({
     foldName,
-    reactor,
+    subscriber,
     event,
     foldState,
     errors,
   }: {
     foldName: string;
-    reactor: ReactorDefinition<EventType>;
+    subscriber: SubscriberDispatchDefinition<EventType>;
     event: EventType;
     foldState: unknown;
     errors: Error[];
   }): Promise<void> {
-    const hasReactorQueues = this.queueManager.hasReactorQueues();
+    const hasSubscriberQueues =
+      this.queueManager.hasProjectionSubscriberQueues();
 
-    if (hasReactorQueues) {
-      const queueProcessor = this.queueManager.getReactorQueue(reactor.name);
+    if (hasSubscriberQueues) {
+      const queueProcessor = this.queueManager.getProjectionSubscriberQueue(
+        subscriber.name,
+      );
       if (queueProcessor) {
         try {
           await queueProcessor.send({ event, foldState });
         } catch (error) {
           this.logger.error(
             {
-              reactorName: reactor.name,
+              subscriberName: subscriber.name,
               foldName,
               eventId: event.id,
               error: error instanceof Error ? error.message : String(error),
             },
-            "Failed to dispatch event to reactor queue",
+            "Failed to dispatch event to subscriber queue",
           );
           errors.push(toError(error));
         }
@@ -2176,40 +2199,40 @@ export class ProjectionRouter<
         // Queue expected but not found — fall back to inline execution
         this.logger.warn(
           {
-            reactorName: reactor.name,
+            subscriberName: subscriber.name,
             foldName,
             eventId: event.id,
           },
-          "Reactor queue not found, falling back to inline execution",
+          "Subscriber queue not found, falling back to inline execution",
         );
         try {
           await withMetrics({
             fn: () =>
-              reactor.handle(
+              subscriber.handle(
                 event,
-                this.buildReactorContext({ event, foldState }),
+                this.buildSubscriberDispatchContext({ event, foldState }),
               ),
             onComplete: (ms) => {
               incrementEsReactorTotal(
                 this.pipelineName,
-                reactor.name,
+                subscriber.name,
                 "completed",
               );
-              observeEsReactorDuration(this.pipelineName, reactor.name, ms);
+              observeEsReactorDuration(this.pipelineName, subscriber.name, ms);
             },
             onFail: (ms) => {
               incrementEsReactorTotal(
                 this.pipelineName,
-                reactor.name,
+                subscriber.name,
                 "failed",
               );
-              observeEsReactorDuration(this.pipelineName, reactor.name, ms);
+              observeEsReactorDuration(this.pipelineName, subscriber.name, ms);
             },
           });
         } catch (error) {
           this.logger.error(
             {
-              reactorName: reactor.name,
+              subscriberName: subscriber.name,
               foldName,
               eventId: event.id,
               eventType: event.type,
@@ -2217,37 +2240,41 @@ export class ProjectionRouter<
               tenantId: event.tenantId,
               error: error instanceof Error ? error.message : String(error),
             },
-            "Reactor failed during inline fallback execution",
+            "Subscriber failed during inline fallback execution",
           );
           errors.push(toError(error));
         }
       }
     } else {
-      // Inline mode: call reactor directly
+      // Inline mode: call subscriber directly
       try {
         await withMetrics({
           fn: () =>
-            reactor.handle(
+            subscriber.handle(
               event,
-              this.buildReactorContext({ event, foldState }),
+              this.buildSubscriberDispatchContext({ event, foldState }),
             ),
           onComplete: (ms) => {
             incrementEsReactorTotal(
               this.pipelineName,
-              reactor.name,
+              subscriber.name,
               "completed",
             );
-            observeEsReactorDuration(this.pipelineName, reactor.name, ms);
+            observeEsReactorDuration(this.pipelineName, subscriber.name, ms);
           },
           onFail: (ms) => {
-            incrementEsReactorTotal(this.pipelineName, reactor.name, "failed");
-            observeEsReactorDuration(this.pipelineName, reactor.name, ms);
+            incrementEsReactorTotal(
+              this.pipelineName,
+              subscriber.name,
+              "failed",
+            );
+            observeEsReactorDuration(this.pipelineName, subscriber.name, ms);
           },
         });
       } catch (error) {
         this.logger.error(
           {
-            reactorName: reactor.name,
+            subscriberName: subscriber.name,
             foldName,
             eventId: event.id,
             eventType: event.type,
@@ -2255,7 +2282,7 @@ export class ProjectionRouter<
             tenantId: event.tenantId,
             error: error instanceof Error ? error.message : String(error),
           },
-          "Reactor failed during inline execution — fold state persisted in CH but reactor side-effect (e.g. ES sync) was lost",
+          "Subscriber failed during inline execution — fold state persisted in CH but subscriber side-effect (e.g. ES sync) was lost",
         );
         errors.push(toError(error));
       }
@@ -2346,10 +2373,12 @@ export class ProjectionRouter<
     return this.eventSubscribers.size > 0;
   }
 
-  /** Returns true if the reactor's runIn filter excludes the current processRole. */
-  private isReactorExcluded(reactor: ReactorDefinition<EventType>): boolean {
+  /** Returns true if the subscriber's runIn filter excludes the current processRole. */
+  private isSubscriberExcluded(
+    subscriber: SubscriberDispatchDefinition<EventType>,
+  ): boolean {
     return !roleSatisfiesRunIn({
-      runIn: reactor.options?.runIn,
+      runIn: subscriber.options?.runIn,
       processRole: this.processRole,
     });
   }

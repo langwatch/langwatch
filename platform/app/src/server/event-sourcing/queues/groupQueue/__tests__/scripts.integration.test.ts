@@ -808,7 +808,7 @@ describe("GroupStagingScripts", () => {
         /**
          * The production incident (missing_blob, ~100-500/hr over 7 days).
          *
-         * Sibling reactors folding the same trace encode identical payloads,
+         * Sibling subscribers folding the same trace encode identical payloads,
          * so they hash to ONE blob. Under the holder scheme the refcount
          * member was SADD'd in a round trip AFTER stage() returned, so a
          * sibling completing in that window saw SCARD == 0 and UNLINKed the
@@ -2563,7 +2563,7 @@ describe("GroupStagingScripts", () => {
             jobDataJson: makePausedJobData(),
           }),
         );
-        await scripts.addPauseKey("ingestion/reactor");
+        await scripts.addPauseKey("ingestion/subscriber");
 
         const result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
         expect(result).not.toBeNull();

@@ -48,7 +48,8 @@ describe("projectMetadataGroupKey", () => {
 
 describe("projectMetadata lane wiring", () => {
   const pipeline = createTraceProcessingPipeline(buildTraceDeps());
-  const registration = pipeline.foldReactors.get("projectMetadata")!.definition;
+  const registration =
+    pipeline.foldSubscribers.get("projectMetadata")!.definition;
 
   function payloadFor({
     tenantId,

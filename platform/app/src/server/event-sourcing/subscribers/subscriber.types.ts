@@ -9,7 +9,7 @@ import type { DeduplicationConfig } from "../queues/queue.types";
  * `.withProcessManager` (ADR-098); this shape is what the router and queue
  * pass beneath that sugar.
  */
-export interface ReactorContext<FoldState = unknown> {
+export interface SubscriberDispatchContext<FoldState = unknown> {
   tenantId: string;
   aggregateId: string;
   foldState: FoldState;
@@ -23,12 +23,12 @@ export interface ReactorContext<FoldState = unknown> {
 }
 
 /**
- * Options for configuring a reactor.
+ * Options for configuring a subscriber.
  */
-export interface ReactorOptions {
+export interface SubscriberDispatchOptions {
   killSwitch?: KillSwitchOptions;
   disabled?: boolean;
-  /** Delay in milliseconds before the reactor fires */
+  /** Delay in milliseconds before the subscriber fires */
   delay?: number;
   /** Deduplication TTL in milliseconds. Only used if makeJobId is provided. */
   ttl?: number;
@@ -39,34 +39,34 @@ export interface ReactorOptions {
     event: Event;
     foldState: unknown;
   }>;
-  /** Process roles where this reactor runs. Omit to run everywhere. */
+  /** Process roles where this subscriber runs. Omit to run everywhere. */
   runIn?: ProcessRole[];
   /** Custom group key function for queue routing. Overrides the domain part of the hierarchical key. */
   groupKeyFn?: (payload: { event: Event; foldState: unknown }) => string;
 }
 
 /**
- * Definition of a reactor — a post-fold side-effect handler.
+ * Definition of a subscriber — a post-fold side-effect handler.
  *
- * A reactor is tied to a specific fold projection and is dispatched
+ * A subscriber is tied to a specific fold projection and is dispatched
  * after every fold apply + store succeeds. This guarantees correctness:
- * if the fold fails, the reactor never fires.
+ * if the fold fails, the subscriber never fires.
  *
- * Reactors fire on every fold completion unless a `shouldReact`
+ * Subscribers fire on every fold completion unless a `shouldDispatch`
  * predicate filters the event out before enqueue.
  * Downstream commands handle their own dedup via makeJobId + delay.
  *
- * See dev/docs/adr/026-reactor-should-react-predicate.md.
+ * See dev/docs/adr/026-subscriber-should-react-predicate.md.
  */
-export interface ReactorDefinition<
+export interface SubscriberDispatchDefinition<
   E extends Event = Event,
   FoldState = unknown,
 > {
-  /** Unique name for this reactor */
+  /** Unique name for this subscriber */
   name: string;
   /**
    * Optional pure predicate evaluated at dispatch time, before any job is
-   * enqueued. Return false to skip this reactor entirely for the event.
+   * enqueued. Return false to skip this subscriber entirely for the event.
    *
    * Must be pure and synchronous — no IO, no injected dependencies; it runs
    * on the projection hot path. Guards that need dependencies (DB lookups
@@ -77,9 +77,15 @@ export interface ReactorDefinition<
    * predicate sees exactly what handle() would receive — do not use this for
    * conditions that should be re-evaluated against fresher state later.
    */
-  shouldReact?(event: E, context: ReactorContext<FoldState>): boolean;
+  shouldDispatch?(
+    event: E,
+    context: SubscriberDispatchContext<FoldState>,
+  ): boolean;
   /** Side-effect handler called after fold succeeds */
-  handle(event: E, context: ReactorContext<FoldState>): Promise<void>;
+  handle(
+    event: E,
+    context: SubscriberDispatchContext<FoldState>,
+  ): Promise<void>;
   /** Optional configuration */
-  options?: ReactorOptions;
+  options?: SubscriberDispatchOptions;
 }

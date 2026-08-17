@@ -63,7 +63,7 @@ export interface EvaluationProcessingPipelineDeps {
  * and enables detection of stuck evaluations.
  *
  * Commands:
- * - executeEvaluation: Preconditions + sampling + run eval + emit events (reactor path)
+ * - executeEvaluation: Preconditions + sampling + run eval + emit events (subscriber path)
  * - startEvaluation: Records eval start to CH (API handler path)
  * - completeEvaluation: Records eval result to CH (API handler path)
  */

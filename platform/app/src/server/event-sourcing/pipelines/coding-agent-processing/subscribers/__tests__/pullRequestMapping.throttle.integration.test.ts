@@ -8,7 +8,7 @@
  * Redis, because the defect is inside it. The dedup key is queue-global, but the
  * squash it guards is conditional on `ZRANK(group:<groupId>:jobs, existingJobId)`
  * — the rank of the existing job in the NEW payload's OWN group. Two sessions
- * on one branch share a dedup id and, with the reactor's default per-aggregate
+ * on one branch share a dedup id and, with the subscriber's default per-aggregate
  * grouping, land in two different groups: the rank lookup misses, the script
  * reads that as "already dispatched", and (with `shouldSurviveDispatch` off)
  * DELETES the dedup key and stages a second job. Both call GitHub, and the key
@@ -61,7 +61,7 @@ function payloadFor(sessionId: string) {
 }
 
 const store = {} as never;
-const reactor = createCodingAgentProcessingPipeline({
+const subscriber = createCodingAgentProcessingPipeline({
   codingAgentSessionStore: store,
   codingAgentTraceSessionAppendStore: store,
   sessionMetricSeriesAppendStore: store,
@@ -69,38 +69,38 @@ const reactor = createCodingAgentProcessingPipeline({
   pullRequestMappingHandler: createPullRequestMappingHandler({
     requestBranchMapping: async () => undefined,
   }),
-} as unknown as CodingAgentProcessingPipelineDeps).foldReactors.get(
+} as unknown as CodingAgentProcessingPipelineDeps).foldSubscribers.get(
   "pullRequestMapping",
 )!.definition;
 
 /**
- * The group id `QueueManager.initializeReactorQueues` builds for a reactor
+ * The group id `QueueManager.initializeSubscriberQueues` builds for a subscriber
  * payload, transcribed: `${tenantId}/${jobPath}/${domainKey}`, where the domain
- * key is the reactor's own `groupKeyFn` when it declares one and
+ * key is the subscriber's own `groupKeyFn` when it declares one and
  * `${aggregateType}:${aggregateId}` otherwise. Transcribed rather than imported
  * because `buildGroupKey` is private; the companion unit test pins the
- * reactor's half of it.
+ * subscriber's half of it.
  */
 function groupIdFor(payload: ReturnType<typeof payloadFor>): string {
   const jobPath = "fold/codingAgentSession/reactor/pullRequestMapping";
   const domainKey =
-    reactor.options?.groupKeyFn?.(payload as never) ??
+    subscriber.options?.groupKeyFn?.(payload as never) ??
     `${payload.event.aggregateType}:${String(payload.event.aggregateId)}`;
   return `${payload.event.tenantId}/${jobPath}/${domainKey}`;
 }
 
-/** Stage one fold's mapping job exactly as the reactor lane would. */
+/** Stage one fold's mapping job exactly as the subscriber lane would. */
 async function stageMappingJob(
   payload: ReturnType<typeof payloadFor>,
   stagedJobId: string,
 ) {
-  const dedup = reactor.options?.deduplication;
-  if (!dedup) throw new Error("reactor declares no deduplication");
+  const dedup = subscriber.options?.deduplication;
+  if (!dedup) throw new Error("subscriber declares no deduplication");
   const groupId = groupIdFor(payload);
   return await scripts.stage({
     stagedJobId,
     groupId,
-    dispatchAfterMs: payload.event.createdAt + (reactor.options?.delay ?? 0),
+    dispatchAfterMs: payload.event.createdAt + (subscriber.options?.delay ?? 0),
     dedupId: dedup.makeId(payload as never),
     dedupTtlMs: dedup.ttlMs ?? 0,
     jobDataJson: JSON.stringify({ stagedJobId }),
@@ -143,7 +143,7 @@ describe("pull-request mapping throttle", () => {
       const first = payloadFor("session-a");
       const second = payloadFor("session-b");
 
-      const dedup = reactor.options!.deduplication!;
+      const dedup = subscriber.options!.deduplication!;
       // The premise: the two folds agree on the job's identity. If they did
       // not, nothing below would be about the throttle at all.
       expect(dedup.makeId(second as never)).toBe(dedup.makeId(first as never));
@@ -160,7 +160,7 @@ describe("pull-request mapping throttle", () => {
     it("keeps the dedup key pointing at the surviving job", async () => {
       const first = payloadFor("session-a");
       const second = payloadFor("session-b");
-      const dedupId = reactor.options!.deduplication!.makeId(first as never);
+      const dedupId = subscriber.options!.deduplication!.makeId(first as never);
 
       await stageMappingJob(first, "job-a");
       await stageMappingJob(second, "job-b");
@@ -171,7 +171,7 @@ describe("pull-request mapping throttle", () => {
 
   describe("given a session whose fold events are already backlogged", () => {
     /**
-     * The reactor's ready score is the event's own `createdAt`, so a job's
+     * The subscriber's ready score is the event's own `createdAt`, so a job's
      * dispatch deadline is `createdAt + delay`. For a group draining an hour-old
      * backlog that deadline is already in the past: the job is immediately
      * dispatchable, and the window that was supposed to collapse the burst has

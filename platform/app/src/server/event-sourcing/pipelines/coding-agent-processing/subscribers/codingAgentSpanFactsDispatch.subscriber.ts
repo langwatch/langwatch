@@ -42,7 +42,7 @@ const logger = createLogger(
  *   - `enqueue.filter` runs the RAW span-name gate at the fan-out seam, so a
  *     span from any other trace never mints a job. Every span in the project
  *     flows past that predicate; one set lookup keeps an ordinary chat trace's
- *     cost at zero. Origin gating is exactly this predicate — no gate reactor
+ *     cost at zero. Origin gating is exactly this predicate — no gate subscriber
  *     (ADR-056 §3).
  *   - A `span_facts_lifted` job carries a bounded derivation: the facts, already
  *     lifted, on the job itself. The handler contributes them directly. Nothing

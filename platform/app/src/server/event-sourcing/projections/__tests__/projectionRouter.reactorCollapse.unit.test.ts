@@ -13,7 +13,6 @@ vi.mock("~/server/metrics", async (importOriginal) => {
 });
 
 import type { Event } from "../../domain/types";
-import type { ReactorDefinition } from "../../reactors/reactor.types";
 import {
   createMockFoldProjectionDefinition,
   createMockFoldProjectionStore,
@@ -22,16 +21,17 @@ import {
   createTestTenantId,
   TEST_CONSTANTS,
 } from "../../services/__tests__/testHelpers";
+import type { SubscriberDispatchDefinition } from "../../subscribers/subscriber.types";
 import { ProjectionRouter } from "../projectionRouter";
 
 /**
- * A reactor's `makeJobId` is its collapse key: the queue dedups on it, so N
+ * A subscriber's `makeJobId` is its collapse key: the queue dedups on it, so N
  * sends carrying one job id leave exactly one job behind. These pin the router
  * to reaching that same queue state without paying N serialize+gzip+blob
  * round-trips per drained batch (2026-07-09 incident; see
  * specs/event-sourcing/hot-trace-fold-amplification.feature).
  */
-describe("ProjectionRouter reactor dispatch over a coalesced batch", () => {
+describe("ProjectionRouter subscriber dispatch over a coalesced batch", () => {
   const tenantId = createTestTenantId();
 
   beforeEach(() => {
@@ -62,17 +62,17 @@ describe("ProjectionRouter reactor dispatch over a coalesced batch", () => {
     );
 
   /**
-   * Registers the reactor, drives one coalesced batch through the fold queue's
-   * batch callback, and returns the payloads the reactor's queue received.
+   * Registers the subscriber, drives one coalesced batch through the fold queue's
+   * batch callback, and returns the payloads the subscriber's queue received.
    */
   async function dispatchBatch(
-    reactor: ReactorDefinition<Event>,
+    subscriber: SubscriberDispatchDefinition<Event>,
     events: Event[],
   ): Promise<Array<{ event: Event; foldState: unknown }>> {
     const send = vi.fn().mockResolvedValue(undefined);
     const queueManager = createMockQueueManager({
-      hasReactorQueues: true,
-      getReactorQueue: vi.fn().mockReturnValue({ send }),
+      hasProjectionSubscriberQueues: true,
+      getProjectionSubscriberQueue: vi.fn().mockReturnValue({ send }),
     });
 
     const router = new ProjectionRouter<Event>(
@@ -90,7 +90,7 @@ describe("ProjectionRouter reactor dispatch over a coalesced batch", () => {
     });
 
     router.registerFoldProjection(fold);
-    router.registerReactor("counter", reactor);
+    router.registerSubscriber("counter", subscriber);
     router.initializeFoldQueues();
 
     const initialize = queueManager.initializeProjectionQueues as ReturnType<
@@ -107,10 +107,10 @@ describe("ProjectionRouter reactor dispatch over a coalesced batch", () => {
     return send.mock.calls.map(([payload]) => payload);
   }
 
-  describe("when the reactor's deduplication id is the same for every event", () => {
-    /** @scenario "Reactors keyed on the aggregate are dispatched once per coalesced batch" */
+  describe("when the subscriber's deduplication id is the same for every event", () => {
+    /** @scenario "Subscribers keyed on the aggregate are dispatched once per coalesced batch" */
     it("dispatches once, with the last event in occurredAt order", async () => {
-      const reactor: ReactorDefinition<Event> = {
+      const subscriber: SubscriberDispatchDefinition<Event> = {
         name: "traceUpdateBroadcast",
         options: {
           makeJobId: ({ event }) => `trace-update:${event.aggregateId}`,
@@ -118,17 +118,17 @@ describe("ProjectionRouter reactor dispatch over a coalesced batch", () => {
         handle: vi.fn().mockResolvedValue(undefined),
       };
 
-      const payloads = await dispatchBatch(reactor, batch());
+      const payloads = await dispatchBatch(subscriber, batch());
 
       expect(payloads).toHaveLength(1);
       expect(payloads[0]?.event.id).toBe(`event-${BATCH_SIZE - 1}`);
     });
   });
 
-  describe("when the reactor's deduplication id includes the event id", () => {
-    /** @scenario "Reactors keyed per event are still dispatched for every event" */
+  describe("when the subscriber's deduplication id includes the event id", () => {
+    /** @scenario "Subscribers keyed per event are still dispatched for every event" */
     it("dispatches for every event", async () => {
-      const reactor: ReactorDefinition<Event> = {
+      const subscriber: SubscriberDispatchDefinition<Event> = {
         name: "customEvaluationSync",
         options: {
           makeJobId: ({ event }) =>
@@ -137,7 +137,7 @@ describe("ProjectionRouter reactor dispatch over a coalesced batch", () => {
         handle: vi.fn().mockResolvedValue(undefined),
       };
 
-      const payloads = await dispatchBatch(reactor, batch());
+      const payloads = await dispatchBatch(subscriber, batch());
 
       expect(payloads.map((p) => p.event.id)).toEqual([
         "event-0",
@@ -149,44 +149,44 @@ describe("ProjectionRouter reactor dispatch over a coalesced batch", () => {
     });
   });
 
-  describe("when the reactor declares no deduplication id", () => {
-    /** @scenario "Reactors without a deduplication id are dispatched for every event" */
+  describe("when the subscriber declares no deduplication id", () => {
+    /** @scenario "Subscribers without a deduplication id are dispatched for every event" */
     it("dispatches for every event", async () => {
-      const reactor: ReactorDefinition<Event> = {
+      const subscriber: SubscriberDispatchDefinition<Event> = {
         name: "undeduped",
         handle: vi.fn().mockResolvedValue(undefined),
       };
 
-      const payloads = await dispatchBatch(reactor, batch());
+      const payloads = await dispatchBatch(subscriber, batch());
 
       expect(payloads).toHaveLength(BATCH_SIZE);
     });
   });
 
-  describe("when an aggregate-keyed reactor finds only some events relevant", () => {
+  describe("when an aggregate-keyed subscriber finds only some events relevant", () => {
     /** @scenario "The relevance check still filters events before collapsing" */
     it("dispatches once, with the last relevant event", async () => {
       const relevant = new Set(["event-1", "event-3"]);
-      const reactor: ReactorDefinition<Event> = {
+      const subscriber: SubscriberDispatchDefinition<Event> = {
         name: "evaluationTrigger",
-        shouldReact: (event) => relevant.has(event.id),
+        shouldDispatch: (event) => relevant.has(event.id),
         options: {
           makeJobId: ({ event }) => `eval-trigger:${event.aggregateId}`,
         },
         handle: vi.fn().mockResolvedValue(undefined),
       };
 
-      const payloads = await dispatchBatch(reactor, batch());
+      const payloads = await dispatchBatch(subscriber, batch());
 
       expect(payloads).toHaveLength(1);
-      // event-4 is the batch's last event, but the reactor never cared about it.
+      // event-4 is the batch's last event, but the subscriber never cared about it.
       expect(payloads[0]?.event.id).toBe("event-3");
     });
   });
 
-  describe("when the reactor's makeJobId throws", () => {
+  describe("when the subscriber's makeJobId throws", () => {
     it("fails open and dispatches every event", async () => {
-      const reactor: ReactorDefinition<Event> = {
+      const subscriber: SubscriberDispatchDefinition<Event> = {
         name: "broken",
         options: {
           makeJobId: () => {
@@ -196,7 +196,7 @@ describe("ProjectionRouter reactor dispatch over a coalesced batch", () => {
         handle: vi.fn().mockResolvedValue(undefined),
       };
 
-      const payloads = await dispatchBatch(reactor, batch());
+      const payloads = await dispatchBatch(subscriber, batch());
 
       expect(payloads).toHaveLength(BATCH_SIZE);
     });
@@ -213,7 +213,7 @@ describe("ProjectionRouter reactor dispatch over a coalesced batch", () => {
         "event-3": "B",
         "event-4": "A",
       };
-      const reactor: ReactorDefinition<Event> = {
+      const subscriber: SubscriberDispatchDefinition<Event> = {
         name: "two-lane",
         options: {
           // Every id is in the map.
@@ -222,7 +222,7 @@ describe("ProjectionRouter reactor dispatch over a coalesced batch", () => {
         handle: vi.fn().mockResolvedValue(undefined),
       };
 
-      const payloads = await dispatchBatch(reactor, batch());
+      const payloads = await dispatchBatch(subscriber, batch());
 
       // Survivors: B's last is event-3, A's last is event-4 → occurredAt order.
       expect(payloads.map((p) => p.event.id)).toEqual(["event-3", "event-4"]);

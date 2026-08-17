@@ -104,7 +104,7 @@ export const computeRunMetricsCommandDataSchema = z.object({
   tenantId: z.string(),
   scenarioRunId: z.string(),
   traceId: z.string(),
-  /** ECST payload: metrics carried from trace-side reactor. Omitted in pull mode. */
+  /** ECST payload: metrics carried from trace-side subscriber. Omitted in pull mode. */
   metrics: z
     .object({
       totalCost: z.number(),

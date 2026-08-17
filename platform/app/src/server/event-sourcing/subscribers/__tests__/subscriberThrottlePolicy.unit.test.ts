@@ -27,13 +27,13 @@ import { createPullRequestMappingHandler } from "../../pipelines/coding-agent-pr
 import { buildTraceDeps } from "../../pipelines/trace-processing/__tests__/support/traceProcessingFixtures";
 import { createTraceProcessingPipeline } from "../../pipelines/trace-processing/pipeline";
 import { createBillingMeterDispatchSubscriber } from "../../projections/global/billingMeterDispatch.subscriber";
-import type { ReactorDefinition } from "../reactor.types";
+import type { SubscriberDispatchDefinition } from "../subscriber.types";
 import { throttledWindow } from "../throttleWindow";
 
 const anyDeps = {} as never;
 
 /** The policy only ever reads `options`, so the generic parameters do not matter. */
-type AnyReactor = ReactorDefinition<never, never>;
+type AnySubscriber = SubscriberDispatchDefinition<never, never>;
 
 /**
  * The registrations under test come off the REAL pipelines — the throttle now
@@ -74,17 +74,17 @@ const codingAgentPipeline = createCodingAgentProcessingPipeline({
   }),
 } as unknown as CodingAgentProcessingPipelineDeps);
 
-function traceRegistration(name: string): AnyReactor {
-  return tracePipeline.foldReactors.get(name)!.definition as AnyReactor;
+function traceRegistration(name: string): AnySubscriber {
+  return tracePipeline.foldSubscribers.get(name)!.definition as AnySubscriber;
 }
 
 /**
- * Every reactor that holds events in a window, with the window it must use and
+ * Every subscriber that holds events in a window, with the window it must use and
  * whether its suppression outlives a dispatch.
  *
  * The numbers are the point of the policy, not an implementation detail: each
  * one was chosen against a specific consumer's tolerance, and widening it
- * silently is how a reactor starts costing a user latency nobody signed off
+ * silently is how a subscriber starts costing a user latency nobody signed off
  * on. They are written as literals here so changing one has to change this
  * table too, next to the reason it is what it is.
  *
@@ -104,7 +104,7 @@ const windowed = [
     // Level-triggered: it tells a connected client the trace moved, so
     // swallowing the last event leaves that client on the previous state.
     survivesDispatch: false,
-    reactor: traceRegistration("traceUpdateBroadcast"),
+    subscriber: traceRegistration("traceUpdateBroadcast"),
   },
   {
     name: "projectMetadata",
@@ -114,7 +114,7 @@ const windowed = [
     // Rebuilt from the fold's running state, so the final event is the one
     // that decides the row.
     survivesDispatch: false,
-    reactor: traceRegistration("projectMetadata"),
+    subscriber: traceRegistration("projectMetadata"),
   },
   {
     name: "governanceKpisSync",
@@ -123,7 +123,7 @@ const windowed = [
     dedupTtlMs: 30_000,
     // Same: the last contribution to an hour bucket is what makes it correct.
     survivesDispatch: false,
-    reactor: traceRegistration("governanceKpisSync"),
+    subscriber: traceRegistration("governanceKpisSync"),
   },
   {
     name: "governanceOcsfEventsSync",
@@ -133,7 +133,7 @@ const windowed = [
     // The sync writes what the fold currently holds, so a dropped last event
     // is a row that never ships.
     survivesDispatch: false,
-    reactor: traceRegistration("governanceOcsfEventsSync"),
+    subscriber: traceRegistration("governanceOcsfEventsSync"),
   },
   {
     name: "pullRequestMapping",
@@ -144,49 +144,49 @@ const windowed = [
     dedupTtlMs: 30_000,
     // The one opt-in, and it reads nothing from the event: the handler asks
     // GitHub one idempotent question about one branch. It needs the TTL past
-    // dispatch because a reactor's ready score is the event's own `createdAt`,
+    // dispatch because a subscriber's ready score is the event's own `createdAt`,
     // so a group draining a backlog stages jobs whose deadline has already
     // passed and the window collapses nothing. What it discards is a re-ask of
     // the identical question inside thirty seconds, which the mapping
     // service's own bookkeeping would have refused one layer down.
     survivesDispatch: true,
-    reactor: codingAgentPipeline.foldReactors.get("pullRequestMapping")!
-      .definition as AnyReactor,
+    subscriber: codingAgentPipeline.foldSubscribers.get("pullRequestMapping")!
+      .definition as AnySubscriber,
   },
 ] as const satisfies readonly {
   name: string;
   windowMs: number;
   dedupTtlMs: number;
   survivesDispatch: boolean;
-  reactor: AnyReactor;
+  subscriber: AnySubscriber;
 }[];
 
 describe("subscriber throttle policy", () => {
-  describe.each(windowed)("given the $name reactor", ({
-    reactor,
+  describe.each(windowed)("given the $name subscriber", ({
+    subscriber,
     windowMs,
     dedupTtlMs,
   }) => {
     it("holds events for exactly the window the policy assigns it", () => {
-      expect(reactor.options?.delay).toBe(windowMs);
+      expect(subscriber.options?.delay).toBe(windowMs);
     });
 
     it("pins the window's deadline so a continuous stream cannot defer it forever", () => {
-      expect(reactor.options?.deduplication?.extend).toBe(false);
+      expect(subscriber.options?.deduplication?.extend).toBe(false);
     });
 
     it("keeps its dedup key alive for exactly the suppression the policy assigns it", () => {
-      expect(reactor.options?.deduplication?.ttlMs).toBe(dedupTtlMs);
+      expect(subscriber.options?.deduplication?.ttlMs).toBe(dedupTtlMs);
     });
 
     it("never lets the key expire before the job it is holding dispatches", () => {
-      const { delay, deduplication } = reactor.options!;
+      const { delay, deduplication } = subscriber.options!;
       expect(deduplication?.ttlMs).toBeGreaterThanOrEqual(delay!);
     });
 
     it("collapses on the same job id the router collapses on", () => {
-      expect(reactor.options?.makeJobId).toBe(
-        reactor.options?.deduplication?.makeId,
+      expect(subscriber.options?.makeJobId).toBe(
+        subscriber.options?.deduplication?.makeId,
       );
     });
   });
@@ -199,16 +199,16 @@ describe("subscriber throttle policy", () => {
     it.each(
       windowed,
     )("holds $name to the post-dispatch suppression the policy allows it", ({
-      reactor,
+      subscriber,
       survivesDispatch,
     }) => {
-      expect(reactor.options?.deduplication?.shouldSurviveDispatch).toBe(
+      expect(subscriber.options?.deduplication?.shouldSurviveDispatch).toBe(
         survivesDispatch,
       );
     });
 
-    // The table above only binds a reactor to the decision written next to it,
-    // so on its own it would follow a reactor that quietly opted in. This is
+    // The table above only binds a subscriber to the decision written next to it,
+    // so on its own it would follow a subscriber that quietly opted in. This is
     // what makes opting in cost an edit here, argued for by name.
     it("keeps suppression past a dispatch an exception", () => {
       expect(
@@ -220,38 +220,38 @@ describe("subscriber throttle policy", () => {
   });
 
   describe("given a consumer that cannot absorb added latency", () => {
-    // Deliberately excluded. Read the comment on the reactor before adding a
+    // Deliberately excluded. Read the comment on the subscriber before adding a
     // window here — the reason is specific, not incidental.
     it("leaves spanStorageBroadcast firing immediately, because nothing polls behind it while a trace is open", () => {
-      const reactor = tracePipeline.mapReactors.get(
+      const subscriber = tracePipeline.mapSubscribers.get(
         "spanStorageBroadcast",
       )!.definition;
 
-      expect(reactor.options?.delay ?? 0).toBe(0);
+      expect(subscriber.options?.delay ?? 0).toBe(0);
     });
 
     it("leaves billingMeterDispatch firing immediately, because its handler reads the clock rather than the event", () => {
       // Holding a trigger moves the billing-month and grace-period decision
       // with it, so a delay can turn a late report into a missing one.
-      const reactor = createBillingMeterDispatchSubscriber({
+      const subscriber = createBillingMeterDispatchSubscriber({
         getDispatch: () => async () => {},
       });
 
-      expect(reactor.options?.delay ?? 0).toBe(0);
+      expect(subscriber.options?.delay ?? 0).toBe(0);
     });
 
     it("never suppresses a billing trigger after one has dispatched", () => {
       // Its dedup TTL outlives a dispatch, so if the key ALSO survived
       // dispatch a trigger just after a UTC month rollover could be discarded
       // and that month's first report skipped. Post-dispatch suppression is
-      // opt-in, and this reactor must never opt in while the handler decides
+      // opt-in, and this subscriber must never opt in while the handler decides
       // its billing month from the clock.
-      const reactor = createBillingMeterDispatchSubscriber({
+      const subscriber = createBillingMeterDispatchSubscriber({
         getDispatch: () => async () => {},
       });
 
       expect(
-        reactor.options?.deduplication?.shouldSurviveDispatch ?? false,
+        subscriber.options?.deduplication?.shouldSurviveDispatch ?? false,
       ).toBe(false);
     });
   });

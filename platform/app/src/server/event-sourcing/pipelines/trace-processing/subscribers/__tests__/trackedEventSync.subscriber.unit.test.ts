@@ -67,7 +67,7 @@ function makeOtlpSpan(feedbackEvents: FeedbackEvent[]): OtlpSpan {
  * trace-processing pipeline: named `TRACK_EVENT_SPAN_NAME`, carrying one span
  * event named after the recorded event type, whose attributes always include
  * `event.type`. With `eventType` set to `langwatch.event` this span is byte-for
- * -byte the shape this reactor reacts to, which is the amplification loop.
+ * -byte the shape this subscriber reacts to, which is the amplification loop.
  */
 function makeRecordedTrackEventSpan(eventType: string): OtlpSpan {
   const attributes = [
@@ -149,8 +149,8 @@ function createNonSpanEvent(): TraceProcessingEvent {
 function createContext(
   state: TraceSummaryData,
 ): TriggerContext<TraceSummaryData> {
-  // Deliberately NOT the event's `tenant-1`: the reactor must record against
-  // the context's tenant, and identical fixtures would let a reactor reading
+  // Deliberately NOT the event's `tenant-1`: the subscriber must record against
+  // the context's tenant, and identical fixtures would let a subscriber reading
   // `event.tenantId` pass just as happily.
   return {
     tenantId: "context-tenant-1",
@@ -281,7 +281,7 @@ describe("extractTrackedEventsFromSpan", () => {
   });
 });
 
-describe("trackedEventSync reactor", () => {
+describe("trackedEventSync subscriber", () => {
   let deps: TrackedEventSyncSubscriberDeps;
 
   beforeEach(() => {
@@ -298,9 +298,9 @@ describe("trackedEventSync reactor", () => {
 
   describe("when the event is not a SpanReceivedEvent", () => {
     it("records no tracked event", async () => {
-      const reactor = createTrackedEventSyncHandler(deps);
+      const subscriber = createTrackedEventSyncHandler(deps);
 
-      await reactor(createNonSpanEvent(), createContext(createFoldState()));
+      await subscriber(createNonSpanEvent(), createContext(createFoldState()));
 
       expect(deps.recordTrackedEvent).not.toHaveBeenCalled();
     });
@@ -308,10 +308,10 @@ describe("trackedEventSync reactor", () => {
 
   describe("when the span has no feedback events", () => {
     it("records no tracked event", async () => {
-      const reactor = createTrackedEventSyncHandler(deps);
+      const subscriber = createTrackedEventSyncHandler(deps);
       const span = makeOtlpSpan([]);
 
-      await reactor(
+      await subscriber(
         createSpanReceivedEvent(span),
         createContext(createFoldState()),
       );
@@ -323,10 +323,10 @@ describe("trackedEventSync reactor", () => {
   describe("when the span carries a langwatch.event with no event type", () => {
     /** @scenario "A malformed feedback event is ignored" */
     it("attaches no tracked event to the trace", async () => {
-      const reactor = createTrackedEventSyncHandler(deps);
+      const subscriber = createTrackedEventSyncHandler(deps);
       const span = makeOtlpSpan([{ metrics: { vote: 1 } }]);
 
-      await reactor(
+      await subscriber(
         createSpanReceivedEvent(span),
         createContext(createFoldState()),
       );
@@ -338,7 +338,7 @@ describe("trackedEventSync reactor", () => {
   describe("when the span carries a thumbs-up feedback event", () => {
     /** @scenario "A thumbs-up vote on a span becomes a tracked event" */
     it("records a tracked event with the type, metrics, and details", async () => {
-      const reactor = createTrackedEventSyncHandler(deps);
+      const subscriber = createTrackedEventSyncHandler(deps);
       const span = makeOtlpSpan([
         {
           type: "thumbs_up_down",
@@ -347,7 +347,7 @@ describe("trackedEventSync reactor", () => {
         },
       ]);
 
-      await reactor(
+      await subscriber(
         createSpanReceivedEvent(span),
         createContext(createFoldState()),
       );
@@ -362,14 +362,14 @@ describe("trackedEventSync reactor", () => {
     });
 
     it("derives a deterministic event id from trace, span, and event type", async () => {
-      const reactor = createTrackedEventSyncHandler(deps);
+      const subscriber = createTrackedEventSyncHandler(deps);
       const span = makeOtlpSpan([
         { type: "thumbs_up_down", metrics: { vote: 1 } },
       ]);
       const event = createSpanReceivedEvent(span);
 
-      await reactor(event, createContext(createFoldState()));
-      await reactor(event, createContext(createFoldState()));
+      await subscriber(event, createContext(createFoldState()));
+      await subscriber(event, createContext(createFoldState()));
 
       const id1 = vi.mocked(deps.recordTrackedEvent).mock.calls[0]![0].eventId;
       const id2 = vi.mocked(deps.recordTrackedEvent).mock.calls[1]![0].eventId;
@@ -379,13 +379,13 @@ describe("trackedEventSync reactor", () => {
 
   describe("when a predefined event type fails its schema", () => {
     it("does not record the invalid event", async () => {
-      const reactor = createTrackedEventSyncHandler(deps);
+      const subscriber = createTrackedEventSyncHandler(deps);
       // thumbs_up_down requires a vote in [-1, 1]; 5 is out of range.
       const span = makeOtlpSpan([
         { type: "thumbs_up_down", metrics: { vote: 5 } },
       ]);
 
-      await reactor(
+      await subscriber(
         createSpanReceivedEvent(span),
         createContext(createFoldState()),
       );
@@ -396,13 +396,13 @@ describe("trackedEventSync reactor", () => {
 
   describe("when the span carries multiple feedback events", () => {
     it("records a tracked event for each", async () => {
-      const reactor = createTrackedEventSyncHandler(deps);
+      const subscriber = createTrackedEventSyncHandler(deps);
       const span = makeOtlpSpan([
         { type: "thumbs_up_down", metrics: { vote: 1 } },
         { type: "waited_to_finish", metrics: { finished: 1 } },
       ]);
 
-      await reactor(
+      await subscriber(
         createSpanReceivedEvent(span),
         createContext(createFoldState()),
       );
@@ -413,13 +413,13 @@ describe("trackedEventSync reactor", () => {
 
   describe("when the span carries two feedback events of the same type", () => {
     it("records both under distinct event ids", async () => {
-      const reactor = createTrackedEventSyncHandler(deps);
+      const subscriber = createTrackedEventSyncHandler(deps);
       const span = makeOtlpSpan([
         { type: "thumbs_up_down", metrics: { vote: 1 } },
         { type: "thumbs_up_down", metrics: { vote: -1 } },
       ]);
 
-      await reactor(
+      await subscriber(
         createSpanReceivedEvent(span),
         createContext(createFoldState()),
       );
@@ -432,15 +432,15 @@ describe("trackedEventSync reactor", () => {
     });
 
     it("keeps each event id stable across a replay", async () => {
-      const reactor = createTrackedEventSyncHandler(deps);
+      const subscriber = createTrackedEventSyncHandler(deps);
       const span = makeOtlpSpan([
         { type: "thumbs_up_down", metrics: { vote: 1 } },
         { type: "thumbs_up_down", metrics: { vote: -1 } },
       ]);
       const event = createSpanReceivedEvent(span);
 
-      await reactor(event, createContext(createFoldState()));
-      await reactor(event, createContext(createFoldState()));
+      await subscriber(event, createContext(createFoldState()));
+      await subscriber(event, createContext(createFoldState()));
 
       const calls = vi.mocked(deps.recordTrackedEvent).mock.calls;
       expect(calls[0]![0].eventId).toBe(calls[2]![0].eventId);
@@ -453,14 +453,14 @@ describe("trackedEventSync reactor", () => {
       vi.mocked(deps.recordTrackedEvent)
         .mockRejectedValueOnce(new Error("clickhouse unavailable"))
         .mockResolvedValueOnce(undefined);
-      const reactor = createTrackedEventSyncHandler(deps);
+      const subscriber = createTrackedEventSyncHandler(deps);
       const span = makeOtlpSpan([
         { type: "thumbs_up_down", metrics: { vote: 1 } },
         { type: "waited_to_finish", metrics: { finished: 1 } },
       ]);
 
       await expect(
-        reactor(
+        subscriber(
           createSpanReceivedEvent(span),
           createContext(createFoldState()),
         ),
@@ -475,13 +475,13 @@ describe("trackedEventSync reactor", () => {
       vi.mocked(deps.recordTrackedEvent).mockRejectedValue(
         new Error("clickhouse unavailable"),
       );
-      const reactor = createTrackedEventSyncHandler(deps);
+      const subscriber = createTrackedEventSyncHandler(deps);
       const span = makeOtlpSpan([
         { type: "thumbs_up_down", metrics: { vote: 1 } },
       ]);
 
       await expect(
-        reactor(
+        subscriber(
           createSpanReceivedEvent(span),
           createContext(createFoldState()),
         ),
@@ -491,7 +491,7 @@ describe("trackedEventSync reactor", () => {
 
   describe("when the event is too old", () => {
     it("records no tracked event", async () => {
-      const reactor = createTrackedEventSyncHandler(deps);
+      const subscriber = createTrackedEventSyncHandler(deps);
       const span = makeOtlpSpan([
         { type: "thumbs_up_down", metrics: { vote: 1 } },
       ]);
@@ -499,7 +499,7 @@ describe("trackedEventSync reactor", () => {
         occurredAt: Date.now() - 2 * 60 * 60 * 1000,
       } as Partial<SpanReceivedEvent>);
 
-      await reactor(oldEvent, createContext(createFoldState()));
+      await subscriber(oldEvent, createContext(createFoldState()));
 
       expect(deps.recordTrackedEvent).not.toHaveBeenCalled();
     });
@@ -508,10 +508,10 @@ describe("trackedEventSync reactor", () => {
   describe("given a span this ingestion path emitted itself", () => {
     describe("when the recorded event type is the envelope name", () => {
       it("records no tracked event", async () => {
-        const reactor = createTrackedEventSyncHandler(deps);
+        const subscriber = createTrackedEventSyncHandler(deps);
         const span = makeRecordedTrackEventSpan("langwatch.event");
 
-        await reactor(
+        await subscriber(
           createSpanReceivedEvent(span),
           createContext(createFoldState()),
         );
@@ -528,10 +528,10 @@ describe("trackedEventSync reactor", () => {
 
     describe("when the recorded event type is an ordinary feedback type", () => {
       it("records no tracked event", async () => {
-        const reactor = createTrackedEventSyncHandler(deps);
+        const subscriber = createTrackedEventSyncHandler(deps);
         const span = makeRecordedTrackEventSpan("thumbs_up_down");
 
-        await reactor(
+        await subscriber(
           createSpanReceivedEvent(span),
           createContext(createFoldState()),
         );
@@ -543,12 +543,12 @@ describe("trackedEventSync reactor", () => {
 
   describe("given a span claiming the envelope name as its event type", () => {
     it("records no tracked event", async () => {
-      const reactor = createTrackedEventSyncHandler(deps);
+      const subscriber = createTrackedEventSyncHandler(deps);
       const span = makeOtlpSpan([
         { type: "langwatch.event", metrics: { vote: 1 } },
       ]);
 
-      await reactor(
+      await subscriber(
         createSpanReceivedEvent(span),
         createContext(createFoldState()),
       );
@@ -559,7 +559,7 @@ describe("trackedEventSync reactor", () => {
 
   describe("given an ordinary SDK feedback span", () => {
     it("still records exactly one tracked event", async () => {
-      const reactor = createTrackedEventSyncHandler(deps);
+      const subscriber = createTrackedEventSyncHandler(deps);
       const span = makeOtlpSpan([
         { type: "thumbs_up_down", metrics: { vote: 1 } },
       ]);
@@ -567,7 +567,7 @@ describe("trackedEventSync reactor", () => {
 
       expect(hasSyncableFeedback(event)).toBe(true);
 
-      await reactor(event, createContext(createFoldState()));
+      await subscriber(event, createContext(createFoldState()));
 
       expect(deps.recordTrackedEvent).toHaveBeenCalledTimes(1);
     });

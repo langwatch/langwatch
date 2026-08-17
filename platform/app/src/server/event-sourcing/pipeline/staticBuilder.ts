@@ -23,12 +23,12 @@ import type {
   MapProjectionOptions,
 } from "../projections/mapProjection.types";
 import type { StateProjectionDefinition } from "../projections/stateProjection.types";
-import type {
-  ReactorDefinition,
-  ReactorOptions,
-} from "../reactors/reactor.types";
 import { ConfigurationError } from "../services/errorHandling";
 import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types";
+import type {
+  SubscriberDispatchDefinition,
+  SubscriberDispatchOptions,
+} from "../subscribers/subscriber.types";
 import {
   buildProcessManager,
   type ProcessManagerApplier,
@@ -140,13 +140,19 @@ export class StaticPipelineBuilderWithNameAndType<
     handlerInstance?: any;
     options?: CommandHandlerOptions;
   }> = [];
-  private foldReactors = new Map<
+  private foldSubscribers = new Map<
     string,
-    { projectionName: string; definition: ReactorDefinition<EventType> }
+    {
+      projectionName: string;
+      definition: SubscriberDispatchDefinition<EventType>;
+    }
   >();
-  private mapReactors = new Map<
+  private mapSubscribers = new Map<
     string,
-    { projectionName: string; definition: ReactorDefinition<EventType> }
+    {
+      projectionName: string;
+      definition: SubscriberDispatchDefinition<EventType>;
+    }
   >();
   private processManagers = new Map<string, ProcessManagerDefinition>();
   private eventSubscribers = new Map<
@@ -324,8 +330,8 @@ export class StaticPipelineBuilderWithNameAndType<
   ): this {
     const nameTaken =
       this.eventSubscribers.has(subscriberName) ||
-      this.foldReactors.has(subscriberName) ||
-      this.mapReactors.has(subscriberName);
+      this.foldSubscribers.has(subscriberName) ||
+      this.mapSubscribers.has(subscriberName);
     if (nameTaken) {
       throw new ConfigurationError(
         "StaticPipelineBuilder",
@@ -396,9 +402,9 @@ export class StaticPipelineBuilderWithNameAndType<
       spec,
     );
     if (isFold) {
-      this.foldReactors.set(subscriberName, { projectionName, definition });
+      this.foldSubscribers.set(subscriberName, { projectionName, definition });
     } else {
-      this.mapReactors.set(subscriberName, { projectionName, definition });
+      this.mapSubscribers.set(subscriberName, { projectionName, definition });
     }
   }
 
@@ -595,8 +601,8 @@ export class StaticPipelineBuilderWithNameAndType<
       stateProjections: this.stateProjections,
       mapProjections: this.mapProjections,
       commands: this.commands,
-      foldReactors: this.foldReactors,
-      mapReactors: this.mapReactors,
+      foldSubscribers: this.foldSubscribers,
+      mapSubscribers: this.mapSubscribers,
       eventSubscribers: this.eventSubscribers,
       processManagers: this.processManagers,
       featureFlagService: this.featureFlagService,
@@ -636,15 +642,15 @@ export function definePipeline<
 
 type SubscriberJobPayload = { event: Event; foldState: unknown };
 
-function toTriggerContext(reactorContext: {
+function toTriggerContext(subscriberDispatchContext: {
   tenantId: string;
   aggregateId: string;
   foldState: unknown;
 }): TriggerContext<unknown> {
   return {
-    tenantId: reactorContext.tenantId,
-    aggregateId: reactorContext.aggregateId,
-    state: reactorContext.foldState,
+    tenantId: subscriberDispatchContext.tenantId,
+    aggregateId: subscriberDispatchContext.aggregateId,
+    state: subscriberDispatchContext.foldState,
   };
 }
 
@@ -657,7 +663,7 @@ function toTriggerContext(reactorContext: {
 function buildProjectionSubscriberDedup<E extends Event>(
   subscriberName: string,
   spec: SubscriberSpec<E>,
-): (ReactorOptions["deduplication"] & object) | undefined {
+): (SubscriberDispatchOptions["deduplication"] & object) | undefined {
   const wantsDedup =
     spec.dedup !== undefined ||
     spec.dedupId !== undefined ||
@@ -691,7 +697,7 @@ function buildProjectionSubscriberDedup<E extends Event>(
 function buildProjectionSubscriberDefinition<E extends Event>(
   subscriberName: string,
   spec: SubscriberSpec<E>,
-): ReactorDefinition<E> {
+): SubscriberDispatchDefinition<E> {
   const eventFilter =
     spec.events !== undefined ? new Set<string>(spec.events) : null;
   const passes = (event: E, context: TriggerContext<unknown>): boolean => {
@@ -723,7 +729,8 @@ function buildProjectionSubscriberDefinition<E extends Event>(
     // Pre-enqueue rejection: a filtered event never pays serialization.
     // The committed projection state is in hand at guard time, so
     // state-dependent `when` guards reject before enqueue too.
-    shouldReact: (event, context) => passes(event, toTriggerContext(context)),
+    shouldDispatch: (event, context) =>
+      passes(event, toTriggerContext(context)),
     handle: async (event, context) => {
       const triggerContext = toTriggerContext(context);
       if (!passes(event, triggerContext)) return;

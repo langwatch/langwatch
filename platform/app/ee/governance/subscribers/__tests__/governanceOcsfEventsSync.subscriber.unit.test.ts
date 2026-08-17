@@ -1,11 +1,11 @@
 /**
- * GovernanceOcsfEventsSyncReactor — unit tests with a mocked CH repository.
+ * GovernanceOcsfEventsSyncSubscriber — unit tests with a mocked CH repository.
  *
- * Sergey commit ee5159879 (step 3d-ii) shipped the reactor that folds
+ * Sergey commit ee5159879 (step 3d-ii) shipped the subscriber that folds
  * governance-origin trace fold-completions into per-event OCSF v1.1
  * rows in the governance_ocsf_events ClickHouse table.
  *
- * This test exercises the reactor's decision logic with a stubbed
+ * This test exercises the subscriber's decision logic with a stubbed
  * GovernanceOcsfEventsClickHouseRepository — no testcontainers needed.
  *
  * Coverage:
@@ -21,7 +21,7 @@
  *   - ActionName falls back to "trace.recorded" when tool.name missing
  *   - TargetName falls back from gen_ai.request.model → models[0] → ""
  *   - EventId equals state.traceId (one OCSF row per trace)
- *   - Repository errors captured + suppressed (reactor failures must
+ *   - Repository errors captured + suppressed (subscriber failures must
  *     NOT block the trace pipeline)
  *   - Job-id dedup contract: per-(tenant, trace) with positive TTL
  *
@@ -145,8 +145,8 @@ describe("governanceOcsfEventsSync subscriber", () => {
   describe("when the trace has no governance origin attributes", () => {
     it("skips silently — application traces never reach OCSF export", async () => {
       const { deps, insertEvent } = mockDeps();
-      const reactor = createGovernanceOcsfEventsSyncHandler(deps);
-      await reactor(event, ctx(createFoldState({})));
+      const subscriber = createGovernanceOcsfEventsSyncHandler(deps);
+      await subscriber(event, ctx(createFoldState({})));
       expect(insertEvent).not.toHaveBeenCalled();
     });
   });
@@ -154,8 +154,8 @@ describe("governanceOcsfEventsSync subscriber", () => {
   describe("when langwatch.origin.kind is not 'ingestion_source'", () => {
     it("skips — origin.kind is reserved for governance ingest only", async () => {
       const { deps, insertEvent } = mockDeps();
-      const reactor = createGovernanceOcsfEventsSyncHandler(deps);
-      await reactor(
+      const subscriber = createGovernanceOcsfEventsSyncHandler(deps);
+      await subscriber(
         event,
         ctx(createFoldState({ "langwatch.origin.kind": "personal_workspace" })),
       );
@@ -166,8 +166,8 @@ describe("governanceOcsfEventsSync subscriber", () => {
   describe("when origin.kind is set but ingestion_source.id is missing", () => {
     it("warns + skips — defensive against malformed governance traffic", async () => {
       const { deps, insertEvent } = mockDeps();
-      const reactor = createGovernanceOcsfEventsSyncHandler(deps);
-      await reactor(
+      const subscriber = createGovernanceOcsfEventsSyncHandler(deps);
+      await subscriber(
         event,
         ctx(createFoldState({ "langwatch.origin.kind": "ingestion_source" })),
       );
@@ -178,8 +178,8 @@ describe("governanceOcsfEventsSync subscriber", () => {
   describe("when occurredAt is the initial sentinel (0)", () => {
     it("skips — fold has not yet observed any spans", async () => {
       const { deps, insertEvent } = mockDeps();
-      const reactor = createGovernanceOcsfEventsSyncHandler(deps);
-      await reactor(
+      const subscriber = createGovernanceOcsfEventsSyncHandler(deps);
+      await subscriber(
         event,
         ctx(
           createFoldState(
@@ -198,7 +198,7 @@ describe("governanceOcsfEventsSync subscriber", () => {
   describe("when origin attributes + actor + target are fully present", () => {
     it("inserts a full OCSF row with all fields populated", async () => {
       const { deps, insertEvent } = mockDeps();
-      const reactor = createGovernanceOcsfEventsSyncHandler(deps);
+      const subscriber = createGovernanceOcsfEventsSyncHandler(deps);
       const state = createFoldState({
         "langwatch.origin.kind": "ingestion_source",
         "langwatch.ingestion_source.id": "is-1",
@@ -210,7 +210,7 @@ describe("governanceOcsfEventsSync subscriber", () => {
         "gen_ai.request.model": "claude-sonnet-4",
       });
 
-      await reactor(event, ctx(state));
+      await subscriber(event, ctx(state));
 
       expect(insertEvent).toHaveBeenCalledTimes(1);
       const [row] = insertEvent.mock.calls[0]!;
@@ -232,14 +232,14 @@ describe("governanceOcsfEventsSync subscriber", () => {
 
     it("emits valid OCSF JSON in rawOcsfJson", async () => {
       const { deps, insertEvent } = mockDeps();
-      const reactor = createGovernanceOcsfEventsSyncHandler(deps);
+      const subscriber = createGovernanceOcsfEventsSyncHandler(deps);
       const state = createFoldState({
         "langwatch.origin.kind": "ingestion_source",
         "langwatch.ingestion_source.id": "is-1",
         "langwatch.ingestion_source.source_type": "otel_generic",
         "langwatch.user_id": "user-42",
       });
-      await reactor(event, ctx(state));
+      await subscriber(event, ctx(state));
       const [row] = insertEvent.mock.calls[0]!;
       const parsed = JSON.parse(row.rawOcsfJson);
       expect(parsed.class_uid).toBe(6003);
@@ -255,14 +255,14 @@ describe("governanceOcsfEventsSync subscriber", () => {
   describe("severity elevation per spec scenario", () => {
     it("elevates severity to MEDIUM when langwatch.governance.anomaly_alert_id is set", async () => {
       const { deps, insertEvent } = mockDeps();
-      const reactor = createGovernanceOcsfEventsSyncHandler(deps);
+      const subscriber = createGovernanceOcsfEventsSyncHandler(deps);
       const state = createFoldState({
         "langwatch.origin.kind": "ingestion_source",
         "langwatch.ingestion_source.id": "is-1",
         "langwatch.ingestion_source.source_type": "claude_cowork",
         "langwatch.governance.anomaly_alert_id": "alert-anomaly-123",
       });
-      await reactor(event, ctx(state));
+      await subscriber(event, ctx(state));
       const [row] = insertEvent.mock.calls[0]!;
       expect(row.severityId).toBe(OCSF_SEVERITY.MEDIUM);
       expect(row.anomalyAlertId).toBe("alert-anomaly-123");
@@ -272,13 +272,13 @@ describe("governanceOcsfEventsSync subscriber", () => {
   describe("when tool.name is missing", () => {
     it("falls back ActionName to 'trace.recorded'", async () => {
       const { deps, insertEvent } = mockDeps();
-      const reactor = createGovernanceOcsfEventsSyncHandler(deps);
+      const subscriber = createGovernanceOcsfEventsSyncHandler(deps);
       const state = createFoldState({
         "langwatch.origin.kind": "ingestion_source",
         "langwatch.ingestion_source.id": "is-1",
         "langwatch.ingestion_source.source_type": "otel_generic",
       });
-      await reactor(event, ctx(state));
+      await subscriber(event, ctx(state));
       const [row] = insertEvent.mock.calls[0]!;
       expect(row.actionName).toBe("trace.recorded");
     });
@@ -287,20 +287,20 @@ describe("governanceOcsfEventsSync subscriber", () => {
   describe("TargetName fallback chain", () => {
     it("prefers gen_ai.request.model when present", async () => {
       const { deps, insertEvent } = mockDeps();
-      const reactor = createGovernanceOcsfEventsSyncHandler(deps);
+      const subscriber = createGovernanceOcsfEventsSyncHandler(deps);
       const state = createFoldState({
         "langwatch.origin.kind": "ingestion_source",
         "langwatch.ingestion_source.id": "is-1",
         "gen_ai.request.model": "claude-haiku-4-5",
       });
-      await reactor(event, ctx(state));
+      await subscriber(event, ctx(state));
       const [row] = insertEvent.mock.calls[0]!;
       expect(row.targetName).toBe("claude-haiku-4-5");
     });
 
     it("falls back to state.models[0] when gen_ai.request.model missing", async () => {
       const { deps, insertEvent } = mockDeps();
-      const reactor = createGovernanceOcsfEventsSyncHandler(deps);
+      const subscriber = createGovernanceOcsfEventsSyncHandler(deps);
       const state = createFoldState(
         {
           "langwatch.origin.kind": "ingestion_source",
@@ -308,14 +308,14 @@ describe("governanceOcsfEventsSync subscriber", () => {
         },
         { models: ["fallback-model"] },
       );
-      await reactor(event, ctx(state));
+      await subscriber(event, ctx(state));
       const [row] = insertEvent.mock.calls[0]!;
       expect(row.targetName).toBe("fallback-model");
     });
 
     it("falls back to '' when no model info available", async () => {
       const { deps, insertEvent } = mockDeps();
-      const reactor = createGovernanceOcsfEventsSyncHandler(deps);
+      const subscriber = createGovernanceOcsfEventsSyncHandler(deps);
       const state = createFoldState(
         {
           "langwatch.origin.kind": "ingestion_source",
@@ -323,14 +323,14 @@ describe("governanceOcsfEventsSync subscriber", () => {
         },
         { models: [] },
       );
-      await reactor(event, ctx(state));
+      await subscriber(event, ctx(state));
       const [row] = insertEvent.mock.calls[0]!;
       expect(row.targetName).toBe("");
     });
   });
 
   describe("when the repository throws", () => {
-    it("captures the exception without rethrowing — reactor failures must not block the trace pipeline", async () => {
+    it("captures the exception without rethrowing — subscriber failures must not block the trace pipeline", async () => {
       const insertEvent = vi
         .fn()
         .mockRejectedValue(new Error("CH connection failed"));
@@ -339,12 +339,12 @@ describe("governanceOcsfEventsSync subscriber", () => {
           insertEvent,
         } as unknown as GovernanceOcsfEventsClickHouseRepository,
       };
-      const reactor = createGovernanceOcsfEventsSyncHandler(deps);
+      const subscriber = createGovernanceOcsfEventsSyncHandler(deps);
       const state = createFoldState({
         "langwatch.origin.kind": "ingestion_source",
         "langwatch.ingestion_source.id": "is-1",
       });
-      await expect(reactor(event, ctx(state))).resolves.toBeUndefined();
+      await expect(subscriber(event, ctx(state))).resolves.toBeUndefined();
       expect(insertEvent).toHaveBeenCalledTimes(1);
     });
   });

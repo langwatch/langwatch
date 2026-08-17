@@ -131,7 +131,7 @@ describe("customerIoEvaluationSync subscriber", () => {
   });
 
   describe("dedupId", () => {
-    /** @scenario 'Evaluation sync reactor uses project-and-evaluation-scoped job ID for debouncing' */
+    /** @scenario 'Evaluation sync subscriber uses project-and-evaluation-scoped job ID for debouncing' */
     it("returns cio-eval-sync-{projectId}-{evaluationId}", () => {
       const deps = createDeps();
       const subscriber = createCustomerIoEvaluationSyncSubscriber(deps);

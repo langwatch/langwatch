@@ -2,7 +2,7 @@ import { z } from "zod";
 
 /**
  * Command data for executing a single evaluation.
- * Sent by the evaluationTrigger reactor — one per monitor.
+ * Sent by the evaluationTrigger subscriber — one per monitor.
  * Does preconditions, sampling, execution, ES write, and emits events.
  */
 export const executeEvaluationCommandDataSchema = z.object({
@@ -16,7 +16,7 @@ export const executeEvaluationCommandDataSchema = z.object({
   occurredAt: z.number(),
   // Thread debouncing: when > 0, traces in the same thread share one dedup key
   threadIdleTimeout: z.number().optional(),
-  // Trace metadata passed from evaluationTrigger reactor
+  // Trace metadata passed from evaluationTrigger subscriber
   threadId: z.string().optional(),
   userId: z.string().optional(),
   customerId: z.string().optional(),
