@@ -226,6 +226,14 @@ export class ProjectionRegistry<EventType extends Event = Event> {
     await this.router.dispatch(events, context);
   }
 
+  /**
+   * Release the router, after which any further dispatch drops its events.
+   *
+   * That makes the ORDER this is called in load-bearing: it must come after the
+   * queue that feeds it has stopped, or jobs still draining will dispatch into
+   * a closed registry. See `EventSourcing.close()` and
+   * `specs/event-sourcing/worker-graceful-shutdown.feature`.
+   */
   async close(): Promise<void> {
     await this.queueManager?.close();
     this.queueManager = undefined;

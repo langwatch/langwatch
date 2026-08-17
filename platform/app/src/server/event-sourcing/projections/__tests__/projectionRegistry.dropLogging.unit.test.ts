@@ -61,6 +61,7 @@ describe("dispatching to a projection registry with no router", () => {
     });
 
     /** @scenario "Work discarded without a throw is logged at error" */
+    /** @scenario "A dispatch arriving after the router is gone is still reported" */
     it("states how many events were discarded", async () => {
       const registry = registryWithAProjection();
       const errorSpy = spyOnLogger(registry, "error");
