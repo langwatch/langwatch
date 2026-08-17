@@ -75,9 +75,51 @@ async function seedMessage(params: {
   return row.id;
 }
 
+/** A second process name, so the fleet-wide dead read has more than one. */
+const nsB = `${ns}.b`;
+
+/**
+ * A dead message under an arbitrary process name, retired at a chosen instant.
+ * `updatedAt` is the retirement moment the dead-letter list orders by.
+ */
+async function seedDeadMessage(params: {
+  processName: string;
+  processKey: string;
+  messageKey: string;
+  retiredAt: Date;
+}) {
+  const row = await prisma.processManagerOutbox.create({
+    data: {
+      processName: params.processName,
+      projectId: PROJECT,
+      processKey: params.processKey,
+      tenantId: PROJECT,
+      messageKey: params.messageKey,
+      intentType: "opstest.intent",
+      payload: { messageKey: params.messageKey },
+      traceCarrier: {
+        traceparent: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+      },
+      status: "dead",
+      attempts: 8,
+      nextAttemptAt: new Date(NOW),
+      createdAt: new Date(NOW - 60_000),
+      updatedAt: params.retiredAt,
+    },
+  });
+  return row.id;
+}
+
+/** This run's rows only. The dead read is fleet-wide by design, so every
+ *  assertion narrows to the namespaces this file seeded rather than to
+ *  totals another run could move. */
+function ours<T extends { processName: string }>(rows: T[]): T[] {
+  return rows.filter((row) => row.processName.startsWith(ns));
+}
+
 afterAll(async () => {
   await prisma.processManagerOutbox.deleteMany({
-    where: { processName: ns, projectId: PROJECT },
+    where: { processName: { in: [ns, nsB] }, projectId: PROJECT },
   });
   await prisma.processManagerInstance.deleteMany({
     where: { processName: ns, projectId: PROJECT },
@@ -299,6 +341,143 @@ describe("process ops against a real Postgres", () => {
         where: { id: liveId, projectId: PROJECT },
       });
       expect(live.leaseToken).not.toBeNull();
+    });
+  });
+
+  describe("given dead messages spread across process names", () => {
+    /**
+     * Seeded once for the whole block: three dead messages under `ns` and one
+     * under `nsB`, retired at distinct instants so ordering is observable.
+     */
+    const seeded = { oldest: "", middle: "", newest: "", other: "" };
+
+    async function seedAll() {
+      if (seeded.newest) return;
+      seeded.oldest = await seedDeadMessage({
+        processName: ns,
+        processKey: "dl-1",
+        messageKey: "dead-oldest",
+        retiredAt: new Date(NOW - 3 * 60_000),
+      });
+      seeded.middle = await seedDeadMessage({
+        processName: ns,
+        processKey: "dl-2",
+        messageKey: "dead-middle",
+        retiredAt: new Date(NOW - 2 * 60_000),
+      });
+      seeded.newest = await seedDeadMessage({
+        processName: ns,
+        processKey: "dl-3",
+        messageKey: "dead-newest",
+        retiredAt: new Date(NOW - 60_000),
+      });
+      seeded.other = await seedDeadMessage({
+        processName: nsB,
+        processKey: "dl-other",
+        messageKey: "dead-other",
+        retiredAt: new Date(NOW - 90_000),
+      });
+    }
+
+    /** @scenario Dead messages are listed across the whole fleet */
+    it("returns every process name's dead messages, with the ref to act on", async () => {
+      await seedAll();
+
+      const { messages } = await service.getDeadLetters({
+        page: 1,
+        pageSize: 100,
+      });
+      const mine = ours(messages);
+
+      expect(mine.map((m) => m.messageKey).sort()).toEqual([
+        "dead-middle",
+        "dead-newest",
+        "dead-oldest",
+        "dead-other",
+      ]);
+      // The whole point of the fleet read: a row can be redriven without the
+      // operator first knowing which instance held it.
+      const other = mine.find((m) => m.messageKey === "dead-other")!;
+      expect(other.processName).toBe(nsB);
+      expect(other.projectId).toBe(PROJECT);
+      expect(other.processKey).toBe("dl-other");
+      expect(other.traceId).toBe("4bf92f3577b34da6a3ce929d0e0e4736");
+    });
+
+    /** @scenario The newest failure is at the top */
+    it("orders by retirement, newest first", async () => {
+      await seedAll();
+
+      const { messages } = await service.getDeadLetters({
+        page: 1,
+        pageSize: 100,
+      });
+
+      expect(ours(messages).map((m) => m.messageKey)).toEqual([
+        "dead-newest",
+        "dead-other",
+        "dead-middle",
+        "dead-oldest",
+      ]);
+    });
+
+    /** @scenario Dead letters can be narrowed to one process */
+    it("returns only the named process when one is given", async () => {
+      await seedAll();
+
+      const { messages, total } = await service.getDeadLetters({
+        processName: nsB,
+        page: 1,
+        pageSize: 100,
+      });
+
+      expect(total).toBe(1);
+      expect(messages).toHaveLength(1);
+      expect(messages[0]?.messageKey).toBe("dead-other");
+    });
+
+    /** @scenario The fleet's dead totals are summarized per process */
+    it("counts each process name and its oldest retirement", async () => {
+      await seedAll();
+
+      const counts = ours(await service.getDeadLetterCounts());
+      const mine = counts.find((c) => c.processName === ns);
+      const other = counts.find((c) => c.processName === nsB);
+
+      expect(mine?.count).toBe(3);
+      expect(other?.count).toBe(1);
+      expect(mine?.oldestUpdatedAt).toBe(NOW - 3 * 60_000);
+      // Heaviest first, so the process to look at is the one at the top.
+      expect(counts.indexOf(mine!)).toBeLessThan(counts.indexOf(other!));
+    });
+
+    /** @scenario A dead message can be redriven from the list */
+    it("redrives a message found without opening its instance", async () => {
+      await seedAll();
+
+      const { messages } = await service.getDeadLetters({
+        processName: nsB,
+        page: 1,
+        pageSize: 10,
+      });
+      const target = messages[0]!;
+
+      const result = await service.redriveDeadMessage({
+        ref: {
+          processName: target.processName,
+          projectId: target.projectId,
+          processKey: target.processKey,
+        },
+        messageId: target.id,
+        actorUserId: ACTOR,
+      });
+
+      expect(result.redriven).toBe(true);
+      const row = await prisma.processManagerOutbox.findFirstOrThrow({
+        where: { id: target.id, projectId: PROJECT },
+      });
+      expect(row.status).toBe("pending");
+      expect(row.attempts).toBe(0);
     });
   });
 });

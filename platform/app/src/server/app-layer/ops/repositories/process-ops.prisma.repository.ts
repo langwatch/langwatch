@@ -1,6 +1,8 @@
 import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import type { ProcessRef } from "~/server/event-sourcing/process-manager/processManager.types";
 import type {
+  DeadLetterCount,
+  DeadOutboxMessageView,
   ProcessInstanceRow,
   ProcessNameCounts,
   ProcessOpsRepository,
@@ -281,6 +283,70 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
         payload: r.payload,
       })),
     };
+  }
+
+  /**
+   * Every retired message across the fleet, newest retirement first.
+   *
+   * Ordered by `updatedAt` rather than `createdAt`: a dead row's interesting
+   * moment is when it was RETIRED, and a message that spent 68 hours climbing
+   * the Stripe ladder before dying is days newer than its creation suggests.
+   * An operator opening this mid-incident wants what just broke at the top.
+   */
+  async findDeadMessages(params: {
+    processName?: string;
+    page: number;
+    pageSize: number;
+  }): Promise<{ messages: DeadOutboxMessageView[]; total: number }> {
+    const where = {
+      status: "dead" as const,
+      ...(params.processName ? { processName: params.processName } : {}),
+    };
+    const [rows, total] = await Promise.all([
+      this.prisma.processManagerOutbox.findMany({
+        where,
+        orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+        skip: (params.page - 1) * params.pageSize,
+        take: params.pageSize,
+      }),
+      this.prisma.processManagerOutbox.count({ where }),
+    ]);
+    return {
+      total,
+      messages: rows.map((r) => ({
+        id: r.id,
+        processName: r.processName,
+        projectId: r.projectId,
+        processKey: r.processKey,
+        messageKey: r.messageKey,
+        intentType: r.intentType,
+        status: r.status,
+        attempts: r.attempts,
+        nextAttemptAt: r.nextAttemptAt.getTime(),
+        leasedUntil: r.leasedUntil?.getTime() ?? null,
+        createdAt: r.createdAt.getTime(),
+        updatedAt: r.updatedAt.getTime(),
+        sourceEventId: r.sourceEventId,
+        traceId: traceIdFromCarrier(r.traceCarrier),
+        payload: r.payload,
+      })),
+    };
+  }
+
+  async countDeadByProcessName(): Promise<DeadLetterCount[]> {
+    const groups = await this.prisma.processManagerOutbox.groupBy({
+      by: ["processName"],
+      where: { status: "dead" },
+      _count: { _all: true },
+      _min: { updatedAt: true },
+    });
+    return groups
+      .map((g) => ({
+        processName: g.processName,
+        count: g._count._all,
+        oldestUpdatedAt: g._min.updatedAt?.getTime() ?? 0,
+      }))
+      .sort((a, b) => b.count - a.count);
   }
 
   async wakeInstanceNow(params: {

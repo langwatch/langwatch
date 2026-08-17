@@ -7,6 +7,8 @@ import type {
   ProcessAuditSink,
 } from "./process-audit.repository";
 import type {
+  DeadLetterCount,
+  DeadOutboxMessageView,
   ProcessInstanceRow,
   ProcessOpsRepository,
   ProcessOutboxMessageView,
@@ -204,6 +206,36 @@ export class ManagerExplorerService {
     pageSize: number;
   }): Promise<{ messages: ProcessOutboxMessageView[]; total: number }> {
     return this.fleet.findOutboxMessages(params);
+  }
+
+  /**
+   * Retired messages across the whole fleet.
+   *
+   * `getOutbox` needs a full process ref, so before this the only way to a
+   * dead message was to already know which instance held it — and the fleet
+   * table only ever reported a count. Work that has permanently stopped is
+   * the most urgent thing this substrate can tell an operator, so it gets a
+   * read that does not require knowing where to look.
+   */
+  async getDeadLetters(params: {
+    processName?: string;
+    page: number;
+    pageSize: number;
+  }): Promise<{
+    messages: DeadOutboxMessageView[];
+    total: number;
+    byProcess: DeadLetterCount[];
+  }> {
+    const [page, byProcess] = await Promise.all([
+      this.fleet.findDeadMessages(params),
+      this.fleet.countDeadByProcessName(),
+    ]);
+    return { ...page, byProcess };
+  }
+
+  /** The fleet's dead totals alone, for the badge and the dashboard card. */
+  async getDeadLetterCounts(): Promise<DeadLetterCount[]> {
+    return this.fleet.countDeadByProcessName();
   }
 
   /**
