@@ -11,8 +11,15 @@ Feature: microsoft_365_audit ingestion source (Office 365 Management Activity AP
   defaults to `awaiting_first_event` and only leaves that state once an event
   arrives, so these sources have sat in `awaiting_first_event` indefinitely.
   The defect is that this state is indistinguishable from a source created
-  five minutes ago — there is no escalation for one that has been waiting for
-  months, and the surrounding copy and docs told operators it was working.
+  five minutes ago: there is no escalation for one that has been waiting for
+  months.
+
+  The published docs were not the problem — they said plainly that no poller
+  had shipped and that events did not flow. They were stale in the opposite
+  direction, still describing an unshipped poller after a broken one landed,
+  and they named the correct API throughout. What lied was the admin UI copy
+  at ingestion-sources.tsx:112, which claimed the source polls an API that no
+  code ever called.
 
   Endpoint (verified against Microsoft docs at filing):
     POST /api/v1.0/{tenantId}/activity/feed/subscriptions/start?contentType=Audit.General
@@ -412,13 +419,15 @@ Feature: microsoft_365_audit ingestion source (Office 365 Management Activity AP
     And it resolves `microsoft_365_audit` instead
 
   @unit
-  Scenario: Published documentation stops advertising the retired source
-    Given `docs/ai-governance/ingestion-sources/copilot-studio.mdx` is listed in
-      the docs nav at docs.json:733 and has a redirect at docs.json:1741
+  Scenario: Documentation stops describing a poller that has not shipped
+    Given the docs page said no poller existed and events did not flow, which
+      went stale when a broken poller landed
     When the source is retired
-    Then the MDX describes `microsoft_365_audit` and the API it actually calls
-    And the nav entry and the redirect target both still point at a page that exists
-    And the MDX no longer states that events do not flow yet
+    Then the page describes `microsoft_365_audit` and the API it actually calls
+    And it states that the feed does not backfill
+    And it tells an operator with an existing `copilot_studio` source to re-create it
+    And every nav entry and redirect resolves to a page that exists, so the
+      previously published URL does not 404
 
   @unit
   Scenario: The two known-false copy strings are gone

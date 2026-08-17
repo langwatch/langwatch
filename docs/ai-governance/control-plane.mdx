@@ -193,9 +193,12 @@ tagged by `SourceType` so dashboards can union or filter at will.
 Per-platform mode (matching the seven `IngestionSource.sourceType`
 values shipped on this branch):
 
-- **`copilot_studio`**, Microsoft Purview pull every 1-5 min via
-  the Office 365 Management Activity API. `parserConfig`:
-  `{ tenantId, clientId, clientSecretHash, pollEverySec }`.
+- **`microsoft_365_audit`**, pull every 15 min from the Office 365
+  Management Activity API. `parserConfig`:
+  `{ credentials: { tenantId, clientId, clientSecret } }`, the secret
+  encrypted at rest rather than hashed — the puller has to present the
+  real value to Microsoft. Replaces `copilot_studio`, which polled an
+  Entra directory-change feed that returned no Copilot interactions.
 - **`claude_compliance`**, pull from the Claude Compliance API.
   `parserConfig`: `{ workspaceApiKeyHash, pollEverySec }`.
 - **`claude_cowork`**, OTel push (Tier 4), admin pastes the

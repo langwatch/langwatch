@@ -95,7 +95,7 @@ OCSF events are derived from `recorded_spans` + `log_records` via the `governanc
 | `claude_cowork` | `user.email` attribute | `agent.action.name` (e.g. `tool_call`) | `agent.tool.name` |
 | `workato` | Webhook envelope `actor` field | Webhook envelope `event_type` | Webhook envelope `target` field |
 | `s3_custom` | Per-customer DSL mapping | Per-customer DSL mapping | Per-customer DSL mapping |
-| `copilot_studio` | Microsoft Copilot Studio audit `actor.email` | Microsoft Copilot Studio audit `event_type` | Microsoft Copilot Studio audit `target` |
+| `microsoft_365_audit` | Management Activity API `UserId` (a UPN; `UserKey` is a PUID and is carried separately) | Management Activity API `Operation` | Management Activity API `AgentId` |
 | `openai_compliance` | OpenAI Compliance API `user.email` | OpenAI Compliance API `event_type` | OpenAI Compliance API `model` |
 | `claude_compliance` | Anthropic Compliance API `user.email` | Anthropic Compliance API `event_type` | Anthropic Compliance API `model` |
 
