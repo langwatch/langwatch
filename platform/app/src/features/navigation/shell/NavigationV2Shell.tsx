@@ -3,7 +3,6 @@ import type { ReactNode } from "react";
 import type { DashboardLayoutProps } from "~/components/DashboardLayout";
 import { DashboardPageBody } from "~/components/DashboardPageBody";
 import { LoadingScreen } from "~/components/LoadingScreen";
-import { MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "~/components/MainMenu";
 import { NotFoundScene } from "~/components/NotFoundScene";
 import {
   APP_HEADER_HEIGHT,
@@ -127,8 +126,8 @@ function ShellContentRow({
   isIconRail: boolean;
   children: ReactNode;
 }) {
-  const { activeProductId, isCompactSidebar, langyDockInset } = state;
-  const menuWidth = isCompactSidebar ? MENU_WIDTH_COMPACT : MENU_WIDTH_EXPANDED;
+  const { activeProductId, isCompactSidebar, langyDockInset, menuWidth } =
+    state;
   // The rail is a sibling of this column, so its width is already gone from
   // the space the content can use. The cap subtracts both it and the sidebar.
   const contentInsetWidth = isIconRail
@@ -148,6 +147,7 @@ function ShellContentRow({
       />
 
       <Box
+        data-testid="shell-content-column"
         width="full"
         height="full"
         background="bg.page"

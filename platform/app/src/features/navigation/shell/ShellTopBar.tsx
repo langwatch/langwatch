@@ -12,6 +12,8 @@ import { ProductScopeControl } from "./ProductScopeControl";
 import { ProductSwitcherMenu } from "./ProductSwitcherMenu";
 import type { NavigationV2ShellReadyState } from "./useNavigationV2ShellState";
 
+const LOGO_HEIGHT = 26;
+
 interface ShellTopBarProps {
   state: NavigationV2ShellReadyState;
   /** The icon rail carries the logo and the product tiles instead. */
@@ -29,13 +31,19 @@ export function ShellTopBar({
   shouldShowProductCluster,
 }: ShellTopBarProps) {
   const { user, project, activeProductId, isDevelopment } = state;
+  // The product cluster spans the sidebar column, so the organization and
+  // the scope start at the left edge of the content column and stay there
+  // whatever the product label is. A compact sidebar is narrower than the
+  // product pill, so there the cluster keeps its own width.
+  const clusterWidth = state.isCompactSidebar ? undefined : state.menuWidth;
 
   return (
     <HStack
       position="relative"
       width="full"
       height={`${APP_HEADER_HEIGHT}px`}
-      paddingX={4}
+      paddingLeft={shouldShowProductCluster ? 0 : 4}
+      paddingRight={4}
       paddingY={3}
       background="bg.page"
       justifyContent="space-between"
@@ -55,12 +63,22 @@ export function ShellTopBar({
         ></Box>
       )}
 
-      <HStack gap={3} flex={1} alignItems="center" minWidth={0}>
+      <HStack gap={0} flex={1} alignItems="center" minWidth={0}>
         {shouldShowProductCluster && (
-          <ProductCluster activeProductId={activeProductId} />
+          <ProductCluster
+            activeProductId={activeProductId}
+            width={clusterWidth}
+          />
         )}
-        <OrganizationSelect activeProductId={activeProductId} />
-        <ProductScopeControl activeProductId={activeProductId} />
+        <HStack
+          gap={3}
+          alignItems="center"
+          minWidth={0}
+          paddingLeft={shouldShowProductCluster ? 3 : 0}
+        >
+          <OrganizationSelect activeProductId={activeProductId} />
+          <ProductScopeControl activeProductId={activeProductId} />
+        </HStack>
       </HStack>
 
       <HStack gap={2} justifyContent="flex-end" overflow="hidden">
@@ -75,13 +93,24 @@ export function ShellTopBar({
 
 function ProductCluster({
   activeProductId,
+  width,
 }: {
   activeProductId: ProductId | null;
+  width: string | undefined;
 }) {
   return (
-    <>
-      <Link href="/" display="flex" alignItems="center">
-        <LogoIcon width={25 * 0.7} height={32 * 0.7} />
+    <HStack
+      data-testid="shell-product-cluster"
+      width={width}
+      minWidth={width}
+      flexShrink={0}
+      gap={2.5}
+      paddingLeft={4}
+      alignItems="center"
+      overflow="hidden"
+    >
+      <Link href="/" display="flex" alignItems="center" flexShrink={0}>
+        <LogoIcon width={LOGO_HEIGHT * (38 / 52)} height={LOGO_HEIGHT} />
       </Link>
       {activeProductId ? (
         <ProductSwitcherMenu activeProductId={activeProductId} />
@@ -95,7 +124,7 @@ function ProductCluster({
           </Text>
         </HStack>
       )}
-    </>
+    </HStack>
   );
 }
 

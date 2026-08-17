@@ -265,6 +265,7 @@ vi.mock("~/components/sidebar/PresenceMenuItem", () => ({
 
 import { useNavigationModeStore } from "~/features/navigation/navigationModeStore";
 import { DashboardLayout } from "../../../components/DashboardLayout";
+import { ICON_RAIL_WIDTH } from "../shell/IconRail";
 
 function renderShell(props: Record<string, unknown> = {}) {
   return render(
@@ -298,6 +299,31 @@ const railTile = (name: string) =>
   );
 
 describe("the icon-rail shell", () => {
+  describe("when the rail renders", () => {
+    /** @scenario The rail is its own surface next to the sidebar */
+    it("closes the rail with an edge against the sidebar", () => {
+      renderShell();
+
+      expect(screen.getByRole("navigation", { name: "Products" })).toHaveStyle({
+        width: ICON_RAIL_WIDTH,
+        borderRightWidth: "1px",
+        borderRightColor: "var(--chakra-colors-border)",
+      });
+    });
+
+    /** @scenario Only the active tile carries a surface */
+    it("raises the active tile and leaves the other tiles flat", () => {
+      renderShell();
+
+      expect(railTile("LLM Ops")).toHaveStyle({
+        backgroundColor: "var(--chakra-colors-bg-panel)",
+      });
+      expect(railTile("Gateway")).not.toHaveStyle({
+        backgroundColor: "var(--chakra-colors-bg-panel)",
+      });
+    });
+  });
+
   describe("when every product is reachable", () => {
     /** @scenario The rail lists the reachable products as tiles */
     it("shows one tile per product and marks the active one", () => {

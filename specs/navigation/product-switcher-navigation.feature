@@ -37,6 +37,20 @@ Feature: Product switcher navigation
     Then I am sent to the Gateway home
 
   @integration
+  Scenario: The product selector reads as a raised pill
+    Given I am on the product-switcher mode
+    When the top bar renders
+    Then the product selector has its own surface, a border and a radius
+
+  @integration
+  Scenario: The organization and the scope start at the content column
+    Given I am on the product-switcher mode
+    When the top bar renders
+    Then the logo and the product selector take the width of the sidebar column
+    And the organization and the scope start where the content column starts
+    And they stay there when the product name is longer or shorter
+
+  @integration
   Scenario: A single organization shows as plain text
     Given I belong to one organization
     When the product-switcher top bar renders

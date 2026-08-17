@@ -11,6 +11,8 @@ import { useReachableProducts } from "../useReachableProducts";
 
 export const ICON_RAIL_WIDTH = "64px";
 
+const LOGO_HEIGHT = 30;
+
 function RailTile({
   icon: Icon,
   label,
@@ -32,12 +34,14 @@ function RailTile({
       paddingY={2}
       borderRadius="xl"
       cursor="pointer"
-      background={isActive ? "bg.surface" : "transparent"}
-      boxShadow={isActive ? "xs" : undefined}
-      color={isActive ? "fg" : "fg.muted"}
+      backgroundColor={isActive ? "bg.panel" : "transparent"}
+      boxShadow={isActive ? "0 1px 3px rgba(26, 26, 46, 0.09)" : undefined}
+      color={isActive ? "fg" : "gray.400"}
       transition="all 0.15s ease-in-out"
       _hover={
-        isActive ? undefined : { background: "bg.surface/60", color: "fg" }
+        isActive
+          ? undefined
+          : { backgroundColor: "bg.panel/50", color: "fg.muted" }
       }
       aria-label={label}
       aria-current={isActive ? "page" : undefined}
@@ -47,18 +51,23 @@ function RailTile({
       {isActive && (
         <Box
           position="absolute"
-          left="-5px"
+          left="-7px"
           top="50%"
           transform="translateY(-50%)"
           width="3px"
           height="24px"
           borderRightRadius="full"
-          background="fg"
+          background="fg/70"
         />
       )}
       <VStack gap={1}>
         <Icon size={19} strokeWidth={isActive ? 2.1 : 1.9} />
-        <Text fontSize="8.5px" fontWeight="semibold" lineHeight="1">
+        <Text
+          fontSize="8.5px"
+          fontWeight="semibold"
+          lineHeight="1"
+          letterSpacing="tight"
+        >
           {label}
         </Text>
       </VStack>
@@ -110,10 +119,10 @@ export function IconRail({
       width={ICON_RAIL_WIDTH}
       minWidth={ICON_RAIL_WIDTH}
       minHeight="100vh"
-      background="bg.muted"
+      backgroundColor="bg.rail"
       borderRightWidth="1px"
       borderRightStyle="solid"
-      borderRightColor="border.muted"
+      borderRightColor="border"
       paddingY={3}
       gap={1}
       alignItems="center"
@@ -125,7 +134,7 @@ export function IconRail({
         alignItems="center"
         marginBottom={2}
       >
-        <LogoIcon width={25 * 0.7} height={32 * 0.7} />
+        <LogoIcon width={LOGO_HEIGHT * (38 / 52)} height={LOGO_HEIGHT} />
       </Link>
 
       {options.map((product) => (
@@ -139,7 +148,7 @@ export function IconRail({
         />
       ))}
 
-      <Box marginTop="auto">
+      <Box marginTop="auto" paddingBottom={1}>
         <RailTile
           icon={SettingsIcon}
           label="Settings"

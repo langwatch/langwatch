@@ -1,3 +1,4 @@
+import type { ButtonProps } from "@chakra-ui/react";
 import { Box, Button, HStack, Portal, Text, VStack } from "@chakra-ui/react";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { Menu } from "~/components/ui/menu";
@@ -11,6 +12,25 @@ import {
   productById,
 } from "../products";
 import { useReachableProducts } from "../useReachableProducts";
+
+/** The trigger reads as a raised pill on the top bar's gray. */
+const productPillStyle = {
+  variant: "ghost",
+  fontSize: "13px",
+  fontWeight: "medium",
+  paddingX: 2.5,
+  height: "28px",
+  minWidth: 0,
+  color: "fg",
+  gap: 2,
+  backgroundColor: "bg.panel",
+  borderWidth: "1px",
+  borderStyle: "solid",
+  borderColor: "border",
+  borderRadius: "lg",
+  boxShadow: "0 1px 2px rgba(26, 26, 46, 0.05)",
+  _hover: { backgroundColor: "bg.panel", borderColor: "border.emphasized" },
+} satisfies ButtonProps;
 
 /**
  * The product dropdown in the product-switcher top bar. Lists only the
@@ -51,20 +71,10 @@ export function ProductSwitcherMenu({
   return (
     <Menu.Root>
       <Menu.Trigger asChild>
-        <Button
-          variant="ghost"
-          aria-label="Switch product"
-          fontSize="13px"
-          fontWeight="medium"
-          paddingX={2}
-          height="32px"
-          color="fg"
-          gap={2}
-          _hover={{ backgroundColor: "bg.muted" }}
-        >
-          <ActiveIcon size={14} />
-          <Text>{active.label}</Text>
-          <ChevronsUpDown size={13} color="var(--chakra-colors-fg-muted)" />
+        <Button {...productPillStyle} aria-label="Switch product">
+          <ActiveIcon size={14} color="var(--chakra-colors-fg-muted)" />
+          <Text truncate>{active.label}</Text>
+          <ChevronsUpDown size={13} color="var(--chakra-colors-gray-400)" />
         </Button>
       </Menu.Trigger>
       <Portal>

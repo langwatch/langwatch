@@ -1,5 +1,6 @@
 import { useBreakpointValue } from "@chakra-ui/react";
 import { useLayoutEffect } from "react";
+import { MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "~/components/MainMenu";
 import {
   LANGY_DOCK_GAP,
   LANGY_DOCKED_OFFSET,
@@ -30,6 +31,12 @@ export interface NavigationV2ShellReadyState {
   isSettingsRoute: boolean;
   isDevelopment: boolean;
   isCompactSidebar: boolean;
+  /**
+   * Width of the sidebar column, and with it the left edge of the
+   * content column. The top bar and the content cap both read it here,
+   * so they cannot drift apart.
+   */
+  menuWidth: string;
   showPresenceMenuItem: boolean;
   /** Room the docked Langy panel takes inside the content row, in pixels. */
   langyDockInset: number;
@@ -137,6 +144,7 @@ function toReadyState({
     isSettingsRoute: route.isSettingsRoute,
     isDevelopment,
     isCompactSidebar,
+    menuWidth: isCompactSidebar ? MENU_WIDTH_COMPACT : MENU_WIDTH_EXPANDED,
     showPresenceMenuItem: pathname.startsWith("/[project]/traces"),
     langyDockInset,
   };

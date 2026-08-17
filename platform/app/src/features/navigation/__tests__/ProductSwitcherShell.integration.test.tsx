@@ -257,6 +257,7 @@ vi.mock("~/components/sidebar/PresenceMenuItem", () => ({
   PresenceMenuItem: () => null,
 }));
 
+import { MENU_WIDTH_EXPANDED } from "~/components/MainMenu";
 import { useNavigationModeStore } from "~/features/navigation/navigationModeStore";
 import {
   DashboardLayout,
@@ -342,6 +343,36 @@ describe("the product-switcher top bar", () => {
       });
       expect(trackEventMock).toHaveBeenCalledWith("navigation_product_switch", {
         product: "gateway",
+      });
+    });
+  });
+
+  describe("when the top bar renders the product cluster", () => {
+    /** @scenario The product selector reads as a raised pill */
+    it("gives the product trigger its own surface, a border and a radius", () => {
+      renderShell();
+
+      expect(
+        screen.getByRole("button", { name: "Switch product" }),
+      ).toHaveStyle({
+        backgroundColor: "var(--chakra-colors-bg-panel)",
+        borderWidth: "1px",
+        borderRadius: "var(--chakra-radii-lg)",
+      });
+    });
+
+    /** @scenario The organization and the scope start at the content column */
+    it("takes the width of the sidebar column, the same width the content cap uses", () => {
+      renderShell();
+
+      expect(screen.getByTestId("shell-product-cluster")).toHaveStyle({
+        width: MENU_WIDTH_EXPANDED,
+        minWidth: MENU_WIDTH_EXPANDED,
+      });
+      // The content column caps itself at the viewport minus that same
+      // width, so the two cannot drift apart.
+      expect(screen.getByTestId("shell-content-column")).toHaveStyle({
+        maxWidth: `${window.innerWidth - Number.parseInt(MENU_WIDTH_EXPANDED, 10)}px`,
       });
     });
   });

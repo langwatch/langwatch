@@ -13,6 +13,19 @@ Feature: Icon rail navigation
   sidebar the product-switcher mode renders.
 
   @integration
+  Scenario: The rail is its own surface next to the sidebar
+    Given I am on the icon-rail mode
+    When the rail renders
+    Then the rail sits on a gray one step off the page gray
+    And an edge closes the rail against the sidebar
+
+  @integration
+  Scenario: Only the active tile carries a surface
+    Given I am on the icon-rail mode
+    Then the tile of the product I am in has a raised white surface
+    And the other tiles have no surface
+
+  @integration
   Scenario: The rail lists the reachable products as tiles
     Given I am on the icon-rail mode
     And I can reach every product
