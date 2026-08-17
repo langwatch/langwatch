@@ -2,9 +2,18 @@
 
 **Companion to:** `dev/docs/adr/092-unified-authorization-engine.md` (the decision
 model: the walk, union semantics, possession, the owner ceiling — all still in
-force) and a **new ADR to be written** covering the storage and rollout redesign
-below (number to be chosen after checking open PRs for collisions, not from main
-alone).
+force). **No new ADR**: ADR-092's storage and rollout sections are rewritten in
+place to the design below, and ADR-007 gains a scoped amendment section for the
+`immediate` discipline (the ADR-004 "Amendment: In-process workers" precedent).
+ADR-001 flips to Superseded at contract. If genuinely new ground ever wants its
+own number, rebase off origin/main and take the next one — nothing more.
+Related ADRs the rewrite must cite: ADR-021 (the `(scopeType, scopeId)` house
+shape, and its warning that org-scoped models lack the tenancy guard — the new
+`Grant` table joins the guard regime), ADR-015 (the replay protocol the
+byte-identical test rides), ADR-098 (subscriber vocabulary; subscribers are
+excluded from replay), ADR-022 *event_log as single source of truth* (cite by
+title — two files share the number; note `leanForProjection` conformance is a
+no-op here, no heavy fields), ADR-093 (Redis as an owned client).
 **Spec:** `specs/rbac/unified-authorization-engine.feature`,
 `specs/rbac/in-place-authz-migration.feature` (both still the behavioural
 contract; new ledger scenarios to be added).
@@ -31,6 +40,12 @@ work already merged (A = the engine #6894, B = the self-migration #7079).
 | 13 | **Platform grants minted from `ADMIN_EMAILS` by the cutover migration itself** — not manual insertion, because self-hosted operators never run anything (the in-place doctrine). The env var becomes bootstrap input, not live authority. |
 | 14 | **The projection cursor replaces `Organization.authzEpoch`.** The cursor is a monotonic per-org version written by the thing that writes the data, so it cannot drift. M7 is deleted from the runbook; stage-F passports key on the cursor. |
 | 15 | **Facts, not inference.** Every access is an explicit grant row; the four `LEGACY-QUIRK(C)` branches in `matchers.ts`/`walk.ts` exist because access is inferred today, and they die because it stops being. |
+| 16 | **ADRs are revised in place, not superseded by new numbers.** ADR-092's storage/rollout sections get rewritten; ADR-007 gains a scoped amendment; ADR-001 → Superseded at contract. New numbers only for genuinely new ground, taken after rebasing off origin/main. |
+| 17 | **The audit log is an insert-only event subscriber**, not a projection. Each runtime grant event inserts one `AuditLog` row in the existing shape — row id derived from the event id, `ON CONFLICT DO NOTHING`, never an update. A `when` guard skips `genesis-import` / `backfill-b` / `read-through-mint` sources so cutover never floods the audit page with backdated history. Subscribers are excluded from replay (ADR-098), so rebuilds can't touch it either. Grant write paths stop writing `AuditLog` directly when they become command emitters. The audit UI, table, and retention are untouched. |
+| 18 | **SCIM is a reconciler.** IdP pushes are declarative state; the handler diffs desired state against the Postgres projection and emits only the difference as `grants.*` commands (`source: "scim"`) — idempotent by construction, replayed pushes diff to nothing (the same diff-and-emit shape as the genesis import). SCIM **removals ride `immediate`** (an IdP deprovision is the fired-employee case); additions are queued. `scim-group-mapping.feature` is rewritten storage-neutral once, so it is true before and after cutover. |
+| 19 | **The epoch stays until contract.** The Redis authz epoch store (`server/authz/epoch.ts`) is live, cheap, and spec-bound (`in-place-authz-migration.feature:112`, bound at `team-user-backfill.unit.test.ts:179`) — PR 1 keeps bumping it alongside the new cursor, which is what makes "passes unchanged" honestly true. The epoch dies in the contract PR, where its two spec scenarios are truthed-up to the cursor. (The `Organization.authzEpoch` *column* never shipped; the Redis store did.) |
+| 20 | **Per-user legacy ADMIN facts are in the import inventory.** `OrganizationUser.role = ADMIN` with zero bindings is a live fallback path (`specs/ai-gateway/rbac-legacy-admin-fallback.feature`); the floor row covers members only. The genesis import mints an org-scoped admin grant per such user, `occurredAt` from the row's `createdAt`. |
+| 21 | **Public REST names are frozen.** `/role-bindings`, the `bindings` wire shape, and `role_binding_already_exists` (409, `role-bindings-rest-api.feature:92`) are customer contracts — the no-sunset philosophy applies to API names exactly as to old keys. The Grant/Role rename never leaks to the wire; no `/grants` API until a customer need exists. |
 
 ## The final data structure
 
@@ -76,7 +91,8 @@ OrganizationUser                   -- membership only, never permission;
 
 GONE at contract: TeamUser · RoleBinding/CustomRole names · rbac.ts ·
 role-binding-resolver.ts · the four LEGACY-QUIRK(C) branches · the fork and
-the gate themselves · Organization.authzEpoch (never shipped)
+the gate themselves · the Redis authz epoch store (bumped as today through
+PR 1-3, superseded by the cursor at contract — decision 19)
 ```
 
 ### ClickHouse (the event log — source of truth, never on the read path)
@@ -137,7 +153,8 @@ becomes the ledger. Bill of materials:
 - `TeamUserBackfillMigration` refactored: emits batched `grant_attached`
   (source backfill-b, backdated occurredAt) → awaits projection → parity proof
   (unchanged: collect once, decide twice, against the compat view the engine
-  reads today) → `migration_parity_proved`.
+  reads today) → `migration_parity_proved`. The Redis epoch bump stays exactly
+  as today (decision 19) — the cursor is added alongside, not instead.
 - Runner lifecycle transitions become events; `SystemMigrationTenantState`
   becomes their projection (same table, same latch, same ops page, same
   legacy-fallback-gate reads). Runner package stays generic — emitting events
@@ -153,16 +170,23 @@ becomes the ledger. Bill of materials:
 ### PR 2 — the ledger becomes the only writer (still dark)
 
 - **The genesis import**: a system migration emits events for every existing
-  `RoleBinding`, `CustomRole`, and `OrganizationUser`-floor fact — per org,
-  batched, `occurredAt` backdated to each row's `createdAt`, source
-  `genesis-import` — so the entire grants state is event-derived from the
-  beginning of history and replayable from genesis. Idempotent by
-  deterministic event identity; proof = compat projection byte-equals the
-  original rows.
+  `RoleBinding`, `CustomRole`, and `OrganizationUser` fact — the member floor
+  row AND a per-user org-scoped admin grant for every zero-binding
+  `OrganizationUser.role = ADMIN` (decision 20) — per org, batched,
+  `occurredAt` backdated to each row's `createdAt`, source `genesis-import` —
+  so the entire grants state is event-derived from the beginning of history
+  and replayable from genesis. Idempotent by deterministic event identity;
+  proof = compat projection byte-equals the original rows.
 - All eight write paths (member add, invites, SCIM, groups, API keys, project
   creation, role editor, better-auth hooks) become `grants.*` command
   emitters and **stop writing tables directly** — both tables are
   projection-fed from here on. `grants.revoke` / `offboard` are `immediate`.
+  SCIM specifically becomes a reconciler (decision 18): diff desired IdP state
+  against the projection, emit only the difference; removals `immediate`.
+- **The audit subscriber** (decision 17) lands here, in the same change that
+  stops the write paths writing `AuditLog` directly: insert-only, row id from
+  event id, `ON CONFLICT DO NOTHING`, `when` guard skipping genesis/backfill/
+  mint sources.
 - Read-through minting for legacy API keys (decision 1) — emits events like
   every other writer.
 - REST error-code reconciliation (409 `role_binding_already_exists` vs
@@ -195,8 +219,13 @@ becomes the ledger. Bill of materials:
   with their names in PR 1.
 - The client role-bag imports and the 55 raw role comparisons go with the
   deletions (bundle-size check in CI).
+- The Redis epoch store goes too (decision 19); its two spec scenarios
+  (`in-place-authz-migration.feature:112`, `:127`) are truthed-up to the
+  cursor in the same change.
+- Public REST names stay (decision 21) — the deletion is internal only.
 - ADR-001 → superseded; docs sweep; spec truth-up
-  (`scoped-role-bindings.feature` → union semantics).
+  (`scoped-role-bindings.feature` → union semantics; stale stage-C4 pointers
+  in both rbac spec headers; `sharing.feature`'s ADR pointer is 057, not 039).
 
 ### PR 5 — accelerate (independent, whenever)
 
@@ -255,9 +284,17 @@ its 2026-08-17 permission-vs-scope ruling.
 
 ## Next actions
 
-1. Write the new ADR (number checked against open PRs first) — the grants
-   ledger, disciplines, vocabulary, rollout doctrine; supersedes ADR-092's
-   storage/rollout sections by explicit reference.
-2. New spec scenarios: immediate revocation, collective grants, floor-as-row,
-   cutover/rollback (`specs/rbac/`).
+1. Rewrite ADR-092's storage and rollout sections in place (decision 16):
+   the ledger, both disciplines, the subscriber, the doctrines nothing else
+   backs (no-transactions/idempotency, occurredAt/acceptedAt, deterministic
+   event-derived ids, batched appends), and the related-ADR cross-links
+   (021, 015, 098, 022 *event_log*, 093). Add the ADR-007 amendment section.
+2. Spec pass: **extend three bound scenarios** rather than duplicate them —
+   `unified-authorization-engine.feature:242` gains the transport guarantee
+   (Grant row gone before the call returns, Redis stopped), `:340` gains the
+   `member_offboarded` event proof, `:107` already covers the owner ceiling —
+   and **add three genuinely new**: collective grants, floor-as-row, the
+   cutover process events (extending `in-place-authz-migration.feature`'s
+   rollback scenario, not a parallel file). Rewrite
+   `scim-group-mapping.feature` storage-neutral (decision 18).
 3. PR 1.
