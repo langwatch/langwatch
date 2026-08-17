@@ -65,6 +65,7 @@ describe("dispatching to a projection registry with no router", () => {
   describe("given close() has cleared a router that was there", () => {
     describe("when events are dispatched afterwards", () => {
       /** @scenario "Dropping events after the projection router is gone is an error" */
+      /** @scenario "A dispatch arriving after the router is gone is still reported" */
       it("logs at error level", async () => {
         const registry = await registryClosedAfterRouting();
         const errorSpy = spyOnLogger(registry, "error");
@@ -77,6 +78,7 @@ describe("dispatching to a projection registry with no router", () => {
       });
 
       /** @scenario "Work discarded without a throw is logged at error" */
+      /** @scenario "A dispatch arriving after the router is gone is still reported" */
       it("states how many events were discarded", async () => {
         const registry = await registryClosedAfterRouting();
         const errorSpy = spyOnLogger(registry, "error");
@@ -84,6 +86,16 @@ describe("dispatching to a projection registry with no router", () => {
         await registry.dispatch(events, context);
 
         expect(errorSpy.mock.calls[0]?.[0]).toMatchObject({ eventCount: 2 });
+      });
+
+      /** @scenario "A dispatch arriving after the router is gone is still reported" */
+      it("does not blame initialize() alone, since close() clears the router too", async () => {
+        const registry = await registryClosedAfterRouting();
+        const errorSpy = spyOnLogger(registry, "error");
+
+        await registry.dispatch(events, context);
+
+        expect(errorSpy.mock.calls[0]?.[1]).toContain("already closed");
       });
     });
   });

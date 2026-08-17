@@ -404,16 +404,24 @@ export class ClickHouseTraceService {
    */
   private readonly resolveTraceSpansBatch: ResolveTraceSpansBatchFn | undefined;
 
-  constructor(
-    private readonly prisma: PrismaClient,
-    resolveTraceSpans?: ResolveTraceSpansFn,
-    resolveTraceSpansBatch?: ResolveTraceSpansBatchFn,
+  private readonly prisma: PrismaClient;
+
+  constructor({
+    prisma,
+    resolveTraceSpans,
+    resolveTraceSpansBatch,
+    retentionResolver,
+  }: {
+    prisma: PrismaClient;
+    resolveTraceSpans?: ResolveTraceSpansFn;
+    resolveTraceSpansBatch?: ResolveTraceSpansBatchFn;
     /**
      * Widens the span read's retention floor to this tenant's own policy.
      * Optional: without it the floor stays at {@link SPAN_READ_FLOOR_LOOKBACK_MS}.
      */
-    retentionResolver?: RetentionPolicyResolver,
-  ) {
+    retentionResolver?: RetentionPolicyResolver;
+  }) {
+    this.prisma = prisma;
     this.resolveTraceSpans = resolveTraceSpans;
     this.resolveTraceSpansBatch = resolveTraceSpansBatch;
     this.retentionFloor = createRetentionFloorService(retentionResolver);
@@ -445,16 +453,23 @@ export class ClickHouseTraceService {
   /**
    * Static factory method for creating ClickHouseTraceService with default dependencies.
    */
-  static create(
-    prisma: PrismaClient = defaultPrisma,
-    resolveTraceSpans?: ResolveTraceSpansFn,
-    resolveTraceSpansBatch?: ResolveTraceSpansBatchFn,
-  ): ClickHouseTraceService {
-    return new ClickHouseTraceService(
+  static create({
+    prisma = defaultPrisma,
+    resolveTraceSpans,
+    resolveTraceSpansBatch,
+    retentionResolver,
+  }: {
+    prisma?: PrismaClient;
+    resolveTraceSpans?: ResolveTraceSpansFn;
+    resolveTraceSpansBatch?: ResolveTraceSpansBatchFn;
+    retentionResolver?: RetentionPolicyResolver;
+  } = {}): ClickHouseTraceService {
+    return new ClickHouseTraceService({
       prisma,
       resolveTraceSpans,
       resolveTraceSpansBatch,
-    );
+      retentionResolver,
+    });
   }
 
   /**
@@ -3251,6 +3266,23 @@ export class ClickHouseTraceService {
             ? (spanRange.to - spanRange.from) / 2 + DEFAULT_PARTITION_WINDOW_MS
             : DEFAULT_PARTITION_WINDOW_MS;
 
+          // Resolved here rather than inside `run` below: the callback is
+          // re-invoked per window attempt and the budget does not vary with the
+          // window.
+          //
+          // `throw`, never `break`: `break` truncates the result and returns
+          // it, which would silently hand back a partial span list as if it
+          // were complete. One row of headroom so an exactly-at-budget batch
+          // still succeeds and only a genuine overrun trips it.
+          const spanReadSettings =
+            maxSpanRows === undefined
+              ? JOINED_SPAN_READ_SETTINGS
+              : {
+                  ...JOINED_SPAN_READ_SETTINGS,
+                  max_result_rows: String(maxSpanRows + 1),
+                  result_overflow_mode: "throw" as const,
+                };
+
           const spanRows = await queryWindowed<SpanRow[]>({
             table: "stored_spans",
             hintMs: spanHintMs,
@@ -3327,20 +3359,7 @@ export class ClickHouseTraceService {
                   traceIds: batchTraceIds,
                   ...(window?.params ?? {}),
                 },
-                clickhouse_settings: {
-                  ...JOINED_SPAN_READ_SETTINGS,
-                  // `throw`, never `break`: `break` truncates the result and
-                  // returns it, which would silently hand back a partial span
-                  // list as if it were complete. One row of headroom so an
-                  // exactly-at-budget batch still succeeds and only a genuine
-                  // overrun trips it.
-                  ...(maxSpanRows !== undefined
-                    ? ({
-                        max_result_rows: String(maxSpanRows + 1),
-                        result_overflow_mode: "throw",
-                      } as const)
-                    : {}),
-                },
+                clickhouse_settings: spanReadSettings,
                 format: "JSONEachRow",
               });
               return (await spansResult.json()) as SpanRow[];

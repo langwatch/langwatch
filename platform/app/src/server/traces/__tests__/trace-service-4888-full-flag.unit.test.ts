@@ -565,10 +565,10 @@ describe("ClickHouseTraceService — #4888 full resolution crosses the mapper", 
           ioExtractionService: new TraceIOExtractionService(),
           logger: createLogger("test"),
         });
-    return new ClickHouseTraceService(
-      { project: { findUnique: vi.fn() } } as never,
-      resolveTraceSpansFn,
-    );
+    return new ClickHouseTraceService({
+      prisma: { project: { findUnique: vi.fn() } } as never,
+      resolveTraceSpans: resolveTraceSpansFn,
+    });
   }
 
   describe("given a >64 KB offloaded langwatch.output (preview + flat eventref)", () => {
