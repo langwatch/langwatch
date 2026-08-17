@@ -30,9 +30,21 @@ func collectorStub(t *testing.T, status int, body string) *httptest.Server {
 
 // clickhouseStub stands in for ClickHouse's HTTP interface, returning the
 // given JSONEachRow body for every query.
+//
+// It asserts the bound parameters rather than ignoring the request. Without
+// that, the canary row comes back whatever was asked for, so the happy path
+// would pass even if the query had lost its tenant, trace or window filters —
+// and losing the tenant filter is how a preflight starts reporting somebody
+// else's spans as proof that this run's span landed.
 func clickhouseStub(t *testing.T, body string) *chClient {
 	t.Helper()
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		query := r.URL.Query()
+		for _, name := range []string{"param_tenantId", "param_traceIds", "param_fromMs", "param_toMs"} {
+			if query.Get(name) == "" {
+				t.Errorf("query did not bind %s: %s", name, r.URL.RawQuery)
+			}
+		}
 		_, _ = io.WriteString(w, body)
 	}))
 	t.Cleanup(server.Close)
