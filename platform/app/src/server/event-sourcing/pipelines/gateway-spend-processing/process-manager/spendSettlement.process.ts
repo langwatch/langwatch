@@ -61,6 +61,11 @@ export const SETTLEMENT_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
  * means something upstream stopped confirming, and settling a hundred
  * thousand live requests is the one outcome this must never produce.
  *
+ * Applied TWICE, and both are load-bearing: once per ClickHouse instance, to
+ * bound the query's own result, and again where the instances are merged, so
+ * the number this sweep settles is the cap rather than the cap times the
+ * number of instances.
+ *
  * Lives here rather than beside the query it bounds because this file must
  * not import a VALUE from the repository: that pulls the ClickHouse client
  * into the module graph of everything reaching the pipeline registry, which

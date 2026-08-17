@@ -137,6 +137,7 @@ import type { ExperimentIdLookup } from "./pipelines/experiment-run-processing/r
 import type { ExperimentRunStateRepository } from "./pipelines/experiment-run-processing/repositories/experimentRunState.repository";
 import type { ComputeExperimentRunMetricsCommandData } from "./pipelines/experiment-run-processing/schemas/commands";
 import { createGatewaySpendProcessingPipeline } from "./pipelines/gateway-spend-processing/pipeline";
+import { MAX_OPEN_ADMISSIONS_PER_SWEEP } from "./pipelines/gateway-spend-processing/process-manager/spendSettlement.process";
 import type { GatewaySpendState } from "./pipelines/gateway-spend-processing/projections/gatewaySpend.foldProjection";
 import { GatewaySpendStore } from "./pipelines/gateway-spend-processing/projections/gatewaySpend.store";
 import type { OpenAdmission } from "./pipelines/gateway-spend-processing/repositories/openAdmissions.clickhouse.repository";
@@ -936,7 +937,18 @@ export class PipelineRegistry {
                 "settlement sweep could not read one ClickHouse instance; its open admissions wait for the next sweep",
               );
             });
-            return open;
+            // The cap bounds ONE SWEEP, and each instance applies it to its own
+            // query — so N instances would hand the sweeper N times the cap.
+            // Re-applying it here is what makes the documented bound true of
+            // the number the sweeper actually settles.
+            //
+            // Oldest first, across instances, so the cap sheds the newest rows
+            // rather than whichever instance happened to answer last. Each
+            // query already returns its own rows oldest-first; this is what
+            // extends that ordering to the merge, and it keeps the sweep
+            // draining a backlog from the end that has waited longest.
+            open.sort((a, b) => a.admittedAtMs - b.admittedAtMs);
+            return open.slice(0, MAX_OPEN_ADMISSIONS_PER_SWEEP);
           },
         },
       }),

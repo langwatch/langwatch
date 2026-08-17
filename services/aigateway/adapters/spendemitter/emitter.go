@@ -107,6 +107,10 @@ const maxMetadataEchoBytes = 4096
 // `json.Valid` accepts `[1,2]`, `"x"` and `3`, all of which the control
 // plane's `metadata must be a JSON object string` refinement rejects. Passing
 // one through would trade a dropped echo for a dropped billing record.
+//
+// Unmarshalling into a map is necessary but NOT sufficient: `null` unmarshals
+// into a map without error and leaves it nil, and the refinement spells that
+// case out (`parsed !== null`). The nil check is what closes it.
 func validMetadataEcho(raw string, gatewayRequestID string) string {
 	if raw == "" {
 		return ""
@@ -118,7 +122,7 @@ func validMetadataEcho(raw string, gatewayRequestID string) string {
 		return ""
 	}
 	var probe map[string]any
-	if err := json.Unmarshal([]byte(raw), &probe); err != nil {
+	if err := json.Unmarshal([]byte(raw), &probe); err != nil || probe == nil {
 		slog.Warn("spend emitter dropped a metadata echo that is not a JSON object",
 			"gateway_request_id", gatewayRequestID)
 		return ""

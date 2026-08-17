@@ -535,3 +535,9 @@ Feature: Billing spend events, one durable record per gateway request
       Given a metadata header that is oversized or not a JSON object
       When the gateway processes the request
       Then the echo is dropped and the request proceeds
+
+    @unit
+    Scenario: The spend record's metadata echo holds to the ingest contract
+      Given a metadata echo that parses as JSON but is not an object
+      When the gateway records the spend
+      Then the echo is dropped and the spend record still ships
