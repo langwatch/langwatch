@@ -638,6 +638,25 @@ describe("simulationRunStateFoldProjection", () => {
       expect(state.Status).toBe("FAILED");
     });
 
+    it("normalizes a historical FAILURE fold state that is already finished", () => {
+      // The terminal branch retains the stored status verbatim rather than
+      // taking the event's candidate. A pre-fix row is exactly the case that
+      // reaches it — finished, and carrying "FAILURE" — so a late snapshot
+      // re-persisted the legacy string that #6834 says nothing writes anymore.
+      const fold = new SimulationRunStateFoldProjection({
+        store: { store: async () => {}, get: async () => null },
+      });
+      let state = fold.init();
+      state = fold.handleSimulationRunStarted(createRunStartedEvent(), state);
+      state = { ...state, Status: "FAILURE", FinishedAt: 3000 };
+      state = fold.handleSimulationRunMessageSnapshot(
+        createMessageSnapshotEvent(),
+        state,
+      );
+
+      expect(state.Status).toBe("FAILED");
+    });
+
     it("defaults to FAILED when no verdict and no explicit status", () => {
       const state = foldEvents([
         createRunStartedEvent(),

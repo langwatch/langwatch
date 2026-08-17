@@ -315,6 +315,38 @@ describe("SimulationClickHouseRepository", () => {
       return { repo, step2Query };
     }
 
+    describe("when the batch summary computes AllCompletedAt", () => {
+      it("treats a QUEUED run as not yet completed", async () => {
+        // AllCompletedAt is "the batch finished" on the public API. QUEUED was
+        // missing from the exclusion, so a batch still holding a queued run
+        // reported a completion time while it was waiting to start (#6834).
+        const { repo, allCompletedExpr } = (() => {
+          const { client, getCapturedQueries } = makeMockClientWithQueryCapture(
+            { rowsForQuery: () => [] },
+          );
+          const r = new SimulationClickHouseRepository(
+            vi.fn().mockResolvedValue(client),
+          );
+          return {
+            repo: r,
+            allCompletedExpr: () =>
+              getCapturedQueries()
+                .map((q) => q.query)
+                .find((q) => q.includes("AS AllCompletedAt")),
+          };
+        })();
+
+        await repo.getBatchHistoryForScenarioSet({
+          projectId: "project-1",
+          scenarioSetId: "set-1",
+        });
+
+        expect(allCompletedExpr()).toMatch(
+          /maxIf\(UpdatedAt, Status NOT IN \([^)]*'QUEUED'[^)]*\)\)/,
+        );
+      });
+    });
+
     describe("when the page carries a StartedAt range", () => {
       it("bounds step 2 with the byte-identical window and meters it as windowed", async () => {
         // The step-2 fake returns no preview rows, and this read declares its

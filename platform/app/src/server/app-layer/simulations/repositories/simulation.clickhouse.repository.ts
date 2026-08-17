@@ -472,8 +472,12 @@ export class SimulationClickHouseRepository implements SimulationRepository {
         toString(toUnixTimestamp64Milli(
           minIf(UpdatedAt, Status IN ('SUCCESS','FAILED','FAILURE','ERROR','CANCELLED'))
         )) AS FirstCompletedAt,
+        -- QUEUED belongs with the other not-yet-completed states: a batch
+        -- still holding a queued run has not all completed, and counting one
+        -- stamped a completion time on a batch that was still waiting to
+        -- start (#6834).
         toString(toUnixTimestamp64Milli(
-          maxIf(UpdatedAt, Status NOT IN ('STALLED','IN_PROGRESS','PENDING'))
+          maxIf(UpdatedAt, Status NOT IN ('STALLED','IN_PROGRESS','PENDING','QUEUED'))
         )) AS AllCompletedAt,
         toString(toUnixTimestamp64Milli(min(StartedAt)))                AS MinStartedAt,
         toString(toUnixTimestamp64Milli(max(StartedAt)))                AS MaxStartedAt

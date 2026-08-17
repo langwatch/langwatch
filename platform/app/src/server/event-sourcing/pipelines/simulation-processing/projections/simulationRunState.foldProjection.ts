@@ -201,6 +201,14 @@ function normalizeLegacyFailure(status: string): string {
   return status === "FAILURE" ? "FAILED" : status;
 }
 
+/**
+ * The single choke point every non-`finished` handler writes Status through.
+ * Normalizing here rather than at each call site covers the retained branch
+ * too: a finished run keeps its stored status verbatim, and a historical row
+ * read back from ClickHouse is exactly the state that arrives finished and
+ * still carrying "FAILURE" (#6834). The `finished` handler writes Status
+ * directly and normalizes its own explicit input.
+ */
 function statusAfter({
   state,
   candidate,
@@ -208,7 +216,9 @@ function statusAfter({
   state: SimulationRunStateData;
   candidate: string;
 }): string {
-  return state.FinishedAt != null ? state.Status : candidate;
+  return normalizeLegacyFailure(
+    state.FinishedAt != null ? state.Status : candidate,
+  );
 }
 
 /**
@@ -403,12 +413,11 @@ export class SimulationRunStateFoldProjection
         };
       }),
       TraceIds: Array.isArray(event.data.traceIds) ? event.data.traceIds : [],
+      // `statusAfter` normalizes both of its branches, so the event's own
+      // status needs no separate pass here (#6834).
       Status: statusAfter({
         state,
-        // Same normalization as the finished handler: nothing writes the
-        // non-enum "FAILURE" string, wherever the status rode in — the event
-        // payload or a historical state read back from ClickHouse (#6834).
-        candidate: normalizeLegacyFailure(event.data.status ?? state.Status),
+        candidate: event.data.status ?? state.Status,
       }),
     };
   }
