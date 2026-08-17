@@ -40,11 +40,14 @@ function closeTriggerOf(toastEl: HTMLElement): HTMLElement | null {
   return toastEl.querySelector<HTMLElement>('[data-part="close-trigger"]');
 }
 
-describe("Toaster", () => {
+describe("given the application renders the shared Toaster", () => {
+  beforeEach(() => {
+    mountToaster();
+  });
+
   describe("when a toast is created without extra options", () => {
     /** @scenario "Every toast shows a close button" */
     it("shows a close button", async () => {
-      mountToaster();
       toaster.create({ title: "Saved" });
 
       const toastEl = (await screen.findByText("Saved")).closest(
@@ -55,7 +58,6 @@ describe("Toaster", () => {
 
     /** @scenario "The close button dismisses the toast" */
     it("dismisses the toast when the close button is clicked", async () => {
-      mountToaster();
       toaster.create({ title: "Saved" });
 
       const toastEl = (await screen.findByText("Saved")).closest(
@@ -72,7 +74,6 @@ describe("Toaster", () => {
   describe("when an error is shown through the error toast helper", () => {
     /** @scenario "An error toast keeps its close button and error actions" */
     it("shows the close button, the docs link and the copyable error id", async () => {
-      mountToaster();
       showErrorToast({
         error: {
           data: {
@@ -104,7 +105,6 @@ describe("Toaster", () => {
   describe("when any toast is created", () => {
     /** @scenario "Toasts appear at the bottom center of the screen" */
     it("places the toast region at the bottom center", async () => {
-      mountToaster();
       toaster.create({ title: "Saved" });
       await screen.findByText("Saved");
 

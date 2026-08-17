@@ -1,4 +1,5 @@
 import { Flex, HStack, Icon } from "@chakra-ui/react";
+import { forwardRef } from "react";
 import type { IconType } from "react-icons";
 import { LuChevronDown } from "react-icons/lu";
 import { Menu } from "~/components/ui/menu";
@@ -68,6 +69,68 @@ function optionLabel(option: FormatOption<string>): string {
 }
 
 /**
+ * The pill: the active format in words, and the caret that opens the menu.
+ *
+ * Rendered under `Menu.Trigger asChild`, which clones this and hands it the
+ * menu's own props and ref, so both are forwarded through.
+ */
+const FormatSelectTrigger = forwardRef<
+  // `Flex` types its ref as a div even with `as="button"`.
+  HTMLDivElement,
+  {
+    label: string;
+    ariaLabel: string;
+    /** Submodes follow inside the pill, so the trailing padding closes up. */
+    tightEnd: boolean;
+  } & React.ComponentProps<typeof Flex>
+>(function FormatSelectTrigger(
+  { label, ariaLabel, tightEnd, ...triggerProps },
+  ref,
+) {
+  return (
+    <Flex
+      ref={ref}
+      as="button"
+      align="center"
+      gap={1}
+      paddingLeft={2.5}
+      paddingRight={tightEnd ? 1.5 : 2}
+      height="full"
+      textStyle="2xs"
+      textTransform="uppercase"
+      letterSpacing="0.04em"
+      fontWeight="semibold"
+      cursor="pointer"
+      aria-label={ariaLabel}
+      transition="background 0.12s ease"
+      _hover={{ bg: "blue.solid/8" }}
+      {...triggerProps}
+    >
+      {label}
+      <Icon as={LuChevronDown} boxSize={3} color="blue.fg/70" />
+    </Flex>
+  );
+});
+
+/** The active format's second axis, as icon toggles inside the pill. */
+function FormatSubmodeStrip({ submodes }: { submodes: FormatSubmodeGroup }) {
+  return (
+    <>
+      {submodes.options.map((sub) => (
+        <SegmentSubmodeIcon
+          key={sub.value}
+          icon={sub.icon}
+          label={sub.label}
+          tooltip={sub.tooltip}
+          active={submodes.value === sub.value}
+          onClick={() => submodes.onChange(sub.value)}
+        />
+      ))}
+    </>
+  );
+}
+
+/**
  * Compact single-control picker for view formats (Pretty / Text / JSON /
  * Markdown, flat / JSON, thread / bubbles / markdown): the active format
  * reads in the pill with a caret, and the alternatives live in the menu it
@@ -99,25 +162,11 @@ export function FormatSelect<Value extends string>({
       >
         <Menu.Root positioning={{ placement: "bottom-start" }}>
           <Menu.Trigger asChild>
-            <Flex
-              as="button"
-              align="center"
-              gap={1}
-              paddingLeft={2.5}
-              paddingRight={active.submodes ? 1.5 : 2}
-              height="full"
-              textStyle="2xs"
-              textTransform="uppercase"
-              letterSpacing="0.04em"
-              fontWeight="semibold"
-              cursor="pointer"
-              aria-label={ariaLabel ?? "View format"}
-              transition="background 0.12s ease"
-              _hover={{ bg: "blue.solid/8" }}
-            >
-              {optionLabel(active)}
-              <Icon as={LuChevronDown} boxSize={3} color="blue.fg/70" />
-            </Flex>
+            <FormatSelectTrigger
+              label={optionLabel(active)}
+              ariaLabel={ariaLabel ?? "View format"}
+              tightEnd={!!active.submodes}
+            />
           </Menu.Trigger>
           <Menu.Content minWidth="140px">
             {normalized.map((option) => (
@@ -132,16 +181,7 @@ export function FormatSelect<Value extends string>({
             ))}
           </Menu.Content>
         </Menu.Root>
-        {active.submodes?.options.map((sub) => (
-          <SegmentSubmodeIcon
-            key={sub.value}
-            icon={sub.icon}
-            label={sub.label}
-            tooltip={sub.tooltip}
-            active={active.submodes!.value === sub.value}
-            onClick={() => active.submodes!.onChange(sub.value)}
-          />
-        ))}
+        {active.submodes && <FormatSubmodeStrip submodes={active.submodes} />}
       </Flex>
     </HStack>
   );

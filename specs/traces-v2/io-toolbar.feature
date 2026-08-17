@@ -54,3 +54,9 @@ Feature: Trace drawer input and output toolbar
     Given a conversation in the drawer
     When the user opens its format selector
     Then the menu lists thread, bubbles and markdown
+
+  @integration
+  Scenario: The span attributes table uses the same format selector
+    Given a span's attributes in the drawer
+    When the user opens the attributes format selector
+    Then the menu lists flat and JSON

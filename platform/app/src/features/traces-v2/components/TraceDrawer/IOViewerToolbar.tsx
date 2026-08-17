@@ -10,7 +10,6 @@ import {
   LuLightbulb,
   LuList,
   LuMessageSquare,
-  type LuPencil,
   LuPlay,
 } from "react-icons/lu";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -39,7 +38,7 @@ const OVERFLOW_TRIGGER_RESERVE_PX = 26;
 const ActionButton = forwardRef<
   HTMLButtonElement,
   {
-    icon: typeof LuPencil;
+    icon: IconType;
     label: string;
   } & React.ComponentProps<typeof Button>
 >(function ActionButton({ icon, label, ...buttonProps }, ref) {
