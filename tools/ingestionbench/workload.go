@@ -135,9 +135,12 @@ type BenchmarkPlan struct {
 // Sizes chosen for the two straddling buckets. Both sit close enough to the
 // threshold that a rounding error in the size check would flip them, which is
 // the point — this is a boundary test, not a "big payload" test.
-var (
-	NearThresholdBytes = int(math.Floor(CommandInlineThresholdBytes * 0.75))
-	OverThresholdBytes = int(math.Floor(CommandInlineThresholdBytes * 1.25))
+// Constants rather than variables: both are exact integers at this threshold
+// (196608 and 327680), and a calibrated boundary is not something another file
+// should be able to reassign.
+const (
+	NearThresholdBytes = CommandInlineThresholdBytes * 3 / 4
+	OverThresholdBytes = CommandInlineThresholdBytes * 5 / 4
 )
 
 // StageSpanTotal is the total spans a stage will send.

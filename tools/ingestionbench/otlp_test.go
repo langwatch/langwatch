@@ -56,6 +56,35 @@ func TestCreateRng(t *testing.T) {
 			}
 		})
 	})
+
+	t.Run("given the golden seed", func(t *testing.T) {
+		t.Run("draws the mulberry32 sequence, not merely a repeatable one", func(t *testing.T) {
+			// Every other case here compares the generator with itself, so a
+			// change to the mixing steps would pass them all. The doc comment
+			// claims bit-for-bit parity with the TypeScript emitter, and this
+			// is the only assertion that can hold it to that: the vector was
+			// produced from an independent implementation of mulberry32 rather
+			// than from this code.
+			//
+			// A failure means the payloads this driver sends have stopped
+			// matching the ones the seed used to produce — replay is broken,
+			// even though every run would still look self-consistent.
+			want := []float64{
+				0.1844118325971067,
+				0.18998925131745636,
+				0.81047199224121869,
+				0.64374882215633988,
+				0.43077461561188102,
+			}
+
+			rng := CreateRng(1337)
+			for i, expected := range want {
+				if got := rng(); got != expected {
+					t.Errorf("draw %d: got %.17g, want %.17g", i, got, expected)
+				}
+			}
+		})
+	})
 }
 
 func TestHexID(t *testing.T) {

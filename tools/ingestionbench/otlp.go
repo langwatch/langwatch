@@ -270,19 +270,20 @@ func BuildResourceSpans(spans []OtlpSpan, serviceNameOpt ...string) OtlpResource
 }
 
 // ChunkSpans splits a span list into request-sized chunks.
+//
+// The same fixed-size grouping as Burstify, and deliberately the same code:
+// two copies of this loop could drift, and a difference between how spans are
+// packed into requests and how requests are packed into bursts would be a
+// difference nobody would think to look for. Kept as its own name because the
+// call sites read better for it — one is about requests, the other about
+// arrival shape.
 func ChunkSpans(spans []OtlpSpan, perRequest int) ([][]OtlpSpan, error) {
+	// Validated here so the message names the caller's own parameter; a reader
+	// of "burstSize must be >= 1" would go looking at the wrong knob.
 	if perRequest <= 0 {
 		return nil, errors.New("perRequest must be >= 1")
 	}
-	chunks := [][]OtlpSpan{}
-	for i := 0; i < len(spans); i += perRequest {
-		end := i + perRequest
-		if end > len(spans) {
-			end = len(spans)
-		}
-		chunks = append(chunks, spans[i:end])
-	}
-	return chunks, nil
+	return Burstify(spans, perRequest)
 }
 
 // ScatterAcrossConcurrentArrivals shuffles spans so a trace's spans are spread

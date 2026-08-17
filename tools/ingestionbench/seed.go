@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"os/exec"
+	"regexp"
 	"strings"
 )
 
@@ -105,12 +106,35 @@ func buildSeedPlan(runID string, count int) (seedPlan, error) {
 // tool the environment must have rather than a dependency the module must
 // carry. ON_ERROR_STOP makes a mid-script failure a non-zero exit instead of a
 // half-seeded organization that the run would then quietly use.
+//
+// No -b (--echo-errors). It echoes the FAILING STATEMENT, and the failing
+// statement is a Project insert carrying a live apiKey literal — so a single
+// constraint violation would have written every seeded API key into the CI log,
+// which the workflow uploads as an artifact. The statement adds nothing a
+// reader needs: ON_ERROR_STOP already names the error and the line.
+//
+// Anything psql does print is redacted before it reaches the error, because
+// this output is not something we can enumerate in advance.
 func applySeed(ctx context.Context, databaseURL, sql string) error {
-	command := exec.CommandContext(ctx, "psql", databaseURL, "-v", "ON_ERROR_STOP=1", "-q", "-b")
+	command := exec.CommandContext(ctx, "psql", databaseURL, "-v", "ON_ERROR_STOP=1", "-q")
 	command.Stdin = strings.NewReader(sql)
 	output, err := command.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("psql failed: %w\n%s", err, strings.TrimSpace(string(output)))
+		return fmt.Errorf("psql failed: %w\n%s", err, redactAPIKeys(strings.TrimSpace(string(output))))
 	}
 	return nil
+}
+
+// apiKeyPattern matches the project API keys this seeder mints. They are the
+// one secret its SQL carries.
+var apiKeyPattern = regexp.MustCompile(`sk-lw-[A-Za-z0-9_-]+`)
+
+// redactAPIKeys removes minted keys from anything psql said before it is
+// returned as an error.
+//
+// Belt as well as braces: dropping -b removes the known path by which a key
+// reached the log, and this removes the ones nobody has thought of — a NOTICE,
+// a constraint message quoting the value, a future psql that echoes more.
+func redactAPIKeys(text string) string {
+	return apiKeyPattern.ReplaceAllString(text, "sk-lw-[redacted]")
 }

@@ -91,70 +91,6 @@ func TestQueryBuilders(t *testing.T) {
 	})
 }
 
-// @scenario "Bursty arrival does not lose or duplicate spans"
-func TestFindLostSpans(t *testing.T) {
-	t.Run("when every accepted span is stored", func(t *testing.T) {
-		t.Run("reports no violation", func(t *testing.T) {
-			got := FindLostSpans(FindLostSpansOptions{
-				TenantId:         "t1",
-				ExpectedPerTrace: map[string]int{"trace-a": 100},
-				StoredPerTrace:   map[string]int{"trace-a": 100},
-			})
-			if len(got) != 0 {
-				t.Errorf("got %d violations, want 0", len(got))
-			}
-		})
-	})
-
-	t.Run("when spans are missing", func(t *testing.T) {
-		t.Run("reports the shortfall", func(t *testing.T) {
-			got := FindLostSpans(FindLostSpansOptions{
-				TenantId:         "t1",
-				ExpectedPerTrace: map[string]int{"trace-a": 100},
-				StoredPerTrace:   map[string]int{"trace-a": 93},
-			})
-			if len(got) != 1 {
-				t.Fatalf("got %d violations, want 1", len(got))
-			}
-			if got[0].Kind != ViolationLostSpans {
-				t.Errorf("got kind %q, want %q", got[0].Kind, ViolationLostSpans)
-			}
-			if !strings.Contains(got[0].Detail, "7 lost") {
-				t.Errorf("detail %q does not report the shortfall", got[0].Detail)
-			}
-		})
-	})
-
-	t.Run("when a trace is entirely absent", func(t *testing.T) {
-		t.Run("treats it as a total loss rather than skipping it", func(t *testing.T) {
-			got := FindLostSpans(FindLostSpansOptions{
-				TenantId:         "t1",
-				ExpectedPerTrace: map[string]int{"trace-a": 40},
-				StoredPerTrace:   map[string]int{},
-			})
-			if len(got) != 1 {
-				t.Fatalf("got %d violations, want 1", len(got))
-			}
-			if got[0].Actual != 0 {
-				t.Errorf("got actual %d, want 0", got[0].Actual)
-			}
-		})
-	})
-
-	t.Run("when more spans are stored than were accepted", func(t *testing.T) {
-		t.Run("does not flag it here, leaving it to the count comparison", func(t *testing.T) {
-			got := FindLostSpans(FindLostSpansOptions{
-				TenantId:         "t1",
-				ExpectedPerTrace: map[string]int{"trace-a": 10},
-				StoredPerTrace:   map[string]int{"trace-a": 12},
-			})
-			if len(got) != 0 {
-				t.Errorf("got %d violations, want 0", len(got))
-			}
-		})
-	})
-}
-
 // @scenario "Spans of one trace arriving at once are still counted exactly once"
 func TestFindCountMismatches(t *testing.T) {
 	cases := []struct {
@@ -317,6 +253,7 @@ func TestFindCrossTenantLeaks(t *testing.T) {
 	})
 }
 
+// @scenario "Bursty arrival does not lose or duplicate spans"
 func TestFindLayerDivergence(t *testing.T) {
 	t.Run("when spans never reached the event log", func(t *testing.T) {
 		t.Run("blames the ingest layer", func(t *testing.T) {

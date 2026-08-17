@@ -34,10 +34,50 @@ func sampleResources(ctx context.Context, namespace string) []ResourceSample {
 			AtMs:          atMs,
 			Target:        fields[0],
 			CPUMillicores: leadingInt(fields[1]),
-			MemoryBytes:   int64(leadingInt(fields[2])) * 1024 * 1024,
+			MemoryBytes:   memoryBytes(fields[2]),
 		})
 	}
 	return samples
+}
+
+// memoryBytes reads a `kubectl top` memory cell ("83Mi", "2Gi", "512Ki").
+//
+// The unit is read rather than assumed. Multiplying the numeric prefix by MiB
+// whatever the suffix said turned a pod reporting 2Gi into 2 MiB — a 1024x
+// understatement landing in the summary table, where nothing downstream could
+// tell it was wrong because the suffix had already been dropped. These figures
+// are informational and cannot fail a run, which is exactly why a silently
+// wrong one is worth avoiding: nobody would be told.
+//
+// An unrecognised suffix yields 0 rather than a guess.
+func memoryBytes(value string) int64 {
+	digits := 0
+	for digits < len(value) && value[digits] >= '0' && value[digits] <= '9' {
+		digits++
+	}
+	if digits == 0 {
+		return 0
+	}
+
+	amount, err := strconv.ParseInt(value[:digits], 10, 64)
+	if err != nil {
+		return 0
+	}
+
+	switch strings.TrimSpace(value[digits:]) {
+	case "", "B":
+		return amount
+	case "Ki":
+		return amount * 1024
+	case "Mi":
+		return amount * 1024 * 1024
+	case "Gi":
+		return amount * 1024 * 1024 * 1024
+	case "Ti":
+		return amount * 1024 * 1024 * 1024 * 1024
+	default:
+		return 0
+	}
 }
 
 // leadingInt reads the numeric prefix of a `kubectl top` cell ("142m", "83Mi").

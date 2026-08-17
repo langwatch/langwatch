@@ -135,8 +135,19 @@ func ForeignTracesQuery() string {
       AND StartTime >= fromUnixTimestamp64Milli({fromMs:Int64})
       AND StartTime <= fromUnixTimestamp64Milli({toMs:Int64})
       AND TraceId NOT IN {ownTraceIds:Array(String)}
+    LIMIT ` + strconv.Itoa(ForeignTraceSampleLimit) + `
   `
 }
+
+// ForeignTraceSampleLimit bounds the cross-tenant read.
+//
+// The verdict is binary — either something leaked or nothing did — so the query
+// only has to prove it happened and show enough examples to chase. Unbounded,
+// a genuine break, or a window overlapping another run in the same database,
+// returns every foreign trace: one Violation each, each with its own formatted
+// Detail, all of them serialised into results.json. The summary caps what it
+// PRINTS at ten; nothing capped what was collected.
+const ForeignTraceSampleLimit = 100
 
 // EventLogCountsQuery returns distinct recordSpan events per trace, straight
 // from the durable log.

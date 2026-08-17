@@ -82,41 +82,6 @@ func sortedKeys(m map[string]int) []string {
 	return keys
 }
 
-// FindLostSpansOptions are the inputs to FindLostSpans.
-type FindLostSpansOptions struct {
-	TenantId string
-	// ExpectedPerTrace must be built from ACCEPTED spans. Treat as read-only.
-	ExpectedPerTrace map[string]int
-	// StoredPerTrace is the distinct stored span count per trace. Read-only.
-	StoredPerTrace map[string]int
-}
-
-// FindLostSpans compares spans accepted by the receiver against spans stored,
-// per trace.
-//
-// ExpectedPerTrace must be built from ACCEPTED spans — the receiver can
-// return 2xx while rejecting spans in partialSuccess.rejectedSpans, and
-// counting those as sent would report phantom data loss.
-func FindLostSpans(opts FindLostSpansOptions) []Violation {
-	violations := []Violation{}
-	for _, traceId := range sortedKeys(opts.ExpectedPerTrace) {
-		expected := opts.ExpectedPerTrace[traceId]
-		actual := opts.StoredPerTrace[traceId]
-		if actual < expected {
-			violations = append(violations, Violation{
-				Kind:     ViolationLostSpans,
-				TenantId: opts.TenantId,
-				TraceId:  traceId,
-				Expected: expected,
-				Actual:   actual,
-				Detail: fmt.Sprintf("accepted %d spans, stored %d (%d lost)",
-					expected, actual, expected-actual),
-			})
-		}
-	}
-	return violations
-}
-
 // FindCountMismatchesOptions are the inputs to FindCountMismatches.
 type FindCountMismatchesOptions struct {
 	TenantId string
