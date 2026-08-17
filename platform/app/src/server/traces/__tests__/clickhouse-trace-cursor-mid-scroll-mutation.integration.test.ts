@@ -206,11 +206,11 @@ beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
   vi.mocked(getClickHouseClientForProject).mockResolvedValue(ch);
-  service = new ClickHouseTraceService(
-    prisma as unknown as ConstructorParameters<
+  service = new ClickHouseTraceService({
+    prisma: prisma as unknown as ConstructorParameters<
       typeof ClickHouseTraceService
-    >[0],
-  );
+    >[0]["prisma"],
+  });
 
   await insert([
     ...(["a", "b", "c", "d"] as const).flatMap((key) => [

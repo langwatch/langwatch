@@ -108,9 +108,11 @@ async function syncFinishedSimulation(
       });
     }
   } catch (error) {
+    // Nothing is rethrown and no retry is scheduled, so this sync is discarded
+    // here for good — which makes this the last layer that can report it.
     logger.error(
       { projectId, error },
-      "Failed to process CIO simulation sync — non-fatal",
+      "Failed to process CIO simulation sync — the sync is discarded",
     );
     captureException(toError(error));
   }

@@ -143,8 +143,10 @@ async function readTraces(traceIds: string[]) {
     "../clickhouse-trace.service"
   );
   const service = new ClickHouseTraceService({
-    project: { findUnique: vi.fn() },
-  } as never);
+    prisma: {
+      project: { findUnique: vi.fn() },
+    } as never,
+  });
   await service.getTracesWithSpans("proj-1", traceIds, protections);
   const spanCall = mockClickHouseQuery.mock.calls.find(([args]) =>
     String(args.query).includes("FROM stored_spans AS t"),

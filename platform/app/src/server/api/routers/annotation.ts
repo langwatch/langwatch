@@ -1270,7 +1270,7 @@ export async function createOrUpdateQueueItems({
   userId,
   prisma,
   findExistingTraceIds = ({ projectId: forProject, traceIds: candidates }) =>
-    ClickHouseTraceService.create(prisma).findExistingTraceIds({
+    ClickHouseTraceService.create({ prisma }).findExistingTraceIds({
       projectId: forProject,
       traceIds: candidates,
     }),

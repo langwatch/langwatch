@@ -437,6 +437,18 @@ export function initializeDefaultApp(options?: {
     ? new SpanStorageClickHouseRepository(resolveClickHouseClient)
     : new NullSpanStorageRepository();
 
+  // Resolves the per-tenant retention cascade; shared by the DSPy CH repo
+  // (which stamps dspy_steps as a traces-category table), the read floors that
+  // bound `evaluation_runs`, and the data-retention services wired further
+  // below. Constructed here rather than beside those services because the
+  // evaluation-run repository below needs it and is built first — without it
+  // that read floor silently falls back to the platform default, which is the
+  // whole point of making it tenant-aware.
+  const dataRetentionPolicyRepo = new DataRetentionPolicyRepository(prisma);
+  const retentionPolicyCache = new RetentionPolicyCache(
+    dataRetentionPolicyRepo,
+  );
+
   const traceSummary = traced(
     new TraceSummaryService(
       clickhouseEnabled
@@ -449,7 +461,10 @@ export function initializeDefaultApp(options?: {
   const evaluationRuns = traced(
     new EvaluationRunService(
       clickhouseEnabled
-        ? new EvaluationRunClickHouseRepository(resolveClickHouseClient)
+        ? new EvaluationRunClickHouseRepository({
+            resolveClient: resolveClickHouseClient,
+            retentionResolver: retentionPolicyCache,
+          })
         : new NullEvaluationRunRepository(),
     ),
     "EvaluationRunService",
@@ -532,14 +547,6 @@ export function initializeDefaultApp(options?: {
       workflowExecutor: { runEvaluationWorkflow },
     }),
     "EvaluationExecutionService",
-  );
-
-  // Resolves the per-tenant retention cascade; shared by the DSPy CH repo
-  // (which stamps dspy_steps as a traces-category table) and the data-retention
-  // services wired further below.
-  const dataRetentionPolicyRepo = new DataRetentionPolicyRepository(prisma);
-  const retentionPolicyCache = new RetentionPolicyCache(
-    dataRetentionPolicyRepo,
   );
 
   const dspySteps = traced(

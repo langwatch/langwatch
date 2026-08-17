@@ -2804,7 +2804,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         "Group queue processor closed successfully",
       );
     } catch (error) {
-      this.logger.error(
+      this.logger.warn(
         {
           queueName: this.queueName,
           error,

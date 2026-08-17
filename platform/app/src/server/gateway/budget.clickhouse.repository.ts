@@ -668,7 +668,7 @@ export class GatewayBudgetClickHouseRepository {
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
     } catch (error) {
-      logger.error(
+      logger.warn(
         { tenantId, count: rows.length, error },
         "failed to insert gateway budget ledger events",
       );
@@ -1136,7 +1136,7 @@ export class GatewayBudgetClickHouseRepository {
         ...spentFromNano(row[`T${i}`] ?? "0"),
       }));
     } catch (error) {
-      logger.error(
+      logger.warn(
         { tenantIds, targets: floored.length, error },
         "failed to read boundary-floored gateway budget spend",
       );
@@ -1192,7 +1192,7 @@ export class GatewayBudgetClickHouseRepository {
         ...spentFromNano(sumRollupRowsForTarget(rows, t)),
       }));
     } catch (error) {
-      logger.error(
+      logger.warn(
         { tenantIds, window, error },
         "failed to read gateway budget scope totals across tenants",
       );
@@ -1290,7 +1290,7 @@ export class GatewayBudgetClickHouseRepository {
         spentByBucket.set(row.ScopeId, row.SpentNanoUSD);
       }
     } catch (error) {
-      logger.error(
+      logger.warn(
         { tenantIds: shape.tenantIds, budgetId: budget.id, error },
         "failed to read gateway budget bucket spend from the rollup",
       );
@@ -1377,7 +1377,7 @@ export class GatewayBudgetClickHouseRepository {
       });
       return (await result.json()) as BucketSpendRow[];
     } catch (error) {
-      logger.error(
+      logger.warn(
         { tenantIds: shape.tenantIds, budgetId: args.budgetId, error },
         "failed to read boundary-floored gateway budget bucket spend",
       );

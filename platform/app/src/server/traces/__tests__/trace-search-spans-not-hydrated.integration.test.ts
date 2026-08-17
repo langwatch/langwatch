@@ -172,9 +172,11 @@ beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
   vi.mocked(getClickHouseClientForProject).mockResolvedValue(ch);
-  service = new ClickHouseTraceService(
-    prisma as ConstructorParameters<typeof ClickHouseTraceService>[0],
-  );
+  service = new ClickHouseTraceService({
+    prisma: prisma as ConstructorParameters<
+      typeof ClickHouseTraceService
+    >[0]["prisma"],
+  });
 
   await ch.insert({
     table: "trace_summaries",

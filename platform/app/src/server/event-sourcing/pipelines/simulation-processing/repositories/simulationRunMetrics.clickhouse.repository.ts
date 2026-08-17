@@ -92,7 +92,7 @@ export class SimulationRunMetricsRepositoryClickHouse
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      logger.error(
+      logger.warn(
         { tenantId, count: rows.length, error: errorMessage },
         "Failed to insert simulation run metrics into ClickHouse",
       );
@@ -164,7 +164,7 @@ export class SimulationRunMetricsRepositoryClickHouse
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      logger.error(
+      logger.warn(
         { tenantId, scenarioRunId, error: errorMessage },
         "Failed to read simulation run metrics from ClickHouse",
       );

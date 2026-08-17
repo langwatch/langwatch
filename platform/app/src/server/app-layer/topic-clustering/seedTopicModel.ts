@@ -167,7 +167,7 @@ async function runSeedPass(
         failed++;
         // Per-project isolation: one bad project must not truncate the
         // fleet. The next boot retries it (its cursor row never appeared).
-        logger.error(
+        logger.warn(
           {
             projectId,
             error: error instanceof Error ? error.message : String(error),
