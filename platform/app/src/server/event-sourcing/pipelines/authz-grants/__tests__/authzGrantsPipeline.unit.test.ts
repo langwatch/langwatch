@@ -119,10 +119,10 @@ describe("authzGrantsState projection", () => {
 
   function ledgerEvent(
     type: AuthzGrantsEvent["type"],
-    data: unknown,
+    data: AuthzGrantsEvent["data"],
     occurredAt = 1_700_000_000_000,
   ): AuthzGrantsEvent {
-    return EventUtils.createEvent({
+    return EventUtils.createEvent<AuthzGrantsEvent>({
       aggregateType: AUTHZ_GRANTS_AGGREGATE_TYPE,
       aggregateId: ORG,
       tenantId: createTenantId(ORG),
@@ -131,7 +131,7 @@ describe("authzGrantsState projection", () => {
       data,
       metadata: {},
       occurredAt,
-    }) as AuthzGrantsEvent;
+    });
   }
 
   describe("when events fold through the reducer", () => {
