@@ -2,6 +2,7 @@ import { emptyGrantsLedgerState } from "@langwatch/authz-server";
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { createTenantId } from "~/server/event-sourcing";
+import type { AuthzGrantsFoldState } from "~/server/event-sourcing/pipelines/authz-grants/projections/authzGrantsState.foldProjection";
 import type { StoredProjection } from "~/server/event-sourcing/projections/stateProjection.types";
 import { PrismaAuthzGrantsProjectionRepository } from "../authz-grants-projection.prisma.repository";
 
@@ -47,11 +48,17 @@ function storedProjection(
       occurredAtMs: number;
     }
   >,
-): StoredProjection<ReturnType<typeof emptyGrantsLedgerState>> {
+): StoredProjection<AuthzGrantsFoldState> {
   return {
     state: {
       ...emptyGrantsLedgerState({ organizationId: ORG }),
       migrationStates,
+      // The fold state is the reducer's state plus the base class's three
+      // bookkeeping stamps; `store()` is typed against that, not the bare
+      // reducer state.
+      CreatedAt: 1_700_000_000_000,
+      UpdatedAt: 1_700_000_000_000,
+      LastEventOccurredAt: 1_700_000_000_000,
     },
     cursor: { acceptedAt: 1_700_000_000_000, eventId: "evt_1" },
     occurredAt: 1_700_000_000_000,
