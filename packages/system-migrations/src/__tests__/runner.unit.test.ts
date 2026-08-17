@@ -63,6 +63,11 @@ class FakeLeaseRepository implements MigrationLeaseRepository {
   async release(): Promise<void> {
     if (this.holder === this.self) this.holder = null;
   }
+
+  /** Hand the lease to somebody else, so renewals start coming back false. */
+  stealForAnotherProcess(): void {
+    this.holder = Symbol("other-process");
+  }
 }
 
 function tenantSourceOf(ids: string[]): TenantSource {
@@ -219,6 +224,100 @@ describe("SystemMigrationRunnerService", () => {
 
       expect(migrate).not.toHaveBeenCalled();
       expect(summary?.skipped).toBe(1);
+    });
+  });
+
+  describe("when an operator rolled a tenant back", () => {
+    /** @scenario "An operator rolls a finalized organization back to its legacy path" */
+    it("skips it, and keeps skipping it on later passes", async () => {
+      await state.upsertRecord({
+        migrationName: "m1",
+        tenantId: "acme",
+        status: "rolled_back",
+        report: null,
+      });
+      const migrate = vi.fn(async () => finalized);
+      const runner = new SystemMigrationRunnerService({
+        state,
+        lease: new FakeLeaseRepository(),
+        tenants: tenantSourceOf(["acme"]),
+        cohort: () => true,
+        migrations: [migrationOf("m1", migrate)],
+      });
+
+      await runner.runPass();
+      const summary = await runner.runPass();
+
+      // The point of the status: without it the next pass would re-run a
+      // migration whose proof still passes and undo the rollback.
+      expect(migrate).not.toHaveBeenCalled();
+      expect(summary?.skipped).toBe(1);
+      expect(
+        (await state.findRecord({ migrationName: "m1", tenantId: "acme" }))
+          ?.status,
+      ).toBe("rolled_back");
+    });
+  });
+
+  describe("when the previous attempt for a tenant parked", () => {
+    it("hands the migration that record so it can finish stranded work", async () => {
+      await state.upsertRecord({
+        migrationName: "m1",
+        tenantId: "acme",
+        status: "parked",
+        report: { kind: "error", message: "epoch bump failed" },
+      });
+      const migrate = vi.fn(async () => finalized);
+      const runner = new SystemMigrationRunnerService({
+        state,
+        lease: new FakeLeaseRepository(),
+        tenants: tenantSourceOf(["acme"]),
+        cohort: () => true,
+        migrations: [migrationOf("m1", migrate)],
+      });
+
+      await runner.runPass();
+
+      expect(migrate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          previous: expect.objectContaining({ status: "parked" }),
+        }),
+      );
+    });
+  });
+
+  describe("when the lease is lost while one tenant is still migrating", () => {
+    /** @scenario "The pass keeps its lease while one large organization migrates" */
+    it("stops at the next tenant rather than double-driving the fleet", async () => {
+      const lease = new FakeLeaseRepository();
+      const touched: string[] = [];
+      const migration = migrationOf("m1", async ({ tenantId }) => {
+        touched.push(tenantId);
+        // Outlive the renew interval, then lose the lease to another driver
+        // mid-tenant - the case a between-tenants renewal cannot detect.
+        if (tenantId === "acme") {
+          lease.stealForAnotherProcess();
+          await new Promise((resolve) => setTimeout(resolve, 30));
+        }
+        return finalized;
+      });
+      const runner = new SystemMigrationRunnerService({
+        state,
+        lease,
+        tenants: tenantSourceOf(["acme", "globex"]),
+        cohort: () => true,
+        migrations: [migration],
+        leaseTtlMs: 50,
+        leaseRenewIntervalMs: 5,
+      });
+
+      const summary = await runner.runPass();
+
+      expect(touched).toEqual(["acme"]);
+      expect(summary?.tenantsSeen).toBe(1);
+      expect(
+        await state.findRecord({ migrationName: "m1", tenantId: "globex" }),
+      ).toBeNull();
     });
   });
 

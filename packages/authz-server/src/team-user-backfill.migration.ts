@@ -24,6 +24,7 @@ import {
 import type {
   SystemMigration,
   TenantMigrationOutcome,
+  TenantMigrationRecord,
 } from "@langwatch/system-migrations";
 import type {
   AuthzMigrationRepository,
@@ -69,8 +70,12 @@ export class TeamUserBackfillMigration implements SystemMigration {
 
   async migrateTenant({
     tenantId,
+    signal,
+    previous,
   }: {
     tenantId: string;
+    signal?: AbortSignal;
+    previous?: TenantMigrationRecord | null;
   }): Promise<TenantMigrationOutcome> {
     const organizationId = tenantId;
     const legacyRows =
@@ -79,13 +84,19 @@ export class TeamUserBackfillMigration implements SystemMigration {
     const backfilled = await this.backfillMissingBindings({
       organizationId,
       legacyRows,
+      // A parked attempt may have committed its bindings and died before
+      // bumping the epoch. This pass writes nothing (the rows are already
+      // there, and `createTeamBindings` skips duplicates), so without this
+      // the bump that publishes them would never happen and every cache
+      // would keep serving pre-backfill decisions.
+      resumeInterruptedAttempt: previous?.status === "parked",
     });
 
     // Only members with legacy rows can decide differently without them -
     // for everyone else the two runs are the same pure function of the same
     // input. No rows at all means the organization finalizes on the spot.
     const userIds = [...new Set(legacyRows.map((row) => row.userId))];
-    const diffs = await this.sweepParity({ organizationId, userIds });
+    const diffs = await this.sweepParity({ organizationId, userIds, signal });
 
     if (diffs.length > 0) {
       return {
@@ -108,9 +119,11 @@ export class TeamUserBackfillMigration implements SystemMigration {
   private async backfillMissingBindings({
     organizationId,
     legacyRows,
+    resumeInterruptedAttempt,
   }: {
     organizationId: string;
     legacyRows: LegacyTeamRow[];
+    resumeInterruptedAttempt: boolean;
   }): Promise<number> {
     if (legacyRows.length === 0) return 0;
 
@@ -121,7 +134,6 @@ export class TeamUserBackfillMigration implements SystemMigration {
     const missing = legacyRows.filter(
       (row) => !existingKeys.has(bindingKey(row)),
     );
-    if (missing.length === 0) return 0;
 
     const writes: TeamBindingWrite[] = missing.map((row) => ({
       bindingId: this.deps.newBindingId(),
@@ -131,27 +143,41 @@ export class TeamUserBackfillMigration implements SystemMigration {
       role: row.role,
       customRoleId: row.customRoleId,
     }));
-    const created = await this.deps.repository.createTeamBindings(writes);
-    if (created === 0) return 0;
+    const created =
+      writes.length === 0
+        ? 0
+        : await this.deps.repository.createTeamBindings(writes);
 
-    await this.deps.audit({
-      userId: SYSTEM_ACTOR,
-      organizationId,
-      action: "authz.migration.team-user-backfill",
-      metadata: { source: "backfill-b", created, legacyRows: legacyRows.length },
-    });
+    if (created > 0) {
+      await this.deps.audit({
+        userId: SYSTEM_ACTOR,
+        organizationId,
+        action: "authz.migration.team-user-backfill",
+        metadata: {
+          source: "backfill-b",
+          created,
+          legacyRows: legacyRows.length,
+        },
+      });
+    }
     // One bump after the batch: every write above becomes visible to caches
-    // and passports together (runbook M7 discipline).
-    await this.deps.bumpEpoch({ organizationId });
+    // and passports together (runbook M7 discipline). Bumping is also how a
+    // resumed attempt publishes bindings its predecessor committed before
+    // dying - cheap, and the alternative is a silently stale fleet.
+    if (created > 0 || resumeInterruptedAttempt) {
+      await this.deps.bumpEpoch({ organizationId });
+    }
     return created;
   }
 
   private async sweepParity({
     organizationId,
     userIds,
+    signal,
   }: {
     organizationId: string;
     userIds: string[];
+    signal?: AbortSignal;
   }): Promise<ParityDiff[]> {
     if (userIds.length === 0) return [];
 
@@ -162,6 +188,15 @@ export class TeamUserBackfillMigration implements SystemMigration {
     const diffs: ParityDiff[] = [];
 
     for (const userId of userIds) {
+      // Throw rather than return what we have: an aborted sweep proves
+      // nothing, and returning a short diff list reads as "clean" - which
+      // would finalize the organization on a proof that never finished.
+      // Parking it instead costs one retry on the next boot.
+      if (signal?.aborted) {
+        throw new Error(
+          "parity sweep aborted before completing; tenant parked for retry",
+        );
+      }
       const grants = await this.deps.collectGrants({
         principal: { type: "user", id: userId },
         organizationId,

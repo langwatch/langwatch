@@ -3,12 +3,13 @@ import type {
   TenantMigrationRecord,
   TenantMigrationStatus,
 } from "@langwatch/system-migrations";
-import type { Prisma, PrismaClient } from "~/generated/prisma/client";
+import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 
 const TENANT_STATUSES: readonly TenantMigrationStatus[] = [
   "migrated",
   "finalized",
   "parked",
+  "rolled_back",
 ];
 
 function parseStatus(raw: string): TenantMigrationStatus {
@@ -50,9 +51,14 @@ export class PrismaSystemMigrationStateRepository
   }
 
   async upsertRecord(record: TenantMigrationRecord): Promise<void> {
-    const report = (record.report ?? undefined) as
-      | Prisma.InputJsonValue
-      | undefined;
+    // `undefined` would OMIT the column, leaving a previous parked tenant's
+    // error report attached to the finalized row that replaced it. The
+    // no-report case has to be written, and for a nullable Json column
+    // that means the DbNull sentinel rather than a bare null.
+    const report =
+      record.report == null
+        ? Prisma.DbNull
+        : (record.report as Prisma.InputJsonValue);
     await this.prisma.systemMigrationTenantState.upsert({
       where: {
         migrationName_tenantId: {
@@ -85,6 +91,7 @@ export class PrismaSystemMigrationStateRepository
       migrated: 0,
       finalized: 0,
       parked: 0,
+      rolled_back: 0,
     };
     for (const row of grouped) {
       counts[parseStatus(row.status)] = row._count._all;

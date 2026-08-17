@@ -1,4 +1,4 @@
-import type { TenantMigrationOutcome } from "./types";
+import type { TenantMigrationOutcome, TenantMigrationRecord } from "./types";
 
 /**
  * One in-place migration, written against the tenant it is given and nothing
@@ -25,9 +25,19 @@ export interface SystemMigration {
    *   behaviour unchanged, and later passes retry the proof.
    * - Throwing parks the tenant; the runner records the error and retries
    *   on a later pass.
+   *
+   * `previous` is the tenant's stored record, or null when it has never
+   * run. A migration whose writes land before its bookkeeping does needs it:
+   * a `parked` previous attempt is the signal that work may have committed
+   * without the follow-up that makes it visible, so this pass must redo the
+   * follow-up rather than short-circuit on "nothing left to write".
+   *
+   * `signal` aborts a long pass at shutdown. Honour it between units of
+   * work - the runner will not interrupt an in-flight call.
    */
   migrateTenant(args: {
     tenantId: string;
     signal?: AbortSignal;
+    previous?: TenantMigrationRecord | null;
   }): Promise<TenantMigrationOutcome>;
 }

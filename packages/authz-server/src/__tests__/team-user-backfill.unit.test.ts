@@ -242,6 +242,93 @@ describe("TeamUserBackfillMigration", () => {
         expect(bumpEpoch).toHaveBeenCalledTimes(1);
       });
     });
+
+    describe("when the previous attempt committed its bindings then parked", () => {
+      /** @scenario "A migration that died after writing publishes its work on the retry" */
+      it("bumps the epoch again so the stranded writes become visible", async () => {
+        const migration = migrationWith(async ({ principal }) =>
+          grantsFor({
+            repository,
+            userId: principal.id,
+            organizationRole: "ADMIN",
+            orgAdminBinding: true,
+            legacy: [
+              {
+                teamId: TEAM,
+                role: "ADMIN",
+                customRoleId: "cr_1",
+                isPersonal: false,
+              },
+            ],
+          }),
+        );
+
+        // First pass writes the bindings; imagine it died on the bump.
+        await migration.migrateTenant({ tenantId: ORG });
+        vi.mocked(bumpEpoch).mockClear();
+
+        // The retry finds nothing missing - `createMany` skipped the
+        // duplicates - so without the parked signal it would return early
+        // and the epoch would stay stale forever.
+        await migration.migrateTenant({
+          tenantId: ORG,
+          previous: {
+            migrationName: "authz-team-user-backfill",
+            tenantId: ORG,
+            status: "parked",
+            report: { kind: "error", message: "epoch bump failed" },
+          },
+        });
+
+        expect(repository.createCalls).toHaveLength(1);
+        expect(bumpEpoch).toHaveBeenCalledTimes(1);
+        expect(bumpEpoch).toHaveBeenCalledWith({ organizationId: ORG });
+      });
+    });
+
+    describe("when the pass is aborted part-way through the parity sweep", () => {
+      /** @scenario "A proof interrupted by shutdown parks the organization" */
+      it("throws rather than reporting a clean proof it never finished", async () => {
+        // Two members, so the sweep has a second iteration to stop at.
+        repository.legacyRows = [
+          ...repository.legacyRows,
+          {
+            userId: "user_robin",
+            teamId: TEAM,
+            role: "ADMIN",
+            customRoleId: "cr_1",
+          },
+        ];
+        const controller = new AbortController();
+        const migration = migrationWith(async ({ principal }) => {
+          controller.abort();
+          return grantsFor({
+            repository,
+            userId: principal.id,
+            organizationRole: "ADMIN",
+            orgAdminBinding: true,
+            legacy: [
+              {
+                teamId: TEAM,
+                role: "ADMIN",
+                customRoleId: "cr_1",
+                isPersonal: false,
+              },
+            ],
+          });
+        });
+
+        // Finalizing here would switch the organization off its legacy path
+        // on the strength of a sweep that stopped early. Parking is the only
+        // safe answer.
+        await expect(
+          migration.migrateTenant({
+            tenantId: ORG,
+            signal: controller.signal,
+          }),
+        ).rejects.toThrow(/aborted/);
+      });
+    });
   });
 
   describe("given a personal workspace team", () => {

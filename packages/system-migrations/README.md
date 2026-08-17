@@ -6,8 +6,12 @@ every tenant at boot and drives each registered `SystemMigration` through a
 per-tenant state machine:
 
 ```
-pending ──► migrated ──► finalized      finalized = the one-way latch the
-  │             ▲                       app keys behaviour changes on
+pending ──► migrated ──► finalized ──► rolled_back
+  │             ▲            │              ▲
+  │             │            │              └─ operator only; the runner
+  │             │            │                 never moves a tenant here
+  │             │            └─ the one-way latch the app keys behaviour
+  │             │               changes on
   │             │ proof failed - held, behaviour unchanged
   └──► parked ──┘ errored - retried on a later pass
 ```
@@ -27,6 +31,12 @@ The properties the contract guarantees:
 - **Failure is parked, never fatal.** One broken tenant cannot stop the
   fleet, and nothing here has a customer-facing failure surface: every
   failure mode leaves the legacy path answering exactly as before.
+- **Rollback is a status, not a deploy.** Write `rolled_back` on a tenant's
+  row and it returns to its legacy path fleet-wide within the gate's cache
+  bound, with no restart. It is the only status the runner refuses to act
+  on, which is what makes it stick — blanking the row or moving it back to
+  `migrated` does *not* roll a tenant back, because the next pass re-runs a
+  migration whose proof still passes and re-finalizes it minutes later.
 
 Storage-engine-free: the app implements `SystemMigrationStateRepository`
 (Prisma), `MigrationLeaseRepository` (Redis) and `TenantSource`

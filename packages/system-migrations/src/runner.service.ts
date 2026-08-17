@@ -9,6 +9,11 @@ const logger = createLogger("langwatch:system-migrations");
 
 const TENANT_PAGE_SIZE = 100;
 
+const LEASE_NAME = "system-migrations:pass";
+const DEFAULT_LEASE_TTL_MS = 60_000;
+/** Renew well inside the TTL so one slow round trip cannot drop the lease. */
+const DEFAULT_LEASE_RENEW_INTERVAL_MS = 20_000;
+
 /**
  * Which tenants a pass may touch. The app composes this: self-hosted
  * installations answer true for every tenant (migration just happens, in
@@ -25,6 +30,10 @@ export type SystemMigrationRunnerDeps = {
   tenants: TenantSource;
   cohort: MigrationCohort;
   migrations: readonly SystemMigration[];
+  /** How long each lease grant lasts. Defaults to a minute. */
+  leaseTtlMs?: number;
+  /** How often the pass renews its lease. Must stay well inside the TTL. */
+  leaseRenewIntervalMs?: number;
 };
 
 /**
@@ -44,15 +53,14 @@ export class SystemMigrationRunnerService {
   async runPass(args?: {
     signal?: AbortSignal;
   }): Promise<MigrationPassSummary | null> {
-    const { state, lease, tenants, cohort, migrations } = this.deps;
+    const { lease, migrations } = this.deps;
     const signal = args?.signal;
     if (migrations.length === 0) {
       return { tenantsSeen: 0, finalized: 0, held: 0, parked: 0, skipped: 0 };
     }
 
-    const leaseName = "system-migrations:pass";
-    const leaseTtlMs = 60_000;
-    if (!(await lease.acquire({ name: leaseName, ttlMs: leaseTtlMs }))) {
+    const ttlMs = this.deps.leaseTtlMs ?? DEFAULT_LEASE_TTL_MS;
+    if (!(await lease.acquire({ name: LEASE_NAME, ttlMs }))) {
       logger.info("another process holds the migration lease; standing down");
       return null;
     }
@@ -65,53 +73,107 @@ export class SystemMigrationRunnerService {
       skipped: 0,
     };
 
+    // A single tenant can outlive the lease TTL on its own - one large
+    // organization's parity sweep is a round trip per member - so the lease
+    // is held by a timer for as long as the pass runs, not renewed once per
+    // tenant between them.
+    const heartbeat = this.startLeaseHeartbeat();
     try {
-      let cursor: string | null = null;
-      let stopEarly = false;
-      while (!stopEarly) {
-        const page = await tenants.findTenantIdsAfter({
-          cursor,
-          limit: TENANT_PAGE_SIZE,
-        });
-        if (page.length === 0) break;
-        cursor = page[page.length - 1] ?? null;
-
-        for (const tenantId of page) {
-          if (signal?.aborted) {
-            stopEarly = true;
-            break;
-          }
-          // A lost lease means another driver may already be running: stop
-          // early rather than double-drive. Idempotent migrations make the
-          // truncated pass harmless.
-          if (!(await lease.renew({ name: leaseName, ttlMs: leaseTtlMs }))) {
-            logger.warn("migration lease lost mid-pass; stopping early");
-            stopEarly = true;
-            break;
-          }
-
-          summary.tenantsSeen += 1;
-          if (!(await cohort(tenantId))) {
-            summary.skipped += 1;
-            continue;
-          }
-
-          for (const migration of migrations) {
-            await this.runMigrationForTenant({
-              migration,
-              tenantId,
-              signal,
-              summary,
-            });
-          }
-        }
-      }
+      await this.driveTenants({
+        summary,
+        signal,
+        leaseLost: heartbeat.leaseLost,
+      });
     } finally {
-      await lease.release({ name: leaseName });
+      heartbeat.stop();
+      await lease.release({ name: LEASE_NAME });
     }
 
     logger.info({ summary }, "system migration pass complete");
     return summary;
+  }
+
+  /**
+   * Keeps the lease alive for the whole pass. A renewal that comes back
+   * false means another driver has legitimately taken over, which the pass
+   * reads as "stop at the next tenant" - never as corruption, since every
+   * migration is idempotent.
+   */
+  private startLeaseHeartbeat(): {
+    leaseLost: () => boolean;
+    stop: () => void;
+  } {
+    let lost = false;
+    const ttlMs = this.deps.leaseTtlMs ?? DEFAULT_LEASE_TTL_MS;
+    const timer = setInterval(() => {
+      void this.deps.lease
+        .renew({ name: LEASE_NAME, ttlMs })
+        .then((held) => {
+          if (!held) lost = true;
+        })
+        .catch(() => {
+          lost = true;
+        });
+    }, this.deps.leaseRenewIntervalMs ?? DEFAULT_LEASE_RENEW_INTERVAL_MS);
+    // Never let the heartbeat alone hold the process open at shutdown.
+    timer.unref?.();
+    return { leaseLost: () => lost, stop: () => clearInterval(timer) };
+  }
+
+  /** Every cohort tenant, a page at a time, until abort or lease loss. */
+  private async driveTenants(args: {
+    summary: MigrationPassSummary;
+    signal?: AbortSignal;
+    leaseLost: () => boolean;
+  }): Promise<void> {
+    let cursor: string | null = null;
+    for (;;) {
+      const page = await this.deps.tenants.findTenantIdsAfter({
+        cursor,
+        limit: TENANT_PAGE_SIZE,
+      });
+      if (page.length === 0) return;
+      cursor = page[page.length - 1] ?? null;
+      if (!(await this.drivePage({ ...args, page }))) return;
+    }
+  }
+
+  /** One page of tenants. False means the pass must stop here. */
+  private async drivePage({
+    page,
+    summary,
+    signal,
+    leaseLost,
+  }: {
+    page: string[];
+    summary: MigrationPassSummary;
+    signal?: AbortSignal;
+    leaseLost: () => boolean;
+  }): Promise<boolean> {
+    const { cohort, migrations } = this.deps;
+    for (const tenantId of page) {
+      if (signal?.aborted) return false;
+      if (leaseLost()) {
+        logger.warn("migration lease lost mid-pass; stopping early");
+        return false;
+      }
+
+      summary.tenantsSeen += 1;
+      if (!(await cohort(tenantId))) {
+        summary.skipped += 1;
+        continue;
+      }
+
+      for (const migration of migrations) {
+        await this.runMigrationForTenant({
+          migration,
+          tenantId,
+          signal,
+          summary,
+        });
+      }
+    }
+    return true;
   }
 
   private async runMigrationForTenant({
@@ -130,14 +192,26 @@ export class SystemMigrationRunnerService {
       migrationName: migration.name,
       tenantId,
     });
-    // The one-way latch: a finalized tenant is done forever.
-    if (existing?.status === "finalized") {
+    // The two terminal states: `finalized` is the one-way latch, and
+    // `rolled_back` is the operator's pin holding a tenant on its legacy
+    // path. Re-running either would undo the operator's decision on the
+    // very next boot.
+    if (
+      existing?.status === "finalized" ||
+      existing?.status === "rolled_back"
+    ) {
       summary.skipped += 1;
       return;
     }
 
     try {
-      const outcome = await migration.migrateTenant({ tenantId, signal });
+      const outcome = await migration.migrateTenant({
+        tenantId,
+        signal,
+        // A migration that writes before it records anything needs to know
+        // its last attempt died, so it can finish work the crash stranded.
+        previous: existing,
+      });
       await state.upsertRecord({
         migrationName: migration.name,
         tenantId,

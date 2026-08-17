@@ -2,8 +2,8 @@
  * The per-tenant state machine for one in-place migration
  * (specs/rbac/in-place-authz-migration.feature):
  *
- *   pending ──► migrated ──► finalized
- *     │             ▲
+ *   pending ──► migrated ──► finalized ──► rolled_back
+ *     │             ▲                          (operator only)
  *     │             │ proof failed - work done, held on the legacy path
  *     └──► parked ──┘ errored - retried on a later pass
  *
@@ -11,8 +11,19 @@
  * except `finalized`, which is the one-way latch consumers key behaviour
  * changes on: a migration's legacy path may only be switched off for a
  * tenant whose record says finalized.
+ *
+ * `rolled_back` is the operator's undo, and the only status the runner will
+ * not act on. Blanking a finalized row, or moving it back to `migrated`,
+ * does NOT roll a tenant back: the next pass re-runs a migration whose proof
+ * still passes and re-finalizes it within minutes. Writing `rolled_back`
+ * both returns the tenant to its legacy path (no consumer reads it as
+ * finalized) and pins it there until a human moves it again.
  */
-export type TenantMigrationStatus = "migrated" | "finalized" | "parked";
+export type TenantMigrationStatus =
+  | "migrated"
+  | "finalized"
+  | "parked"
+  | "rolled_back";
 
 export type TenantMigrationRecord = {
   migrationName: string;
@@ -43,6 +54,6 @@ export type MigrationPassSummary = {
   finalized: number;
   held: number;
   parked: number;
-  /** Already finalized before this pass, or outside the cohort. */
+  /** Finalized or rolled back before this pass, or outside the cohort. */
   skipped: number;
 };

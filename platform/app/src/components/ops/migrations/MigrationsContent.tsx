@@ -23,12 +23,14 @@ const STATUS_COLOR: Record<string, string> = {
   finalized: "green",
   migrated: "orange",
   parked: "red",
+  rolled_back: "gray",
 };
 
 const STATUS_LABEL: Record<string, string> = {
   finalized: "Finalized",
   migrated: "Held",
   parked: "Parked",
+  rolled_back: "Rolled back",
 };
 
 export function MigrationsContent() {
@@ -61,7 +63,10 @@ export function MigrationsContent() {
     );
   }
 
-  if (query.error) {
+  // Only when there is nothing to show. This view polls every 30s, and a
+  // failed refetch keeps the last good data - replacing a loaded table with
+  // an error panel because one poll blipped loses the operator's place.
+  if (query.error && !query.data) {
     return (
       <Center paddingY={20}>
         <HandledErrorAlert

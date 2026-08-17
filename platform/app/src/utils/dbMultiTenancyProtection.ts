@@ -643,6 +643,42 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
       return null;
     },
   },
+  // In-place system migration state (@langwatch/system-migrations). Its
+  // tenancy column is `tenantId` - deliberately not an FK, because the runner
+  // is generic over whatever a migration calls a tenant (an organization, for
+  // ADR-092 stage B). Two shapes are legitimately bounded: one tenant's row
+  // (what the runner and the authz fallback gate read), and one migration's
+  // rows across tenants (the platform-scope ops rollup, which is the whole
+  // point of the dashboard). A query naming neither would walk every
+  // migration's every tenant, so it throws.
+  SystemMigrationTenantState: {
+    validateWhere: (where) => {
+      const reason =
+        "requires a migrationName or tenantId in the where clause (compound key included)";
+      if (!where) return reason;
+      const ok = validateRecursive(
+        where,
+        (c) =>
+          typeof c.migrationName === "string" ||
+          typeof c.tenantId === "string" ||
+          typeof c.migrationName_tenantId?.migrationName === "string",
+      );
+      return ok ? null : reason;
+    },
+    validateCreateData: (data) => {
+      const records = Array.isArray(data) ? data : [data];
+      for (const d of records) {
+        if (!d) return "create requires a data payload";
+        if (
+          typeof d.migrationName !== "string" ||
+          typeof d.tenantId !== "string"
+        ) {
+          return "create requires a migrationName and tenantId in the data payload";
+        }
+      }
+      return null;
+    },
+  },
 };
 
 /**

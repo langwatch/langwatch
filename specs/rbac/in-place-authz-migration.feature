@@ -17,7 +17,10 @@ Feature: In-place authorization data migration
   # Per-organization state machine, one-way:
   #
   #   pending ──► migrated ──► finalized      (parity clean: legacy fallback
-  #     │             ▲                        no longer consulted)
+  #     │             ▲            │           no longer consulted)
+  #     │             │            ▼
+  #     │             │        rolled_back    (operator only: back on the
+  #     │             │                        legacy path, and pinned there)
   #     │             │ diffs recorded, held
   #     └──► parked ──┘                       (error: retried on a later pass)
   #
@@ -66,6 +69,21 @@ Feature: In-place authorization data migration
     When a later pass runs
     Then "acme" is skipped without any backfill or parity work
 
+  @unit
+  Scenario: An operator rolls a finalized organization back to its legacy path
+    Given "acme" was finalized
+    When an operator records "acme" as rolled back
+    Then permission checks in "acme" consult the legacy fallback again
+    And later passes leave "acme" alone instead of re-finalizing it
+
+  @unit
+  Scenario: The pass keeps its lease while one large organization migrates
+    Given migrating "acme" takes longer than a single lease term
+    When the pass is working through "acme"
+    Then the lease is renewed for as long as the pass runs
+    And a lease lost to another process stops this pass at the next
+      organization
+
   # ============================================================================
   # The backfill (runbook M1)
   # ============================================================================
@@ -96,6 +114,14 @@ Feature: In-place authorization data migration
     Then the epoch for "acme" is bumped after the bindings are written
     And an audit event records the backfill with its counts
 
+  @unit
+  Scenario: A migration that died after writing publishes its work on the retry
+    Given an earlier pass wrote "acme"'s bindings and then parked before
+      bumping the epoch
+    When a later pass processes "acme"
+    Then the epoch for "acme" is bumped even though no binding was missing
+    And no duplicate bindings are created
+
   # ============================================================================
   # The parity proof and the per-organization switch
   # ============================================================================
@@ -115,6 +141,13 @@ Feature: In-place authorization data migration
     Then "acme" is recorded as migrated with the disagreement in its report
     And "acme" is not finalized
     And "sam" keeps that permission because the legacy path stays live
+
+  @unit
+  Scenario: A proof interrupted by shutdown parks the organization
+    Given the workers shut down while "acme"'s parity proof is part-way through
+    When the proof is interrupted
+    Then "acme" is parked rather than finalized on an unfinished proof
+    And the next pass verifies "acme" from the start
 
   @integration
   Scenario: A finalized organization stops consulting the legacy fallback
