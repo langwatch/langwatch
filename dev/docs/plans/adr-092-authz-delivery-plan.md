@@ -22,7 +22,7 @@ contract; new ledger scenarios to be added).
 the stage-by-stage (A–F) rollout entirely. The stages survive only as names for
 work already merged (A = the engine #6894, B = the self-migration #7079).
 
-## Decisions log (all 2026-08-17, Alex)
+## Decisions log (2026-08-17 unless dated otherwise, Alex)
 
 | # | Decision |
 |---|---|
@@ -49,6 +49,7 @@ work already merged (A = the engine #6894, B = the self-migration #7079).
 | 21 | **Public REST names are frozen.** `/role-bindings`, the `bindings` wire shape, and `role_binding_already_exists` (409, `role-bindings-rest-api.feature:92`) are customer contracts — the no-sunset philosophy applies to API names exactly as to old keys. The Grant/Role rename never leaks to the wire; no `/grants` API until a customer need exists. |
 | 22 | **Resource-tier facts live on `Grant`; accounting does not.** `token`, `permission`, `expiresAt`, `maxViews` are fact columns set by the mint event, fold-owned like every other column. `viewCount` has a different writer (ShareService, per view), so it moves to a ShareService-owned accounting row (`GrantUsage { grantId, viewCount, lastViewedAt }`) when ShareService moves onto the ledger in PR 3 — never onto the projection table. |
 | 23 | **Event idempotency is commandId-based.** Every command mints a random `commandId` at the boundary; retries reuse it; each emitted event carries `idempotencyKey = <commandId>:<index>`. Legitimate repeats (same action twice in a second) can never be deduped away, and retries always are. Migrations derive commandIds deterministically from source rows (`genesis:<rowId>`, `backfill-b:<rowId>` — the identity programme's backfill shape). Where an upstream system id exists (the general house pattern, e.g. trace ids) it remains the key; commandId is for facts born from direct user action. Grant ids stay content-derived on top, so re-imports converge by upsert regardless. |
+| 24 | *(2026-08-18)* **Write paths fork per org.** The ledger becomes the writer for an organization only when its genesis import completes; everyone else keeps the imperative path. Deploy changes nothing until an org migrates. |
 
 ## The final data structure
 
@@ -411,6 +412,29 @@ PR 1) — the ledger is the only writer, still dark:
    `in-place-authz-migration.feature`; the Redis-stopped revocation scenario
    in `unified-authorization-engine.feature` drops `@unimplemented` and binds
    to that test.
+
+**Amended 2026-08-18 (decision 24): the write-path move is per organization,
+not per deploy.** As first written, PR 2 flipped every organization onto
+ledger-emitting writes the moment it deployed — an all-at-once behaviour
+change, which is exactly what the in-place doctrine (decision 4) exists to
+avoid. The fork now lives in one place, `GrantsLedgerWriter`, and every verb
+asks `app-layer/authz/ledger-write-gate.ts` first: an organization is on
+ledger writes iff its `SystemMigrationTenantState` row for
+`authz-grants-genesis-import` reads `migrated` or `finalized`. Absent,
+`pending`, `parked` or `rolled_back` all mean the imperative write, with the
+pre-conversion semantics intact — `create` / `createMany skipDuplicates` /
+`update` / `deleteMany` / the role upsert — so the deploy is inert until an
+organization migrates and no converted call site changes at all. Rollback is
+the operator's `rolled_back` flip on that row, fleet-wide within the gate's
+cache TTL and with no deploy; rows written imperatively meanwhile are adopted
+by the next genesis pass (adoption ids make re-runs convergent), which is what
+makes flip → rollback → re-flip safe. Decision 17 holds either side of the
+fork: a migrated organization's audit rows come from the subscriber, and an
+unmigrated one's are written by the writer in the same shape, best-effort, so
+removing the call sites' audit writes lost no trail. Read-through minting is
+gated the same way — an unmigrated organization's legacy keys keep their
+existing branch and state nothing. Bound in `in-place-authz-migration.feature`
+under "Per-organization write cutover".
 
 Reads still do not move: every permission check keeps reading the legacy
 tables, per org, until PR 3.

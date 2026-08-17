@@ -344,6 +344,47 @@ Feature: In-place authorization data migration
     Then the legacy-shaped binding row is written by the fold
 
   # ============================================================================
+  # Per-organization write cutover (ADR-092 decision 4)
+  # ============================================================================
+  # "One writer" arrives the same way every other change in this feature does:
+  # one organization at a time, never all at once. The code above ships to
+  # production gated closed - an organization's grant writes move onto the
+  # ledger only when its own genesis import has landed, and everyone else keeps
+  # the imperative writes, audit rows included, exactly as before. A deploy
+  # therefore changes nobody's behaviour, and putting an organization back is
+  # the operator's flip on its state row rather than a release. Rows written
+  # imperatively meanwhile are adopted by the next genesis pass, so flipping
+  # back and forth converges instead of diverging.
+
+  @unit
+  Scenario: An organization that has not completed the genesis import keeps writing legacy rows imperatively
+    Given "acme" has no completed genesis import
+    When an admin attaches, changes, revokes, or defines a grant in "acme"
+    Then the row is written directly, as it was before the ledger
+    And no command is emitted for it
+
+  @unit
+  Scenario: Completing the genesis import moves an organization's writes onto the ledger
+    Given the genesis import for "acme" has completed
+    When an admin attaches, revokes, or defines a grant in "acme"
+    Then the write emits a command
+    And it writes no grant table row of its own
+
+  @unit
+  Scenario: The operator rollback returns an organization's writes to the legacy path without a deploy
+    Given "acme" was writing through the ledger
+    When an operator records its genesis import as rolled back
+    Then its writes return to the imperative path with no deploy
+
+  @unit
+  Scenario: A write on the legacy path still records its audit row
+    Given "acme" has no completed genesis import
+    When an admin attaches a role binding
+    Then an audit row is recorded naming the actor, the organization, and the
+      fact
+    And it has the same shape the ledger's subscriber writes
+
+  # ============================================================================
   # The audit trail as an event subscriber (ADR-092 decision 17)
   # ============================================================================
   # The audit page, its table and its retention are unchanged; what feeds it

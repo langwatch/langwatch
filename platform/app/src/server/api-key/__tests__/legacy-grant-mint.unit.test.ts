@@ -48,6 +48,9 @@ function writerSpy() {
 /** Lets the fire-and-forget promise settle before assertions on failure. */
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
+/** The mint is per-organization; these cases are about an org past genesis. */
+const onMigratedOrg = async () => true;
+
 describe("legacy API key read-through mint", () => {
   beforeEach(() => {
     resetLegacyMintGuardForTests();
@@ -58,7 +61,11 @@ describe("legacy API key read-through mint", () => {
     it("mints the organization-scoped admin grant the mint path already documents", async () => {
       const { attachBindings, writer } = writerSpy();
 
-      mintLegacyKeyGrant({ apiKey: serviceKey(), writer });
+      mintLegacyKeyGrant({
+        apiKey: serviceKey(),
+        writer,
+        onLedgerWrites: onMigratedOrg,
+      });
       await settle();
 
       expect(attachBindings).toHaveBeenCalledTimes(1);
@@ -84,7 +91,11 @@ describe("legacy API key read-through mint", () => {
     it("carries the key's own creation time as the fact's business time", async () => {
       const { attachBindings, writer } = writerSpy();
 
-      mintLegacyKeyGrant({ apiKey: serviceKey(), writer });
+      mintLegacyKeyGrant({
+        apiKey: serviceKey(),
+        writer,
+        onLedgerWrites: onMigratedOrg,
+      });
       await settle();
 
       expect(attachBindings.mock.calls[0]![0].occurredAtMs).toBe(
@@ -96,7 +107,11 @@ describe("legacy API key read-through mint", () => {
     it("does not wait for the projection", async () => {
       const { attachBindings, writer } = writerSpy();
 
-      mintLegacyKeyGrant({ apiKey: serviceKey(), writer });
+      mintLegacyKeyGrant({
+        apiKey: serviceKey(),
+        writer,
+        onLedgerWrites: onMigratedOrg,
+      });
       await settle();
 
       expect(attachBindings.mock.calls[0]![0].awaitProjection).toBe(false);
@@ -106,8 +121,16 @@ describe("legacy API key read-through mint", () => {
     it("emits once while the projection is still catching up", async () => {
       const { attachBindings, writer } = writerSpy();
 
-      mintLegacyKeyGrant({ apiKey: serviceKey(), writer });
-      mintLegacyKeyGrant({ apiKey: serviceKey(), writer });
+      mintLegacyKeyGrant({
+        apiKey: serviceKey(),
+        writer,
+        onLedgerWrites: onMigratedOrg,
+      });
+      mintLegacyKeyGrant({
+        apiKey: serviceKey(),
+        writer,
+        onLedgerWrites: onMigratedOrg,
+      });
       await settle();
 
       expect(attachBindings).toHaveBeenCalledTimes(1);
@@ -121,6 +144,44 @@ describe("legacy API key read-through mint", () => {
     });
   });
 
+  describe("given an organization the genesis import has not reached", () => {
+    it("mints nothing, leaving the key's legacy branch to decide", async () => {
+      const { attachBindings, writer } = writerSpy();
+
+      mintLegacyKeyGrant({
+        apiKey: serviceKey(),
+        writer,
+        onLedgerWrites: async () => false,
+      });
+      await settle();
+
+      expect(attachBindings).not.toHaveBeenCalled();
+    });
+
+    it("mints on the first use after the organization migrates", async () => {
+      const { attachBindings, writer } = writerSpy();
+      let migrated = false;
+
+      mintLegacyKeyGrant({
+        apiKey: serviceKey(),
+        writer,
+        onLedgerWrites: async () => migrated,
+      });
+      await settle();
+      expect(attachBindings).not.toHaveBeenCalled();
+
+      migrated = true;
+      mintLegacyKeyGrant({
+        apiKey: serviceKey(),
+        writer,
+        onLedgerWrites: async () => migrated,
+      });
+      await settle();
+
+      expect(attachBindings).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("given a key that states its access already", () => {
     /** @scenario "A key that already states its access mints nothing" */
     it("mints nothing", async () => {
@@ -130,7 +191,11 @@ describe("legacy API key read-through mint", () => {
       });
 
       expect(legacyGrantForKey(bound)).toBeNull();
-      mintLegacyKeyGrant({ apiKey: bound, writer });
+      mintLegacyKeyGrant({
+        apiKey: bound,
+        writer,
+        onLedgerWrites: onMigratedOrg,
+      });
       await settle();
 
       expect(attachBindings).not.toHaveBeenCalled();
@@ -144,7 +209,11 @@ describe("legacy API key read-through mint", () => {
       const personal = serviceKey({ userId: "user_1" });
 
       expect(legacyGrantForKey(personal)).toBeNull();
-      mintLegacyKeyGrant({ apiKey: personal, writer });
+      mintLegacyKeyGrant({
+        apiKey: personal,
+        writer,
+        onLedgerWrites: onMigratedOrg,
+      });
       await settle();
 
       expect(attachBindings).not.toHaveBeenCalled();
@@ -157,7 +226,11 @@ describe("legacy API key read-through mint", () => {
       const ingestion = serviceKey({ ingestSourceType: "claude_code" });
 
       expect(legacyGrantForKey(ingestion)).toBeNull();
-      mintLegacyKeyGrant({ apiKey: ingestion, writer });
+      mintLegacyKeyGrant({
+        apiKey: ingestion,
+        writer,
+        onLedgerWrites: onMigratedOrg,
+      });
       await settle();
 
       expect(attachBindings).not.toHaveBeenCalled();
@@ -174,11 +247,19 @@ describe("legacy API key read-through mint", () => {
       const writer = { attachBindings } as unknown as GrantsLedgerWriter;
 
       expect(() =>
-        mintLegacyKeyGrant({ apiKey: serviceKey(), writer }),
+        mintLegacyKeyGrant({
+          apiKey: serviceKey(),
+          writer,
+          onLedgerWrites: onMigratedOrg,
+        }),
       ).not.toThrow();
       await settle();
 
-      mintLegacyKeyGrant({ apiKey: serviceKey(), writer });
+      mintLegacyKeyGrant({
+        apiKey: serviceKey(),
+        writer,
+        onLedgerWrites: onMigratedOrg,
+      });
       await settle();
       expect(attachBindings).toHaveBeenCalledTimes(2);
     });
@@ -191,7 +272,11 @@ describe("legacy API key read-through mint", () => {
       const writer = { attachBindings } as unknown as GrantsLedgerWriter;
 
       expect(() =>
-        mintLegacyKeyGrant({ apiKey: serviceKey(), writer }),
+        mintLegacyKeyGrant({
+          apiKey: serviceKey(),
+          writer,
+          onLedgerWrites: onMigratedOrg,
+        }),
       ).not.toThrow();
     });
   });

@@ -81,6 +81,9 @@ describe("given a revocation with the queue severed and Redis disconnected", () 
 
   const writer = () =>
     new GrantsLedgerWriter(prisma, {
+      // This organization is past its genesis import: the doctrine under
+      // test is the ledger revoke path, not the pre-ledger one it forks from.
+      onLedgerWrites: async () => true,
       commands: async () => ({
         commands: Object.fromEntries(
           COMMAND_VERBS.map((verb) => [

@@ -19,6 +19,12 @@
  * bindings at all, because zero bindings means zero access there, so there is
  * no implicit grant to write down and this mints nothing for it.
  *
+ * Like every other grant write, this is per-organization (decision 4): the
+ * mint only runs for an organization whose genesis import has landed. For
+ * everyone else the key's legacy branch keeps deciding what it may do —
+ * unchanged, and with no ledger fact stated ahead of the history the import
+ * still owes that organization.
+ *
  * Identity is derived, not random (decision 23): the grant id is a function
  * of the fact's content and the key's own `createdAt` — its business time,
  * since that is when the access really began — and the command id is derived
@@ -37,6 +43,7 @@ import {
   type LedgerActor,
   type LedgerBindingAttach,
 } from "~/server/app-layer/authz/ledger";
+import { isOrgOnLedgerWrites } from "~/server/app-layer/authz/ledger-write-gate";
 import type { ApiKeyWithBindings } from "./api-key.repository";
 
 const logger = createLogger("langwatch:api-key:legacy-grant-mint");
@@ -98,9 +105,12 @@ export function legacyGrantForKey(
 export function mintLegacyKeyGrant({
   apiKey,
   writer,
+  onLedgerWrites = isOrgOnLedgerWrites,
 }: {
   apiKey: ApiKeyWithBindings;
   writer?: GrantsLedgerWriter;
+  /** The per-organization write fork (decision 4); injectable for tests. */
+  onLedgerWrites?: (args: { organizationId: string }) => Promise<boolean>;
 }): void {
   try {
     const binding = legacyGrantForKey(apiKey);
@@ -108,8 +118,18 @@ export function mintLegacyKeyGrant({
     if (emitted.has(apiKey.id)) return;
     emitted.add(apiKey.id);
 
-    void (writer ?? grantsLedgerWriter())
-      .attachBindings({
+    void (async () => {
+      // Nothing to state for an organization the genesis import has not
+      // reached: its keys are still decided by the legacy branch, which is
+      // untouched, and a mint would put the only ledger fact the
+      // organization has in front of the history the import still owes it.
+      // The guard is released rather than latched, so the first request
+      // after the organization migrates mints as it should.
+      if (!(await onLedgerWrites({ organizationId: apiKey.organizationId }))) {
+        emitted.delete(apiKey.id);
+        return;
+      }
+      await (writer ?? grantsLedgerWriter()).attachBindings({
         organizationId: apiKey.organizationId,
         bindings: [binding],
         actor: READ_THROUGH_MINT_ACTOR,
@@ -118,8 +138,8 @@ export function mintLegacyKeyGrant({
         commandId: `read-through-mint:${apiKey.id}`,
         occurredAtMs: apiKey.createdAt.getTime(),
         awaitProjection: false,
-      })
-      .catch((err: unknown) => failed({ apiKey, err }));
+      });
+    })().catch((err: unknown) => failed({ apiKey, err }));
   } catch (err) {
     // Composing the writer, or deriving the fact, can fail on this thread —
     // and this function's whole contract is that authentication does not
