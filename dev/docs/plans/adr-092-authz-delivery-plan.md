@@ -61,8 +61,9 @@ above say otherwise.
  AUTHZ_V2_ENFORCE       stage D    engine is primary, legacy runs as the shadow
                                    (reverse-shadow); 0 = instant revert to legacy
                                    until stage E deletes legacy entirely
- AUTHZ_LEGACY_KEY_ENFORCE  stage C log-only → enforce, per-org overridable for
-                                   escalation during the sunset window
+ AUTHZ_LEGACY_KEY_ENFORCE  RETIRED  never shipped. D2 decided there is no
+                                   legacy-key sunset, so there is no window to
+                                   stage and no enforcement to flip
  AUTHZ_EPOCH_CACHE      stage F    L1 cache on/off; off = every check collects
                                    (stage-E behaviour, always correct).
                                    PRECONDITION: stays off until M7 holds -
@@ -213,9 +214,10 @@ is a dashboard number, not a launch blocker.
 
 ## Stage C - re-key roles, fix the principal escalations
 
-**Blocked on:** product sign-off #1 (legacy-key sunset comms + date) and #2
-(empty-custom-role semantics change). Both are called out in the ADR's
-migration section as the only customer-visible changes.
+**Unblocked 2026-08-17.** Both sign-offs are closed (D2: no legacy-key
+sunset; D3: empty role means deny, with a measured blast radius of zero),
+and neither leaves a customer-visible permission change behind. Stage C
+waits on nothing.
 
 - **C1 `RoleBinding.roleKey`.** Nullable column, backfilled from
   `(scopeType, role, customRoleId)` → `admin | member | viewer |
@@ -225,19 +227,34 @@ migration section as the only customer-visible changes.
 - **C2 lite-member becomes a role.** EXTERNAL org members get
   `lite-member` at org scope during C1's backfill; SCIM provisioning maps
   seat → roleKey (member vs lite-member) instead of unconditional MEMBER
-  (`scim.service.ts:153-204`); the API-key resolver's missing EXTERNAL cap
+  (**note: `scim.service.ts` no longer exists - the provisioning path moved
+  since this plan was written, and C2 must re-locate it before assuming the
+  old line numbers**); the API-key resolver's missing EXTERNAL cap
   (Context #10's escalation) closes by construction because keys and
   sessions now read the same roleKeys. Seat classification stays as billing
   data the engine never reads (coordinate with #3388's licence counting).
   *Regression tests:* lite member's key ≤ lite member's session, on every
   surface.
-- **C3 legacy API key sunset.** Backfill every legacy key to explicit
-  bindings mirroring today's full-project access; deprecation response
-  header + `authz_legacy_key_use_total` metric; comms doc for cloud
-  customers; `AUTHZ_LEGACY_KEY_ENFORCE` staged log-only → enforce. The
-  zero-binding service-key default-to-org-ADMIN (`api-key.service.ts:151`)
-  gets the same treatment: backfill explicit bindings for existing keys,
-  then delete the default (creation requires bindings).
+- **C3 legacy API key compatibility** (was "sunset" - D2 decided against
+  one). Old keys keep working forever, with no deadline and no customer
+  action. What moves is where their access lives:
+  - Backfill every legacy key to explicit bindings mirroring today's
+    full-project access. Additive; nothing is revoked.
+  - **Read-through minting**: a key that reaches the resolver with no
+    bindings (created before the backfill, or a race) mints them from its
+    `permissions` JSON on first use rather than being denied. This is what
+    makes "old keys work forever" true instead of aspirational, and it is
+    the piece that lets the raw-JSON *decision path* die on schedule.
+  - `permissions` becomes a dormant column - a source the minter reads,
+    never a path `decide()` consults. Keep an `authz_legacy_key_mint_total`
+    counter so we can see the tail converge; it is an observation, not a
+    gate, and nothing is deleted when it reaches zero.
+  - No deprecation header, no comms doc, no `AUTHZ_LEGACY_KEY_ENFORCE`.
+  - The zero-binding service-key default-to-org-ADMIN
+    (`api-key.service.ts:224-235`) is a separate matter and still gets
+    fixed: backfill explicit bindings for existing keys, then require
+    bindings at creation. Existing keys keep working - this closes a
+    silent escalation for NEW keys, which is not a compatibility break.
 - **C4 spec truth-up.** Rewrite `scoped-role-bindings.feature` to union
   semantics; flip the engine spec's now-passing scenarios off
   `@unimplemented`.
@@ -390,8 +407,8 @@ revocation-lag SLO green for a week.
 | # | Decision | Blocks | Proposed default |
 |---|----------|--------|------------------|
 | D1 | ~~Union semantics sign-off~~ **settled** - implemented on this branch with bound scenarios; merging the engine PR is the sign-off, and the spec supersession note activates on ADR-092 acceptance | nothing | Union, per ADR §3 |
-| D2 | Legacy-key sunset date + comms owner | C3 | 60-day window from C1 merge |
-| D3 | Empty-custom-role semantics change | C1 | Role means what it says (deny) |
+| D2 | ~~Legacy-key sunset date + comms owner~~ **settled 2026-08-17: there is no sunset.** Legacy keys are supported indefinitely; C3 becomes a compatibility backfill (see below), not a deprecation. No date, no comms doc, no `AUTHZ_LEGACY_KEY_ENFORCE` | nothing | n/a - decision was "don't" |
+| D3 | ~~Empty-custom-role semantics change~~ **settled 2026-08-17: the role means what it says (deny).** Measured against production the same day: of 464 custom roles, zero are empty and zero carry only strings outside the registry, so the change lands with no affected customer and needs no remediation path | nothing | Deny, as proposed |
 | D4 | Epoch storage (PG column + Redis fanout vs Redis-only) | F1 | PG column, Redis fanout |
 | D5 | Access-surface IA (replace 5 pages vs add 6th) | E2 | Replace, with redirects |
 | D6 | Passport secret (reuse CREDENTIALS_SECRET vs dedicated) | F2 | Dedicated `AUTHZ_PASSPORT_SECRET` |
@@ -452,7 +469,7 @@ destroys legacy data before its gate passes).
 |---|-------|------|-----------|--------------------|----------|
 | M1 | B | `TeamUser` rows → `RoleBinding` at TEAM scope | **In-place**: the `@langwatch/system-migrations` runner drives `TeamUserBackfillMigration` per organization at worker boot (role → role, `assignedRoleId` → `customRoleId`; personal teams stay team-scoped), audit-tagged `source: backfill-b`, one epoch bump per org. The old dry-run flag became the mandatory verify phase of the state machine | Per-org `decide()` parity sweep (with vs without legacy rows, spec: "Legacy membership rows resolve identically"); zero diffs → `finalized` and that org's fallback gate closes; any diff → held as `migrated`, behaviour unchanged | Write `rolled_back` on the org's state row (fallback reads resume fleet-wide within 15 min, no restart; the runner refuses to re-run that org, so it stays rolled back). Bindings stay (additive) |
 | M2 | B | Delete `LEGACY-QUIRK(B)` fallbacks | Code deletion PR once M1's gate holds | Zero `legacy-team-fallback` grants observed in decision audit for 7 days | Revert PR |
-| M3 | C | Legacy API keys (`permissions` JSON, no bindings) → explicit key bindings | Backfill mints bindings equal to each key's measured effective set; `AUTHZ_LEGACY_KEY_ENFORCE` flips the raw-JSON path off | Key-by-key parity report; sunset comms sent (D2); canary orgs first | Flag back on; bindings stay (additive) |
+| M3 | C | Legacy API keys (`permissions` JSON, no bindings) → explicit key bindings | Backfill mints bindings equal to each key's measured effective set, plus read-through minting for any key the backfill missed. No enforcement flag - D2 removed the sunset, so the raw-JSON path is retired by having no callers left, not by being switched off | Key-by-key parity report; canary orgs first. NOT gated on legacy use reaching zero - keys are supported indefinitely | Bindings stay (additive); a key that loses its bindings still mints them on next use |
 | M4 | C | EXTERNAL org rows → `lite-member` role bindings; org-scoped enum semantics re-keyed | Same expand/verify shape; the escalation regression pack pins the fixed behaviour | Escalation pack green + shadow silent on the divergence families | Flag back |
 | M5 | C5 | `ShareLink` → general `ResourceGrant` store | Prisma migration EXTENDS ShareLink: `permission` column (default `traces:view`), principal-audience columns; `resolveForViewer` delegates its authorization step to `authz.check` on the resource scope | Share e2e pack green; `sharedTrace.get` behaviour byte-identical for existing links | Revert the delegation; columns are additive |
 | M6 | E | Legacy vocabulary types/bags in `rbac.ts` | Migrate-consumers-then-delete, in one stage: the registry becomes the source, every consumer is updated to import it directly, and `rbac.ts` is deleted. No re-export shim - the house rule bans re-exporting "for backwards compatibility", and a shim would leave two importable spellings of one vocabulary for a release, which is the drift this ADR exists to end | tsgo clean repo-wide + zero runtime references (grep gate in CI) | Revert the consumer-migration PR (it is one mechanical diff; `rbac.ts` comes back with it) |
@@ -470,10 +487,22 @@ schema-adjacent steps, M7's flag only after D0 completes.
    + ops surface (this amendment's PR). Cloud rollout = widen
    `SYSTEM_MIGRATIONS_COHORT` self-service-first, watching the ops page.
 3. Stage-C PR (one PR): `roleKey` re-key + lite-member + legacy-key
-   backfill rider (M3) + ShareLink `permission` column (M5) + spec
-   truth-up. Needs sign-offs D2/D3.
-4. Stage-D PR (one PR): `.permission()` codemod, eight write paths through
+   compatibility backfill (M3) + ShareLink `permission` column (M5) + spec
+   truth-up. **Sign-offs D2/D3 both closed 2026-08-17 - this is unblocked.**
+4. Separately and not blocking C: **the shadow soak currently produces no
+   readable evidence.** The comparison emits nothing on agreement, and its
+   failure path logs at `debug` (`authz-shadow.service.ts:193, 292, 372`)
+   while cloud runs `PINO_LOG_LEVEL=info` - so a shadow throwing on every
+   call is indistinguishable from perfect agreement, which is exactly what
+   the logs show today (zero mismatches over the full live window since
+   2026-08-16T23:51Z). The `authz_shadow_mismatch_total` metric gate A
+   named was never implemented, so there is no dashboard and no
+   denominator. Before gate A's seven days can mean anything: raise the
+   failure log to `warn` (sampled), add a comparison counter alongside the
+   mismatch counter so agreement is positively observable, and build the
+   gcx dashboard. Small PR, but every day it waits is a wasted soak day.
+5. Stage-D PR (one PR): `.permission()` codemod, eight write paths through
    `grants.*`, Hono edge identity, service principals. `AUTHZ_V2_ENFORCE`
    flips after merge, per cohort. (The annotations slice already merged as
    the scope-contract reference.)
-5. Stage-E PR, then stage-F PR, per the one-PR-per-stage structure above.
+6. Stage-E PR, then stage-F PR, per the one-PR-per-stage structure above.

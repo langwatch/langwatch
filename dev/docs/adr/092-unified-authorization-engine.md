@@ -451,10 +451,14 @@ auth blocks collapse into that one edge.
  lite member  ─→ a ROLE (its own permission set) + a separate billing seat
                  classification that authz NEVER reads (fixes the #3388 class);
                  denialReason preserves today's tailored UI messaging
- legacy keys  ─→ the full-RBAC-bypass grandfather path gets a dated sunset:
-                 backfill each legacy key to explicit bindings mirroring what
-                 it can do today, then delete the bypass branch - a credential
-                 must never be stronger than its bindings
+ legacy keys  ─→ NO sunset (decided 2026-08-17): old keys keep working, with
+                 no deadline and no customer action. What changes is where
+                 their access LIVES - each legacy key is backfilled to explicit
+                 bindings mirroring what it can do today, and any key the
+                 backfill missed mints its bindings on first use. The
+                 `permissions` JSON stops being a decision path and becomes a
+                 dormant column, so the bypass branch still dies and a
+                 credential is never stronger than its bindings
 ```
 
 Impersonation becomes a first-class shape instead of a session rewrite. A
@@ -937,10 +941,22 @@ re-collect is the same 1-2 queries the engine already does.
 Each stage merges independently and is verifiable - stage A's shadow
 mismatch telemetry is the safety net for B-D, and again for F. No big-bang
 cutover, no downtime, and no customer-visible permission change except
-deliberate, spec'd ones. There are two: the legacy-API-key sunset (C), and
-the empty-custom-role fallthrough (today the server quietly permits
-viewer-level; the role becomes exactly what it says, which is what the UI
-already shows).
+deliberate, spec'd ones.
+
+Both candidates closed on 2026-08-17, leaving **no customer-visible
+permission change at all**:
+
+- **Legacy API keys: no sunset.** Old keys keep working indefinitely. The
+  backfill moves where their access is stored, not what it grants, so
+  nothing a customer holds stops working and no comms are owed.
+- **Empty custom roles: the role means what it says (deny).** Today an empty
+  custom role falls through to the binding's built-in role
+  (`matchers.ts`: "Non-empty custom role is authoritative; empty/missing
+  falls through"), quietly granting more than the UI shows. Measured against
+  production on 2026-08-17: of 464 custom roles, **zero** are empty and
+  **zero** carry only strings outside the 126-permission registry. The
+  change is real but its blast radius is empirically nil, so it ships
+  without a remediation path.
 
 ## What falls out for free (not being decided here)
 

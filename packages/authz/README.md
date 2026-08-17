@@ -212,7 +212,7 @@ them, and the migration deletes the synonyms.
 
 | Term | Meaning |
 |---|---|
-| **Permission** | A `resource:action` string, e.g. `traces:view`. Comes from the one registry; nothing else may invent one. The registry order is **append-only** because bitset indices are derived from it. |
+| **Permission** | A `resource:action` string, e.g. `traces:view`. Comes from the one registry; nothing else may invent one. The registry order is **append-only** because bitset indices are derived from it. **Never call these "scopes"** - see the note under this table. |
 | **Resource** | A noun the registry declares: its supported actions, the scopes it can be granted at, and what `manage` implies for it. `traces:rotate` is a type error, not a runtime surprise. |
 | **Action** | The verb half of a permission. `manage` satisfies the resource's other actions through the hierarchy rule (`permissionSatisfiedBy`). |
 | **Registry** | `AUTHZ_RESOURCES` in `registry.ts` - the single authoritative vocabulary. Everything else (types, validators, bitset indices, pickers) is derived from it. |
@@ -238,6 +238,34 @@ them, and the migration deletes the synonyms.
 | **Witness** | `Authorized<Scope>` - a branded, unforgeable proof that `authz.authorize()` allowed a permission at a scope. Repositories that accept a witness instead of a raw id make "forgot the check" fail to compile. |
 | **Repository port** | The storage interfaces the runtime services are written against: `AuthzReadRepository` (everything COLLECT reads) and `AuthzGrantsRepository` (everything the write surface touches, transactions included). The app implements them as `Prisma*Repository` classes. |
 | **Composition root** | `platform/app/src/server/authz/runtime.ts` - the one place repositories, redis, the audit writer and the KSUID minter meet the services. Everything else imports the composed instances. |
+
+### "Permission" or "scope"? Permission - everywhere (2026-08-17)
+
+`traces:view` looks like an OAuth scope, and on an API key it even behaves
+like one: a key's access is *reductive*, intersected with its owner's
+(`effective(key) = grants(key) ∩ grants(owner)`). That is a real property,
+and it already has a name here - the **owner ceiling**. It is not a reason
+to call the string a scope.
+
+**Scope is taken, and it is taken in the customer's vocabulary, not just
+ours.** The product already teaches "scope = where": `ScopeChipPicker` is a
+hard rule for every scoped-resource surface
+(`dev/docs/best_practices/scope-selector-and-badges.md`), and the scopes it
+offers are organization / team / project. A customer who met "scopes" on
+their API key would be meeting a second, unrelated sense of the word in the
+same settings area.
+
+So one vocabulary, no translation layer, no internal-versus-external split:
+
+```
+ PERMISSION  what you may do     traces:view          registry string
+ SCOPE       where it applies    project p_abc123     org → team → project → resource
+```
+
+This holds in code, API documentation and UI copy alike. On a user binding a
+permission is additive (the union); on a key it is bounded by the owner
+ceiling. Same string, same word, two behaviours the model already names -
+reach for `additive union` and `owner ceiling` when you need to say which.
 | **Passport** | A signed, short-TTL (≤60s), epoch-bound token carrying per-scope permission bitsets. Lets stateless surfaces (Go gateway, collectors) verify with an HMAC check and an epoch compare - zero database. |
 | **Bitset** | An effective permission set as bits indexed by registry order. The reason the registry is append-only: an index, once shipped inside a passport, must never change meaning. |
 | **Epoch** | A per-organization counter. Every grant write bumps it; caches and passports are valid only for the epoch they were built under, so revocation lands on the next request. |
