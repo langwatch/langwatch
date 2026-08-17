@@ -76,7 +76,26 @@ Feature: Shards are balanced by measured duration
         | null             |
         | infinity         |
 
+  # Each shard emits ONLY the files it measured, and the aggregation lays those
+  # deltas over the committed manifest. Having each shard merge over the
+  # committed manifest instead would put the whole baseline in every artifact,
+  # so a file measured by one shard would carry its new value in that shard's
+  # artifact and its old value in all the others — and whichever artifact was
+  # combined last would decide, discarding fresh measurements by file order.
+
   Rule: a refresh accumulates rather than replaces
+
+    @unit
+    Scenario: A shard reports only what it measured
+      Given a run that measured two of the suite's files
+      When the run writes its durations
+      Then only those two files are written
+
+    @unit
+    Scenario: A shard never writes over the committed manifest
+      Given a committed manifest of durations
+      When a run writes its durations
+      Then the committed manifest is untouched
 
     @unit
     Scenario: A shard refreshes only the files it ran

@@ -1,10 +1,16 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { mergeDurations } from "../durationManifestReporter";
+import DurationManifestReporter, {
+  mergeDurations,
+} from "../durationManifestReporter";
 import { createWeigher, loadDurationManifest } from "../shardWeights";
+
+/** A vitest TestModule, as much of one as the reporter actually reads. */
+const fakeModule = (moduleId: string, duration: number) =>
+  ({ moduleId, diagnostic: () => ({ duration }) }) as never;
 
 /** Binds specs/ci/shard-duration-weights.feature. */
 describe("shard weights", () => {
@@ -144,6 +150,41 @@ describe("shard weights", () => {
       expect(weigh(path.join(root, "b.test.ts"))).toBeGreaterThan(
         weigh(path.join(root, "a.test.ts")),
       );
+    });
+  });
+
+  describe("when a run writes its durations", () => {
+    /** @scenario "A shard reports only what it measured" */
+    it("writes only the files it measured", () => {
+      const deltaPath = path.join(root, "vitest.durations.delta.json");
+      const reporter = new DurationManifestReporter({
+        manifestPath: deltaPath,
+        root,
+      });
+
+      reporter.onTestModuleEnd(fakeModule(path.join(root, "a.test.ts"), 120));
+      reporter.onTestModuleEnd(fakeModule(path.join(root, "b.test.ts"), 340));
+      reporter.onTestRunEnd();
+
+      expect(JSON.parse(readFileSync(deltaPath, "utf8"))).toEqual({
+        "a.test.ts": 120,
+        "b.test.ts": 340,
+      });
+    });
+
+    /** @scenario "A shard never writes over the committed manifest" */
+    it("leaves the committed manifest untouched", () => {
+      writeManifest({ "already-measured.test.ts": 999 });
+      const before = readFileSync(manifestPath, "utf8");
+
+      const reporter = new DurationManifestReporter({
+        manifestPath: path.join(root, "vitest.durations.delta.json"),
+        root,
+      });
+      reporter.onTestModuleEnd(fakeModule(path.join(root, "a.test.ts"), 120));
+      reporter.onTestRunEnd();
+
+      expect(readFileSync(manifestPath, "utf8")).toBe(before);
     });
   });
 

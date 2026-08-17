@@ -401,7 +401,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: shard-durations-unit-${{ matrix.shard }}
-          path: platform/app/vitest.durations.json
+          path: platform/app/vitest.durations.delta.json
           if-no-files-found: ignore
 
       - name: Extract test failures
@@ -516,7 +516,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: shard-durations-component-${{ matrix.shard }}
-          path: platform/app/vitest.durations.json
+          path: platform/app/vitest.durations.delta.json
           if-no-files-found: ignore
 
       # The sibling lanes both upload, so without this the instrumentation the
@@ -769,7 +769,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: shard-durations-integration-${{ matrix.shard }}
-          path: platform/app/vitest.durations.json
+          path: platform/app/vitest.durations.delta.json
           if-no-files-found: ignore
 
       - name: Extract test failures
@@ -1350,26 +1350,48 @@ jobs:
           pattern: shard-durations-*
           path: shard-durations
 
+      # The committed manifest is the base layer, so files this run did not
+      # execute keep the weights they already had.
+      - name: Check out the committed manifest
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          sparse-checkout: platform/app/vitest.durations.json
+          sparse-checkout-cone-mode: false
+          path: baseline
+
       - name: Merge into one manifest
         run: |
-          # `add` lets later keys win, and keys DO collide: the reporter merges
-          # over whatever manifest was committed, so every shard's artifact
-          # carries the whole existing manifest plus its own timings. That is
-          # safe because a colliding key holds the same committed value in every
-          # artifact, and the only differing values are the fresh measurements,
-          # each of which appears in exactly one artifact — the lanes partition
-          # the files (integrationLanes.ts) and a lane's shards partition its
-          # own.
-          find shard-durations -name 'vitest.durations.json' -print0 |
+          # Baseline FIRST, then every shard's delta on top: `add` lets later
+          # keys win, so this is "the committed weights, updated by whatever was
+          # measured". The deltas cannot fight each other — each holds only the
+          # files its own shard ran, and the lanes partition the files
+          # (integrationLanes.ts) while a lane's shards partition its own — so
+          # their union is the same whatever order `find` lists them in.
+          #
+          # This ordering is the whole point. Were each shard to emit the full
+          # manifest instead of a delta, every artifact would carry the baseline,
+          # a file measured by shard A would hold its NEW value in A's artifact
+          # and its OLD one in every other, and whichever artifact `find`
+          # happened to list last would decide — silently discarding fresh
+          # measurements.
+          baseline=baseline/platform/app/vitest.durations.json
+          if [ ! -f "$baseline" ]; then
+            baseline=empty-baseline.json
+            echo '{}' > "$baseline"
+          fi
+
+          find shard-durations -name 'vitest.durations.delta.json' -print0 |
             xargs -0 cat |
-            jq -s 'add // {} | to_entries | sort_by(.key) | from_entries' \
+            jq -s --slurpfile base "$baseline" \
+              '($base[0] + (add // {})) | to_entries | sort_by(.key) | from_entries' \
               > vitest.durations.json
 
-          # An empty merge means no shard uploaded anything — every test job
-          # skipped, or all of them died before their upload step. Publishing
-          # `{}` would hand someone an artifact the instructions above say to
-          # commit, and committing it would delete every weight in the repo.
-          # Fail instead: an absent manifest is a safe state, a blank one is not.
+          # An empty merge means no shard uploaded a delta AND there was no
+          # committed manifest — every test job skipped, or all of them died
+          # before their upload step. Publishing `{}` would hand someone an
+          # artifact the instructions above say to commit, and committing it
+          # would delete every weight in the repo. Fail instead: an absent
+          # manifest is a safe state, a blank one is not.
           count=$(jq 'length' vitest.durations.json)
           if [ "$count" -eq 0 ]; then
             echo "::error::No shard produced any timings — refusing to publish an empty manifest."

@@ -9,16 +9,30 @@
  * writes the manifest and a run that reads it are therefore deliberately
  * different runs.
  *
- * Merges rather than replaces. A sharded refresh writes one shard's files at a
- * time, and a lane refresh knows nothing about the other lane's; replacing
- * would leave each run's manifest covering a fraction of the suite, which is
- * indistinguishable from a manifest that has gone stale.
+ * WRITES A DELTA, NOT A MANIFEST, and to its own file. Each shard emits only
+ * the files IT measured, and the aggregation overlays every shard's delta onto
+ * the committed manifest.
+ *
+ * The obvious alternative — have each shard merge its measurements over the
+ * committed manifest and emit the whole thing — is wrong in a way that is easy
+ * to miss. Every shard's artifact would then carry the full baseline, so for a
+ * file measured by shard A, A's artifact holds the NEW value while every other
+ * shard's holds the OLD one. A `jq -s add` lets the last artifact win, so
+ * whether the fresh measurement survives comes down to the order `find` happened
+ * to list the artifacts in. Deltas do not overlap — the lanes partition the
+ * files and a lane's shards partition its own — so their union is
+ * order-independent, and the baseline is applied once, underneath.
+ *
+ * Its own file, because a manifest is a COMMITTED artifact: writing a partial
+ * one over `vitest.durations.json` would silently delete the weights for every
+ * file this run did not execute, which is exactly what a developer running one
+ * lane locally would do.
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { Reporter, TestModule } from "vitest/node";
 
-import { type DurationManifest, loadDurationManifest } from "./shardWeights";
+import type { DurationManifest } from "./shardWeights";
 
 export interface DurationManifestReporterOptions {
   /** Where the manifest lives. Paths inside it are relative to its directory. */
@@ -38,7 +52,7 @@ export interface DurationManifestReporterOptions {
  * against the app root, so a default that lands anywhere else would be written
  * faithfully and never read.
  */
-const DEFAULT_MANIFEST = "vitest.durations.json";
+const DEFAULT_DELTA = "vitest.durations.delta.json";
 
 /**
  * Fold this run's timings into whatever the manifest already holds.
@@ -80,7 +94,7 @@ export default class DurationManifestReporter implements Reporter {
     // so with platform/app as the working directory, and the sequencer resolves
     // the manifest from its own __dirname, which is the same place.
     this.manifestPath =
-      options.manifestPath ?? path.join(process.cwd(), DEFAULT_MANIFEST);
+      options.manifestPath ?? path.join(process.cwd(), DEFAULT_DELTA);
     this.root = options.root ?? path.dirname(this.manifestPath);
   }
 
@@ -91,11 +105,10 @@ export default class DurationManifestReporter implements Reporter {
   }
 
   onTestRunEnd(): void {
-    const merged = mergeDurations({
-      existing: loadDurationManifest(this.manifestPath),
-      measured: this.measured,
-    });
-    writeFileSync(this.manifestPath, `${JSON.stringify(merged, null, 2)}\n`);
+    // ONLY what this run measured. Emphatically not merged over the committed
+    // manifest — see the note at the top of this file.
+    const delta = mergeDurations({ existing: {}, measured: this.measured });
+    writeFileSync(this.manifestPath, `${JSON.stringify(delta, null, 2)}\n`);
   }
 }
 
