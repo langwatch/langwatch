@@ -185,7 +185,23 @@ jobs:
               # Composite actions are covered by ci-scripts-test through the
               # scripts they call, so an edit that only touches an action.yml
               # has to reach the gate too.
-              - '.github/actions/**'
+              #
+              # NAMED, not `.github/actions/**`. This flag gates nine jobs —
+              # typecheck, all ten test shards, build, e2e — and the glob
+              # matched every composite action in the repository, including
+              # ones this workflow has never used. A pull request adding
+              # `.github/actions/go-build-cache` for go-ci ran the entire app
+              # suite on two Go CI files and nothing else.
+              #
+              # The trade is real and worth stating: a list can go stale where
+              # a glob cannot. If you add a `uses: ./.github/actions/<name>`
+              # step to this workflow, add it here in the same edit, or an
+              # edit to that action will silently not re-run the suite it
+              # feeds. These three are every action this file currently uses
+              # (`grep -o "uses: \./\.github/actions/[a-z-]*"`).
+              - '.github/actions/detect-changes/**'
+              - '.github/actions/prepare-generated-files/**'
+              - '.github/actions/setup-pnpm-node/**'
             # The parity scanner binds @scenario annotations from test files
             # across many roots, not just specs/ and platform/app/. This list MUST
             # cover every root the scanner reads (DEFAULT_TEST_ROOTS,
