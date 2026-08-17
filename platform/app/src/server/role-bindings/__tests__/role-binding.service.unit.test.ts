@@ -28,6 +28,9 @@ const changeBindingRole = vi.fn();
 const revokeBindings = vi.fn();
 const bindingFindFirst = vi.fn();
 const bindingFindMany = vi.fn();
+const bindingCreate = vi.fn();
+const bindingUpdate = vi.fn();
+const bindingDeleteMany = vi.fn();
 const customRoleFindMany = vi.fn();
 const transaction = vi.fn();
 
@@ -41,6 +44,13 @@ const prisma = {
   roleBinding: {
     findFirst: bindingFindFirst,
     findMany: bindingFindMany,
+    // The write path must never reach these three: since PR 2 the tables are
+    // projection-fed and the ledger is the only writer. They are here so a
+    // regression reads as a failed assertion rather than as a mock missing a
+    // method.
+    create: bindingCreate,
+    update: bindingUpdate,
+    deleteMany: bindingDeleteMany,
   },
   customRole: { findMany: customRoleFindMany },
   $transaction: transaction,
@@ -138,8 +148,13 @@ describe("RoleBindingService create", () => {
       expect(attachBindings).not.toHaveBeenCalled();
     });
 
+    /** @scenario "A grant write states a fact instead of writing the table" */
     it("stores the binding against the key", async () => {
       await service.create({ ...bindingInput, apiKeyId: "key_1" });
+
+      expect(bindingCreate).not.toHaveBeenCalled();
+      expect(bindingUpdate).not.toHaveBeenCalled();
+      expect(bindingDeleteMany).not.toHaveBeenCalled();
 
       expect(attachBindings).toHaveBeenCalledWith(
         expect.objectContaining({

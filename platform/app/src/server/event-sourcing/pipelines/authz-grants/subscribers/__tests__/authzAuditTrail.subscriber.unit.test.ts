@@ -104,6 +104,7 @@ describe("authz audit trail subscriber", () => {
   });
 
   describe("when a grant is attached by a person", () => {
+    /** @scenario "A grant a person made is recorded in the audit trail" */
     it("writes one row in the AuditLog shape", async () => {
       const store = recordingStore();
       await deliver(store, attached());
@@ -150,6 +151,7 @@ describe("authz audit trail subscriber", () => {
   });
 
   describe("when the event carries a cutover source", () => {
+    /** @scenario "The migration's own facts never reach the audit trail" */
     it.each([
       "genesis-import",
       "backfill-b",
@@ -161,6 +163,7 @@ describe("authz audit trail subscriber", () => {
       expect(store.inserts).toHaveLength(0);
     });
 
+    /** @scenario "The migration's own facts never reach the audit trail" */
     it("still writes a row for a live source", async () => {
       const store = recordingStore();
       await deliver(store, attached({ source: "invite" }));
@@ -230,6 +233,7 @@ describe("authz audit trail subscriber", () => {
   });
 
   describe("when the same event is delivered twice", () => {
+    /** @scenario "A fact delivered twice writes one audit row" */
     it("derives the same row id, so the second insert is dropped", async () => {
       const store = recordingStore();
       const redelivered = attached();

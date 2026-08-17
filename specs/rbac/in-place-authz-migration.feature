@@ -263,6 +263,117 @@ Feature: In-place authorization data migration
     And every imported grant carries the business time of the fact it came from
 
   # ============================================================================
+  # The genesis import (ADR-092 §13 - the grants state becomes event-derived)
+  # ============================================================================
+  # Before the ledger can be the only writer, everything that already exists
+  # has to be something the ledger said. The import states every existing
+  # binding, custom role and membership fact as an event backdated to the
+  # row's own creation time - and it ADOPTS rather than re-creates: the
+  # legacy row's id becomes the fact's id, so the identity customers already
+  # hold survives, and the compat view stays byte-for-byte what it was.
+
+  @unit
+  Scenario: Existing grants become ledger facts under the ids they already have
+    Given "acme" holds role bindings and custom roles written before the ledger
+    When the genesis import runs for "acme"
+    Then each binding is stated as a fact carrying that binding's own id
+    And each custom role is stated as a role fact carrying that role's own id
+    And every fact carries the business time of the row it came from
+
+  @unit
+  Scenario: The import proves itself against the rows it started from
+    Given the genesis import emitted every fact for "acme"
+    When the import re-reads the compat view
+    Then "acme" is finalized only when every original row is still there,
+      field for field
+
+  @unit
+  Scenario: A compat view that no longer reproduces a legacy row holds the organization
+    Given the compat view for "acme" has drifted from one of its legacy rows
+    When the import re-reads the compat view
+    Then "acme" is held with the drift named in a bounded report
+    And "acme" is not finalized
+
+  @unit
+  Scenario: The organization member floor becomes a grant the organization holds
+    Given "acme" has members whose only access is the organization's baseline
+    When the genesis import runs for "acme"
+    Then the organization itself holds one member grant at "acme"
+    And that grant carries the organization's own creation time
+
+  @unit
+  Scenario: A legacy organization admin with no bindings states its access
+    Given "acme" has an ADMIN membership row whose user holds no binding
+    When the genesis import runs for "acme"
+    Then that user holds an organization-scoped admin grant
+    And a member with no bindings gains nothing beyond the floor
+
+  @unit
+  Scenario: Running the genesis import twice states the same facts
+    Given the genesis import already ran for "acme"
+    When it runs again
+    Then the same fact ids are emitted, so the import converges rather than
+      duplicating
+
+  @unit
+  Scenario: An imported grant updates the row it adopted and never authors a new one
+    Given a legacy binding row adopted by the genesis import
+    When the fold stores that grant
+    Then the existing compat row is updated in place
+    And no second compat row is created for it
+
+  # ============================================================================
+  # One writer (ADR-092 §13 - the ledger becomes the only writer)
+  # ============================================================================
+  # From here on no application code writes a grant table. Every write path -
+  # role bindings, roles, invites, groups, keys, SCIM - emits a command, and
+  # both the new head and the legacy-shaped compat row are written by the fold
+  # that follows. That is what makes replay honest: the tables cannot hold
+  # anything the ledger never said.
+
+  @unit
+  Scenario: A grant write states a fact instead of writing the table
+    When an admin attaches a role binding
+    Then the write path emits an attach command
+    And it writes no binding row of its own
+
+  @unit
+  Scenario: The compat rows are authored by the fold alone
+    Given a grant fact from a live write path
+    When the fold stores it
+    Then the legacy-shaped binding row is written by the fold
+
+  # ============================================================================
+  # The audit trail as an event subscriber (ADR-092 decision 17)
+  # ============================================================================
+  # The audit page, its table and its retention are unchanged; what feeds it
+  # moves. Write paths stop writing audit rows, and one insert-only subscriber
+  # writes a row per runtime fact - never an update, and never for the
+  # backdated facts a migration states, which would otherwise flood the page
+  # with years of history on the day an organization migrates.
+
+  @unit
+  Scenario: A grant a person made is recorded in the audit trail
+    Given an admin attaches a role binding
+    When the fact reaches the audit subscriber
+    Then one audit row is written naming the actor, the organization, and the
+      fact
+
+  @unit
+  Scenario: The migration's own facts never reach the audit trail
+    Given facts stated by the genesis import, the backfill, or a read-through
+      mint
+    When they reach the audit subscriber
+    Then no audit row is written for them
+    And a fact from a live write path still writes its row
+
+  @unit
+  Scenario: A fact delivered twice writes one audit row
+    Given an audit row was written for a fact
+    When the same fact is delivered again
+    Then the row id is the same and the second insert is dropped
+
+  # ============================================================================
   # Read-through minting for legacy keys (ADR-092 decision 1 - no key sunset)
   # ============================================================================
   # Old keys keep working with no deadline and no customer action. What moves

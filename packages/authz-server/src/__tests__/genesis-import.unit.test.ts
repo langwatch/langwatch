@@ -176,6 +176,7 @@ describe("GrantsGenesisImportMigration", () => {
     });
 
     describe("when the import runs", () => {
+      /** @scenario "Existing grants become ledger facts under the ids they already have" */
       it("adopts every legacy id verbatim as the ledger's own", async () => {
         await migration().migrateTenant({ tenantId: ORG });
 
@@ -240,6 +241,7 @@ describe("GrantsGenesisImportMigration", () => {
         ]);
       });
 
+      /** @scenario "The import proves itself against the rows it started from" */
       it("finalizes when every original row is still there, field for field", async () => {
         const outcome = await migration().migrateTenant({ tenantId: ORG });
 
@@ -273,6 +275,7 @@ describe("GrantsGenesisImportMigration", () => {
     });
 
     describe("when the compat view no longer reproduces a legacy row", () => {
+      /** @scenario "A compat view that no longer reproduces a legacy row holds the organization" */
       it("holds the organization with the drift in a bounded report", async () => {
         // The proof's re-read is what it compares against: one row moved
         // scope, the other gone.
@@ -341,6 +344,7 @@ describe("GrantsGenesisImportMigration", () => {
       ];
     });
 
+    /** @scenario "The organization member floor becomes a grant the organization holds" */
     it("mints the member floor row once, at the organization's own birth", async () => {
       await migration().migrateTenant({ tenantId: ORG });
 
@@ -358,6 +362,7 @@ describe("GrantsGenesisImportMigration", () => {
       ]);
     });
 
+    /** @scenario "A legacy organization admin with no bindings states its access" */
     it("mints an admin fact only for an ADMIN the legacy fallback is the sole source for", async () => {
       await migration().migrateTenant({ tenantId: ORG });
 
@@ -383,6 +388,7 @@ describe("GrantsGenesisImportMigration", () => {
       ).not.toContain("user_kim");
     });
 
+    /** @scenario "Running the genesis import twice states the same facts" */
     it("emits the same ids on a second pass", async () => {
       await migration().migrateTenant({ tenantId: ORG });
       const first = attachedGrants().map((grant) => grant.grantId);

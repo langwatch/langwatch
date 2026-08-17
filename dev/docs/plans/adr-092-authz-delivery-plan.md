@@ -365,6 +365,62 @@ PR 1's remainder, all delivered 2026-08-17:
    Redis-down revocation test rides with PR 2, where the revoke path it
    exercises first exists.
 
+PR 2, delivered 2026-08-17 on `feat/adr-092-ledger-only-writer` (stacked on
+PR 1) — the ledger is the only writer, still dark:
+
+1. **The genesis import** (`GrantsGenesisImportMigration`): per org, batched,
+   backdated to each row's `createdAt`, source `genesis-import`, commandIds
+   `genesis:<kind>:<org>:<chunk>`. It ADOPTS rather than re-creates — the
+   legacy row's id becomes the fact's id, so the identity the REST surface
+   already hands customers survives, and the fold updates the adopted compat
+   row instead of authoring a second one. It mints the org-member floor row
+   at the organization's own creation time and a per-user org-scoped admin
+   grant for every zero-binding `OrganizationUser.role = ADMIN`
+   (decision 20). The proof re-reads the compat view field for field against
+   the originals; drift holds the org with a bounded report. A custom row's
+   normalized `role` column is not drift — the partial unique indexes never
+   keyed that row's identity on it.
+2. **Every write path emits commands and writes no grant table**: the
+   role-binding service and its REST surface, org/team/project/group writes,
+   the role editor and API-key bindings, invites, the signup bootstrap and
+   the better-auth hooks, and SCIM as a reconciler (decision 18) that diffs
+   desired IdP state against the projection and emits only the difference,
+   removals carrying instant enforcement. `revokeBindings` / `offboardMember`
+   carry decision 7's synchronous deny effect, so the seam PR 1 shipped now
+   has its production callers.
+3. **The audit subscriber** (decision 17): insert-only, row id derived from
+   the event id, `ON CONFLICT DO NOTHING`, and a `when` guard skipping
+   `genesis-import` / `backfill-b` / `read-through-mint`, so a cutover never
+   floods the audit page with backdated history. The write paths stopped
+   writing `AuditLog` directly in the same change.
+4. **Read-through minting** for legacy keys (decision 1): a zero-binding
+   service key states its organization-scoped admin grant the first time it
+   authenticates — source `read-through-mint`, business time the key's own
+   creation time — off the request's critical path, minting once under
+   concurrency, and never able to fail the authentication that triggered it.
+5. **REST error-code reconciliation** before the write paths moved, not
+   after: the duplicate is `role_binding_already_exists` / 409 all the way
+   through (decision 21), and `GrantsService` carries the write actor rather
+   than writing audit rows of its own.
+6. **The doctrine's second test**
+   (`app-layer/authz/__tests__/ledger-instant-revoke.integration.test.ts`,
+   datastore lane): queue leg severed, Redis handle disconnected, and both
+   heads — the `Grant` row and its compat `RoleBinding` — gone from Postgres
+   before `revokeBindings` returns. The import, the single-writer rule, the
+   audit guard and the mint are tagged and bound in
+   `in-place-authz-migration.feature`; the Redis-stopped revocation scenario
+   in `unified-authorization-engine.feature` drops `@unimplemented` and binds
+   to that test.
+
+Reads still do not move: every permission check keeps reading the legacy
+tables, per org, until PR 3.
+
+**Next is PR 3** — the composite per-org cutover migration (remaining facts,
+parity proof over every registry permission, `cutover_completed`), the fork
+at the 10 seams, the collector repoint onto `Grant`/`Role`, ShareService onto
+the ledger, and rollback inside the gate's TTL — then our own organization
+first, in production, before the cohort widens.
+
 The rollout after PR 1–2 merge is one organization at a time: cut an org
 over in one batch (its whole surface into `Grant`s via the ledger), then
 that org reads from the engine — the fork, the collector repoint, and the
