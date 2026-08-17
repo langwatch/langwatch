@@ -67,6 +67,10 @@ export class AttachGrantsCommand
     "Record a batch of access facts for one organization",
   );
 
+  static getAggregateId(payload: AttachGrantsCommandData): string {
+    return payload.organizationId;
+  }
+
   async handle(
     command: Command<AttachGrantsCommandData>,
   ): Promise<GrantAttachedEvent[]> {
@@ -100,6 +104,10 @@ export class ProveMigrationParityCommand
     "Record a per-organization parity proof; an empty diff list means clean",
   );
 
+  static getAggregateId(payload: ProveMigrationParityCommandData): string {
+    return payload.organizationId;
+  }
+
   async handle(
     command: Command<ProveMigrationParityCommandData>,
   ): Promise<MigrationParityProvedEvent[]> {
@@ -130,6 +138,10 @@ export class CompleteCutoverCommand
     "Flip one organization onto the engine after a clean parity proof",
   );
 
+  static getAggregateId(payload: CompleteCutoverCommandData): string {
+    return payload.organizationId;
+  }
+
   async handle(
     command: Command<CompleteCutoverCommandData>,
   ): Promise<CutoverCompletedEvent[]> {
@@ -159,6 +171,10 @@ export class RollBackCutoverCommand
     rollBackCutoverCommandDataSchema,
     "Put one organization back on its legacy path",
   );
+
+  static getAggregateId(payload: RollBackCutoverCommandData): string {
+    return payload.organizationId;
+  }
 
   async handle(
     command: Command<RollBackCutoverCommandData>,
@@ -192,6 +208,12 @@ export class RecordMigrationTenantStateCommand
     recordMigrationTenantStateCommandDataSchema,
     "Witness one runner lifecycle transition for one organization",
   );
+
+  static getAggregateId(
+    payload: RecordMigrationTenantStateCommandData,
+  ): string {
+    return payload.organizationId;
+  }
 
   async handle(
     command: Command<RecordMigrationTenantStateCommandData>,
