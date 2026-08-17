@@ -74,7 +74,7 @@ jobs:
 
       - name: Run typecheck
         working-directory: mcp/typescript
-        run: ./node_modules/.bin/tsgo --noEmit --project ./tsconfig.json
+        run: ./node_modules/.bin/tsc --noEmit --project ./tsconfig.json
 
   build_and_test:
     needs: changes
