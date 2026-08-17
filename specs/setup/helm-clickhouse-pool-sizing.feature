@@ -5,25 +5,33 @@ Feature: Pods size their ClickHouse connection pools against the whole fleet
   so that scaling any part of the platform cannot quietly ask the database for
   more connections than it is allowed.
 
-  # PARKED behind #6614. The scenarios below are correct about the inputs, and
-  # the chart wiring they bind to works. What is NOT settled is whether the
-  # derived number should reach the client at all:
+  # NOT READY TO MERGE, and no longer for the reason first written here. The
+  # scenarios below are correct about the inputs and the chart wiring they bind
+  # to works; what is unsettled is whether the derived number should reach the
+  # client at all. #6614 has since landed, which changes the stakes rather than
+  # removing them:
   #
   #   - Pool size is a ceiling on sockets, and sockets are not the quantity that
   #     reaches the server. ClickHouse holds roughly one connection per statement
   #     in flight and closes idle ones inside `idle_socket_ttl` (1500 ms), so the
   #     cap is never approached in practice.
-  #   - #6614 sets the statement limiter's `maxConcurrent` FROM this number. Once
-  #     it lands, a value that is too small stops bounding sockets and starts
-  #     bounding in-flight statements, shedding past the queue as a
-  #     customer-visible ClickHouseOverloadedError.
-  #   - The values this chart derives - 8 on a default install, 5 at a
-  #     production shape - sit an order of magnitude below observed working
-  #     concurrency (GLOBAL_QUEUE_CONCURRENCY is 100-256 per pod).
+  #   - The statement limiter now takes its `maxConcurrent` FROM this number
+  #     (managedClient.ts passes the resolved pool size straight through), with a
+  #     queue of QUEUE_DEPTH_PER_SLOT (8) per slot behind it. So this figure has
+  #     stopped bounding sockets and started bounding in-flight statements, and
+  #     anything past slots + queue sheds as a customer-visible
+  #     ClickHouseOverloadedError.
+  #   - The derived values moved when DEFAULT_CLIENTS_PER_PROCESS went from 2 to
+  #     1, so the 8 and 5 written here originally are now 17 on a default install
+  #     (50 x 0.7 / 2 pods) and 14 at a production shape (270 x 0.7 / 13 pods).
+  #     Both still sit well under the per-pod concurrency that feeds them -
+  #     GLOBAL_QUEUE_CONCURRENCY defaults to 100 - so the queue, not the slot
+  #     count, is what would absorb steady state, and a burst above 126 per pod
+  #     is what would shed.
   #
   # The real bound should be decided from `clickhouse_statements_in_flight` and
-  # `clickhouse_statement_wait_seconds` once #6614 puts those in production.
-  # Deriving a ceiling before that measurement exists is how the previous
+  # `clickhouse_statement_wait_seconds`, which #6614 now puts in production.
+  # Deriving a ceiling before reading that measurement is how the previous
   # hardcoded 25 was chosen, and #6399 removed it for exactly this reason.
   #
   # Cross-references:
@@ -32,8 +40,9 @@ Feature: Pods size their ClickHouse connection pools against the whole fleet
   #   packages/clickhouse-client/src/rateLimit.ts - the statement limiter that
   #     #6614 wires this number into.
   #   charts/langwatch/templates/_helpers.tpl - langwatch.clickhousePoolSizingEnv,
-  #     langwatch.clickhouse.clientReplicas and
-  #     langwatch.clickhouse.chartManagedAdmissionLimit.
+  #     langwatch.clickhouse.clientReplicas,
+  #     langwatch.clickhouse.chartManagedAdmissionLimit and
+  #     langwatch.clickhouse.platformShare, which owns what a stated budget may be.
   #   charts/langwatch/templates/app/deployment.yaml and
   #   charts/langwatch/templates/workers/deployment.yaml - where it is emitted.
   #   charts/langwatch/tests/clickhouse-pool-sizing.sh - the test that renders
@@ -123,6 +132,20 @@ Feature: Pods size their ClickHouse connection pools against the whole fleet
       Given an operator who sets a budget above what this chart's ClickHouse admits
       When the chart renders
       Then the render stops and names the limit the server actually has
+
+    @e2e
+    Scenario: A budget that is not a whole number is refused
+      Given an operator who mistypes the budget
+      When the chart renders
+      Then the render stops and says the budget has to be a whole number
+      And no pod is handed a budget it would read as no answer at all
+
+    @e2e
+    Scenario: A budget of none is refused rather than derived
+      Given an operator who sets the budget to zero or below
+      When the chart renders
+      Then the render stops and says a budget that low admits no queries
+      And the chart does not derive a budget the operator did not ask for
 
   Rule: The chart and the client agree on the names
 

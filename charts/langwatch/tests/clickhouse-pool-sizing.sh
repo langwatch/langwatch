@@ -178,21 +178,69 @@ test_operator_states_the_budget_once() {
   expect_env "workers tuned budget" workers "$tuned" CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES 150
 }
 
+# Asserts that a render STOPS, and that it says why. A refusal that renders
+# nothing is only half the contract: the operator has to be able to read which
+# value was rejected, or the fix is a guess.
+expect_render_refused() {
+  local label="$1" flags="$2" needle="$3" output
+  # shellcheck disable=SC2086
+  if output=$(helm template lw . $flags 2>&1); then
+    fail "$label" "render succeeded; expected it to fail"
+    return
+  fi
+  if ! printf '%s' "$output" | grep -q "$needle"; then
+    fail "$label" "render failed without saying why: $(printf '%s' "$output" | tail -n 2)"
+    return
+  fi
+  echo "ok   [$label] render refused and said why"
+}
+
 # @scenario "A budget larger than the chart's own server is refused"
 test_budget_above_the_chart_managed_limit_is_refused() {
   # 270 against a default chart-managed server, which admits 50. Rendering has
   # to STOP: the alternative is pods sizing for a budget the server never had,
   # which is only discovered as rejected queries in production.
-  local output
-  if output=$(helm template lw . --set autogen.enabled=true --set workers.enabled=true --set clickhouse.platformConcurrentQueryShare=270 2>&1); then
-    fail "over-budget share" "render succeeded; expected it to fail"
-    return
-  fi
-  if ! printf '%s' "$output" | grep -q "admits at most 50 concurrent queries"; then
-    fail "over-budget share" "render failed without naming the limit: $(printf '%s' "$output" | tail -n 2)"
-    return
-  fi
-  echo "ok   [over-budget share] render refused and named the server's limit"
+  expect_render_refused "over-budget share" \
+    "$BASE_FLAGS --set clickhouse.platformConcurrentQueryShare=270" \
+    "admits at most 50 concurrent queries"
+}
+
+# @scenario "A budget that is not a whole number is refused"
+test_non_numeric_budget_is_refused() {
+  # The value is emitted verbatim, so a typo reaches the pods as one. The client
+  # parses it as NaN, skips the derivation, and keeps the fixed 64 per pool -
+  # the sizing this whole wiring exists to replace, restored silently.
+  expect_render_refused "non-numeric share" \
+    "$BASE_FLAGS --set clickhouse.platformConcurrentQueryShare=abc" \
+    "which is not a whole number"
+
+  # A decimal is the near miss: it reads as a number to a person and still
+  # reaches the client as one it cannot use.
+  expect_render_refused "fractional share" \
+    "$BASE_FLAGS --set clickhouse.platformConcurrentQueryShare=12.5" \
+    "which is not a whole number"
+
+  # And the check does not belong to the chart-managed branch. An operator
+  # pointing at their own server can mistype the number just as easily, and
+  # nothing downstream of here would notice.
+  local external="--set autogen.enabled=true --set workers.enabled=true --set clickhouse.chartManaged=false --set clickhouse.external.url.value=http://ch:8123/langwatch"
+  expect_render_refused "non-numeric share, external server" \
+    "$external --set clickhouse.platformConcurrentQueryShare=abc" \
+    "which is not a whole number"
+}
+
+# @scenario "A budget of none is refused rather than derived"
+test_zero_or_negative_budget_is_refused() {
+  # Zero is falsy in Helm, so the obvious `if $explicit` reading treats a stated
+  # budget of none as though nothing had been stated and derives one instead -
+  # answering a question the operator did not ask.
+  expect_render_refused "zero share" \
+    "$BASE_FLAGS --set clickhouse.platformConcurrentQueryShare=0" \
+    "admits no queries at all"
+
+  expect_render_refused "negative share" \
+    "$BASE_FLAGS --set clickhouse.platformConcurrentQueryShare=-5" \
+    "admits no queries at all"
 }
 
 # @scenario "The chart emits the names the client actually reads"
@@ -223,6 +271,8 @@ test_budget_defaults_to_the_chart_managed_limit
 test_external_server_uses_the_clickhouse_default
 test_operator_states_the_budget_once
 test_budget_above_the_chart_managed_limit_is_refused
+test_non_numeric_budget_is_refused
+test_zero_or_negative_budget_is_refused
 test_emitted_names_match_the_package_contract
 
 if [ "$failures" -ne 0 ]; then

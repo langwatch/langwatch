@@ -787,10 +787,25 @@ app.kubernetes.io/instance: {{ .Release.Name }}
      The failure it prevents is silent - pools sized for a budget the server
      never had, discovered as rejected queries - so it is better as a render
      that stops than a release that ships.
+
+     A share that is stated at all has to be a positive whole number, and that
+     check runs whoever owns the server. The value is emitted verbatim, so a
+     typo reaches the pods as one: the client parses it as NaN, skips the
+     derivation, and keeps the fixed pool the chart-managed cap above exists to
+     replace. Zero is refused rather than treated as unset, because an operator
+     who states a budget of none means something, and deriving one instead
+     would answer a different question.
 */}}
 {{- define "langwatch.clickhouse.platformShare" -}}
 {{- $explicit := (.Values.clickhouse).platformConcurrentQueryShare -}}
-{{- if $explicit -}}
+{{- $stated := and (not (kindIs "invalid" $explicit)) (ne (printf "%v" $explicit) "") -}}
+{{- if $stated -}}
+{{- if not (regexMatch "^-?[0-9]+$" (printf "%v" $explicit)) -}}
+{{- fail (printf "clickhouse.platformConcurrentQueryShare is %v, which is not a whole number. This value is emitted verbatim as CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES, where the client parses it as NaN and quietly returns to a fixed 64 connections per pool - the sizing this wiring exists to replace. Leave it empty to derive the budget, or state it as a positive whole number." $explicit) -}}
+{{- end -}}
+{{- if lt (int $explicit) 1 -}}
+{{- fail (printf "clickhouse.platformConcurrentQueryShare is %v, but a budget below 1 admits no queries at all. Leave it empty to derive the budget from the server, or state the number of concurrent queries the platform may fill." $explicit) -}}
+{{- end -}}
 {{- if (.Values.clickhouse).chartManaged -}}
 {{- $limit := include "langwatch.clickhouse.chartManagedAdmissionLimit" . -}}
 {{- if gt (int $explicit) (int $limit) -}}
