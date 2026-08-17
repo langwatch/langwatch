@@ -210,14 +210,14 @@ $ langwatch login --device
 … opening https://app.langwatch.ai/cli/auth?code=ABCD-EFGH …
 Error: HTTP 409, no_default_routing_policy
        Your organization has no default routing policy published.
-       Ask your admin to publish one at Settings → Routing Policies
+       Ask your admin to publish one at Gateway → Routing Policies
        (/gateway/routing-policies), then re-run `langwatch login`.
 ```
 
 **Admin remediation:**
 
 1. Sign in to the LangWatch web app as an org admin.
-2. Navigate to **Settings → Routing Policies** (`/gateway/routing-policies`).
+2. Navigate to **Gateway → Routing Policies** (`/gateway/routing-policies`).
 3. Create at least one routing policy and toggle it to **Default**.
 4. Ask the developer to re-run `langwatch login --device`.
 
