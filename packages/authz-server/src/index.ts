@@ -9,6 +9,8 @@
  *                           inside the instance)
  *   GrantsService           the one write surface, over AuthzGrantsRepository
  *   AuthzShadowService      the legacy resolvers' engine comparison
+ *   AuthzForkService        the engine ANSWERING for a cut-over organization,
+ *                           with legacy as the reverse-shadow comparison
  *
  * No storage engine lives here, and no environment read either: every knob
  * arrives as a closure through a service's options. The app implements the
@@ -35,6 +37,13 @@ export type {
   ScopeLineageRepository,
   ShareLinkRow,
 } from "./authz-read.repository";
+export { AuthzForkService } from "./authz-fork.service";
+export type {
+  AuthzForkOptions,
+  ForkedAnyDecision,
+  ForkedBatchDecision,
+  ForkedDecision,
+} from "./authz-fork.service";
 export type {
   AuthzGenesisRepository,
   AuthzMigrationRepository,

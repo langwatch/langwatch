@@ -35,7 +35,7 @@ import {
   isUniqueViolation,
 } from "../ledger";
 import { PrismaAuthzGrantsRepository } from "./authz-grants.prisma.repository";
-import { PrismaAuthzReadRepository } from "./authz-read.prisma.repository";
+import { CutoverAwareAuthzReadRepository } from "./authz-read.cutover.repository";
 
 /**
  * The port's two typed failures, restored on the way out.
@@ -286,6 +286,28 @@ export class LedgerAuthzGrantsRepository implements AuthzGrantsRepository {
       where: { organizationId, userId },
       select: { id: true },
     });
+    // The compat head is not the whole head any more (delivery-plan PR 3). A
+    // cut-over organization carries user facts `RoleBinding` cannot express —
+    // the lite-member rows the cutover imports, the zero-binding-admin facts
+    // genesis wrote — and enumerating only compat rows would leave every one
+    // of them resolving for a user who has just been offboarded. So the
+    // revoked set is the UNION: the compat ids, plus every Grant-head row this
+    // organization holds for this user as a principal.
+    //
+    // The rows expressible both ways are counted once and revoked once:
+    // instant enforcement deletes by grant id, and the compat row SHARES that
+    // id by construction, so one revocation takes out both heads. That is also
+    // why the proof below means the same thing whichever head it reads.
+    const grantHeads = await this.db.grant.findMany({
+      where: { organizationId, principalType: "USER", principalId: userId },
+      select: { id: true },
+    });
+    const revokedGrantIds = [
+      ...new Set([
+        ...bindings.map((row) => row.id),
+        ...grantHeads.map((row) => row.id),
+      ]),
+    ];
     // The fact first (the ledger is the truth), enforcement with it — the
     // deny holds before the membership rows move.
     //
@@ -298,7 +320,7 @@ export class LedgerAuthzGrantsRepository implements AuthzGrantsRepository {
     await this.writer.offboardMember({
       organizationId,
       userId,
-      revokedGrantIds: bindings.map((row) => row.id),
+      revokedGrantIds,
       actor,
     });
 
@@ -329,7 +351,12 @@ export class LedgerAuthzGrantsRepository implements AuthzGrantsRepository {
       // The proof sees the enforced binding deletes (already committed)
       // and this transaction's own membership deletes; a throw rolls the
       // memberships back while the revocations stand — fail-safe.
-      await prove(new PrismaAuthzReadRepository(tx));
+      //
+      // It reads through the CUTOVER-AWARE repository, not the legacy one:
+      // "nothing resolves any more" has to be proven against the head this
+      // organization is actually served from, or a cut-over organization's
+      // offboarding would prove the wrong thing about the wrong table.
+      await prove(new CutoverAwareAuthzReadRepository(tx));
 
       return {
         bindings: bindings.length,
