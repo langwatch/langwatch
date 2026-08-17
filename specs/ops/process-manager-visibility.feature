@@ -77,10 +77,11 @@ Feature: Process-manager visibility in ops
   # feature (best_practices/ops-dashboard.md), and dead work is the one state
   # this substrate reports that never resolves on its own.
   #
-  # The outbox row does not record WHY a message died: the dispatcher puts the
-  # diagnostic on the span and the log line. Each row carries its trace id
-  # instead, so the reason is one hop away rather than duplicated into
-  # Postgres.
+  # v1 did not record WHY a message died — the dispatcher put the diagnostic
+  # on the span and the log line, and each row carried its trace id as the
+  # join back to it. dead-letter-recovery.feature reverses that: failed
+  # attempts are recorded per message, so the reason is on the page. The
+  # trace id remains as the deeper join.
 
   @integration
   Scenario: Dead messages are listed across the whole fleet

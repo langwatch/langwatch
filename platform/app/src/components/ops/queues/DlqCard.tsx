@@ -9,7 +9,7 @@ import {
   Table,
   Text,
 } from "@chakra-ui/react";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ConfirmDialog } from "~/components/ops/shared/ConfirmDialog";
 import { VirtualizedTableRows } from "~/components/ops/shared/VirtualizedTableRows";
 import { Link } from "~/components/ui/link";
@@ -68,6 +68,14 @@ function ProcessOutboxDeadRow({
   );
 }
 
+/** What a pending bulk or single act covers — named fully in the confirm. */
+interface PendingDlqAction {
+  kind: "redrive" | "discard";
+  queueName: string;
+  queueDisplayName: string;
+  groupIds: string[];
+}
+
 export function DlqCard({ queueNames }: { queueNames: string[] }) {
   const { hasAccess } = useOpsPermission();
   const utils = api.useUtils();
@@ -81,38 +89,43 @@ export function DlqCard({ queueNames }: { queueNames: string[] }) {
     refetchInterval: 30_000,
   });
 
-  const [replayTarget, setReplayTarget] = useState<{
-    queueName: string;
-    groupId: string;
-  } | null>(null);
-  const [replayAllTarget, setReplayAllTarget] = useState<string | null>(null);
+  const [filterText, setFilterText] = useState("");
+  const [pending, setPending] = useState<PendingDlqAction | null>(null);
   const [canaryTarget, setCanaryTarget] = useState<string | null>(null);
   const [canaryCount, setCanaryCount] = useState(5);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  const replayMutation = api.ops.replayFromDlq.useMutation({
+  // Both the row action and the per-queue bulk go through the explicit-id
+  // endpoints: one verb, one audit shape, and the confirmation covers exactly
+  // the ids that were shown when the operator clicked
+  // (specs/ops/dead-letter-recovery.feature).
+  const redriveMutation = api.ops.redriveManyFromDlq.useMutation({
     onSuccess: (data) => {
       toaster.create({
-        title: `Replayed ${data.jobsReplayed} jobs`,
+        title: `Redrove ${data.redrivenCount} ${
+          data.redrivenCount === 1 ? "group" : "groups"
+        } (${data.jobsRedriven} jobs)`,
         type: "success",
       });
-      setReplayTarget(null);
+      setPending(null);
       void utils.ops.invalidate();
     },
     onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't replay the group" }),
+      showErrorToast({ error, fallbackTitle: "Couldn't redrive the groups" }),
   });
-  const replayAllMutation = api.ops.replayAllFromDlq.useMutation({
+  const discardMutation = api.ops.discardManyFromDlq.useMutation({
     onSuccess: (data) => {
       toaster.create({
-        title: `Replayed ${data.replayedCount} groups`,
+        title: `Discarded ${data.discardedCount} ${
+          data.discardedCount === 1 ? "group" : "groups"
+        } (${data.jobsDiscarded} jobs)`,
         type: "success",
       });
-      setReplayAllTarget(null);
+      setPending(null);
       void utils.ops.invalidate();
     },
     onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't replay the groups" }),
+      showErrorToast({ error, fallbackTitle: "Couldn't discard the groups" }),
   });
   const canaryRedriveMutation = api.ops.canaryRedrive.useMutation({
     onSuccess: (data) => {
@@ -131,7 +144,19 @@ export function DlqCard({ queueNames }: { queueNames: string[] }) {
   });
 
   const groups = dlqQuery.data ?? [];
-  const dlqQueueNames = [...new Set(groups.map((g) => g.queueName))];
+  // The filter narrows what is SHOWN, and the bulk actions act on exactly
+  // that — group id, pipeline, or error, matched case-insensitively.
+  const shownGroups = useMemo(() => {
+    const needle = filterText.trim().toLowerCase();
+    if (!needle) return groups;
+    return groups.filter(
+      (g) =>
+        g.groupId.toLowerCase().includes(needle) ||
+        (g.pipelineName ?? "").toLowerCase().includes(needle) ||
+        (g.error ?? "").toLowerCase().includes(needle),
+    );
+  }, [groups, filterText]);
+  const dlqQueueNames = [...new Set(shownGroups.map((g) => g.queueName))];
   const processDead = processDeadQuery.data ?? [];
   const processDeadTotal = processDead.reduce((sum, r) => sum + r.count, 0);
 
@@ -151,6 +176,26 @@ export function DlqCard({ queueNames }: { queueNames: string[] }) {
     return null;
   }
 
+  const bulkFor = (
+    kind: "redrive" | "discard",
+    queueName: string,
+  ): PendingDlqAction => {
+    const inQueue = shownGroups.filter((g) => g.queueName === queueName);
+    return {
+      kind,
+      queueName,
+      queueDisplayName: inQueue[0]?.queueDisplayName ?? queueName,
+      groupIds: inQueue.map((g) => g.groupId),
+    };
+  };
+
+  const confirmPending = () => {
+    if (!pending) return;
+    const input = { queueName: pending.queueName, groupIds: pending.groupIds };
+    if (pending.kind === "redrive") redriveMutation.mutate(input);
+    else discardMutation.mutate(input);
+  };
+
   return (
     <>
       <Card.Root>
@@ -168,28 +213,50 @@ export function DlqCard({ queueNames }: { queueNames: string[] }) {
                 printing "0 groups" above a red process-outbox count. */}
             {groups.length > 0 && (
               <Text textStyle="sm" fontWeight="medium" color="orange.500">
-                Dead Letter Queue — {groups.length} group
-                {groups.length !== 1 ? "s" : ""}
+                Dead Letter Queue —{" "}
+                {filterText.trim()
+                  ? `${shownGroups.length} of ${groups.length}`
+                  : groups.length}{" "}
+                group{groups.length !== 1 ? "s" : ""}
               </Text>
+            )}
+            {groups.length > 0 && (
+              <Input
+                size="xs"
+                width="220px"
+                placeholder="Filter by group, pipeline, or error"
+                value={filterText}
+                onChange={(e) => setFilterText(e.target.value)}
+                data-testid="dlq-filter"
+              />
             )}
             <Spacer />
             {hasAccess && (
               <HStack gap={1.5} flexWrap="wrap">
                 {dlqQueueNames.map((qn) => {
-                  const count = groups.filter((g) => g.queueName === qn).length;
-                  const displayName =
-                    groups.find((g) => g.queueName === qn)?.queueDisplayName ??
-                    qn;
+                  const shown = shownGroups.filter((g) => g.queueName === qn);
+                  const displayName = shown[0]?.queueDisplayName ?? qn;
                   return (
-                    <Button
-                      key={qn}
-                      variant="outline"
-                      size="2xs"
-                      colorPalette="green"
-                      onClick={() => setReplayAllTarget(qn)}
-                    >
-                      Replay All {displayName} ({count})
-                    </Button>
+                    <HStack key={qn} gap={1}>
+                      <Button
+                        variant="outline"
+                        size="2xs"
+                        colorPalette="green"
+                        data-testid={`dlq-redrive-shown-${qn}`}
+                        onClick={() => setPending(bulkFor("redrive", qn))}
+                      >
+                        Redrive shown {displayName} ({shown.length})
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="2xs"
+                        colorPalette="red"
+                        data-testid={`dlq-discard-shown-${qn}`}
+                        onClick={() => setPending(bulkFor("discard", qn))}
+                      >
+                        Discard shown ({shown.length})
+                      </Button>
+                    </HStack>
                   );
                 })}
                 <HStack gap={1}>
@@ -252,7 +319,7 @@ export function DlqCard({ queueNames }: { queueNames: string[] }) {
                     Jobs
                   </Table.ColumnHeader>
                   {hasAccess && (
-                    <Table.ColumnHeader width="70px">
+                    <Table.ColumnHeader width="130px">
                       Actions
                     </Table.ColumnHeader>
                   )}
@@ -260,16 +327,16 @@ export function DlqCard({ queueNames }: { queueNames: string[] }) {
               </Table.Header>
               <Table.Body>
                 <VirtualizedTableRows
-                  count={groups.length}
+                  count={shownGroups.length}
                   rowHeight={DLQ_ROW_HEIGHT}
                   columnCount={hasAccess ? 6 : 5}
                   scrollContainerRef={scrollContainerRef}
                   getItemKey={(i) => {
-                    const g = groups[i]!;
+                    const g = shownGroups[i]!;
                     return `${g.queueName}:${g.groupId}`;
                   }}
                   renderRow={(i) => {
-                    const group = groups[i]!;
+                    const group = shownGroups[i]!;
                     return (
                       <Table.Row key={`${group.queueName}:${group.groupId}`}>
                         <Table.Cell>
@@ -308,19 +375,38 @@ export function DlqCard({ queueNames }: { queueNames: string[] }) {
                         </Table.Cell>
                         {hasAccess && (
                           <Table.Cell>
-                            <Button
-                              variant="outline"
-                              size="2xs"
-                              colorPalette="green"
-                              onClick={() =>
-                                setReplayTarget({
-                                  queueName: group.queueName,
-                                  groupId: group.groupId,
-                                })
-                              }
-                            >
-                              Replay
-                            </Button>
+                            <HStack gap={1}>
+                              <Button
+                                variant="outline"
+                                size="2xs"
+                                colorPalette="green"
+                                onClick={() =>
+                                  setPending({
+                                    kind: "redrive",
+                                    queueName: group.queueName,
+                                    queueDisplayName: group.queueDisplayName,
+                                    groupIds: [group.groupId],
+                                  })
+                                }
+                              >
+                                Redrive
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="2xs"
+                                colorPalette="red"
+                                onClick={() =>
+                                  setPending({
+                                    kind: "discard",
+                                    queueName: group.queueName,
+                                    queueDisplayName: group.queueDisplayName,
+                                    groupIds: [group.groupId],
+                                  })
+                                }
+                              >
+                                Discard
+                              </Button>
+                            </HStack>
                           </Table.Cell>
                         )}
                       </Table.Row>
@@ -334,25 +420,28 @@ export function DlqCard({ queueNames }: { queueNames: string[] }) {
       </Card.Root>
 
       <ConfirmDialog
-        open={!!replayTarget}
-        onClose={() => setReplayTarget(null)}
-        onConfirm={() => {
-          if (replayTarget) replayMutation.mutate(replayTarget);
-        }}
-        title="Replay from DLQ"
-        description={`Move "${replayTarget?.groupId}" back to main queue for reprocessing.`}
-        isLoading={replayMutation.isPending}
+        open={pending?.kind === "redrive"}
+        onClose={() => setPending(null)}
+        onConfirm={confirmPending}
+        title="Redrive from the dead-letter queue"
+        description={
+          pending?.groupIds.length === 1
+            ? `Return "${pending.groupIds[0]}" in "${pending.queueDisplayName}" to the main queue for reprocessing.`
+            : `Return ${pending?.groupIds.length} shown groups in "${pending?.queueDisplayName}" to the main queue for reprocessing.`
+        }
+        isLoading={redriveMutation.isPending}
       />
       <ConfirmDialog
-        open={!!replayAllTarget}
-        onClose={() => setReplayAllTarget(null)}
-        onConfirm={() => {
-          if (replayAllTarget)
-            replayAllMutation.mutate({ queueName: replayAllTarget });
-        }}
-        title="Replay All from DLQ"
-        description={`Move all DLQ groups in "${replayAllTarget}" back to main queue.`}
-        isLoading={replayAllMutation.isPending}
+        open={pending?.kind === "discard"}
+        onClose={() => setPending(null)}
+        onConfirm={confirmPending}
+        title="Discard from the dead-letter queue"
+        description={
+          pending?.groupIds.length === 1
+            ? `Mark "${pending.groupIds[0]}" in "${pending.queueDisplayName}" as never to be run. The act is recorded in the audit trail with the group's last error; the jobs will not run.`
+            : `Mark ${pending?.groupIds.length} shown groups in "${pending?.queueDisplayName}" as never to be run. The act is recorded in the audit trail with each group's last error; the jobs will not run.`
+        }
+        isLoading={discardMutation.isPending}
       />
       <ConfirmDialog
         open={!!canaryTarget}
@@ -365,7 +454,7 @@ export function DlqCard({ queueNames }: { queueNames: string[] }) {
             });
         }}
         title="Canary Redrive"
-        description={`Replay ${canaryCount} random DLQ groups from "${canaryTarget}" as canary.`}
+        description={`Redrive ${canaryCount} random dead-letter groups from "${canaryTarget}" as a canary.`}
         isLoading={canaryRedriveMutation.isPending}
       />
     </>

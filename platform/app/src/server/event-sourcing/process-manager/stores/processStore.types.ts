@@ -24,7 +24,30 @@ export interface PersistedProcessInstance<State = unknown> {
   updatedAt: number;
 }
 
-export type OutboxMessageStatus = "pending" | "dispatched" | "dead";
+export type OutboxMessageStatus =
+  | "pending"
+  | "dispatched"
+  | "dead"
+  /** Operator-marked never-to-be-sent (specs/ops/dead-letter-recovery.feature).
+   *  A mark, not a delete: the row stays as its own audit trail. */
+  | "discarded";
+
+/**
+ * One FAILED delivery attempt, recorded so a dead letter can say why it died
+ * without a span lookup (specs/ops/dead-letter-recovery.feature). Successes
+ * write nothing.
+ */
+export interface FailedOutboxAttempt {
+  /** 1-based attempt number, as the dispatcher counts it. */
+  attempt: number;
+  occurredAt: number;
+  /** Whether this failure retired the message or scheduled a retry. */
+  outcome: "retry_scheduled" | "dead";
+  errorType: string;
+  /** The safe failure diagnostic — never a raw provider body. */
+  errorMessage: string;
+  retryAfterMs?: number;
+}
 
 export interface NewOutboxMessage {
   messageKey: string;
@@ -215,6 +238,16 @@ export interface ProcessStore {
     nextAttemptAt: number;
     dead: boolean;
   }): Promise<{ applied: boolean }>;
+
+  /**
+   * Append one failed attempt to the message's history. Best-effort by
+   * contract: callers wrap it so a history write that fails never fails the
+   * delivery accounting (the attempt entry is the only loss).
+   */
+  recordFailedAttempt(params: {
+    identity: OutboxMessageIdentity;
+    attempt: FailedOutboxAttempt;
+  }): Promise<void>;
 
   /**
    * Return a leased message to the pool WITHOUT running it: clears the lease

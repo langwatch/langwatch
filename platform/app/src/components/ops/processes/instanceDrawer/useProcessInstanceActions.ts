@@ -63,6 +63,20 @@ export function useProcessInstanceActions() {
       showErrorToast({ error, fallbackTitle: "Couldn't redrive the message" }),
   });
 
+  const discardMessageMutation = api.ops.processDiscardDeadMessage.useMutation({
+    onSuccess: (data) => {
+      toaster.create({
+        title: data.discarded
+          ? "Message discarded"
+          : "Message is no longer dead",
+        type: data.discarded ? "success" : "error",
+      });
+      void utils.ops.invalidate();
+    },
+    onError: (error) =>
+      showErrorToast({ error, fallbackTitle: "Couldn't discard the message" }),
+  });
+
   const releaseLeaseMutation = api.ops.processReleaseLapsedLease.useMutation({
     onSuccess: (data) => {
       toaster.create({
@@ -83,6 +97,7 @@ export function useProcessInstanceActions() {
     wakeMutation,
     redriveInstanceMutation,
     redriveMessageMutation,
+    discardMessageMutation,
     releaseLeaseMutation,
   };
 }

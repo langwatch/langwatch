@@ -6,6 +6,7 @@ import {
 } from "~/components/ops/shared/formatters";
 import type { DashboardData } from "~/server/app-layer/ops/types";
 import { LATENCY_SAMPLE_SIZE } from "~/shared/ops/latency";
+import { api } from "~/utils/api";
 import { LinkedStat } from "./LinkedStat";
 import { RedisStatTile } from "./RedisStatTile";
 
@@ -35,6 +36,19 @@ export function StatStrip({ data }: { data: DashboardData }) {
     0,
   );
   const totalDlq = data.queues.reduce((sum, q) => sum + q.dlqCount, 0);
+  // The other dead-letter substrate. The queue figure alone once read "0"
+  // while 94 process-outbox messages sat dead further down the page — the
+  // headline number must be the union or it lies
+  // (specs/ops/dead-letter-recovery.feature). Same source the navigation
+  // badge and the DLQ card poll, so the figures can never disagree.
+  const outboxDeadQuery = api.ops.listDeadLetterCounts.useQuery(undefined, {
+    refetchInterval: 30_000,
+  });
+  const outboxDead = (outboxDeadQuery.data ?? []).reduce(
+    (sum, row) => sum + row.count,
+    0,
+  );
+  const totalDead = totalDlq + outboxDead;
 
   return (
     <HStack
@@ -93,9 +107,15 @@ export function StatStrip({ data }: { data: DashboardData }) {
         hint={LATENCY_BASIS}
       />
       <LinkedStat
-        label="Dead-letter queue"
-        value={formatCount(totalDlq)}
-        color={totalDlq > 0 ? "orange.500" : undefined}
+        label="Dead letters"
+        href="/ops/event-sourcing/dead-letters"
+        value={formatCount(totalDead)}
+        sublabel={
+          totalDead > 0
+            ? `${formatCount(totalDlq)} queue · ${formatCount(outboxDead)} outbox`
+            : undefined
+        }
+        color={totalDead > 0 ? "red.500" : undefined}
       />
       <RedisStatTile data={data} />
     </HStack>

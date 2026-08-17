@@ -9,9 +9,25 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DashboardData, PhaseMetrics } from "~/server/app-layer/ops/types";
 import { StatStrip } from "../StatStrip";
+
+// The dead-letters tile reads the process-outbox side through the same query
+// the navigation badge uses; the strip itself is otherwise snapshot-driven.
+vi.mock("~/utils/api", () => ({
+  api: {
+    ops: {
+      listDeadLetterCounts: {
+        useQuery: () => ({
+          data: [
+            { processName: "webhookDelivery", count: 94, oldestUpdatedAt: 0 },
+          ],
+        }),
+      },
+    },
+  },
+}));
 
 const emptyPhase = (): PhaseMetrics => ({
   pending: 0,
@@ -106,6 +122,30 @@ describe("StatStrip", () => {
         expect(strip.textContent).toContain("327ms");
         expect(strip.textContent).toContain("1.6s");
       });
+    });
+  });
+
+  describe("given dead letters exist on both substrates", () => {
+    /** @scenario The dashboard's dead-letter figure covers both substrates */
+    it("headlines the union and states how many come from each", () => {
+      renderStrip({
+        queues: [
+          {
+            name: "queue-a",
+            displayName: "Queue A",
+            pendingGroupCount: 0,
+            blockedGroupCount: 0,
+            activeGroupCount: 0,
+            totalPendingJobs: 0,
+            dlqCount: 6,
+            parkedGroupCount: 0,
+          },
+        ],
+      });
+      const strip = screen.getByTestId("ops-stat-strip");
+      expect(strip.textContent).toContain("Dead letters");
+      expect(strip.textContent).toContain("100");
+      expect(strip.textContent).toContain("6 queue · 94 outbox");
     });
   });
 });

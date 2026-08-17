@@ -167,11 +167,15 @@ export function ProcessInstanceDrawer({
               onRedriveMessage={(messageId) =>
                 actions.redriveMessageMutation.mutate({ ...target, messageId })
               }
+              onDiscardMessage={(messageId) =>
+                actions.discardMessageMutation.mutate({ ...target, messageId })
+              }
               onReleaseLease={(messageId) =>
                 actions.releaseLeaseMutation.mutate({ ...target, messageId })
               }
               actionPending={
                 actions.redriveMessageMutation.isPending ||
+                actions.discardMessageMutation.isPending ||
                 actions.releaseLeaseMutation.isPending
               }
               now={detailQuery.dataUpdatedAt || undefined}

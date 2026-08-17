@@ -3,6 +3,7 @@ import type { ProcessRef } from "~/server/event-sourcing/process-manager/process
 import type {
   DeadLetterCount,
   DeadOutboxMessageView,
+  OutboxAttemptView,
   ProcessInstanceRow,
   ProcessNameCounts,
   ProcessOpsRepository,
@@ -461,6 +462,100 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
     });
     if (updated.count === 0) return null;
     return { messageKey: message.messageKey };
+  }
+
+  async discardDeadMessage(params: {
+    ref: ProcessRef;
+    messageId: string;
+    now: number;
+  }): Promise<{ messageKey: string } | null> {
+    const message = await this.prisma.processManagerOutbox.findFirst({
+      where: {
+        id: params.messageId,
+        projectId: params.ref.projectId,
+        processName: params.ref.processName,
+        processKey: params.ref.processKey,
+        status: "dead",
+      },
+      select: { messageKey: true },
+    });
+    if (!message) return null;
+    // A mark, not a delete: the row is retained as its own audit trail.
+    // Guarded on status in the WHERE, same as the redrive: only a dead row
+    // can be discarded, so a racing redrive keeps its win.
+    const updated = await this.prisma.processManagerOutbox.updateMany({
+      where: {
+        id: params.messageId,
+        projectId: params.ref.projectId,
+        status: "dead",
+      },
+      data: {
+        status: "discarded",
+        updatedAt: new Date(params.now),
+      },
+    });
+    if (updated.count === 0) return null;
+    return { messageKey: message.messageKey };
+  }
+
+  async redriveAllDeadMessages(params: {
+    processName?: string;
+    now: number;
+  }): Promise<number> {
+    const now = new Date(params.now);
+    const nameFilter = params.processName
+      ? Prisma.sql`AND "processName" = ${params.processName}`
+      : Prisma.empty;
+    // Raw, like the fleet-wide reads: a dead-letter sweep has no single
+    // project to name for the tenancy guard, and the surface is ops-gated.
+    return await this.prisma.$executeRaw(Prisma.sql`
+      -- @tenancy: cross-tenant ops dead-letter recovery; the surface is ops-gated
+      UPDATE "ProcessManagerOutbox"
+      SET "status" = 'pending',
+          "attempts" = 0,
+          "nextAttemptAt" = ${now},
+          "leasedUntil" = NULL,
+          "leaseToken" = NULL,
+          "updatedAt" = ${now}
+      WHERE "status" = 'dead'
+      ${nameFilter}
+    `);
+  }
+
+  async discardAllDeadMessages(params: {
+    processName?: string;
+    now: number;
+  }): Promise<number> {
+    const now = new Date(params.now);
+    const nameFilter = params.processName
+      ? Prisma.sql`AND "processName" = ${params.processName}`
+      : Prisma.empty;
+    return await this.prisma.$executeRaw(Prisma.sql`
+      -- @tenancy: cross-tenant ops dead-letter recovery; the surface is ops-gated
+      UPDATE "ProcessManagerOutbox"
+      SET "status" = 'discarded',
+          "updatedAt" = ${now}
+      WHERE "status" = 'dead'
+      ${nameFilter}
+    `);
+  }
+
+  async findAttempts(params: {
+    outboxId: string;
+    projectId: string;
+  }): Promise<OutboxAttemptView[]> {
+    const rows = await this.prisma.processManagerOutboxAttempt.findMany({
+      where: { outboxId: params.outboxId, projectId: params.projectId },
+      orderBy: { attempt: "asc" },
+    });
+    return rows.map((r) => ({
+      attempt: r.attempt,
+      occurredAt: r.occurredAt.getTime(),
+      outcome: r.outcome,
+      errorType: r.errorType,
+      errorMessage: r.errorMessage,
+      retryAfterMs: r.retryAfterMs,
+    }));
   }
 
   async releaseLapsedLease(params: {

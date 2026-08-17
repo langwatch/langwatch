@@ -4,6 +4,7 @@ import type {
   AppendIntentsResult,
   CommitResult,
   DueWake,
+  FailedOutboxAttempt,
   LeasedOutboxMessageRecord,
   NewOutboxMessage,
   OutboxMessageIdentity,
@@ -81,6 +82,7 @@ export class InMemoryProcessStore implements ProcessStore {
   /** Inbox key to the epoch ms it was consumed at, which retention reaps by. */
   private readonly inbox = new Map<string, number>();
   private readonly messages = new Map<string, StoredMessage>();
+  private readonly attempts = new Map<string, FailedOutboxAttempt[]>();
 
   async findByRef<State = unknown>(params: {
     ref: ProcessRef;
@@ -270,6 +272,21 @@ export class InMemoryProcessStore implements ProcessStore {
     message.leaseToken = null;
     message.updatedAt = params.now;
     return { applied: true };
+  }
+
+  async recordFailedAttempt(params: {
+    identity: OutboxMessageIdentity;
+    attempt: FailedOutboxAttempt;
+  }): Promise<void> {
+    if (!this.messages.has(messageKeyOf(params.identity))) return;
+    const existing = this.attempts.get(messageKeyOf(params.identity)) ?? [];
+    existing.push(params.attempt);
+    this.attempts.set(messageKeyOf(params.identity), existing);
+  }
+
+  /** Test read for the attempt history, mirroring the durable table. */
+  findFailedAttempts(identity: OutboxMessageIdentity): FailedOutboxAttempt[] {
+    return this.attempts.get(messageKeyOf(identity)) ?? [];
   }
 
   async releaseLease(params: {

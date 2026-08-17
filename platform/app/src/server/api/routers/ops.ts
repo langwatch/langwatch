@@ -669,6 +669,72 @@ export const opsRouter = createTRPCRouter({
       });
     }),
 
+  /** Mark one dead message never-to-be-sent — a mark, not a delete. */
+  processDiscardDeadMessage: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        processName: z.string().min(1).max(200),
+        projectId: z.string().min(1).max(200),
+        processKey: z.string().min(1).max(500),
+        messageId: z.string().min(1).max(64),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { messageId, ...ref } = input;
+      return requireOps().managerExplorer.discardDeadMessage({
+        ref,
+        messageId,
+        actorUserId: ctx.session.user.id,
+      });
+    }),
+
+  /**
+   * Every dead letter back to pending — one process, or the fleet when
+   * `processName` is omitted (specs/ops/dead-letter-recovery.feature).
+   */
+  redriveDeadLetters: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        processName: z.string().min(1).max(200).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      return requireOps().managerExplorer.redriveDeadLetters({
+        ...input,
+        actorUserId: ctx.session.user.id,
+      });
+    }),
+
+  /** Every dead letter marked discarded; same scoping. */
+  discardDeadLetters: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        processName: z.string().min(1).max(200).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      return requireOps().managerExplorer.discardDeadLetters({
+        ...input,
+        actorUserId: ctx.session.user.id,
+      });
+    }),
+
+  /** The message's failed attempts, oldest first — why a dead letter died. */
+  listOutboxAttempts: protectedProcedure
+    .use(opsViewPermission)
+    .input(
+      z.object({
+        outboxId: z.string().min(1).max(64),
+        projectId: z.string().min(1).max(200),
+      }),
+    )
+    .query(async ({ input }) => {
+      return requireOps().managerExplorer.getOutboxAttempts(input);
+    }),
+
   processReleaseLapsedLease: protectedProcedure
     .use(opsManagePermission)
     .input(
@@ -900,6 +966,45 @@ export const opsRouter = createTRPCRouter({
     .mutation(async ({ input }) => {
       const ops = requireOps();
       return ops.queues.replayAllFromDlq(input);
+    }),
+
+  /**
+   * Redrive exactly the DLQ groups the operator's filter showed
+   * (specs/ops/dead-letter-recovery.feature) — explicit ids, so the
+   * confirmation and the act cover the same groups.
+   */
+  redriveManyFromDlq: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        queueName: z.string(),
+        groupIds: z.array(z.string().min(1).max(500)).min(1).max(2000),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      return requireOps().queues.redriveManyFromDlq({
+        ...input,
+        requestedBy: ctx.session.user.id,
+      });
+    }),
+
+  /**
+   * Discard exactly the shown DLQ groups: their jobs never run again. The
+   * audit row is the retained mark — the Redis entries expire regardless.
+   */
+  discardManyFromDlq: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        queueName: z.string(),
+        groupIds: z.array(z.string().min(1).max(500)).min(1).max(2000),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      return requireOps().queues.discardManyFromDlq({
+        ...input,
+        requestedBy: ctx.session.user.id,
+      });
     }),
 
   canaryRedrive: protectedProcedure

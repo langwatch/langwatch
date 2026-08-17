@@ -24,7 +24,13 @@ function StatusBadge({
   status: ProcessOutboxMessageView["status"];
 }) {
   const palette =
-    status === "dead" ? "red" : status === "dispatched" ? "green" : "blue";
+    status === "dead"
+      ? "red"
+      : status === "discarded"
+        ? "gray"
+        : status === "dispatched"
+          ? "green"
+          : "blue";
   return (
     <Badge size="xs" colorPalette={palette} variant="subtle">
       {status}
@@ -82,6 +88,7 @@ function MessageMetaRow({
   traceHref,
   canManage,
   onRedrive,
+  onDiscard,
   onReleaseLease,
   actionPending,
 }: {
@@ -91,6 +98,7 @@ function MessageMetaRow({
   traceHref: string | null;
   canManage: boolean;
   onRedrive?: (messageId: string) => void;
+  onDiscard?: (messageId: string) => void;
   onReleaseLease?: (messageId: string) => void;
   actionPending?: boolean;
 }) {
@@ -129,6 +137,18 @@ function MessageMetaRow({
           Redrive
         </Button>
       )}
+      {canManage && message.status === "dead" && onDiscard && (
+        <Button
+          size="2xs"
+          variant="outline"
+          colorPalette="red"
+          loading={actionPending}
+          title="A mark, not a delete: the row is kept as the audit record and the message is never sent."
+          onClick={() => onDiscard(message.id)}
+        >
+          Discard
+        </Button>
+      )}
       {canManage && leaseLapsed && onReleaseLease && (
         <Button
           size="2xs"
@@ -158,6 +178,7 @@ export function OutboxMessageCard({
   grafana,
   canManage,
   onRedrive,
+  onDiscard,
   onReleaseLease,
   actionPending,
 }: {
@@ -166,6 +187,7 @@ export function OutboxMessageCard({
   grafana?: GrafanaDeepLinkConfig | null;
   canManage: boolean;
   onRedrive?: (messageId: string) => void;
+  onDiscard?: (messageId: string) => void;
   onReleaseLease?: (messageId: string) => void;
   actionPending?: boolean;
 }) {
@@ -195,6 +217,7 @@ export function OutboxMessageCard({
           traceHref={traceHref}
           canManage={canManage}
           onRedrive={onRedrive}
+          onDiscard={onDiscard}
           onReleaseLease={onReleaseLease}
           actionPending={actionPending}
         />

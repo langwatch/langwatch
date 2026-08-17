@@ -4,6 +4,12 @@ export type ProcessControlAction =
   | "process_wake_now"
   | "process_redrive_dead_instance"
   | "process_redrive_dead_message"
+  | "process_discard_dead_message"
+  /** Fleet-scoped acts record a pseudo-ref (`__fleet__`/`__all__`), the same
+   *  shape scheduled singletons use for their `__global__` pseudo-project;
+   *  the count moved lives in metadata. */
+  | "process_redrive_dead_letters"
+  | "process_discard_dead_letters"
   | "process_release_lapsed_lease";
 
 export interface ProcessAuditEntryView {

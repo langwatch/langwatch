@@ -13,6 +13,7 @@ import type {
   AppendIntentsResult,
   CommitResult,
   DueWake,
+  FailedOutboxAttempt,
   LeasedOutboxMessageRecord,
   NewOutboxMessage,
   OutboxMessageIdentity,
@@ -476,6 +477,35 @@ export class PrismaProcessStore implements ProcessStore {
       },
     });
     return { applied: result.count === 1 };
+  }
+
+  async recordFailedAttempt(params: {
+    identity: OutboxMessageIdentity;
+    attempt: FailedOutboxAttempt;
+  }): Promise<void> {
+    // Two queries, failure path only: the attempt row needs the outbox row's
+    // id, and updateMany cannot return it. The read uses the uniqueness
+    // contract, so it is index-covered either way.
+    const row = await this.prisma.processManagerOutbox.findUnique({
+      where: {
+        projectId: params.identity.projectId,
+        processName_projectId_messageKey: params.identity,
+      },
+      select: { id: true, projectId: true },
+    });
+    if (!row) return;
+    await this.prisma.processManagerOutboxAttempt.create({
+      data: {
+        outboxId: row.id,
+        projectId: row.projectId,
+        attempt: params.attempt.attempt,
+        occurredAt: asDate(params.attempt.occurredAt),
+        outcome: params.attempt.outcome,
+        errorType: params.attempt.errorType,
+        errorMessage: params.attempt.errorMessage,
+        retryAfterMs: params.attempt.retryAfterMs ?? null,
+      },
+    });
   }
 
   async releaseLease(params: {

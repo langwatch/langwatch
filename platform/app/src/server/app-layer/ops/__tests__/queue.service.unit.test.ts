@@ -59,6 +59,14 @@ function createMockRepo(
     replayAllFromDlq: vi
       .fn()
       .mockResolvedValue({ replayedCount: 0, jobsReplayed: 0 }),
+    redriveManyFromDlq: vi
+      .fn()
+      .mockResolvedValue({ redrivenCount: 0, jobsRedriven: 0 }),
+    discardManyFromDlq: vi.fn().mockResolvedValue({
+      discardedCount: 0,
+      jobsDiscarded: 0,
+      lastErrors: [],
+    }),
     canaryRedrive: vi
       .fn()
       .mockResolvedValue({ redrivenCount: 0, groupIds: [] }),
@@ -82,6 +90,69 @@ function createMockRepo(
 }
 
 describe("QueueService", () => {
+  describe("dead-letter recovery audit", () => {
+    /** @scenario Discarding a DLQ group removes it and remembers the act */
+    it("records the queue, the groups, the job count and the last errors on a discard", async () => {
+      const repo = createMockRepo({
+        discardManyFromDlq: vi.fn().mockResolvedValue({
+          discardedCount: 2,
+          jobsDiscarded: 5,
+          lastErrors: ["HTTP 500"],
+        }),
+      });
+      const append = vi.fn().mockResolvedValue(undefined);
+      const service = new QueueService(repo, { append });
+
+      const result = await service.discardManyFromDlq({
+        queueName: "queue-a",
+        groupIds: ["g1", "g2"],
+        requestedBy: "user_1",
+      });
+
+      expect(result).toEqual({ discardedCount: 2, jobsDiscarded: 5 });
+      expect(append).toHaveBeenCalledWith({
+        actorUserId: "user_1",
+        action: "queue_discard_dlq_groups",
+        queueName: "queue-a",
+        metadata: {
+          groupIds: ["g1", "g2"],
+          requestedGroups: 2,
+          lastErrors: ["HTTP 500"],
+          discardedCount: 2,
+          jobsDiscarded: 5,
+        },
+      });
+    });
+
+    it("audits a redrive with what moved and skips the audit when nothing did", async () => {
+      const repo = createMockRepo({
+        redriveManyFromDlq: vi
+          .fn()
+          .mockResolvedValueOnce({ redrivenCount: 1, jobsRedriven: 3 })
+          .mockResolvedValueOnce({ redrivenCount: 0, jobsRedriven: 0 }),
+      });
+      const append = vi.fn().mockResolvedValue(undefined);
+      const service = new QueueService(repo, { append });
+
+      await service.redriveManyFromDlq({
+        queueName: "queue-a",
+        groupIds: ["g1"],
+        requestedBy: "user_1",
+      });
+      expect(append).toHaveBeenCalledWith(
+        expect.objectContaining({ action: "queue_redrive_dlq_groups" }),
+      );
+
+      append.mockClear();
+      await service.redriveManyFromDlq({
+        queueName: "queue-a",
+        groupIds: ["g-gone"],
+        requestedBy: "user_1",
+      });
+      expect(append).not.toHaveBeenCalled();
+    });
+  });
+
   describe("getGroups()", () => {
     const groups = Array.from({ length: 25 }, (_, i) =>
       createGroup({ groupId: `g${i}` }),

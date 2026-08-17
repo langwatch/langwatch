@@ -247,6 +247,7 @@ import {
   ProcessAuditRepository,
 } from "./ops/process-audit.repository";
 import { QueueService } from "./ops/queue.service";
+import { QueueAuditRepository } from "./ops/queue-audit.repository";
 import { ReplayService } from "./ops/replay.service";
 import { BlobStoreRedisRepository } from "./ops/repositories/blob-store.redis.repository";
 import { NullBlobStoreRepository } from "./ops/repositories/blob-store.repository";
@@ -1619,7 +1620,7 @@ export function initializeDefaultApp(options?: {
     : new NullEventExplorerRepository();
 
   const ops = {
-    queues: new QueueService(queueRepo),
+    queues: new QueueService(queueRepo, new QueueAuditRepository(prisma)),
     scheduler: new SchedulerOpsService({
       repo: new PrismaScheduledJobRepository(prisma),
       audit: new SchedulerAuditRepository(prisma),
