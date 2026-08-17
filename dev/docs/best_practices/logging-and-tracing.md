@@ -117,10 +117,58 @@ identifier:
   addresses. These are what the PII redaction pass exists for; see
   `platform/app/src/server/data-privacy/`.
 
+## Choosing a Level: Who Decides the Outcome
+
+`error` means something bad and final happened. A failure that is about to be
+retried is neither, so logging it at `error` is a false positive — and a steady
+supply of them is how a team learns to scroll past the one level that was meant
+to stop them.
+
+**The rule: a layer that rethrows does not get to claim an outcome it did not
+decide. It logs at `warn`. The layer that stops the propagation — the retry
+loop out of attempts, the boundary answering the caller — logs at `error`.**
+
+`GroupQueue` is the reference implementation:
+
+```
+repository catch     -> logger.warn  ... then rethrow      every attempt
+groupQueue.ts:1641   -> logger.warn  "Job attempt failed, re-staged with backoff"
+groupQueue.ts:2320   -> logger.error "Group blocked after exhausted retries"   once, on giving up
+```
+
+The log below the retry loop still earns its place — it holds identifiers
+(`tenantId`, `evaluationId`, row counts) that the queue never sees. Keep the
+context; drop the severity claim.
+
+This is a different axis from the one in
+`specs/observability/request-log-cause-and-level.feature`, which levels a
+*request* by fault: customer fault below error, platform fault at error. This
+one levels by **finality**. A platform fault that will be retried is still not
+final, so fault alone does not settle it.
+
+The inverse is the case people miss. **Work discarded without anything being
+thrown gets `error`**, however routine the code path feels: no layer above will
+ever see it, so the discarding layer is the last one that can report it.
+`ProjectionRegistry.dispatch` dropping events with no router is the worked
+example — it sat at `warn` and lost events on every rolling deploy unnoticed.
+
+| Situation | Level |
+|---|---|
+| Failed, and this layer rethrows | `warn` |
+| Failed, retry scheduled | `warn` |
+| Failed, retries exhausted / gave up | `error` |
+| Work silently discarded, nothing thrown | `error` |
+| Handled customer fault at a request boundary | `warn` (see the request spec) |
+
+Spec: `specs/observability/retryable-failure-log-level.feature`.
+
 ## Anti-Patterns
 
 | Don't | Do |
 |-------|-----|
+| `logger.error({ error }, "...")` then `throw error` | `logger.warn(...)` then `throw` — the layer that stops the throw logs the error |
+| `logger.warn(...)` on a path that discards work | `logger.error(...)` — nothing above will report the loss |
+| `logger.warn({ error: error.message }, "...")` | `logger.warn({ error }, "...")` — a bare string under `error` loses the stack and is dropped by the log collector |
 | `logger.info("User " + userId + " logged in")` | `logger.info({ userId }, "User logged in")` |
 | `logger.error("Error: " + error.message)` | `logger.error({ error }, "Operation failed")` |
 | `logger.info({ password, apiKey }, "...")` | Never log credentials, customer content, or personal data — see above |
