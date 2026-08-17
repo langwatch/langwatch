@@ -73,7 +73,7 @@ func ResolveCheckSlots(totalRAMBytes uint64, numCPU int, env CheckEnv) (int, str
 // rather than lower because a ceiling below the live heap is missed anyway, at
 // the price of collecting continuously to miss it. 6 itself is a judgement
 // between measured points and wants a re-measure on an unloaded machine; see
-// ADR-099, which records what the samples do and do not establish.
+// ADR-100, which records what the samples do and do not establish.
 func CheckGoMemLimit(totalRAMBytes uint64, existing string) string {
 	if existing != "" {
 		return existing

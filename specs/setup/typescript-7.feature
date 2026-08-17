@@ -10,7 +10,7 @@ Feature: TypeScript 7 is the compiler
   the type level, so a static scan that still does it goes quiet rather than
   red — it finds nothing and reports clean.
 
-  ADR: dev/docs/adr/099-typescript-7-and-the-typecheck-memory-ceiling.md
+  ADR: dev/docs/adr/099-typescript-7-is-the-compiler.md
 
   @unit
   Scenario: The compiler API is only reached through its unstable export
@@ -36,8 +36,8 @@ Feature: TypeScript 7 is the compiler
   Scenario: Source text with no file behind it still parses
     Given a snippet that exists only as a string
     When a scan asks for its parsed form
-    Then the text is served to the compiler through a virtual filesystem
-    And the scan walks the resulting syntax tree
+    Then it gets back a syntax tree of that text
+    And the scan walks it without the snippet ever reaching disk
 
   @unit
   Scenario: A name reused with new text parses the new text

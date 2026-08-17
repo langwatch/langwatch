@@ -13,7 +13,7 @@
  * deliberately and must not be swept forward by a well-meaning bulk bump.
  *
  * Spec: specs/setup/typescript-7.feature
- * ADR: dev/docs/adr/099-typescript-7-and-the-typecheck-memory-ceiling.md
+ * ADR: dev/docs/adr/099-typescript-7-is-the-compiler.md
  */
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";

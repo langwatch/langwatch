@@ -179,7 +179,7 @@ pnpm test:e2e         # E2E tests
 **Whole-repo checks take a machine-wide slot.** A typecheck holds a 2.3 to
 3.5 GiB working set and uses every core — though what you see in Activity
 Monitor is its footprint, which expands toward whatever `GOMEMLIMIT` the queue
-gave it (ADR-099); a biome run over 6,800 files spends 38 CPU-seconds in 4
+gave it (ADR-100); a biome run over 6,800 files spends 38 CPU-seconds in 4
 seconds of wall clock. That is fine once and ruinous four times over, so
 `typecheck`, `typecheck:tests`, `lint`, `lint:fix`,
 `lint:plugins` and `format` all go through `dev/scripts/check-queue.mjs`. It
@@ -310,7 +310,7 @@ specs/               # BDD feature specs
 
 | Common Mistake | Correct Behavior |
 |----------------|------------------|
-| Using npm tsc to compile | Use `pnpm typecheck` instead — it goes through the check queue, and a bare `tsc` run does not |
+| Using npm tsc to compile | Use `pnpm typecheck` instead — it names the right project and the right compiler. A `tsc` reached any other way still queues (the bin shim sees to that, see "Going around the scripts" above), so the reason is correctness, not the queue |
 | Importing the TypeScript compiler API from `typescript` | TypeScript 7's root export is a version constant; the compiler lives behind `typescript/unstable/*`, and nothing parses a string in-process any more. Static scans go through `src/test-utils/tsAst.ts`, which owns the one API session. See ADR-099 |
 | Creating shared types for single-use interfaces | Colocate interfaces with their usage; only extract to `types.ts` when shared across multiple files |
 | Using -- on pnpm tasks, pnpm adds the -- automatically | Using e.g. `pnpm test:unit path/to/file` directly |

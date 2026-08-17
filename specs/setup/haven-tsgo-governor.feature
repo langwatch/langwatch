@@ -90,9 +90,9 @@ Feature: tsgo can never take the machine down
 
   @unit
   Scenario: The soft cap stays inside what a run can meet
-    Given the machine has more memory than a whole-tree run needs
-    Then the cap is held down to six gibibytes rather than half the machine
-    And a small machine is still given three, never less
+    Given the machine has far more memory than a whole-tree run needs
+    Then the run is capped well below what half the machine would allow
+    And a small machine is still capped high enough for a run to meet it
     # A ceiling is one the runtime expands toward, so a generous cap is spent
     # rather than saved; a cap below the live heap is missed anyway, at the
-    # price of collecting continuously. See ADR-099.
+    # price of collecting continuously. See ADR-100.

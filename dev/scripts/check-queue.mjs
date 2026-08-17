@@ -390,7 +390,7 @@ function delegateToHaven(commandArgv, env) {
  * [3,6] GiB; an operator's explicit GOMEMLIMIT always wins. The haven daemon's
  * process watch is the hard backstop above this.
  *
- * Both ends of the clamp are measured, not chosen — see ADR-099. GOMEMLIMIT is
+ * Both ends of the clamp are measured, not chosen — see ADR-100. GOMEMLIMIT is
  * a ceiling the runtime expands toward, so the old cap of 10 turned an 18 GiB
  * laptop into a 9 GiB typecheck against a 2.29 GB working set; and a limit
  * below the live heap is worse than none, because the runtime collects

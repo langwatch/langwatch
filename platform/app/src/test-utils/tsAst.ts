@@ -1,4 +1,4 @@
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import type { SourceFile } from "typescript/unstable/ast";
@@ -77,10 +77,22 @@ function scratchDir(): string {
   return scratch;
 }
 
-/** Ends the session, and with it the compiler child process. */
+/**
+ * Ends the session, and with it the compiler child process. Also drops what
+ * the session was holding on this side: every staged file's text, and the
+ * temporary directory they were staged in. Without that a process that opens
+ * and closes sessions keeps both, and neither is small — the overlay holds a
+ * copy of every file the scans parsed.
+ */
 export function closeTsAstSession(): void {
   session?.close();
   session = undefined;
+  overlay.clear();
+  if (scratch) {
+    rmSync(scratch, { recursive: true, force: true });
+    scratch = undefined;
+  }
+  counter = 0;
 }
 
 /** Registers one file's text in the overlay and returns the path it took. */
