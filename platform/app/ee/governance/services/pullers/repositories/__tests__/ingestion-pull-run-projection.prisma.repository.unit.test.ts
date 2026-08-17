@@ -1,8 +1,9 @@
 import type { IngestionPullRunStatusData } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/projections/ingestionPullRunStatus.foldProjection";
 import { describe, expect, it, vi } from "vitest";
-import type { Prisma, PrismaClient } from "~/generated/prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import type { StoredProjection } from "~/server/event-sourcing/projections/stateProjection.types";
+import type { GuardParams } from "~/utils/dbGuardMiddleware";
 import { guardProjectId } from "~/utils/dbMultiTenancyProtection";
 import { PrismaIngestionPullRunProjectionRepository } from "../ingestion-pull-run-projection.prisma.repository";
 
@@ -10,16 +11,14 @@ const PROJECT_ID = "governance-project-1";
 const SOURCE_ID = "source-1";
 
 async function runGuard(
-  action: Prisma.MiddlewareParams["action"],
-  args: Prisma.MiddlewareParams["args"],
+  action: GuardParams["action"],
+  args: GuardParams["args"],
 ): Promise<void> {
   await guardProjectId(
     {
       model: "IngestionPullRunProjection",
       action,
       args,
-      dataPath: [],
-      runInTransaction: false,
     },
     async () => undefined,
   );
@@ -53,7 +52,7 @@ function storedProjection(): StoredProjection<IngestionPullRunStatusData> {
 
 describe("PrismaIngestionPullRunProjectionRepository tenancy", () => {
   it("loads a source projection through the guarded Prisma client", async () => {
-    const findUnique = vi.fn(async (args: Prisma.MiddlewareParams["args"]) => {
+    const findUnique = vi.fn(async (args: GuardParams["args"]) => {
       await runGuard("findUnique", args);
       return null;
     });
@@ -76,7 +75,7 @@ describe("PrismaIngestionPullRunProjectionRepository tenancy", () => {
   });
 
   it("stores a source projection through the guarded Prisma client", async () => {
-    const upsert = vi.fn(async (args: Prisma.MiddlewareParams["args"]) => {
+    const upsert = vi.fn(async (args: GuardParams["args"]) => {
       await runGuard("upsert", args);
     });
     const tx = {
