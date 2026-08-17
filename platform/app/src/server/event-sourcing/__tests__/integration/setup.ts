@@ -62,6 +62,7 @@ import { selectedGraphLane } from "../../../../test-utils/integrationModuleGraph
  * the broken combination — so both go through selectedGraphLane().
  */
 const SHARES_MODULE_GRAPH = selectedGraphLane(process.env) === "shared";
+
 import { resetApp, tryGetApp } from "../../../app-layer/app";
 import { startTestContainers, stopTestContainers } from "./testContainers";
 

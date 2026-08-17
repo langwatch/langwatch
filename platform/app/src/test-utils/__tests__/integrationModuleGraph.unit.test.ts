@@ -37,9 +37,9 @@ describe("graphLaneForSource", () => {
     it("keeps it on the mocking lane, because a hoisted mock cannot apply to a shared registry", () => {
       expect(graphLaneForSource('vi.mock("~/server/db");')).toBe("mocking");
       expect(graphLaneForSource("vi.doMock('./x');")).toBe("mocking");
-      expect(graphLaneForSource("const { a } = vi.hoisted(() => ({ a: 1 }));")).toBe(
-        "mocking",
-      );
+      expect(
+        graphLaneForSource("const { a } = vi.hoisted(() => ({ a: 1 }));"),
+      ).toBe("mocking");
     });
 
     it("reads it through whitespace, the way it is actually written", () => {
@@ -55,9 +55,9 @@ describe("graphLaneForSource", () => {
     });
 
     it("is not fooled by other vi helpers, which do not touch the registry", () => {
-      expect(graphLaneForSource("vi.fn(); vi.spyOn(x, 'y'); vi.useFakeTimers();")).toBe(
-        "shared",
-      );
+      expect(
+        graphLaneForSource("vi.fn(); vi.spyOn(x, 'y'); vi.useFakeTimers();"),
+      ).toBe("shared");
     });
   });
 });
@@ -65,9 +65,18 @@ describe("graphLaneForSource", () => {
 describe("partitionByModuleGraph", () => {
   describe("given a mix of files", () => {
     it("splits them without losing or duplicating any", () => {
-      writeFile({ relative: "a.integration.test.ts", source: "vi.mock('./x');" });
-      writeFile({ relative: "b.integration.test.ts", source: "expect(1).toBe(1);" });
-      writeFile({ relative: "c.integration.test.ts", source: "vi.hoisted(() => ({}));" });
+      writeFile({
+        relative: "a.integration.test.ts",
+        source: "vi.mock('./x');",
+      });
+      writeFile({
+        relative: "b.integration.test.ts",
+        source: "expect(1).toBe(1);",
+      });
+      writeFile({
+        relative: "c.integration.test.ts",
+        source: "vi.hoisted(() => ({}));",
+      });
 
       const { mocking, shared } = partitionByModuleGraph({
         root,
@@ -102,8 +111,12 @@ describe("partitionByModuleGraph", () => {
 
 describe("selectedGraphLane", () => {
   it("reads the two lane names and nothing else", () => {
-    expect(selectedGraphLane({ INTEGRATION_GRAPH_LANE: "shared" })).toBe("shared");
-    expect(selectedGraphLane({ INTEGRATION_GRAPH_LANE: "mocking" })).toBe("mocking");
+    expect(selectedGraphLane({ INTEGRATION_GRAPH_LANE: "shared" })).toBe(
+      "shared",
+    );
+    expect(selectedGraphLane({ INTEGRATION_GRAPH_LANE: "mocking" })).toBe(
+      "mocking",
+    );
     expect(selectedGraphLane({ INTEGRATION_GRAPH_LANE: "yes" })).toBeNull();
     expect(selectedGraphLane({})).toBeNull();
   });
@@ -111,15 +124,25 @@ describe("selectedGraphLane", () => {
 
 describe("graphLaneSelection", () => {
   beforeEach(() => {
-    writeFile({ relative: "mocks.integration.test.ts", source: "vi.mock('./x');" });
-    writeFile({ relative: "plain.integration.test.ts", source: "expect(1).toBe(1);" });
+    writeFile({
+      relative: "mocks.integration.test.ts",
+      source: "vi.mock('./x');",
+    });
+    writeFile({
+      relative: "plain.integration.test.ts",
+      source: "expect(1).toBe(1);",
+    });
   });
 
   const files = ["mocks.integration.test.ts", "plain.integration.test.ts"];
 
   describe("when no lane is selected", () => {
     it("runs every file with a fresh registry, so a laptop behaves as before the split", () => {
-      const selection = graphLaneSelection({ root, datastoreFiles: files, env: {} });
+      const selection = graphLaneSelection({
+        root,
+        datastoreFiles: files,
+        env: {},
+      });
 
       expect(selection.files).toEqual(files);
       expect(selection.isolate).toBe(true);
