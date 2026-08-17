@@ -241,6 +241,15 @@ describe("SCIM group PATCH membership", () => {
         expect(prisma.groupMembership.deleteMany).not.toHaveBeenCalled();
       });
     });
+
+    describe("when the member array contains entries without a string value key", () => {
+      it("leaves the group's membership untouched", async () => {
+        await patchGroup([{ op: "replace", path: "members", value: [{}] }]);
+
+        expect(prisma.groupMembership.deleteMany).not.toHaveBeenCalled();
+        expect(prisma.groupMembership.upsert).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe("given a replace operation that names an empty member list", () => {
