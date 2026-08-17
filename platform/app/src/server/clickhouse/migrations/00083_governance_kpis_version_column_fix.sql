@@ -74,7 +74,7 @@ DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.governance_kpis_old;
 -- +goose ENVSUB OFF
 
 -- +goose Down
--- Down intentionally not provided. The version column fix is
--- forward-only; rolling back would reintroduce the backward-moving
--- version column bug. The table is derived data (rebuildable from
--- event_log) so a manual rebuild is the rollback path if needed.
+-- IRREVERSIBLE: the version column swap discards the backward-moving
+-- LastEventOccurredAt engine and there is no way to reconstruct it.
+-- The table is derived data (rebuildable from event_log) so a manual
+-- rebuild is the rollback path if needed.

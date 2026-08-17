@@ -34,7 +34,7 @@ describe("governance_kpis ReplacingMergeTree version column", () => {
     await client.close();
   });
 
-  describe("when version column is CreatedAt (the fix)", () => {
+  describe("given version column is CreatedAt (the fix)", () => {
     beforeAll(async () => {
       await client.command({
         query: `DROP TABLE IF EXISTS ${database}.${TABLE}`,
@@ -128,7 +128,7 @@ describe("governance_kpis ReplacingMergeTree version column", () => {
     });
   });
 
-  describe("when version column is LastEventOccurredAt (the bug)", () => {
+  describe("given version column is LastEventOccurredAt (the bug)", () => {
     const BUG_TABLE = `${TABLE}_bug`;
 
     beforeAll(async () => {

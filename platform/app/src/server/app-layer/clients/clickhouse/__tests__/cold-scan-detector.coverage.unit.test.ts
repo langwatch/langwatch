@@ -35,6 +35,7 @@ const NOT_ON_A_READ_PATH = new Set<string>([
   "gateway_budget_scope_totals_rebuild",
   "trace_analytics_rollup_rebuild",
   "evaluation_analytics_rollup_rebuild",
+  "governance_kpis_v2", // transient: created by 00083, immediately renamed to governance_kpis
 ]);
 
 /**
