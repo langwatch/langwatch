@@ -1038,43 +1038,14 @@ jobs:
   # Scans changed files only. The rules are severity: warning during rollout,
   # so this reports without failing; promote a rule to severity: error in its
   # .yml once its baseline is clean and this job starts gating on it.
-  # ast-grep, feature parity, OpenAPI completeness and CI's own two self-tests,
-  # on ONE runner.
-  #
-  # They were five jobs of 16-85s each (ast-grep 26, parity 49, openapi 85,
-  # ci-scripts 16, ci-self 41), and three of them independently ran
-  # `setup-pnpm-node` with the same `@langwatch/web...` filter. Under a
-  # saturated queue the lease, not the work, is the cost — and the duplicated
-  # pnpm install was most of the work. Serial here is ~217s of steps against
-  # `test-integration`'s ~700s, so this never becomes the critical path, and
-  # collapsing three installs into one makes the real figure lower still.
-  #
-  # `lint` is deliberately NOT here. It carries a job-scoped
-  # `pull-requests: write` so reviewdog can annotate the diff, and the whole
-  # point of scoping it to that job is that nothing else gains the write. See
-  # its own comment.
-  #
-  # `typecheck` and `build` are deliberately NOT here either: branch protection
-  # requires them by bare name, so folding them into another job would delete
-  # the check it waits for and block every pull request.
-  #
-  # Every step carries `!cancelled()`, so one failure does not hide the next
-  # four — a run reports everything broken, the way five jobs did.
-  checks:
-    name: "ast-grep · parity · openapi · ci-tests"
+  ast-grep:
     needs: changes
-    # The union of the two gates the five jobs used. `feature-parity` has its
-    # own flag because it tracks specs and test roots rather than app source;
-    # the steps below keep that distinction individually.
-    if: ${{ needs.changes.outputs.relevant == 'true' || needs.changes.outputs.feature-parity == 'true' }}
+    if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
-          # fetch-depth 0 is ast-grep's requirement: it diffs against the merge
-          # base to scan only changed files.
           fetch-depth: 0
           persist-credentials: false
           # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
@@ -1089,36 +1060,19 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
-        if: ${{ needs.changes.outputs.relevant == 'true' }}
         with:
           python-version: "3.12"
 
-      # One install for the three steps that used to do their own.
-      - uses: ./.github/actions/setup-pnpm-node
-        with:
-          install: "@langwatch/web..."
-
-      # Only the OpenAPI check needs these, but it is the union's cost and it
-      # is small next to the install above.
-      - uses: ./.github/actions/prepare-generated-files
-        if: ${{ needs.changes.outputs.relevant == 'true' }}
-
-      # ── ast-grep ────────────────────────────────────────────────────────
       # Pinned to the same version coderabbit-config-check.yml uses —
       # rule-matching behaviour is version-sensitive. Bump both together.
       - name: Install pinned ast-grep
-        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' }}
         run: pip install "ast-grep-cli==0.42.3"
 
       - name: Rule fixtures must still pass
-        id: ast_grep_fixtures
-        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' }}
         working-directory: dev/lint/ast-grep
         run: ast-grep test -c sgconfig.yml -t rule-tests
 
       - name: Scan changed files
-        id: ast_grep_scan
-        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' }}
         run: |
           BASE="${{ github.base_ref || 'main' }}"
           git fetch --no-tags origin "+refs/heads/$BASE:refs/remotes/origin/$BASE"
@@ -1131,120 +1085,86 @@ jobs:
           # shellcheck disable=SC2086
           ast-grep scan -c dev/lint/ast-grep/sgconfig.yml $files
 
-      # ── feature parity ──────────────────────────────────────────────────
+      - name: Notify Slack on failure
+        if: failure() && github.ref == 'refs/heads/main'
+        env:
+          SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/notify-slack-job-failure.sh ast-grep
+
+  feature-parity:
+    needs: changes
+    if: needs.changes.outputs.feature-parity == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
+          sparse-checkout: |
+            /*
+            !/docs/media/
+            !/docs/images/
+            !/assets/
+          sparse-checkout-cone-mode: false
+
+      - uses: ./.github/actions/setup-pnpm-node
+        with:
+          install: "@langwatch/web..."
+
       - name: Check feature-file parity
-        id: parity
-        if: ${{ !cancelled() && needs.changes.outputs.feature-parity == 'true' }}
         working-directory: platform/app
         run: pnpm check:feature-parity
-
-      # ── OpenAPI completeness ────────────────────────────────────────────
-      # The generated OpenAPI document is what external integrators compile
-      # clients from, and an operation missing its body, parameters or success
-      # response still appears in it. This turns each omission into a failure.
-      - name: Check OpenAPI completeness
-        id: openapi
-        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' }}
-        working-directory: platform/app
-        run: pnpm check:openapi-completeness
-
-      # ── CI's own script tests ───────────────────────────────────────────
-      - name: Test extract-failures.sh
-        id: script_extract_failures
-        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' }}
-        run: bash .github/scripts/__tests__/extract-failures.test.sh
-
-      - name: Test start-clickhouse-with-storage-policy.sh
-        id: script_clickhouse
-        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' }}
-        run: bash .github/scripts/__tests__/start-clickhouse-with-storage-policy.test.sh
-
-      - name: Test start-boxd-ssh-agent.sh
-        id: script_boxd
-        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' }}
-        run: bash .github/scripts/__tests__/start-boxd-ssh-agent.test.sh
-
-      # ── CI self-test: prove a failing test actually fails the run ───────
-      - name: Stage canary fixture inside vitest root
-        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' }}
-        working-directory: platform/app
-        run: cp ../../.github/scripts/__fixtures__/intentional-failure.test.ts ./_ci_canary.test.ts
-
-      - name: Run intentional failure
-        id: canary
-        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' }}
-        continue-on-error: true
-        working-directory: platform/app
-        run: |
-          pnpm vitest run _ci_canary.test.ts \
-            --reporter=default --reporter=json --outputFile=test-results.json
-
-      - name: Extract failures
-        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' }}
-        working-directory: platform/app
-        run: bash ../../.github/scripts/extract-failures.sh test-results.json test-failures.txt
-
-      - name: Assert detection worked
-        id: ci_self_test
-        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' }}
-        run: |
-          if [ "${{ steps.canary.outcome }}" != "failure" ]; then
-            echo "FAIL: canary step should have failed (vitest should exit non-zero for a failing test), got outcome=${{ steps.canary.outcome }}"
-            exit 1
-          fi
-          if [ ! -s platform/app/test-failures.txt ]; then
-            echo "FAIL: test-failures.txt is missing or empty — failure extraction did not work"
-            exit 1
-          fi
-          echo "PASS: canary failed as expected and failures were extracted"
-          cat platform/app/test-failures.txt
-
-      # Five checks in one job means five places to look when it goes red, and
-      # the step list does not say which of them mattered without scrolling.
-      # This names every failure in one line, at the end, the way five separate
-      # jobs did on the PR's check list.
-      #
-      # It re-fails on purpose. The job is already red — a failed step fails its
-      # job even with `!cancelled()` letting the rest run — so this adds no
-      # gating, only a readable verdict at the bottom of the log.
-      - name: Summary
-        if: ${{ !cancelled() }}
-        env:
-          AST_GREP_FIXTURES: ${{ steps.ast_grep_fixtures.outcome }}
-          AST_GREP_SCAN: ${{ steps.ast_grep_scan.outcome }}
-          FEATURE_PARITY: ${{ steps.parity.outcome }}
-          OPENAPI: ${{ steps.openapi.outcome }}
-          SCRIPT_EXTRACT_FAILURES: ${{ steps.script_extract_failures.outcome }}
-          SCRIPT_CLICKHOUSE: ${{ steps.script_clickhouse.outcome }}
-          SCRIPT_BOXD: ${{ steps.script_boxd.outcome }}
-          CI_SELF_TEST: ${{ steps.ci_self_test.outcome }}
-        run: |
-          set -uo pipefail
-          failed=()
-          for check in \
-            AST_GREP_FIXTURES AST_GREP_SCAN FEATURE_PARITY OPENAPI \
-            SCRIPT_EXTRACT_FAILURES SCRIPT_CLICKHOUSE SCRIPT_BOXD CI_SELF_TEST
-          do
-            outcome="${!check}"
-            case "$outcome" in
-              success) echo "ok       ${check}" ;;
-              skipped|"") echo "skipped  ${check}" ;;
-              *) echo "FAIL     ${check}"; failed+=("${check}") ;;
-            esac
-          done
-
-          if [ "${#failed[@]}" -gt 0 ]; then
-            echo
-            echo "checks that failed: ${failed[*]}"
-            exit 1
-          fi
 
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'
         env:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
           GH_TOKEN: ${{ github.token }}
-        run: bash .github/scripts/notify-slack-job-failure.sh checks
+        run: bash .github/scripts/notify-slack-job-failure.sh feature-parity
+
+  # The generated OpenAPI document is what external integrators compile
+  # clients from, and an operation missing its body, parameters or success
+  # response still appears in it. This turns each omission into a failure.
+  openapi-completeness:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
+          sparse-checkout: |
+            /*
+            !/docs/media/
+            !/docs/images/
+            !/assets/
+          sparse-checkout-cone-mode: false
+
+      - uses: ./.github/actions/setup-pnpm-node
+        with:
+          install: "@langwatch/web..."
+
+      - uses: ./.github/actions/prepare-generated-files
+
+      - name: Check OpenAPI completeness
+        working-directory: platform/app
+        run: pnpm check:openapi-completeness
+
+      # The completeness check only inspects operations already in the
+      # document. This one catches the route that never got there: a handler
+      # with no describeRoute, or one whose app the generator never imports.
+      - name: Check OpenAPI route coverage
+        working-directory: platform/app
+        run: pnpm check:openapi-route-coverage
+
+      - name: Notify Slack on failure
+        if: failure() && github.ref == 'refs/heads/main'
+        env:
+          SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/notify-slack-job-failure.sh openapi-completeness
 
   build:
     needs: changes
@@ -1366,6 +1286,88 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/notify-slack-job-failure.sh build
 
+  ci-scripts-test:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
+          sparse-checkout: |
+            /*
+            !/docs/media/
+            !/docs/images/
+            !/assets/
+          sparse-checkout-cone-mode: false
+
+      - name: Test extract-failures.sh
+        run: bash .github/scripts/__tests__/extract-failures.test.sh
+
+      - name: Test start-clickhouse-with-storage-policy.sh
+        run: bash .github/scripts/__tests__/start-clickhouse-with-storage-policy.test.sh
+
+      - name: Test start-boxd-ssh-agent.sh
+        run: bash .github/scripts/__tests__/start-boxd-ssh-agent.test.sh
+
+  ci-self-test:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
+          sparse-checkout: |
+            /*
+            !/docs/media/
+            !/docs/images/
+            !/assets/
+          sparse-checkout-cone-mode: false
+
+      - uses: ./.github/actions/setup-pnpm-node
+        with:
+          install: "@langwatch/web..."
+
+      - name: Stage canary fixture inside vitest root
+        working-directory: platform/app
+        run: cp ../../.github/scripts/__fixtures__/intentional-failure.test.ts ./_ci_canary.test.ts
+
+      - name: Run intentional failure
+        id: canary
+        continue-on-error: true
+        working-directory: platform/app
+        run: |
+          pnpm vitest run _ci_canary.test.ts \
+            --reporter=default --reporter=json --outputFile=test-results.json
+
+      - name: Extract failures
+        if: always()
+        working-directory: platform/app
+        run: bash ../../.github/scripts/extract-failures.sh test-results.json test-failures.txt
+
+      - name: Assert detection worked
+        if: always()
+        run: |
+          if [ "${{ steps.canary.outcome }}" != "failure" ]; then
+            echo "FAIL: canary step should have failed (vitest should exit non-zero for a failing test), got outcome=${{ steps.canary.outcome }}"
+            exit 1
+          fi
+          if [ ! -s platform/app/test-failures.txt ]; then
+            echo "FAIL: test-failures.txt is missing or empty — failure extraction did not work"
+            exit 1
+          fi
+          echo "PASS: canary failed as expected and failures were extracted"
+          cat platform/app/test-failures.txt
+
+  # Assemble the shard sequencer's weights from the lanes that just ran.
+  #
+  # Only on a dispatched run, and it produces an ARTIFACT rather than a commit:
+  # the manifest has to be identical for every shard that reads it, so it lands
+  # in the repo through a reviewed change like anything else. Download
+  # `shard-durations`, drop it at platform/app/vitest.durations.json, commit.
   shard-durations:
     needs: [changes, test-unit, test-component, test-integration]
     if: always() && needs.changes.outputs.durations == 'true'
@@ -1434,11 +1436,11 @@ jobs:
           path: vitest.durations.json
 
   langwatch-app-complete:
-    needs: [changes, typecheck, test-unit, test-component, test-integration, lint, checks, build]
+    needs: [changes, typecheck, test-unit, test-component, test-integration, lint, ast-grep, feature-parity, openapi-completeness, build, ci-scripts-test, ci-self-test]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
         with:
           jobs: ${{ toJSON(needs) }}
-          allowed-skips: typecheck, test-unit, test-component, test-integration, lint, checks, build
+          allowed-skips: typecheck, test-unit, test-component, test-integration, lint, ast-grep, feature-parity, openapi-completeness, build, ci-scripts-test, ci-self-test
