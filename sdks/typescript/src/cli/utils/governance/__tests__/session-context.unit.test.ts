@@ -14,6 +14,7 @@ import {
   SESSION_CONTEXT_EVENT_NAME,
   SESSION_CONTEXT_SCOPE_NAME,
   sessionContextFingerprint,
+  sessionTitleFromPrompt,
 } from "../session-context";
 
 const repository = { host: "github.com", owner: "langwatch", name: "langwatch" };
@@ -252,6 +253,54 @@ describe("buildSessionContextLogPayload", () => {
       expect(keys).not.toContain("vcs.worktree.name");
       expect(bareRecord).not.toHaveProperty("traceId");
       expect(bareRecord).not.toHaveProperty("spanId");
+    });
+  });
+
+  describe("given a session title", () => {
+    const attrsOf = (title: string | null | undefined) => {
+      const built = buildSessionContextLogPayload({
+        sessionId: "session-3",
+        agent: "codex",
+        context: { repository },
+        timeUnixNano: "1700000000000000000",
+        scopeVersion: "1.2.3",
+        title,
+      });
+      return built.resourceLogs[0]!.scopeLogs[0]!.logRecords[0]!.attributes;
+    };
+
+    /** @scenario "The harvest names the session by the first thing the user asked" */
+    it("carries the title as an attribute", () => {
+      expect(attrsOf("Fix the pricing rounding bug")).toContainEqual({
+        key: "langwatch.session.title",
+        value: { stringValue: "Fix the pricing rounding bug" },
+      });
+    });
+
+    it("omits the attribute when there is no title", () => {
+      for (const title of [null, undefined, ""]) {
+        expect(attrsOf(title).map((a) => a.key)).not.toContain(
+          "langwatch.session.title",
+        );
+      }
+    });
+  });
+});
+
+describe("sessionTitleFromPrompt", () => {
+  describe("given a prompt someone typed", () => {
+    it("keeps the first line, collapses whitespace, and caps the length", () => {
+      expect(
+        sessionTitleFromPrompt("  Fix   the pricing bug\nStart with tests."),
+      ).toBe("Fix the pricing bug");
+      expect(sessionTitleFromPrompt(`${"x".repeat(200)} tail`)).toHaveLength(120);
+    });
+  });
+
+  describe("given text no one typed", () => {
+    it("names nothing from tags or blank text", () => {
+      expect(sessionTitleFromPrompt("<environment_context>\n</environment_context>")).toBeNull();
+      expect(sessionTitleFromPrompt("   \n  ")).toBeNull();
     });
   });
 });

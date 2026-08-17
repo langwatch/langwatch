@@ -16,8 +16,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
 	findRolloutForThread,
+	harvestAndEmitCodexIO,
 	harvestCodexThread,
 } from "../codex-rollout-otlp";
+import { assertCodexTurnHarvest } from "../shell-rc";
 
 const THREAD = "019fc156-02e3-76a1-b462-14c38b450cb6";
 const TRACE = "add81f7dde443979dde88487bd7fb454";
@@ -69,14 +71,29 @@ const agentFinal = (message: string) => ({
 	payload: { type: "agent_message", message, phase: "final_answer" },
 });
 
-/** A fetch double that records the OTLP bodies it was handed. */
+const sessionMeta = (git?: Record<string, unknown>) => ({
+	type: "session_meta",
+	payload: {
+		id: THREAD,
+		cwd: "/home/dev/acme-app",
+		...(git ? { git } : {}),
+	},
+});
+
+/**
+ * URLs are kept beside the bodies because the harvest posts to two endpoints,
+ * spans to `/v1/traces` and the session context to `/v1/logs`, and several
+ * tests assert which signal a payload went to rather than only its content.
+ */
 function recordingFetch() {
 	const bodies: any[] = [];
-	const impl = vi.fn(async (_url: string, init?: any) => {
+	const urls: string[] = [];
+	const impl = vi.fn(async (url: string, init?: any) => {
+		urls.push(String(url));
 		bodies.push(JSON.parse(init.body));
 		return { ok: true, status: 200 } as any;
 	});
-	return { bodies, impl: impl as unknown as typeof fetch };
+	return { bodies, urls, impl: impl as unknown as typeof fetch };
 }
 
 const spansOf = (bodies: any[]) =>
@@ -105,6 +122,7 @@ describe("harvestCodexThread", () => {
 					threadId: THREAD,
 					nowMs: 1785654950000,
 					endpoint: "https://app.langwatch.ai/api/otel/v1/traces",
+					logsEndpoint: null,
 					token: "sk-lw-test",
 					sessionsRoot: root,
 					fetchImpl: impl,
@@ -127,6 +145,7 @@ describe("harvestCodexThread", () => {
 					threadId: THREAD,
 					nowMs: 1785654950000,
 					endpoint: "https://app.langwatch.ai/api/otel/v1/traces",
+					logsEndpoint: null,
 					token: "sk-lw-test",
 					sessionsRoot: root,
 					fetchImpl: impl,
@@ -169,6 +188,7 @@ describe("harvestCodexThread", () => {
 					threadId: THREAD,
 					nowMs: 1785654950000,
 					endpoint: "https://e/v1/traces",
+					logsEndpoint: null,
 					token: "sk-lw-test",
 					sessionsRoot: root,
 					fetchImpl: impl,
@@ -197,6 +217,7 @@ describe("harvestCodexThread", () => {
 					threadId: THREAD,
 					nowMs: 1785654950000,
 					endpoint: "https://e/v1/traces",
+					logsEndpoint: null,
 					token: "sk-lw-test",
 					sessionsRoot: root,
 					fetchImpl: impl,
@@ -224,6 +245,7 @@ describe("harvestCodexThread", () => {
 					threadId: THREAD,
 					nowMs: 1785654950000,
 					endpoint: "https://e/v1/traces",
+					logsEndpoint: null,
 					token: "sk-lw-test",
 					sessionsRoot: root,
 					fetchImpl: impl,
@@ -261,6 +283,7 @@ describe("harvestCodexThread", () => {
 					threadId: THREAD,
 					nowMs: 1785654950000,
 					endpoint: "https://e/v1/traces",
+					logsEndpoint: null,
 					token: "sk-lw-test",
 					sessionsRoot: root,
 					fetchImpl: impl,
@@ -269,6 +292,235 @@ describe("harvestCodexThread", () => {
 				const spans = spansOf(bodies);
 				expect(spans).toHaveLength(1);
 				expect(attrOf(spans[0], "langwatch.output")).toBe("mine reply");
+			});
+		});
+	});
+
+	describe("given a session whose transcript records its repository", () => {
+		const GIT = {
+			branch: "feat/pricing",
+			repository_url: "https://github.com/acme/acme-app.git",
+			commit_hash: "f40dfb14fe962ff5c0e662de43424943ba44ae3e",
+		};
+		let stateDir: string;
+
+		beforeEach(() => {
+			stateDir = mkdtempSync(join(tmpdir(), "lw-codex-state-"));
+		});
+
+		afterEach(() => {
+			rmSync(stateDir, { recursive: true, force: true });
+		});
+
+		describe("when the session is harvested", () => {
+			/** @scenario "The harvest reports the repository the session worked on" */
+			it("posts one session-context record beside the conversation", async () => {
+				writeRollout(THREAD, [
+					sessionMeta(GIT),
+					taskStarted(TRACE),
+					userMessage("hi"),
+					agentFinal("hello"),
+				]);
+				const { bodies, urls, impl } = recordingFetch();
+
+				await harvestCodexThread({
+					threadId: THREAD,
+					nowMs: 1785654950000,
+					endpoint: "https://e/v1/traces",
+					logsEndpoint: "https://e/v1/logs",
+					token: "sk-lw-test",
+					sessionsRoot: root,
+					stateDir,
+					fetchImpl: impl,
+				});
+
+				const log =
+					bodies[urls.indexOf("https://e/v1/logs")].resourceLogs[0]
+						.scopeLogs[0].logRecords[0];
+				const attr = (key: string) =>
+					log.attributes.find((a: any) => a.key === key)?.value?.stringValue;
+				expect(attr("event.name")).toBe("langwatch.session_context");
+				expect(attr("session.id")).toBe(THREAD);
+				expect(attr("coding_agent.name")).toBe("codex");
+				expect(attr("vcs.repository.host")).toBe("github.com");
+				expect(attr("vcs.repository.owner")).toBe("acme");
+				expect(attr("vcs.repository.name")).toBe("acme-app");
+				expect(attr("vcs.ref.head.name")).toBe("feat/pricing");
+				expect(urls).toContain("https://e/v1/traces");
+			});
+
+			/** @scenario "A notify that fires after every turn posts the repository once" */
+			it("does not re-post an unchanged context on the next turn", async () => {
+				writeRollout(THREAD, [
+					sessionMeta(GIT),
+					taskStarted(TRACE),
+					userMessage("hi"),
+					agentFinal("hello"),
+				]);
+				const { urls, impl } = recordingFetch();
+				const args = {
+					threadId: THREAD,
+					nowMs: 1785654950000,
+					endpoint: "https://e/v1/traces",
+					logsEndpoint: "https://e/v1/logs",
+					token: "sk-lw-test",
+					sessionsRoot: root,
+					stateDir,
+					fetchImpl: impl,
+				};
+
+				await harvestCodexThread(args);
+				await harvestCodexThread(args);
+
+				expect(urls.filter((u) => u === "https://e/v1/logs")).toHaveLength(1);
+				expect(urls.filter((u) => u === "https://e/v1/traces")).toHaveLength(2);
+			});
+
+			/** @scenario "A state directory that cannot be written still lets the conversation through" */
+			it("still posts the turn spans when the fingerprint cannot be stored", async () => {
+				writeRollout(THREAD, [
+					sessionMeta(GIT),
+					taskStarted(TRACE),
+					userMessage("hi"),
+					agentFinal("hello"),
+				]);
+				// A file where the state directory should be: every mkdir under it
+				// fails with ENOTDIR, which is what makes writeFingerprint throw.
+				const blocked = join(stateDir, "not-a-directory");
+				writeFileSync(blocked, "");
+				const { urls, impl } = recordingFetch();
+
+				await harvestCodexThread({
+					threadId: THREAD,
+					nowMs: 1785654950000,
+					endpoint: "https://e/v1/traces",
+					logsEndpoint: "https://e/v1/logs",
+					token: "sk-lw-test",
+					sessionsRoot: root,
+					stateDir: join(blocked, "state"),
+					fetchImpl: impl,
+				});
+
+				// The context landed and the conversation went with it; only the
+				// bookkeeping write was lost, which costs one re-POST next turn.
+				expect(urls).toContain("https://e/v1/logs");
+				expect(urls).toContain("https://e/v1/traces");
+			});
+		});
+	});
+
+	describe("given a session whose transcript records the typed prompt", () => {
+		const GIT = {
+			branch: "feat/pricing",
+			repository_url: "https://github.com/acme/acme-app.git",
+		};
+		const typedPrompt = (message: string) => ({
+			type: "event_msg",
+			payload: { type: "user_message", message },
+		});
+		let stateDir: string;
+
+		beforeEach(() => {
+			stateDir = mkdtempSync(join(tmpdir(), "lw-codex-state-"));
+		});
+
+		afterEach(() => {
+			rmSync(stateDir, { recursive: true, force: true });
+		});
+
+		const harvest = async (impl: typeof fetch) =>
+			harvestCodexThread({
+				threadId: THREAD,
+				nowMs: 1785654950000,
+				endpoint: "https://e/v1/traces",
+				logsEndpoint: "https://e/v1/logs",
+				token: "sk-lw-test",
+				sessionsRoot: root,
+				stateDir,
+				fetchImpl: impl,
+			});
+
+		const contextAttr = ({
+			bodies,
+			urls,
+			key,
+		}: {
+			bodies: any[];
+			urls: string[];
+			key: string;
+		}) => {
+			const at = urls.indexOf("https://e/v1/logs");
+			// Without this the missing POST reads as `bodies[-1]` and the chain
+			// throws a TypeError, which hides which expectation actually failed.
+			expect(at, "no session-context record was posted").toBeGreaterThan(-1);
+			return bodies[at].resourceLogs[0].scopeLogs[0].logRecords[0].attributes.find(
+				(a: any) => a.key === key,
+			)?.value?.stringValue;
+		};
+
+		describe("when the session is harvested", () => {
+			/** @scenario "The harvest names the session by the first thing the user asked" */
+			it("posts the prompt's first line as the session title", async () => {
+				writeRollout(THREAD, [
+					sessionMeta(GIT),
+					typedPrompt("Fix the pricing rounding bug\nStart with the invoice tests."),
+					taskStarted(TRACE),
+					userMessage("Fix the pricing rounding bug"),
+					agentFinal("done"),
+				]);
+				const { bodies, urls, impl } = recordingFetch();
+
+				await harvest(impl);
+
+				expect(contextAttr({ bodies, urls, key: "langwatch.session.title" })).toBe(
+					"Fix the pricing rounding bug",
+				);
+			});
+
+			/** @scenario "A machine-injected first prompt does not name the session" */
+			it("posts no title when the first prompt is an injected tag", async () => {
+				writeRollout(THREAD, [
+					sessionMeta(GIT),
+					typedPrompt("<environment_context>...</environment_context>"),
+					taskStarted(TRACE),
+					userMessage("hi"),
+					agentFinal("hello"),
+				]);
+				const { bodies, urls, impl } = recordingFetch();
+
+				await harvest(impl);
+
+				expect(urls).toContain("https://e/v1/logs");
+				expect(
+					contextAttr({ bodies, urls, key: "langwatch.session.title" }),
+				).toBeUndefined();
+			});
+		});
+	});
+
+	describe("given a session with no repository in its transcript", () => {
+		describe("when the session is harvested", () => {
+			/** @scenario "A session outside any repository posts its conversation and no context" */
+			it("posts the conversation and no context record", async () => {
+				writeRollout(THREAD, [
+					sessionMeta(),
+					taskStarted(TRACE),
+					userMessage("hi"),
+					agentFinal("hello"),
+				]);
+				const { urls, impl } = recordingFetch();
+
+				await harvestCodexThread({
+					threadId: THREAD,
+					nowMs: 1785654950000,
+					endpoint: "https://e/v1/traces",
+					logsEndpoint: "https://e/v1/logs",
+					token: "sk-lw-test",
+					sessionsRoot: root,
+					fetchImpl: impl,
+				});
+
+				expect(urls).toEqual(["https://e/v1/traces"]);
 			});
 		});
 	});
@@ -282,6 +534,7 @@ describe("harvestCodexThread", () => {
 					threadId: "019fc000-0000-0000-0000-000000000000",
 					nowMs: 1785654950000,
 					endpoint: "https://e/v1/traces",
+					logsEndpoint: null,
 					token: "sk-lw-test",
 					sessionsRoot: root,
 					fetchImpl: impl,
@@ -290,6 +543,155 @@ describe("harvestCodexThread", () => {
 				expect(turns).toBe(0);
 				expect(bodies).toHaveLength(0);
 			});
+		});
+	});
+});
+
+describe("assertCodexTurnHarvest", () => {
+	let codexHome: string;
+	let originalCodexHome: string | undefined;
+	let logSpy: ReturnType<typeof vi.spyOn>;
+
+	beforeEach(() => {
+		codexHome = mkdtempSync(join(tmpdir(), "lw-codex-home-"));
+		originalCodexHome = process.env.CODEX_HOME;
+		process.env.CODEX_HOME = codexHome;
+		logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+	});
+
+	afterEach(() => {
+		logSpy.mockRestore();
+		if (originalCodexHome === undefined) delete process.env.CODEX_HOME;
+		else process.env.CODEX_HOME = originalCodexHome;
+		rmSync(codexHome, { recursive: true, force: true });
+	});
+
+	describe("when the harvest is wired for the first time", () => {
+		it("announces the install and how to recover earlier sessions", () => {
+			assertCodexTurnHarvest();
+
+			const printed = logSpy.mock.calls.flat().join("\n");
+			expect(printed).toContain("record each turn's conversation");
+			expect(printed).toContain("langwatch ingest codex");
+		});
+	});
+
+	describe("when it is asserted again with nothing to change", () => {
+		it("stays silent", () => {
+			assertCodexTurnHarvest();
+			logSpy.mockClear();
+
+			assertCodexTurnHarvest();
+
+			expect(logSpy).not.toHaveBeenCalled();
+		});
+	});
+
+	describe("when the config cannot be written", () => {
+		/** @scenario "A harvest that cannot be wired is reported, never silent" */
+		it("says the harvest is not wired instead of returning silently", () => {
+			rmSync(codexHome, { recursive: true, force: true });
+			writeFileSync(codexHome, "a file where the directory should be");
+
+			assertCodexTurnHarvest();
+
+			const printed = logSpy.mock.calls.flat().join("\n");
+			expect(printed).toContain("Could not wire the codex turn harvest");
+		});
+	});
+});
+
+describe("harvestAndEmitCodexIO", () => {
+	describe("given a backfill of many sessions and a logs endpoint that never answers", () => {
+		let stateDir: string;
+
+		beforeEach(() => {
+			stateDir = mkdtempSync(join(tmpdir(), "lw-codex-state-"));
+			// Only the timers the harvest itself schedules, so the file reads
+			// below still run on the real event loop and the test does not
+			// depend on when they finish.
+			vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+		});
+
+		afterEach(() => {
+			vi.useRealTimers();
+			rmSync(stateDir, { recursive: true, force: true });
+		});
+
+		/** @scenario "A backfill of many sessions does not wait for them one by one" */
+		it("posts the conversations after a bounded wait, whatever the session count", async () => {
+			const SESSIONS = 60;
+			for (let i = 0; i < SESSIONS; i++) {
+				const thread = `019fc156-02e3-76a1-b462-14c38b45${String(i).padStart(4, "0")}`;
+				writeRollout(thread, [
+					{
+						type: "session_meta",
+						payload: {
+							id: thread,
+							cwd: "/home/dev/acme-app",
+							git: {
+								branch: "feat/pricing",
+								repository_url: "https://github.com/acme/acme-app.git",
+							},
+						},
+					},
+					taskStarted(TRACE),
+					userMessage("hi"),
+					agentFinal("hello"),
+				]);
+			}
+
+			let contextPostsInFlight = 0;
+			let peakInFlight = 0;
+			let tracePostAtMs: number | null = null;
+			const impl = vi.fn((url: string, init?: any) => {
+				if (String(url).endsWith("/v1/logs")) {
+					contextPostsInFlight += 1;
+					peakInFlight = Math.max(peakInFlight, contextPostsInFlight);
+					// Answers only when its own abort fires, which is what a
+					// wedged endpoint looks like to the caller.
+					return new Promise((_resolve, reject) => {
+						init.signal.addEventListener("abort", () => {
+							contextPostsInFlight -= 1;
+							reject(new Error("aborted"));
+						});
+					});
+				}
+				tracePostAtMs = Date.now();
+				return Promise.resolve({ ok: true, status: 200 });
+			}) as unknown as typeof fetch;
+
+			const startedAtMs = Date.now();
+			const harvesting = harvestAndEmitCodexIO({
+				sinceMs: 0,
+				nowMs: 1785654950000,
+				endpoint: "https://e/v1/traces",
+				logsEndpoint: "https://e/v1/logs",
+				token: "sk-lw-test",
+				sessionsRoot: root,
+				stateDir,
+				fetchImpl: impl,
+			});
+			// The rollouts are read off disk, one at a time, before the first
+			// post goes out, and a fake clock does not wait for that. Give the
+			// real event loop its turn first, or the advance below would run
+			// past an empty schedule and the timers those posts create would
+			// never fire.
+			for (let i = 0; i < 20_000 && contextPostsInFlight === 0; i++) {
+				await new Promise((resolve) => setImmediate(resolve));
+			}
+			expect(contextPostsInFlight).toBeGreaterThan(0);
+			// Long enough for the serial shape to finish too, so a regression
+			// fails on the assertion below rather than by timing out.
+			await vi.advanceTimersByTimeAsync(600_000);
+			await harvesting;
+
+			// Posted one at a time, 60 sessions against this endpoint would hold
+			// the conversation back for 60 times the 5 s per-post timeout.
+			expect(peakInFlight).toBeGreaterThan(1);
+			expect((tracePostAtMs ?? Number.NaN) - startedAtMs).toBeLessThanOrEqual(
+				20_000,
+			);
 		});
 	});
 });

@@ -60,13 +60,13 @@ import {
   readFingerprint,
   stateFilePath,
   writeFingerprint,
-} from "./hook-state";
+} from "@/cli/utils/governance/hook-state";
 import {
   buildSessionContextLogPayload,
   parseOtlpHeaders,
   parseTraceparent,
   sessionContextFingerprint,
-} from "./session-context";
+} from "@/cli/utils/governance/session-context";
 
 /**
  * What each accepted tool argument means: the agent the record declares, plus

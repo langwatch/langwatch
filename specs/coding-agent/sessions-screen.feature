@@ -74,13 +74,36 @@ Rule: The page lists my sessions with their context economics
     When the user opens their Sessions page
     Then the page says no sessions have been recorded yet
 
-Rule: A session is named by its generated title
+Rule: A session is named by its generated title, else by its first prompt
+
+  Most agents rarely generate a title, so a title-only session list reads as
+  a wall of untitled rows. The first thing the user actually asked names the
+  session until a generated title arrives; a generated title always wins.
 
   @unit
   Scenario: A row is named by the title the session generated
     Given a session whose agent generated a title for it
     When the sessions list is read
     Then the row carries that title
+
+  @unit
+  Scenario: A session with no generated title is named by the first thing the user asked
+    Given a session whose agent never generated a title
+    When its first prompt event arrives
+    Then the session is named by the prompt's first line
+    And a later prompt does not rename it
+
+  @unit
+  Scenario: A generated title replaces the prompt-derived name
+    Given a session named by its first prompt
+    When the agent generates a title for it
+    Then the generated title replaces the prompt-derived name
+
+  @unit
+  Scenario: A machine-injected first prompt does not name the session
+    Given a session whose first prompt event is machine-injected or withheld
+    When the prompt event arrives
+    Then the session stays unnamed
 
   @unit
   Scenario: A viewer who may not read captured content gets no session title
@@ -91,7 +114,7 @@ Rule: A session is named by its generated title
 
   @integration
   Scenario: A session with no title reads as untitled
-    Given a session whose agent never generated a title
+    Given a session whose agent never generated a title or received a prompt
     When the user reads its row
     Then the row names it as an untitled session
 

@@ -700,6 +700,7 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 			? createCodexIOStreamer({
 					sinceMs: sessionStartMs,
 					endpoint: `${normalizeEndpoint(modeResult.endpoint)}/v1/traces`,
+					logsEndpoint: `${normalizeEndpoint(modeResult.endpoint)}/v1/logs`,
 					token: modeResult.ingestionToken,
 				})
 			: null;

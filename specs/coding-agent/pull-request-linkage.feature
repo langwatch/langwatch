@@ -460,6 +460,14 @@ Rule: A contributor is a person or a project, never an agent-reported id
     Then the workspace is named by itself
     And the name still opens nothing
 
+  # The schema has no foreign keys, so a membership row can outlive its user.
+  @integration
+  Scenario: A membership row that outlives its user still resolves the scope
+    Given a personal workspace whose membership row points at a deleted user
+    When the caller's project scope is resolved
+    Then the read does not fail
+    And the workspace is named by itself
+
   # Members answer "who worked here" only where the answer is one person, and
   # reading them for every team would cost a query nothing displays.
   @integration
