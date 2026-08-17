@@ -1202,6 +1202,16 @@ export function initializeDefaultApp(options?: {
     enterprisePipelines: {
       prisma,
       runsWorkers: roleRunsWorkers(config.processRole),
+      // Pulled provider cost shares the gateway debits' ClickHouse gate: it
+      // lands in the same ledger table, so without ClickHouse there is nowhere
+      // for it to go. The pipeline still records every observation on the log.
+      pulledUsageLedger: clickhouseEnabled
+        ? {
+            budgetCHRepository: new GatewayBudgetClickHouseRepository(
+              resolveClickHouseClient,
+            ),
+          }
+        : undefined,
     },
     projects,
     monitors,

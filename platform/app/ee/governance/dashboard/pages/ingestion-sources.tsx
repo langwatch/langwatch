@@ -59,6 +59,14 @@ import { api, type RouterOutputs } from "~/utils/api";
  */
 
 type Source = RouterOutputs["ingestionSources"]["list"][number];
+/** The one-time secret reveal, shown after a create or a rotate. */
+type SecretDetails = {
+  title: string;
+  secret: string;
+  sourceId: string;
+  sourceName: string;
+  sourceType: SourceType;
+};
 type SourceType =
   | "otel_generic"
   | "claude_code"
@@ -67,6 +75,8 @@ type SourceType =
   | "copilot_studio"
   | "openai_compliance"
   | "claude_compliance"
+  | "anthropic_admin"
+  | "databricks_genie"
   | "s3_custom"
   | "http_custom";
 
@@ -125,6 +135,20 @@ const SOURCE_TYPE_OPTIONS: Array<{
     blurb: "Polls Anthropic's compliance API with a workspace API key.",
   },
   {
+    value: "anthropic_admin",
+    label: "Anthropic Admin API (usage & cost)",
+    mode: "pull",
+    blurb:
+      "Polls Anthropic's organization usage/cost reports with an Admin API key (sk-ant-admin-...). Pick ONE report per source: usage (token counts, we price them) or cost (invoice amounts, carried verbatim). Never create both for the same org — the same spend would be counted twice.",
+  },
+  {
+    value: "databricks_genie",
+    label: "Databricks AI/BI Genie",
+    mode: "pull",
+    blurb:
+      "Records who asked what in Genie and the SQL it ran against your warehouse. Needs a workspace token with Can Manage on every Genie space you want covered — anything less returns only that token's own conversations.",
+  },
+  {
     value: "s3_custom",
     label: "Custom S3 audit log",
     mode: "s3",
@@ -157,7 +181,7 @@ const STATUS_META: Record<
   disabled: { icon: CircleX, label: "Disabled", color: "fg.muted" },
 };
 
-interface ComposerState {
+export interface ComposerState {
   sourceType: SourceType;
   name: string;
   description: string;
@@ -190,6 +214,8 @@ const PULL_ADAPTER_FOR_SOURCE: Partial<Record<SourceType, string>> = {
   copilot_studio: "copilot_studio",
   openai_compliance: "openai_compliance",
   claude_compliance: "claude_compliance",
+  anthropic_admin: "anthropic_admin",
+  databricks_genie: "databricks_genie",
   http_custom: "http_polling",
 };
 
@@ -203,6 +229,8 @@ const PULL_SCHEDULE_DEFAULTS: Record<string, string> = {
   copilot_studio: "*/15 * * * *",
   openai_compliance: "*/15 * * * *",
   claude_compliance: "*/15 * * * *",
+  anthropic_admin: "0 * * * *",
+  databricks_genie: "*/15 * * * *",
   http_polling: "*/15 * * * *",
 };
 
@@ -229,7 +257,305 @@ function fmtRelative(date: Date | string | null): string {
   return `${days}d ago`;
 }
 
-function IngestionSourcesPage() {
+/**
+ * The pull config the create call should carry, or `null` when the form is not
+ * yet valid. Returning a wrapper rather than the bare config keeps "no pull
+ * config for this source type" (a valid `{ pullConfig: null }`) distinct from
+ * "the form is wrong" (`null`), which a bare return would collapse.
+ */
+function resolvePullConfig(
+  composer: ComposerState,
+): { pullConfig: Record<string, unknown> | null } | null {
+  const pullAdapter = PULL_ADAPTER_FOR_SOURCE[composer.sourceType];
+  // For BYO `http_custom` we send the FULL HttpPollingConfig shape so the
+  // generic adapter can run unmodified. The locked-shape reference pullers
+  // (copilot_studio / openai_compliance / claude_compliance) only need the
+  // adapter id - their validateConfig override returns the frozen config.
+  const builders: Partial<
+    Record<SourceType, [() => unknown | null, string, string]>
+  > = {
+    http_custom: [
+      () => buildHttpCustomPullConfig(composer),
+      "Missing required HTTP source fields",
+      "URL, auth header value, token, events JSONPath, cursor JSONPath, and event mapping are all required.",
+    ],
+    databricks_genie: [
+      () => buildDatabricksGeniePullConfig(composer),
+      "Missing required Databricks fields",
+      "Workspace URL and workspace token are both required.",
+    ],
+    anthropic_admin: [
+      () => buildAnthropicAdminPullConfig(composer),
+      "Missing or invalid Anthropic fields",
+      "Admin API key is required, report must be `usage` or `cost`, bucket width is usage-only and must be 1m/1h/1d, and the backfill start must be a calendar date (2026-08-01) or an instant carrying a timezone (2026-08-01T00:00:00Z).",
+    ],
+  };
+
+  const builder = builders[composer.sourceType];
+  if (builder) {
+    const [build, title, description] = builder;
+    const pullConfig = build();
+    if (!pullConfig) {
+      toaster.create({ title, description, type: "error" });
+      return null;
+    }
+    return { pullConfig: pullConfig as Record<string, unknown> };
+  }
+  return { pullConfig: pullAdapter ? { adapter: pullAdapter } : null };
+}
+
+function IngestionSourcesHeader({
+  isEnterprise,
+  sourceCount,
+  onAdd,
+}: {
+  isEnterprise: boolean;
+  sourceCount: number;
+  onAdd: () => void;
+}) {
+  return (
+    <HStack alignItems="end">
+      <VStack align="start" gap={0}>
+        <HStack gap={2}>
+          <Heading size="md">Ingestion Sources</Heading>
+          <Badge colorPalette="purple" size="sm" variant="surface">
+            Preview
+          </Badge>
+        </HStack>
+        <Text color="fg.muted" fontSize="sm" maxW="3xl">
+          Configure cross-platform feeds for the activity monitor. Each source
+          maps an external AI platform into the normalised activity stream via
+          OTel push, webhook, or S3 audit drops.{" "}
+          <Link href="/governance" color="blue.600">
+            Back to governance
+          </Link>
+          .
+        </Text>
+      </VStack>
+      <Spacer />
+      <VStack align="end" gap={1}>
+        <Button
+          size="sm"
+          colorPalette="blue"
+          disabled={
+            !isEnterprise && sourceCount >= NON_ENTERPRISE_INGESTION_SOURCE_CAP
+          }
+          onClick={onAdd}
+        >
+          <Plus size={14} /> Add source
+        </Button>
+        {!isEnterprise && (
+          <Text fontSize="xs" color="fg.muted">
+            {sourceCount} / {NON_ENTERPRISE_INGESTION_SOURCE_CAP} sources used.
+            Upgrade to Enterprise for unlimited.
+          </Text>
+        )}
+      </VStack>
+    </HStack>
+  );
+}
+
+/**
+ * The id a per-row mutation is currently working on, so a row can show its own
+ * spinner without every row spinning. Null while idle.
+ */
+function pendingId(mutation: {
+  isPending: boolean;
+  variables?: { id: string } | undefined;
+}): string | null {
+  return mutation.isPending ? (mutation.variables?.id ?? null) : null;
+}
+
+const MODE_COPY: Record<"push" | "pull" | "s3", [string, string]> = {
+  push: [
+    "Push (OTLP / webhooks)",
+    "Upstream pushes events to LangWatch in near-real-time.",
+  ],
+  pull: [
+    "Pull (admin API polling)",
+    "LangWatch polls upstream's admin API on a cadence.",
+  ],
+  s3: ["S3 audit drops", "LangWatch reads JSONL drops from an S3 bucket."],
+};
+
+function SourceModeSection({
+  mode,
+  sources,
+  knowsFleetIsEmpty,
+  rotatingId,
+  archivingId,
+  onEdit,
+  onRotate,
+  onArchive,
+}: {
+  mode: "push" | "pull" | "s3";
+  sources: Source[];
+  knowsFleetIsEmpty: boolean;
+  rotatingId: string | null;
+  archivingId: string | null;
+  onEdit: (id: string) => void;
+  onRotate: (id: string) => void;
+  onArchive: (id: string) => void;
+}) {
+  const [title, blurb] = MODE_COPY[mode];
+  return (
+    <Box
+      borderWidth="1px"
+      borderColor="border.muted"
+      borderRadius="md"
+      padding={4}
+    >
+      <HStack alignItems="start" marginBottom={3}>
+        <VStack align="start" gap={0}>
+          <Text fontSize="sm" fontWeight="semibold">
+            {title}
+          </Text>
+          <Text fontSize="xs" color="fg.muted">
+            {blurb}
+          </Text>
+        </VStack>
+        <Spacer />
+      </HStack>
+      <VStack align="stretch" gap={2}>
+        {sources.length === 0 && knowsFleetIsEmpty && (
+          <Text fontSize="sm" color="fg.muted">
+            No {mode}-mode sources configured.
+          </Text>
+        )}
+        {sources.map((source) => (
+          <SourceRow
+            key={source.id}
+            source={source}
+            isPendingRotate={rotatingId === source.id}
+            isPendingArchive={archivingId === source.id}
+            onEdit={() => onEdit(source.id)}
+            onRotate={() => onRotate(source.id)}
+            onArchive={() => onArchive(source.id)}
+          />
+        ))}
+      </VStack>
+    </Box>
+  );
+}
+
+/**
+ * The create payload for the composer, or `null` when the form is not ready —
+ * either unnamed, or carrying a pull config the adapter cannot honour (which
+ * `resolvePullConfig` has already toasted about).
+ */
+function buildCreateInput(composer: ComposerState, organizationId: string) {
+  if (!composer.name.trim()) return null;
+  const resolved = resolvePullConfig(composer);
+  if (!resolved) return null;
+  const pullAdapter = PULL_ADAPTER_FOR_SOURCE[composer.sourceType];
+  return {
+    organizationId,
+    sourceType: composer.sourceType,
+    name: composer.name.trim(),
+    description: composer.description.trim() || null,
+    parserConfig: buildParserConfig(composer),
+    pullConfig: resolved.pullConfig,
+    pullSchedule: pullAdapter
+      ? composer.pullSchedule.trim() ||
+        PULL_SCHEDULE_DEFAULTS[pullAdapter] ||
+        null
+      : null,
+  };
+}
+
+/** Sources split into the three sections the page renders. */
+function useGroupedSources(sources: Source[] | undefined) {
+  return useMemo(() => {
+    const out: Record<"push" | "pull" | "s3", Source[]> = {
+      push: [],
+      pull: [],
+      s3: [],
+    };
+    for (const s of sources ?? []) {
+      const meta = SOURCE_TYPE_OPTIONS.find((o) => o.value === s.sourceType);
+      out[meta?.mode ?? "push"].push(s);
+    }
+    return out;
+  }, [sources]);
+}
+
+/** The four mutations the page drives, with their toasts and cache busting. */
+function useIngestionSourceMutations({
+  refetch,
+  setComposing,
+  setComposer,
+  setEditingSourceId,
+  setSecretModal,
+}: {
+  refetch: () => unknown;
+  setComposing: (open: boolean) => void;
+  setComposer: (next: ComposerState) => void;
+  setEditingSourceId: (id: string | null) => void;
+  setSecretModal: (details: SecretDetails | null) => void;
+}) {
+  const create = api.ingestionSources.create.useMutation({
+    onSuccess: (data) => {
+      void refetch();
+      setComposing(false);
+      setComposer(blankComposer());
+      setSecretModal({
+        title: "Source created - paste this secret upstream",
+        secret: data.ingestSecret,
+        sourceId: data.source.id,
+        sourceName: data.source.name,
+        sourceType: data.source.sourceType as SourceType,
+      });
+    },
+    onError: (e) =>
+      showErrorToast({ error: e, fallbackTitle: "Couldn't create the source" }),
+  });
+
+  const rotate = api.ingestionSources.rotateSecret.useMutation({
+    onSuccess: (data) => {
+      void refetch();
+      setSecretModal({
+        title: "New secret minted - old one valid for 24h",
+        secret: data.ingestSecret,
+        sourceId: data.source.id,
+        sourceName: data.source.name,
+        sourceType: data.source.sourceType as SourceType,
+      });
+    },
+    onError: (e) =>
+      showErrorToast({ error: e, fallbackTitle: "Couldn't rotate the secret" }),
+  });
+
+  const update = api.ingestionSources.update.useMutation({
+    onSuccess: () => {
+      void refetch();
+      setEditingSourceId(null);
+      toaster.create({ title: "Source updated", type: "success" });
+    },
+    onError: (e) =>
+      showErrorToast({ error: e, fallbackTitle: "Couldn't update the source" }),
+  });
+
+  const archive = api.ingestionSources.archive.useMutation({
+    onSuccess: () => {
+      void refetch();
+      toaster.create({ title: "Source archived", type: "success" });
+    },
+    onError: (e) =>
+      showErrorToast({
+        error: e,
+        fallbackTitle: "Couldn't archive the source",
+      }),
+  });
+
+  return { create, rotate, update, archive };
+}
+
+/**
+ * Everything the page needs: the org it is scoped to, the source list, the
+ * composer/edit/secret state and the mutations that drive them. State and
+ * callbacks only — the component owns the markup.
+ */
+function useIngestionSourcesPage() {
   const { organization } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
@@ -247,175 +573,78 @@ function IngestionSourcesPage() {
   const [composing, setComposing] = useState(false);
   const [composer, setComposer] = useState<ComposerState>(blankComposer());
   const [editingSourceId, setEditingSourceId] = useState<string | null>(null);
-  const [secretModal, setSecretModal] = useState<{
-    title: string;
-    secret: string;
-    sourceId: string;
-    sourceName: string;
-    sourceType: SourceType;
-  } | null>(null);
+  const [secretModal, setSecretModal] = useState<SecretDetails | null>(null);
 
-  const createMutation = api.ingestionSources.create.useMutation({
-    onSuccess: (data) => {
-      void refetch();
-      setComposing(false);
-      setComposer(blankComposer());
-      setSecretModal({
-        title: "Source created - paste this secret upstream",
-        secret: data.ingestSecret,
-        sourceId: data.source.id,
-        sourceName: data.source.name,
-        sourceType: data.source.sourceType as SourceType,
-      });
-    },
-    onError: (e) =>
-      showErrorToast({ error: e, fallbackTitle: "Couldn't create the source" }),
-  });
-
-  const rotateMutation = api.ingestionSources.rotateSecret.useMutation({
-    onSuccess: (data) => {
-      void refetch();
-      setSecretModal({
-        title: "New secret minted - old one valid for 24h",
-        secret: data.ingestSecret,
-        sourceId: data.source.id,
-        sourceName: data.source.name,
-        sourceType: data.source.sourceType as SourceType,
-      });
-    },
-    onError: (e) =>
-      showErrorToast({ error: e, fallbackTitle: "Couldn't rotate the secret" }),
-  });
-
-  const updateMutation = api.ingestionSources.update.useMutation({
-    onSuccess: () => {
-      void refetch();
-      setEditingSourceId(null);
-      toaster.create({ title: "Source updated", type: "success" });
-    },
-    onError: (e) =>
-      showErrorToast({ error: e, fallbackTitle: "Couldn't update the source" }),
-  });
-
-  const archiveMutation = api.ingestionSources.archive.useMutation({
-    onSuccess: () => {
-      void refetch();
-      toaster.create({ title: "Source archived", type: "success" });
-    },
-    onError: (e) =>
-      showErrorToast({
-        error: e,
-        fallbackTitle: "Couldn't archive the source",
-      }),
+  const mutations = useIngestionSourceMutations({
+    refetch,
+    setComposing,
+    setComposer,
+    setEditingSourceId,
+    setSecretModal,
   });
 
   const onSubmit = () => {
-    if (!composer.name.trim()) return;
-    const pullAdapter = PULL_ADAPTER_FOR_SOURCE[composer.sourceType];
-    // For BYO `http_custom` we send the FULL HttpPollingConfig shape so the
-    // generic adapter can run unmodified. The locked-shape reference pullers
-    // (copilot_studio / openai_compliance / claude_compliance) only need the
-    // adapter id - their validateConfig override returns the frozen config.
-    const pullConfig =
-      composer.sourceType === "http_custom"
-        ? buildHttpCustomPullConfig(composer)
-        : pullAdapter
-          ? { adapter: pullAdapter }
-          : null;
-    if (composer.sourceType === "http_custom" && !pullConfig) {
-      // buildHttpCustomPullConfig returns null when required fields are
-      // empty - keep the drawer open so the user can fix the form.
-      toaster.create({
-        title: "Missing required HTTP source fields",
-        description:
-          "URL, auth header value, token, events JSONPath, cursor JSONPath, and event mapping are all required.",
-        type: "error",
-      });
-      return;
-    }
-    createMutation.mutate({
-      organizationId: orgId,
-      sourceType: composer.sourceType,
-      name: composer.name.trim(),
-      description: composer.description.trim() || null,
-      parserConfig: buildParserConfig(composer),
-      pullConfig,
-      pullSchedule: pullAdapter
-        ? composer.pullSchedule.trim() ||
-          PULL_SCHEDULE_DEFAULTS[pullAdapter] ||
-          null
-        : null,
-    });
+    const input = buildCreateInput(composer, orgId);
+    // A null input means a required field is missing or malformed;
+    // resolvePullConfig has already said which, and the drawer stays open so
+    // the user can fix it.
+    if (input) mutations.create.mutate(input);
   };
 
-  const grouped = useMemo(() => {
-    const out: Record<"push" | "pull" | "s3", Source[]> = {
-      push: [],
-      pull: [],
-      s3: [],
-    };
-    for (const s of sourcesQuery.data ?? []) {
-      const meta = SOURCE_TYPE_OPTIONS.find((o) => o.value === s.sourceType);
-      const mode = meta?.mode ?? "push";
-      out[mode].push(s);
-    }
-    return out;
-  }, [sourcesQuery.data]);
+  return {
+    orgId,
+    isEnterprise,
+    sourcesQuery,
+    grouped: useGroupedSources(sourcesQuery.data),
+    composing,
+    setComposing,
+    composer,
+    setComposer,
+    editingSourceId,
+    setEditingSourceId,
+    secretModal,
+    setSecretModal,
+    mutations,
+    onSubmit,
+  };
+}
+
+function IngestionSourcesPage() {
+  const {
+    orgId,
+    isEnterprise,
+    sourcesQuery,
+    grouped,
+    composing,
+    setComposing,
+    composer,
+    setComposer,
+    editingSourceId,
+    setEditingSourceId,
+    secretModal,
+    setSecretModal,
+    mutations,
+    onSubmit,
+  } = useIngestionSourcesPage();
 
   return (
     <GovernanceLayout pageTitle="Ingestion Sources · Governance · LangWatch">
       <VStack align="stretch" gap={6} width="full" maxW="container.xl">
-        <HStack alignItems="end">
-          <VStack align="start" gap={0}>
-            <HStack gap={2}>
-              <Heading size="md">Ingestion Sources</Heading>
-              <Badge colorPalette="purple" size="sm" variant="surface">
-                Preview
-              </Badge>
-            </HStack>
-            <Text color="fg.muted" fontSize="sm" maxW="3xl">
-              Configure cross-platform feeds for the activity monitor. Each
-              source maps an external AI platform into the normalised activity
-              stream via OTel push, webhook, or S3 audit drops.{" "}
-              <Link href="/governance" color="blue.600">
-                Back to governance
-              </Link>
-              .
-            </Text>
-          </VStack>
-          <Spacer />
-          <VStack align="end" gap={1}>
-            <Button
-              size="sm"
-              colorPalette="blue"
-              disabled={
-                !isEnterprise &&
-                (sourcesQuery.data?.length ?? 0) >=
-                  NON_ENTERPRISE_INGESTION_SOURCE_CAP
-              }
-              onClick={() => {
-                setComposer(blankComposer());
-                setComposing(true);
-              }}
-            >
-              <Plus size={14} /> Add source
-            </Button>
-            {!isEnterprise && (
-              <Text fontSize="xs" color="fg.muted">
-                {sourcesQuery.data?.length ?? 0} /{" "}
-                {NON_ENTERPRISE_INGESTION_SOURCE_CAP} sources used. Upgrade to
-                Enterprise for unlimited.
-              </Text>
-            )}
-          </VStack>
-        </HStack>
+        <IngestionSourcesHeader
+          isEnterprise={isEnterprise}
+          sourceCount={sourcesQuery.data?.length ?? 0}
+          onAdd={() => {
+            setComposer(blankComposer());
+            setComposing(true);
+          }}
+        />
 
         <SourceComposerDrawer
           isOpen={composing}
           organizationId={orgId}
           composer={composer}
           setComposer={setComposer}
-          isPending={createMutation.isPending}
+          isPending={mutations.create.isPending}
           onSubmit={onSubmit}
           onClose={() => {
             setComposing(false);
@@ -435,70 +664,23 @@ function IngestionSourcesPage() {
         />
 
         {(["push", "pull", "s3"] as const).map((mode) => (
-          <Box
+          <SourceModeSection
             key={mode}
-            borderWidth="1px"
-            borderColor="border.muted"
-            borderRadius="md"
-            padding={4}
-          >
-            <HStack alignItems="start" marginBottom={3}>
-              <VStack align="start" gap={0}>
-                <Text fontSize="sm" fontWeight="semibold">
-                  {mode === "push"
-                    ? "Push (OTLP / webhooks)"
-                    : mode === "pull"
-                      ? "Pull (admin API polling)"
-                      : "S3 audit drops"}
-                </Text>
-                <Text fontSize="xs" color="fg.muted">
-                  {mode === "push"
-                    ? "Upstream pushes events to LangWatch in near-real-time."
-                    : mode === "pull"
-                      ? "LangWatch polls upstream's admin API on a cadence."
-                      : "LangWatch reads JSONL drops from an S3 bucket."}
-                </Text>
-              </VStack>
-              <Spacer />
-            </HStack>
-            <VStack align="stretch" gap={2}>
-              {/* "None configured" is a claim about the fleet, and we can
-                  only make it when we actually know. The alert above says
-                  what went wrong instead. */}
-              {grouped[mode].length === 0 && !sourcesQuery.error && (
-                <Text fontSize="sm" color="fg.muted">
-                  No {mode}-mode sources configured.
-                </Text>
-              )}
-              {grouped[mode].map((source) => (
-                <SourceRow
-                  key={source.id}
-                  source={source}
-                  isPendingRotate={
-                    rotateMutation.isPending &&
-                    rotateMutation.variables?.id === source.id
-                  }
-                  isPendingArchive={
-                    archiveMutation.isPending &&
-                    archiveMutation.variables?.id === source.id
-                  }
-                  onEdit={() => setEditingSourceId(source.id)}
-                  onRotate={() =>
-                    rotateMutation.mutate({
-                      organizationId: orgId,
-                      id: source.id,
-                    })
-                  }
-                  onArchive={() =>
-                    archiveMutation.mutate({
-                      organizationId: orgId,
-                      id: source.id,
-                    })
-                  }
-                />
-              ))}
-            </VStack>
-          </Box>
+            mode={mode}
+            sources={grouped[mode]}
+            // Only claim "none configured" when we actually know: on a load
+            // failure the alert above says what went wrong instead.
+            knowsFleetIsEmpty={!sourcesQuery.error}
+            rotatingId={pendingId(mutations.rotate)}
+            archivingId={pendingId(mutations.archive)}
+            onEdit={setEditingSourceId}
+            onRotate={(id) =>
+              mutations.rotate.mutate({ organizationId: orgId, id })
+            }
+            onArchive={(id) =>
+              mutations.archive.mutate({ organizationId: orgId, id })
+            }
+          />
         ))}
       </VStack>
 
@@ -512,8 +694,8 @@ function IngestionSourcesPage() {
             : null
         }
         onClose={() => setEditingSourceId(null)}
-        onSubmit={(input) => updateMutation.mutate(input)}
-        isPending={updateMutation.isPending}
+        onSubmit={(input) => mutations.update.mutate(input)}
+        isPending={mutations.update.isPending}
       />
     </GovernanceLayout>
   );
@@ -940,9 +1122,18 @@ interface FieldDef {
   placeholder: string;
   hint?: string;
   required?: boolean;
+  /**
+   * True when this field's value is a secret: something that must be
+   * masked as the admin types it AND kept out of the plaintext
+   * `parserConfig` JSONB (it belongs only inside the encrypted
+   * `credentials` subtree). This is the single declaration both of those
+   * decisions are driven from - see `isSecretFieldKey` below for why
+   * that matters.
+   */
+  secret?: boolean;
 }
 
-const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
+export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
   // No parser-config fields for generic OTel sources today - the
   // receiver accepts any well-formed OTLP/HTTP body. (Earlier copy
   // referenced a `LangWatchSourceType` attribute filter that the
@@ -990,6 +1181,7 @@ const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       placeholder: "(value pasted from Azure portal)",
       hint: "We hash this server-side; only the hash is persisted.",
       required: true,
+      secret: true,
     },
     {
       key: "pollEverySec",
@@ -1031,11 +1223,69 @@ const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       placeholder: "sk-ant-admin-...",
       hint: "Generate under Anthropic Admin Console → Compliance → Workspace API Keys. We hash this server-side.",
       required: true,
+      secret: true,
     },
     {
       key: "pollEverySec",
       label: "Polling cadence (seconds)",
       placeholder: "300",
+    },
+  ],
+  anthropic_admin: [
+    {
+      // `credentials*` prefix routes this into the encrypted `credentials`
+      // subtree — same rule as the Genie token below.
+      key: "credentialsToken",
+      label: "Admin API key",
+      placeholder: "sk-ant-admin-...",
+      hint: "Generate under Anthropic Admin Console → API Keys → Admin Keys. A regular workspace key returns 401 on the organization reports. We encrypt this server-side.",
+      required: true,
+      secret: true,
+    },
+    {
+      key: "report",
+      label: "Report (usage or cost)",
+      placeholder: "cost",
+      hint: "Exactly one per source. `cost` carries Anthropic's invoice amounts verbatim; `usage` pulls token counts that we price ourselves. Never create both reports for the same organization — the same spend would be counted twice.",
+      required: true,
+    },
+    {
+      key: "bucketWidth",
+      label: "Bucket width (optional, usage report only)",
+      placeholder: "1d",
+      hint: "1m, 1h or 1d. Only affects the usage report; cost is always daily. Default 1d.",
+    },
+    {
+      key: "startingAt",
+      label: "Backfill start (optional)",
+      placeholder: "2026-08-01",
+      hint: "The date the first run reads from: `2026-08-01`, or an instant carrying a timezone (`2026-08-01T00:00:00Z`). A time without a timezone is rejected rather than read as yours. Empty = 24 hours back.",
+    },
+  ],
+  databricks_genie: [
+    {
+      key: "workspaceUrl",
+      label: "Workspace URL",
+      placeholder: "https://adb-1234567890123456.7.azuredatabricks.net",
+      required: true,
+    },
+    {
+      // Named `credentialsToken` on purpose: `buildParserConfig` routes every
+      // `credentials*` field into the `credentials` subtree, which is the ONLY
+      // part of parserConfig the server encrypts before it reaches the
+      // database. A field named `token` would sit in the JSONB in plaintext.
+      key: "credentialsToken",
+      label: "Workspace token",
+      placeholder: "dapi...",
+      hint: "A personal access token or OAuth token for a service principal holding Can Manage on every Genie space you want covered. Read access is not enough — Databricks only returns other people's conversations to a token that can manage the space, so a weaker token records nothing and reports no error. We encrypt this server-side.",
+      required: true,
+      secret: true,
+    },
+    {
+      key: "spaceIds",
+      label: "Genie space IDs (optional)",
+      placeholder: "Leave empty to cover every space the token can see",
+      hint: "Comma-separated. Empty is the usual setting — new spaces are then covered the day someone creates them.",
     },
   ],
   s3_custom: [
@@ -1097,6 +1347,7 @@ const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       placeholder: "(value pasted from the upstream admin console)",
       hint: "Persisted server-side; only the value is held in IngestionSource.pullConfig.credentials. Substituted into the header template at request time.",
       required: true,
+      secret: true,
     },
     {
       key: "eventsJsonPath",
@@ -1128,6 +1379,37 @@ const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
     },
   ],
 };
+
+const SECRET_FIELD_KEYS = new Set(
+  Object.values(PARSER_FIELDS)
+    .flat()
+    .filter((f) => f.secret)
+    .map((f) => f.key),
+);
+
+/**
+ * "Is this field a secret" used to be answered two different ways in this
+ * file: an exact-match allowlist decided whether the input rendered masked,
+ * and a separate `key.startsWith("credentials")` check in `parserFieldValue`
+ * decided whether the value was routed into the encrypted `credentials`
+ * subtree instead of the plaintext `parserConfig`. They happened to agree on
+ * every field that existed at the time, but nothing forced them to keep
+ * agreeing - a future field could satisfy one rule and not the other, and
+ * the two ways that can go wrong are both bad: a genuinely secret value
+ * rendered in plaintext on screen, or a plausibly-secret-looking value
+ * persisted to Postgres unencrypted because it missed the `credentials*`
+ * naming convention.
+ *
+ * This is now the ONE place that decision gets made. Both the input-masking
+ * render and the parserConfig storage routing call this function, driven
+ * first by the explicit `secret: true` declaration on the `FieldDef` (the
+ * source of truth - see the doc comment on `FieldDef.secret`), with the
+ * `credentials` prefix kept only as a belt-and-braces fallback so an
+ * undeclared `credentials*` field still can't slip through and leak.
+ */
+export function isSecretFieldKey(key: string): boolean {
+  return SECRET_FIELD_KEYS.has(key) || key.startsWith("credentials");
+}
 
 /**
  * Build the full `HttpPollingConfig`-shaped pullConfig for the
@@ -1194,6 +1476,145 @@ function buildHttpCustomPullConfig(
   };
 }
 
+/**
+ * The Anthropic Admin adapter config, or null when a required field is empty
+ * or `report` is not one of the two values the adapter accepts. Nothing
+ * validates pullConfig against the adapter schema at save time — a bad value
+ * here would sit in the row looking fine and fail on every pull — so the
+ * builder is the last checkpoint before the database.
+ */
+export function buildAnthropicAdminPullConfig(
+  c: ComposerState,
+): Record<string, unknown> | null {
+  const p = c.parserConfig;
+  const token = trimmedField(p, "credentialsToken");
+  const report = trimmedField(p, "report").toLowerCase();
+  if (!token) return null;
+  if (report !== "usage" && report !== "cost") return null;
+
+  const bucketWidth = validBucketWidth(trimmedField(p, "bucketWidth"), report);
+  if (bucketWidth === null) return null;
+
+  const startingAt = normalizeStartingAt(trimmedField(p, "startingAt"));
+  if (startingAt === null) return null;
+
+  return {
+    adapter: "anthropic_admin",
+    report,
+    ...(bucketWidth ? { bucketWidth } : {}),
+    ...(startingAt ? { startingAt } : {}),
+    schedule:
+      c.pullSchedule.trim() ||
+      PULL_SCHEDULE_DEFAULTS.anthropic_admin ||
+      "0 * * * *",
+    credentials: { token },
+  };
+}
+
+/** One composer field, trimmed, with an absent key reading as empty. */
+function trimmedField(p: Record<string, string>, key: string): string {
+  return (p[key] ?? "").trim();
+}
+
+/**
+ * The bucket width to store, or null when it is one the adapter will not honour.
+ *
+ * Only the usage report reads this. The cost report pins `1d` — the puller sends
+ * `COST_REPORT_BUCKET_WIDTH` and deliberately ignores `config.bucketWidth` — so
+ * saving `1m` on a cost source writes a setting that silently never applies, and
+ * the form's own hint already promises the opposite.
+ *
+ * Empty yields undefined (the field is optional); rejected yields null.
+ */
+function validBucketWidth(
+  raw: string,
+  report: string,
+): string | null | undefined {
+  if (!raw) return undefined;
+  if (report !== "usage") return null;
+  return ["1m", "1h", "1d"].includes(raw) ? raw : null;
+}
+
+/** Whether y-m-d is a date that exists, rather than one Date would roll forward. */
+function isRealCalendarDate(year: number, month: number, day: number): boolean {
+  const probe = new Date(Date.UTC(year, month - 1, day));
+  return (
+    probe.getUTCFullYear() === year &&
+    probe.getUTCMonth() === month - 1 &&
+    probe.getUTCDate() === day
+  );
+}
+
+/**
+ * A bare `YYYY-MM-DD`, or a timestamp carrying an explicit offset. Anything else
+ * is rejected rather than guessed.
+ *
+ * The two shapes are the ones `Date.parse` reads unambiguously. An offset-less
+ * `2026-08-01T00:00` is spec'd as *local* time, so the same typed value would
+ * mean a different instant for an admin in Amsterdam than one in Tokyo.
+ */
+const STARTING_AT =
+  /^(\d{4})-(\d{2})-(\d{2})(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2}))?$/;
+
+/**
+ * ISO-normalizes an admin-typed backfill start for the adapter's
+ * `z.string().datetime()`.
+ *
+ * Strict on purpose: `Date.parse` rolls `2026-02-30` forward to March 2 instead
+ * of failing, which would silently backfill from a date nobody chose.
+ *
+ * Empty is not an error — the field is optional — so it yields undefined, while
+ * anything rejected yields null for the caller to turn into a toast.
+ */
+function normalizeStartingAt(raw: string): string | null | undefined {
+  if (!raw) return undefined;
+
+  const match = STARTING_AT.exec(raw);
+  if (!match) return null;
+  if (
+    !isRealCalendarDate(Number(match[1]), Number(match[2]), Number(match[3]))
+  ) {
+    return null;
+  }
+
+  const parsed = Date.parse(raw);
+  return Number.isNaN(parsed) ? null : new Date(parsed).toISOString();
+}
+
+/**
+ * The Databricks Genie adapter config, or null when a required field is empty.
+ *
+ * Genie needs a real builder rather than the bare `{ adapter }` the other
+ * reference pullers get, for two reasons the form cannot express on its own:
+ * the token has to land under `credentials` so the server encrypts it, and
+ * `spaceIds` is a comma-separated string in the form but an array in the
+ * adapter's schema.
+ */
+function buildDatabricksGeniePullConfig(
+  c: ComposerState,
+): Record<string, unknown> | null {
+  const p = c.parserConfig;
+  const workspaceUrl = (p.workspaceUrl ?? "").trim().replace(/\/+$/, "");
+  const token = (p.credentialsToken ?? "").trim();
+  if (!workspaceUrl || !token) return null;
+
+  return {
+    adapter: "databricks_genie",
+    workspaceUrl,
+    // Empty means "every space the token can see", which is the setting most
+    // workspaces want and the one that covers a new space automatically.
+    spaceIds: (p.spaceIds ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0),
+    schedule:
+      c.pullSchedule.trim() ||
+      PULL_SCHEDULE_DEFAULTS.databricks_genie ||
+      "*/15 * * * *",
+    credentials: { token },
+  };
+}
+
 function ParserConfigFields({
   sourceType,
   values,
@@ -1234,13 +1655,7 @@ function ParserConfigFields({
             <Input
               size="sm"
               backgroundColor="white"
-              type={
-                f.key === "credentialsToken" ||
-                f.key === "clientSecret" ||
-                f.key === "workspaceApiKey"
-                  ? "password"
-                  : "text"
-              }
+              type={isSecretFieldKey(f.key) ? "password" : "text"}
               value={values[f.key] ?? ""}
               onChange={(e) => onChange({ ...values, [f.key]: e.target.value })}
               placeholder={f.placeholder}
@@ -1291,23 +1706,67 @@ function PullScheduleField({
   );
 }
 
-function buildParserConfig(c: ComposerState): Record<string, unknown> {
+/**
+ * Form fields owned by a source type's ADAPTER config rather than by
+ * parserConfig.
+ *
+ * The server merges pullConfig into parserConfig and lets parserConfig WIN on a
+ * key clash, so a raw form value copied through here would silently override
+ * the typed one its builder produced. For Genie that is not cosmetic:
+ * `spaceIds` is a comma string in the form and an array in the adapter's
+ * schema, so the string would win and the source would fail validation at pull
+ * time — a broken source that looked fine when it was saved.
+ */
+const PULL_CONFIG_OWNED_FIELDS: Partial<Record<SourceType, readonly string[]>> =
+  {
+    // `report`/`bucketWidth` pass through unchanged, but `startingAt` is
+    // normalized to an ISO instant by the builder — the raw form value
+    // winning the merge would fail the adapter's `.datetime()` check at
+    // pull time.
+    anthropic_admin: ["report", "bucketWidth", "startingAt"],
+    databricks_genie: ["workspaceUrl", "spaceIds"],
+  };
+
+// Skip sentinel for a parserConfig entry that must not be persisted, kept
+// distinct from a legitimately-falsy value an admin typed.
+const DROP_PARSER_FIELD = Symbol("drop");
+
+// The persisted value for one parserConfig entry, or DROP_PARSER_FIELD to omit
+// it. Pulling the per-key decision out of the loop keeps `buildParserConfig`
+// flat instead of a five-deep branch ladder.
+function parserFieldValue(
+  key: string,
+  value: unknown,
+): unknown | typeof DROP_PARSER_FIELD {
+  if (value == null || value === "") return DROP_PARSER_FIELD;
+  // Secrets travel in exactly one place: `pullConfig.credentials`, which is
+  // the only subtree `encryptParserConfigCredentials` wraps before the row
+  // reaches Postgres. A secret field copied to the top level of parserConfig
+  // would be persisted as plaintext JSONB — so it never is. `isSecretFieldKey`
+  // is the single source of truth for "is this a secret" (see its doc
+  // comment) — this must not go back to an inline
+  // `key.startsWith("credentials")` check here, or the storage-routing rule
+  // can drift from the input-masking rule again.
+  if (isSecretFieldKey(key)) return DROP_PARSER_FIELD;
+  if (key === "pollEverySec") {
+    const n = Number(value);
+    return Number.isNaN(n) ? DROP_PARSER_FIELD : n;
+  }
+  return value;
+}
+
+export function buildParserConfig(c: ComposerState): Record<string, unknown> {
   const out: Record<string, unknown> = {};
+  const adapterOwned = new Set(PULL_CONFIG_OWNED_FIELDS[c.sourceType] ?? []);
   for (const [k, v] of Object.entries(c.parserConfig)) {
-    if (v == null || v === "") continue;
-    if (k === "pollEverySec") {
-      const n = Number(v);
-      if (!Number.isNaN(n)) out[k] = n;
-      continue;
-    }
-    out[k] = v;
+    if (adapterOwned.has(k)) continue;
+    const resolved = parserFieldValue(k, v);
+    if (resolved !== DROP_PARSER_FIELD) out[k] = resolved;
   }
   // Strip empty rows from the OTTL statement list - admins may leave a
   // blank trailing row from clicking "Add statement"; persisting it
   // would force the gateway parser to handle empty input as an error.
-  const ottl = c.ottlStatements
-    .map((s) => s)
-    .filter((s) => s.trim().length > 0);
+  const ottl = c.ottlStatements.filter((s) => s.trim().length > 0);
   if (ottl.length > 0) {
     out.ottlStatements = ottl;
   }
@@ -1318,13 +1777,7 @@ function SecretModal({
   details,
   onClose,
 }: {
-  details: {
-    title: string;
-    secret: string;
-    sourceId: string;
-    sourceName: string;
-    sourceType: SourceType;
-  } | null;
+  details: SecretDetails | null;
   onClose: () => void;
 }) {
   const [copied, setCopied] = useState(false);
