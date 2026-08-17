@@ -14,12 +14,14 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import type { SourceFile } from "typescript/unstable/ast";
 import { beforeAll, describe, expect, it } from "vitest";
 import {
   mightContainMockCall,
   resolveMockSpecifier,
   scanSourceForMockSpecifiers,
 } from "../mockSpecifierScan";
+import { parseSourceText, parseSourceTexts } from "../tsAst";
 import {
   aliasesForFile,
   type ModuleAlias,
@@ -69,18 +71,18 @@ function readAliasTables(files: string[]): Map<string, ModuleAlias[]> {
 
 function offendersIn({
   relativePath,
+  source,
   aliasesByConfigDir,
 }: {
   relativePath: string;
+  source: SourceFile;
   aliasesByConfigDir: Map<string, ModuleAlias[]>;
 }): string[] {
   const fileName = join(REPO_ROOT, relativePath);
-  const sourceText = readFileSync(fileName, "utf8");
-  if (!mightContainMockCall({ sourceText })) return [];
 
   const aliases = aliasesForFile({ file: fileName, aliasesByConfigDir });
   const offenders: string[] = [];
-  for (const site of scanSourceForMockSpecifiers({ fileName, sourceText })) {
+  for (const site of scanSourceForMockSpecifiers({ source })) {
     const resolution = resolveMockSpecifier({
       specifier: site.specifier,
       fromDir: dirname(fileName),
@@ -109,9 +111,28 @@ function scanTrackedTestFiles(): {
   const aliasesByConfigDir = readAliasTables(files);
   const testFiles = files.filter((file) => TEST_FILE_PATTERN.test(file));
 
+  // Parsed in one exchange with the compiler rather than one per file: under
+  // TypeScript 7 parsing is a round trip, and a tree's worth of them does not
+  // finish.
+  const candidates = testFiles
+    .map((relativePath) => ({
+      relativePath,
+      sourceText: readFileSync(join(REPO_ROOT, relativePath), "utf8"),
+    }))
+    .filter(({ sourceText }) => mightContainMockCall({ sourceText }));
+
+  const parsed = parseSourceTexts({
+    sources: candidates.map(({ relativePath, sourceText }) => ({
+      fileName: relativePath,
+      sourceText,
+    })),
+  });
+
   const offenders: string[] = [];
-  for (const relativePath of testFiles) {
-    offenders.push(...offendersIn({ relativePath, aliasesByConfigDir }));
+  for (const { fileName, source } of parsed) {
+    offenders.push(
+      ...offendersIn({ relativePath: fileName, source, aliasesByConfigDir }),
+    );
   }
 
   return {
@@ -123,7 +144,9 @@ function scanTrackedTestFiles(): {
 }
 
 const scan = (sourceText: string) =>
-  scanSourceForMockSpecifiers({ fileName: "virtual.test.ts", sourceText });
+  scanSourceForMockSpecifiers({
+    source: parseSourceText({ fileName: "virtual.test.ts", sourceText }),
+  });
 
 const APP_ALIASES: ModuleAlias[] = [
   { find: "~/", replacement: join(APP_ROOT, "src/") },

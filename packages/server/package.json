@@ -29,7 +29,7 @@
 		"@types/tar": "^6.1.13",
 		"esbuild": "^0.28.1",
 		"tsx": "^4.21.0",
-		"typescript": "^5.9.3",
+		"typescript": "^7.0.2",
 		"vitest": "^4.1.0"
 	}
 }
