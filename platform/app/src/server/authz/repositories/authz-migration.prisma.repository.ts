@@ -1,8 +1,13 @@
 import type {
+  AuthzGenesisRepository,
   AuthzMigrationRepository,
   ExistingTeamBinding,
+  LegacyBindingRow,
+  LegacyRoleRow,
   LegacyTeamRow,
+  OrganizationMemberFact,
   OrganizationScopeInventory,
+  RoleHeadRow,
   TeamBindingWrite,
 } from "@langwatch/authz-server";
 import type { PrismaClient } from "~/generated/prisma/client";
@@ -13,9 +18,125 @@ import type { PrismaClient } from "~/generated/prisma/client";
  * `TeamUserBackfillMigration` (@langwatch/authz-server).
  */
 export class PrismaAuthzMigrationRepository
-  implements AuthzMigrationRepository
+  implements AuthzMigrationRepository, AuthzGenesisRepository
 {
   constructor(private readonly prisma: PrismaClient) {}
+
+  async findOrganizationCreatedAtMs({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<number | null> {
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { createdAt: true },
+    });
+    return organization?.createdAt.getTime() ?? null;
+  }
+
+  async findLegacyBindingRows({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<LegacyBindingRow[]> {
+    const rows = await this.prisma.roleBinding.findMany({
+      where: { organizationId },
+      select: {
+        id: true,
+        userId: true,
+        groupId: true,
+        apiKeyId: true,
+        role: true,
+        customRoleId: true,
+        scopeType: true,
+        scopeId: true,
+        createdAt: true,
+      },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      userId: row.userId,
+      groupId: row.groupId,
+      apiKeyId: row.apiKeyId,
+      role: row.role,
+      customRoleId: row.customRoleId,
+      scopeType: row.scopeType,
+      scopeId: row.scopeId,
+      createdAtMs: row.createdAt.getTime(),
+    }));
+  }
+
+  async findLegacyRoleRows({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<LegacyRoleRow[]> {
+    const rows = await this.prisma.customRole.findMany({
+      where: { organizationId },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        permissions: true,
+        kind: true,
+        createdAt: true,
+      },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      permissions: row.permissions,
+      kind: row.kind,
+      createdAtMs: row.createdAt.getTime(),
+    }));
+  }
+
+  async findOrganizationMembers({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<OrganizationMemberFact[]> {
+    const rows = await this.prisma.organizationUser.findMany({
+      where: { organizationId },
+      select: { userId: true, role: true, createdAt: true },
+    });
+    return rows.map((row) => ({
+      userId: row.userId,
+      role: row.role,
+      createdAtMs: row.createdAt.getTime(),
+    }));
+  }
+
+  async findGrantHeadIds({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<string[]> {
+    const rows = await this.prisma.grant.findMany({
+      where: { organizationId },
+      select: { id: true },
+    });
+    return rows.map((row) => row.id);
+  }
+
+  async findRoleHeads({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<RoleHeadRow[]> {
+    const rows = await this.prisma.role.findMany({
+      where: { organizationId },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        permissions: true,
+        kind: true,
+      },
+    });
+    return rows;
+  }
 
   async findLegacyTeamRows({
     organizationId,

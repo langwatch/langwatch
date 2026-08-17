@@ -36,10 +36,15 @@ export type {
   ShareLinkRow,
 } from "./authz-read.repository";
 export type {
+  AuthzGenesisRepository,
   AuthzMigrationRepository,
   ExistingTeamBinding,
+  LegacyBindingRow,
+  LegacyRoleRow,
   LegacyTeamRow,
+  OrganizationMemberFact,
   OrganizationScopeInventory,
+  RoleHeadRow,
   TeamBindingWrite,
 } from "./authz-migration.repository";
 export { AuthzShadowService } from "./authz-shadow.service";
