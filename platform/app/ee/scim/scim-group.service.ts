@@ -529,6 +529,13 @@ export class ScimGroupService {
     // written out as empty may clear it.
     if (ids.length !== value.length) return { kind: "malformed" };
 
+    // A blank id is well-formed enough to survive the check above and still
+    // names nobody: `[{"value":""}]` matches no member, so every current member
+    // falls outside the requested set and is removed. An id that refers to
+    // someone outside the organization is a different matter and stays allowed
+    // — that is a membership question, resolved later. This is a shape problem.
+    if (ids.some((id) => id.trim() === "")) return { kind: "malformed" };
+
     return { kind: "list", ids };
   }
 

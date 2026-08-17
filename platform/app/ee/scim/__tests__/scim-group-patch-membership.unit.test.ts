@@ -263,6 +263,18 @@ describe("SCIM group PATCH membership", () => {
         expect(prisma.groupMembership.upsert).not.toHaveBeenCalled();
       });
 
+      // A blank id is a string, so it survives every check that asks about
+      // types and lengths, and still names nobody — leaving every current
+      // member outside the requested set, which is to say removed.
+      it("leaves it untouched for a blank id", async () => {
+        await patchGroup([
+          { op: "replace", path: "members", value: [{ value: "  " }] },
+        ]);
+
+        expect(prisma.groupMembership.deleteMany).not.toHaveBeenCalled();
+        expect(prisma.groupMembership.upsert).not.toHaveBeenCalled();
+      });
+
       it("leaves it untouched even when only some entries are readable", async () => {
         await patchGroup([
           {
