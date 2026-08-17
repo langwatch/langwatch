@@ -8,18 +8,24 @@ import { SegmentSubmodeIcon } from "./SegmentSubmodeIcon";
  * A secondary axis of the active format, rendered as icon toggles inside
  * the selector pill (e.g. rendered/source markdown, thread/bubbles chat).
  */
-export interface FormatSubmode {
-  value: string;
+export interface FormatSubmode<Submode extends string = string> {
+  value: Submode;
   label: string;
   icon: IconType;
   /** Override default tooltip `${label} view`. */
   tooltip?: string;
 }
 
-export interface FormatSubmodeGroup {
-  value: string;
-  onChange: (value: string) => void;
-  options: readonly FormatSubmode[];
+export interface FormatSubmodeGroup<Submode extends string = string> {
+  value: Submode;
+  /**
+   * Method syntax on purpose: it makes the parameter bivariant, so a handler
+   * that accepts only its own submode union still fits a group typed with the
+   * wider `string`. Every value it can receive comes from `options` below,
+   * which the same caller declares.
+   */
+  onChange(value: Submode): void;
+  options: readonly FormatSubmode<Submode>[];
 }
 
 /**
@@ -27,30 +33,34 @@ export interface FormatSubmodeGroup {
  * simple case (label derived from the value); the object form opts into
  * `submodes` for an inline icon pair shown while the option is active.
  */
-export interface FormatOption {
-  value: string;
+export interface FormatOption<Value extends string = string> {
+  value: Value;
   label?: string;
-  submodes?: FormatSubmodeGroup;
+  // Submodes are a second axis, unrelated to the format union, so they carry
+  // their own value type.
+  submodes?: FormatSubmodeGroup<string>;
 }
 
-type Option = string | FormatOption;
+type Option<Value extends string> = Value | FormatOption<Value>;
 
-interface FormatSelectProps {
-  value: string;
-  onChange: (value: string) => void;
-  options: readonly Option[];
+interface FormatSelectProps<Value extends string> {
+  value: Value;
+  onChange: (value: Value) => void;
+  options: readonly Option<Value>[];
   /** Accessible name for the trigger, naming which panel's format it picks. */
   ariaLabel?: string;
 }
 
-function normalizeOption(option: Option): FormatOption {
+function normalizeOption<Value extends string>(
+  option: Option<Value>,
+): FormatOption<Value> {
   return typeof option === "string" ? { value: option } : option;
 }
 
 /** Initialisms keep their casing; everything else reads as a word. */
 const VALUE_LABELS: Record<string, string> = { json: "JSON" };
 
-function optionLabel(option: FormatOption): string {
+function optionLabel(option: FormatOption<string>): string {
   if (option.label) return option.label;
   const mapped = VALUE_LABELS[option.value];
   if (mapped) return mapped;
@@ -65,12 +75,12 @@ function optionLabel(option: FormatOption): string {
  * matter how many formats a panel offers. When the active option carries
  * `submodes`, their icon toggles render inside the pill, after the caret.
  */
-export function FormatSelect({
+export function FormatSelect<Value extends string>({
   value,
   onChange,
   options,
   ariaLabel,
-}: FormatSelectProps) {
+}: FormatSelectProps<Value>) {
   const normalized = options.map(normalizeOption);
   const active =
     normalized.find((option) => option.value === value) ?? normalized[0];

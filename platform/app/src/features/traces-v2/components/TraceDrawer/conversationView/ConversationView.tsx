@@ -607,7 +607,7 @@ const ConversationHeader: React.FC<{
       )}
       <FormatSelect
         value={mode}
-        onChange={(v) => onModeChange(v as Mode)}
+        onChange={onModeChange}
         options={CONVERSATION_MODES}
         ariaLabel="Conversation view format"
       />

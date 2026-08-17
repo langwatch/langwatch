@@ -224,13 +224,19 @@ function FormatGlyph({ format }: { format: Exclude<AttributeFormat, "leaf"> }) {
   );
 }
 
+/**
+ * The formats a reader can pick. `json-string` is missing on purpose: it is a
+ * detection result that renders through the JSON option, never a choice.
+ */
+type OverridableFormat = Exclude<AttributeFormat, "leaf" | "json-string">;
+
 const OVERRIDE_OPTIONS: ReadonlyArray<{
-  format: AttributeFormat;
+  value: OverridableFormat;
   label: string;
 }> = [
-  { format: "chat", label: "Chat" },
-  { format: "json", label: "JSON" },
-  { format: "text", label: "Text" },
+  { value: "chat", label: "Chat" },
+  { value: "json", label: "JSON" },
+  { value: "text", label: "Text" },
 ];
 
 function FormatToggle({
@@ -240,10 +246,11 @@ function FormatToggle({
   active: AttributeFormat;
   onChange: (next: AttributeFormat | null) => void;
 }) {
-  // `json-string` is a detection result, not an option the reader picks: it
-  // renders through the JSON option, so it has to read as JSON here or the
-  // selector would fall through to the first option instead.
-  const value = active === "json-string" ? "json" : active;
+  // Chat and text map to themselves; `json`, `json-string` and `leaf` all
+  // render through the JSON option. Without this, a detected `json-string`
+  // would match no option and the selector would read as the first one.
+  const value: OverridableFormat =
+    active === "chat" || active === "text" ? active : "json";
   return (
     <HStack gap={1} flexShrink={0}>
       <Text
@@ -257,11 +264,8 @@ function FormatToggle({
       </Text>
       <FormatSelect
         value={value}
-        onChange={(next) => onChange(next as AttributeFormat)}
-        options={OVERRIDE_OPTIONS.map((opt) => ({
-          value: opt.format,
-          label: opt.label,
-        }))}
+        onChange={onChange}
+        options={OVERRIDE_OPTIONS}
         ariaLabel="Attribute value format"
       />
     </HStack>

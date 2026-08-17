@@ -83,6 +83,7 @@ afterEach(cleanup);
 
 describe("given the trace drawer is open on a conversation", () => {
   /** @scenario "The conversation offers no separate annotations mode" */
+  /** @scenario "The conversation view uses the same format selector" */
   it("offers thread, bubbles, and markdown only", async () => {
     const user = userEvent.setup();
     renderView();

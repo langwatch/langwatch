@@ -91,6 +91,11 @@ export function useOverflowVisibility({
     if (els.length === 0) return;
 
     const containerRect = root.getBoundingClientRect();
+    // A row with no width is not laid out — it is `display: none`, or not in
+    // the document yet. Measuring it would put every item past the cutoff and
+    // collapse the whole row; the resize observer re-measures once it has a
+    // size.
+    if (containerRect.width === 0) return;
     const limit = containerRect.right - reservePx;
 
     const next = new Set<string>();

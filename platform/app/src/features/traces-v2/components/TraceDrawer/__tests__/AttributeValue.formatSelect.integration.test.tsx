@@ -21,9 +21,16 @@ const wrapper = ({ children }: { children: React.ReactNode }) => (
 
 afterEach(cleanup);
 
-const openValue = async (user: ReturnType<typeof userEvent.setup>) => {
-  const trigger = screen.getByRole("button");
-  await user.click(trigger);
+/**
+ * The collapsed row is one button holding the value preview. Named by its
+ * text rather than by being the only button, so another control appearing in
+ * the row does not break every test here.
+ */
+const openValue = async (
+  user: ReturnType<typeof userEvent.setup>,
+  preview: string | RegExp,
+) => {
+  await user.click(screen.getByRole("button", { name: preview }));
 };
 
 describe("given an attribute holding a chat-shaped value", () => {
@@ -32,14 +39,14 @@ describe("given an attribute holding a chat-shaped value", () => {
     { role: "assistant", content: "on its way" },
   ];
 
-  /** @scenario "Conversation and attribute views use the same format selector" */
+  /** @scenario "Attribute values use the same format selector" */
   it("offers chat, JSON and text through the format selector", async () => {
     const user = userEvent.setup();
     render(<AttributeValue attrKey="gen_ai.input.messages" value={chat} />, {
       wrapper,
     });
 
-    await openValue(user);
+    await openValue(user, /Detected format: chat/);
 
     const select = await screen.findByRole("button", {
       name: "Attribute value format",
@@ -58,7 +65,7 @@ describe("given an attribute holding a chat-shaped value", () => {
       wrapper,
     });
 
-    await openValue(user);
+    await openValue(user, /Detected format: chat/);
     await user.click(
       await screen.findByRole("button", { name: "Attribute value format" }),
     );
@@ -71,7 +78,7 @@ describe("given an attribute holding a chat-shaped value", () => {
 });
 
 describe("given an attribute whose value is JSON inside a string", () => {
-  /** @scenario "Conversation and attribute views use the same format selector" */
+  /** @scenario "Attribute values use the same format selector" */
   it("reads as JSON in the selector rather than as the first option", async () => {
     const user = userEvent.setup();
     render(
@@ -82,7 +89,7 @@ describe("given an attribute whose value is JSON inside a string", () => {
       { wrapper },
     );
 
-    await openValue(user);
+    await openValue(user, /Detected format: json/);
 
     expect(
       await screen.findByRole("button", { name: "Attribute value format" }),

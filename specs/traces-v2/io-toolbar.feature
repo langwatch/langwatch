@@ -43,8 +43,14 @@ Feature: Trace drawer input and output toolbar
     And it is never moved into the menu
 
   @integration
-  Scenario: Conversation and attribute views use the same format selector
+  Scenario: Attribute values use the same format selector
     Given an attribute value the drawer can render more than one way
     When the user opens its format selector
     Then the menu lists chat, JSON and text
     And a value that holds JSON inside a string reads as JSON
+
+  @integration
+  Scenario: The conversation view uses the same format selector
+    Given a conversation in the drawer
+    When the user opens its format selector
+    Then the menu lists thread, bubbles and markdown

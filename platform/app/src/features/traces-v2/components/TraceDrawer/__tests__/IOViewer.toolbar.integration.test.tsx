@@ -102,8 +102,9 @@ const wrapper = ({ children }: { children: React.ReactNode }) => (
 /**
  * Rects for the overflow measurement. When `itemRights` is set, elements
  * carrying `data-overflow-id` report the mapped right edge and the scroller
- * (the nearest element containing them) reports `containerRight`; everything
- * else keeps jsdom's zero rects, which the hook reads as "everything fits".
+ * (the nearest element containing them) reports `containerRight`; without it
+ * everything keeps jsdom's zero rects, which the hook reads as a row that is
+ * not laid out and leaves alone.
  */
 let itemRights: Record<string, number> | null = null;
 let containerRight = 0;
@@ -128,6 +129,9 @@ beforeEach(() => {
   mocks.storedComments = [];
   mocks.translate.mockClear();
   itemRights = null;
+  // Reset with `itemRights`, or a suite that sets item rects without setting
+  // a container edge would inherit whichever one ran before it.
+  containerRight = 0;
   vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(
     function (this: Element) {
       if (!itemRights) return originalGetRect.call(this);
@@ -221,10 +225,12 @@ describe("given a chat-shaped input rendered in the Pretty format", () => {
 
 describe("given a toolbar too narrow for all action buttons", () => {
   beforeEach(() => {
+    // The cutoff is `containerRight - reservePx`, i.e. 174: translate and
+    // comment fit, suggest and playground do not.
     containerRight = 200;
     itemRights = {
-      translate: 120,
-      comment: 180,
+      translate: 60,
+      comment: 120,
       suggest: 260,
       playground: 320,
     };
@@ -270,6 +276,145 @@ describe("given a toolbar too narrow for all action buttons", () => {
       menuTrigger.compareDocumentPosition(copyButton) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+  });
+
+  /** @scenario "Copy is always the last visible control" */
+  it("never moves the copy button into the menu", async () => {
+    const user = userEvent.setup();
+    renderViewer({});
+
+    await user.click(
+      await screen.findByRole("button", { name: "More actions" }),
+    );
+
+    // The menu holds the two actions that overflowed and nothing else — Copy
+    // is not one of the measured items, so it can never be folded in.
+    expect(
+      (await screen.findAllByRole("menuitem")).map((item) => item.textContent),
+    ).toEqual(["Suggest edit", "Open in Playground"]);
+    expect(
+      screen.getByRole("button", { name: "Copy to clipboard" }),
+    ).toBeVisible();
+  });
+
+  /**
+   * The trigger is measured along with the actions rather than sitting outside
+   * the row: as an outside sibling its mount shrinks the row, the
+   * ResizeObserver clears the hidden set, and the trigger unmounts and
+   * remounts on every measurement.
+   */
+  /** @scenario "Actions that do not fit collapse into the overflow menu" */
+  it("keeps the overflow trigger inside the measured row", async () => {
+    renderViewer({});
+
+    const menuTrigger = await screen.findByRole("button", {
+      name: "More actions",
+    });
+    const measuredRow = document
+      .querySelector("[data-overflow-id]")
+      ?.closest("div")?.parentElement;
+
+    expect(measuredRow).not.toBeNull();
+    expect(measuredRow?.contains(menuTrigger)).toBe(true);
+  });
+});
+
+describe("given an action that fits the row but not the trigger's slot", () => {
+  beforeEach(() => {
+    // Comment ends 10px before the row's right edge, inside the room held
+    // back for the trigger. It has to fold in, or the trigger has nowhere to
+    // render.
+    containerRight = 200;
+    itemRights = {
+      translate: 60,
+      comment: 190,
+      suggest: 260,
+      playground: 320,
+    };
+  });
+
+  /** @scenario "Actions that do not fit collapse into the overflow menu" */
+  it("folds it into the menu so the trigger keeps its room", async () => {
+    const user = userEvent.setup();
+    renderViewer({});
+
+    await user.click(
+      await screen.findByRole("button", { name: "More actions" }),
+    );
+
+    expect(
+      await screen.findByRole("menuitem", { name: "Comment" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("menuitem", { name: "Translate" }),
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe("given a reader who cannot manage annotations", () => {
+  beforeEach(() => {
+    mocks.canManage = false;
+  });
+
+  describe("when the field carries no comments", () => {
+    it("offers neither Comment nor Suggest edit", async () => {
+      renderViewer({});
+
+      // Translate is unconditional, so waiting on it proves the toolbar
+      // rendered before asserting the other two are absent.
+      expect(
+        await screen.findByRole("button", { name: /Translate/ }),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Comment" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Suggest edit" })).toBeNull();
+    });
+
+    it("keeps them out of the overflow menu as well", async () => {
+      const user = userEvent.setup();
+      // Only translate and playground are built for this reader; the row is
+      // narrow enough that playground has to fold in, so there is a menu to
+      // read.
+      containerRight = 200;
+      itemRights = { translate: 60, playground: 320 };
+      renderViewer({});
+
+      await user.click(
+        await screen.findByRole("button", { name: "More actions" }),
+      );
+
+      expect(
+        (await screen.findAllByRole("menuitem")).map(
+          (item) => item.textContent,
+        ),
+      ).toEqual(["Open in Playground"]);
+    });
+  });
+
+  describe("when the field already carries a comment", () => {
+    beforeEach(() => {
+      // The anchor has to match the one the panel builds, or the annotation
+      // indexes under a different key and the gate sees no comments.
+      mocks.storedComments = [
+        {
+          id: "annotation-1",
+          comment: "looks wrong",
+          anchorKind: "field",
+          anchorId: SPAN_ID,
+          anchorPath: "input",
+        },
+      ];
+    });
+
+    it("offers the comment to read, but still no Suggest edit", async () => {
+      renderViewer({});
+
+      // The control names the count, so this also proves the stored comment
+      // reached it rather than the action merely being present.
+      expect(
+        await screen.findByRole("button", { name: "1 comment" }),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Suggest edit" })).toBeNull();
+    });
   });
 });
 

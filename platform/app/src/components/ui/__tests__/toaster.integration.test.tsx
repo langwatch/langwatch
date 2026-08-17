@@ -71,13 +71,19 @@ describe("Toaster", () => {
 
   describe("when an error is shown through the error toast helper", () => {
     /** @scenario "An error toast keeps its close button and error actions" */
-    it("shows the close button and the copyable error id", async () => {
+    it("shows the close button, the docs link and the copyable error id", async () => {
       mountToaster();
       showErrorToast({
         error: {
           data: {
-            error: { code: "query_timeout", httpStatus: 504 },
-            traceId: "trace_123",
+            error: {
+              code: "query_timeout",
+              httpStatus: 504,
+              // `safeDocsUrl` accepts our own docs origins only, so the link
+              // has to be one the server could really have sent.
+              docsUrl: "https://docs.langwatch.ai/support",
+              traceId: "trace_123",
+            },
           },
         },
       });
@@ -89,6 +95,9 @@ describe("Toaster", () => {
       // jsdom has no clipboard API, so ErrorActions falls back from the
       // "Copy error ID" button to showing the id as selectable text.
       expect(screen.getByText("Error ID: trace_123")).toBeInTheDocument();
+      expect(
+        screen.getByRole("link", { name: /Read the docs/ }),
+      ).toHaveAttribute("href", "https://docs.langwatch.ai/support");
     });
   });
 

@@ -1425,7 +1425,7 @@ export function AttributeTable({
         {!editing && (
           <FormatSelect
             value={viewMode}
-            onChange={(m) => setViewMode(m as AttrViewMode)}
+            onChange={setViewMode}
             options={VIEW_MODE_OPTIONS}
             ariaLabel="Attributes view format"
           />

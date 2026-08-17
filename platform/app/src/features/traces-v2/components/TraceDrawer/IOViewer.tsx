@@ -1,40 +1,15 @@
-import { Box, Button, Flex, HStack, Icon, Text } from "@chakra-ui/react";
-import { forwardRef, memo, useEffect, useMemo, useRef, useState } from "react";
-import type { IconType } from "react-icons";
-import {
-  LuCheck,
-  LuChevronDown,
-  LuChevronRight,
-  LuCode,
-  LuCopy,
-  LuEye,
-  LuLanguages,
-  LuLightbulb,
-  LuList,
-  LuMessageSquare,
-  type LuPencil,
-  LuPlay,
-} from "react-icons/lu";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useGoToSpanInPlaygroundTabUrlBuilder } from "~/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground";
+import { Box, Button, HStack, Icon, Text } from "@chakra-ui/react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { LuChevronDown, LuChevronRight } from "react-icons/lu";
 import { TRANSLATE_TEXT_MAX_CHARS } from "~/utils/constants";
-import {
-  type TraceAnchor,
-  useAnchoredAnnotations,
-} from "../../hooks/useAnchoredAnnotations";
-import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
-import { useOverflowVisibility } from "../../hooks/useOverflowVisibility";
+import type { TraceAnchor } from "../../hooks/useAnchoredAnnotations";
 import { useTextTranslation } from "../../hooks/useTextTranslation";
-import { OverflowMenu } from "../shared/OverflowMenu";
-import { FieldCommentButton } from "./anchoredComments/FieldCommentButton";
-import { AnnotationPopover } from "./conversationView/AnnotationPopover";
-import { FormatSelect } from "./FormatSelect";
 import { IOViewerBody } from "./IOViewerBody";
+import { IOViewerToolbar } from "./IOViewerToolbar";
 import { safePrettyJson } from "./JsonHighlight";
 import {
   applyChatTextLeaves,
   asMarkdownBody,
-  type ChatLayout,
   type ChatMessage,
   type ConversationTurn,
   coerceToChatMessages,
@@ -133,228 +108,6 @@ interface IOViewerProps {
   spanId?: string;
   /** Span type — `llm` enables the Playground affordance. */
   spanType?: string;
-}
-
-const ActionButton = forwardRef<
-  HTMLButtonElement,
-  {
-    icon: typeof LuPencil;
-    label: string;
-  } & React.ComponentProps<typeof Button>
->(function ActionButton({ icon, label, ...buttonProps }, ref) {
-  return (
-    <Button
-      ref={ref}
-      size="xs"
-      variant="ghost"
-      color="fg.muted"
-      gap={1.5}
-      paddingX={2}
-      height="22px"
-      onClick={(e) => e.stopPropagation()}
-      {...buttonProps}
-    >
-      <Icon as={icon} boxSize={3} />
-      {label}
-    </Button>
-  );
-});
-
-function PlaygroundButton({ href }: { href: string }) {
-  return (
-    <Button
-      asChild
-      size="xs"
-      variant="ghost"
-      color="fg.muted"
-      gap={1.5}
-      paddingX={2}
-      height="22px"
-    >
-      <a
-        href={href}
-        target="_blank"
-        rel="noreferrer noopener"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <Icon as={LuPlay} boxSize={3} />
-        Open in Playground
-      </a>
-    </Button>
-  );
-}
-
-function SuggestCorrectionButton({
-  traceId,
-  output,
-  anchor,
-}: {
-  traceId: string;
-  output: string;
-  /** The field the suggestion corrects. */
-  anchor: TraceAnchor;
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <AnnotationPopover
-      traceId={traceId}
-      output={output}
-      mode="suggest"
-      anchorKind={anchor.anchorKind}
-      anchorId={anchor.anchorId}
-      anchorPath={anchor.anchorPath}
-      open={open}
-      onOpenChange={setOpen}
-      trigger={<ActionButton icon={LuLightbulb} label="Suggest edit" />}
-    />
-  );
-}
-
-function TranslateButton({
-  isActive,
-  isLoading,
-  onToggle,
-}: {
-  isActive: boolean;
-  isLoading: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <ActionButton
-      icon={LuLanguages}
-      label={
-        isLoading ? "Translating…" : isActive ? "Show original" : "Translate"
-      }
-      aria-pressed={isActive}
-      color={isActive ? "blue.fg" : "fg.muted"}
-      disabled={isLoading}
-      onClick={(e) => {
-        e.stopPropagation();
-        onToggle();
-      }}
-    />
-  );
-}
-
-function CopyButton({ text }: { text: string }) {
-  const { copied, copy } = useCopyToClipboard();
-
-  const handleCopy = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    copy(text);
-  };
-
-  return (
-    <Button
-      size="xs"
-      variant="ghost"
-      onClick={handleCopy}
-      aria-label="Copy to clipboard"
-      padding={0}
-      minWidth="auto"
-      height="auto"
-    >
-      <Icon
-        as={copied ? LuCheck : LuCopy}
-        boxSize={3}
-        color={copied ? "green.fg" : "fg.subtle"}
-      />
-    </Button>
-  );
-}
-
-/** One toolbar action: its inline rendering and its overflow-menu row. */
-type IOAction = {
-  id: string;
-  menuLabel: string;
-  menuIcon: IconType;
-  disabled?: boolean;
-  render: () => React.ReactNode;
-};
-
-/**
- * The toolbar actions a panel offers, in render order.
- *
- * Each action keeps its real component mounted even while collapsed, so
- * popover wiring and permission gates live in one place and picking the
- * action out of the overflow menu clicks the same control.
- */
-function buildIOActions({
-  translation,
-  traceId,
-  fieldAnchor,
-  originalContent,
-  showComment,
-  showSuggest,
-  playgroundHref,
-}: {
-  translation: ReturnType<typeof useTextTranslation>;
-  traceId: string | undefined;
-  fieldAnchor: TraceAnchor | null;
-  originalContent: string;
-  showComment: boolean;
-  showSuggest: boolean;
-  playgroundHref: string;
-}): IOAction[] {
-  const actions: IOAction[] = [
-    {
-      id: "translate",
-      menuLabel: translation.isLoading
-        ? "Translating…"
-        : translation.isActive
-          ? "Show original"
-          : "Translate",
-      menuIcon: LuLanguages,
-      disabled: translation.isLoading,
-      render: () => (
-        <TranslateButton
-          isActive={translation.isActive}
-          isLoading={translation.isLoading}
-          onToggle={translation.toggle}
-        />
-      ),
-    },
-  ];
-
-  if (traceId && fieldAnchor && showComment) {
-    actions.push({
-      id: "comment",
-      menuLabel: "Comment",
-      menuIcon: LuMessageSquare,
-      render: () => (
-        <FieldCommentButton traceId={traceId} anchor={fieldAnchor} />
-      ),
-    });
-  }
-
-  if (traceId && fieldAnchor && showSuggest) {
-    actions.push({
-      id: "suggest",
-      menuLabel: "Suggest edit",
-      menuIcon: LuLightbulb,
-      // Every field this viewer shows is one a correction can replace, the
-      // trace's own input included. Corrections must be stored against the
-      // REAL text, never the translated variant the viewer happens to show.
-      render: () => (
-        <SuggestCorrectionButton
-          traceId={traceId}
-          output={originalContent}
-          anchor={fieldAnchor}
-        />
-      ),
-    });
-  }
-
-  if (playgroundHref) {
-    actions.push({
-      id: "playground",
-      menuLabel: "Open in Playground",
-      menuIcon: LuPlay,
-      render: () => <PlaygroundButton href={playgroundHref} />,
-    });
-  }
-
-  return actions;
 }
 
 export const IOViewer = memo(function IOViewer({
@@ -530,64 +283,6 @@ export const IOViewer = memo(function IOViewer({
     [canJson],
   );
 
-  const { hasPermission } = useOrganizationTeamProject();
-  const annotations = useAnchoredAnnotations();
-  const { buildUrl } = useGoToSpanInPlaygroundTabUrlBuilder();
-
-  const canAnnotate = hasPermission("annotations:manage");
-  // Mirrors AnchorCommentButton's own gate: writers always get the action,
-  // readers only when there is something to read.
-  const showComment =
-    fieldAnchor !== null &&
-    (canAnnotate || annotations.commentsAt(fieldAnchor).length > 0);
-  const showSuggest = fieldAnchor !== null && canAnnotate;
-  // No explicit playground action — the loader auto-detects: opens the
-  // existing managed prompt at the traced version when one is linked,
-  // creates a fresh tab when not. One button, smart default.
-  const playgroundHref =
-    spanType === "llm" && spanId && mode === "input"
-      ? (buildUrl(spanId)?.toString() ?? "")
-      : "";
-
-  // On a narrow drawer the actions that no longer fit collapse into the
-  // three-dot overflow menu, the same element the span tab strip uses.
-  const actions = useMemo(
-    () =>
-      buildIOActions({
-        translation,
-        traceId,
-        fieldAnchor,
-        originalContent,
-        showComment,
-        showSuggest,
-        playgroundHref,
-      }),
-    [
-      translation,
-      traceId,
-      fieldAnchor,
-      originalContent,
-      showComment,
-      showSuggest,
-      playgroundHref,
-    ],
-  );
-
-  // Stable by VALUE, not reference: `actions` rebuilds on unrelated renders
-  // (translation state identity churns), and `useOverflowVisibility` resets
-  // its measurement whenever the items array changes reference — an unstable
-  // array here loops reset → render → reset forever.
-  const actionIdsKey = actions.map((a) => a.id).join(" ");
-  const actionIds = useMemo(() => actionIdsKey.split(" "), [actionIdsKey]);
-  const actionsScrollerRef = useRef<HTMLDivElement>(null);
-  const actionElsRef = useRef<Record<string, HTMLDivElement | null>>({});
-  const hiddenActionIds = useOverflowVisibility({
-    scrollerRef: actionsScrollerRef,
-    items: actionIds,
-    reservePx: 0,
-  });
-  const overflowActions = actions.filter((a) => hiddenActionIds.has(a.id));
-
   // When the virtualized chat list is active it owns its own scroll viewport;
   // the outer card must not impose its own overflow/maxHeight or we'd end up
   // with nested scroll containers.
@@ -674,128 +369,26 @@ export const IOViewer = memo(function IOViewer({
             </Text>
           )}
         </HStack>
-        {!collapsed && (
-          <FormatSelect
-            value={format}
-            onChange={(f) => setFormat(f as ViewFormat)}
-            ariaLabel={`${label} view format`}
-            options={formatOptions.map((opt) => {
-              // Both layouts (thread / bubbles) are available for any
-              // chat-shaped content — input *or* output. Even with a
-              // single assistant reply, the operator may want the
-              // bubble visual; conversely, a multi-message output
-              // (rare but possible) benefits from the flat stack.
-              if (opt === "pretty" && isChat) {
-                return {
-                  value: "pretty",
-                  submodes: {
-                    value: chatLayout,
-                    onChange: (v) => setChatLayout(v as ChatLayout),
-                    options: [
-                      {
-                        value: "thread",
-                        label: "Thread",
-                        icon: LuList,
-                        tooltip: "Thread layout",
-                      },
-                      {
-                        value: "bubbles",
-                        label: "Bubbles",
-                        icon: LuMessageSquare,
-                        tooltip: "Bubble layout",
-                      },
-                    ],
-                  },
-                };
-              }
-              if (opt === "markdown") {
-                return {
-                  value: "markdown",
-                  submodes: {
-                    value: markdownSubmode,
-                    onChange: (v) =>
-                      setMarkdownSubmode(v as "rendered" | "source"),
-                    options: [
-                      {
-                        value: "rendered",
-                        label: "Rendered",
-                        icon: LuEye,
-                        tooltip: "Rendered markdown view",
-                      },
-                      {
-                        value: "source",
-                        label: "Source",
-                        icon: LuCode,
-                        tooltip: "Source markdown view",
-                      },
-                    ],
-                  },
-                };
-              }
-              return opt;
-            })}
-          />
-        )}
-        {/* Stays mounted while the panel is collapsed so its ResizeObserver
-            keeps watching the same element — going through display:none and
-            back re-measures on its own. */}
-        <HStack
-          ref={actionsScrollerRef}
-          display={collapsed ? "none" : "flex"}
-          flex={1}
-          minWidth={0}
-          gap={0}
-          overflow="hidden"
-          flexWrap="nowrap"
-          align="center"
-        >
-          <Box flex={1} minWidth={0} />
-          {actions.map((action) => {
-            const hidden = hiddenActionIds.has(action.id);
-            return (
-              <Flex
-                key={action.id}
-                data-overflow-id={action.id}
-                ref={(el: HTMLDivElement | null) => {
-                  actionElsRef.current[action.id] = el;
-                }}
-                align="center"
-                flexShrink={0}
-                paddingLeft={2}
-                {...(hidden
-                  ? {
-                      width: 0,
-                      minWidth: 0,
-                      paddingLeft: 0,
-                      overflow: "hidden",
-                      visibility: "hidden",
-                    }
-                  : {})}
-              >
-                {action.render()}
-              </Flex>
-            );
-          })}
-        </HStack>
-        {!collapsed && overflowActions.length > 0 && (
-          <OverflowMenu
-            items={overflowActions.map((action) => ({
-              id: action.id,
-              label: action.menuLabel,
-              icon: <Icon as={action.menuIcon} boxSize={3.5} />,
-              disabled: action.disabled,
-            }))}
-            onSelect={(id) => {
-              // Route the selection through the real (zero-width) control so
-              // popover wiring and permission gates stay in one place.
-              actionElsRef.current[id]
-                ?.querySelector<HTMLElement>("button, a")
-                ?.click();
-            }}
-            ariaLabel="More actions"
-          />
-        )}
-        <CopyButton text={content} />
+        <IOViewerToolbar
+          label={label}
+          collapsed={collapsed}
+          format={format}
+          onFormatChange={setFormat}
+          formatOptions={formatOptions}
+          isChat={isChat}
+          chatLayout={chatLayout}
+          onChatLayoutChange={setChatLayout}
+          markdownSubmode={markdownSubmode}
+          onMarkdownSubmodeChange={setMarkdownSubmode}
+          translation={translation}
+          traceId={traceId}
+          spanId={spanId}
+          spanType={spanType}
+          mode={mode}
+          fieldAnchor={fieldAnchor}
+          originalContent={originalContent}
+          copyText={content}
+        />
       </HStack>
 
       {!collapsed && (
