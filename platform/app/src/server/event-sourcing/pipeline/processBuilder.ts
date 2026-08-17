@@ -177,6 +177,20 @@ class ProcessManagerBuilder<E extends Event> {
    * Declares that evolutions keeping the initial state and arming no wake
    * may commit their intents alone — see `ProcessManagerConfig.transient`.
    *
+   * TWO PRECONDITIONS, neither of which the type system can check.
+   *
+   * 1. Every message key such an evolution mints must be derivable from the
+   *    EVENT alone. A key built from a clock, a counter or a random value
+   *    cannot be re-derived by a redelivery, so the outbox suppression misses
+   *    and the side effect happens twice.
+   *
+   * 2. Every intent handler must be idempotent AT ITS OWN SINK. A transient
+   *    commit writes no inbox marker, so the dispatched outbox row is the
+   *    only suppression, and that row is pruned at
+   *    `DISPATCHED_OUTBOX_RETENTION_MS` (24h) rather than the inbox's 7 days.
+   *    Past that window a redelivery dispatches again, and only the sink can
+   *    stop it becoming a second effect.
+   *
    * Refuses a schedule: a scheduled process is armed by writing a wake onto
    * its instance row, so a transient one would have nowhere to be armed and
    * would silently never run.

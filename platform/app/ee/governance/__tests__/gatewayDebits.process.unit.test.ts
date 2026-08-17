@@ -252,6 +252,47 @@ describe("gateway debits process", () => {
     );
   });
 
+  /** @scenario A self-describing admission still releases an outcome that stashed */
+  it("releases a stashed outcome when the admission declares outcomes self-describing", () => {
+    const { handlers, initial } = capture();
+    const admitted = handlers.get(GATEWAY_SPEND_ADMITTED_EVENT_TYPE)!;
+    const confirmed = handlers.get(GATEWAY_SPEND_CONFIRMED_EVENT_TYPE)!;
+
+    // An outcome stashes on ITS OWN empty organization, which is a different
+    // condition from the build flag below. Where the two disagree, the
+    // admission is still the only place the scopes are known.
+    const stashed = confirmed(
+      initial(),
+      outcomeData({ organization_id: "" }),
+      ctx(),
+    );
+    expect(stashed.intents ?? []).toHaveLength(0);
+
+    const c = ctx();
+    const released = admitted(
+      stashed.state,
+      admission({ outcome_carries_attribution: true }),
+      c,
+    );
+
+    expect(released.intents).toHaveLength(1);
+    expect(c.intents.writeDebits).toHaveBeenCalledWith(
+      "debits:late",
+      expect.objectContaining({
+        gateway_request_id: "req_1",
+        organization_id: "org_1",
+        team_id: "team_1",
+        virtual_key_id: "vk_1",
+        principal_user_id: "usr_1",
+        end_user_id: "user_9",
+        status: "confirmed",
+      }),
+    );
+    // Nothing left waiting: this branch is the only thing that could ever
+    // clear it, so a stash it dropped would strand the row that holds it.
+    expect(released.state.pendingOutcome).toBeNull();
+  });
+
   it("releases an outrunning outcome even when admission names no end user", () => {
     const { handlers, initial } = capture();
     const admitted = handlers.get(GATEWAY_SPEND_ADMITTED_EVENT_TYPE)!;

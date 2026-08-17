@@ -496,6 +496,55 @@ function writeDebitsPayload({
   };
 }
 
+/**
+ * The admission: the one place a request's scopes are known.
+ *
+ * It releases an outcome that arrived ahead of it on BOTH paths, including
+ * the one where it remembers nothing. A stash is not expected there — an
+ * outcome only stashes when it carried no attribution, and admission and
+ * outcome always come from the same pod and the same build — but the two
+ * conditions are not the same one: an outcome stashes on its OWN empty
+ * organization, not on the build that sent it. Where they disagree, dropping
+ * the stash would cost the debit and strand the instance row holding it,
+ * since this handler is the only thing that could ever clear it.
+ */
+function onAdmission<Intent>(
+  state: GatewayDebitsState,
+  ctx: OutcomeContext<Intent>,
+  admitted: AdmitSpendCommandData,
+): { state: GatewayDebitsState; intents?: Intent[] } {
+  const stashed = state.pendingOutcome;
+  const attributed = {
+    organization_id: admitted.organization_id,
+    team_id: admitted.team_id ?? "",
+    virtual_key_id: admitted.virtual_key_id,
+    principal_user_id: admitted.principal_user_id ?? "",
+    end_user_id: admitted.end_user_id ?? "",
+  };
+  const release = stashed
+    ? [ctx.intents.writeDebits("debits:late", { ...stashed, ...attributed })]
+    : void 0;
+
+  // The outcome states the attribution itself, so there is nothing worth
+  // remembering and this admission writes no row.
+  if (admitted.outcome_carries_attribution) {
+    if (!stashed) return { state };
+    return { state: { ...state, pendingOutcome: null }, intents: release };
+  }
+
+  const next = {
+    ...state,
+    endUserId: attributed.end_user_id,
+    virtualKeyId: attributed.virtual_key_id,
+    organizationId: attributed.organization_id,
+    teamId: attributed.team_id,
+    principalUserId: attributed.principal_user_id,
+    admitted: true,
+    pendingOutcome: null,
+  };
+  return stashed ? { state: next, intents: release } : { state: next };
+}
+
 /** What an outcome handler needs from the process context. */
 interface OutcomeContext<Intent> {
   projectId: string;
@@ -573,44 +622,9 @@ export function gatewayDebitsPM(
       // Admission carries the attribution every debit needs, so it also
       // releases an outcome that arrived ahead of it. One admission per
       // instance keeps `debits:late` minted at most once.
-      .on(GATEWAY_SPEND_ADMITTED_EVENT_TYPE, (state, data, ctx) => {
-        const admitted = data as AdmitSpendCommandData;
-        if (admitted.outcome_carries_attribution) {
-          // The outcome will state the attribution itself, so there is
-          // nothing here worth remembering and this admission writes no row.
-          //
-          // Nothing can be waiting on it either: an outcome only stashes
-          // when it carried no attribution, and admission and outcome always
-          // come from the same pod and the same build, so a stash and this
-          // flag cannot both exist for one request.
-          return { state };
-        }
-        const stashed = state.pendingOutcome;
-        const next = {
-          ...state,
-          endUserId: admitted.end_user_id ?? "",
-          virtualKeyId: admitted.virtual_key_id,
-          organizationId: admitted.organization_id,
-          teamId: admitted.team_id ?? "",
-          principalUserId: admitted.principal_user_id ?? "",
-          admitted: true,
-          pendingOutcome: null,
-        };
-        if (!stashed) return { state: next };
-        return {
-          state: next,
-          intents: [
-            ctx.intents.writeDebits("debits:late", {
-              ...stashed,
-              organization_id: next.organizationId,
-              team_id: next.teamId,
-              virtual_key_id: next.virtualKeyId,
-              principal_user_id: next.principalUserId,
-              end_user_id: next.endUserId,
-            }),
-          ],
-        };
-      })
+      .on(GATEWAY_SPEND_ADMITTED_EVENT_TYPE, (state, data, ctx) =>
+        onAdmission(state, ctx, data as AdmitSpendCommandData),
+      )
       .on(GATEWAY_SPEND_CONFIRMED_EVENT_TYPE, (state, data, ctx) =>
         onOutcome(state, ctx, {
           status: "confirmed",

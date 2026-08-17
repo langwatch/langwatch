@@ -30,6 +30,22 @@ Feature: Transient process evolutions cost no durable row
   # mints must be derivable from the event alone. A key built from a clock or
   # a random value cannot be re-derived by a redelivery, so the suppression
   # misses and the side effect happens twice.
+  #
+  # AND A SECOND CLAUSE, about how LONG that suppression lasts. The inbox
+  # marker a durable commit writes is retained for seven days, chosen to
+  # outlive a redelivery horizon of roughly twenty-five hours. A dispatched
+  # outbox row is retained for twenty-four, chosen for table size, and for a
+  # transient process that row is the only record that the event was already
+  # handled. The window is therefore SHORTER than the horizon, deliberately:
+  # widening it would give back the row growth this whole path exists to
+  # remove.
+  #
+  # What closes the gap is the sink rather than the window. A transient
+  # process's intent handlers must be idempotent where they land, so a
+  # redelivery past the window costs a duplicate DISPATCH and never a
+  # duplicate EFFECT. Gateway debits collapse on (tenant, budget, request) in
+  # the ledger; webhook delivery claims its idempotency key before it sends.
+  # A process whose sink cannot do this must stay durable.
 
   Rule: An evolution that keeps nothing writes no process instance
 

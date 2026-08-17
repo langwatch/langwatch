@@ -1081,6 +1081,44 @@ function onSpendOutcome<
   };
 }
 
+/**
+ * The admission: the one place a request's attribution is known.
+ *
+ * It releases an outcome that arrived ahead of it on BOTH paths, including
+ * the one where it remembers nothing. A stash is not expected there — an
+ * outcome only stashes when it carried no attribution, and admission and
+ * outcome always come from the same pod and the same build — but the two
+ * conditions are not the same one: an outcome stashes on its OWN empty
+ * organization, not on the build that sent it. Where they disagree, dropping
+ * the stash would cost the envelope and strand the instance row holding it,
+ * since this handler is the only thing that could ever clear it.
+ */
+function onAdmission<Intent>({
+  state,
+  ctx,
+  admit,
+}: {
+  state: WebhookDeliveryState;
+  ctx: DeliverOutcomeContext<Intent>;
+  admit: AdmitSpendCommandData;
+}): { state: WebhookDeliveryState; intents?: Intent[] } {
+  const attribution = attributionFrom(admit);
+  const stashed = state.pendingOutcome;
+  const release = stashed
+    ? [ctx.intents.deliver("deliver:late", { ...stashed, attribution })]
+    : void 0;
+
+  // Every outcome states the attribution itself, so there is nothing worth
+  // remembering and this admission writes no row.
+  if (admit.outcome_carries_attribution) {
+    if (!stashed) return { state };
+    return { state: { ...state, pendingOutcome: null }, intents: release };
+  }
+
+  const admitted = { ...state, attribution, pendingOutcome: null };
+  return stashed ? { state: admitted, intents: release } : { state: admitted };
+}
+
 function attributionFrom(data: AdmitSpendCommandData): SpendAttribution {
   return {
     organization_id: data.organization_id,
@@ -1115,29 +1153,9 @@ export function webhookDeliveryPM(
       // releases whatever outcome arrived ahead of it. One admission per
       // instance (the log's idempotency key, then the inbox) means
       // `deliver:late` is minted at most once.
-      .on(GATEWAY_SPEND_ADMITTED_EVENT_TYPE, (state, data, ctx) => {
-        const admit = data as AdmitSpendCommandData;
-        if (admit.outcome_carries_attribution) {
-          // Every outcome will state the attribution itself, so there is
-          // nothing here worth remembering and this admission writes no row.
-          //
-          // Nothing can be waiting on it either: an outcome only stashes when
-          // it carried no attribution, and admission and outcome always come
-          // from the same pod and the same build, so a stash and this flag
-          // cannot both exist for one request.
-          return { state };
-        }
-        const attribution = attributionFrom(admit);
-        const stashed = state.pendingOutcome;
-        const admitted = { ...state, attribution, pendingOutcome: null };
-        if (!stashed) return { state: admitted };
-        return {
-          state: admitted,
-          intents: [
-            ctx.intents.deliver("deliver:late", { ...stashed, attribution }),
-          ],
-        };
-      })
+      .on(GATEWAY_SPEND_ADMITTED_EVENT_TYPE, (state, data, ctx) =>
+        onAdmission({ state, ctx, admit: data as AdmitSpendCommandData }),
+      )
       .on(GATEWAY_SPEND_CONFIRMED_EVENT_TYPE, (state, data, ctx) =>
         onSpendOutcome({
           state,

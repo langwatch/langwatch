@@ -368,6 +368,21 @@ Feature: Billing spend events, one durable record per gateway request
       When the spend command batch is ingested
       Then it is not enriched and the admission's remembered join is used
 
+    # An outcome stashes itself when it states no attribution of its own, and
+    # an admission that declares its outcomes self-describing writes no state
+    # at all. The two conditions are not the same one: the first is about the
+    # OUTCOME's data, the second about the build that sent it. Where they
+    # disagree the admission is still the only place the scopes are known, so
+    # it releases the stash rather than discarding it — dropping it would cost
+    # the debit and strand the row holding it, which is the row this path
+    # exists not to write.
+    @unit
+    Scenario: A self-describing admission still releases an outcome that stashed
+      Given an outcome that stated no attribution and is waiting on its admission
+      When an admission arrives declaring its outcomes carry attribution
+      Then the waiting outcome is released against the admission's scopes
+      And nothing is left waiting on that request
+
   Rule: Silence settles, and settlement is never the last word
 
     # The sweeper used to be one process instance per gateway request, each
