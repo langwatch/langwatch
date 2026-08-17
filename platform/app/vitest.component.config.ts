@@ -51,3 +51,16 @@ export default defineConfig({
     ),
   },
 });
+
+// A note on the pool, which is inherited from the unit lane and must stay that
+// way. The obvious-looking alternative is `pool: "forks"`, on the reasoning
+// that these files ran on forks under the integration config for their whole
+// history and a move should not change the environment. Measured, that is
+// backwards: forks + isolate:false failed 87 of 236 files in src/components,
+// against 4 under vmForks.
+//
+// The reason is that they ran on forks with isolate:TRUE — a fresh module
+// registry per file. Reusing one registry inside a plain process is what leaks
+// module state between files; a VM context is what makes reuse survivable, and
+// it is why the unit lane runs 1,688 files this way. The two settings are a
+// pair, not independent knobs.

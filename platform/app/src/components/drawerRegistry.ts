@@ -401,8 +401,12 @@ function primeLazyComponent(component: object): Promise<void> {
     // a VM context. `then` is what React itself looks for, and what the promise
     // contract actually specifies; realm identity was never the question being
     // asked. (Same class of bug as the `dedupe: ["zod"]` note in CLAUDE.md.)
+    // Promise.resolve() adopts the foreign thenable into a real promise of
+    // THIS realm, which is both what the signature asks for and the right
+    // semantics: a bare PromiseLike carries no `catch`/`finally`, and callers
+    // await this like any other promise.
     return isThenable(pending)
-      ? pending.then(
+      ? Promise.resolve(pending).then(
           () => undefined,
           () => undefined,
         )

@@ -59,6 +59,38 @@ const DATASTORE_PATTERN = new RegExp(DATASTORE_MARKERS.join("|"), "i");
 /** Vitest reads the environment from a docblock in the first comment block. */
 const JSDOM_PATTERN = /@vitest-environment\s+jsdom/;
 
+/**
+ * Files held back from the component lane for a reason that is not a datastore.
+ *
+ * Each of these replaces `window.location` wholesale:
+ *
+ *   Object.defineProperty(window, "location", { value: { ...fake } })
+ *
+ * The component lane runs files in a VM context, where jsdom defines
+ * `window.location` as a NON-CONFIGURABLE ACCESSOR — measured directly:
+ * `configurable: false`, with a getter and a setter. It cannot be deleted
+ * ("Cannot delete property 'location' of [object Window]") and it cannot be
+ * redefined ("Cannot redefine property: location"). The setter means
+ * `window.location = "..."` still works; replacing the object never will.
+ *
+ * So this is not a property of the lane split — the technique is incompatible
+ * with a VM realm wherever it runs, and these files would fail the same way if
+ * anyone moved them to the unit lane. Listing them keeps 541 files moving while
+ * the incompatibility stays visible and attributed.
+ *
+ * THE FIX IS PER FILE, and it is to mock the thing actually used rather than
+ * the object holding it — spy on `reload`, assert on an injected navigation
+ * callback, or route through a seam the component already has. Delete each
+ * entry as its file is converted; when the list empties, delete the list.
+ */
+const VM_REALM_INCOMPATIBLE = new Set([
+  "src/components/license/__tests__/useLicenseActions.integration.test.ts",
+  "src/components/messages/__tests__/LegacyTracesDeprecationBanner.integration.test.tsx",
+  "src/features/langy/__tests__/LangyEvalRunCard.integration.test.tsx",
+  "src/pages/auth/__tests__/error.integration.test.tsx",
+  "src/pages/auth/__tests__/signin.integration.test.tsx",
+]);
+
 export type Lane = "component" | "datastore";
 
 /**
@@ -160,6 +192,13 @@ export function partitionIntegrationFiles({
   const datastore: string[] = [];
 
   for (const relative of collectIntegrationFiles(root, searchDirs)) {
+    // Normalised so the list matches on Windows too, where the walk yields
+    // backslashes and the entries here are written with forward ones.
+    if (VM_REALM_INCOMPATIBLE.has(relative.split(path.sep).join("/"))) {
+      datastore.push(relative);
+      continue;
+    }
+
     let source: string;
     try {
       source = fs.readFileSync(path.join(root, relative), "utf8");
