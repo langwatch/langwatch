@@ -100,6 +100,23 @@ function InstanceActionConfirms({
         description={`Return every dead outbox message of "${label}" to pending, due now, with a fresh attempt budget. Deliveries may reach customers; duplicates are absorbed by each message's key.`}
         isLoading={actions.redriveInstanceMutation.isPending}
       />
+      {/* Discard asks, because nothing un-discards: no redrive path selects a
+          discarded row, so a mis-click is permanent. */}
+      <ConfirmDialog
+        open={!!actions.discardTarget}
+        onClose={() => actions.setDiscardTarget(null)}
+        onConfirm={() => {
+          if (actions.discardTarget) {
+            actions.discardMessageMutation.mutate({
+              ...target,
+              messageId: actions.discardTarget.id,
+            });
+          }
+        }}
+        title="Discard Dead Message"
+        description={`Mark "${actions.discardTarget?.intentType}" on "${label}" as never to be sent. The row is kept as the audit record, and it cannot be redriven afterwards.`}
+        isLoading={actions.discardMessageMutation.isPending}
+      />
     </>
   );
 }
@@ -167,11 +184,13 @@ export function ProcessInstanceDrawer({
               onRedriveMessage={(messageId) =>
                 actions.redriveMessageMutation.mutate({ ...target, messageId })
               }
+              onDiscardMessage={actions.setDiscardTarget}
               onReleaseLease={(messageId) =>
                 actions.releaseLeaseMutation.mutate({ ...target, messageId })
               }
               actionPending={
                 actions.redriveMessageMutation.isPending ||
+                actions.discardMessageMutation.isPending ||
                 actions.releaseLeaseMutation.isPending
               }
               now={detailQuery.dataUpdatedAt || undefined}

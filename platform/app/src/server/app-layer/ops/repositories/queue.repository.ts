@@ -178,6 +178,25 @@ export interface QueueRepository {
     errorFilter?: string;
   }): Promise<{ replayedCount: number; jobsReplayed: number }>;
 
+  /** Redrive an explicit set of DLQ groups — the operator's shown set. */
+  redriveManyFromDlq(params: {
+    queueName: string;
+    groupIds: string[];
+  }): Promise<{ redrivenCount: number; jobsRedriven: number }>;
+
+  /**
+   * Discard an explicit set of DLQ groups: their jobs never run again.
+   * Returns what the audit row must record — counts and an error sample.
+   */
+  discardManyFromDlq(params: {
+    queueName: string;
+    groupIds: string[];
+  }): Promise<{
+    discardedCount: number;
+    jobsDiscarded: number;
+    lastErrors: string[];
+  }>;
+
   canaryRedrive(params: {
     queueName: string;
     count?: number;
@@ -296,6 +315,21 @@ export class NullQueueRepository implements QueueRepository {
     jobsReplayed: number;
   }> {
     return { replayedCount: 0, jobsReplayed: 0 };
+  }
+
+  async redriveManyFromDlq(): Promise<{
+    redrivenCount: number;
+    jobsRedriven: number;
+  }> {
+    return { redrivenCount: 0, jobsRedriven: 0 };
+  }
+
+  async discardManyFromDlq(): Promise<{
+    discardedCount: number;
+    jobsDiscarded: number;
+    lastErrors: string[];
+  }> {
+    return { discardedCount: 0, jobsDiscarded: 0, lastErrors: [] };
   }
 
   async canaryRedrive(): Promise<{

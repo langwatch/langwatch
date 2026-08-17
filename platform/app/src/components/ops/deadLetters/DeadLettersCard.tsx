@@ -4,14 +4,16 @@ import {
   Button,
   Card,
   HStack,
+  Spinner,
   Table,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { RotateCcw, Skull } from "lucide-react";
+import { RotateCcw, Skull, XCircle } from "lucide-react";
 import { JsonViewer } from "~/components/ops/JsonViewer";
 import { middleEllipsis } from "~/components/ops/queues/clusterGroups";
 import { formatTimeAgo } from "~/components/ops/shared/formatters";
+import { api } from "~/utils/api";
 
 /** Exactly what this surface renders; a structural subset of the server view. */
 export interface DeadLetterMessage {
@@ -134,16 +136,20 @@ export function DeadLettersTable({
   canManage,
   expandedId,
   redrivingId,
+  discardingId,
   onToggle,
   onRedrive,
+  onDiscard,
 }: {
   messages: DeadLetterMessage[];
   now: number;
   canManage: boolean;
   expandedId: string | null;
   redrivingId: string | null;
+  discardingId: string | null;
   onToggle: (id: string) => void;
   onRedrive: (message: DeadLetterMessage) => void;
+  onDiscard: (message: DeadLetterMessage) => void;
 }) {
   return (
     <Card.Root>
@@ -168,8 +174,10 @@ export function DeadLettersTable({
                 canManage={canManage}
                 isExpanded={expandedId === message.id}
                 isRedriving={redrivingId === message.id}
+                isDiscarding={discardingId === message.id}
                 onToggle={() => onToggle(message.id)}
                 onRedrive={() => onRedrive(message)}
+                onDiscard={() => onDiscard(message)}
               />
             ))}
           </Table.Body>
@@ -185,16 +193,20 @@ function DeadLetterRow({
   canManage,
   isExpanded,
   isRedriving,
+  isDiscarding,
   onToggle,
   onRedrive,
+  onDiscard,
 }: {
   message: DeadLetterMessage;
   now: number;
   canManage: boolean;
   isExpanded: boolean;
   isRedriving: boolean;
+  isDiscarding: boolean;
   onToggle: () => void;
   onRedrive: () => void;
+  onDiscard: () => void;
 }) {
   return (
     <>
@@ -249,19 +261,35 @@ function DeadLetterRow({
         </Table.Cell>
         <Table.Cell textAlign="end">
           {canManage && (
-            <Button
-              size="xs"
-              variant="outline"
-              loading={isRedriving}
-              data-testid={`dead-redrive-${message.messageKey}`}
-              onClick={(event) => {
-                event.stopPropagation();
-                onRedrive();
-              }}
-            >
-              <RotateCcw size={12} />
-              Redrive
-            </Button>
+            <HStack gap={1} justify="end">
+              <Button
+                size="xs"
+                variant="outline"
+                loading={isRedriving}
+                data-testid={`dead-redrive-${message.messageKey}`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onRedrive();
+                }}
+              >
+                <RotateCcw size={12} />
+                Redrive
+              </Button>
+              <Button
+                size="xs"
+                variant="outline"
+                colorPalette="red"
+                loading={isDiscarding}
+                data-testid={`dead-discard-${message.messageKey}`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onDiscard();
+                }}
+              >
+                <XCircle size={12} />
+                Discard
+              </Button>
+            </HStack>
           )}
         </Table.Cell>
       </Table.Row>
@@ -273,12 +301,13 @@ function DeadLetterRow({
                 <Labelled label="Message key" value={message.messageKey} />
                 <Labelled label="Project" value={message.projectId} />
                 {message.traceId ? (
-                  // The failure reason is not on this row: the dispatcher
-                  // records it on the span and in the log line. The trace id
-                  // is the join back to it.
                   <Labelled label="Trace" value={message.traceId} />
                 ) : null}
               </HStack>
+              <AttemptHistory
+                outboxId={message.id}
+                projectId={message.projectId}
+              />
               <Box>
                 <Text textStyle="2xs" color="fg.muted" marginBottom={1}>
                   Payload
@@ -290,6 +319,72 @@ function DeadLetterRow({
         </Table.Row>
       )}
     </>
+  );
+}
+
+/**
+ * Why the message died, on the page: its failed attempts, oldest first
+ * (specs/ops/dead-letter-recovery.feature). Fetched on expand — the history
+ * only exists for messages that failed, and only an opened row needs it.
+ * Messages retired before the attempt log existed have no entries; the trace
+ * id above remains the join for those.
+ *
+ * Ordered chronologically rather than by attempt number, because a redrive
+ * resets the count: a message that failed, was redriven, and failed again
+ * carries two entries numbered 1, and only time puts them in the order they
+ * happened.
+ */
+function AttemptHistory({
+  outboxId,
+  projectId,
+}: {
+  outboxId: string;
+  projectId: string;
+}) {
+  const attempts = api.ops.listOutboxAttempts.useQuery({ outboxId, projectId });
+  if (attempts.isPending) return <Spinner size="xs" />;
+  const rows = attempts.data ?? [];
+  if (rows.length === 0) {
+    return (
+      <Text textStyle="xs" color="fg.muted">
+        No recorded attempts — this message was retired before failures were
+        recorded per attempt.
+      </Text>
+    );
+  }
+  return (
+    <Box>
+      <Text textStyle="2xs" color="fg.muted" marginBottom={1}>
+        Attempts
+      </Text>
+      <VStack align="stretch" gap={1}>
+        {rows.map((row) => (
+          // Keyed by row id, not attempt number: a redrive resets the count,
+          // so one message can hold two entries numbered 1.
+          <HStack
+            key={row.id}
+            gap={2}
+            align="start"
+            data-testid={`dead-attempt-${row.attempt}`}
+          >
+            <Badge
+              size="xs"
+              colorPalette={row.outcome === "dead" ? "red" : "orange"}
+              variant="subtle"
+              flexShrink={0}
+            >
+              {row.attempt}
+            </Badge>
+            <Text textStyle="xs" fontFamily="mono" color="red.500">
+              {row.errorType}
+            </Text>
+            <Text textStyle="xs" color="fg.muted">
+              {row.errorMessage}
+            </Text>
+          </HStack>
+        ))}
+      </VStack>
+    </Box>
   );
 }
 

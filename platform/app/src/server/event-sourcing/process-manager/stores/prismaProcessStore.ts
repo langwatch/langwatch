@@ -13,6 +13,7 @@ import type {
   AppendIntentsResult,
   CommitResult,
   DueWake,
+  FailedOutboxAttempt,
   LeasedOutboxMessageRecord,
   NewOutboxMessage,
   OutboxMessageIdentity,
@@ -478,6 +479,35 @@ export class PrismaProcessStore implements ProcessStore {
     return { applied: result.count === 1 };
   }
 
+  async recordFailedAttempt(params: {
+    identity: OutboxMessageIdentity;
+    attempt: FailedOutboxAttempt;
+  }): Promise<void> {
+    // Two queries, failure path only: the attempt row needs the outbox row's
+    // id, and updateMany cannot return it. The read uses the uniqueness
+    // contract, so it is index-covered either way.
+    const row = await this.prisma.processManagerOutbox.findUnique({
+      where: {
+        projectId: params.identity.projectId,
+        processName_projectId_messageKey: params.identity,
+      },
+      select: { id: true, projectId: true },
+    });
+    if (!row) return;
+    await this.prisma.processManagerOutboxAttempt.create({
+      data: {
+        outboxId: row.id,
+        projectId: row.projectId,
+        attempt: params.attempt.attempt,
+        occurredAt: asDate(params.attempt.occurredAt),
+        outcome: params.attempt.outcome,
+        errorType: params.attempt.errorType,
+        errorMessage: params.attempt.errorMessage,
+        retryAfterMs: params.attempt.retryAfterMs ?? null,
+      },
+    });
+  }
+
   async releaseLease(params: {
     identity: OutboxMessageIdentity;
     leaseToken: string;
@@ -628,11 +658,22 @@ export class PrismaProcessStore implements ProcessStore {
     // that retired them, so it IS the moment the row became a failure record.
     // No new index: `dead` is a rare status, so the existing
     // (status, nextAttemptAt, leasedUntil) index already makes this selective.
+    //
+    // `discarded` is reaped on the same window and by the same sweep. It is
+    // the terminal state an operator writes rather than one the dispatcher
+    // writes, but it means the same thing to retention — a record of work
+    // that will never run, kept for as long as the operator might ask about
+    // it. Leaving it out is what would make it immortal: no other family's
+    // predicate matches it, and this is the highest-volume table in the
+    // system (specs/ops/dead-letter-recovery.feature).
     return await this.prisma.$executeRaw`
       DELETE FROM "ProcessManagerOutbox"
       WHERE "id" IN (
         SELECT "id" FROM "ProcessManagerOutbox"
-        WHERE "status" = 'dead'::"ProcessManagerOutboxStatus"
+        WHERE "status" IN (
+            'dead'::"ProcessManagerOutboxStatus",
+            'discarded'::"ProcessManagerOutboxStatus"
+          )
           AND "updatedAt" < ${asDate(params.before)}
         LIMIT ${params.limit}
       )

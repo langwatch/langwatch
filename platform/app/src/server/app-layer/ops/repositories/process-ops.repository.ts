@@ -42,7 +42,7 @@ export interface ProcessOutboxMessageView {
   id: string;
   messageKey: string;
   intentType: string;
-  status: "pending" | "dispatched" | "dead";
+  status: "pending" | "dispatched" | "dead" | "discarded";
   attempts: number;
   nextAttemptAt: number;
   leasedUntil: number | null;
@@ -61,9 +61,8 @@ export interface ProcessOutboxMessageView {
  * to — and the fleet table only ever showed them a count. This view is the
  * fleet-wide read: it carries the full ref so a row can be redriven straight
  * from the list, and the trace id so the operator can reach the failure
- * itself. The outbox row does not store WHY a message died; the dispatcher
- * records that on the span and the log line, and `traceId` is the join back
- * to it.
+ * itself. WHY it died is in the attempt history (`findAttempts`); `traceId`
+ * remains the deeper join to the producing trace.
  */
 export interface DeadOutboxMessageView extends ProcessOutboxMessageView {
   processName: string;
@@ -79,6 +78,26 @@ export interface DeadLetterCount {
   count: number;
   /** Oldest retirement in this group, so the operator can age the incident. */
   oldestUpdatedAt: number;
+}
+
+/**
+ * One FAILED delivery attempt of an outbox message, oldest first — why a
+ * dead letter died, on the page (specs/ops/dead-letter-recovery.feature).
+ */
+export interface OutboxAttemptView {
+  /**
+   * Row identity, not the attempt number. A redrive resets `attempts` to 0,
+   * so a message that failed, was redriven, and failed again holds two
+   * entries numbered 1 — the number is not unique over a message's life.
+   */
+  id: string;
+  attempt: number;
+  occurredAt: number;
+  /** "dead" marks the failure that killed the message. */
+  outcome: "retry_scheduled" | "dead";
+  errorType: string;
+  errorMessage: string;
+  retryAfterMs: number | null;
 }
 
 export interface ProcessOpsRepository {
@@ -141,6 +160,51 @@ export interface ProcessOpsRepository {
   }): Promise<{ messageKey: string } | null>;
 
   /**
+   * One dead message marked never-to-be-sent. A mark, not a delete: the row
+   * is retained as its own audit trail and the dispatcher never leases a
+   * discarded row. Returns the message key for the audit trail, or null when
+   * the message was not dead (or not that instance's).
+   */
+  discardDeadMessage(params: {
+    ref: ProcessRef;
+    messageId: string;
+    now: number;
+  }): Promise<{ messageKey: string } | null>;
+
+  /**
+   * Dead messages back to pending with a fresh budget — narrowed to one
+   * process name, or every process when omitted.
+   *
+   * BOUNDED, not exhaustive: an implementation moves at most one batch per
+   * call, because an unbounded UPDATE holds row locks on the highest-volume
+   * table in the system for as long as it runs. The returned count is what
+   * actually moved, so a caller wanting the rest calls again — and an
+   * operator pressing the button again is exactly that.
+   *
+   * Due times are spread rather than set to a single instant: releasing
+   * thousands of intents all due now hands the dispatcher one batch the size
+   * of the backlog.
+   */
+  redriveAllDeadMessages(params: {
+    processName?: string;
+    now: number;
+  }): Promise<number>;
+
+  /**
+   * Dead messages marked discarded; same scoping, and bounded the same way.
+   */
+  discardAllDeadMessages(params: {
+    processName?: string;
+    now: number;
+  }): Promise<number>;
+
+  /** The message's failed attempts, oldest first. */
+  findAttempts(params: {
+    outboxId: string;
+    projectId: string;
+  }): Promise<OutboxAttemptView[]>;
+
+  /**
    * Clear a LAPSED lease so the dispatcher can pick the message up now
    * instead of waiting out the lease. Guarded in the write itself: only a
    * pending message whose lease already expired is touched, so a live
@@ -191,6 +255,18 @@ export class NullProcessOpsRepository implements ProcessOpsRepository {
   }
   async redriveDeadMessage(): Promise<null> {
     return null;
+  }
+  async discardDeadMessage(): Promise<null> {
+    return null;
+  }
+  async redriveAllDeadMessages(): Promise<number> {
+    return 0;
+  }
+  async discardAllDeadMessages(): Promise<number> {
+    return 0;
+  }
+  async findAttempts(): Promise<OutboxAttemptView[]> {
+    return [];
   }
   async releaseLapsedLease(): Promise<null> {
     return null;
