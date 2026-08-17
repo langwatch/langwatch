@@ -14274,13 +14274,13 @@ $ langwatch login --device
 Error: HTTP 409, no_default_routing_policy
        Your organization has no default routing policy published.
        Ask your admin to publish one at Settings → Routing Policies
-       (/governance/routing-policies), then re-run `langwatch login`.
+       (/gateway/routing-policies), then re-run `langwatch login`.
 ```
 
 **Admin remediation:**
 
 1. Sign in to the LangWatch web app as an org admin.
-2. Navigate to **Settings → Routing Policies** (`/governance/routing-policies`).
+2. Navigate to **Settings → Routing Policies** (`/gateway/routing-policies`).
 3. Create at least one routing policy and toggle it to **Default**.
 4. Ask the developer to re-run `langwatch login --device`.
 
@@ -14651,7 +14651,7 @@ existing routes:
 | `/governance` | Daily-use **org governance home**: spend, ingestion-source health, anomalies, per-user breakdown. Read-mostly. | Org admins whose org's `setupState.governanceActive` is `true` (see [Persona-based home routing](#persona-based-home-routing--the-setup-state-signal) below) | Top-level route, org-scoped. |
 | `/me`, `/me/settings` | Daily-use **personal home**: your usage, your budget, your personal VK, your IDE setup snippet. | Any user with a personal VK | Top-level route, principal-scoped. |
 | `/[project]/...` | LLMOps daily-use, traces, evals, datasets, scenarios, workflows. | Project members | Per-project routes. **Unchanged** from current LangWatch. |
-| `/governance/ingestion-sources`, `/governance/anomaly-rules`, `/governance/routing-policies` | Admin-authoring (CRUD), create, rotate, archive sources, write rules, publish routing policies. | Org admins with `organization:manage` | Governance sub-routes, deliberately separate from daily-use surfaces. |
+| `/governance/ingestion-sources`, `/governance/anomaly-rules`, `/gateway/routing-policies` | Admin-authoring (CRUD), create, rotate, archive sources, write rules, publish routing policies. | Org admins with `organization:manage` | Governance sub-routes, deliberately separate from daily-use surfaces. |
 
 The whole governance product sits at the top level, not under Settings.
 The daily home is `/governance`, and the create, rotate and archive tools
@@ -15470,7 +15470,7 @@ Ask your admin to publish a default routing policy at Settings → Routing Polic
 
 Publish at least one policy *before* opening CLI sign-in to your team:
 
-1. Navigate to **Settings → Routing Policies** (`/governance/routing-policies`).
+1. Navigate to **Settings → Routing Policies** (`/gateway/routing-policies`).
 2. Click **+ New routing policy**.
 3. Pick a recommended starter shape: "Anthropic primary, OpenAI fallback, prompt caching on" works on day one.
 4. Tick **Mark as default** before saving.
@@ -17763,7 +17763,7 @@ HTTP 422 response with an actionable hint rather than a green key that
 returns 504 on every call.
 
 Ask your admin to bind at least one provider in
-`/governance/routing-policies`. Once a provider is bound,
+`/gateway/routing-policies`. Once a provider is bound,
 retry, issuance will succeed and your key works immediately.
 
 ### When to create a project instead
@@ -19005,7 +19005,7 @@ Budgets are evaluated in scope order, broadest first. A request that would breac
 
 ## How routing policies attach to workspaces
 
-Routing Policies live at `/governance/routing-policies` (org-scoped). One policy is marked `default` and is the policy every Personal VK binds to on first sign-in.
+Routing Policies live at `/gateway/routing-policies` (org-scoped). One policy is marked `default` and is the policy every Personal VK binds to on first sign-in.
 
 Workspace overrides:
 

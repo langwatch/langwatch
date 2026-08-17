@@ -207,7 +207,7 @@ function GovernanceOverviewPage() {
                 done={hasPolicies}
                 title="Define a routing policy"
                 description="Tell virtual keys which providers + models to route through."
-                href="/governance/routing-policies"
+                href="/gateway/routing-policies"
                 ctaLabel={
                   hasPolicies
                     ? `${policies.length} ${policies.length === 1 ? "policy" : "policies"} configured`

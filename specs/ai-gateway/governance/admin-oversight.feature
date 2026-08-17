@@ -74,7 +74,7 @@ Feature: AI Gateway Governance — Admin Oversight Dashboard
     And below the cards a tile prompts "Connect a provider, enable a
       RoutingPolicy, or set up an IngestionSource to start collecting data"
     And the prompt links to /settings/model-providers,
-      /governance/routing-policies, /governance/ingestion-sources
+      /gateway/routing-policies, /governance/ingestion-sources
 
   # ---------------------------------------------------------------------------
   # Per-user breakdown

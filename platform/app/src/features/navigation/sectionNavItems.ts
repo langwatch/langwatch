@@ -52,6 +52,12 @@ export const gatewayNavItems: readonly SectionNavItemData[] = [
     icon: Gauge,
   },
   {
+    label: "Routing Policies",
+    href: "/gateway/routing-policies",
+    includePath: "/gateway/routing-policies",
+    icon: Route,
+  },
+  {
     label: "Cache Rules",
     href: "/gateway/cache-rules",
     includePath: "/gateway/cache-rules",
@@ -81,12 +87,6 @@ export const gatewayNavItems: readonly SectionNavItemData[] = [
     includePath: "/gateway/webhooks",
     icon: Webhook,
   },
-  {
-    label: "Routing Policies",
-    href: "/governance/routing-policies",
-    includePath: "/governance/routing-policies",
-    icon: Route,
-  },
 ];
 
 export const governanceNavItems: readonly SectionNavItemData[] = [
@@ -106,12 +106,6 @@ export const governanceNavItems: readonly SectionNavItemData[] = [
     href: "/governance/anomaly-rules",
     includePath: "/governance/anomaly-rules",
     icon: AlertTriangle,
-  },
-  {
-    label: "Routing Policies",
-    href: "/governance/routing-policies",
-    includePath: "/governance/routing-policies",
-    icon: Route,
   },
   {
     label: "Tool Catalog",

@@ -31,11 +31,20 @@ export const legacyRedirectRoutes: RouteObject[] = [
     ),
   },
   {
+    path: "/settings/routing-policies/*",
+    element: (
+      <LegacyPrefixRedirect
+        from="/settings/routing-policies"
+        to="/gateway/routing-policies"
+      />
+    ),
+  },
+  {
     path: "/settings/routing-policies",
     element: (
       <LegacyPrefixRedirect
         from="/settings/routing-policies"
-        to="/governance/routing-policies"
+        to="/gateway/routing-policies"
       />
     ),
   },

@@ -60,6 +60,7 @@ const ROUTE_PATTERNS = [
   "/gateway/guardrails",
   "/gateway/billing-events",
   "/gateway/webhooks",
+  "/gateway/routing-policies",
   // Personal-scope governance routes — must precede the "/:project/*" patterns
   // so the auto-detection in components/useWorkspaceCurrent doesn't classify
   // /me as a project page (which collapses the WorkspaceSwitcher to project
@@ -71,7 +72,6 @@ const ROUTE_PATTERNS = [
   "/governance/ingestion-sources/:id",
   "/governance/ingestion-sources",
   "/governance/anomaly-rules",
-  "/governance/routing-policies",
   "/governance/tool-catalog",
   "/governance/departments",
   "/governance/teams/:id",

@@ -10,8 +10,8 @@ import {
 import { Lightbulb, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
-import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import {
   RoutingPoliciesTable,
   type RoutingPolicyRow,
@@ -62,7 +62,7 @@ export function RoutingPoliciesPage() {
     });
 
   return (
-    <GovernanceLayout pageTitle="Routing Policies · AI Governance · LangWatch">
+    <AiGatewayLayout pageTitle="Routing Policies · AI Gateway · LangWatch">
       <VStack align="stretch" gap={6} width="full" maxW="container.xl">
         <VStack align="start" gap={0}>
           <Heading as="h2" size="lg">
@@ -120,7 +120,7 @@ export function RoutingPoliciesPage() {
           );
         }}
       />
-    </GovernanceLayout>
+    </AiGatewayLayout>
   );
 }
 
@@ -226,6 +226,15 @@ function NoDefaultNotice({
   );
 }
 
+/**
+ * A routing policy is authored for a whole organization and cascades down to
+ * its teams and projects, so this page asks for `organization:manage` rather
+ * than one of the narrower gateway permissions the sibling pages use.
+ */
 export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
   bypassOnboardingRedirect: true,
-})(withPermissionGuard("organization:manage", {})(RoutingPoliciesPage));
+})(
+  withPermissionGuard("organization:manage", {
+    layoutComponent: AiGatewayLayout,
+  })(RoutingPoliciesPage),
+);

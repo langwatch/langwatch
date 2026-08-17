@@ -72,12 +72,14 @@ Current customers must not see any change until we decide.
    deviation from ADR-038, which keeps applying unchanged to legacy mode.
 
 5. URLs move now, without the flag. `/settings/gateway/*` becomes
-   `/gateway/*`, and the governance family (`/settings/governance/*`,
-   `/settings/routing-policies`) becomes `/governance/*`, like `/governance`
-   already is at top level. Old URLs redirect permanently through a
-   component-level `Navigate replace` that preserves sub-path, query and
-   hash; the address bar shows the canonical URL. Redirects are safe in
-   every mode, so they do not wait for the flag.
+   `/gateway/*`, and `/settings/governance/*` becomes `/governance/*`, like
+   `/governance` already is at top level. Routing policies decide which
+   providers and models a virtual key reaches, so
+   `/settings/routing-policies` joins the gateway at
+   `/gateway/routing-policies` rather than governance. Old URLs redirect
+   permanently through a component-level `Navigate replace` that preserves
+   sub-path, query and hash; the address bar shows the canonical URL.
+   Redirects are safe in every mode, so they do not wait for the flag.
 
 6. The settings menu regroups; pages stay. The settings menu becomes grouped
    and iconed: ORGANIZATION, ACCESS, AI INFRASTRUCTURE, DATA CONTROLS,

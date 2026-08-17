@@ -51,7 +51,7 @@ function renderRouterAt(initialEntries: string[]) {
     { path: "/governance", element: <div>governance home</div> },
     { path: "/governance/teams/:id", element: <div>team detail</div> },
     {
-      path: "/governance/routing-policies",
+      path: "/gateway/routing-policies",
       element: <div>routing policies</div>,
     },
     {
@@ -164,15 +164,30 @@ describe("legacy governance redirects", () => {
   });
 
   describe("when the old routing policies address is cold-loaded", () => {
-    /** @scenario Routing policies join governance */
-    it("lands on the governance routing policies page", async () => {
+    /** @scenario Routing policies join the gateway */
+    it("lands on the gateway routing policies page", async () => {
       const router = renderRouterAt(["/settings/routing-policies"]);
 
       await waitFor(() => {
         expect(router.state.location.pathname).toBe(
-          "/governance/routing-policies",
+          "/gateway/routing-policies",
         );
       });
+    });
+
+    /** @scenario Routing policies join the gateway */
+    it("keeps the query and hash on the way over", async () => {
+      const router = renderRouterAt([
+        "/settings/routing-policies?scope=team#policy_1",
+      ]);
+
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe(
+          "/gateway/routing-policies",
+        );
+      });
+      expect(router.state.location.search).toBe("?scope=team");
+      expect(router.state.location.hash).toBe("#policy_1");
     });
   });
 

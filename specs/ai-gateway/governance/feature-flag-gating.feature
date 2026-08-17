@@ -40,7 +40,7 @@ Feature: Governance visibility rides a single feature flag
       | surface                            | path                              |
       | My Workspace dashboard             | /me                               |
       | My Workspace settings              | /me/settings                      |
-      | Admin Routing Policies             | /governance/routing-policies        |
+      | Admin Routing Policies             | /gateway/routing-policies         |
       | Admin Activity Monitor             | /settings/activity-monitor        |
       | Admin Provider Catalog             | /settings/providers               |
       | Admin IngestionSource setup        | /settings/ingestion-sources       |

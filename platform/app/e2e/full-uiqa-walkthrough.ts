@@ -162,7 +162,7 @@ void (async () => {
   await tryGoto(page, "C4-ingestion", "/governance/ingestion-sources");
   await shoot(page, "C4-ingestion-sources-list", true);
 
-  await tryGoto(page, "C5-routing", "/governance/routing-policies");
+  await tryGoto(page, "C5-routing", "/gateway/routing-policies");
   await shoot(page, "C5-routing-policies-list", true);
 
   // ============================================================

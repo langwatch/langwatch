@@ -159,7 +159,7 @@ Feature: AI Gateway Governance — Persona-aware chrome (sidebar + header)
     Given user is Persona 4 (governance admin) with both FFs on
     And the user is on "/governance" with the Govern sub-nav visible in
         the left rail (Overview / Ingestion Sources / Anomaly Rules /
-        Routing Policies)
+        Tool Catalog / Departments)
     When the user clicks any of these sub-nav links and lands on:
       | route                                              |
       | /governance/ingestion-sources             |
@@ -170,7 +170,6 @@ Feature: AI Gateway Governance — Persona-aware chrome (sidebar + header)
       | /governance/teams/<id>                    |
       | /governance/users                         |
       | /governance/users/<id>                    |
-      | /governance/routing-policies                         |
     Then the destination page renders inside `<GovernanceLayout>` —
         the Govern sub-nav is still visible in the left rail with the
         active item highlighted

@@ -229,10 +229,6 @@ const routes: RouteObject[] = [
         ...page(() => import("@ee/governance/dashboard/pages/anomaly-rules")),
       },
       {
-        path: "/governance/routing-policies",
-        ...page(() => import("./pages/governance/routing-policies")),
-      },
-      {
         path: "/governance/tool-catalog",
         ...page(() => import("./pages/governance/tool-catalog")),
       },
@@ -347,6 +343,10 @@ const routes: RouteObject[] = [
       {
         path: "/gateway/budgets/:id",
         ...page(() => import("./pages/gateway/budgets/[id]")),
+      },
+      {
+        path: "/gateway/routing-policies",
+        ...page(() => import("./pages/gateway/routing-policies")),
       },
       {
         path: "/gateway/usage",

@@ -2,10 +2,11 @@ Feature: Governance home — route, nav promotion, persona detection
   The governance product surface lives at top-level `/governance` (a
   daily-use org-scoped home), NOT under Settings. The whole family
   lives there: `/governance/ingestion-sources*`, `/governance/anomaly-rules`,
-  `/governance/routing-policies`, `/governance/tool-catalog`,
-  `/governance/departments`. The legacy `/settings/governance*` and
-  `/settings/routing-policies` addresses redirect permanently to the new
-  ones (specs/navigation/gateway-url-move.feature).
+  `/governance/tool-catalog`, `/governance/departments`. Routing policies
+  are gateway behavior and live at `/gateway/routing-policies` instead. The
+  legacy `/settings/governance*` and `/settings/routing-policies` addresses
+  redirect permanently to the new ones
+  (specs/navigation/gateway-url-move.feature).
 
   A `Governance` entry surfaces in the MainMenu sidebar ONLY for org
   admins whose org has actual governance state. Vast-majority current
@@ -43,9 +44,8 @@ Feature: Governance home — route, nav promotion, persona detection
     And "/governance/ingestion-sources/<id>" is the per-source
       detail page
     And "/governance/anomaly-rules" is the rule authoring surface
-    And "/governance/routing-policies" is the routing-policy
-      authoring surface
-    # The daily-use dashboard at /governance links into them.
+    # The daily-use dashboard at /governance links into them, and into the
+    # routing-policy surface the gateway owns at /gateway/routing-policies.
 
   # ---------------------------------------------------------------------------
   # Persona / nav promotion via api.governance.setupState
@@ -143,7 +143,6 @@ Feature: Governance home — route, nav promotion, persona detection
       | Overview          | /governance                                   |
       | Ingestion Sources | /governance/ingestion-sources                 |
       | Anomaly Rules     | /governance/anomaly-rules                     |
-      | Routing Policies  | /governance/routing-policies                  |
 
   @bdd @ui @governance-home @layout @sub-routes
   Scenario: Admin-authoring sub-routes share the GovernanceLayout chrome
@@ -151,8 +150,7 @@ Feature: Governance home — route, nav promotion, persona detection
       left rail and lands on "/governance/ingestion-sources"
     Then the page renders inside GovernanceLayout, the same chrome as
       the daily-use home
-    And the same applies to "/governance/anomaly-rules" and
-      "/governance/routing-policies"
+    And the same applies to "/governance/anomaly-rules"
 
   @bdd @ui @governance-home @layout @bypass-project-redirect
   Scenario: /governance bypasses the no-project onboarding redirect

@@ -68,7 +68,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
-vi.mock("~/components/governance/GovernanceLayout", () => ({
+vi.mock("~/components/gateway/AiGatewayLayout", () => ({
   default: ({ children }: { children: React.ReactNode }) => children,
 }));
 

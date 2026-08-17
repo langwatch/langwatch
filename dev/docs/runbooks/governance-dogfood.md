@@ -135,7 +135,7 @@ All three: zero acceptance of forged value, zero "rejectedSpans" — silent clam
 ### 7. Admin drill-in
 
 **Surfaces:**
-- `/governance/routing-policies`
+- `/gateway/routing-policies`
 - `/[project]/governance/*` — birdeye, audit log, anomalies, recent activity
 - Budget management, virtual key management
 

@@ -4,13 +4,15 @@ Feature: Gateway and Governance URLs move to the top level
   So that the move to /gateway and /governance never strands me on a dead page
 
   AI Gateway and Governance pages are organization-wide, so they do not
-  belong under /settings. /settings/gateway/* becomes /gateway/*, and the
-  governance family (/settings/governance/*, /settings/routing-policies)
-  joins the existing top-level /governance/*. Old addresses redirect to the
-  new ones with the request intact: the sub-path, the query string and the
-  hash all survive, and the browser history keeps only the new address so
-  the back button never bounces through the old one. The redirects work on a
-  cold load of a pasted link, not only on in-app navigation.
+  belong under /settings. /settings/gateway/* becomes /gateway/*, and
+  /settings/governance/* joins the existing top-level /governance/*.
+  Routing policies decide which providers and models a virtual key reaches,
+  which is gateway behavior, so /settings/routing-policies becomes
+  /gateway/routing-policies. Old addresses redirect to the new ones with the
+  request intact: the sub-path, the query string and the hash all survive,
+  and the browser history keeps only the new address so the back button
+  never bounces through the old one. The redirects work on a cold load of a
+  pasted link, not only on in-app navigation.
 
   Background:
     Given I am signed in to an organization that can see the AI Gateway
@@ -42,9 +44,10 @@ Feature: Gateway and Governance URLs move to the top level
     Then I land on "/governance/teams/team_123?range=30d"
 
   @integration
-  Scenario: Routing policies join governance
+  Scenario: Routing policies join the gateway
     When I cold-load "/settings/routing-policies"
-    Then I land on "/governance/routing-policies"
+    Then I land on "/gateway/routing-policies"
+    And a query string and a hash on the old address survive the move
 
   @integration
   Scenario: The retired cost centers address lands on departments

@@ -54,6 +54,11 @@ describe("gateway section navigation", () => {
         target: "_blank",
       },
       { label: "Budgets", href: "/gateway/budgets", target: undefined },
+      {
+        label: "Routing Policies",
+        href: "/gateway/routing-policies",
+        target: undefined,
+      },
       { label: "Cache Rules", href: "/gateway/cache-rules", target: undefined },
       { label: "Guardrails", href: "/gateway/guardrails", target: undefined },
       { label: "Usage", href: "/gateway/usage", target: undefined },
@@ -63,11 +68,6 @@ describe("gateway section navigation", () => {
         target: undefined,
       },
       { label: "Webhooks", href: "/gateway/webhooks", target: undefined },
-      {
-        label: "Routing Policies",
-        href: "/governance/routing-policies",
-        target: undefined,
-      },
     ]);
   });
 });
@@ -82,7 +82,6 @@ describe("governance section navigation", () => {
       { label: "Overview", href: "/governance" },
       { label: "Ingestion Sources", href: "/governance/ingestion-sources" },
       { label: "Anomaly Rules", href: "/governance/anomaly-rules" },
-      { label: "Routing Policies", href: "/governance/routing-policies" },
       { label: "Tool Catalog", href: "/governance/tool-catalog" },
       { label: "Departments", href: "/governance/departments" },
     ]);
