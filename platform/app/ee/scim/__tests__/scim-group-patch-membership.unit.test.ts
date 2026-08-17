@@ -16,6 +16,12 @@
  * never mentions members must leave membership alone, and an explicit
  * `members: []` must still clear the group, because that is a legitimate
  * request the IdP is entitled to make.
+ *
+ * Every assertion here is on the writes, not on the response body: the Prisma
+ * mock returns a fixed membership for every read, so the group returned by a
+ * "clears the group" case still lists its old members. That is deliberate — the
+ * write is the behaviour under test, and end-state verification belongs to a
+ * test with a real database.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -90,6 +96,10 @@ describe("SCIM group PATCH membership", () => {
   });
 
   describe("given a replace operation that names no members", () => {
+    // externalId stands in for any attribute PATCH does not handle. That it is
+    // unhandled is a gap rather than a decision — see #7141 — so this asserts
+    // only what the fix is about: an operation about something else must not
+    // touch membership.
     describe("when it replaces an unrelated attribute", () => {
       it("leaves the group's membership untouched", async () => {
         await patchGroup([
