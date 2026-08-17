@@ -226,6 +226,7 @@ func TestRenderCorrectnessSection(t *testing.T) {
 	})
 }
 
+// @scenario "Resource usage never fails the run on an absolute threshold"
 func TestMeasurementCaveat(t *testing.T) {
 	cases := []struct{ it, want string }{
 		{"states that the figures measure contention rather than capacity", "contention, not capacity"},
@@ -241,6 +242,7 @@ func TestMeasurementCaveat(t *testing.T) {
 	}
 }
 
+// @scenario "Each stage reports its resource usage as a job summary"
 func TestRenderJobSummary(t *testing.T) {
 	summary := func() string {
 		return RenderJobSummary(RenderJobSummaryOptions{

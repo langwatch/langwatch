@@ -219,6 +219,7 @@ func TestStagePayloadBytes(t *testing.T) {
 	})
 }
 
+// @scenario "A workload too large for the runner is refused before it starts"
 func TestAssertWithinBudget(t *testing.T) {
 	t.Run("when the plan fits", func(t *testing.T) {
 		t.Run("accepts it", func(t *testing.T) {

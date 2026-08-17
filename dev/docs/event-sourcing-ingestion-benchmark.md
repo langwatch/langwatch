@@ -264,16 +264,23 @@ single-node cluster and still not production.
 
 ## Files
 
+The driver is a Go CLI. `cmd/ingestionbench` is the entry point; everything
+else lives in `tools/ingestionbench`.
+
 | Path | Role |
 | --- | --- |
-| `workload.ts` | Stage plans, byte budgeting, threshold constants. Pure. |
-| `otlp.ts` | Deterministic OTLP payload construction. Pure. |
-| `verify.ts` | ClickHouse query builders and violation logic. Pure. |
-| `report.ts` | Markdown job-summary rendering. Pure. |
-| `run.ts` | The impure driver: HTTP, ClickHouse, clocks, argv. |
-| `seed-tenants.ts` | Seeds isolated projects, prints them as JSON. |
+| `workload.go` | Stage plans, byte budgeting, threshold constants. Pure. |
+| `otlp.go` | Deterministic OTLP payload construction. Pure. |
+| `verify.go` | ClickHouse query builders and violation logic. Pure. |
+| `report.go` | Markdown job-summary rendering. Pure. |
+| `args.go` | Argument parsing and validation. Pure. |
+| `driver.go` | The impure driver: HTTP, ClickHouse, clocks, kubectl. |
+| `clickhouse.go` | The ClickHouse HTTP client and its JSONEachRow decoding. |
+| `preflight.go` | The one-span canary that runs before the stages. |
+| `cli.go` | Command dispatch and flag wiring. |
+| `seed.go` | Seeds isolated projects, prints them as JSON. |
 
 The split is deliberate: everything with a decision in it is pure and
 unit-tested, so the parts that can be verified without a cluster are verified
-without a cluster. Anything added to `run.ts` that has logic in it belongs in
+without a cluster. Anything added to `driver.go` that has logic in it belongs in
 one of the pure modules instead.

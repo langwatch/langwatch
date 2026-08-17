@@ -116,6 +116,7 @@ func TestMsToUnixNano(t *testing.T) {
 	})
 }
 
+// @scenario "Unusually large payloads survive the round trip"
 func TestBuildSpan(t *testing.T) {
 	t.Run("given no payload padding", func(t *testing.T) {
 		t.Run("carries only the marker attributes", func(t *testing.T) {

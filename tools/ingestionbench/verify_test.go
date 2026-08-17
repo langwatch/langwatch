@@ -91,6 +91,7 @@ func TestQueryBuilders(t *testing.T) {
 	})
 }
 
+// @scenario "Bursty arrival does not lose or duplicate spans"
 func TestFindLostSpans(t *testing.T) {
 	t.Run("when every accepted span is stored", func(t *testing.T) {
 		t.Run("reports no violation", func(t *testing.T) {
@@ -154,6 +155,7 @@ func TestFindLostSpans(t *testing.T) {
 	})
 }
 
+// @scenario "Spans of one trace arriving at once are still counted exactly once"
 func TestFindCountMismatches(t *testing.T) {
 	cases := []struct {
 		describe  string
@@ -283,6 +285,7 @@ func TestFindMissingSummaries(t *testing.T) {
 	})
 }
 
+// @scenario "Interleaved tenants never see each other's spans"
 func TestFindCrossTenantLeaks(t *testing.T) {
 	t.Run("when a foreign trace appears under a tenant", func(t *testing.T) {
 		t.Run("reports leakage naming both the trace and the tenant", func(t *testing.T) {
@@ -425,6 +428,8 @@ func TestFindResendDrift(t *testing.T) {
 	})
 }
 
+// @scenario "A benchmark that could not run is not reported as a passing run"
+// @scenario "A correctness violation fails the run"
 func TestIsFailure(t *testing.T) {
 	t.Run("treats any violation as a hard failure", func(t *testing.T) {
 		if !IsFailure([]Violation{{Kind: ViolationLostSpans, TenantId: "t", Detail: "d"}}) {
@@ -439,6 +444,7 @@ func TestIsFailure(t *testing.T) {
 	})
 }
 
+// @scenario "A run that finds a violation is distinguishable from a broken run"
 func TestSummarizeViolations(t *testing.T) {
 	t.Run("given no violations", func(t *testing.T) {
 		t.Run("says so plainly", func(t *testing.T) {

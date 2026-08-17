@@ -162,6 +162,13 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // The CLI half of the same tool: the verdict-to-exit-code step is the part
   // CI gates on, so the "check fails" / "check passes" scenarios bind here.
   "cmd/linkcheck",
+  // The ingestion benchmark driver, for the same reason as ciguard: its
+  // workload planning, correctness rules and reporting are pure Go and tested
+  // by nothing else, so specs/ci/event-sourcing-ingestion-benchmark.feature can
+  // only bind from this root. The scenarios that need a live cluster are
+  // @unimplemented on purpose — the benchmark job itself is what asserts them.
+  "tools/ingestionbench",
+  "cmd/ingestionbench",
 ];
 
 /**

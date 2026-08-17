@@ -24,10 +24,12 @@
 # workflow will be disabled or deleted inside a month. That has happened before
 # to benchmark jobs and it is the reason this one is written the way it is.
 #
-# If you want a regression gate, gate on a DELTA against the baseline artifact
-# from a previous run at the same scale on the same runner size — never on an
-# absolute number. If you want real capacity figures, move to a larger runner
-# (see the `runner` input below); do not try to squeeze them out of this one.
+# There is deliberately NO regression gate here today: nothing fetches a
+# previous run's results.json and nothing compares against it. If you add one,
+# gate on a DELTA against the baseline artifact from a previous run at the same
+# scale on the same runner size — never on an absolute number. If you want real
+# capacity figures, move to a larger runner (see the `runner` input below); do
+# not try to squeeze them out of this one.
 #
 # =============================================================================
 # Why this exists at all
@@ -94,7 +96,7 @@ on:
     # without needing an empty push.
     types: [opened, synchronize, reopened, labeled]
     paths:
-      - "langwatch/src/server/event-sourcing/**"
+      - "platform/app/src/server/event-sourcing/**"
       - "charts/clickhouse-serverless/**"
       - "tools/ingestionbench/**"
       - "cmd/ingestionbench/**"
@@ -167,7 +169,7 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: "langwatch/pnpm-lock.yaml"
+          cache-dependency-path: "pnpm-lock.yaml"
           install-dir: langwatch
 
       # The driver is a Go CLI (cmd/ingestionbench). pnpm above is only for
@@ -260,7 +262,7 @@ jobs:
           fi
 
       - name: Run migrations
-        working-directory: langwatch
+        working-directory: platform/app
         env:
           DATABASE_URL: postgresql://langwatch_ci:ci_password@localhost:5432/langwatch_bench
           CLICKHOUSE_URL: http://default:${{ env.CH_PASSWORD }}@localhost:8123/langwatch_bench
@@ -269,26 +271,41 @@ jobs:
           pnpm prisma:migrate
           # ClickHouse can refuse the first connection while the replicas are
           # still settling; retry rather than failing the whole run on a race.
+          #
+          # The final attempt has to FAIL the step. Without the flag the loop's
+          # last `sleep` returns zero, the step goes green, and the run proceeds
+          # against an unmigrated database — which surfaces later as every span
+          # being reported lost, blaming the pipeline for a missing table.
+          migrated=false
           for attempt in 1 2 3; do
-            if pnpm clickhouse:migrate; then break; fi
-            echo "clickhouse:migrate attempt $attempt failed, retrying"
-            sleep 10
+            if pnpm clickhouse:migrate; then migrated=true; break; fi
+            echo "clickhouse:migrate attempt $attempt failed"
+            [ "$attempt" -lt 3 ] && sleep 10
           done
+          if [ "$migrated" != "true" ]; then
+            echo "clickhouse:migrate failed after 3 attempts; refusing to benchmark an unmigrated database"
+            exit 1
+          fi
 
       - name: Seed benchmark tenants
         id: seed
         env:
           DATABASE_URL: postgresql://langwatch_ci:ci_password@localhost:5432/langwatch_bench
+          # Dispatch inputs reach the shell as environment values, never as
+          # template expansion inside `run:`. Expanded inline, a crafted input
+          # would be substituted before bash ever sees the script and could
+          # close the quote and append its own commands.
+          BENCH_BIN: ${{ runner.temp }}/ingestionbench
+          BENCH_TENANT_COUNT: ${{ inputs.tenants || '4' }}
         run: |
           # stdout is only the tenants JSON; progress goes to stderr.
-          tenants=$("${{ runner.temp }}/ingestionbench" seed \
-            -count "${{ inputs.tenants || '4' }}")
+          tenants=$("$BENCH_BIN" seed -count "$BENCH_TENANT_COUNT")
           echo "tenants<<EOF" >> "$GITHUB_OUTPUT"
           echo "$tenants" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
 
       - name: Start the platform
-        working-directory: langwatch
+        working-directory: platform/app
         env:
           NODE_ENV: production
           DATABASE_URL: postgresql://langwatch_ci:ci_password@localhost:5432/langwatch_bench
@@ -328,15 +345,21 @@ jobs:
         env:
           BENCHMARK_TENANTS: ${{ steps.seed.outputs.tenants }}
           RUNNER_LABEL: ${{ inputs.runner || 'ubuntu-latest' }}
+          # As above: every dispatch input arrives as an environment value, so
+          # none of them is substituted into the script text.
+          BENCH_BIN: ${{ runner.temp }}/ingestionbench
+          BENCH_SCALE: ${{ inputs.scale || '1' }}
+          BENCH_SEED: ${{ inputs.seed || '1337' }}
+          BENCH_SETTLE_TIMEOUT: ${{ inputs.settle_timeout || '3m' }}
         run: |
-          "${{ runner.temp }}/ingestionbench" run \
+          "$BENCH_BIN" run \
             -endpoint http://localhost:5560 \
             -clickhouse "http://default:${CH_PASSWORD}@localhost:8123/langwatch_bench" \
             -namespace "$NAMESPACE" \
-            -scale "${{ inputs.scale || '1' }}" \
-            -seed "${{ inputs.seed || '1337' }}" \
-            -settle-timeout "${{ inputs.settle_timeout || '3m' }}" \
-            -runner-label "${RUNNER_LABEL}" \
+            -scale "$BENCH_SCALE" \
+            -seed "$BENCH_SEED" \
+            -settle-timeout "$BENCH_SETTLE_TIMEOUT" \
+            -runner-label "$RUNNER_LABEL" \
             -out "${GITHUB_WORKSPACE}/benchmark-output"
 
       - name: Report available disk after the run
@@ -348,11 +371,13 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ingestion-benchmark-samples
-          # results.json is the baseline for the NEXT run's comparison. Keep it
-          # with the samples so a delta can be computed without re-running.
+          # results.json is kept so a delta against a previous run can be
+          # computed by hand, at the same scale on the same runner size.
+          # NOTHING here compares it automatically — there is no baseline
+          # fetch and no delta gate, by design (see the header).
           path: |
             benchmark-output/
-            langwatch/platform.log
+            platform/app/platform.log
           retention-days: 30
 
       - name: Diagnostics on failure
@@ -367,4 +392,4 @@ jobs:
             kubectl -n "$NAMESPACE" logs "$pod" --previous --tail=50 || true
           done
           echo "=== platform log ==="
-          tail -200 langwatch/platform.log || true
+          tail -200 platform/app/platform.log || true

@@ -78,6 +78,7 @@ func TestParseTenants(t *testing.T) {
 	})
 }
 
+// @scenario "A mistyped workload size fails immediately"
 func TestRunArgsValidate(t *testing.T) {
 	valid := func() RunArgs {
 		return RunArgs{

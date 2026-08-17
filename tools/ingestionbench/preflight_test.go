@@ -63,6 +63,7 @@ func runPreflight(collector *httptest.Server, ch *chClient, timeout time.Duratio
 	})
 }
 
+// @scenario "A run with nothing draining the queue is not reported as data loss"
 func TestPreflight(t *testing.T) {
 	accepted := `{"message":"Trace received successfully.","partialSuccess":{"rejectedSpans":0,"errorMessage":""}}`
 
