@@ -25,6 +25,7 @@ import {
 } from "@ee/governance/services/activity-monitor/anomalyRule.service";
 import { ValidationError } from "@langwatch/handled-error";
 import { z } from "zod";
+import { z as z4 } from "zod/v4";
 
 import {
   ENTERPRISE_FEATURE_ERRORS,
@@ -63,7 +64,13 @@ function translateConfigValidationError(
   err: unknown,
   ruleType?: string,
 ): never {
-  if (err instanceof z.ZodError) {
+  // Both zod entry points are live in this package while the migration to v4
+  // finishes, and they carry different `ZodError` classes. The schemas this
+  // catches are built with `zod/v4` (thresholdConfig.schema.ts), while this
+  // router's own input schemas are still v3, so testing one class alone lets
+  // the other escape as a raw ZodError and the admin gets a wall of JSON
+  // instead of the `validation_error` copy. Both shapes expose `issues`.
+  if (err instanceof z.ZodError || err instanceof z4.ZodError) {
     // Detect which config the issues belong to so the error message
     // points the admin at the right field. Both threshold-config and
     // destination-config (Phase 2C C3) validation produce ZodError;
