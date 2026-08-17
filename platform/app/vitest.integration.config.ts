@@ -10,9 +10,19 @@ import {
   integrationFilesRunInParallel,
   withdrawWorkerCountOverride,
 } from "./src/test-utils/integrationFileConcurrency";
+import {
+  INTEGRATION_SEARCH_DIRS,
+  partitionIntegrationFiles,
+  toIncludePatterns,
+} from "./src/test-utils/integrationLanes";
 import WeightBalancedSequencer from "./vitest.sequencer";
 
 config();
+
+const { datastore } = partitionIntegrationFiles({
+  root: __dirname,
+  searchDirs: [...INTEGRATION_SEARCH_DIRS],
+});
 
 // One switch for the CI-vs-laptop trade-offs below.
 const isCI = !!process.env.CI;
@@ -37,7 +47,12 @@ export default defineConfig({
       "./src/server/event-sourcing/__tests__/integration/setup.ts",
       "./test-setup.ts",
     ],
-    include: ["**/*.integration.{test,spec}.?(c|m)[jt]s?(x)"],
+    // The files that actually need a datastore. The complement — jsdom files
+    // naming no database, queue or cache — runs on the component lane with no
+    // service containers at all (vitest.component.config.ts). Both lanes call
+    // partitionIntegrationFiles, so together they are still every integration
+    // file, exactly once. See specs/ci/integration-test-lanes.feature.
+    include: toIncludePatterns(datastore),
     exclude: [...configDefaults.exclude, ".next/**/*", ".next-saas/**/*"],
     testTimeout: 60_000, // 60 seconds for testcontainers startup and processing
     hookTimeout: 60_000, // 60 seconds for beforeAll/afterAll hooks
@@ -97,6 +112,32 @@ export default defineConfig({
     // and Redis; handing vitest the whole box starved the datastores and
     // suites failed on vi.waitFor timeouts rather than on their assertions.
     maxWorkers: isCI ? 2 : 1,
+    // Reuse the module registry across the files in the worker instead of
+    // rebuilding it per file.
+    //
+    // This is NOT the concurrency knob above, and the distinction is the whole
+    // argument. `fileParallelism` decides whether two files run AT ONCE, which
+    // is the property the ClickHouse schema and the Redis keyspace depend on;
+    // that stays off. `isolate` decides only whether the second file re-imports
+    // the module graph the first already loaded. Files still run strictly one
+    // at a time either way, so the earlier VITEST_INTEGRATION_PARALLEL attempt
+    // — reverted because concurrent workers lost each other's Redis state — is
+    // not what this re-enables.
+    //
+    // The cost it removes is the largest single line item in the suite.
+    // Measured across the six CI shards: 1,664s of `import` against 1,408s of
+    // actual test execution, or ~1.8s per file spent rebuilding the same Prisma
+    // client, the same zod schemas and the same server graph 171 times a shard.
+    // Import was 43% of integration runner time and the tests themselves 37%.
+    //
+    // The unit lane has run this way at larger scale for some time (1,688 files,
+    // vitest.config.ts), so the failure mode is known and narrow: module-level
+    // state that outlives a file — a memoised client, a module-scope queue
+    // handle, a cached config read at import. That shows up as an
+    // order-dependent failure, not as a wrong assertion. If a shard starts
+    // flaking that way, drop this line first and read the ordering before
+    // reaching for anything else.
+    isolate: false,
     // Same weight-balanced split as the unit config: equal file counts are not
     // equal work, and a matrix is only as fast as its slowest leg.
     sequence: { sequencer: WeightBalancedSequencer },

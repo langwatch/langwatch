@@ -28,6 +28,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 
+import {
+  cachedBinaryIsUsable,
+  digestGoSources,
+  writeStamp,
+} from "./_nlpgoBinaryStamp";
+
 // _nlpgoSubprocess.ts lives in platform/app/src/server/nlpgo/__tests__ →
 // up 6 = repo root.
 export const REPO_ROOT = path.resolve(__dirname, "../../../../../..");
@@ -42,6 +48,10 @@ const NLPGO_TEST_BIN = path.join(
   NLPGO_TEST_BIN_DIR,
   process.platform === "win32" ? "nlpgo-test.exe" : "nlpgo-test",
 );
+// Lives beside the binary so actions/cache carries the two together: the
+// cached path is the whole directory, and a stamp restored without its binary
+// (or vice versa) is treated as a miss.
+const NLPGO_TEST_BIN_STAMP = `${NLPGO_TEST_BIN}.stamp`;
 
 /** True when `go` is on PATH — use in `describe.skipIf(!hasGo())`. */
 export function hasGo(): boolean {
@@ -54,66 +64,36 @@ export function hasGo(): boolean {
 }
 
 /**
- * Builds the nlpgo binary once and caches it on disk, rebuilding only
- * when a .go source under services/nlpgo / cmd/service / pkg is newer
- * than the cached binary (the same staleness conclusion `go build`
- * itself would reach, but without paying the compile when nothing
- * changed). Returns the absolute binary path.
+ * Builds the nlpgo binary once and caches it on disk, rebuilding only when a
+ * build input under services/nlpgo / cmd/service / pkg differs in CONTENT from
+ * the sources the cached binary was compiled from. Returns the absolute binary
+ * path.
+ *
+ * Content rather than modification time, because mtimes make the cache
+ * unhittable on CI: git records none, so actions/checkout stamps every source
+ * with the current run's time while the binary actions/cache restored carries
+ * the time it was built in an earlier run. An mtime comparison therefore found
+ * every source newer than the binary and rebuilt on every run — ~90s a shard
+ * for a cache that was restoring correctly the whole time. See
+ * specs/ci/nlpgo-test-binary-reuse.feature.
  */
 export function ensureNlpgoBinary(timeoutMs = 600_000): string {
   fs.mkdirSync(NLPGO_TEST_BIN_DIR, { recursive: true });
 
-  let cachedMtime = 0;
-  try {
-    cachedMtime = fs.statSync(NLPGO_TEST_BIN).mtimeMs;
-  } catch {
-    cachedMtime = 0;
-  }
   const watchDirs = [
     path.join(REPO_ROOT, "services", "nlpgo"),
     path.join(REPO_ROOT, "cmd", "service"),
     path.join(REPO_ROOT, "pkg"),
-  ].filter((p) => fs.existsSync(p));
+  ];
+  const digest = digestGoSources({ watchDirs, root: REPO_ROOT });
 
-  function newestGoMtime(dir: string): number {
-    let newest = 0;
-    const stack = [dir];
-    while (stack.length) {
-      const d = stack.pop()!;
-      let entries: fs.Dirent[];
-      try {
-        entries = fs.readdirSync(d, { withFileTypes: true });
-      } catch {
-        continue;
-      }
-      for (const e of entries) {
-        const full = path.join(d, e.name);
-        if (e.isDirectory()) {
-          if (e.name === "node_modules" || e.name.startsWith(".")) continue;
-          stack.push(full);
-        } else if (
-          e.name.endsWith(".go") ||
-          e.name === "go.mod" ||
-          e.name === "go.sum"
-        ) {
-          try {
-            const m = fs.statSync(full).mtimeMs;
-            if (m > newest) newest = m;
-          } catch {
-            /* ignore */
-          }
-        }
-      }
-    }
-    return newest;
-  }
-
-  const newestSrcMtime = watchDirs.reduce(
-    (acc, d) => Math.max(acc, newestGoMtime(d)),
-    0,
-  );
-
-  if (cachedMtime > 0 && newestSrcMtime <= cachedMtime) {
+  if (
+    cachedBinaryIsUsable({
+      binaryPath: NLPGO_TEST_BIN,
+      stampPath: NLPGO_TEST_BIN_STAMP,
+      currentDigest: digest,
+    })
+  ) {
     return NLPGO_TEST_BIN;
   }
 
@@ -126,6 +106,10 @@ export function ensureNlpgoBinary(timeoutMs = 600_000): string {
     stdio: process.env.NLPGO_TEST_LOG === "1" ? "inherit" : "pipe",
     timeout: timeoutMs,
   });
+  // Stamp only after the build succeeds, so a failed compile leaves the old
+  // stamp (or none) and the next run tries again rather than trusting a binary
+  // that was never produced.
+  writeStamp(NLPGO_TEST_BIN_STAMP, digest);
   return NLPGO_TEST_BIN;
 }
 

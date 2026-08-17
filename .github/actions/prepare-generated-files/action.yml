@@ -1,0 +1,69 @@
+name: Prepare generated files
+description: >-
+  Runs platform/app's `start:prepare:files`, reusing a cached result when none
+  of its inputs changed.
+
+# `start:prepare:files` is a chain of seven generators — the Prisma client, the
+# langevals evaluator types, the TypeScript SDK build, the MCP server build, the
+# langy skill catalogue and the task registry. It costs 30-35s and every test,
+# build and check job in this workflow pays it. Across the shards that was
+# several runner-minutes per push spent regenerating byte-identical output from
+# byte-identical committed inputs.
+#
+# Every one of those generators is a pure function of files in the repo, so the
+# cache key is a hash of those files. Miss the inputs in the key and a job gets
+# stale generated code, so the key is deliberately broad: whole source trees
+# rather than the handful of files that seem to matter, because "seem to" is how
+# a generated-code cache goes wrong.
+#
+# On a miss the generators run and the result is saved. On a hit nothing runs.
+# Either way the outputs exist afterwards, which is the action's whole contract.
+
+runs:
+  using: composite
+  steps:
+    - name: Restore generated files
+      id: cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        # Everything `start:prepare:files` writes. The Prisma client is NOT in
+        # node_modules: this schema sets `output = "../src/generated/prisma"`,
+        # and the app imports it as `~/generated/prisma/client`.
+        path: |
+          platform/app/src/generated/prisma
+          platform/app/src/server/evaluations/evaluators.generated.ts
+          platform/app/src/tasks.generated.ts
+          platform/app/src/shared/langy/langySkills.generated.json
+          sdks/typescript/dist
+          mcp/typescript/dist
+        key: >-
+          ${{ runner.os }}-prepared-files-${{ hashFiles(
+            'platform/app/prisma/schema.prisma',
+            'platform/app/prisma/schema/**',
+            'platform/app/package.json',
+            'platform/app/scripts/generate-task-registry.mjs',
+            'platform/app/scripts/generate-langy-skills.ts',
+            'platform/app/scripts/build-mcp-server.sh',
+            'platform/app/src/tasks/**',
+            'services/langevals/ts-integration/evaluators.generated.ts',
+            'sdks/typescript/src/**',
+            'sdks/typescript/package.json',
+            'sdks/typescript/tsup.config.ts',
+            'mcp/typescript/src/**',
+            'mcp/typescript/package.json',
+            'infra/docker/Dockerfile.langyagent',
+            'skills/**/SKILL.md'
+          ) }}
+
+    - name: Generate files
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      working-directory: platform/app
+      run: pnpm start:prepare:files
+
+    # A cache hit is only useful if it actually produced the files. A key that
+    # silently stops covering a new generator would otherwise hand every job a
+    # missing module minutes later, in a stack trace pointing anywhere but here.
+    - name: Verify the generated files are present
+      shell: bash
+      run: bash .github/scripts/verify-generated-files.sh
