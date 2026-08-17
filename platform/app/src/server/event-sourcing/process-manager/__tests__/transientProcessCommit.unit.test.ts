@@ -75,7 +75,13 @@ function probeHandler(
 let store: InMemoryProcessStore;
 let service: ProcessManagerService<ProbeState>;
 
-function envelope(mode: ProbeMode, key: string): ProcessEventEnvelope {
+function envelope({
+  mode,
+  key,
+}: {
+  mode: ProbeMode;
+  key: string;
+}): ProcessEventEnvelope {
   return {
     eventId: `${mode}:${key}`,
     eventType: PROBE_EVENT,
@@ -104,7 +110,7 @@ describe("transient process commits", () => {
     /** @scenario A transient evolution writes its intents and no process instance */
     it("enqueues the intent and writes no instance row", async () => {
       const result = await service.handleEvent({
-        envelope: envelope("note", "req-1"),
+        envelope: envelope({ mode: "note", key: "req-1" }),
         now: 2_000,
       });
 
@@ -118,11 +124,11 @@ describe("transient process commits", () => {
     /** @scenario A redelivered event re-derives the same key and enqueues nothing new */
     it("suppresses a redelivery without an inbox marker", async () => {
       await service.handleEvent({
-        envelope: envelope("note", "req-2"),
+        envelope: envelope({ mode: "note", key: "req-2" }),
         now: 2_000,
       });
       const second = await service.handleEvent({
-        envelope: envelope("note", "req-2"),
+        envelope: envelope({ mode: "note", key: "req-2" }),
         now: 3_000,
       });
 
@@ -152,7 +158,7 @@ describe("transient process commits", () => {
       });
 
       await silent.handleEvent({
-        envelope: envelope("note", "req-3"),
+        envelope: envelope({ mode: "note", key: "req-3" }),
         now: 2_000,
       });
 
@@ -167,7 +173,7 @@ describe("transient process commits", () => {
     /** @scenario A process manager may be transient for one key and durable for another */
     it("commits an instance row durably", async () => {
       await service.handleEvent({
-        envelope: envelope("remember", "endpoint-1"),
+        envelope: envelope({ mode: "remember", key: "endpoint-1" }),
         now: 2_000,
       });
 
@@ -181,11 +187,11 @@ describe("transient process commits", () => {
     /** @scenario The durable path keeps its inbox marker, so a redelivery is a no-op */
     it("refuses a redelivered event on the durable path", async () => {
       await service.handleEvent({
-        envelope: envelope("remember", "endpoint-2"),
+        envelope: envelope({ mode: "remember", key: "endpoint-2" }),
         now: 2_000,
       });
       const second = await service.handleEvent({
-        envelope: envelope("remember", "endpoint-2"),
+        envelope: envelope({ mode: "remember", key: "endpoint-2" }),
         now: 3_000,
       });
 
@@ -215,12 +221,12 @@ describe("transient process commits", () => {
 
       // Persist something for this key through the durable path first.
       await service.handleEvent({
-        envelope: envelope("remember", "endpoint-3"),
+        envelope: envelope({ mode: "remember", key: "endpoint-3" }),
         now: 2_000,
       });
 
       await stateDependent.handleEvent({
-        envelope: envelope("note", "endpoint-3"),
+        envelope: envelope({ mode: "note", key: "endpoint-3" }),
         now: 3_000,
       });
 

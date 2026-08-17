@@ -40,7 +40,10 @@ function stuckDrainTimeoutMs(leaseDurationMs: number | undefined): number {
 }
 
 export const SCHEDULED_SINGLETON_PROJECT_ID = "__global__" as const;
-const SCHEDULE_ARM_EVENT_TYPE = "__schedule_arm" as const;
+/** The synthetic event that arms a scheduled process's first wake. Exported
+ *  so a test drives the same value the runtime does, rather than copying the
+ *  literal and drifting from it. */
+export const SCHEDULE_ARM_EVENT_TYPE = "__schedule_arm" as const;
 
 interface RegisteredProcessManager {
   definition: ProcessManagerDefinition;

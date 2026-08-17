@@ -55,6 +55,20 @@ export const SETTLEMENT_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
  */
 export const SETTLEMENT_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
 
+/**
+ * Sanity cap on one sweep. The steady-state population is the handful of
+ * requests whose confirmation genuinely never arrived; a result this large
+ * means something upstream stopped confirming, and settling a hundred
+ * thousand live requests is the one outcome this must never produce.
+ *
+ * Lives here rather than beside the query it bounds because this file must
+ * not import a VALUE from the repository: that pulls the ClickHouse client
+ * into the module graph of everything reaching the pipeline registry, which
+ * turns a `vi.mock` factory into a hoisting failure. The repository imports
+ * it from here instead, which is a one-way runtime edge.
+ */
+export const MAX_OPEN_ADMISSIONS_PER_SWEEP = 10_000;
+
 /** Operator override, epoch-milliseconds. Bounded below so a typo cannot
  *  turn every in-flight request into a settlement storm. */
 export function settlementGraceMs(): number {
@@ -190,10 +204,29 @@ function runSweep(deps: SpendSettlementProcessDeps) {
       }
     }
 
-    logger.info(
-      { settled, failed, graceMs, attempt: context.attempt },
-      "settled admissions whose confirmation never arrived",
-    );
+    // A sweep that came back full did not finish: the rest waits for the next
+    // interval, and a run of these means the population is growing faster
+    // than one sweep drains it. The doc block on the cap promised this was
+    // reported; it was not, so an operator would have seen a steady settled
+    // count and no sign of the backlog behind it.
+    const hitCap = open.length >= MAX_OPEN_ADMISSIONS_PER_SWEEP;
+    const report = {
+      settled,
+      failed,
+      graceMs,
+      hitCap,
+      attempt: context.attempt,
+    };
+    if (failed > 0 || hitCap) {
+      logger.warn(
+        report,
+        hitCap
+          ? "settlement sweep hit its per-sweep cap; the remainder waits for the next sweep"
+          : "settlement sweep could not settle every admission it found",
+      );
+      return;
+    }
+    logger.info(report, "settled admissions whose confirmation never arrived");
   };
 }
 

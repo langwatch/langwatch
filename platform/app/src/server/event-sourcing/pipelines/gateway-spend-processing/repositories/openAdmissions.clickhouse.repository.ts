@@ -1,5 +1,9 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { getAllClickHouseInstances } from "~/server/clickhouse/clickhouseClient";
+// The cap belongs to the sweep that reports on it, not to the query it
+// bounds. One-way edge: the process imports only TYPES from here, so this
+// does not put the ClickHouse client on the process's module graph.
+import { MAX_OPEN_ADMISSIONS_PER_SWEEP } from "../process-manager/spendSettlement.process";
 
 const TABLE_NAME = "gateway_spend" as const;
 
@@ -13,16 +17,6 @@ const TABLE_NAME = "gateway_spend" as const;
  * `admitted`. Reading them here is what lets settlement cost one process
  * instance for the whole install instead of one per gateway request.
  */
-
-/**
- * Sanity cap on one sweep. The steady-state population is the handful of
- * requests whose confirmation genuinely never arrived; a result this large
- * means something upstream stopped confirming, and settling a hundred
- * thousand live requests is the one outcome this must never produce. The
- * sweep logs and settles what it has rather than throwing: refusing
- * altogether would leave the ledger stale for as long as the incident lasts.
- */
-export const MAX_OPEN_ADMISSIONS_PER_SWEEP = 10_000;
 
 /**
  * An admission still waiting for its outcome, with the attribution the fold

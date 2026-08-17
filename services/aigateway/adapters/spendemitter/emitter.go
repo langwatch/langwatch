@@ -93,14 +93,33 @@ func attributionPayload(o pipeline.SpendOutcome) AttributionPayload {
 	return payload
 }
 
+// maxMetadataEchoBytes mirrors the ingest schema's own bound on the echo.
+// A value past it fails validation at the control plane, which rejects the
+// whole record — so the emitter drops the echo here instead of losing the
+// spend record to it.
+const maxMetadataEchoBytes = 4096
+
 // validMetadataEcho passes the caller-controlled echo through only when it
-// is valid JSON, so a bad header costs the echo and never the record.
+// matches what the ingest schema will accept, so a bad header costs the echo
+// and never the record.
+//
+// The bar is a JSON OBJECT within the size bound, not merely valid JSON:
+// `json.Valid` accepts `[1,2]`, `"x"` and `3`, all of which the control
+// plane's `metadata must be a JSON object string` refinement rejects. Passing
+// one through would trade a dropped echo for a dropped billing record.
 func validMetadataEcho(raw string, gatewayRequestID string) string {
 	if raw == "" {
 		return ""
 	}
-	if !json.Valid([]byte(raw)) {
-		slog.Warn("spend emitter dropped an invalid metadata echo",
+	if len(raw) > maxMetadataEchoBytes {
+		slog.Warn("spend emitter dropped an oversized metadata echo",
+			"gateway_request_id", gatewayRequestID,
+			"bytes", len(raw))
+		return ""
+	}
+	var probe map[string]any
+	if err := json.Unmarshal([]byte(raw), &probe); err != nil {
+		slog.Warn("spend emitter dropped a metadata echo that is not a JSON object",
 			"gateway_request_id", gatewayRequestID)
 		return ""
 	}

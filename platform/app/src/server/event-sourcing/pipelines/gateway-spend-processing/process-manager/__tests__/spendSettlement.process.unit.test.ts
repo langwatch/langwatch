@@ -20,6 +20,7 @@ import type { ProcessEventEnvelope } from "~/server/event-sourcing/process-manag
 import {
   buildIntentHandlers,
   buildProcessDefinition,
+  SCHEDULE_ARM_EVENT_TYPE,
   SCHEDULED_SINGLETON_PROJECT_ID,
 } from "~/server/event-sourcing/process-manager/processRuntime";
 import type { OpenAdmission } from "../../repositories/openAdmissions.clickhouse.repository";
@@ -35,10 +36,6 @@ const ns = `settle-pm-${nanoid(8)}`;
 const T0 = Date.UTC(2026, 6, 21, 9, 0, 0);
 const GRACE_MS = 60_000;
 const PROJECT = `project-${ns}`;
-
-/** What the runtime's own schedule arming sends; mirrored here so the test
- *  drives the same path rather than seeding an instance by hand. */
-const SCHEDULE_ARM_EVENT_TYPE = "__schedule_arm";
 
 let store: InMemoryProcessStore;
 let service: ProcessManagerService<SpendSettlementState>;
