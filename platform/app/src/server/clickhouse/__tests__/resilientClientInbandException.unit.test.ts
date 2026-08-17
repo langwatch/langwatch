@@ -4,17 +4,22 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mockObserveQueryDuration = vi.fn();
 const mockIncrementQueryCount = vi.fn();
 
-vi.mock("~/server/clickhouse/metrics", () => ({
-  observeClickHouseQueryDuration: (...args: unknown[]) =>
-    mockObserveQueryDuration(...args),
-  incrementClickHouseQueryCount: (...args: unknown[]) =>
-    mockIncrementQueryCount(...args),
-}));
+vi.mock("~/server/clickhouse/metrics", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("~/server/clickhouse/metrics")>();
+  return {
+    ...actual,
+    observeClickHouseQueryDuration: (...args: unknown[]) =>
+      mockObserveQueryDuration(...args),
+    incrementClickHouseQueryCount: (...args: unknown[]) =>
+      mockIncrementQueryCount(...args),
+  };
+});
 
 // Vitest hoists vi.mock above static imports, so this import receives the
 // mocked metrics module regardless of ordering; kept below the factory for
 // readability only.
-import { createResilientClickHouseClient } from "../resilient-client";
+import { createResilientClickHouseClient } from "../managedClient";
 
 /**
  * ClickHouse streams over HTTP: an error after the first flushed row cannot

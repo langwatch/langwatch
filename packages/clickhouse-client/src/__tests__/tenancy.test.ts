@@ -5,7 +5,7 @@ import {
   parseRoutingTable,
   type TenantDirectory,
   UnknownTenantError,
-} from "./tenancy";
+} from "../tenancy";
 
 const directoryOf = (mapping: Record<string, string>): TenantDirectory => ({
   organizationForTenant: async (tenantId) => mapping[tenantId] ?? null,

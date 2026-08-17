@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   AcquireAbortedError,
-  createConcurrencyLimiter,
+  ConcurrencyLimiter,
   QueueFullError,
-  rateLimit,
-} from "./rateLimit";
+} from "../rateLimit";
+import { ClickHouseQueryClient } from "../client";
 
 /** A task whose completion the test controls. */
 const deferred = () => {
@@ -17,11 +17,11 @@ const deferred = () => {
   return { promise, resolve, reject };
 };
 
-describe("createConcurrencyLimiter", () => {
+describe("ConcurrencyLimiter", () => {
   describe("given an invalid concurrency limit", () => {
     describe("when the limiter is built", () => {
       it.each([0, -1, 2.5])("refuses to be built with %s", (maxConcurrent) => {
-        expect(() => createConcurrencyLimiter({ maxConcurrent })).toThrow(
+        expect(() => new ConcurrencyLimiter({ maxConcurrent })).toThrow(
           RangeError,
         );
       });
@@ -39,7 +39,7 @@ describe("createConcurrencyLimiter", () => {
         // `waiting.length >= NaN` is false forever, so an unvalidated NaN
         // unbounds the queue and removes the only thing this module is for.
         expect(() =>
-          createConcurrencyLimiter({ maxConcurrent: 1, maxQueued }),
+          new ConcurrencyLimiter({ maxConcurrent: 1, maxQueued }),
         ).toThrow(RangeError);
       });
     });
@@ -50,15 +50,15 @@ describe("createConcurrencyLimiter", () => {
       it("sheds without waiting, which is a real configuration", async () => {
         // Zero is the boundary between valid and invalid, and it means
         // something deliberate: never queue, refuse the moment the slots go.
-        const limiter = createConcurrencyLimiter({
+        const limiter = new ConcurrencyLimiter({
           maxConcurrent: 1,
           maxQueued: 0,
         });
         const gate = deferred();
 
-        void limiter.run(() => gate.promise);
+        void limiter.run({ task: () => gate.promise });
 
-        await expect(limiter.run(async () => "second")).rejects.toBeInstanceOf(
+        await expect(limiter.run({ task: async () => "second" })).rejects.toBeInstanceOf(
           QueueFullError,
         );
         gate.resolve();
@@ -69,14 +69,16 @@ describe("createConcurrencyLimiter", () => {
   describe("given more work than the limit allows", () => {
     describe("when the tasks are submitted", () => {
       it("runs only up to the limit at once", async () => {
-        const limiter = createConcurrencyLimiter({ maxConcurrent: 2 });
+        const limiter = new ConcurrencyLimiter({ maxConcurrent: 2 });
         const gates = [deferred(), deferred(), deferred()];
         const started = [false, false, false];
 
         gates.forEach((gate, i) => {
-          void limiter.run(async () => {
-            started[i] = true;
-            await gate.promise;
+          void limiter.run({
+            task: async () => {
+              started[i] = true;
+              await gate.promise;
+            },
           });
         });
         await Promise.resolve();
@@ -88,13 +90,15 @@ describe("createConcurrencyLimiter", () => {
 
     describe("when a slot frees", () => {
       it("admits the next waiter", async () => {
-        const limiter = createConcurrencyLimiter({ maxConcurrent: 1 });
+        const limiter = new ConcurrencyLimiter({ maxConcurrent: 1 });
         const first = deferred();
         let secondStarted = false;
 
-        void limiter.run(() => first.promise);
-        const second = limiter.run(async () => {
-          secondStarted = true;
+        void limiter.run({ task: () => first.promise });
+        const second = limiter.run({
+          task: async () => {
+            secondStarted = true;
+          },
         });
         await Promise.resolve();
         expect(secondStarted).toBe(false);
@@ -110,16 +114,18 @@ describe("createConcurrencyLimiter", () => {
   describe("given a task that fails", () => {
     describe("when the failure propagates", () => {
       it("still releases the slot", async () => {
-        const limiter = createConcurrencyLimiter({ maxConcurrent: 1 });
+        const limiter = new ConcurrencyLimiter({ maxConcurrent: 1 });
 
         await expect(
-          limiter.run(async () => {
-            throw new Error("boom");
+          limiter.run({
+            task: async () => {
+              throw new Error("boom");
+            },
           }),
         ).rejects.toThrow("boom");
 
         expect(limiter.stats().inFlight).toBe(0);
-        await expect(limiter.run(async () => "ok")).resolves.toBe("ok");
+        await expect(limiter.run({ task: async () => "ok" })).resolves.toBe("ok");
       });
     });
   });
@@ -129,16 +135,16 @@ describe("createConcurrencyLimiter", () => {
       it("sheds immediately rather than queueing without bound", async () => {
         // An unbounded queue does not prevent overload, it hides it: the
         // server stays inside its limit while latency and memory climb.
-        const limiter = createConcurrencyLimiter({
+        const limiter = new ConcurrencyLimiter({
           maxConcurrent: 1,
           maxQueued: 1,
         });
         const gate = deferred();
 
-        void limiter.run(() => gate.promise);
-        void limiter.run(() => gate.promise);
+        void limiter.run({ task: () => gate.promise });
+        void limiter.run({ task: () => gate.promise });
 
-        await expect(limiter.run(async () => "third")).rejects.toBeInstanceOf(
+        await expect(limiter.run({ task: async () => "third" })).rejects.toBeInstanceOf(
           QueueFullError,
         );
         gate.resolve();
@@ -149,12 +155,12 @@ describe("createConcurrencyLimiter", () => {
   describe("given a caller that aborts", () => {
     describe("when it aborts while waiting", () => {
       it("gives up its place instead of occupying the queue", async () => {
-        const limiter = createConcurrencyLimiter({ maxConcurrent: 1 });
+        const limiter = new ConcurrencyLimiter({ maxConcurrent: 1 });
         const gate = deferred();
         const controller = new AbortController();
 
-        void limiter.run(() => gate.promise);
-        const waiting = limiter.run(async () => "never", controller.signal);
+        void limiter.run({ task: () => gate.promise });
+        const waiting = limiter.run({ task: async () => "never", signal: controller.signal });
         await Promise.resolve();
         expect(limiter.stats().queued).toBe(1);
 
@@ -168,12 +174,12 @@ describe("createConcurrencyLimiter", () => {
 
     describe("when it has already aborted before arriving", () => {
       it("refuses it without taking a slot", async () => {
-        const limiter = createConcurrencyLimiter({ maxConcurrent: 1 });
+        const limiter = new ConcurrencyLimiter({ maxConcurrent: 1 });
         const controller = new AbortController();
         controller.abort();
 
         await expect(
-          limiter.run(async () => "never", controller.signal),
+          limiter.run({ task: async () => "never", signal: controller.signal }),
         ).rejects.toBeInstanceOf(AcquireAbortedError);
         expect(limiter.stats().inFlight).toBe(0);
       });
@@ -181,14 +187,18 @@ describe("createConcurrencyLimiter", () => {
   });
 });
 
-describe("rateLimit middleware", () => {
+describe("a limiter driving a client", () => {
   describe("given a statement", () => {
     describe("when it is executed", () => {
-      it("runs it through the limiter", async () => {
-        const limiter = createConcurrencyLimiter({ maxConcurrent: 1 });
-        const next = vi.fn(async () => ({ rows: [1] }));
+      it("runs it through the limiter and releases the slot", async () => {
+        const limiter = new ConcurrencyLimiter({ maxConcurrent: 1 });
+        const execute = vi.fn(async () => ({ rows: [1] }));
+        const client = new ClickHouseQueryClient({
+          driver: { execute } as never,
+          limiter,
+        });
 
-        const result = await rateLimit({ limiter })(next as never)({
+        const result = await client.query({
           tenantId: "project_1",
           sql: "SELECT 1",
         });

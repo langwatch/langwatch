@@ -309,6 +309,15 @@ jobs:
         if: matrix.shard == 1
         run: pnpm --filter @langwatch/observability run test:unit
 
+      # Same reason again. This package owns the retry classifier, the
+      # concurrency limiter and the tenant routing every ClickHouse statement
+      # passes through — and the app's own suites exercise it only through the
+      # managedClient assembly, so a regression in an unassembled path (the
+      # query client, the router) would otherwise ship untested.
+      - name: Run @langwatch/clickhouse-client unit tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/clickhouse-client run test:unit
+
       # @langwatch/authz is the pure authorization engine (ADR-092) and
       # @langwatch/authz-server its storage-port runtime — raw TypeScript the
       # app inlines the same way, same shard-1 arrangement.

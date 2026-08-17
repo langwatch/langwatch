@@ -1,10 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
-import type { QueryExecutor, QueryRequest } from "./pipeline";
-import { checkTenantScope, TenantScopeError, tenantGuard } from "./tenantGuard";
+import type { QueryDriver, QueryRequest } from "../query";
+import { ClickHouseQueryClient } from "../client";
+import {
+  checkTenantScope,
+  TenantGuard,
+  type TenantGuardOptions,
+  TenantScopeError,
+} from "../tenantGuard";
 
 const TENANT = "project_abc";
 
-const passthrough: QueryExecutor = async () => ({ rows: [] });
+const passthrough: QueryDriver["execute"] = async () => ({ rows: [] });
 
 const request = (overrides: Partial<QueryRequest> = {}): QueryRequest => ({
   tenantId: TENANT,
@@ -233,13 +239,30 @@ describe("checkTenantScope", () => {
   });
 });
 
-describe("tenantGuard", () => {
+/**
+ * The guard as the client actually runs it: outermost, in front of a driver.
+ * Asserting through the client rather than on `assert()` alone is what keeps
+ * "refuses BEFORE the statement runs" a real claim — the driver spy is the
+ * only thing that can witness it.
+ */
+function guardedBy(
+  execute: QueryDriver["execute"],
+  options: TenantGuardOptions = {},
+) {
+  const client = new ClickHouseQueryClient({
+    driver: { execute },
+    tenantGuard: new TenantGuard(options),
+  });
+  return (request: QueryRequest) => client.query(request);
+}
+
+describe("TenantGuard", () => {
   describe("given a scoped statement", () => {
     describe("when it is executed", () => {
       it("passes it through", async () => {
         const next = vi.fn(passthrough);
 
-        await tenantGuard()(next)(request());
+        await guardedBy(next)(request());
 
         expect(next).toHaveBeenCalledTimes(1);
       });
@@ -250,7 +273,7 @@ describe("tenantGuard", () => {
     describe("when it is executed", () => {
       it("refuses before the statement runs", async () => {
         const next = vi.fn(passthrough);
-        const execute = tenantGuard()(next);
+        const execute = guardedBy(next);
 
         await expect(
           execute(request({ sql: "SELECT 1 FROM t", params: {} })),
@@ -259,7 +282,7 @@ describe("tenantGuard", () => {
       });
 
       it("explains how to fix it", async () => {
-        const execute = tenantGuard()(passthrough);
+        const execute = guardedBy(passthrough);
 
         await expect(
           execute(request({ sql: "SELECT 1 FROM t", params: {} })),
@@ -272,7 +295,7 @@ describe("tenantGuard", () => {
     describe("when it is executed", () => {
       it("allows it", async () => {
         const next = vi.fn(passthrough);
-        const execute = tenantGuard()(next);
+        const execute = guardedBy(next);
 
         await execute(
           request({
@@ -287,7 +310,7 @@ describe("tenantGuard", () => {
 
       it("reports it so the exemptions can be audited", async () => {
         const onUnscoped = vi.fn();
-        const execute = tenantGuard({ onUnscoped })(passthrough);
+        const execute = guardedBy(passthrough, { onUnscoped });
         const unscoped = request({
           sql: "SELECT count() FROM system.parts",
           params: {},
@@ -297,6 +320,31 @@ describe("tenantGuard", () => {
         await execute(unscoped);
 
         expect(onUnscoped).toHaveBeenCalledWith(unscoped);
+      });
+    });
+
+    describe("when the audit hook throws", () => {
+      it("still allows the statement the guard just approved", async () => {
+        // `onUnscoped` is host code — an audit log, a counter — and it runs on
+        // the branch where the guard has already decided to allow. Unguarded,
+        // a broken audit sink turns every declared-unscoped statement into a
+        // refusal, which is a reporting hook deciding policy.
+        const next = vi.fn(passthrough);
+        const execute = guardedBy(next, {
+          onUnscoped: () => {
+            throw new Error("audit sink is down");
+          },
+        });
+
+        await execute(
+          request({
+            sql: "SELECT count() FROM system.parts",
+            params: {},
+            unscoped: { reason: "operational part-count check" },
+          }),
+        );
+
+        expect(next).toHaveBeenCalledTimes(1);
       });
     });
   });

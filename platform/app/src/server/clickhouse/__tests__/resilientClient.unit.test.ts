@@ -22,7 +22,7 @@ vi.mock("@langwatch/observability", () => ({
     name.includes("query") ? mockQueryLogger : mockLogger,
 }));
 
-import { createResilientClickHouseClient } from "../../clickhouse/resilient-client";
+import { createResilientClickHouseClient } from "../managedClient";
 
 function makeMockClient(overrides?: Partial<ClickHouseClient>) {
   return {
