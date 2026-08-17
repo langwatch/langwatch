@@ -178,7 +178,7 @@ export class InMemoryProcessStore implements ProcessStore {
       }
       this.messages.set(identity, {
         ...message,
-        ...(message.userId ?? params.userId
+        ...((message.userId ?? params.userId)
           ? { userId: message.userId ?? params.userId }
           : {}),
         processName: ref.processName,

@@ -48,6 +48,8 @@ const SECRET = "0123456789abcdef0123456789abcdef";
 
 /** Every admission the route appended, in order, as the pipeline saw it. */
 let appended: Array<Record<string, unknown>> = [];
+/** Every confirmation the route appended, which the seam now enriches too. */
+let appendedConfirms: Array<Record<string, unknown>> = [];
 
 function signedPost(path: string, payload: unknown) {
   const fullPath = `/api/internal/gateway${path}`;
@@ -126,7 +128,16 @@ describe("spend-command ingest enrichment (real PG + internal route)", () => {
                 return Promise.resolve();
               },
             },
-            confirmSpend: { send: () => Promise.resolve() },
+            confirmSpend: {
+              sendBatch: (payloads: Array<Record<string, unknown>>) => {
+                appendedConfirms.push(...payloads);
+                return Promise.resolve();
+              },
+              send: (payload: Record<string, unknown>) => {
+                appendedConfirms.push(payload);
+                return Promise.resolve();
+              },
+            },
             failSpend: { send: () => Promise.resolve() },
           },
         }),
@@ -192,6 +203,7 @@ describe("spend-command ingest enrichment (real PG + internal route)", () => {
 
   afterEach(() => {
     appended = [];
+    appendedConfirms = [];
     vi.restoreAllMocks();
   });
 
@@ -239,6 +251,62 @@ describe("spend-command ingest enrichment (real PG + internal route)", () => {
     // The key was in use, so admission is what advances the column: one write
     // for the whole batch, not one per record.
     expect(await lastUsedAt()).not.toBeNull();
+  });
+
+  /** @scenario Ingest joins the control-plane attribution onto outcomes too */
+  it("joins the team and the principal onto attributed confirmations", async () => {
+    const { status } = await postRecords([
+      {
+        command: "confirmSpend" as const,
+        pod_id: "pod-a",
+        pod_seq: 1,
+        payload: {
+          gateway_request_id: `req-${nanoid(10)}`,
+          occurred_at: Date.now(),
+          project_id: PROJECT_ID,
+          usage: {},
+          // The attribution a build that repeats it on the outcome sends.
+          organization_id: ORG_ID,
+          virtual_key_id: VK_ID,
+        },
+      },
+    ]);
+
+    expect(status).toBe(200);
+    expect(appendedConfirms).toHaveLength(1);
+    expect(appendedConfirms[0]).toMatchObject({
+      tenantId: PROJECT_ID,
+      virtual_key_id: VK_ID,
+      team_id: TEAM_ID,
+      principal_user_id: USER_ID,
+    });
+  });
+
+  /** @scenario An outcome from a build that carries no attribution is left alone */
+  it("skips enrichment for a confirmation that names no key", async () => {
+    const { status } = await postRecords([
+      {
+        command: "confirmSpend" as const,
+        pod_id: "pod-a",
+        pod_seq: 1,
+        payload: {
+          gateway_request_id: `req-${nanoid(10)}`,
+          occurred_at: Date.now(),
+          project_id: PROJECT_ID,
+          usage: {},
+        },
+      },
+    ]);
+
+    expect(status).toBe(200);
+    expect(appendedConfirms).toHaveLength(1);
+    // Nothing to join against, so nothing is invented. Those requests keep
+    // the admission-time join in the consuming process managers, which is
+    // what their admission's `outcome_carries_attribution` flag asks for.
+    expect(appendedConfirms[0]).toMatchObject({
+      principal_user_id: "",
+      team_id: "",
+    });
   });
 
   /** @scenario A key in constant use is not written on every request */

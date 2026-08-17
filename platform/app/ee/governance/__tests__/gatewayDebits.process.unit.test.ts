@@ -54,6 +54,9 @@ function capture() {
     outbox() {
       return builder;
     },
+    transient() {
+      return builder;
+    },
   };
   gatewayDebitsPM({
     prisma: {} as never,

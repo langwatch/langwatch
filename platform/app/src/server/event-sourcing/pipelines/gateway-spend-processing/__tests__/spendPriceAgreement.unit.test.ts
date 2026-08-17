@@ -135,6 +135,9 @@ function captureHandlers(apply: (builder: unknown) => unknown): {
     outbox() {
       return builder;
     },
+    transient() {
+      return builder;
+    },
   };
   apply(builder);
   return { handlers, initial };

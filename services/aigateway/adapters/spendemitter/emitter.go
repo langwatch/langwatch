@@ -30,30 +30,26 @@ func (e *Emitter) AdmitSpend(a pipeline.SpendAdmission) {
 		Model:            a.Model,
 		RequestType:      a.RequestType,
 		Labels:           a.Labels,
+		// This build repeats attribution on every outcome, which is what
+		// lets the control plane skip the durable admission-to-outcome
+		// join. See AdmittedPayload.OutcomeCarriesAttribution.
+		OutcomeCarriesAttribution: true,
 	}
-	// The echo is caller-controlled; ship it only when it is valid JSON so
-	// a bad header costs the echo, never the admission.
-	if a.MetadataJSON != "" {
-		if json.Valid([]byte(a.MetadataJSON)) {
-			payload.Metadata = a.MetadataJSON
-		} else {
-			slog.Warn("spend emitter dropped an invalid metadata echo",
-				"gateway_request_id", a.GatewayRequestID)
-		}
-	}
+	payload.Metadata = validMetadataEcho(a.MetadataJSON, a.GatewayRequestID)
 	e.append(CommandAdmit, payload)
 }
 
 // ConfirmSpend records a served request's usage on the local spool.
 func (e *Emitter) ConfirmSpend(o pipeline.SpendOutcome) {
 	e.append(CommandConfirm, ConfirmedPayload{
-		GatewayRequestID: o.GatewayRequestID,
-		OccurredAtUnixMs: o.OccurredAt.UTC().UnixMilli(),
-		ProjectID:        o.ProjectID,
-		Usage:            usageFromDomain(o.Usage),
-		Model:            o.Model,
-		ModelProviderID:  o.ModelProviderID,
-		DurationMS:       o.Duration.Milliseconds(),
+		GatewayRequestID:   o.GatewayRequestID,
+		OccurredAtUnixMs:   o.OccurredAt.UTC().UnixMilli(),
+		ProjectID:          o.ProjectID,
+		Usage:              usageFromDomain(o.Usage),
+		Model:              o.Model,
+		ModelProviderID:    o.ModelProviderID,
+		DurationMS:         o.Duration.Milliseconds(),
+		AttributionPayload: attributionPayload(o),
 	})
 }
 
@@ -64,15 +60,51 @@ func (e *Emitter) FailSpend(o pipeline.SpendOutcome) {
 		errPayload = ErrorPayload{Type: o.Err.Type, HTTPStatus: o.Err.HTTPStatus}
 	}
 	e.append(CommandFail, FailedPayload{
-		GatewayRequestID: o.GatewayRequestID,
-		OccurredAtUnixMs: o.OccurredAt.UTC().UnixMilli(),
-		ProjectID:        o.ProjectID,
-		Error:            errPayload,
-		Usage:            usageFromDomain(o.Usage),
-		Model:            o.Model,
-		ModelProviderID:  o.ModelProviderID,
-		DurationMS:       o.Duration.Milliseconds(),
+		GatewayRequestID:   o.GatewayRequestID,
+		OccurredAtUnixMs:   o.OccurredAt.UTC().UnixMilli(),
+		ProjectID:          o.ProjectID,
+		Error:              errPayload,
+		Usage:              usageFromDomain(o.Usage),
+		Model:              o.Model,
+		ModelProviderID:    o.ModelProviderID,
+		DurationMS:         o.Duration.Milliseconds(),
+		AttributionPayload: attributionPayload(o),
 	})
+}
+
+// attributionPayload maps the outcome's copy of the admission attribution
+// onto the wire, applying the same metadata-echo validation the admission
+// applies: the two records must state the same thing, including when the
+// echo is dropped.
+func attributionPayload(o pipeline.SpendOutcome) AttributionPayload {
+	a := o.Attribution
+	payload := AttributionPayload{
+		OrganizationID: a.OrganizationID,
+		VirtualKeyID:   a.VirtualKeyID,
+		EndUserID:      a.EndUserID,
+		TraceID:        a.TraceID,
+		RequestType:    a.RequestType,
+		Labels:         a.Labels,
+		Metadata:       validMetadataEcho(a.MetadataJSON, o.GatewayRequestID),
+	}
+	if !a.AdmittedAt.IsZero() {
+		payload.AdmittedAtUnixMs = a.AdmittedAt.UTC().UnixMilli()
+	}
+	return payload
+}
+
+// validMetadataEcho passes the caller-controlled echo through only when it
+// is valid JSON, so a bad header costs the echo and never the record.
+func validMetadataEcho(raw string, gatewayRequestID string) string {
+	if raw == "" {
+		return ""
+	}
+	if !json.Valid([]byte(raw)) {
+		slog.Warn("spend emitter dropped an invalid metadata echo",
+			"gateway_request_id", gatewayRequestID)
+		return ""
+	}
+	return raw
 }
 
 func (e *Emitter) append(command string, payload any) {

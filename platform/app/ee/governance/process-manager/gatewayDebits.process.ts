@@ -417,6 +417,49 @@ function movedNothing(outcome: SpendOutcome): boolean {
   );
 }
 
+/** The scopes a debit is charged against, from wherever this instance can
+ *  see them: the outcome event itself, or the admission it remembered. */
+interface DebitAttribution {
+  organizationId: string;
+  teamId: string;
+  virtualKeyId: string;
+  principalUserId: string;
+  endUserId: string;
+}
+
+function attributionFromState(state: GatewayDebitsState): DebitAttribution {
+  return {
+    organizationId: state.organizationId,
+    teamId: state.teamId,
+    virtualKeyId: state.virtualKeyId,
+    principalUserId: state.principalUserId,
+    endUserId: state.endUserId,
+  };
+}
+
+/**
+ * The attribution the outcome states about itself, or null when it states
+ * none.
+ *
+ * A gateway build that predates attribution-on-outcome sends outcomes
+ * without it, and its admissions say so (`outcome_carries_attribution`), so
+ * those requests fall back to the remembered admission. The organization is
+ * the discriminator because it is the one field no request can be billed
+ * without.
+ */
+function attributionFromOutcome(
+  data: ConfirmSpendCommandData | FailSpendCommandData,
+): DebitAttribution | null {
+  if (!data.organization_id) return null;
+  return {
+    organizationId: data.organization_id,
+    teamId: data.team_id,
+    virtualKeyId: data.virtual_key_id,
+    principalUserId: data.principal_user_id,
+    endUserId: data.end_user_id,
+  };
+}
+
 /**
  * The debit payload for one outcome. A failure still debits whatever
  * tokens the provider billed before erroring. The price rides the event,
@@ -424,7 +467,7 @@ function movedNothing(outcome: SpendOutcome): boolean {
  * envelope state for the same request.
  */
 function writeDebitsPayload(
-  state: GatewayDebitsState,
+  attribution: DebitAttribution,
   projectId: string,
   outcome: SpendOutcome,
 ): WriteGatewayDebitsPayload {
@@ -432,11 +475,11 @@ function writeDebitsPayload(
   return {
     gateway_request_id: data.gateway_request_id,
     project_id: projectId,
-    organization_id: state.organizationId,
-    team_id: state.teamId,
-    virtual_key_id: state.virtualKeyId,
-    principal_user_id: state.principalUserId,
-    end_user_id: state.endUserId,
+    organization_id: attribution.organizationId,
+    team_id: attribution.teamId,
+    virtual_key_id: attribution.virtualKeyId,
+    principal_user_id: attribution.principalUserId,
+    end_user_id: attribution.endUserId,
     model: data.model,
     model_provider_id: data.model_provider_id,
     usage: data.usage,
@@ -458,10 +501,13 @@ interface OutcomeContext<Intent> {
 }
 
 /**
- * One outcome, routed by what the instance knows. A request that moved
- * nothing is dropped before any intent exists. Before any admission the
- * outcome is stashed for the admitted handler to release; after one it
- * freezes its debit intent, whether or not the request named an end user.
+ * One outcome, routed by what it can see. A request that moved nothing is
+ * dropped before any intent exists.
+ *
+ * An outcome that states its own attribution freezes its debit intent
+ * immediately and leaves the state untouched, so the evolution is transient
+ * and this request costs no durable row at all. One that does not falls back
+ * to the admission: stashed until admission arrives, released by it after.
  */
 function onOutcome<Intent>(
   state: GatewayDebitsState,
@@ -469,7 +515,25 @@ function onOutcome<Intent>(
   outcome: SpendOutcome,
 ): { state: GatewayDebitsState; intents?: Intent[] } {
   if (movedNothing(outcome)) return { state };
-  const payload = writeDebitsPayload(state, ctx.projectId, outcome);
+
+  const stated = attributionFromOutcome(outcome.data);
+  if (stated) {
+    return {
+      state,
+      intents: [
+        ctx.intents.writeDebits(
+          `debits:${outcome.status}`,
+          writeDebitsPayload(stated, ctx.projectId, outcome),
+        ),
+      ],
+    };
+  }
+
+  const payload = writeDebitsPayload(
+    attributionFromState(state),
+    ctx.projectId,
+    outcome,
+  );
   if (!state.admitted) return { state: { ...state, pendingOutcome: payload } };
   return {
     state,
@@ -503,6 +567,16 @@ export function gatewayDebitsPM(
       // instance keeps `debits:late` minted at most once.
       .on(GATEWAY_SPEND_ADMITTED_EVENT_TYPE, (state, data, ctx) => {
         const admitted = data as AdmitSpendCommandData;
+        if (admitted.outcome_carries_attribution) {
+          // The outcome will state the attribution itself, so there is
+          // nothing here worth remembering and this admission writes no row.
+          //
+          // Nothing can be waiting on it either: an outcome only stashes
+          // when it carried no attribution, and admission and outcome always
+          // come from the same pod and the same build, so a stash and this
+          // flag cannot both exist for one request.
+          return { state };
+        }
         const stashed = state.pendingOutcome;
         const next = {
           ...state,
@@ -542,6 +616,11 @@ export function gatewayDebitsPM(
         }),
       )
       .toPayload((event) => event.data as unknown as JsonValue)
+      // Every debit an attribution-carrying outcome mints is one idempotent
+      // outbox insert and nothing else: no instance row, no inbox row, no
+      // transaction. The keys (`debits:confirmed`, `debits:failed`) are pure
+      // functions of the event, which is what the absent transaction rests on.
+      .transient()
       .outbox({
         maxAttempts: 8,
         concurrency: 4,

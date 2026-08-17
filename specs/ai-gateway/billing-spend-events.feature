@@ -318,29 +318,99 @@ Feature: Billing spend events, one durable record per gateway request
       Then gateway spend events are not governed by it
       And the table's own retention is a fixed thirteen month delete
 
-  Rule: Silence settles, and settlement is never the last word
+  # WHY THE OUTCOME REPEATS THE ADMISSION'S ATTRIBUTION. The consumers that
+  # act on an outcome — budget debits, webhook delivery — need to know who the
+  # request belonged to, and only the admission used to say. So each of them
+  # remembered every open admission in a durable row, one per gateway request,
+  # in a table with no retention sweep (process-manager-retention.feature).
+  #
+  # The gateway already holds that attribution when it builds the outcome; it
+  # simply was not repeating it. Repeating it lets both consumers act on the
+  # one event they are handling and keep nothing, which is what makes their
+  # evolutions transient (transient-process-instances.feature).
+  #
+  # ROLLING UPGRADE. The admission declares whether its emitter will repeat
+  # attribution on the outcome, because the decision has to be made when the
+  # admission is handled, before the outcome exists. Admission and outcome
+  # always come from the same pod and the same build, so the pair is
+  # self-consistent and the gateway and control plane may roll in either
+  # order: an older build omits the flag and keeps the durable join.
+
+  Rule: An outcome states the attribution it is billed against
+
+    @unit
+    Scenario: A confirmation carries the attribution its admission carried
+      Given a gateway request admitted against an organization and virtual key
+      When the gateway emits its confirmation
+      Then the confirmation states the same organization, key, end user and trace
+
+    @unit
+    Scenario: A failure carries the attribution its admission carried
+      Given a gateway request admitted against an organization and virtual key
+      When the provider call fails
+      Then the failure states the same organization and end user
+
+    @unit
+    Scenario: The outcome's attribution is the admission's, not a re-derivation
+      Given a request whose end user was resolved at admission
+      When the outcome is built after the body was materialized
+      Then it states the end user the admission stated
 
     @integration
+    Scenario: Ingest joins the control-plane attribution onto outcomes too
+      Given a confirmation naming a virtual key
+      When the spend command batch is ingested
+      Then the confirmation carries the key's principal and the project's team
+
+    @integration
+    Scenario: An outcome from a build that carries no attribution is left alone
+      Given a confirmation emitted without attribution
+      When the spend command batch is ingested
+      Then it is not enriched and the admission's remembered join is used
+
+  Rule: Silence settles, and settlement is never the last word
+
+    # The sweeper used to be one process instance per gateway request, each
+    # holding a durable row and a wake armed at admission + grace. The join
+    # those rows performed is already done by the fold, which leaves a request
+    # at `admitted` until an outcome arrives, so "which requests are still
+    # open" is a query rather than a memory. Settlement latency became grace
+    # plus at most one sweep interval.
+
+    @unit
     Scenario: An unconfirmed admission settles when the grace expires
       Given an admitted request whose confirmation never arrives
       When the settlement grace elapses
       Then the sweeper issues settleSpend for that request
 
-    @integration
-    Scenario: A confirmation inside the grace stands the sweeper down
-      Given an admitted request
-      When its confirmation arrives inside the grace
-      Then the armed settlement wake is cleared and nothing settles
+    @unit
+    Scenario: Settlement keeps one process instance for the install, not one per request
+      Given several admissions open past their grace
+      When the sweeper settles them
+      Then exactly one settlement process instance exists
 
-    @integration
-    Scenario: An outcome racing ahead of its admission arms no wake
-      Given a confirmation that arrived before its admission
-      Then the late admission arms no settlement wake
+    @unit
+    Scenario: The sweeper re-arms itself after every wake
+      Given the settlement sweeper has run
+      Then its next sweep is armed from the present
 
-    @integration
-    Scenario: Duplicate wakes cannot double-settle
-      Given a settlement wake that already fired
-      Then a duplicate wake issues no second settle
+    @unit
+    Scenario: One tenant's failed settle does not cost the rest of the sweep
+      Given two admissions open past their grace and the first settle fails
+      When the sweeper runs
+      Then the second admission is still settled
+
+    @unit
+    Scenario: A sweep that finds nothing settles nothing
+      Given no admission is open past its grace
+      When the sweeper runs
+      Then no settle command is sent
+
+    @unit
+    Scenario: A settled request names the organization it belonged to
+      Given an admission the sweeper settles
+      When the settle command is built from the spend record
+      Then it carries the organization, key and end user the fold recorded
 
     @integration
     Scenario: The full settlement sequence: silent admission settles, a late confirmation supersedes

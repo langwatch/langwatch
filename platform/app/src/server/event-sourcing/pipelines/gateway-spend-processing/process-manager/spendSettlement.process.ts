@@ -2,16 +2,9 @@ import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import type { ProcessManagerApplier } from "~/server/event-sourcing/pipeline/processBuilder";
 import type { IntentContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
-import type {
-  AdmitSpendCommandData,
-  SettleSpendCommandData,
-} from "../schemas/commands";
-import {
-  GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
-  GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
-  GATEWAY_SPEND_FAILED_EVENT_TYPE,
-  GATEWAY_SPEND_SETTLED_EVENT_TYPE,
-} from "../schemas/constants";
+import type { OpenAdmission } from "../repositories/openAdmissions.clickhouse.repository";
+import { SETTLEMENT_LOOKBACK_MS } from "../repositories/openAdmissions.clickhouse.repository";
+import type { SettleSpendCommandData } from "../schemas/commands";
 import type { GatewaySpendProcessingEvent } from "../schemas/events";
 
 const logger = createLogger("langwatch:gateway-spend:settlement");
@@ -32,6 +25,13 @@ export const SPEND_SETTLEMENT_PROCESS_NAME = "spendSettlement" as const;
  */
 export const SETTLEMENT_GRACE_MS_DEFAULT = 30 * 60 * 1000;
 
+/**
+ * How often the sweeper looks. Settlement latency is grace + at most one
+ * interval, so five minutes is a rounding error against a thirty-minute
+ * grace while keeping each sweep's scan small.
+ */
+export const SETTLEMENT_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
+
 /** Operator override, epoch-milliseconds. Bounded below so a typo cannot
  *  turn every in-flight request into a settlement storm. */
 export function settlementGraceMs(): number {
@@ -49,120 +49,143 @@ export function settlementGraceMs(): number {
 }
 
 export interface SpendSettlementState {
-  /** Admission instant (event time), 0 until the admitted event is seen. */
-  admittedAtMs: number;
-  /** A confirmation, failure, or settlement closed this request. */
-  resolved: boolean;
-  /** The sweeper already issued settleSpend; wakes stand down. */
-  settleIssued: boolean;
+  /** Epoch ms of the last sweep this process scheduled, for operators. */
+  lastSweepAt: number | null;
 }
 
 export const INITIAL_SPEND_SETTLEMENT_STATE: SpendSettlementState = {
-  admittedAtMs: 0,
-  resolved: false,
-  settleIssued: false,
+  lastSweepAt: null,
 };
 
 export interface SpendSettlementProcessDeps {
   /** Sends the settleSpend command into this pipeline. Injected lazily so
    *  the process manager can be registered while the pipeline is built. */
   sendSettleSpend: (data: SettleSpendCommandData) => Promise<void>;
+  /** Every ClickHouse instance's open admissions. One sweeper settles the
+   *  shared instance and every private one. */
+  findOpenAdmissions: (params: {
+    now: number;
+    graceMs: number;
+    lookbackMs: number;
+  }) => Promise<OpenAdmission[]>;
   /** Grace override for tests; production reads the env-backed constant. */
   graceMs?: number;
+  lookbackMs?: number;
   now?: () => number;
 }
 
-const settleSchema = z.object({
-  gateway_request_id: z.string().min(1),
-  project_id: z.string().min(1),
+const sweepSchema = z.object({
+  scheduledFor: z.number().int(),
 });
 
-function runSettle(deps: SpendSettlementProcessDeps) {
+/**
+ * Settles every admission past its grace.
+ *
+ * Best-effort per row: one tenant's failed send must not cost the rest of
+ * the sweep, because the next wake would find the same backlog plus another
+ * interval of it. A row that fails is left open and retried on the next
+ * sweep, which is exactly what the sweep is for.
+ */
+function runSweep(deps: SpendSettlementProcessDeps) {
   return async (
-    payload: z.output<typeof settleSchema>,
+    _payload: z.output<typeof sweepSchema>,
     context: IntentContext,
   ): Promise<void> => {
-    await deps.sendSettleSpend({
-      gateway_request_id: payload.gateway_request_id,
-      tenantId: payload.project_id,
-      occurred_at: (deps.now ?? Date.now)(),
-      reason: "confirmation_deadline_expired",
+    const now = (deps.now ?? Date.now)();
+    const graceMs = deps.graceMs ?? settlementGraceMs();
+    const open = await deps.findOpenAdmissions({
+      now,
+      graceMs,
+      lookbackMs: deps.lookbackMs ?? SETTLEMENT_LOOKBACK_MS,
     });
+    if (open.length === 0) return;
+
+    let settled = 0;
+    let failed = 0;
+    for (const admission of open) {
+      try {
+        await deps.sendSettleSpend({
+          gateway_request_id: admission.gatewayRequestId,
+          tenantId: admission.tenantId,
+          occurred_at: now,
+          reason: "confirmation_deadline_expired",
+          // The fold recorded this at admission, so the settled record and
+          // the envelope it delivers name the same organization and key the
+          // request was admitted against.
+          organization_id: admission.organizationId,
+          virtual_key_id: admission.virtualKeyId,
+          principal_user_id: admission.principalUserId,
+          team_id: "",
+          end_user_id: admission.endUserId,
+          trace_id: admission.traceId,
+          request_type: admission.requestType,
+          labels: admission.labels,
+          metadata: admission.metadata,
+          admitted_at: admission.admittedAtMs,
+        });
+        settled++;
+      } catch (error) {
+        failed++;
+        logger.warn(
+          {
+            gatewayRequestId: admission.gatewayRequestId,
+            projectId: admission.tenantId,
+            error,
+          },
+          "failed to settle an admission; the next sweep retries it",
+        );
+      }
+    }
+
     logger.info(
-      {
-        gatewayRequestId: payload.gateway_request_id,
-        projectId: payload.project_id,
-        attempt: context.attempt,
-      },
-      "settled an admission whose confirmation never arrived",
+      { settled, failed, graceMs, attempt: context.attempt },
+      "settled admissions whose confirmation never arrived",
     );
   };
 }
 
 /**
- * The M2 settlement sweeper: every admission arms a wake at
- * admission + grace, and an outcome (confirmed, failed, or an
- * already-settled replay) stands the wake down. A wake that fires with
- * no outcome seen issues settleSpend, which the fold records as
- * status=settled with unknown (null, never zero) quantities and
- * needs_reconciliation=true, and the delivery process manager emits the
- * `gateway.request.settled` envelope. A confirmation arriving after
- * settlement still resolves: the fold's supersession table replaces the
- * settled record and the superseding completed envelope delivers.
+ * The settlement sweeper: ONE process instance for the whole install, woken
+ * on a schedule, asking the spend record which admissions are still open
+ * past their grace and settling each one.
  *
- * Instances are keyed by the aggregate id (the gateway request), so the
- * process key IS the request id. The command is idempotent by
- * (tenant, request, step), so a duplicate wake or an ops replay of the
- * settle intent cannot double-settle.
+ * It used to be one instance per gateway request, each holding a durable row
+ * and a wake armed at admission + grace. That is the right shape for a
+ * long-lived entity and the wrong one for a request: the aggregate is
+ * per-request, so the framework keyed an instance per request, and
+ * `ProcessManagerInstance` has no retention sweep because it is documented as
+ * bounded by entity population rather than by traffic. A timer per LLM call
+ * made that false.
+ *
+ * The join those rows existed to perform is already done: the fold writes one
+ * `gateway_spend` row per request and leaves it at `admitted` until an
+ * outcome arrives, so "which requests are still open" is a query, not a
+ * memory. Settlement latency becomes grace + at most one sweep interval, and
+ * the settle command is idempotent by (tenant, request, step), so a
+ * re-settled row is a no-op rather than a double charge.
  */
 export function spendSettlementPM(
   deps: SpendSettlementProcessDeps,
 ): ProcessManagerApplier<GatewaySpendProcessingEvent> {
-  const grace = deps.graceMs ?? settlementGraceMs();
   return (pm) =>
     pm
       .state<SpendSettlementState>(INITIAL_SPEND_SETTLEMENT_STATE)
-      .intent("settle", settleSchema, runSettle(deps))
-      .on(GATEWAY_SPEND_ADMITTED_EVENT_TYPE, (state, data, ctx) => {
-        const admitted = data as AdmitSpendCommandData;
-        if (state.resolved) {
-          // The outcome raced ahead of its admission; nothing to watch.
-          return {
-            state: { ...state, admittedAtMs: admitted.occurred_at },
-          };
-        }
-        return {
-          state: { ...state, admittedAtMs: admitted.occurred_at },
-          // Schedule from max(admission + grace, now): a backlogged
-          // admission whose grace already elapsed wakes immediately
-          // instead of writing a wake into the past.
-          nextWakeAt: Math.max(admitted.occurred_at + grace, ctx.now),
-        };
-      })
-      .on(GATEWAY_SPEND_CONFIRMED_EVENT_TYPE, (state) => ({
-        state: { ...state, resolved: true },
-        nextWakeAt: null,
+      .schedule({ everyMs: SETTLEMENT_SWEEP_INTERVAL_MS })
+      // Wake handlers must be pure and synchronous — the commit that
+      // persists this evolution is what fences racing workers — so the query
+      // and the sends run behind the outbox lease as an intent instead.
+      .onWake((state, ctx) => ({
+        state: { ...state, lastSweepAt: ctx.at },
+        intents: [
+          ctx.intents.sweep(`sweep:${ctx.at}`, { scheduledFor: ctx.at }),
+        ],
       }))
-      .on(GATEWAY_SPEND_FAILED_EVENT_TYPE, (state) => ({
-        state: { ...state, resolved: true },
-        nextWakeAt: null,
-      }))
-      .on(GATEWAY_SPEND_SETTLED_EVENT_TYPE, (state) => ({
-        // Whether this sweeper's own settle or an operator's, the request
-        // is closed and any pending wake stands down.
-        state: { ...state, resolved: true, settleIssued: true },
-        nextWakeAt: null,
-      }))
-      .onWake((state, ctx) => {
-        if (state.resolved || state.settleIssued) return { state };
-        return {
-          state: { ...state, settleIssued: true },
-          intents: [
-            ctx.intents.settle(`settle:${ctx.key}`, {
-              gateway_request_id: ctx.key,
-              project_id: ctx.projectId,
-            }),
-          ],
-        };
+      .intent("sweep", sweepSchema, runSweep(deps))
+      .outbox({
+        maxAttempts: 3,
+        concurrency: 1,
+        batchSize: 1,
+        // One sweep can settle thousands of rows, each a command append.
+        leaseDurationMs: 10 * 60 * 1000,
       });
 }

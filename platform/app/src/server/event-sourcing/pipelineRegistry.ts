@@ -139,6 +139,7 @@ import type { ComputeExperimentRunMetricsCommandData } from "./pipelines/experim
 import { createGatewaySpendProcessingPipeline } from "./pipelines/gateway-spend-processing/pipeline";
 import type { GatewaySpendState } from "./pipelines/gateway-spend-processing/projections/gatewaySpend.foldProjection";
 import { GatewaySpendStore } from "./pipelines/gateway-spend-processing/projections/gatewaySpend.store";
+import { getOpenAdmissionFindersByInstance } from "./pipelines/gateway-spend-processing/repositories/openAdmissions.clickhouse.repository";
 import { GATEWAY_SPEND_PIPELINE_NAME } from "./pipelines/gateway-spend-processing/schemas/constants";
 import { createGithubMaintenancePipeline } from "./pipelines/github-maintenance/pipeline";
 import { createGovernanceEventsPipeline } from "./pipelines/governance-events/pipeline";
@@ -903,6 +904,15 @@ export class PipelineRegistry {
               };
             };
             await pipeline.commands.settleSpend.send(data);
+          },
+          // Every configured instance, shared and private alike: one sweeper
+          // settles the whole install, so it cannot hold a single client.
+          findOpenAdmissions: async (params) => {
+            const finders = await getOpenAdmissionFindersByInstance();
+            const perInstance = await Promise.all(
+              finders.map(({ finder }) => finder.findOpenAdmissions(params)),
+            );
+            return perInstance.flat();
           },
         },
       }),
