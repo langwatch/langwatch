@@ -348,7 +348,7 @@ The two URLs are split for **auth + routing convenience**, not for architectural
 - **Same `recorded_spans` and `log_records` tables**, governance-ingested events land in the same ClickHouse storage that powers the rest of the platform. They're distinguished by reserved attribute namespaces stamped at the receiver edge:
   - `langwatch.origin.kind = "ingestion_source"`, discriminator
   - `langwatch.ingestion_source.{id, organization_id, source_type}`, source identity
-- **Same trace viewer**: open a span in `/messages`, the rendering is identical regardless of which URL it came from. The origin attributes appear as read-only system metadata.
+- **Same trace viewer**: open a span in `/traces`, the rendering is identical regardless of which URL it came from. The origin attributes appear as read-only system metadata.
 - **Same compliance + RBAC + multitenancy machinery**: all the controls that have been hardened over years of running OTel ingest at scale apply equally to governance data.
 
 The auth + tenancy split is what's actually different:
@@ -18102,7 +18102,7 @@ override the default.
 |---------|------------------|-----------------|------------------|
 | **Org admin** (governance-relevant role on at least one org) | `RoleBinding` carries `organization:manage` OR `governance:view` | [`/governance`](/ai-governance/governance-dashboard): the bird-eye dashboard | Their job is org-wide oversight; first paint shows usage-by-team graphs, anomaly alerts, drill-in to per-team, per-user activity. Their own personal traces are secondary. |
 | **Personal-only user** (no project membership beyond their own personal workspace) | `OrganizationUser` role=member AND `Project.isPersonal=true` AND no `TeamUser` membership beyond personal | [`/me`](/ai-governance/personal-portal/end-user): the AI Tools Portal + Trace Ingest section | Their primary use case is *"sign in, install Claude Code, Cursor template, see my own usage"*. AI Tools Portal tile-grid + Trace Ingest catalog is the headline. |
-| **Project-only user** (LLMOps customer, no personal-workspace activity) | `TeamUser` membership exists with `Team.isPersonal=false` AND no traces in `Project.isPersonal` | `/<project>/messages`, the existing LLMOps trace explorer | Existing LLMOps customer story stays unchanged. First paint is the Messages explorer, not /me. |
+| **Project-only user** (LLMOps customer, no personal-workspace activity) | `TeamUser` membership exists with `Team.isPersonal=false` AND no traces in `Project.isPersonal` | `/<project>/traces`, the existing LLMOps trace explorer | Existing LLMOps customer story stays unchanged. First paint is the Trace Explorer, not /me. |
 | **Mixed** (personal + project membership) | Combination of above | [`/me`](/ai-governance/personal-portal/end-user) (default) OR last-touched (cookie-tracked) | Cookie remembers where the user last spent time. New mixed user lands at /me first paint to discover the AI Tools Portal, then uses the workspace switcher to flip to project work. |
 
 ## How detection works
@@ -18120,7 +18120,7 @@ and the resolver implementation:
    beyond their personal team? If yes, route to `/me`.
 3. **Project-only check**: does the user have NO personal-workspace
    activity (no traces in `Project.isPersonal=true` in the past 30 days)?
-   If yes, route to their default project's `/messages`.
+   If yes, route to their default project's `/traces`.
 4. **Fallback**: for mixed users, route to `/me` unless a cookie remembers
    they last spent time in a project.
 
@@ -18143,7 +18143,7 @@ Every user can override the persona-based default in
 - **Always /me**: always lands on the AI Tools Portal + Trace Ingest
   section, regardless of role.
 - **Always project home**: always lands on the user's last-active project's
-  `/messages`, regardless of role.
+  `/traces`, regardless of role.
 
 Override applies after the next sign-in.
 

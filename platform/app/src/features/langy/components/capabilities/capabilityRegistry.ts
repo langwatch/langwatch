@@ -138,7 +138,7 @@ const nestedResourceHref = (base: string, resourceId: string) =>
   `${base}/${encodeURIComponent(resourceId)}`;
 
 const SURFACE_ROUTE_CONFIG: Record<CapabilitySurface, SurfaceRouteConfig> = {
-  traces: { path: "messages", resourceHref: nestedResourceHref },
+  traces: { path: "traces", resourceHref: nestedResourceHref },
   analytics: { path: "analytics" },
   experiments: { path: "experiments", resourceHref: nestedResourceHref },
   evaluations: {

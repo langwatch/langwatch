@@ -71,16 +71,6 @@ Feature: Media rendering across trace surfaces
     Then the input preview cell shows a compact audio indicator instead of base64 text
 
   # ===========================================================================
-  # Conversation / messages view
-  # ===========================================================================
-
-  @integration
-  Scenario: The conversation view renders media parts inside message bubbles
-    Given a thread whose messages carry an externalized image and audio part
-    When I open the conversation view
-    Then each message bubble renders its image inline and its audio with a player
-
-  # ===========================================================================
   # Conversation thread: media hangs off the message that carried it
   # ===========================================================================
   # The thread layout gives each role its own full-width row, so a turn's media

@@ -240,9 +240,9 @@ const TargetTypeSelectorDrawer = lazyDefault({
   factory: () => import("./targets/TargetTypeSelectorDrawer"),
   key: "TargetTypeSelectorDrawer",
 });
-const TraceDetailsDrawer = lazyDefault({
-  factory: () => import("./TraceDetailsDrawer"),
-  key: "TraceDetailsDrawer",
+const LegacyTraceDrawerRedirect = lazyDefault({
+  factory: () => import("./LegacyTraceDrawerRedirect"),
+  key: "LegacyTraceDrawerRedirect",
 });
 
 // Traces V2 drawers — the real shell is mounted from `TracesPage` based
@@ -261,7 +261,11 @@ const TraceV2DrawerNoop: FC<TraceV2DrawerShellProps> = () => null;
  * Add new drawers here - types will be automatically derived.
  */
 export const drawers = {
-  traceDetails: TraceDetailsDrawer,
+  // The legacy trace drawer is gone. The name is kept because it is resolved
+  // straight from the address bar, so links shared before the removal — and
+  // the REST/notification URLs that named it — would otherwise resolve to
+  // nothing. It redirects to `traceV2Details` on the page it was opened on.
+  traceDetails: LegacyTraceDrawerRedirect,
   traceV2Details: TraceV2DrawerNoop,
   automation: AutomationDrawer,
   viewAutomation: ViewAutomationDrawer,

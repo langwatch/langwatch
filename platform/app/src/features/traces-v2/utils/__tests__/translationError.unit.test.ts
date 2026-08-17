@@ -3,13 +3,17 @@ import {
   extractAiCallFailedInfo,
   extractMissingModelInfo,
   extractProviderDisabledInfo,
-} from "../../../utils/trpcError";
+} from "~/utils/trpcError";
 import { shouldShowGenericTranslateError } from "../translationError";
 
 // The gating logic is what we own here; the extractors are a boundary
 // (tested in utils/trpcError). Mock them so we can prove the fallback fires
 // only when none matched.
-vi.mock("../../../utils/trpcError", () => ({
+// Aliased, not relative: the relative form has to be re-counted every time
+// this file moves, and a path that resolves to nothing mocks nothing — the
+// import above still binds the real module and every `vi.mocked(...)` call
+// fails on it.
+vi.mock("~/utils/trpcError", () => ({
   extractMissingModelInfo: vi.fn(),
   extractAiCallFailedInfo: vi.fn(),
   extractProviderDisabledInfo: vi.fn(),

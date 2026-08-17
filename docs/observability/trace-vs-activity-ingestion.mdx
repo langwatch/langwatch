@@ -36,7 +36,7 @@ The two URLs are split for **auth + routing convenience**, not for architectural
 - **Same `recorded_spans` and `log_records` tables**, governance-ingested events land in the same ClickHouse storage that powers the rest of the platform. They're distinguished by reserved attribute namespaces stamped at the receiver edge:
   - `langwatch.origin.kind = "ingestion_source"`, discriminator
   - `langwatch.ingestion_source.{id, organization_id, source_type}`, source identity
-- **Same trace viewer**: open a span in `/messages`, the rendering is identical regardless of which URL it came from. The origin attributes appear as read-only system metadata.
+- **Same trace viewer**: open a span in `/traces`, the rendering is identical regardless of which URL it came from. The origin attributes appear as read-only system metadata.
 - **Same compliance + RBAC + multitenancy machinery**: all the controls that have been hardened over years of running OTel ingest at scale apply equally to governance data.
 
 The auth + tenancy split is what's actually different:
