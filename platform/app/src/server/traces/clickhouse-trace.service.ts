@@ -6,7 +6,7 @@ import type { PrismaClient } from "~/generated/prisma/client";
 import { LLM_PARAMETER_MAP } from "~/prompts/prompt-playground/llmParameterMap";
 import { AnnotationService } from "~/server/annotations/annotation.service";
 import { annotationSuggestedOutput } from "~/server/annotations/annotationSuggestedOutput";
-import { resolveRetentionLookbackMs } from "~/server/app-layer/clients/clickhouse/retention-floor";
+import { createRetentionFloorService } from "~/server/app-layer/clients/clickhouse/retention-floor";
 import {
   DEFAULT_PARTITION_WINDOW_MS,
   queryWindowed,
@@ -412,11 +412,16 @@ export class ClickHouseTraceService {
      * Widens the span read's retention floor to this tenant's own policy.
      * Optional: without it the floor stays at {@link SPAN_READ_FLOOR_LOOKBACK_MS}.
      */
-    private readonly retentionResolver?: RetentionPolicyResolver,
+    retentionResolver?: RetentionPolicyResolver,
   ) {
     this.resolveTraceSpans = resolveTraceSpans;
     this.resolveTraceSpansBatch = resolveTraceSpansBatch;
+    this.retentionFloor = createRetentionFloorService(retentionResolver);
   }
+
+  private readonly retentionFloor: ReturnType<
+    typeof createRetentionFloorService
+  >;
 
   /**
    * Resolve the ClickHouse client for a given project.
@@ -3243,10 +3248,9 @@ export class ClickHouseTraceService {
                   // got 90 days here and simply could not see its own older
                   // spans; one on a short policy no longer pays for a reach it
                   // has no rows in. See {@link resolveRetentionLookbackMs}.
-                  lookbackMs: await resolveRetentionLookbackMs({
+                  lookbackMs: await this.retentionFloor.getLookbackMs({
                     table: "stored_spans",
                     tenantId: projectId,
-                    resolver: this.retentionResolver,
                     minLookbackMs: SPAN_READ_FLOOR_LOOKBACK_MS,
                   }),
                 },

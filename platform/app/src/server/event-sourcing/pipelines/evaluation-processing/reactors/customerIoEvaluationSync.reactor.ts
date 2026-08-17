@@ -166,7 +166,7 @@ export function createCustomerIoEvaluationSyncReactor(
             },
           })
           .catch((error) => {
-            logger.error(
+            logger.warn(
               { projectId, error },
               "Failed to track evaluation_ran event",
             );

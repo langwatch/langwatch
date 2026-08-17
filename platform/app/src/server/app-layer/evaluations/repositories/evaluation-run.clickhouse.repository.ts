@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import { resolveRetentionFloorMs } from "~/server/app-layer/clients/clickhouse/retention-floor";
+import { createRetentionFloorService } from "~/server/app-layer/clients/clickhouse/retention-floor";
 import { RESOLVER_RECENT_WINDOW_MS } from "~/server/app-layer/clients/clickhouse/windowed-read";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
@@ -73,8 +73,14 @@ export class EvaluationRunClickHouseRepository
      * horizon. Optional so existing construction sites keep working on the
      * platform default; see {@link resolveRetentionFloorMs}.
      */
-    private readonly retentionResolver?: RetentionPolicyResolver,
-  ) {}
+    retentionResolver?: RetentionPolicyResolver,
+  ) {
+    this.retentionFloor = createRetentionFloorService(retentionResolver);
+  }
+
+  private readonly retentionFloor: ReturnType<
+    typeof createRetentionFloorService
+  >;
 
   async upsert(
     data: EvaluationRunData,
@@ -211,10 +217,9 @@ export class EvaluationRunClickHouseRepository
     return this.queryScheduledAtMs({
       tenantId,
       evaluationId,
-      sinceMs: await resolveRetentionFloorMs({
+      sinceMs: await this.retentionFloor.getFloorMs({
         table: TABLE_NAME,
         tenantId,
-        resolver: this.retentionResolver,
       }),
     });
   }

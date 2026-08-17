@@ -57,7 +57,10 @@ describe("ProcessOutboxWorker", () => {
     await vi.advanceTimersByTimeAsync(100);
 
     expect(runOnce).toHaveBeenCalledTimes(2);
-    expect(logger.error).toHaveBeenCalledOnce();
+    // Warning, not error: the drain is retried on the next poll, and the very
+    // next assertion is that it recovered.
+    expect(logger.warn).toHaveBeenCalledOnce();
+    expect(logger.error).not.toHaveBeenCalled();
     await worker.stop();
   });
 

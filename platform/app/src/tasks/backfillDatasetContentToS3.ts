@@ -386,7 +386,7 @@ export const migrateAllPostgresDatasets = async (
           else summary.alreadyMigrated += 1;
         } catch (error) {
           summary.failed += 1;
-          logger.error(
+          logger.warn(
             { error, datasetId: dataset.id, projectId: dataset.projectId },
             "Failed to migrate dataset to S3 — will retry on the next run",
           );

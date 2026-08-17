@@ -121,7 +121,7 @@ export function createCustomerIoTraceSyncReactor(
               },
             })
             .catch((error) => {
-              logger.error(
+              logger.warn(
                 { projectId, error },
                 "Failed to identify user for trace update",
               );

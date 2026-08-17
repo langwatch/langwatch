@@ -64,7 +64,7 @@ export function startAnomalyWorker(): AnomalyWorkerHandle | undefined {
         logger.info(result, "anomaly tick");
       }
     } catch (err) {
-      logger.error(
+      logger.warn(
         { err: err instanceof Error ? err.message : String(err) },
         "anomaly detector tick failed (will retry on next interval)",
       );

@@ -108,7 +108,7 @@ async function syncFinishedSimulation(
       });
     }
   } catch (error) {
-    logger.error(
+    logger.warn(
       { projectId, error },
       "Failed to process CIO simulation sync — non-fatal",
     );

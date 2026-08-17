@@ -64,6 +64,17 @@ Feature: A read that cannot be pruned must still be bounded
     When a read floor is resolved
     Then the platform default bounds the read
 
+  # The provider walks the project → team → organization cascade, so an
+  # uncached lookup would put a database round trip in front of every read this
+  # exists to make cheaper. Retention changes on human timescales.
+  @unit
+  Scenario: The retention lookup is not repeated for every read
+    Given many reads for the same tenant and table
+    When their floors are resolved
+    Then the policy cascade is asked once, not once per read
+    And one tenant's answer is never served to another
+    And what is remembered is bounded, so many tenants cannot grow it forever
+
   # ---------------------------------------------------------------------------
   # The ceiling
   #

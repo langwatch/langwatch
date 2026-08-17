@@ -211,7 +211,7 @@ export function createProjectMetadataReactor(
           });
         }
       } catch (error) {
-        logger.error(
+        logger.warn(
           {
             tenantId,
             error: error instanceof Error ? error.message : String(error),

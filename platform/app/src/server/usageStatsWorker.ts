@@ -87,7 +87,7 @@ export function startUsageStatsWorker(): UsageStatsWorkerHandle | undefined {
     try {
       await sendUsageStatsForAllOrganizations();
     } catch (error) {
-      logger.error(
+      logger.warn(
         { error },
         "usage stats tick failed (will retry on next interval)",
       );
