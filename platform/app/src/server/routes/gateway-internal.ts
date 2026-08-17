@@ -342,11 +342,23 @@ function virtualKeyParseRejection(presented: string): KeyAuthRejection | null {
   }
 }
 
-/** Why a resolved key's status bars it from serving, or null when it may.
- *  Disabled is distinct from revoked AND from a bad key: a disabled tenant
- *  must be able to tell "we turned you off" from "your credential is
- *  wrong", and the platform's own tooling branches on this code. */
-function virtualKeyStatusRejection(status: string): KeyAuthRejection | null {
+/** Why a resolved key bars itself from serving, or null when it may.
+ *  Each stop carries its own code: a tenant must be able to tell "we turned
+ *  you off" from "your credential is wrong" from "your key ran out", and the
+ *  platform's own tooling branches on this code.
+ *
+ *  Expiry is a date rather than a status, so it is checked here rather than
+ *  read off the row's status: the key stays ACTIVE past the date, which is
+ *  what keeps extending the date an ordinary edit. A key that expires now
+ *  stops being resolved immediately, and a token minted before then ends at
+ *  the date itself, because the mint clamps its exp to the key's expiry. */
+function virtualKeyStatusRejection({
+  status,
+  expiresAt,
+}: {
+  status: string;
+  expiresAt: Date | null;
+}): KeyAuthRejection | null {
   if (status === "REVOKED") {
     return {
       status: 403,
@@ -362,6 +374,15 @@ function virtualKeyStatusRejection(status: string): KeyAuthRejection | null {
       code: "virtual_key_disabled",
       message:
         "virtual key is disabled; it can be re-enabled by an administrator",
+    };
+  }
+  if (expiresAt && expiresAt.getTime() <= Date.now()) {
+    return {
+      status: 403,
+      type: "virtual_key_expired",
+      code: "virtual_key_expired",
+      message:
+        "virtual key has expired; extend its expiration or mint a new one",
     };
   }
   return null;
@@ -409,7 +430,10 @@ secured.access(gatewayPolicy()).post("/resolve-key", async (c) => {
       401,
     );
   }
-  const statusRejection = virtualKeyStatusRejection(vk.status);
+  const statusRejection = virtualKeyStatusRejection({
+    status: vk.status,
+    expiresAt: vk.expiresAt,
+  });
   if (statusRejection) {
     logAuthDecision(c, statusRejection.code, statusRejection.status, {
       vkId: vk.id,
@@ -423,6 +447,10 @@ secured.access(gatewayPolicy()).post("/resolve-key", async (c) => {
   // failing the auth handshake.
   const traceProject = await traceProjectFor(prisma, vk.traceProjectId);
 
+  // notAfter ends the token at the key's expiration date when that arrives
+  // before the ordinary 15 minute TTL, and travels on as the vk_expires_at
+  // claim. Without it the gateway holds a token that outlives the key, and its
+  // auth cache keeps serving that key while the control plane is unreachable.
   const { jwt } = signGatewayJwt({
     vk_id: vk.id,
     project_id: traceProject?.id ?? null,
@@ -430,6 +458,7 @@ secured.access(gatewayPolicy()).post("/resolve-key", async (c) => {
     org_id: vk.organizationId,
     principal_id: vk.principalUserId,
     revision: vk.revision.toString(),
+    notAfter: vk.expiresAt,
   });
 
   // Fire-and-forget last-used bump. Failures here must not deny the request.

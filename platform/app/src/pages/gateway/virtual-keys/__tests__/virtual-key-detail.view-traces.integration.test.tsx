@@ -126,6 +126,11 @@ vi.mock("~/utils/api", () => ({
         useQuery: () => ({ data: { providers: [] }, isLoading: false }),
       },
     },
+    routingPolicy: {
+      get: {
+        useQuery: () => ({ data: undefined, isError: false, isLoading: false }),
+      },
+    },
     gatewayUsage: {
       summaryForVirtualKey: {
         useQuery: () => ({ data: undefined, isLoading: false }),

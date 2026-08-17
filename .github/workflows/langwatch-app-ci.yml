@@ -106,15 +106,37 @@ jobs:
       # files that genuinely talk to something, so the same per-shard file count
       # fits in fewer shards — and two runners come off the critical path,
       # which is its own win while every shard is queueing 5-10 minutes for one.
-      integration-shards: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '[1,2,3,4]' || '[1]' }}
-      integration-shard-count: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '4' || '1' }}
+      #
+      # The lane splits again by whether a file can share a module registry.
+      # Import was 42% of this lane's runner time — ~1.6s per file rebuilding
+      # the same Prisma client and server graph — and 331 of the 477 files can
+      # share one. The other 146 call `vi.mock`, which cannot apply to a
+      # registry an earlier file already populated, so they keep isolation.
+      # See platform/app/src/test-utils/integrationModuleGraph.ts.
+      #
+      # Two shards each rather than four of one kind: measured on src/app/api,
+      # the shared lane runs ~4x faster per file, so 331 shared files and 146
+      # mocking ones are close to balanced at 2+2 — the same four runners as
+      # before, finishing sooner.
+      integration-matrix: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '[{"lane":"shared","shard":1,"count":2},{"lane":"shared","shard":2,"count":2},{"lane":"mocking","shard":1,"count":2},{"lane":"mocking","shard":2,"count":2}]' || '[{"lane":"shared","shard":1,"count":1},{"lane":"mocking","shard":1,"count":1}]' }}
       # The component lane is unit-shaped: forked VM workers and concurrent
       # files, with no service containers to wait on, so a shard gets through
-      # its files far faster than a datastore shard does. Two is enough for
-      # ~546 files. (It does NOT share a module registry the way the unit lane
-      # does — see the `isolate` note in vitest.component.config.ts.)
-      component-shards: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '[1,2]' || '[1]' }}
-      component-shard-count: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '2' || '1' }}
+      # its files far faster than a datastore shard does. (It does NOT share a
+      # module registry the way the unit lane does, see the `isolate` note in
+      # vitest.component.config.ts.)
+      #
+      # Three rather than two, because two put the lane inside a minute of the
+      # hard floor. The floor in src/test-unit-global-setup.ts fires at 4 min
+      # and is calibrated for a lane whose healthy shard takes ~3 min; measured
+      # on 540 files over two shards, shard 1 spent 3m34s in the test step, so
+      # 26 seconds separated a green lane from one the floor cut mid-run. Six
+      # more files crossed it. The floor then reports the shard as red with no
+      # failed test in it, which reads as a wedge rather than as a lane that
+      # outgrew its split, so the cost of being close to it is a confusing
+      # failure rather than a slow pass. Every PR that adds a component test
+      # spends that margin, so the split has to leave some.
+      component-shards: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '[1,2,3]' || '[1]' }}
+      component-shard-count: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '3' || '1' }}
       # Coverage instrumentation costs ~45% of the run (measured: a unit subset
       # goes 3.7s -> 6.6s with --coverage). Nothing gates on it — there is no
       # codecov.yml, no codecov status check, and both uploads are
@@ -481,6 +503,26 @@ jobs:
       VITEST_MAX_WORKERS: "4" # physical core count on GitHub-hosted ubuntu runners
       BUILD_TIME: "true"
       CI: "true"
+      # This lane inherits the UNIT lane's hard floor and needs a bigger one.
+      #
+      # vitest.component.config.ts spreads `...unitTest`, so it also inherits
+      # `globalSetup: ["./src/test-unit-global-setup.ts"]` and its
+      # DEFAULT_HARD_FLOOR_MS of 4 minutes. That number is sized for a unit
+      # shard, which the file says finishes in ~3 min. A component shard does
+      # not: measured over recent runs the median is 297s — 4.95 min — so the
+      # floor fires on a HEALTHY shard, mid-run, whenever it lands on the slow
+      # side of its own average.
+      #
+      # The failure reads as a hang and is not one. The floor says so itself:
+      # "the shard still had files to start, so the floor cut a run that was
+      # working rather than one that was wedged. Read that as a shard too slow
+      # for the floor, not as a hang." Observed on main (run 32011... shard 2)
+      # as well as on pull requests, so it is intermittent rather than new.
+      #
+      # 12 minutes keeps the floor doing its job — a finalize wedge still gets
+      # cut well before the 25-minute job cap below, which is the outcome the
+      # floor exists to avoid — while leaving a healthy 5-minute shard alone.
+      LANGWATCH_UNIT_HARD_FLOOR_MS: "720000"
     runs-on: ubuntu-latest
     # No services, so nothing here can wedge on a container. The cap matches
     # test-unit's reasoning rather than test-integration's: a vitest finalize
@@ -574,13 +616,19 @@ jobs:
         run: bash ../../.github/scripts/notify-slack-test-failure.sh test-component
 
   test-integration:
+    name: "test-integration (${{ matrix.lane }} ${{ matrix.shard }}/${{ matrix.count }})"
     needs: changes
     if: needs.changes.outputs.relevant == 'true'
     strategy:
       fail-fast: false
       matrix:
-        shard: ${{ fromJSON(needs.changes.outputs.integration-shards) }}
+        include: ${{ fromJSON(needs.changes.outputs.integration-matrix) }}
     env:
+      # Which half of the datastore lane this shard runs, and — because the
+      # config derives `include` and `isolate` from this one variable — whether
+      # it may share a module registry. Setting it anywhere else, or setting it
+      # to something these two jobs do not, silently changes what runs.
+      INTEGRATION_GRAPH_LANE: ${{ matrix.lane }}
       # VITEST_INTEGRATION_PARALLEL is deliberately NOT set, so a shard runs
       # its files one at a time.
       #
@@ -748,7 +796,7 @@ jobs:
           helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
           helm repo add langwatch https://langwatch.github.io/langwatch
 
-      - name: Run integration tests (shard ${{ matrix.shard }}/4)
+      - name: Run integration tests (${{ matrix.lane }} ${{ matrix.shard }}/${{ matrix.count }})
         id: integration-tests
         working-directory: platform/app
         # Integration files run sequentially in a single long-lived fork worker
@@ -786,7 +834,7 @@ jobs:
               --outputFile=test-results.json
           else
             # shellcheck disable=SC2086
-            pnpm test:integration --shard=${{ matrix.shard }}/${{ needs.changes.outputs.integration-shard-count }} $COV $DUR \
+            pnpm test:integration --shard=${{ matrix.shard }}/${{ matrix.count }} $COV $DUR \
               --reporter=default --reporter=json --reporter=./src/test-utils/shardFailureReporter.ts \
               --outputFile=test-results.json
           fi
@@ -797,7 +845,12 @@ jobs:
         if: always() && needs.changes.outputs.durations == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: shard-durations-integration-${{ matrix.shard }}
+          # The lane is in the name because the two lanes both number their
+          # shards from 1: without it, `shared 1/2` and `mocking 1/2` would both
+          # upload `shard-durations-integration-1`, and upload-artifact rejects
+          # a duplicate name within one run. The merge job below globs
+          # `shard-durations-*`, so it picks both up either way.
+          name: shard-durations-integration-${{ matrix.lane }}-${{ matrix.shard }}
           path: platform/app/vitest.durations.delta.json
           if-no-files-found: ignore
 
@@ -961,16 +1014,18 @@ jobs:
           # run. They must agree: a path linted on one side and not the other
           # reads as that file's whole backlog appearing or vanishing.
           # `./packages` is GONE from this list, and deliberately not replaced
-          # with `../../packages`. The nine workspace packages now live in one
-          # repo-root tree, which is outside biome's project root here (the app
-          # directory, where biome.jsonc lives). Biome reports out-of-root files
+          # with `../../packages`. The nine workspace packages live in one
+          # repo-root tree that this run does not reach: it is started from the
+          # app directory, and /biome.jsonc scopes the workspace to
+          # platform/app/** anyway. Biome reports files outside the project root
           # by ABSOLUTE path, and the gate keys counts on the reported path, so
           # the base tree's temp-dir prefix can never match the head's: all 268
           # of their diagnostics read as brand new every run. Restoring coverage
-          # means giving packages/ its own biome root and its own gate run, which
-          # is a change to the lint setup rather than to this move -- tracked as
-          # a follow-up. The app tree, which is what this job is named for, is
-          # still fully covered.
+          # means giving packages/ a nested config of its own, adding it to the
+          # root config's includes, and giving it its own gate run -- a change to
+          # the lint setup rather than to this list, tracked as a follow-up. The
+          # app tree, which is what this job is named for, is still fully
+          # covered.
           BIOME_PATHS=(./src ./ee ./scripts ./e2e ./prisma ./vite)
 
           # Biome exits non-zero whenever it reports anything; the gate is the

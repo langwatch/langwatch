@@ -90,6 +90,7 @@ describe("FoldProjectionExecutor applied-set eviction", () => {
 
   describe("given a batch carrying one already-applied event and three new ones", () => {
     describe("when it commits on a first attempt", () => {
+      /** @scenario 'A commit records every id it recognised' */
       it("keeps the already-applied id in the set instead of evicting it", async () => {
         const events = ["c0", "c1", "c2", "c3"].map((id, index) =>
           makeEvent(id, 1000 + index),

@@ -13,7 +13,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { BarChart3, Download, X } from "lucide-react";
+import { BarChart3, Bird, Download, X } from "lucide-react";
 import Parse from "papaparse";
 import { useMemo } from "react";
 import {
@@ -29,6 +29,10 @@ import {
 import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
 import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
 import { GatewayErrorPanel } from "~/components/gateway/GatewayErrorPanel";
+import {
+  resolveTracesHrefForKey,
+  type TracesWindow,
+} from "~/components/gateway/tracesHrefForKey";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Link } from "~/components/ui/link";
 import { Tooltip as UITooltip } from "~/components/ui/tooltip";
@@ -45,6 +49,38 @@ const PRESETS: Array<{ label: string; days: number | "mtd" }> = [
   { label: "Last 90 days", days: 90 },
   { label: "This month", days: "mtd" },
 ];
+
+/**
+ * The period the Trace Explorer should open on for the period being read.
+ *
+ * Three of the five map onto presets the explorer already has. The other
+ * two travel as exact instants: it has no 90-day preset at all, and its
+ * "this month" starts in the reader's own timezone while this page's starts
+ * in UTC, so the preset would open on a different set of days than the
+ * numbers above it were computed from.
+ */
+const TRACE_WINDOW_PRESETS: Record<number, string> = {
+  1: "24h",
+  7: "7d",
+  30: "30d",
+};
+
+function traceWindowFor({
+  days,
+  fromIso,
+  toIso,
+}: {
+  days: number | "mtd";
+  fromIso: string;
+  toIso: string;
+}): TracesWindow {
+  const presetId = typeof days === "number" ? TRACE_WINDOW_PRESETS[days] : null;
+  if (presetId) return { presetId };
+  return {
+    fromMs: new Date(fromIso).getTime(),
+    toMs: new Date(toIso).getTime(),
+  };
+}
 
 function GatewayUsagePage() {
   const { organization } = useOrganizationTeamProject();
@@ -102,6 +138,22 @@ function GatewayUsagePage() {
   const filteredKeyName = virtualKeyId
     ? (keyQuery.data?.name ?? virtualKeyId)
     : null;
+  // Only offered while one key is in focus: the organization-wide view has
+  // no single trace destination to open, and the key's own destination is
+  // what decides whether there is anything to open at all.
+  const viewTracesHref = useMemo(
+    () =>
+      virtualKeyId && keyQuery.data
+        ? resolveTracesHrefForKey({
+            teams: organization?.teams ?? [],
+            virtualKeyId,
+            traceProjectId: keyQuery.data.traceProjectId,
+            traceProjectArchived: keyQuery.data.traceProjectArchived,
+            window: traceWindowFor({ days, fromIso, toIso }),
+          })
+        : undefined,
+    [virtualKeyId, keyQuery.data, organization?.teams, days, fromIso, toIso],
+  );
 
   const activeQuery = virtualKeyId ? vkSummaryQuery : summaryQuery;
   const data = virtualKeyId
@@ -320,7 +372,21 @@ function GatewayUsagePage() {
               )}
 
               <VStack align="stretch" gap={2}>
-                <Heading size="sm">Top models</Heading>
+                <HStack>
+                  <Heading size="sm">Top models</Heading>
+                  <Spacer />
+                  {viewTracesHref && (
+                    <Link href={viewTracesHref}>
+                      <Button
+                        variant="outline"
+                        size="xs"
+                        data-testid="usage-view-all-traces"
+                      >
+                        <Bird size={14} /> View all traces
+                      </Button>
+                    </Link>
+                  )}
+                </HStack>
                 <Table.Root size="sm">
                   <Table.Header>
                     <Table.Row>

@@ -3,6 +3,7 @@ import {
   Box,
   Button,
   Code,
+  chakra,
   Heading,
   HStack,
   Separator,
@@ -12,8 +13,11 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { keepPreviousData } from "@tanstack/react-query";
+import { formatDistanceToNow } from "date-fns";
 import {
   ArrowLeft,
+  Bird,
   FileClock,
   PauseCircle,
   Pencil,
@@ -45,10 +49,17 @@ import {
 } from "~/components/gateway/eligibleModelProviders";
 import { GuardrailAttachmentsSection } from "~/components/gateway/GuardrailAttachmentsSection";
 import { resolveTracesHrefForKey } from "~/components/gateway/tracesHrefForKey";
-import { VirtualKeyEditDrawer } from "~/components/gateway/VirtualKeyEditDrawer";
+import {
+  type VirtualKeyDetail,
+  VirtualKeyEditDrawer,
+} from "~/components/gateway/VirtualKeyEditDrawer";
 import { VirtualKeyOwnershipReadOnly } from "~/components/gateway/VirtualKeyOwnershipSection";
 import { VirtualKeySecretReveal } from "~/components/gateway/VirtualKeySecretReveal";
 import { VirtualKeyUsageSnippet } from "~/components/gateway/VirtualKeyUsageSnippet";
+import {
+  formatExpiry,
+  isExpired,
+} from "~/components/gateway/virtualKeyExpiration";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Link } from "~/components/ui/link";
@@ -76,6 +87,14 @@ function VirtualKeyDetailPage() {
       { organizationId: orgId },
       { enabled: !!orgId },
     );
+  // Reading a policy needs `routingPolicies:view`, which is stricter than
+  // the permission that opens this page, so the query is allowed to fail:
+  // the section falls back to the stored identifier rather than the name.
+  const routingPolicyId = detailQuery.data?.routingPolicyId ?? null;
+  const routingPolicyQuery = api.routingPolicy.get.useQuery(
+    { organizationId: orgId, id: routingPolicyId ?? "" },
+    { enabled: !!orgId && !!routingPolicyId, retry: false },
+  );
   const availableTeams = useMemo(
     () => organization?.teams?.map((t) => ({ id: t.id, name: t.name })) ?? [],
     [organization?.teams],
@@ -91,6 +110,10 @@ function VirtualKeyDetailPage() {
       ) ?? [],
     [organization?.teams],
   );
+  // The model picked in Spend by model, or null for every model. It
+  // narrows the recent-activity list only, so it rides the same query and
+  // leaves the totals, the chart and the model list themselves whole.
+  const [usageModel, setUsageModel] = useState<string | null>(null);
   const usageWindow = useRollingWindow(30);
   const usageQuery = api.gatewayUsage.summaryForVirtualKey.useQuery(
     {
@@ -98,8 +121,12 @@ function VirtualKeyDetailPage() {
       virtualKeyId: vkId,
       fromDate: usageWindow.fromIso,
       toDate: usageWindow.toIso,
+      ...(usageModel ? { model: usageModel } : {}),
     },
-    { enabled: !!orgId && !!vkId },
+    // Picking a model re-reads the same block, so holding the previous
+    // answer keeps the chips and the chart on screen instead of replacing
+    // the whole section with a spinner on every click.
+    { enabled: !!orgId && !!vkId, placeholderData: keepPreviousData },
   );
   const utils = api.useUtils();
   const rotateMutation = api.virtualKeys.rotate.useMutation({
@@ -187,6 +214,33 @@ function VirtualKeyDetailPage() {
         : undefined,
     [vk, organization?.teams],
   );
+  // The same link, narrowed to whatever the usage block is showing, so the
+  // trace list opens on the requests the table underneath it lists.
+  const usageTracesHref = useMemo(
+    () =>
+      vk
+        ? resolveTracesHrefForKey({
+            teams: organization?.teams ?? [],
+            virtualKeyId: vk.id,
+            traceProjectId: vk.traceProjectId,
+            traceProjectArchived: vk.traceProjectArchived,
+            model: usageModel,
+          })
+        : undefined,
+    [vk, organization?.teams, usageModel],
+  );
+
+  const routingPolicyName = routingPolicyQuery.data?.name ?? null;
+  // The providers the pinned policy walks, so the panel can mark one the
+  // key may hold but dispatch would never reach.
+  const routingPolicyProviderIds = useMemo(() => {
+    const ids = routingPolicyQuery.data?.modelProviderIds;
+    return Array.isArray(ids) ? ids.filter((id) => typeof id === "string") : [];
+  }, [routingPolicyQuery.data?.modelProviderIds]);
+  const providersAllowed = useMemo(() => {
+    const config = vk?.config as VkConfig | null | undefined;
+    return config?.providersAllowed ?? null;
+  }, [vk?.config]);
 
   const guardrailAttachments = useMemo(
     () =>
@@ -266,6 +320,20 @@ function VirtualKeyDetailPage() {
                   <FileClock size={14} /> Audit history
                 </Button>
               </Link>
+              {/* Traces outlive the key, so this is offered whatever the
+                  key's status: investigating what a revoked key did is
+                  exactly when somebody needs it. */}
+              {viewTracesHref && (
+                <Link href={viewTracesHref}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    data-testid="vk-header-view-traces"
+                  >
+                    <Bird size={14} /> View traces
+                  </Button>
+                </Link>
+              )}
               {vk.status === "active" && canUpdate && (
                 <Button
                   variant="outline"
@@ -334,15 +402,45 @@ function VirtualKeyDetailPage() {
                 <DetailRow label="Status">
                   <Badge
                     colorPalette={
-                      vk.status === "active"
-                        ? "green"
+                      vk.status === "revoked"
+                        ? "red"
                         : vk.status === "disabled"
                           ? "yellow"
-                          : "red"
+                          : isExpired(vk.expiresAt)
+                            ? "orange"
+                            : "green"
                     }
+                    data-testid="vk-detail-status"
                   >
-                    {vk.status}
+                    {vk.status === "active" && isExpired(vk.expiresAt)
+                      ? "expired"
+                      : vk.status}
                   </Badge>
+                </DetailRow>
+                <DetailRow label="Expires">
+                  {vk.expiresAt ? (
+                    <Tooltip content={new Date(vk.expiresAt).toLocaleString()}>
+                      <Text
+                        fontSize="sm"
+                        color="fg.muted"
+                        data-testid="vk-detail-expires"
+                      >
+                        {formatExpiry(new Date(vk.expiresAt))} (
+                        {formatDistanceToNow(new Date(vk.expiresAt), {
+                          addSuffix: true,
+                        })}
+                        )
+                      </Text>
+                    </Tooltip>
+                  ) : (
+                    <Text
+                      fontSize="sm"
+                      color="fg.muted"
+                      data-testid="vk-detail-expires"
+                    >
+                      Never
+                    </Text>
+                  )}
                 </DetailRow>
                 {vk.description && (
                   <DetailRow label="Description">
@@ -415,7 +513,24 @@ function VirtualKeyDetailPage() {
                       Routing policy:
                     </Text>
                     {vk.routingPolicyId ? (
-                      <Code fontSize="xs">{vk.routingPolicyId}</Code>
+                      // The name when the reader may read policies, the
+                      // stored identifier when they may not: this page opens
+                      // on a weaker permission than the policy needs, and an
+                      // identifier is still better than an empty row.
+                      routingPolicyName ? (
+                        <Link
+                          href={`/gateway/routing-policies?drawer.open=routingPolicy&drawer.policyId=${vk.routingPolicyId}`}
+                          color="blue.600"
+                          fontSize="sm"
+                          data-testid="vk-routing-policy-link"
+                        >
+                          {routingPolicyName}
+                        </Link>
+                      ) : (
+                        <Code fontSize="xs" data-testid="vk-routing-policy-id">
+                          {vk.routingPolicyId}
+                        </Code>
+                      )
                     ) : (
                       <Text fontSize="sm" color="fg.muted">
                         default cascade, all eligible providers in priority
@@ -430,7 +545,8 @@ function VirtualKeyDetailPage() {
                     availableTeams={availableTeams}
                     availableProjects={availableProjects}
                     isLoading={orgProvidersQuery.isLoading}
-                    providers={(orgProvidersQuery.data?.providers ?? []) as any}
+                    providers={orgProvidersQuery.data?.providers ?? []}
+                    providersAllowed={providersAllowed}
                   />
                   <Box>
                     <HStack
@@ -444,7 +560,7 @@ function VirtualKeyDetailPage() {
                         fontWeight="semibold"
                         color="fg.muted"
                       >
-                        Eligible model providers
+                        Allowed model providers
                       </Text>
                       <ConfigureModelProvidersLink scopes={vk.scopes ?? []} />
                     </HStack>
@@ -455,9 +571,9 @@ function VirtualKeyDetailPage() {
                       availableTeams={availableTeams}
                       availableProjects={availableProjects}
                       isLoading={orgProvidersQuery.isLoading}
-                      providers={
-                        (orgProvidersQuery.data?.providers ?? []) as any
-                      }
+                      providers={orgProvidersQuery.data?.providers ?? []}
+                      providersAllowed={providersAllowed}
+                      routingPolicyProviderIds={routingPolicyProviderIds}
                       selectedModel={snippetModel}
                       onSelectProviderModel={setSnippetModelOverride}
                     />
@@ -477,7 +593,12 @@ function VirtualKeyDetailPage() {
 
               <ConfigurationSection config={vk.config as VkConfig | null} />
 
-              <UsageSection data={usageQuery.data ?? null} />
+              <UsageSection
+                data={usageQuery.data ?? null}
+                selectedModel={usageModel}
+                onSelectModel={setUsageModel}
+                viewTracesHref={usageTracesHref}
+              />
             </VStack>
           )}
         </Box>
@@ -486,7 +607,11 @@ function VirtualKeyDetailPage() {
       {orgId && vk && (
         <VirtualKeyEditDrawer
           organizationId={orgId}
-          vk={editing ? (vk as any) : null}
+          // The cast stands on one field: VirtualKeyCamelDto types `config`
+          // as `unknown`, while the drawer names the config shape it reads.
+          // Modelling the config JSON on the DTO is what removes this, and it
+          // is a change to the wire type rather than to this call.
+          vk={editing ? (vk as VirtualKeyDetail) : null}
           onOpenChange={(open) => {
             if (!open) setEditing(false);
           }}
@@ -541,15 +666,20 @@ function VirtualKeyDetailPage() {
 function Section({
   title,
   children,
+  action,
 }: {
   title: string;
   children: React.ReactNode;
+  /** Rendered opposite the heading, for a section that leads somewhere. */
+  action?: React.ReactNode;
 }) {
   return (
     <Box>
-      <Heading size="sm" mb={2}>
-        {title}
-      </Heading>
+      <HStack mb={2}>
+        <Heading size="sm">{title}</Heading>
+        <Spacer />
+        {action}
+      </HStack>
       <Separator mb={3} />
       <VStack align="stretch" gap={2}>
         {children}
@@ -578,6 +708,8 @@ function DetailRow({
 type VkConfig = {
   modelAliases?: Record<string, string>;
   modelsAllowed?: string[] | null;
+  /** Null or absent means every provider the key's scopes reach. */
+  providersAllowed?: string[] | null;
   cache?: { mode?: "respect" | "force" | "disable"; ttlS?: number };
   rateLimits?: {
     rpm?: number | null;
@@ -618,17 +750,36 @@ type VkUsageData = {
   }>;
 };
 
-function UsageSection({ data }: { data: VkUsageData | null }) {
+function UsageSection({
+  data,
+  selectedModel,
+  onSelectModel,
+  viewTracesHref,
+}: {
+  data: VkUsageData | null;
+  /** The model the chips have picked, or null for every model. */
+  selectedModel: string | null;
+  onSelectModel: (model: string | null) => void;
+  viewTracesHref?: string;
+}) {
+  const action = viewTracesHref ? (
+    <Link href={viewTracesHref}>
+      <Button variant="outline" size="xs" data-testid="vk-usage-view-traces">
+        <Bird size={14} /> View all traces
+      </Button>
+    </Link>
+  ) : null;
+
   if (!data) {
     return (
-      <Section title="Usage (last 30 days)">
+      <Section title="Usage (last 30 days)" action={action}>
         <Spinner size="sm" />
       </Section>
     );
   }
   if (data.totalRequests === 0) {
     return (
-      <Section title="Usage (last 30 days)">
+      <Section title="Usage (last 30 days)" action={action}>
         <Text fontSize="sm" color="fg.muted">
           No usage in the last 30 days. Send a request through this virtual key
           and it'll show up here.
@@ -642,7 +793,7 @@ function UsageSection({ data }: { data: VkUsageData | null }) {
     requests: p.requests,
   }));
   return (
-    <Section title="Usage (last 30 days)">
+    <Section title="Usage (last 30 days)" action={action}>
       <VStack align="stretch" gap={4}>
         <HStack gap={6} wrap="wrap">
           <VkStat
@@ -726,62 +877,96 @@ function UsageSection({ data }: { data: VkUsageData | null }) {
               Spend by model
             </Text>
             <HStack gap={2} flexWrap="wrap">
-              {data.byModel.map((m) => (
-                <Badge key={m.model} variant="outline" fontSize="2xs">
-                  {m.model} · ${Number(m.totalUsd).toFixed(2)} · {m.requests}
-                </Badge>
-              ))}
+              {data.byModel.map((m) => {
+                const isSelected = selectedModel === m.model;
+                return (
+                  <chakra.button
+                    key={m.model}
+                    type="button"
+                    cursor="pointer"
+                    data-testid={`vk-usage-model-${m.model}`}
+                    aria-pressed={isSelected}
+                    onClick={() => onSelectModel(isSelected ? null : m.model)}
+                  >
+                    <Badge
+                      variant={isSelected ? "solid" : "outline"}
+                      colorPalette={isSelected ? "orange" : undefined}
+                      fontSize="2xs"
+                    >
+                      {m.model} · ${Number(m.totalUsd).toFixed(2)} ·{" "}
+                      {m.requests}
+                    </Badge>
+                  </chakra.button>
+                );
+              })}
             </HStack>
           </VStack>
         )}
-        {data.recentDebits.length > 0 && (
+        {(data.recentDebits.length > 0 || selectedModel) && (
           <VStack align="stretch" gap={1}>
-            <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-              Recent activity
-            </Text>
-            <Table.Root size="sm" variant="line">
-              <Table.Header>
-                <Table.Row>
-                  <Table.ColumnHeader>When</Table.ColumnHeader>
-                  <Table.ColumnHeader>Model</Table.ColumnHeader>
-                  <Table.ColumnHeader>Tokens</Table.ColumnHeader>
-                  <Table.ColumnHeader>Amount</Table.ColumnHeader>
-                  <Table.ColumnHeader>Latency</Table.ColumnHeader>
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-                {data.recentDebits.slice(0, 10).map((d) => (
-                  <Table.Row key={d.id}>
-                    <Table.Cell>
-                      <Tooltip
-                        content={new Date(d.occurredAt).toLocaleString()}
-                      >
-                        <Text fontSize="xs" color="fg.muted">
-                          {formatTimeAgo(new Date(d.occurredAt).getTime())}
-                        </Text>
-                      </Tooltip>
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Code fontSize="xs">{d.model}</Code>
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Text fontSize="xs" color="fg.muted">
-                        {d.tokensInput.toLocaleString()} →{" "}
-                        {d.tokensOutput.toLocaleString()}
-                      </Text>
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Text fontSize="xs">{formatVkAmount(d.amountUsd)}</Text>
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Text fontSize="xs" color="fg.muted">
-                        {d.durationMs !== null ? `${d.durationMs}ms` : "—"}
-                      </Text>
-                    </Table.Cell>
+            <HStack gap={2}>
+              <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+                Recent activity
+              </Text>
+              {selectedModel && (
+                <Text
+                  fontSize="xs"
+                  color="fg.muted"
+                  data-testid="vk-usage-model-filter"
+                >
+                  {selectedModel} only. Click the model again to see all.
+                </Text>
+              )}
+            </HStack>
+            {data.recentDebits.length === 0 ? (
+              <Text fontSize="xs" color="fg.muted">
+                No requests on that model in the last 30 days.
+              </Text>
+            ) : (
+              <Table.Root size="sm" variant="line">
+                <Table.Header>
+                  <Table.Row>
+                    <Table.ColumnHeader>When</Table.ColumnHeader>
+                    <Table.ColumnHeader>Model</Table.ColumnHeader>
+                    <Table.ColumnHeader>Tokens</Table.ColumnHeader>
+                    <Table.ColumnHeader>Amount</Table.ColumnHeader>
+                    <Table.ColumnHeader>Latency</Table.ColumnHeader>
                   </Table.Row>
-                ))}
-              </Table.Body>
-            </Table.Root>
+                </Table.Header>
+                <Table.Body>
+                  {data.recentDebits.slice(0, 10).map((d) => (
+                    <Table.Row key={d.id}>
+                      <Table.Cell>
+                        <Tooltip
+                          content={new Date(d.occurredAt).toLocaleString()}
+                        >
+                          <Text fontSize="xs" color="fg.muted">
+                            {formatTimeAgo(new Date(d.occurredAt).getTime())}
+                          </Text>
+                        </Tooltip>
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Code fontSize="xs">{d.model}</Code>
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Text fontSize="xs" color="fg.muted">
+                          {d.tokensInput.toLocaleString()} →{" "}
+                          {d.tokensOutput.toLocaleString()}
+                        </Text>
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Text fontSize="xs">{formatVkAmount(d.amountUsd)}</Text>
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Text fontSize="xs" color="fg.muted">
+                          {d.durationMs !== null ? `${d.durationMs}ms` : "—"}
+                        </Text>
+                      </Table.Cell>
+                    </Table.Row>
+                  ))}
+                </Table.Body>
+              </Table.Root>
+            )}
           </VStack>
         )}
       </VStack>

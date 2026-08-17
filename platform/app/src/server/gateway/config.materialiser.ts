@@ -242,6 +242,19 @@ export type GatewayConfigPayload = {
   // The gateway stamps them on customer spans as langwatch.labels (Trace
   // Explorer "Label" filter) and matches cache-rule vk_tags against them.
   vk_tags: string[];
+  /**
+   * The date the key stops serving, in unix seconds, and `null` for a key that
+   * never expires. Always present, because the gateway tells an explicit null
+   * ("this key has no date") apart from a field a control plane older than it
+   * never sent ("keep the date you already hold").
+   *
+   * The key's expiry also travels on the auth token as `vk_expires_at`, which
+   * is the mint-time floor. Carrying it here as well is what bounds how long
+   * the gateway can hold an out-of-date value: the ETag moves on every
+   * mutation, so a shortened or extended date reaches the gateway on its next
+   * config revalidation even while the change feed is unavailable.
+   */
+  expires_at: number | null;
 };
 
 export class GatewayConfigMaterialiser {
@@ -363,6 +376,7 @@ export class GatewayConfigMaterialiser {
       cache_rules: cacheRules.map(cacheRuleToWire),
       metadata: config.metadata ?? {},
       vk_tags: config.metadata?.tags ?? [],
+      expires_at: expiresAtWire(vk.expiresAt),
     };
   }
 
@@ -824,6 +838,17 @@ function routingModeToWire(
 
 function providerExclusionWire(mp: ModelProvider): ProviderExclusionWire {
   return { id: mp.id, type: mp.provider };
+}
+
+/**
+ * The key's expiration date as the gateway reads it: unix SECONDS, and null for
+ * a key that never expires. Seconds because the gateway decodes the field as a
+ * unix timestamp, the same unit the `vk_expires_at` token claim uses;
+ * milliseconds would put the date tens of thousands of years out and lift the
+ * expiry cap off the key.
+ */
+function expiresAtWire(expiresAt: Date | null): number | null {
+  return expiresAt ? Math.floor(expiresAt.getTime() / 1000) : null;
 }
 
 /**

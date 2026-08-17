@@ -15,6 +15,7 @@ import {
   partitionIntegrationFiles,
   toIncludePatterns,
 } from "./src/test-utils/integrationLanes";
+import { graphLaneSelection } from "./src/test-utils/integrationModuleGraph";
 import WeightBalancedSequencer from "./vitest.sequencer";
 
 config();
@@ -22,6 +23,16 @@ config();
 const { datastore } = partitionIntegrationFiles({
   root: __dirname,
   searchDirs: [...INTEGRATION_SEARCH_DIRS],
+});
+
+// The datastore lane splits again, by whether a file can tolerate a shared
+// module registry. `files` and `isolate` come out of ONE call on purpose:
+// deriving them separately is how a lane ends up running the mocking files
+// with a shared graph. See src/test-utils/integrationModuleGraph.ts.
+const graphLane = graphLaneSelection({
+  root: __dirname,
+  datastoreFiles: datastore,
+  env: process.env,
 });
 
 // One switch for the CI-vs-laptop trade-offs below.
@@ -52,7 +63,7 @@ export default defineConfig({
     // service containers at all (vitest.component.config.ts). Both lanes call
     // partitionIntegrationFiles, so together they are still every integration
     // file, exactly once. See specs/ci/integration-test-lanes.feature.
-    include: toIncludePatterns(datastore),
+    include: toIncludePatterns(graphLane.files),
     exclude: [...configDefaults.exclude, ".next/**/*", ".next-saas/**/*"],
     testTimeout: 60_000, // 60 seconds for testcontainers startup and processing
     hookTimeout: 60_000, // 60 seconds for beforeAll/afterAll hooks
@@ -138,6 +149,18 @@ export default defineConfig({
     // between files instead of relying on a fresh module graph to provide one.
     // That is a real change to the test harness and belongs in its own PR,
     // where the failures it causes are the subject rather than collateral.
+    //
+    // THAT PR IS THIS ONE, and the paragraph above turned out to be half the
+    // story. The teardown was one blocker and is fixed: `setup.ts` is a setup
+    // FILE, so its `afterAll` ran per test file and disconnected the very
+    // Prisma and Redis singletons a shared graph exists to keep.
+    //
+    // The other blocker is `vi.mock`, which no teardown reaches — a hoisted
+    // mock cannot apply to a registry an earlier file already populated — and
+    // 123 of 414 files mock a module. So the answer is a partition rather than
+    // a flag: the mocking files keep a fresh registry, the rest share one.
+    // Decided together with `include` above; see integrationModuleGraph.ts.
+    isolate: graphLane.isolate,
     // Same weight-balanced split as the unit config: equal file counts are not
     // equal work, and a matrix is only as fast as its slowest leg.
     sequence: { sequencer: WeightBalancedSequencer },

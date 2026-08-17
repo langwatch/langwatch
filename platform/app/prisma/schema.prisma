@@ -2655,6 +2655,14 @@ model VirtualKey {
   disabledAt     DateTime?
   disabledReason String?
 
+  // The moment the key stops serving, or null for a key that never
+  // expires. Read at resolve time and compared with now, the same way
+  // ApiKey.expiresAt is: the status column stays ACTIVE, so extending the
+  // date is an ordinary edit and no sweeper has to run for the key to
+  // stop. Unindexed on purpose: the check rides a lookup by secret hash
+  // that already resolves one row.
+  expiresAt DateTime?
+
   // Credential material. Full secret format:
   //   vk-lw-<26-char-crockford-ulid>  (32 chars total)
   // Only the hashed form and a short display prefix are kept after

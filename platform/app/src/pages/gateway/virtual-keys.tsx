@@ -40,6 +40,7 @@ import {
 import { VirtualKeyCreateDrawer } from "~/components/gateway/VirtualKeyCreateDrawer";
 import { VirtualKeyEditDrawer } from "~/components/gateway/VirtualKeyEditDrawer";
 import { VirtualKeySecretReveal } from "~/components/gateway/VirtualKeySecretReveal";
+import { isExpired } from "~/components/gateway/virtualKeyExpiration";
 import { ProviderScopeChips } from "~/components/settings/ProviderScopeChips";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Link } from "~/components/ui/link";
@@ -55,6 +56,27 @@ import { formatTimeAgo } from "~/utils/formatTimeAgo";
 /** Deep link from a key's spend to its Usage view over the same window. */
 function usageHrefForKey(virtualKeyId: string): string {
   return `/gateway/usage?vk=${virtualKeyId}&days=mtd`;
+}
+
+/**
+ * What the status column says, which is not always what the column stores.
+ *
+ * Expiry is a date on an ACTIVE key rather than a status value, so the badge
+ * derives it. The stored stops come first: a revoked key that also carried a
+ * date is revoked, and reporting it as expired would offer a fix that does
+ * not exist.
+ */
+function statusBadge(vk: { status: string; expiresAt?: string | null }): {
+  label: string;
+  colorPalette: string;
+} {
+  if (vk.status === "revoked") return { label: "revoked", colorPalette: "red" };
+  if (vk.status === "disabled")
+    return { label: "disabled", colorPalette: "yellow" };
+  if (isExpired(vk.expiresAt)) {
+    return { label: "expired", colorPalette: "orange" };
+  }
+  return { label: "active", colorPalette: "green" };
 }
 
 type ScopeEntry = {
@@ -169,8 +191,12 @@ function VirtualKeysPage() {
   const [statusTab, setStatusTab] = useState<"active" | "revoked">("active");
 
   const allRows = listQuery.data ?? [];
+  // A disabled key belongs with the live ones: it is paused, not finished,
+  // and it used to appear in neither tab, which left the only route to it a
+  // link somebody had kept. Revoked is the one terminal state, so it keeps
+  // its own tab.
   const activeRows = useMemo(
-    () => allRows.filter((vk) => vk.status === "active"),
+    () => allRows.filter((vk) => vk.status !== "revoked"),
     [allRows],
   );
   const revokedRows = useMemo(
@@ -414,13 +440,17 @@ function VirtualKeysPage() {
                               </Text>
                             </Table.Cell>
                             <Table.Cell>
-                              <Badge
-                                colorPalette={
-                                  vk.status === "active" ? "green" : "red"
-                                }
-                              >
-                                {vk.status}
-                              </Badge>
+                              {(() => {
+                                const badge = statusBadge(vk);
+                                return (
+                                  <Badge
+                                    colorPalette={badge.colorPalette}
+                                    data-testid={`vk-status-${vk.id}`}
+                                  >
+                                    {badge.label}
+                                  </Badge>
+                                );
+                              })()}
                             </Table.Cell>
                             <Table.Cell>
                               <ProviderScopeChips
@@ -533,7 +563,7 @@ function VirtualKeysPage() {
                               onClick={(e) => e.stopPropagation()}
                               cursor="default"
                             >
-                              {vk.status === "active" && (
+                              {vk.status !== "revoked" && (
                                 <Menu.Root>
                                   <Menu.Trigger asChild>
                                     <Button
@@ -568,7 +598,12 @@ function VirtualKeysPage() {
                                         <Bird size={14} /> View traces
                                       </Menu.Item>
                                     )}
-                                    {canUpdate && (
+                                    {/* Editing and rotating a paused key
+                                        would take effect the moment it is
+                                        enabled again, so both wait for the
+                                        key to be live. Its detail page has
+                                        the Enable button. */}
+                                    {canUpdate && vk.status === "active" && (
                                       <Menu.Item
                                         value="edit"
                                         onClick={() => setEditing(vk)}
@@ -576,7 +611,7 @@ function VirtualKeysPage() {
                                         <Pencil size={14} /> Edit
                                       </Menu.Item>
                                     )}
-                                    {canRotate && (
+                                    {canRotate && vk.status === "active" && (
                                       <Menu.Item
                                         value="rotate"
                                         onClick={() =>

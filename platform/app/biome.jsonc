@@ -1,6 +1,21 @@
 {
 	"$schema": "https://biomejs.dev/schemas/2.5.1/schema.json",
 
+	// Nested under /biome.jsonc, which is a marker rather than a ruleset -- see
+	// the comment there for why it has to exist. Everything below is still the
+	// whole of this project's configuration; `extends: "//"` inherits only the
+	// vcs block.
+	//
+	// KEEP THESE TWO KEYS TOGETHER. `root: false` without a reachable root does
+	// not fail -- Biome falls back to its built-in defaults in silence, which
+	// turns every rule disabled below back on and reformats to the default
+	// style. On the subset used to check this, 179 diagnostics became 1232. A
+	// tree with this file but no /biome.jsonc (an export, a sparse checkout, a
+	// base tree built from a commit that predates the root) lints clean-looking
+	// nonsense rather than erroring, so there is nothing to notice.
+	"root": false,
+	"extends": "//",
+
 	// SEVERITY IS THE TIER.
 	//
 	//   error — baseline is clean; blocks everywhere, for everyone.

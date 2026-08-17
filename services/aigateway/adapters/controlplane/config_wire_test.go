@@ -2,7 +2,9 @@ package controlplane
 
 import (
 	"encoding/json"
+	"regexp"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -401,4 +403,70 @@ func TestConfigWire_FallbackWithoutRetiredKeysDecodes(t *testing.T) {
 
 	cfg := wire.toDomain()
 	assert.Equal(t, 2, cfg.Fallback.MaxAttempts)
+}
+
+// The key's own expiration date on the config wire. Three answers have to stay
+// apart, because two of them look the same to a decoder that only reads a
+// zero value: a key that never expires, and a control plane older than the field
+// that said nothing. Collapsing them lifts the expiry cap off a key whose own
+// token says it expires.
+//
+// Spec: specs/ai-gateway/auth-cache.feature, Rule "A changed expiration date
+// reaches the gateway on the config channel".
+//
+// @scenario "the config wire tells a null date apart from a missing one"
+func TestConfigWire_KeyExpiry(t *testing.T) {
+	decode := func(t *testing.T, payload string) *configWire {
+		t.Helper()
+		var wire configWire
+		require.NoError(t, json.Unmarshal([]byte(payload), &wire))
+		return &wire
+	}
+
+	t.Run("a unix timestamp is the date the key stops", func(t *testing.T) {
+		at, known, err := decode(t, `{"expires_at":1734568790}`).keyExpiry()
+
+		require.NoError(t, err)
+		assert.True(t, known)
+		assert.True(t, at.Equal(time.Unix(1734568790, 0)), "got %s", at)
+	})
+
+	t.Run("an explicit null is a key that never expires", func(t *testing.T) {
+		at, known, err := decode(t, `{"expires_at":null}`).keyExpiry()
+
+		require.NoError(t, err)
+		assert.True(t, known, "the control plane answered about expiry; the answer is that there is none")
+		assert.True(t, at.IsZero(), "no date, which is what the zero value means downstream")
+	})
+
+	t.Run("a missing field says nothing about expiry", func(t *testing.T) {
+		at, known, err := decode(t, `{"models_allowed":["gpt-5-mini"]}`).keyExpiry()
+
+		require.NoError(t, err)
+		assert.False(t, known, "the caller has to keep the date it already holds")
+		assert.True(t, at.IsZero())
+	})
+
+	t.Run("a field that is neither is a malformed response", func(t *testing.T) {
+		_, _, err := decode(t, `{"expires_at":"2026-09-01T00:00:00Z"}`).keyExpiry()
+
+		require.Error(t, err, "a date the gateway cannot read must fail the fetch, not move the key's end date")
+	})
+}
+
+// The control-plane half of the same contract. A rename or a unit change here
+// reads as "an older control plane" on the gateway side, which is tolerated by
+// design and therefore silent: the cap would quietly stop following a changed
+// date. Pin both the field and its unit.
+func TestControlPlaneMaterialiserEmitsTheKeyExpiry(t *testing.T) {
+	src := readControlPlaneSource(t, "src", "server", "gateway", "config.materialiser.ts")
+
+	// Whitespace-tolerant: a formatter may break the expression across lines
+	// without breaking the contract it expresses.
+	if !regexp.MustCompile(`expires_at:\s*expiresAtWire\(\s*vk\.expiresAt\s*\)`).MatchString(src) {
+		t.Error("config.materialiser.ts no longer emits expires_at from the key's own date")
+	}
+	if !regexp.MustCompile(`Math\.floor\(\s*expiresAt\.getTime\(\)\s*/\s*1000\s*\)`).MatchString(src) {
+		t.Error("config.materialiser.ts no longer emits expires_at in unix SECONDS; milliseconds would push the date out of reach")
+	}
 }
