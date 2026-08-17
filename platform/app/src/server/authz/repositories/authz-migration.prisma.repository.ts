@@ -12,7 +12,9 @@ import type { PrismaClient } from "~/generated/prisma/client";
  * batch writes only; equivalence, parity and finalization live in
  * `TeamUserBackfillMigration` (@langwatch/authz-server).
  */
-export class PrismaAuthzMigrationRepository implements AuthzMigrationRepository {
+export class PrismaAuthzMigrationRepository
+  implements AuthzMigrationRepository
+{
   constructor(private readonly prisma: PrismaClient) {}
 
   async findLegacyTeamRows({

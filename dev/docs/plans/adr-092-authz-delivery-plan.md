@@ -29,23 +29,23 @@ per-customer migrations).
 ## The shape of the whole thing
 
 ```
-        A ENGINE           B BACKFILL         C RE-KEY           D ONE IDIOM
-        registry+roles     TeamUser →         roleKey column     grants service,
-        engine+shadow      bindings, kill     lite-member fix,   .permission(),
-        5 PRs, 1 wk   ──►  fallbacks     ──►  legacy-key    ──►  edge identity,
-        + 1 wk soak        3 PRs, 1 wk        sunset             authz.authorize
-                                              4 PRs, 1.5 wk     8 PRs, 2-3 wk
+        A ENGINE           B SELF-MIGRATE     C RE-KEY           D ONE IDIOM
+        registry+roles     in-place runner,   roleKey column     grants service,
+        engine+shadow      TeamUser →         lite-member fix,   .permission(),
+        MERGED #6894  ──►  bindings, per-org  legacy-key    ──►  edge identity,
+        shadow at 100%     parity + switch    sunset             authz.authorize
+        on cloud (soak)    1 PR               1 PR               1 PR
                                                    │                  │
  union semantics: settled (D1)        product sign-off #1, #2         │
                                                                       ▼
         F ACCELERATE                            E DERIVE + DELETE
         epochs, L1 cache,                       useCan, Access surface,
         passports, witnesses   ◄──────────────  offboard verb, delete
-        4 PRs, 1-2 wk                           rbac.ts monolith
-                                                5 PRs, 2-3 wk
+        1 PR                                    rbac.ts + stage tails
+                                                1 PR
 
- Total: ~28 PRs · ~9-12 weeks wall clock (soaks dominate, code doesn't)
- Parallelism: D's route-family PRs fan out; E1/E3/E4 run parallel after D
+ Total: 5 PRs after stage A · ~9-12 weeks wall clock (soaks dominate)
+ Parallelism: inside each stage PR; the soak gates between stages stay serial
 ```
 
 Every stage ends at a **gate**: a measurable condition, not a vibe. No stage
