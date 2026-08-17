@@ -124,10 +124,33 @@ Even batched, the walk over every tracked test file costs appreciably more than
 in-process parsing did — around 15s, past vitest's 10s default for a hook — so
 that hook declares its own timeout and says why.
 
-The compiler stops parsing 7.7 MB it never checked. The remaining bulk in the
-program is generated Prisma types, at 11 MB across 111 files; nothing here
-addresses that, and it is the obvious next place to look if the program's size
-ever becomes the binding constraint.
+The compiler stops parsing 7.7 MB it never checked. The remaining bulk is
+generated Prisma types, at 10.5 MB across 111 files, and the reason to write
+that down is to stop it being mistaken for the next thing to fix.
+
+It is not a large schema, and both obvious levers are already closed. 103 models
+is ordinary; the amplification is Prisma's constant, flat across the tree at a
+67 KB median per model — a leaf model with six scalar columns and no relations
+still generates 44 KB and 52 exported types, which is the floor before our
+schema enters into it. The hub models add a multiplicative term, since Prisma
+emits a nested `Create`/`Update`/`Upsert` family once per relation and everything
+project-scoped points back at `Project` (756 KB, 456 types, 299 of them those
+families) — but that fan-in is the multi-tenancy model, not an accident. And
+excluding the directory from `include` would change nothing: all 111 files
+already carry `@ts-nocheck`, `models.ts` re-exports all 103 models, so the tree
+is reachable through any import of the client regardless.
+
+**Bytes are also the wrong unit.** Bytes are what gets parsed, which is cheap and
+linear; what costs is type instantiations, and the two come apart — Prisma 7
+briefly tripled instantiations across every schema (11.4M to 30.2M) by defaulting
+one generic to `undefined` and defeating the instantiation cache, without adding
+a byte of output (prisma/prisma#29011, fixed in 7.9.0; we are on 7.9.1 and the
+generated client carries the fix). So the next step here is a measurement rather
+than a change — `--extendedDiagnostics`, or `--generateTrace` for per-file
+attribution — and nothing so far establishes that this is the binding
+constraint. The sampling in [ADR-100](100-the-typecheck-memory-ceiling.md) is
+mild evidence against: the working set stayed in a 2.3–3.5 GB band at every
+ceiling, so the compiler never came close to needing what it had.
 
 The two packages on `typescript@6` are a standing item, not a resting state.
 
