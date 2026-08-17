@@ -147,6 +147,22 @@ if (explicitEndpoint || langwatchTracingEnabled) {
     ],
   });
 
+  // Which spans are being kept. The SDK reads OTEL_TRACES_SAMPLER and
+  // OTEL_TRACES_SAMPLER_ARG itself and falls back to parentbased_always_on, so
+  // nothing here parses them — but an unset variable and a misspelled one
+  // produce the same silence and the same full-rate export, and the cost of
+  // that lands on the collector rather than anywhere obvious. One line at boot
+  // is the answer to "is this fleet sampling or not?" without reading a chart.
+  console.log(
+    `[observability] trace sampling: ${
+      process.env.OTEL_TRACES_SAMPLER ?? "parentbased_always_on (default)"
+    }${
+      process.env.OTEL_TRACES_SAMPLER_ARG
+        ? ` at ${process.env.OTEL_TRACES_SAMPLER_ARG}`
+        : ""
+    }`,
+  );
+
   // Replaces the exit-on-flush the SDK does by default (disabled above): the
   // same flush, run as the last phase of the one graceful-shutdown sequence,
   // with no opinion about when the process should end.
