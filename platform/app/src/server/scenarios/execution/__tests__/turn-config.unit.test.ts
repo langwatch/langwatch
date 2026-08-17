@@ -171,16 +171,16 @@ describe("fetchScenario turn config mapping", () => {
       },
     });
 
-    const result = await prefetchScenarioData(
-      {
+    const result = await prefetchScenarioData({
+      context: {
         projectId: "proj_1",
         scenarioId: "scen_1",
         setId: "set_1",
         batchRunId: "batch_1",
       },
-      { type: "prompt", referenceId: "prompt_1" },
+      target: { type: "prompt", referenceId: "prompt_1" },
       deps,
-    );
+    });
 
     expect(result.success).toBe(true);
     if (result.success) {
@@ -209,16 +209,16 @@ describe("fetchScenario turn config mapping", () => {
       },
     });
 
-    const result = await prefetchScenarioData(
-      {
+    const result = await prefetchScenarioData({
+      context: {
         projectId: "proj_1",
         scenarioId: "scen_1",
         setId: "set_1",
         batchRunId: "batch_1",
       },
-      { type: "prompt", referenceId: "prompt_1" },
+      target: { type: "prompt", referenceId: "prompt_1" },
       deps,
-    );
+    });
 
     expect(result.success).toBe(true);
     if (result.success) {

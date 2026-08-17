@@ -15,6 +15,7 @@ describe("scenarioFormSchema turn config", () => {
     situation: "User asks",
     criteria: ["polite"],
     labels: [],
+    parameters: [],
   };
 
   it("accepts maxTurns as a positive integer", () => {
