@@ -8,6 +8,7 @@ import {
   inspect,
   listEntries,
   pullRequestFilter,
+  stripComment,
 } from "./guard-path-filters.ts";
 
 const gated = (onPaths: string[], filterPaths: string[]): string =>
@@ -170,6 +171,30 @@ describe("given a paths key carrying a trailing comment", () => {
       kind: "filtered",
       entries: ["pkg/**"],
     });
+  });
+
+  it("keeps a # that YAML treats as scalar content, not a comment", () => {
+    const source = ["on:", "  pull_request:", '    paths: ["pkg # b/**"]'].join("\n");
+    assert.deepEqual(pullRequestFilter(source), {
+      kind: "filtered",
+      entries: ["pkg # b/**"],
+    });
+  });
+});
+
+describe("stripComment", () => {
+  it("drops a comment that starts outside quotes", () => {
+    assert.equal(stripComment("paths: # only Go"), "paths:");
+    assert.equal(stripComment('paths: ["a"] # why'), 'paths: ["a"]');
+  });
+
+  it("keeps a # inside a quoted scalar", () => {
+    assert.equal(stripComment('paths: ["pkg # b/**"]'), 'paths: ["pkg # b/**"]');
+    assert.equal(stripComment("paths: ['a#b']"), "paths: ['a#b']");
+  });
+
+  it("requires whitespace before an unquoted # so a#b is not a comment", () => {
+    assert.equal(stripComment("paths: a#b"), "paths: a#b");
   });
 });
 

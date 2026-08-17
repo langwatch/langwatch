@@ -129,6 +129,34 @@ const findKeyAnyIndent = (
   });
 
 /**
+ * Drop a trailing `# comment`, but only where YAML would treat it as one.
+ *
+ * A `#` starts a comment only outside a quoted scalar and only when preceded by
+ * whitespace, so `paths: ["pkg # b/**"]` keeps its hash — a blanket
+ * `/\s+#.*$/` truncated that to `paths: ["pkg` and the guard then reported R3
+ * against a legal filter. Quoted entries also survive with no preceding space,
+ * e.g. `["a#b"]`.
+ */
+export const stripComment = (line: string): string => {
+  let quote: string | null = null;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i]!;
+    if (quote) {
+      if (c === quote) quote = null;
+      continue;
+    }
+    if (c === '"' || c === "'") {
+      quote = c;
+      continue;
+    }
+    if (c === "#" && (i === 0 || /\s/.test(line[i - 1]!))) {
+      return line.slice(0, i).trimEnd();
+    }
+  }
+  return line;
+};
+
+/**
  * The text after `key:` on its own line, with any trailing comment removed.
  *
  * `paths:  # only the Go tree` is a block list with a note on the key line, not
@@ -140,11 +168,7 @@ const findKeyAnyIndent = (
  * entry (`["a#b"]`) survives.
  */
 const inlineValue = (line: string): string =>
-  line
-    .trim()
-    // Comment first, THEN the key: stripping the key first would leave a bare
-    // `# note` with no preceding whitespace for `\s+#` to match.
-    .replace(/\s+#.*$/, "")
+  stripComment(line.trim())
     .replace(/^(['"]?)[a-z_-]+\1\s*:\s*/i, "")
     .trim();
 
