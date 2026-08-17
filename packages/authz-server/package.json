@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@langwatch/authz": "workspace:*",
+    "@langwatch/ksuid": "^2.0.2",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/system-migrations": "workspace:*"

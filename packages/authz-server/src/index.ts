@@ -59,6 +59,25 @@ export type {
 } from "./grants.service";
 export { OffboardIncompleteError } from "./offboard";
 export type { OffboardResult } from "./offboard";
+export { deriveGrantId } from "./ledger/grant-identity";
+export {
+  emptyGrantsLedgerState,
+  reduceGrantsLedger,
+} from "./ledger/grants-ledger.reducer";
+export type {
+  GrantEventSource,
+  GrantFact,
+  GrantsLedgerActor,
+  GrantsLedgerCutover,
+  GrantsLedgerEvent,
+  GrantsLedgerState,
+  LedgerPrincipal,
+  LedgerPrincipalType,
+  LedgerScope,
+  LedgerScopeType,
+  ResourceGrantTerms,
+  RoleFact,
+} from "./ledger/grants-ledger.reducer";
 export {
   TEAM_USER_BACKFILL_MIGRATION_NAME,
   TeamUserBackfillMigration,
