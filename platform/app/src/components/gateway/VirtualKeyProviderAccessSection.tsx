@@ -97,7 +97,7 @@ export function VirtualKeyProviderAccessSection({
     [availableProjects, organizationId],
   );
   const eligible = useMemo(
-    () => resolveEligible(scopes, providers, hierarchy),
+    () => resolveEligible({ scopes, providers, hierarchy }),
     [scopes, providers, hierarchy],
   );
   const providerById = useMemo(

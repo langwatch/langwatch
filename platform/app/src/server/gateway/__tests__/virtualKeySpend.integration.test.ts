@@ -43,6 +43,9 @@ const USER_ID = `usr-spend-${suffix}`;
 const VK_UNBUDGETED_ID = `vk_spend_nobudget_${suffix}`;
 const VK_BUDGETED_ID = `vk_spend_budgeted_${suffix}`;
 const VK_ORG_SCOPED_ID = `vk_spend_orgscoped_${suffix}`;
+// A key that served two models, so the recent-activity list has something
+// to narrow down to.
+const VK_TWO_MODELS_ID = `vk_spend_models_${suffix}`;
 const BUDGET_ORG_ID = `bdg-spend-org-${suffix}`;
 const BUDGET_PROJECT_ID = `bdg-spend-proj-${suffix}`;
 
@@ -242,6 +245,34 @@ describe("virtual key spend (real PG + real CH)", () => {
       totalCost: 0.123456,
       tenantId: GOV_PROJECT_ID,
     });
+
+    await prisma.virtualKey.create({
+      data: {
+        id: VK_TWO_MODELS_ID,
+        organizationId: ORG_ID,
+        name: "two-models-key",
+        hashedSecret: `hash-${VK_TWO_MODELS_ID}`,
+        displayPrefix: "vk-lw-mdl",
+        createdById: USER_ID,
+        scopes: { create: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }] },
+      },
+    });
+    await insertGatewayTrace({
+      ch,
+      traceId: `trace-models-openai-${suffix}`,
+      virtualKeyId: VK_TWO_MODELS_ID,
+      occurredAt: new Date(now.getTime() - 180_000),
+      totalCost: 0.01,
+      models: ["gpt-5-mini"],
+    });
+    await insertGatewayTrace({
+      ch,
+      traceId: `trace-models-anthropic-${suffix}`,
+      virtualKeyId: VK_TWO_MODELS_ID,
+      occurredAt: new Date(now.getTime() - 90_000),
+      totalCost: 0.02,
+      models: ["claude-sonnet-4"],
+    });
   }, 120_000);
 
   afterAll(async () => {
@@ -262,7 +293,14 @@ describe("virtual key spend (real PG + real CH)", () => {
     });
     await prisma.virtualKey.deleteMany({
       where: {
-        id: { in: [VK_UNBUDGETED_ID, VK_BUDGETED_ID, VK_ORG_SCOPED_ID] },
+        id: {
+          in: [
+            VK_UNBUDGETED_ID,
+            VK_BUDGETED_ID,
+            VK_ORG_SCOPED_ID,
+            VK_TWO_MODELS_ID,
+          ],
+        },
       },
     });
     await prisma.project.deleteMany({
@@ -442,6 +480,66 @@ describe("virtual key spend (real PG + real CH)", () => {
       6,
     );
     expect(column.get(VK_ORG_SCOPED_ID)?.requests).toBe(perKey.totalRequests);
+  });
+
+  describe("when one model is picked from the spend breakdown", () => {
+    const thirtyDays = 30 * 24 * 60 * 60 * 1000;
+    const windowNow = () => {
+      const now = new Date();
+      return { fromDate: new Date(now.getTime() - thirtyDays), toDate: now };
+    };
+
+    /** @scenario "Picking a model narrows the recent activity to that model" */
+    it("lists only that model's requests, and leaves every other slice whole", async () => {
+      const service = usageService();
+      const unfiltered = await service.summaryForVirtualKey({
+        organizationId: ORG_ID,
+        virtualKeyId: VK_TWO_MODELS_ID,
+        window: windowNow(),
+      });
+      expect(unfiltered.recentDebits.map((d) => d.model).sort()).toEqual([
+        "claude-sonnet-4",
+        "gpt-5-mini",
+      ]);
+
+      const filtered = await service.summaryForVirtualKey({
+        organizationId: ORG_ID,
+        virtualKeyId: VK_TWO_MODELS_ID,
+        window: windowNow(),
+        model: "claude-sonnet-4",
+      });
+      expect(filtered.recentDebits.map((d) => d.model)).toEqual([
+        "claude-sonnet-4",
+      ]);
+      // The chips are the control the model is picked from, so they and
+      // the totals have to read the same either way.
+      expect(filtered.totalRequests).toBe(unfiltered.totalRequests);
+      expect(filtered.totalUsd).toBe(unfiltered.totalUsd);
+      expect(filtered.byModel).toEqual(unfiltered.byModel);
+      expect(filtered.byDay).toEqual(unfiltered.byDay);
+    });
+
+    /** @scenario "Clicking the picked model again clears the filter" */
+    it("lists every model again when no model is named", async () => {
+      const summary = await usageService().summaryForVirtualKey({
+        organizationId: ORG_ID,
+        virtualKeyId: VK_TWO_MODELS_ID,
+        window: windowNow(),
+        model: undefined,
+      });
+      expect(summary.recentDebits).toHaveLength(2);
+    });
+
+    it("lists nothing for a model this key never served", async () => {
+      const summary = await usageService().summaryForVirtualKey({
+        organizationId: ORG_ID,
+        virtualKeyId: VK_TWO_MODELS_ID,
+        window: windowNow(),
+        model: "a-model-nobody-called",
+      });
+      expect(summary.recentDebits).toHaveLength(0);
+      expect(summary.totalRequests).toBe(2);
+    });
   });
 
   /** @scenario "Spend that lands in the key's trace project is visible from anywhere in the organization" */

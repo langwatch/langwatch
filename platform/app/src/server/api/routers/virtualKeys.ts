@@ -314,6 +314,8 @@ export const virtualKeysRouter = createTRPCRouter({
         traceProjectId: z.string().nullable().optional(),
         routingPolicyId: z.string().nullable().optional(),
         routingMode: routingModeSchema.optional(),
+        /** When the key stops serving. Omit it and the key never expires. */
+        expiresAt: z.coerce.date().optional(),
         budget: virtualKeyBudgetInputSchema.nullable().optional(),
         config: virtualKeyConfigSchema.partial().optional(),
       }),
@@ -372,6 +374,7 @@ export const virtualKeysRouter = createTRPCRouter({
         traceProjectId: input.traceProjectId ?? null,
         routingPolicyId: input.routingPolicyId ?? null,
         routingMode: input.routingMode,
+        expiresAt: input.expiresAt ?? null,
         budget: input.budget ?? null,
         config: input.config,
         actorUserId: ctx.session.user.id,
@@ -399,6 +402,8 @@ export const virtualKeysRouter = createTRPCRouter({
         traceProjectId: z.string().nullable().optional(),
         routingPolicyId: z.string().nullable().optional(),
         routingMode: routingModeSchema.optional(),
+        /** Omitted leaves it alone; null clears it; a date moves it. */
+        expiresAt: z.coerce.date().nullable().optional(),
         budget: virtualKeyBudgetInputSchema.nullable().optional(),
         config: virtualKeyConfigSchema.partial().optional(),
       }),
@@ -484,6 +489,7 @@ export const virtualKeysRouter = createTRPCRouter({
         traceProjectId: input.traceProjectId,
         routingPolicyId: input.routingPolicyId,
         routingMode: input.routingMode,
+        expiresAt: input.expiresAt,
         budget: input.budget,
         config: input.config,
         actorUserId: ctx.session.user.id,
