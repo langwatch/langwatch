@@ -44,6 +44,7 @@
     "packages/redaction/",
     "packages/redis-client/",
     "packages/ssrf/",
+    "packages/system-migrations/",
     "platform/app/",
     "services/langevals/",
     "sdks/python/",
