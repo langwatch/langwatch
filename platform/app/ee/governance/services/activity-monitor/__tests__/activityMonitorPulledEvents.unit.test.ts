@@ -137,10 +137,18 @@ describe("ActivityMonitorService pulled and pushed source events", () => {
     const byId = new Map(rows.map((row) => [row.eventId, row]));
     // The one field that was a number survives; only the bad two fall back.
     expect(byId.get("poisoned-fields")).toEqual(
-      expect.objectContaining({ costUsd: "0", tokensInput: 0, tokensOutput: 5 }),
+      expect.objectContaining({
+        costUsd: "0",
+        tokensInput: 0,
+        tokensOutput: 5,
+      }),
     );
     expect(byId.get("poisoned-extension")).toEqual(
-      expect.objectContaining({ costUsd: "0", tokensInput: 0, tokensOutput: 0 }),
+      expect.objectContaining({
+        costUsd: "0",
+        tokensInput: 0,
+        tokensOutput: 0,
+      }),
     );
   });
 
