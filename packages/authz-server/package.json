@@ -23,7 +23,8 @@
   "dependencies": {
     "@langwatch/authz": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/observability": "workspace:*"
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/system-migrations": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24",

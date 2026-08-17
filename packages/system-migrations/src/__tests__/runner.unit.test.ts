@@ -1,0 +1,307 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { MigrationLeaseRepository } from "../lease.repository";
+import { SystemMigrationRunnerService } from "../runner.service";
+import type { SystemMigrationStateRepository } from "../state.repository";
+import type { SystemMigration } from "../system-migration";
+import type { TenantSource } from "../tenant-source";
+import type { TenantMigrationOutcome, TenantMigrationRecord } from "../types";
+
+class FakeStateRepository implements SystemMigrationStateRepository {
+  records = new Map<string, TenantMigrationRecord>();
+
+  private key(migrationName: string, tenantId: string): string {
+    return `${migrationName}::${tenantId}`;
+  }
+
+  async findRecord({
+    migrationName,
+    tenantId,
+  }: {
+    migrationName: string;
+    tenantId: string;
+  }): Promise<TenantMigrationRecord | null> {
+    return this.records.get(this.key(migrationName, tenantId)) ?? null;
+  }
+
+  async upsertRecord(record: TenantMigrationRecord): Promise<void> {
+    this.records.set(this.key(record.migrationName, record.tenantId), record);
+  }
+}
+
+class FakeLeaseRepository implements MigrationLeaseRepository {
+  private holder: symbol | null = null;
+  private readonly self = Symbol("lease-holder");
+
+  static shared(): [FakeLeaseRepository, FakeLeaseRepository] {
+    const first = new FakeLeaseRepository();
+    const second = new FakeLeaseRepository();
+    const state = { holder: null as symbol | null };
+    for (const repo of [first, second]) {
+      repo.acquire = async () => {
+        if (state.holder !== null && state.holder !== repo.self) return false;
+        state.holder = repo.self;
+        return true;
+      };
+      repo.renew = async () => state.holder === repo.self;
+      repo.release = async () => {
+        if (state.holder === repo.self) state.holder = null;
+      };
+    }
+    return [first, second];
+  }
+
+  async acquire(): Promise<boolean> {
+    if (this.holder !== null && this.holder !== this.self) return false;
+    this.holder = this.self;
+    return true;
+  }
+
+  async renew(): Promise<boolean> {
+    return this.holder === this.self;
+  }
+
+  async release(): Promise<void> {
+    if (this.holder === this.self) this.holder = null;
+  }
+}
+
+function tenantSourceOf(ids: string[]): TenantSource {
+  return {
+    async findTenantIdsAfter({ cursor, limit }) {
+      const start = cursor === null ? 0 : ids.indexOf(cursor) + 1;
+      return ids.slice(start, start + limit);
+    },
+  };
+}
+
+function migrationOf(
+  name: string,
+  migrateTenant: SystemMigration["migrateTenant"],
+): SystemMigration {
+  return { name, migrateTenant };
+}
+
+const finalized: TenantMigrationOutcome = { status: "finalized" };
+
+describe("SystemMigrationRunnerService", () => {
+  let state: FakeStateRepository;
+
+  beforeEach(() => {
+    state = new FakeStateRepository();
+  });
+
+  describe("when two processes boot at the same moment", () => {
+    /** @scenario "One process drives the migration at a time" */
+    it("lets exactly one acquire the lease while the other stands down", async () => {
+      const [leaseA, leaseB] = FakeLeaseRepository.shared();
+      const touched: string[] = [];
+      const migration = migrationOf("m1", async ({ tenantId }) => {
+        touched.push(tenantId);
+        // Hold the lease across the other runner's whole attempt.
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        return finalized;
+      });
+      const deps = {
+        state,
+        tenants: tenantSourceOf(["acme"]),
+        cohort: () => true,
+        migrations: [migration],
+      };
+      const runnerA = new SystemMigrationRunnerService({
+        ...deps,
+        lease: leaseA,
+      });
+      const runnerB = new SystemMigrationRunnerService({
+        ...deps,
+        lease: leaseB,
+      });
+
+      const [summaryA, summaryB] = await Promise.all([
+        runnerA.runPass(),
+        // Give runner A the first tick so the race is deterministic.
+        new Promise((resolve) => setTimeout(resolve, 5)).then(() =>
+          runnerB.runPass(),
+        ),
+      ]);
+
+      expect(summaryA?.finalized).toBe(1);
+      expect(summaryB).toBeNull();
+      expect(touched).toEqual(["acme"]);
+    });
+  });
+
+  describe("when the cohort excludes a tenant", () => {
+    /** @scenario "Cloud rollout processes only the configured cohort" */
+    it("processes cohort tenants and records nothing for the rest", async () => {
+      const migrate = vi.fn(async () => finalized);
+      const runner = new SystemMigrationRunnerService({
+        state,
+        lease: new FakeLeaseRepository(),
+        tenants: tenantSourceOf(["acme", "globex"]),
+        cohort: (tenantId) => tenantId === "acme",
+        migrations: [migrationOf("m1", migrate)],
+      });
+
+      const summary = await runner.runPass();
+
+      expect(migrate).toHaveBeenCalledTimes(1);
+      expect(migrate).toHaveBeenCalledWith(
+        expect.objectContaining({ tenantId: "acme" }),
+      );
+      expect(summary?.skipped).toBe(1);
+      expect(
+        await state.findRecord({ migrationName: "m1", tenantId: "globex" }),
+      ).toBeNull();
+    });
+  });
+
+  describe("when a migration throws for one tenant", () => {
+    /** @scenario "An organization that fails mid-migration is parked and retried" */
+    it("parks that tenant with the error, continues the fleet, and retries next pass", async () => {
+      let failures = 0;
+      const migration = migrationOf("m1", async ({ tenantId }) => {
+        if (tenantId === "acme" && failures === 0) {
+          failures += 1;
+          throw new Error("storage unavailable");
+        }
+        return finalized;
+      });
+      const runner = new SystemMigrationRunnerService({
+        state,
+        lease: new FakeLeaseRepository(),
+        tenants: tenantSourceOf(["acme", "globex"]),
+        cohort: () => true,
+        migrations: [migration],
+      });
+
+      const first = await runner.runPass();
+      expect(first?.parked).toBe(1);
+      expect(first?.finalized).toBe(1);
+      const parked = await state.findRecord({
+        migrationName: "m1",
+        tenantId: "acme",
+      });
+      expect(parked?.status).toBe("parked");
+      expect(parked?.report).toMatchObject({
+        kind: "error",
+        message: "storage unavailable",
+      });
+
+      const second = await runner.runPass();
+      expect(second?.finalized).toBe(1);
+      const healed = await state.findRecord({
+        migrationName: "m1",
+        tenantId: "acme",
+      });
+      expect(healed?.status).toBe("finalized");
+    });
+  });
+
+  describe("when a tenant was finalized on an earlier pass", () => {
+    /** @scenario "A finalized organization is never processed again" */
+    it("skips it without calling the migration", async () => {
+      await state.upsertRecord({
+        migrationName: "m1",
+        tenantId: "acme",
+        status: "finalized",
+        report: null,
+      });
+      const migrate = vi.fn(async () => finalized);
+      const runner = new SystemMigrationRunnerService({
+        state,
+        lease: new FakeLeaseRepository(),
+        tenants: tenantSourceOf(["acme"]),
+        cohort: () => true,
+        migrations: [migrationOf("m1", migrate)],
+      });
+
+      const summary = await runner.runPass();
+
+      expect(migrate).not.toHaveBeenCalled();
+      expect(summary?.skipped).toBe(1);
+    });
+  });
+
+  describe("when a migration reports disagreements", () => {
+    it("holds the tenant as migrated with the report and re-runs it next pass", async () => {
+      const outcomes: TenantMigrationOutcome[] = [
+        { status: "migrated", report: { diffs: ["budgets:view at org"] } },
+        finalized,
+      ];
+      let call = 0;
+      const migration = migrationOf("m1", async () => {
+        const outcome = outcomes[call];
+        call += 1;
+        if (!outcome) throw new Error("unexpected extra call");
+        return outcome;
+      });
+      const runner = new SystemMigrationRunnerService({
+        state,
+        lease: new FakeLeaseRepository(),
+        tenants: tenantSourceOf(["acme"]),
+        cohort: () => true,
+        migrations: [migration],
+      });
+
+      const first = await runner.runPass();
+      expect(first?.held).toBe(1);
+      const held = await state.findRecord({
+        migrationName: "m1",
+        tenantId: "acme",
+      });
+      expect(held?.status).toBe("migrated");
+      expect(held?.report).toMatchObject({ diffs: ["budgets:view at org"] });
+
+      const second = await runner.runPass();
+      expect(second?.finalized).toBe(1);
+    });
+  });
+
+  describe("when the pass is aborted", () => {
+    it("stops between tenants and releases the lease", async () => {
+      const controller = new AbortController();
+      const lease = new FakeLeaseRepository();
+      const migration = migrationOf("m1", async () => {
+        controller.abort();
+        return finalized;
+      });
+      const runner = new SystemMigrationRunnerService({
+        state,
+        lease,
+        tenants: tenantSourceOf(["acme", "globex"]),
+        cohort: () => true,
+        migrations: [migration],
+      });
+
+      const summary = await runner.runPass({ signal: controller.signal });
+
+      expect(summary?.tenantsSeen).toBe(1);
+      expect(
+        await state.findRecord({ migrationName: "m1", tenantId: "globex" }),
+      ).toBeNull();
+      expect(await lease.acquire()).toBe(true);
+    });
+  });
+
+  describe("when the tenant source pages", () => {
+    it("walks every page with the last id as the cursor", async () => {
+      const ids = Array.from(
+        { length: 250 },
+        (_, i) => `org-${String(i).padStart(3, "0")}`,
+      );
+      const migrate = vi.fn(async () => finalized);
+      const runner = new SystemMigrationRunnerService({
+        state,
+        lease: new FakeLeaseRepository(),
+        tenants: tenantSourceOf(ids),
+        cohort: () => true,
+        migrations: [migrationOf("m1", migrate)],
+      });
+
+      const summary = await runner.runPass();
+
+      expect(summary?.finalized).toBe(250);
+      expect(migrate).toHaveBeenCalledTimes(250);
+    });
+  });
+});

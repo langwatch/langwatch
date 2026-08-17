@@ -360,6 +360,12 @@ jobs:
         if: matrix.shard == 1
         run: pnpm --filter @langwatch/authz-server run test
 
+      # @langwatch/system-migrations is the in-place data-migration runner
+      # (ADR-092 stage B) — same raw-TypeScript, shard-1 arrangement.
+      - name: Run @langwatch/system-migrations unit tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/system-migrations run test
+
       - name: Run unit tests (shard ${{ matrix.shard }}/4)
         id: unit-tests
         working-directory: platform/app

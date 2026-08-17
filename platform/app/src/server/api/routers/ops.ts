@@ -1312,4 +1312,50 @@ export const opsRouter = createTRPCRouter({
         requestedBy: ctx.session.user.id,
       });
     }),
+
+  /**
+   * The in-place system migrations (@langwatch/system-migrations), per
+   * migration: status rollup plus the tenants needing attention - held
+   * (`migrated`, parity disagreements in the report) and `parked` (errored,
+   * retried next pass). Finalized tenants are a count, not a listing.
+   */
+  listSystemMigrations: protectedProcedure
+    .use(opsViewPermission)
+    .query(async () => {
+      const { registeredMigrations, systemMigrationState } = await import(
+        "~/server/app-layer/system-migrations/runtime"
+      );
+      return Promise.all(
+        registeredMigrations().map(async (migration) => ({
+          name: migration.name,
+          counts: await systemMigrationState.findStatusCounts({
+            migrationName: migration.name,
+          }),
+          attention: await systemMigrationState.findRecordsByStatus({
+            migrationName: migration.name,
+            statuses: ["migrated", "parked"],
+            limit: 50,
+          }),
+        })),
+      );
+    }),
+
+  /**
+   * Kick a migration pass now instead of waiting for the next worker boot -
+   * the lever for widening a cloud cohort or re-verifying held tenants
+   * after remediation. Fire-and-forget: the fleet-wide lease already
+   * guarantees a single driver, so the worst case for a double click is a
+   * pass that stands down immediately.
+   */
+  runSystemMigrationPass: protectedProcedure
+    .use(opsManagePermission)
+    .mutation(async () => {
+      const { runSystemMigrationPass } = await import(
+        "~/server/app-layer/system-migrations/runtime"
+      );
+      void runSystemMigrationPass().catch(() => {
+        // The pass logs its own failures; the next boot retries.
+      });
+      return { started: true };
+    }),
 });

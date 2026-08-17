@@ -7,9 +7,24 @@ rollback, and the open decisions that block each stage.
 
 The ADR's six stages (A-F) survive here unchanged, with one addition: a stage
 D0 (the `grants.*` write service) pulled forward because stages D, E, and F
-all depend on it. Roughly 28 PRs, six flag-gated soak periods, and two
-customer-facing behaviour changes that need product sign-off before their
-stage starts.
+all depend on it. **One PR per stage** (decided 2026-08-17, after stage A
+merged as #6894): the flags and soak gates are what protect the rollout, not
+the PR boundaries, and fewer PRs means less rebase churn and less fragmented
+releases. Each stage's tighten-and-delete tail rides the NEXT stage's PR
+(fallback deletion, `roleKey` NOT NULL, enum special cases all land in E).
+Rollback posture: revert the PR - except stage B's data, which rolls back by
+per-organization state (see below), not by git.
+
+**Data migrations are in-place** (same decision): the system migrates its own
+data at worker boot - a leased runner (`@langwatch/system-migrations`) walks
+every organization through `pending → migrated → finalized` (parked on
+error), one driver fleet-wide. Self-hosted installations migrate silently in
+the background with no operator action; cloud is paced through
+`SYSTEM_MIGRATIONS_COHORT` (unset = nothing, org list, or `all`). Nothing
+ships as a runnable script. The ops dashboard (Migrations page) shows every
+tenant's state and can kick a pass. The identity-platform program is the
+expected second consumer of the runner (its D01 Account backfill and D09
+per-customer migrations).
 
 ## The shape of the whole thing
 
@@ -151,31 +166,50 @@ one cloud canary org. Every explained mismatch is either an engine fix or a
 `LEGACY-QUIRK` entry. Mismatch dashboard built with gcx before the soak
 starts, not after.
 
-## Stage B - backfill, then delete the fallbacks
+## Stage B - the system backfills itself (ONE PR)
 
-- **B1 backfill script** (idempotent, org-batched, dry-run first):
+Spec: `specs/rbac/in-place-authz-migration.feature`. The old B1/B2/B3 script
+sequence became one in-place mechanism:
+
+- **The runner** (`@langwatch/system-migrations`, generic; app composition
+  in `platform/app/src/server/app-layer/system-migrations/`): worker boot
+  kicks one pass under a Redis lease (single driver fleet-wide), walking
+  every cohort organization through `pending → migrated → finalized`, parked
+  on error and retried next pass. Self-hosted: every org, no configuration.
+  Cloud: `SYSTEM_MIGRATIONS_COHORT` (unset/`none` → nothing, org list, or
+  `all`). Ops → Migrations lists per-tenant state and kicks passes by hand.
+- **The M1 rider** (`TeamUserBackfillMigration`, in `@langwatch/authz-server`):
   `TeamUser` → TEAM-scoped binding carrying `(role, assignedRoleId →
-  customRoleId)`. Personal teams keep their bindings team-scoped (parity
-  with today's `isPersonal: false` exclusion in the org-level union -
-  verified by the report, not assumed). `OrganizationUser` is NOT promoted
-  to org bindings - today a bare `OrgUser.role=ADMIN` with no binding has no
-  admin power (`rbac.ts:1050-1057`), and the backfill preserves today's
-  semantics exactly. The script emits a per-user parity report:
-  engine-with-fallbacks vs engine-bindings-only, and refuses to finalise any
-  org with a diff.
-- **B2 delete the fallback reads.** Both `rbac.ts` fallback branches, the
-  batch legacy replay, and `virtualKey.authz.ts`'s membership set move to
-  bindings. Add `findOrgAdmins()` (binding-aware) and migrate the six
-  `where: { role: "ADMIN" }` readers (`usage-limit.service.ts`,
-  `langyAttribution.ts`, `resolveOrgAdminEmail.ts`,
-  `project.prisma.repository.ts`, `costs.ts`,
-  `organization.prisma.repository.ts`).
-- **B3 stop writing `TeamUser`** (invite/apply paths), schema comment marks
-  it read-only-legacy. The table itself survives until Gate C passes
-  (rollback = re-enable B2's reads).
+  customRoleId)`, batch-inserted under the partial unique indexes
+  (idempotent), one audit event (`source: backfill-b`) and one epoch bump
+  per organization. Personal teams stay team-scoped; `OrganizationUser` is
+  NOT promoted to org bindings - today a bare `OrgUser.role=ADMIN` with no
+  binding has no admin power, and the backfill preserves today's semantics
+  exactly.
+- **Finalization is a per-organization parity proof**, not a fleet event:
+  collect once per member, decide twice (with and without the legacy rows)
+  over every registry permission at the org/team/project scopes the rows can
+  reach. Zero disagreements → `finalized`, and the org's legacy fallback
+  reads switch off (the `legacy-fallback-gate`, consulted by all three
+  rbac.ts fallback branches AND the engine collector, so shadow keeps
+  agreeing with legacy). Any disagreement → HELD as `migrated` with the
+  diffs in its report: behaviour unchanged, fallback live, re-verified every
+  pass so granting the gap heals it. **Held is the expected steady state for
+  organizations whose members lean on the legacy org-level union quirk** - a
+  team-ADMIN row grants ~95 org-scope permissions a TEAM binding never will,
+  so those orgs finalize only after remediation (an explicit org-scope
+  binding) or after stage C's re-key shrinks the quirk. Their fate is the
+  M2 observed-zero gate, not this PR.
+- **What moved to later stages:** deleting the fallback code paths and the
+  `virtualKey.authz.ts` / `findOrgAdmins()` reader migrations ride stage E
+  (per-org gating makes the code deletion safe only once every org is
+  finalized); "stop writing `TeamUser`" is already true everywhere except
+  the personal-workspace dual-write, which STAYS until the legacy readers
+  are gone (it is the expand-phase posture, not a leftover).
 
-**Gate B:** shadow still silent; backfill parity reports archived per org;
-CI grep-gate asserts zero `teamUser.find*` outside the deprecated allowlist.
+**Gate B:** shadow still silent; parity evidence lives in each org's state
+record (the ops page is the report archive); fleet finalization percentage
+is a dashboard number, not a launch blocker.
 
 ## Stage C - re-key roles, fix the principal escalations
 
@@ -416,7 +450,7 @@ destroys legacy data before its gate passes).
 
 | # | Stage | Data | Mechanism | Gate before cutover | Rollback |
 |---|-------|------|-----------|--------------------|----------|
-| M1 | B | `TeamUser` rows → `RoleBinding` at TEAM scope | Idempotent backfill job (role → role, `assignedRoleId` → `customRoleId`; personal teams flagged, not skipped) writes bindings tagged `source: backfill-b` in the audit event | Per-user `decide()` parity sweep: effective permissions identical before/after for EVERY member (spec: "Legacy membership rows resolve identically") + 7 quiet shadow days | Delete rows the job tagged; fallback path still live |
+| M1 | B | `TeamUser` rows → `RoleBinding` at TEAM scope | **In-place**: the `@langwatch/system-migrations` runner drives `TeamUserBackfillMigration` per organization at worker boot (role → role, `assignedRoleId` → `customRoleId`; personal teams stay team-scoped), audit-tagged `source: backfill-b`, one epoch bump per org. The old dry-run flag became the mandatory verify phase of the state machine | Per-org `decide()` parity sweep (with vs without legacy rows, spec: "Legacy membership rows resolve identically"); zero diffs → `finalized` and that org's fallback gate closes; any diff → held as `migrated`, behaviour unchanged | Flip the org's state off `finalized` (fallback reads resume); bindings stay (additive) |
 | M2 | B | Delete `LEGACY-QUIRK(B)` fallbacks | Code deletion PR once M1's gate holds | Zero `legacy-team-fallback` grants observed in decision audit for 7 days | Revert PR |
 | M3 | C | Legacy API keys (`permissions` JSON, no bindings) → explicit key bindings | Backfill mints bindings equal to each key's measured effective set; `AUTHZ_LEGACY_KEY_ENFORCE` flips the raw-JSON path off | Key-by-key parity report; sunset comms sent (D2); canary orgs first | Flag back on; bindings stay (additive) |
 | M4 | C | EXTERNAL org rows → `lite-member` role bindings; org-scoped enum semantics re-keyed | Same expand/verify shape; the escalation regression pack pins the fixed behaviour | Escalation pack green + shadow silent on the divergence families | Flag back |
@@ -430,13 +464,16 @@ schema-adjacent steps, M7's flag only after D0 completes.
 
 ## What lands next (in order)
 
-1. Open D2-D3 as decision threads (they gate C - cheap to start now; D1 is
-   settled by this branch).
-2. Shadow soak: enable `AUTHZ_V2_SHADOW=0.1` on staging, build the
-   mismatch dashboard (gcx, `langwatch:authz:shadow` warns), start the
-   7-day clock. The two `knownDivergence` families are expected lines.
-3. Stage-D retrofit PR: flip representative routers to `.permission()` and
-   route the first legacy write path through `grants.*` (member add), with
-   `resolveForViewer` delegating to `authz.check` as the A5 proof.
-4. M1 backfill job behind a dry-run flag, so the parity sweep can run
-   against production data without writing anything.
+1. ~~Shadow soak~~ - running: `AUTHZ_V2_SHADOW=1` on cloud web since
+   langwatch-saas#1078 (2026-08-16).
+2. ~~Stage-B PR~~ - the in-place runner + M1 rider + per-org fallback gate
+   + ops surface (this amendment's PR). Cloud rollout = widen
+   `SYSTEM_MIGRATIONS_COHORT` self-service-first, watching the ops page.
+3. Stage-C PR (one PR): `roleKey` re-key + lite-member + legacy-key
+   backfill rider (M3) + ShareLink `permission` column (M5) + spec
+   truth-up. Needs sign-offs D2/D3.
+4. Stage-D PR (one PR): `.permission()` codemod, eight write paths through
+   `grants.*`, Hono edge identity, service principals. `AUTHZ_V2_ENFORCE`
+   flips after merge, per cohort. (The annotations slice already merged as
+   the scope-contract reference.)
+5. Stage-E PR, then stage-F PR, per the one-PR-per-stage structure above.

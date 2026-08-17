@@ -34,6 +34,13 @@ export type {
   ScopeLineageRepository,
   ShareLinkRow,
 } from "./authz-read.repository";
+export type {
+  AuthzMigrationRepository,
+  ExistingTeamBinding,
+  LegacyTeamRow,
+  OrganizationScopeInventory,
+  TeamBindingWrite,
+} from "./authz-migration.repository";
 export { AuthzShadowService } from "./authz-shadow.service";
 export type { AuthzShadowOptions } from "./authz-shadow.service";
 export { AuthzService } from "./authz.service";
@@ -52,3 +59,11 @@ export type {
 } from "./grants.service";
 export { OffboardIncompleteError } from "./offboard";
 export type { OffboardResult } from "./offboard";
+export {
+  TEAM_USER_BACKFILL_MIGRATION_NAME,
+  TeamUserBackfillMigration,
+} from "./team-user-backfill.migration";
+export type {
+  ParityDiff,
+  TeamUserBackfillDeps,
+} from "./team-user-backfill.migration";

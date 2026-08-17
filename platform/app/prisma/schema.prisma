@@ -3936,3 +3936,28 @@ model IdempotencyReceipt {
   @@unique([scopeId, key])
   @@index([expiresAt])
 }
+
+// One record per (migration, tenant) for the in-place system migrations
+// runner (@langwatch/system-migrations): one-time data migrations the
+// system performs on itself at worker boot, organization by organization.
+// "Pending" is the absence of a record. `status` is the package's
+// TenantMigrationStatus ("migrated" | "finalized" | "parked"); "finalized"
+// is a one-way latch hot paths read through an in-process cache (a tenant
+// may only leave its legacy path once its record says finalized). `report`
+// carries the migration's own evidence: parity diffs for a held tenant,
+// the error for a parked one, counts for a finalized one. `tenantId` is an
+// Organization id as a plain column ref (no FK) - the runner is generic
+// over tenants and survives organization deletion trivially. First rider:
+// the ADR-092 stage-B TeamUser backfill (@langwatch/authz-server). Spec:
+// specs/rbac/in-place-authz-migration.feature.
+model SystemMigrationTenantState {
+  migrationName String
+  tenantId      String
+  status        String
+  report        Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
+
+  @@id([migrationName, tenantId])
+  @@index([migrationName, status])
+}

@@ -134,6 +134,17 @@ async function bootUsageStatsWorker(
   }
 }
 
+async function bootSystemMigrations(
+  shutdownHandles: ShutdownHandles,
+): Promise<void> {
+  const { startSystemMigrations } = await import(
+    "~/server/app-layer/system-migrations/boot"
+  );
+  const migrations = startSystemMigrations();
+  shutdownHandles.push(() => migrations.stop());
+  logger.info("system migration pass started");
+}
+
 /**
  * The worker's liveness path. Deliberately UNAUTHENTICATED and deliberately
  * not `/metrics`.
@@ -503,6 +514,9 @@ export async function startWorkers(
     await bootAnomalyWorker(shutdownHandles);
     await bootSpendSpikeAnomalyWorker(shutdownHandles);
     await bootUsageStatsWorker(shutdownHandles);
+    // One-time in-place data migrations (ADR-092 stage B and successors):
+    // a background pass under a fleet-wide lease, never blocking boot.
+    await bootSystemMigrations(shutdownHandles);
     if (shouldStartMetricsServer) {
       await bootMetricsServer(shutdownHandles);
     }
