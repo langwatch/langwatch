@@ -5,7 +5,20 @@
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorkflowAgentData } from "../../types";
+
+vi.mock("@langwatch/observability/tracing", () => ({
+  injectTraceContextHeaders: vi.fn(
+    ({ headers }: { headers: Record<string, string> }) => ({
+      headers,
+      traceId: undefined,
+    }),
+  ),
+}));
+
+import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 import { SerializedWorkflowAgentAdapter } from "../workflow-agent.adapter";
+
+const mockInjectTraceContextHeaders = vi.mocked(injectTraceContextHeaders);
 
 // Mock global fetch
 const mockFetch = vi.fn();
@@ -87,12 +100,19 @@ describe("SerializedWorkflowAgentAdapter", () => {
     messages: [{ role: "user", content: "Hello" }],
     newMessages: [{ role: "user", content: "Hello" }],
     requestedRole: AgentRole.AGENT,
+    propagationHeaders: {},
     scenarioState: {} as AgentInput["scenarioState"],
     scenarioConfig: {} as AgentInput["scenarioConfig"],
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // clearAllMocks keeps implementations, so pin the no-active-context
+    // default here; tests that need a trace context override it themselves.
+    mockInjectTraceContextHeaders.mockImplementation(({ headers }) => ({
+      headers,
+      traceId: undefined,
+    }));
     mockFetch.mockResolvedValue(nlpResponse({ output: "Hi there!" }));
   });
 
@@ -559,6 +579,77 @@ describe("SerializedWorkflowAgentAdapter", () => {
         seats: 12,
       });
       expect(sentPayload().workflow.secrets).toEqual({});
+    });
+  });
+
+  describe("when a turn has an active trace context", () => {
+    const TRACE_ID = "0af7651916cd43dd8448eb211c80319c";
+    const TRACEPARENT = `00-${TRACE_ID}-b7ad6b7169203331-01`;
+
+    const injectTraceContext = () => {
+      mockInjectTraceContextHeaders.mockImplementation(({ headers }) => {
+        headers.traceparent = TRACEPARENT;
+        return { headers, traceId: TRACE_ID };
+      });
+    };
+
+    function sentPayload() {
+      return JSON.parse(mockFetch.mock.calls[0]![1].body).payload;
+    }
+
+    /** @scenario "A workflow execution receives the trace context in its params" */
+    it("carries params.trace_id and params.traceparent on the workflow", async () => {
+      injectTraceContext();
+      const adapter = new SerializedWorkflowAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl,
+        projectApiKey: apiKey,
+        parameters: { region: "eu-central" },
+      });
+
+      await adapter.call(defaultInput);
+
+      expect(sentPayload().workflow.params).toEqual({
+        region: "eu-central",
+        trace_id: TRACE_ID,
+        traceparent: TRACEPARENT,
+      });
+    });
+
+    /** @scenario "The trace context wins over a run parameter with the same name" */
+    it("overrides a run parameter named trace_id or traceparent", async () => {
+      injectTraceContext();
+      const adapter = new SerializedWorkflowAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl,
+        projectApiKey: apiKey,
+        parameters: { trace_id: "supplied", traceparent: "supplied" },
+      });
+
+      await adapter.call(defaultInput);
+
+      expect(sentPayload().workflow.params).toEqual({
+        trace_id: TRACE_ID,
+        traceparent: TRACEPARENT,
+      });
+    });
+
+    /** @scenario "A workflow execution receives the trace context in its params" */
+    it("keeps the trace context out of the entry inputs", async () => {
+      injectTraceContext();
+      const adapter = new SerializedWorkflowAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl,
+        projectApiKey: apiKey,
+        parameters: { region: "eu-central" },
+      });
+
+      await adapter.call(defaultInput);
+
+      const entryInputs = sentPayload().inputs[0];
+      expect(entryInputs.trace_id).toBeUndefined();
+      expect(entryInputs.traceparent).toBeUndefined();
+      expect(entryInputs.region).toBe("eu-central");
     });
   });
 });

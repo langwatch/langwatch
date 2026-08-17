@@ -22,6 +22,7 @@ import {
   prefetchScenarioData,
   type ScenarioFetcher,
   type SuiteConfigFetcher,
+  type TraceWaitBudgetResolver,
   type WorkflowVersionFetcher,
 } from "../data-prefetcher";
 import type { ExecutionContext, LiteLLMParams, TargetConfig } from "../types";
@@ -100,6 +101,10 @@ describe("prefetchScenarioData", () => {
       getSecrets: vi.fn().mockResolvedValue({}),
     };
 
+    const traceWaitBudgetResolver: TraceWaitBudgetResolver = {
+      resolveTraceWaitTimeoutMs: vi.fn().mockResolvedValue(30_000),
+    };
+
     const modelResolver = {
       // Distinguish every feature key so simulator/judge/agent-under-test
       // selection can be asserted independently of one another.
@@ -132,6 +137,7 @@ describe("prefetchScenarioData", () => {
       modelParamsProvider,
       modelResolver,
       projectSecretsFetcher,
+      traceWaitBudgetResolver,
       ...overrides,
     };
   }
@@ -2082,6 +2088,100 @@ describe("prefetchScenarioData", () => {
       expect(result.data.adapterData).toMatchObject({
         type: "http",
         secrets: { AGENT_TOKEN: "tok-123" },
+      });
+    });
+  });
+
+  describe("when the prefetcher sizes the trace wait budget", () => {
+    const httpDeps = (budgetMs: number) =>
+      createMockDeps({
+        agentFetcher: {
+          findById: vi.fn().mockResolvedValue({
+            id: "agent_http",
+            type: "http",
+            config: { url: "https://api.test/chat", method: "POST" },
+          }),
+        },
+        traceWaitBudgetResolver: {
+          resolveTraceWaitTimeoutMs: vi.fn().mockResolvedValue(budgetMs),
+        },
+      });
+
+    describe("given an http target", () => {
+      /** @scenario "The prefetcher computes the wait budget only for http targets" */
+      it("puts the project's resolved budget on the job data", async () => {
+        const deps = httpDeps(45_000);
+
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: { type: "http", referenceId: "agent_http" },
+          deps,
+        });
+
+        expect(result.success).toBe(true);
+        if (!result.success) return;
+        expect(result.data.traceWaitTimeoutMs).toBe(45_000);
+        expect(
+          deps.traceWaitBudgetResolver.resolveTraceWaitTimeoutMs,
+        ).toHaveBeenCalledWith({ projectId: "proj_123" });
+      });
+    });
+
+    describe("given a prompt target", () => {
+      it("computes no budget and carries none on the job data", async () => {
+        const deps = createMockDeps({
+          promptFetcher: {
+            getPromptByIdOrHandle: vi.fn().mockResolvedValue({
+              id: "prompt_123",
+              prompt: "You are helpful",
+              messages: [],
+            }),
+          },
+        });
+
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: { type: "prompt", referenceId: "prompt_123" },
+          deps,
+        });
+
+        expect(result.success).toBe(true);
+        if (!result.success) return;
+        expect(result.data.traceWaitTimeoutMs).toBeUndefined();
+        expect(
+          deps.traceWaitBudgetResolver.resolveTraceWaitTimeoutMs,
+        ).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("given a code target", () => {
+      it("computes no budget", async () => {
+        const deps = createMockDeps({
+          agentFetcher: {
+            findById: vi.fn().mockResolvedValue({
+              id: "agent_code",
+              type: "code",
+              config: {
+                parameters: [
+                  { identifier: "code", type: "code", value: "def f(): pass" },
+                ],
+              },
+            }),
+          },
+        });
+
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: { type: "code", referenceId: "agent_code" },
+          deps,
+        });
+
+        expect(result.success).toBe(true);
+        if (!result.success) return;
+        expect(result.data.traceWaitTimeoutMs).toBeUndefined();
+        expect(
+          deps.traceWaitBudgetResolver.resolveTraceWaitTimeoutMs,
+        ).not.toHaveBeenCalled();
       });
     });
   });

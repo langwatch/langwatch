@@ -556,6 +556,7 @@
                 "agent get",
                 "agent create",
                 "agent run",
+                "agent dev",
                 "agent update",
                 "agent delete"
               ],

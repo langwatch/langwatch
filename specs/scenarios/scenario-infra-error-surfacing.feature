@@ -34,6 +34,20 @@ Feature: Scenario infrastructure error surfacing and empty-response state
     Then the handled error code is "scenario_platform_unreachable"
 
   @unit
+  Scenario: A dead tunnel names itself without a devTunnel lookup
+    Given a raw failure carrying the Cloudflare edge's HTTP 530 answer with its "error code: 1033" body
+    When the failure is classified
+    Then the handled error code is "agent_dev_tunnel_unreachable" with the restart hint
+    And an HTTP 530 without the 1033 body stays out of the tunnel classification
+
+  @unit
+  Scenario: An SDK-recorded failure classifies the same as a processor-caught one
+    Given a run failure the scenario SDK recorded itself as serialized error JSON
+    When the run's error is resolved for display
+    Then the same classification applies and a dead tunnel shows the named tunnel copy
+    And an upstream's HTML error page never renders as the failure reason
+
+  @unit
   Scenario: A model-provider rejection becomes a model-provider error
     Given a scenario run failed with a raw error mentioning a provider "API key is invalid"
     When the failure is classified

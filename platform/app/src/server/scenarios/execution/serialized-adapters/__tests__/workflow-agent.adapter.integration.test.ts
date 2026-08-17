@@ -164,6 +164,7 @@ function makeAgentInput(): AgentInput {
     messages: TWO_TURN_HISTORY,
     newMessages: [lastTurn],
     requestedRole: AgentRole.AGENT,
+    propagationHeaders: {},
     scenarioState: {
       currentTurn: 1,
       addMessages: () => undefined,

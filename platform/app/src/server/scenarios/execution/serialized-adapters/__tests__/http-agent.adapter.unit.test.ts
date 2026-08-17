@@ -44,6 +44,7 @@ describe("SerializedHttpAgentAdapter", () => {
     messages: [{ role: "user", content: "Hello" }],
     newMessages: [{ role: "user", content: "Hello" }],
     requestedRole: AgentRole.AGENT,
+    propagationHeaders: {},
 
     scenarioState: {} as AgentInput["scenarioState"],
     scenarioConfig: {} as AgentInput["scenarioConfig"],
@@ -51,6 +52,12 @@ describe("SerializedHttpAgentAdapter", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // clearAllMocks keeps implementations, so pin the no-active-context
+    // default here; tests that need a trace context override it themselves.
+    mockInjectTraceContextHeaders.mockImplementation(({ headers }) => ({
+      headers,
+      traceId: undefined,
+    }));
     mockSsrfSafeFetch.mockResolvedValue({
       ok: true,
       status: 200,
@@ -324,53 +331,150 @@ describe("SerializedHttpAgentAdapter", () => {
     });
   });
 
-  describe("trace ID capture", () => {
-    it("exposes captured trace ID after a request", async () => {
-      mockInjectTraceContextHeaders.mockImplementation(({ headers }) => ({
-        headers,
-        traceId: "captured_trace_id_123",
-      }));
+  describe("trace context propagation", () => {
+    const TRACE_ID = "0af7651916cd43dd8448eb211c80319c";
+    const TRACEPARENT = `00-${TRACE_ID}-b7ad6b7169203331-01`;
 
-      const adapter = new SerializedHttpAgentAdapter({ config: defaultConfig });
-      await adapter.call(defaultInput);
-
-      expect(adapter.getTraceId()).toBe("captured_trace_id_123");
-    });
-
-    it("returns undefined when no trace ID was captured", () => {
-      const adapter = new SerializedHttpAgentAdapter({ config: defaultConfig });
-      expect(adapter.getTraceId()).toBeUndefined();
-    });
-  });
-
-  describe("trace context injection", () => {
-    it("calls injectTraceContextHeaders on each request", async () => {
-      const adapter = new SerializedHttpAgentAdapter({ config: defaultConfig });
-
-      await adapter.call(defaultInput);
-
-      expect(mockInjectTraceContextHeaders).toHaveBeenCalledWith({
-        headers: expect.objectContaining({
-          "Content-Type": "application/json",
-        }),
+    const injectTraceContext = () => {
+      mockInjectTraceContextHeaders.mockImplementation(({ headers }) => {
+        headers.traceparent = TRACEPARENT;
+        headers.tracestate = "vendor=1";
+        return { headers, traceId: TRACE_ID };
       });
+    };
+
+    const sentHeaders = (): Record<string, string> =>
+      (
+        mockSsrfSafeFetch.mock.calls[0]![1] as {
+          headers: Record<string, string>;
+        }
+      ).headers;
+
+    it("captures the propagation once per call and sends its headers", async () => {
+      injectTraceContext();
+      const adapter = new SerializedHttpAgentAdapter({ config: defaultConfig });
+
+      await adapter.call(defaultInput);
+
+      expect(mockInjectTraceContextHeaders).toHaveBeenCalledTimes(1);
+      expect(sentHeaders().traceparent).toBe(TRACEPARENT);
+      expect(sentHeaders().tracestate).toBe("vendor=1");
     });
 
-    describe("when custom headers are configured", () => {
-      it("calls injection after custom headers are applied", async () => {
+    describe("when the target configures its own traceparent header", () => {
+      /** @scenario "The automatic traceparent does not replace one the target configured" */
+      it("keeps the configured value, whatever its casing", async () => {
+        injectTraceContext();
         const config: HttpAgentData = {
           ...defaultConfig,
-          headers: [{ key: "X-Custom", value: "custom-value" }],
+          headers: [
+            {
+              key: "Traceparent",
+              value: "00-{{ traceId }}-0000000000000001-01",
+            },
+          ],
         };
         const adapter = new SerializedHttpAgentAdapter({ config });
 
         await adapter.call(defaultInput);
 
-        expect(mockInjectTraceContextHeaders).toHaveBeenCalledWith({
-          headers: expect.objectContaining({
-            "Content-Type": "application/json",
-            "X-Custom": "custom-value",
-          }),
+        const headers = sentHeaders();
+        expect(headers.Traceparent).toBe(`00-${TRACE_ID}-0000000000000001-01`);
+        expect(headers.traceparent).toBeUndefined();
+        // Propagation headers the target did not configure still arrive.
+        expect(headers.tracestate).toBe("vendor=1");
+      });
+    });
+
+    describe("when the url and body templates read the trace variables", () => {
+      /** @scenario "The url and body templates can read the turn's trace id and traceparent" */
+      it("renders the turn's trace id and traceparent in both", async () => {
+        injectTraceContext();
+        const config: HttpAgentData = {
+          ...defaultConfig,
+          url: "https://api.example.com/t/{{ traceId }}",
+          bodyTemplate:
+            '{"trace": "{{ traceId }}", "parent": "{{ traceparent }}"}',
+        };
+        const adapter = new SerializedHttpAgentAdapter({ config });
+
+        await adapter.call(defaultInput);
+
+        expect(mockSsrfSafeFetch).toHaveBeenCalledWith(
+          `https://api.example.com/t/${TRACE_ID}`,
+          expect.any(Object),
+        );
+        const body = JSON.parse(
+          (mockSsrfSafeFetch.mock.calls[0]![1] as { body: string }).body,
+        );
+        expect(body).toEqual({ trace: TRACE_ID, parent: TRACEPARENT });
+      });
+    });
+  });
+
+  describe("header value templating", () => {
+    const TRACE_ID = "0af7651916cd43dd8448eb211c80319c";
+    const TRACEPARENT = `00-${TRACE_ID}-b7ad6b7169203331-01`;
+
+    const sentHeaders = (): Record<string, string> =>
+      (
+        mockSsrfSafeFetch.mock.calls[0]![1] as {
+          headers: Record<string, string>;
+        }
+      ).headers;
+
+    /** @scenario "A header value renders run parameters" */
+    it("renders {{ params.NAME }} in a header value", async () => {
+      const config: HttpAgentData = {
+        ...defaultConfig,
+        headers: [{ key: "X-Region", value: "{{ params.region }}" }],
+      };
+      const adapter = new SerializedHttpAgentAdapter({
+        config,
+        parameters: { region: "eu-central" },
+      });
+
+      await adapter.call(defaultInput);
+
+      expect(sentHeaders()["X-Region"]).toBe("eu-central");
+    });
+
+    /** @scenario "A header value renders the turn's trace id and traceparent" */
+    it("renders the turn's trace id and traceparent in header values", async () => {
+      mockInjectTraceContextHeaders.mockImplementation(({ headers }) => {
+        headers.traceparent = TRACEPARENT;
+        return { headers, traceId: TRACE_ID };
+      });
+      const config: HttpAgentData = {
+        ...defaultConfig,
+        headers: [
+          { key: "X-Trace-Id", value: "{{ traceId }}" },
+          { key: "X-Parent", value: "{{ traceparent }}" },
+        ],
+      };
+      const adapter = new SerializedHttpAgentAdapter({ config });
+
+      await adapter.call(defaultInput);
+
+      expect(sentHeaders()["X-Trace-Id"]).toBe(TRACE_ID);
+      expect(sentHeaders()["X-Parent"]).toBe(TRACEPARENT);
+    });
+
+    describe("when a header template is malformed", () => {
+      /** @scenario "A failing header template names the header it came from" */
+      it("rejects naming the header key and the headers field", async () => {
+        const config: HttpAgentData = {
+          ...defaultConfig,
+          headers: [{ key: "X-Broken", value: "{% if %}" }],
+        };
+        const adapter = new SerializedHttpAgentAdapter({ config });
+
+        await expect(adapter.call(defaultInput)).rejects.toThrow(
+          TemplateRenderError,
+        );
+        await expect(adapter.call(defaultInput)).rejects.toMatchObject({
+          field: "headers",
+          message: expect.stringContaining('header "X-Broken"'),
         });
       });
     });

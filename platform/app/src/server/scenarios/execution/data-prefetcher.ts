@@ -46,6 +46,7 @@ import {
 } from "../../prompt-config/prompt.service";
 import { type FieldMapping, FieldMappingSchema } from "../field-mapping";
 import { ScenarioService } from "../scenario.service";
+import { resolveTraceWaitTimeoutMs } from "./ingest-lag.service";
 import {
   AuthConfigSchema,
   type ChildProcessJobData,
@@ -182,6 +183,15 @@ export interface ModelParamsProvider {
   prepare(projectId: string, model: string): Promise<ModelParamsResult>;
 }
 
+/**
+ * Resolves the verdict-time trace wait budget for remote-trace judging from
+ * the project's own ingest lag. Only consulted for http targets - the only
+ * ones whose judge fetches remote traces.
+ */
+export interface TraceWaitBudgetResolver {
+  resolveTraceWaitTimeoutMs(params: { projectId: string }): Promise<number>;
+}
+
 /** All dependencies required by prefetchScenarioData */
 export interface DataPrefetcherDependencies {
   scenarioFetcher: ScenarioFetcher;
@@ -193,6 +203,7 @@ export interface DataPrefetcherDependencies {
   modelParamsProvider: ModelParamsProvider;
   modelResolver: ModelResolver;
   projectSecretsFetcher: ProjectSecretsFetcher;
+  traceWaitBudgetResolver: TraceWaitBudgetResolver;
 }
 
 // ============================================================================
@@ -530,6 +541,16 @@ export async function prefetchScenarioData({
     ? modelParamsResult.params
     : undefined;
 
+  // Only an http target's judge fetches remote traces, so only it needs a
+  // wait budget. The resolver degrades to a default on any failure, so this
+  // never fails the prefetch.
+  const traceWaitTimeoutMs =
+    target.type === "http"
+      ? await deps.traceWaitBudgetResolver.resolveTraceWaitTimeoutMs({
+          projectId: context.projectId,
+        })
+      : undefined;
+
   return {
     success: true,
     data: {
@@ -542,6 +563,7 @@ export async function prefetchScenarioData({
       judgeModelParams: judgeParamsResult.params,
       nlpServiceUrl: env.LANGWATCH_NLP_SERVICE,
       target,
+      ...(traceWaitTimeoutMs !== undefined ? { traceWaitTimeoutMs } : {}),
     },
     telemetry: {
       endpoint: env.LANGWATCH_ENDPOINT,
@@ -1197,6 +1219,9 @@ export function createDataPrefetcherDependencies(): DataPrefetcherDependencies {
         });
         return resolved.model;
       },
+    },
+    traceWaitBudgetResolver: {
+      resolveTraceWaitTimeoutMs: (params) => resolveTraceWaitTimeoutMs(params),
     },
     projectSecretsFetcher: {
       getSecrets: async (projectId) => {

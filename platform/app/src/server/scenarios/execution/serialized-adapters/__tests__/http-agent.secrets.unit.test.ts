@@ -49,6 +49,7 @@ const input: AgentInput = {
   messages: [{ role: "user", content: "Hello" }],
   newMessages: [{ role: "user", content: "Hello" }],
   requestedRole: AgentRole.AGENT,
+  propagationHeaders: {},
   scenarioState: {} as AgentInput["scenarioState"],
   scenarioConfig: {} as AgentInput["scenarioConfig"],
 };
@@ -230,6 +231,63 @@ describe("SerializedHttpAgentAdapter secret references", () => {
         type: "bearer",
         token: "{{ secrets.AGENT_TOKEN }}",
       });
+    });
+  });
+
+  describe("given a header value mixing a secret reference with a template", () => {
+    /** @scenario "A secret reference in a header value survives rendering byte for byte" */
+    it("resolves the secret and renders the parameter around it", async () => {
+      const adapter = new SerializedHttpAgentAdapter({
+        config: config({
+          headers: [
+            {
+              key: "X-Agent-Key",
+              value: "{{ secrets.AGENT_TOKEN }}/{{ params.region }}",
+            },
+          ],
+        }),
+        parameters: { region: "eu-central" },
+      });
+
+      await adapter.call(input);
+
+      expect(requestedHeaders()["X-Agent-Key"]).toBe(
+        `${SECRET_VALUE}/eu-central`,
+      );
+    });
+
+    /** @scenario "A secret reference in a header value survives rendering byte for byte" */
+    it("keeps a secret value that is itself template syntax out of the engine", async () => {
+      const adapter = new SerializedHttpAgentAdapter({
+        config: config({
+          headers: [{ key: "X-Agent-Key", value: "{{ secrets.AGENT_TOKEN }}" }],
+          secrets: { AGENT_TOKEN: "x{% endraw %}{{ params.region }}{% raw %}" },
+        }),
+        parameters: { region: "eu-central" },
+      });
+
+      await adapter.call(input);
+
+      expect(requestedHeaders()["X-Agent-Key"]).toBe(
+        "x{% endraw %}{{ params.region }}{% raw %}",
+      );
+    });
+
+    /** @scenario "A secret reference in a header value survives rendering byte for byte" */
+    it("never resolves a reference the render itself produced", async () => {
+      // A run parameter is supplied by whoever starts the run, not by whoever
+      // holds the credential. If its value spells a secret reference, that
+      // text must stay text in the header rather than pulling the secret in.
+      const adapter = new SerializedHttpAgentAdapter({
+        config: config({
+          headers: [{ key: "X-Echo", value: "{{ params.suffix }}" }],
+        }),
+        parameters: { suffix: "{{ secrets.AGENT_TOKEN }}" },
+      });
+
+      await adapter.call(input);
+
+      expect(requestedHeaders()["X-Echo"]).toBe("{{ secrets.AGENT_TOKEN }}");
     });
   });
 

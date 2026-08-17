@@ -21,9 +21,16 @@
 		"userPrompt": "How is my agent performing?"
 	},
 	{
+		"id": "connect-agent",
+		"label": "Connect agent",
+		"description": "Connect the codebase's AI agent to LangWatch agent simulations over HTTP, so scenario suites run against it from the platform. Finds or adds the agent's chat endpoint, wires authentication for scenario traffic, makes the server adopt the W3C traceparent header so the judge reads the agent's own traces, registers the agent with the `langwatch` CLI, and runs the first suite. Use when the user wants platform scenarios to test their real, deployed agent.",
+		"category": "skill",
+		"userPrompt": "Connect my agent to LangWatch simulations"
+	},
+	{
 		"id": "datasets",
 		"label": "Datasets",
-		"description": "Generate realistic synthetic evaluation datasets by analyzing the user's codebase, prompts, production traces, and reference materials. Interactive, consultant-style — asks clarifying questions, proposes a plan, generates a preview for approval, then delivers a complete dataset uploaded to LangWatch. Use when user asks to generate, create, or build a dataset for evaluation, testing, or benchmarking.",
+		"description": "Generate realistic synthetic evaluation datasets by analyzing the user's codebase, prompts, production traces, and reference materials. Interactive and consultant-style. Asks clarifying questions, proposes a plan, generates a preview for approval, then delivers a complete dataset uploaded to LangWatch. Use when user asks to generate, create, or build a dataset for evaluation, testing, or benchmarking.",
 		"category": "skill"
 	},
 	{
@@ -35,7 +42,7 @@
 	{
 		"id": "debug-with-langwatch",
 		"label": "Debug with langwatch",
-		"description": "Root-cause production errors and misbehaving agent runs with LangWatch. Finds errored traces, inspects spans, checks monitor and evaluator scores, then narrows to a root cause. Use when something is failing or misbehaving in production — errors, bad answers, latency spikes.",
+		"description": "Root-cause production errors and misbehaving agent runs with LangWatch. Finds errored traces, inspects spans, checks monitor and evaluator scores, then narrows to a root cause. Use when something is failing or misbehaving in production (errors, bad answers, latency spikes).",
 		"category": "recipe"
 	},
 	{
@@ -73,7 +80,7 @@
 	{
 		"id": "github",
 		"label": "GitHub",
-		"description": "Open a real pull request — clone a repo, branch, commit, push, and open a PR authored by the LangWatch app on behalf of the requesting user. Use when the user asks to open a PR, fix something in a repo and submit it, send a patch, raise a pull request, or otherwise land a code change on GitHub.",
+		"description": "Open a real pull request. Clone a repo, branch, commit, push, and open a PR authored by the LangWatch app on behalf of the requesting user. Use when the user asks to open a PR, fix something in a repo and submit it, send a patch, raise a pull request, or otherwise land a code change on GitHub.",
 		"category": "skill"
 	},
 	{
@@ -107,7 +114,7 @@
 	{
 		"id": "setup-lw",
 		"label": "Setup lw",
-		"description": "Set up and troubleshoot the LangWatch CLI — login (cloud and self-hosted), endpoint configuration, project selection, and connection problems. Use when the CLI isn't authenticated, can't reach LangWatch, or talks to the wrong project.",
+		"description": "Set up and troubleshoot the LangWatch CLI, covering login (cloud and self-hosted), endpoint configuration, project selection, and connection problems. Use when the CLI isn't authenticated, can't reach LangWatch, or talks to the wrong project.",
 		"category": "recipe"
 	},
 	{

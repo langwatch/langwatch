@@ -26,17 +26,14 @@
 
 import * as ScenarioRunner from "@langwatch/scenario";
 import { type TracerProvider, trace } from "@opentelemetry/api";
-import { bridgeTraceIdFromAdapterToJudge } from "./bridge-trace-id";
 import { createChildProcessLogger } from "./child-logger";
 import { selectRoleModelParams } from "./job-model-params";
 import {
   createJudgeModelFromParams,
   createModelFromParams,
 } from "./model.factory";
-import { RemoteSpanJudgeAgent } from "./remote-span-judge-agent";
+import { buildRemoteTraceRunConfig } from "./remote-trace-run-config";
 import { createAdapter } from "./serialized-adapter.registry";
-import { SerializedHttpAgentAdapter } from "./serialized-adapters/http-agent.adapter";
-import { createTraceApiSpanQuery } from "./trace-api-span-query";
 import { type ChildProcessJobData, ChildProcessJobDataSchema } from "./types";
 
 const logger = createChildProcessLogger("langwatch:scenarios:child");
@@ -145,37 +142,13 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
     nlpServiceUrl,
   });
 
-  // For HTTP targets, use a remote span judge that queries spans from
-  // the platform API before evaluation. The trace ID will be captured
-  // from the adapter after the conversation completes.
-  let remoteSpanJudge: RemoteSpanJudgeAgent | undefined;
-  const judgeAgent =
-    target.type === "http"
-      ? (() => {
-          remoteSpanJudge = new RemoteSpanJudgeAgent({
-            criteria: scenario.criteria,
-            model: judgeModel,
-            projectId: context.projectId,
-            querySpans: createTraceApiSpanQuery({
-              endpoint: langwatchEndpoint,
-              apiKey: langwatchApiKey,
-            }),
-          });
-          return remoteSpanJudge;
-        })()
-      : ScenarioRunner.judgeAgent({
-          criteria: scenario.criteria,
-          model: judgeModel,
-        });
+  const judgeAgent = ScenarioRunner.judgeAgent({
+    criteria: scenario.criteria,
+    model: judgeModel,
+  });
 
   // Results are reported via LangWatch SDK automatically
   const verbose = process.env.SCENARIO_VERBOSE === "true";
-
-  // Hook into the scenario lifecycle to capture the trace ID from the adapter
-  // before judge evaluation. The adapter captures it during HTTP calls.
-  if (remoteSpanJudge && adapter instanceof SerializedHttpAgentAdapter) {
-    bridgeTraceIdFromAdapterToJudge({ adapter, judge: remoteSpanJudge });
-  }
 
   const result = await ScenarioRunner.run(
     {
@@ -189,6 +162,16 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
         judgeAgent,
       ],
       verbose,
+      // An http target's own spans land in the trace each turn propagates,
+      // so the judge fetches them back from the platform's trace API before
+      // any verdict. The wait budget comes from the prefetcher's per-project
+      // ingest-lag measurement.
+      ...buildRemoteTraceRunConfig({
+        targetType: target.type,
+        traceWaitTimeoutMs: jobData.traceWaitTimeoutMs,
+        langwatchEndpoint,
+        langwatchApiKey,
+      }),
       metadata: {
         langwatch: {
           targetReferenceId: target.referenceId,

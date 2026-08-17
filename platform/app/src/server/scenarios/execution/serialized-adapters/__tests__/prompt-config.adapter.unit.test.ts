@@ -43,6 +43,7 @@ describe("SerializedPromptConfigAdapter", () => {
     messages: [{ role: "user", content: "How are you?" }],
     newMessages: [{ role: "user", content: "How are you?" }],
     requestedRole: AgentRole.AGENT,
+    propagationHeaders: {},
 
     scenarioState: {} as AgentInput["scenarioState"],
     scenarioConfig: {} as AgentInput["scenarioConfig"],
