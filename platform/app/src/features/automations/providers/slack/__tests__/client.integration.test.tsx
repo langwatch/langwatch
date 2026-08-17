@@ -10,7 +10,13 @@
  * asserted through their wrapper test ids.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -370,6 +376,38 @@ describe("SlackConfigForm channel picker", () => {
     // typist can win, and not the bug under test.
     const typist = () => userEvent.setup({ delay: 10 });
 
+    /**
+     * Type into the combobox, then wait for the box to actually hold it.
+     *
+     * The cadence above makes the resync race unlikely, not impossible: on a
+     * loaded CI runner a keystroke is still occasionally lost, and a fixed
+     * delay only moves the threshold rather than removing it.
+     *
+     * What this changes is WHERE the loss shows up. A test that types and then
+     * goes on to tab, click or press Enter carries the corrupted value forward,
+     * so the drop surfaces several interactions later as something that reads
+     * like a real defect — "expected ['#ahoc'] to deeply equal ['#adhoc']"
+     * about which item carries a tick. Settling on the typed value keeps the
+     * failure at the point the typing failed, and lets the retry that the
+     * `waitFor` performs absorb a race that is not what any of these tests are
+     * about.
+     *
+     * Tests that type and immediately assert the value do NOT need this: there
+     * the dropped character IS the assertion, and it should fail.
+     */
+    const typeAndSettle = async ({
+      user,
+      input,
+      text,
+    }: {
+      user: ReturnType<typeof typist>;
+      input: HTMLElement;
+      text: string;
+    }): Promise<void> => {
+      await user.type(input, text);
+      await waitFor(() => expect(input).toHaveValue(text));
+    };
+
     describe("when the author types a channel name to search", () => {
       it("keeps every typed character in the box", async () => {
         const user = typist();
@@ -388,7 +426,7 @@ describe("SlackConfigForm channel picker", () => {
         const input = screen.getByPlaceholderText(/#alerts or c0123/i);
 
         await user.click(input);
-        await user.type(input, "signoff");
+        await typeAndSettle({ user, input, text: "signoff" });
 
         expect(screen.getByText("#release-signoff")).toBeInTheDocument();
         expect(screen.queryByText("#support")).not.toBeInTheDocument();
@@ -411,10 +449,11 @@ describe("SlackConfigForm channel picker", () => {
         const onChangeSpy = vi.fn();
         renderForm({ initial: botSlice({ channelId: "" }), onChangeSpy });
 
-        await user.type(
-          screen.getByPlaceholderText(/#alerts or c0123/i),
-          "#adhoc",
-        );
+        await typeAndSettle({
+          user,
+          input: screen.getByPlaceholderText(/#alerts or c0123/i),
+          text: "#adhoc",
+        });
         await user.tab();
 
         expect(onChangeSpy).toHaveBeenLastCalledWith(
@@ -427,10 +466,15 @@ describe("SlackConfigForm channel picker", () => {
         const onChangeSpy = vi.fn();
         renderForm({ initial: botSlice({ channelId: "" }), onChangeSpy });
 
-        await user.type(
-          screen.getByPlaceholderText(/#alerts or c0123/i),
-          "#adhoc{Enter}",
-        );
+        // Enter is sent separately so the settle can assert the typed value —
+        // with `#adhoc{Enter}` in one call there is no point at which the box
+        // is expected to hold exactly `#adhoc`.
+        await typeAndSettle({
+          user,
+          input: screen.getByPlaceholderText(/#alerts or c0123/i),
+          text: "#adhoc",
+        });
+        await user.keyboard("{Enter}");
 
         expect(onChangeSpy).toHaveBeenLastCalledWith(
           expect.objectContaining({ channelId: "#adhoc" }),
@@ -466,7 +510,7 @@ describe("SlackConfigForm channel picker", () => {
         const input = screen.getByPlaceholderText(/#alerts or c0123/i);
 
         await user.click(input);
-        await user.type(input, "signoff");
+        await typeAndSettle({ user, input, text: "signoff" });
         await user.keyboard("{ArrowDown}{Enter}");
 
         expect(onChangeSpy).toHaveBeenLastCalledWith(
@@ -488,7 +532,7 @@ describe("SlackConfigForm channel picker", () => {
         await user.click(input);
         await user.click(await screen.findByText("#release-signoff"));
         await user.clear(input);
-        await user.type(input, "#adhoc");
+        await typeAndSettle({ user, input, text: "#adhoc" });
         await user.tab();
         await user.click(input);
 
@@ -516,7 +560,7 @@ describe("SlackConfigForm channel picker", () => {
         await user.click(input);
         await user.click(await screen.findByText("#release-signoff"));
         await user.clear(input);
-        await user.type(input, "#adhoc");
+        await typeAndSettle({ user, input, text: "#adhoc" });
         await user.tab();
 
         expect(input).toHaveValue("#adhoc");
