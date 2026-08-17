@@ -129,6 +129,33 @@ describe("suiteRunSync subscriber", () => {
         occurredAt: 5_000,
       });
     });
+
+    it("normalizes a legacy FAILURE status to the FAILED enum member (#6834)", async () => {
+      // `data.status` is an unconstrained string on the event, so events
+      // written before #6834 still carry "FAILURE" — a value the suite fold's
+      // status ladder, written against ScenarioRunStatus, does not recognise.
+      // Left raw, such an item fell through into the completed count and a
+      // suite finished SUCCESS around a failure.
+      const deps = makeDeps();
+      const subscriber = createSuiteRunSyncSubscriber(deps);
+
+      await subscriber.handler(finishedEvent({ status: "FAILURE" }), CONTEXT);
+
+      expect(deps.completeSuiteRunItem).toHaveBeenCalledWith(
+        expect.objectContaining({ status: "FAILED" }),
+      );
+    });
+
+    it("passes a cancelled status through unchanged", async () => {
+      const deps = makeDeps();
+      const subscriber = createSuiteRunSyncSubscriber(deps);
+
+      await subscriber.handler(finishedEvent({ status: "CANCELLED" }), CONTEXT);
+
+      expect(deps.completeSuiteRunItem).toHaveBeenCalledWith(
+        expect.objectContaining({ status: "CANCELLED" }),
+      );
+    });
   });
 
   describe("when the run does not belong to a suite", () => {
