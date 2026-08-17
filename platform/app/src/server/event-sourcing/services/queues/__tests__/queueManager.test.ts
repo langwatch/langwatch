@@ -1005,7 +1005,7 @@ describe("QueueManager", () => {
       });
 
       manager.initializeProjectionSubscriberQueues(
-        { reactor1: createMockSubscriberDispatchDefinition("reactor1") },
+        { subscriber1: createMockSubscriberDispatchDefinition("subscriber1") },
         vi.fn(),
       );
 
@@ -1025,20 +1025,20 @@ describe("QueueManager", () => {
 
       manager.initializeProjectionSubscriberQueues(
         {
-          reactor1: createMockSubscriberDispatchDefinition("reactor1"),
-          reactor2: createMockSubscriberDispatchDefinition("reactor2"),
+          subscriber1: createMockSubscriberDispatchDefinition("subscriber1"),
+          subscriber2: createMockSubscriberDispatchDefinition("subscriber2"),
         },
         vi.fn(),
       );
 
-      expect(globalJobRegistry.has("test-pipeline:reactor:reactor1")).toBe(
+      expect(globalJobRegistry.has("test-pipeline:reactor:subscriber1")).toBe(
         true,
       );
-      expect(globalJobRegistry.has("test-pipeline:reactor:reactor2")).toBe(
+      expect(globalJobRegistry.has("test-pipeline:reactor:subscriber2")).toBe(
         true,
       );
-      expect(manager.getProjectionSubscriberQueue("reactor1")).toBeDefined();
-      expect(manager.getProjectionSubscriberQueue("reactor2")).toBeDefined();
+      expect(manager.getProjectionSubscriberQueue("subscriber1")).toBeDefined();
+      expect(manager.getProjectionSubscriberQueue("subscriber2")).toBeDefined();
       expect(manager.hasProjectionSubscriberQueues()).toBe(true);
     });
 
@@ -1054,11 +1054,11 @@ describe("QueueManager", () => {
       });
 
       manager.initializeProjectionSubscriberQueues(
-        { reactor1: createMockSubscriberDispatchDefinition("reactor1") },
+        { subscriber1: createMockSubscriberDispatchDefinition("subscriber1") },
         vi.fn(),
       );
 
-      const facade = manager.getProjectionSubscriberQueue("reactor1")!;
+      const facade = manager.getProjectionSubscriberQueue("subscriber1")!;
       const event = createTestEvent(
         TEST_CONSTANTS.AGGREGATE_ID,
         aggregateType,
@@ -1070,7 +1070,7 @@ describe("QueueManager", () => {
         expect.objectContaining({
           __pipelineName: "test-pipeline",
           __jobType: "reactor",
-          __jobName: "reactor1",
+          __jobName: "subscriber1",
           event: expect.objectContaining({
             aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
           }),
@@ -1093,8 +1093,8 @@ describe("QueueManager", () => {
 
       manager.initializeProjectionSubscriberQueues(
         {
-          reactor1: createMockSubscriberDispatchDefinition(
-            "reactor1",
+          subscriber1: createMockSubscriberDispatchDefinition(
+            "subscriber1",
             undefined,
             {
               parentProjection: "traceSummary",
@@ -1105,7 +1105,7 @@ describe("QueueManager", () => {
         vi.fn(),
       );
 
-      const entry = globalJobRegistry.get("test-pipeline:reactor:reactor1");
+      const entry = globalJobRegistry.get("test-pipeline:reactor:subscriber1");
       const event = createTestEvent(
         TEST_CONSTANTS.AGGREGATE_ID,
         aggregateType,
@@ -1117,7 +1117,7 @@ describe("QueueManager", () => {
         foldState: {},
       });
       expect(groupKey).toBe(
-        `${tenantId}/fold/traceSummary/reactor/reactor1/${aggregateType}:${TEST_CONSTANTS.AGGREGATE_ID}`,
+        `${tenantId}/fold/traceSummary/reactor/subscriber1/${aggregateType}:${TEST_CONSTANTS.AGGREGATE_ID}`,
       );
     });
 
@@ -1133,11 +1133,11 @@ describe("QueueManager", () => {
       });
 
       manager.initializeProjectionSubscriberQueues(
-        { reactor1: createMockSubscriberDispatchDefinition("reactor1") },
+        { subscriber1: createMockSubscriberDispatchDefinition("subscriber1") },
         vi.fn(),
       );
 
-      const entry = globalJobRegistry.get("test-pipeline:reactor:reactor1");
+      const entry = globalJobRegistry.get("test-pipeline:reactor:subscriber1");
       const event = createTestEvent(
         TEST_CONSTANTS.AGGREGATE_ID,
         aggregateType,
@@ -1166,14 +1166,14 @@ describe("QueueManager", () => {
 
       manager.initializeProjectionSubscriberQueues(
         {
-          reactor1: createMockSubscriberDispatchDefinition("reactor1", {
+          subscriber1: createMockSubscriberDispatchDefinition("subscriber1", {
             delay: 3000,
           }),
         },
         vi.fn(),
       );
 
-      const facade = manager.getProjectionSubscriberQueue("reactor1")!;
+      const facade = manager.getProjectionSubscriberQueue("subscriber1")!;
       const event = createTestEvent(
         TEST_CONSTANTS.AGGREGATE_ID,
         aggregateType,

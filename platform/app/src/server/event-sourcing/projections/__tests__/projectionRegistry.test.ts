@@ -204,13 +204,13 @@ describe("ProjectionRegistry", () => {
         const fold = createMockFoldProjectionDefinition("myFold");
         registry.registerFoldProjection(fold);
 
-        const reactor1 = createMockSubscriber("sameName");
-        const reactor2 = createMockSubscriber("sameName");
+        const subscriber1 = createMockSubscriber("sameName");
+        const subscriber2 = createMockSubscriber("sameName");
 
-        registry.registerSubscriber("myFold", reactor1);
-        expect(() => registry.registerSubscriber("myFold", reactor2)).toThrow(
-          /already registered/,
-        );
+        registry.registerSubscriber("myFold", subscriber1);
+        expect(() =>
+          registry.registerSubscriber("myFold", subscriber2),
+        ).toThrow(/already registered/);
       });
     });
   });

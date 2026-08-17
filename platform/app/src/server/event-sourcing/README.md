@@ -16,7 +16,7 @@ const pipeline = definePipeline<MyEvent>()
   .withAggregateType("my_aggregate")
   .withFoldProjection("summary", summaryFoldProjection)
   .withMapProjection("records", recordsMapProjection)
-  .withReactor("summary", "notify", notifyReactor)
+  .withSubscriber("notify", { fold: "summary", handler: notifyHandler })
   .withCommand("doSomething", DoSomethingCommand)
   .build();
 ```
@@ -40,7 +40,8 @@ Registration connects the static definition to ClickHouse, Redis, and the in-hou
 | `.withAggregateType(type)` | Aggregate type for event grouping |
 | `.withFoldProjection(name, definition, options?)` | Register a fold projection (stateful, ordered) |
 | `.withMapProjection(name, definition, options?)` | Register a map projection (stateless, parallel) |
-| `.withReactor(foldName, reactorName, definition)` | Register a reactor on a fold projection |
+| `.withSubscriber(name, spec)` | Register best-effort side-effect work — on a fold, a map, or the live event stream |
+| `.withProcessManager(name, spec)` | Register stake-sensitive orchestration (durable inbox, state, leased intents) |
 | `.withCommand(name, HandlerClass, options?)` | Register a command handler |
 | `.withFeatureFlagService(service)` | Optional kill-switch support |
 | `.build()` | Build the static pipeline definition |
@@ -102,24 +103,33 @@ interface AppendStore<T> {
 }
 ```
 
-### Reactor
+### Subscriber
 
-A reactor fires after a fold projection succeeds:
+A subscriber is best-effort side-effect work. Declare it on the pipeline with
+`.withSubscriber(name, spec)`. Name a `fold` and it fires after that fold
+projection's apply + store succeeds, with the committed state in `context`; omit
+`fold` and it runs off the live event stream instead.
 
 ```typescript
-import type { ReactorDefinition } from "~/server/event-sourcing/subscribers/subscriber.types";
-
-const notifyReactor: ReactorDefinition<MyEvent, SummaryState> = {
-  name: "notify",
-  handle: async (event, { foldState, tenantId, aggregateId }) => {
-    await broadcastService.send(tenantId, { type: "updated", aggregateId });
-  },
-  options: {
+const pipeline = definePipeline<MyEvent>()
+  .withFoldProjection("summary", summaryFoldProjection)
+  .withSubscriber("notify", {
+    fold: "summary",
+    // Pre-enqueue guard — runs on the projection hot path, so keep it pure and
+    // synchronous. Returning false skips the job entirely (ADR-069).
+    when: (event, { state }) => state.count > 0,
+    handler: async (event, { state, tenantId, aggregateId }) => {
+      await broadcastService.send(tenantId, { type: "updated", aggregateId });
+    },
     delay: 500,
-    makeJobId: ({ event }) => `notify:${event.aggregateId}`,
-  },
-};
+    dedupId: ({ event }) => `notify:${event.aggregateId}`,
+  })
+  .build();
 ```
+
+For stake-sensitive work — anything where a dropped side effect is a customer-
+visible loss — use `.withProcessManager` instead. Those are the only two
+options; see [ADR-098](../../../../dev/docs/adr/098-post-event-work-subscribers-and-process-managers.md).
 
 ## Defining Commands
 
@@ -155,7 +165,7 @@ class RecordSpanCommand
 
 ## Composition Root
 
-The `PipelineRegistry` (in `pipelineRegistry.ts`) is the composition root. It creates store adapters, builds reactors and commands, then registers all pipelines:
+The `PipelineRegistry` (in `pipelineRegistry.ts`) is the composition root. It creates store adapters, builds subscribers and commands, then registers all pipelines:
 
 ```typescript
 export class PipelineRegistry {
@@ -228,7 +238,7 @@ All paths below are relative to `src/server/event-sourcing/`.
 | `pipeline/` | Static builder: `definePipeline()`, `StaticPipelineDefinition`, pipeline types |
 | `services/` | `EventSourcingService` (main orchestration), `CommandDispatcher`, `QueueManager` |
 | `projections/` | Projection executors: `FoldProjectionExecutor`, `MapProjectionExecutor`, `ProjectionRouter`, `ProjectionRegistry` |
-| `reactors/` | Reactor type definitions |
+| `subscribers/` | Subscriber type definitions and the shared throttle-window helper |
 | `queues/` | Queue implementations: `GroupQueue` (in-house, Redis + Lua — see [`queues/groupQueue/README.md`](./queues/groupQueue/README.md)) and `MemoryQueue` (in-process dev/test fallback) |
 | `stores/` | Event store implementations: `EventStoreClickHouse`, `EventStoreMemory`, projection store interfaces |
 | `utils/` | `EventUtils` (event creation, validation), `KillSwitch` |
@@ -242,7 +252,8 @@ Each pipeline follows the same internal structure:
 pipelines/<name>/
   commands/         # Command handlers
   projections/      # Fold and map projection definitions + stores
-  reactors/         # Reactor definitions
+  subscribers/      # Subscriber definitions
+  process-manager/  # Process-manager definitions, where the pipeline has one
   repositories/     # Projection store implementations (ClickHouse + Memory)
   schemas/          # Event types, command schemas, constants
   utils/            # Pipeline-specific utilities
@@ -281,7 +292,7 @@ SaaS-only cross-pipeline fold projections live in `projections/global/`:
 ## Common Pitfalls
 
 1. **Missing tenant validation**: Always call `EventUtils.validateTenantId()` in store implementations.
-2. **Reactor without fold**: Reactors must be registered on an existing fold projection (`withReactor(foldName, ...)`). The builder will throw if the fold does not exist.
+2. **Subscriber naming a fold that does not exist**: a subscriber declared with `fold:` must name an already-registered fold projection. The builder throws at `build()` if it does not exist.
 3. **Fold store failures**: If `store.store()` fails, GroupQueue retries the entire event (with exponential backoff in front of the same group, preserving FIFO). Make sure your store is idempotent or uses upsert semantics.
 4. **Map projection ordering**: Map projections have no ordering guarantees. Do not rely on event order in append stores.
 5. **Process role mismatch**: Commands dispatched in a `web` process are enqueued but not processed until a `worker` process picks them up. Ensure workers are running.

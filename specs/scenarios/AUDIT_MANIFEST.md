@@ -102,7 +102,7 @@ Concentrations:
 | specs/scenarios/simulation-runner.feature | "Emit run started event" | DUPLICATE | RUN_STARTED emission tested via extensible-metadata.integration.test.ts:87-96 + scenario-event.service.integration.test.ts |
 | specs/scenarios/simulation-runner.feature | "Emit message events during conversation" | DUPLICATE | MESSAGE_SNAPSHOT emission/consumption covered by scenario-event.service.integration.test.ts:95-160 |
 | specs/scenarios/simulation-runner.feature | "Emit run finished event with results" | KEEP | RUN_FINISHED enum exists; no test directly asserts event shape on completion |
-| specs/scenarios/simulation-runner.feature | "Execute scenario in isolated child process via execution reactor" | DUPLICATE | Covered by scenario.processor.spawning.integration.test.ts:33-63 (spawns child, receives serialized data) |
+| specs/scenarios/simulation-runner.feature | "Execute scenario in isolated child process via execution subscriber" | DUPLICATE | Covered by scenario.processor.spawning.integration.test.ts:33-63 (spawns child, receives serialized data) |
 | specs/scenarios/simulation-runner.feature | "Child process has isolated OTEL context" | DUPLICATE | Covered by scenario.processor.otel-isolation.integration.test.ts:35-72 (sends to LANGWATCH_ENDPOINT, OTEL traces endpoint) |
 | specs/scenarios/simulation-runner.feature | "Child traces include scenario metadata" | DUPLICATE | Covered by scenario.processor.otel-isolation.integration.test.ts:74-150 (concurrent processes, distinct scenarioId, batchRunId) |
 | specs/scenarios/simulation-runner.feature | "Child events include scenario set ID" | DUPLICATE | Covered by scenario.processor.otel-isolation.integration.test.ts:178-210 "includes setId in scenario events sent to collector" |

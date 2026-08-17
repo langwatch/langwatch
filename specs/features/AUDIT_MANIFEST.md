@@ -242,18 +242,18 @@ See `~/workspace/orchard-codex/plans/unimpl-reduction-2026-04-25.md` for the orc
 | specs/features/customer-io-nurturing-integration.feature | "Signup identification includes optional marketing fields when present" | KEEP | utm_campaign + how_heard tests exist; not bound |
 | specs/features/customer-io-nurturing-integration.feature | "Customer.io failure during signup does not block onboarding" | KEEP | API-unavailable test in signupIdentification.unit.test.ts |
 | specs/features/customer-io-nurturing-integration.feature | "Signup with no Customer.io key configured completes without errors" | KEEP | nurturing-undefined branch tested in signupIdentification.unit.test.ts |
-| specs/features/customer-io-nurturing-integration.feature | "First trace identifies user with trace milestones" | KEEP | customerIoTraceSync.reactor.unit.test.ts covers first-trace identify |
-| specs/features/customer-io-nurturing-integration.feature | "First trace fires first_trace_integrated event" | KEEP | first_trace_integrated tracked in trace sync reactor tests |
-| specs/features/customer-io-nurturing-integration.feature | "First trace fires immediately without debouncing" | KEEP | Reactor tested; immediate firing covered implicitly via first-trace branch |
-| specs/features/customer-io-nurturing-integration.feature | "Subsequent traces update count and timestamp with debouncing" | KEEP | last_trace_at update tested in trace sync reactor tests |
-| specs/features/customer-io-nurturing-integration.feature | "Trace sync reactor uses project-scoped job ID for debouncing" | KEEP | makeJobId returns cio-trace-sync-{projectId}; covered by reactor unit test |
-| specs/features/customer-io-nurturing-integration.feature | "Trace sync does not duplicate first-trace detection logic" | KEEP | Reactor reads firstMessage; tested via project service mock |
-| specs/features/customer-io-nurturing-integration.feature | "First evaluation identifies user with evaluation milestones" | KEEP | customerIoEvaluationSync.reactor.unit.test.ts covers first-eval identify |
-| specs/features/customer-io-nurturing-integration.feature | "First evaluation fires first_evaluation_created event" | KEEP | first_evaluation_created tracked in eval sync reactor tests |
+| specs/features/customer-io-nurturing-integration.feature | "First trace identifies user with trace milestones" | KEEP | customerIoTraceSync.subscriber.unit.test.ts covers first-trace identify |
+| specs/features/customer-io-nurturing-integration.feature | "First trace fires first_trace_integrated event" | KEEP | first_trace_integrated tracked in trace sync subscriber tests |
+| specs/features/customer-io-nurturing-integration.feature | "First trace fires immediately without debouncing" | KEEP | Subscriber tested; immediate firing covered implicitly via first-trace branch |
+| specs/features/customer-io-nurturing-integration.feature | "Subsequent traces update count and timestamp with debouncing" | KEEP | last_trace_at update tested in trace sync subscriber tests |
+| specs/features/customer-io-nurturing-integration.feature | "Trace sync subscriber uses project-scoped job ID for debouncing" | KEEP | makeJobId returns cio-trace-sync-{projectId}; covered by subscriber unit test |
+| specs/features/customer-io-nurturing-integration.feature | "Trace sync does not duplicate first-trace detection logic" | KEEP | Subscriber reads firstMessage; tested via project service mock |
+| specs/features/customer-io-nurturing-integration.feature | "First evaluation identifies user with evaluation milestones" | KEEP | customerIoEvaluationSync.subscriber.unit.test.ts covers first-eval identify |
+| specs/features/customer-io-nurturing-integration.feature | "First evaluation fires first_evaluation_created event" | KEEP | first_evaluation_created tracked in eval sync subscriber tests |
 | specs/features/customer-io-nurturing-integration.feature | "Subsequent evaluations update identify with evaluation count" | KEEP | Updated count + last_evaluation_at tested |
-| specs/features/customer-io-nurturing-integration.feature | "Subsequent evaluations fire evaluation_ran event" | KEEP | evaluation_ran event tested in eval sync reactor tests |
-| specs/features/customer-io-nurturing-integration.feature | "Subsequent evaluation updates are debounced per project" | KEEP | Per-project debounce confirmed in reactor implementation |
-| specs/features/customer-io-nurturing-integration.feature | "Evaluation sync reactor uses project-scoped job ID for debouncing" | UPDATE | Actual makeJobId returns cio-eval-sync-{projectId}-{evaluationId}; scenario says project only |
+| specs/features/customer-io-nurturing-integration.feature | "Subsequent evaluations fire evaluation_ran event" | KEEP | evaluation_ran event tested in eval sync subscriber tests |
+| specs/features/customer-io-nurturing-integration.feature | "Subsequent evaluation updates are debounced per project" | KEEP | Per-project debounce confirmed in subscriber implementation |
+| specs/features/customer-io-nurturing-integration.feature | "Evaluation sync subscriber uses project-scoped job ID for debouncing" | UPDATE | Actual makeJobId returns cio-eval-sync-{projectId}-{evaluationId}; scenario says project only |
 | specs/features/customer-io-nurturing-integration.feature | "Team member invite updates member count and fires event" | KEEP | fireTeamMemberInvitedNurturing tested in featureAdoption.unit.test.ts |
 | specs/features/customer-io-nurturing-integration.feature | "Workflow creation updates workflow count and fires event" | KEEP | fireWorkflowCreatedNurturing tested in featureAdoption.unit.test.ts |
 | specs/features/customer-io-nurturing-integration.feature | "Scenario creation updates scenario count and fires event" | KEEP | fireScenarioCreatedNurturing tested in featureAdoption.unit.test.ts |

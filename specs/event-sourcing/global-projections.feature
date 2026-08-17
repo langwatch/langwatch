@@ -1,6 +1,6 @@
-Feature: Global Projections and Reactors
+Feature: Global Projections and Subscribers
 
-  Global projections and reactors subscribe to events from all pipelines. They are used for
+  Global projections and subscribers subscribe to events from all pipelines. They are used for
   cross-pipeline metrics like billable event counts.
 
   Scenario: Dispatched from any pipeline
@@ -14,4 +14,4 @@ Feature: Global Projections and Reactors
     Given a global projection or reaction registered in the registry
     When events are dispatched to global projections
     Then they are processed in a dedicated virtual pipeline "global"
-    And failures in global projections and reactors do not affect local pipeline processing
+    And failures in global projections and subscribers do not affect local pipeline processing

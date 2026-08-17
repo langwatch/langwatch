@@ -2,7 +2,13 @@
 
 **Date:** 2026-06-10
 
-**Status:** Accepted
+**Status:** Accepted — **renamed by [ADR-098](./098-post-event-work-subscribers-and-process-managers.md).**
+
+The decision below stands unchanged: a pure, synchronous predicate gates the
+enqueue, and a throwing predicate fails open. Only the vocabulary moved. Read
+"reactor" as "subscriber", `shouldReact` as `shouldDispatch`, and
+`dispatchToReactors` as `dispatchToSubscribers`. The `es_reactor_total`
+counter this ADR names is deliberately unrenamed — dashboards key on it.
 
 ## Context
 

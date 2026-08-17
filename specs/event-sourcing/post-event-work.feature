@@ -1,6 +1,6 @@
-# Supersedes reactors.feature. See dev/docs/adr/098-post-event-work-subscribers-and-process-managers.md:
+# Supersedes subscribers.feature. See dev/docs/adr/098-post-event-work-subscribers-and-process-managers.md:
 # post-event work is subscribers (best-effort) and process managers
-# (stake-sensitive); the reactor vocabulary is retired. The shouldReact
+# (stake-sensitive); the subscriber vocabulary is retired. The shouldReact
 # contract from ADR-026 carries over as the subscriber `when` guard.
 Feature: Post-event work
 
@@ -69,7 +69,7 @@ Feature: Post-event work
 
   @unit
   Scenario: A registration keeps its queue identity across the vocabulary change
-    Given a side effect that was registered as a reactor before this decision
+    Given a side effect that was registered as a subscriber before this decision
     When it is registered as a subscriber under the same name
     Then jobs staged under the old registration dispatch into the new one
 

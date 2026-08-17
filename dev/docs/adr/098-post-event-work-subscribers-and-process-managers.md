@@ -105,14 +105,35 @@ Concretely:
    the `ReactorDefinition` authoring type, and the `*.reactor.ts` files go.
    The internal dispatch machinery — which was always the subscriber
    machinery — stays, renamed to match. No re-exports for compatibility.
-4. **The never-registered Customer.io reactors are deleted**, not migrated.
-   They were dead code on every pipeline; if CRM nurturing sync returns, it
-   returns as a subscriber with a real counting strategy.
+4. **The never-registered Customer.io reactors are migrated, not deleted.**
+   They are offered as optional pipeline dependencies and stay unregistered
+   pending a counting strategy, with their spec bindings
+   (`specs/features/customer-io-nurturing-integration.feature`) intact.
+   Deleting them would have thrown away working CRM sync code to save a file
+   move.
 5. **Nothing about dispatch semantics changes.** This is a vocabulary
    retirement, byte-for-byte on queue behavior: same job paths, same dedup
    keys where they carried event identity, same delays, same replay
    exclusion. Anything that would change delivery semantics is out of scope
    and listed below as explicit follow-up work.
+6. **Four names keep the retired word, because each is a contract read from
+   outside this repository.** They are decisions, not oversights:
+
+   | Kept name | Read by | Why renaming it costs more than it pays |
+   |---|---|---|
+   | `es_reactor_total`, `es_reactor_duration_milliseconds`, `es_reactor_collapsed_total` and their `reactor_name` label | prod Grafana dashboards and alerts, which live in the saas infrastructure repository | A rename blanks panels and silences alerts until a second repository ships a matching change. The emitter helpers keep the matching spelling so a reader can still tell which metric a call writes. |
+   | the `reactor` queue-kind literal and the `fold/<projection>/reactor/<name>` job path | in-flight GroupQueue jobs | The path *is* the routing key. Renaming it strands every job staged by a pod running the old code for the length of a rolling deploy. |
+   | `reactor_dispatch` ops stage and the `reactor.name` span attribute | ops dashboards and dejaview | Same dashboard-breakage argument, without even a metric's cardinality excuse. |
+   | `ReactorOutbox` in `prisma/migrations/**` | Postgres | Deployed migrations are immutable history. The model itself is already gone from `schema.prisma`. |
+
+   Everything else — types, identifiers, file and directory names, comments,
+   docs and specs — is renamed. The dispatch-plane types are
+   `SubscriberDispatchDefinition`, `SubscriberDispatchContext` and
+   `SubscriberDispatchOptions`; `shouldReact` is `shouldDispatch`. Where the
+   rename collided with the pre-existing live-event subscriber family, the
+   fold/map-attached side took the `projectionSubscriber*` spelling
+   (`initializeProjectionSubscriberQueues`) so the two families stay legible
+   apart.
 
 ## Rationale / Trade-offs
 

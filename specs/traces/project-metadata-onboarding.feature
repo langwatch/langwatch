@@ -21,8 +21,8 @@ Feature: Project becomes integrated after first trace ingestion
   # PostHog product analytics on the firstMessage transition
   #
   # The Customer.io nurturing integration tracks a separately named
-  # first_trace_integrated event from its own reactor; these scenarios are
-  # about the PostHog milestone fired by the projectMetadata reactor.
+  # first_trace_integrated event from its own subscriber; these scenarios are
+  # about the PostHog milestone fired by the projectMetadata subscriber.
   # ---------------------------------------------------------------------------
 
   @unit
@@ -69,4 +69,4 @@ Feature: Project becomes integrated after first trace ingestion
     # Trace Explorer now decides from its own `hasAnyTraces` result, which
     # answers the same question without a second query. The dedicated
     # setup screen still lives at /[project]/setup. project.firstMessage is
-    # set by the projectMetadata reactor on first trace ingestion.
+    # set by the projectMetadata subscriber on first trace ingestion.

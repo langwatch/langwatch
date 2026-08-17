@@ -13,8 +13,8 @@ Feature: Customer.io nurturing integration
   #   platform/app/ee/billing/nurturing/hooks/promptCreation.unit.test.ts
   #   platform/app/ee/billing/nurturing/hooks/promptCreation.integration.test.ts
   #   platform/app/src/hooks/__tests__/useAttributionCapture.unit.test.ts
-  #   platform/app/src/server/event-sourcing/pipelines/trace-processing/reactors/__tests__/customerIoTraceSync.reactor.unit.test.ts
-  #   platform/app/src/server/event-sourcing/pipelines/evaluation-processing/reactors/__tests__/customerIoEvaluationSync.reactor.unit.test.ts
+  #   platform/app/src/server/event-sourcing/pipelines/trace-processing/subscribers/__tests__/customerIoTraceSync.subscriber.unit.test.ts
+  #   platform/app/src/server/event-sourcing/pipelines/evaluation-processing/subscribers/__tests__/customerIoEvaluationSync.subscriber.unit.test.ts
   #   platform/app/src/server/event-sourcing/pipelines/simulation-processing/subscribers/__tests__/customerIoSimulationSync.subscriber.unit.test.ts
   # Six scenarios were rewritten to match shipped implementation (was UPDATE-class):
   #   - "Null service resolves..." dropped (impl uses `undefined`, not null pattern)
@@ -25,7 +25,7 @@ Feature: Customer.io nurturing integration
   #     (the actual onboarding flow & trait names)
 
   All scheduling, sequencing, and email delivery is owned by Customer.io.
-  LangWatch reactors and hooks fire-and-forget data to Customer.io via the
+  LangWatch subscribers and hooks fire-and-forget data to Customer.io via the
   Pipelines API. The NurturingService follows the NotificationService pattern
   (private constructor, static create/createNull, wired through App).
 
@@ -162,7 +162,7 @@ Feature: Customer.io nurturing integration
     And no Customer.io requests are made
 
   # ---------------------------------------------------------------------------
-  # R3: Trace integration reactor — customerIoTraceSync
+  # R3: Trace integration subscriber — customerIoTraceSync
   # ---------------------------------------------------------------------------
 
   @integration
@@ -192,19 +192,19 @@ Feature: Customer.io nurturing integration
     And the update is debounced so at most one call per project per 5 minutes
 
   @unit
-  Scenario: Trace sync reactor uses project-scoped job ID for debouncing
-    Given the customerIoTraceSync reactor
+  Scenario: Trace sync subscriber uses project-scoped job ID for debouncing
+    Given the customerIoTraceSync subscriber
     When makeJobId is called for a project
     Then the returned ID is "cio-trace-sync-{projectId}"
 
   @unit
   Scenario: Trace sync does not duplicate first-trace detection logic
-    Given the projectMetadata reactor already tracks first trace via Project.firstMessage
-    When the customerIoTraceSync reactor processes a trace
+    Given the projectMetadata subscriber already tracks first trace via Project.firstMessage
+    When the customerIoTraceSync subscriber processes a trace
     Then it reads the existing first-trace flag rather than re-detecting it
 
   # ---------------------------------------------------------------------------
-  # R4: Evaluation sync reactor — customerIoEvaluationSync
+  # R4: Evaluation sync subscriber — customerIoEvaluationSync
   # ---------------------------------------------------------------------------
 
   @integration
@@ -239,8 +239,8 @@ Feature: Customer.io nurturing integration
     Then the update is debounced per project
 
   @unit
-  Scenario: Evaluation sync reactor uses project-and-evaluation-scoped job ID for debouncing
-    Given the customerIoEvaluationSync reactor
+  Scenario: Evaluation sync subscriber uses project-and-evaluation-scoped job ID for debouncing
+    Given the customerIoEvaluationSync subscriber
     When makeJobId is called for an evaluation event
     Then the returned ID is "cio-eval-sync-{projectId}-{evaluationId}"
 
@@ -312,7 +312,7 @@ Feature: Customer.io nurturing integration
   #
   # Aligns LangWatch nurturing data with the Customer.io onboarding Journey.
   # Adds product_interest capture, has_prompts tracking, has_simulations
-  # tracking via the simulation pipeline reactor, and updated trait schema.
+  # tracking via the simulation pipeline subscriber, and updated trait schema.
   #
   # Challenge findings incorporated:
   # 1. product_interest is captured via a separate identify call AFTER the
@@ -410,7 +410,7 @@ Feature: Customer.io nurturing integration
     And the Customer.io error is captured for observability
 
   # ---------------------------------------------------------------------------
-  # R12: has_simulations trait + reactor on simulation_processing pipeline
+  # R12: has_simulations trait + subscriber on simulation_processing pipeline
   #
   # simulation_count is org-wide (aggregated across all projects in the
   # organization), following the createEvaluationCountFn pattern.

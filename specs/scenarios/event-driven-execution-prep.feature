@@ -11,7 +11,7 @@ Feature: Event-driven scenario execution
   # intent on queued/cancelled, and 6-pod GroupQueue distribution — tracked in
   # PR #3458.
   #
-  # Migration note (ADR-094): the fire-and-forget scenarioExecution reactor was
+  # Migration note (ADR-094): the fire-and-forget scenarioExecution subscriber was
   # replaced by the durable simulation_run_execution process manager. A queued
   # event now evolves per-run PM state and emits an `execute` intent through
   # the leased PG outbox (retried, never silently dropped); the intent handler

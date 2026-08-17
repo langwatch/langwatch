@@ -716,7 +716,7 @@ describe("breaking-change scope guard", () => {
     const files = [
       ".release-please-shim",
       "platform/app/src/server/app-layer/traces/canonicalisation/extractors/genAi.ts",
-      "platform/app/src/server/event-sourcing/pipelines/trace-processing/reactors/trackedEventSync.reactor.ts",
+      "platform/app/src/server/event-sourcing/pipelines/trace-processing/subscribers/trackedEventSync.subscriber.ts",
       "sdks/go/instrumentation/openai/middleware.go",
       "specs/go-sdk/span-attribute-parity.feature",
     ];
