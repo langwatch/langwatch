@@ -13,7 +13,7 @@ import { createLogger } from "@langwatch/observability";
  * either (a) configure this adapter from the admin UI with the right
  * pullConfig, or (b) extend a thin wrapper that locks the URL + auth
  * shape and only exposes credentials (see
- * `copilotStudio.puller.ts` for the reference impl).
+ * `claudeCompliance.puller.ts` for the reference impl).
  *
  * Spec: specs/ai-governance/puller-framework/http-polling.feature
  */

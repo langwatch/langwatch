@@ -337,7 +337,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-governance/personal-portal/portal-grid.feature",
   "specs/ai-governance/personal-portal/tool-catalog-scoping.feature",
   "specs/ai-governance/personal-portal/tool-catalog-vk-bridge.feature",
-  "specs/ai-governance/puller-framework/copilot-studio-reference.feature",
   "specs/ai-governance/puller-framework/event-sourced-process-scheduling.feature",
   "specs/ai-governance/puller-framework/http-custom-byo-admin-ui.feature",
   "specs/ai-governance/puller-framework/http-polling.feature",

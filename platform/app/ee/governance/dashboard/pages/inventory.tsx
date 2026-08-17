@@ -38,6 +38,10 @@ import {
   recommendedPullSchedule,
 } from "@ee/governance/dashboard/logic/pullCadence";
 import { NON_ENTERPRISE_INGESTION_SOURCE_CAP } from "@ee/governance/services/activity-monitor/ingestionSource.constants";
+import {
+  classifyIngestionSourceHealth,
+  HEALTH_COPY,
+} from "@ee/governance/services/activity-monitor/ingestionSourceHealth";
 import { isOttlEnabledSourceType } from "@ee/governance/services/activity-monitor/ottlStarterTemplates";
 import {
   ChevronRight,
@@ -101,13 +105,33 @@ const STATUS_META: Record<
   string,
   { icon: typeof CircleCheck; label: string; color: string }
 > = {
-  active: { icon: CircleCheck, label: "Active", color: "green.500" },
+  active: {
+    icon: CircleCheck,
+    label: HEALTH_COPY.active.label,
+    color: "green.500",
+  },
   awaiting_first_event: {
     icon: CircleDashed,
-    label: "Awaiting first event",
+    label: HEALTH_COPY.awaiting_first_event.label,
     color: "amber.500",
   },
-  disabled: { icon: CircleX, label: "Disabled", color: "fg.muted" },
+  // Configured, not erroring, and silent for longer than any setup delay
+  // explains. Deliberately not amber: this is a finding, not a wait.
+  never_produced: {
+    icon: CircleX,
+    label: HEALTH_COPY.never_produced.label,
+    color: "red.500",
+  },
+  erroring: {
+    icon: CircleX,
+    label: HEALTH_COPY.erroring.label,
+    color: "red.500",
+  },
+  disabled: {
+    icon: CircleX,
+    label: HEALTH_COPY.disabled.label,
+    color: "fg.muted",
+  },
 };
 
 export interface ComposerState {
@@ -179,8 +203,12 @@ function resolvePullConfig(
   const pullAdapter = PULL_ADAPTER_FOR_SOURCE[composer.sourceType];
   // For BYO `http_custom` we send the FULL HttpPollingConfig shape so the
   // generic adapter can run unmodified. The locked-shape reference pullers
-  // (copilot_studio / openai_compliance / claude_compliance) only need the
-  // adapter id - their validateConfig override returns the frozen config.
+  // (openai_compliance / claude_compliance) only need the adapter id - their
+  // validateConfig override returns the frozen config.
+  //
+  // `microsoft_365_audit` is neither: its config is locked, but it needs
+  // per-tenant credentials the frozen config cannot carry. Sending the bare
+  // `{ adapter }` is what left #6785's secrets stored nowhere at all.
   const builders: Partial<
     Record<SourceType, [() => unknown | null, string, string]>
   > = {
@@ -201,6 +229,11 @@ function resolvePullConfig(
       shouldRequireCredentials
         ? "Admin API key is required, report must be `usage` or `cost`, bucket width is usage-only and must be 1m/1h/1d, and the backfill start must be a calendar date (2026-08-01) or an instant carrying a timezone (2026-08-01T00:00:00Z)."
         : "Report must be `usage` or `cost`, bucket width is usage-only and must be 1m/1h/1d, and the backfill start must be a calendar date (2026-08-01) or an instant carrying a timezone (2026-08-01T00:00:00Z). Leave the admin API key blank to keep the current one.",
+    ],
+    microsoft_365_audit: [
+      () => buildMicrosoft365AuditPullConfig(composer),
+      "Missing required Microsoft 365 audit fields",
+      "Tenant ID, client ID, and client secret are all required.",
     ],
   };
 
@@ -868,8 +901,17 @@ function SourceRow({
   onArchive: () => void;
   canManage: boolean;
 }) {
-  const status =
-    STATUS_META[source.status] ?? STATUS_META.awaiting_first_event!;
+  // Derived rather than stored: `status` alone cannot tell a source created
+  // five minutes ago from one that has been configured for months without
+  // ever producing an event. Both read `awaiting_first_event`, and that
+  // ambiguity is how the retired copilot_studio source stayed invisible.
+  const health = classifyIngestionSourceHealth({
+    status: source.status,
+    createdAt: new Date(source.createdAt),
+    lastEventAt: source.lastEventAt ? new Date(source.lastEventAt) : null,
+    errorCount: source.errorCount ?? 0,
+  });
+  const status = STATUS_META[health] ?? STATUS_META.awaiting_first_event!;
   const StatusIcon = status.icon;
   const typeLabel =
     SOURCE_TYPE_LABEL[source.sourceType as SourceType] ?? source.sourceType;
@@ -1777,10 +1819,10 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       required: true,
     },
   ],
-  copilot_studio: [
+  microsoft_365_audit: [
     {
       key: "tenantId",
-      label: "Azure AD tenant ID",
+      label: "Microsoft Entra tenant ID",
       placeholder: "00000000-0000-0000-0000-000000000000",
       required: true,
     },
@@ -1794,15 +1836,9 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       key: "clientSecret",
       label: "App registration client secret",
       placeholder: "(value pasted from Azure portal)",
-      hint: "We hash this server-side; only the hash is persisted.",
+      hint: "Encrypted at rest, not hashed — the puller has to present the real value to Microsoft. It is never shown again after you save.",
       required: true,
       secret: true,
-    },
-    {
-      key: "pollEverySec",
-      label: "Polling cadence (seconds)",
-      placeholder: "300",
-      hint: "How often to call Purview Audit. Default 300s.",
     },
   ],
   openai_compliance: [
@@ -2504,6 +2540,44 @@ function ParserConfigField({
   );
 }
 
+/**
+ * Fields that `microsoft_365_audit` carries in its pullConfig `credentials`
+ * subtree rather than at the top level of parserConfig.
+ *
+ * The distinction is not cosmetic: `encryptParserConfigCredentials` encrypts
+ * the `credentials` subtree and nothing else, so a secret left at the top
+ * level is either stored in plaintext or, once PR #6670 taught the redactor to
+ * recognise it as a secret, stored nowhere at all. That is #6785.
+ */
+const MICROSOFT_365_AUDIT_CREDENTIAL_FIELDS = [
+  "tenantId",
+  "clientId",
+  "clientSecret",
+] as const;
+
+/**
+ * Build the pullConfig for `microsoft_365_audit`, moving the credentials the
+ * composer collected into the `credentials` subtree the worker decrypts.
+ * Returns null when a required field is blank, so the caller can keep the
+ * drawer open rather than saving a source that cannot authenticate.
+ */
+function buildMicrosoft365AuditPullConfig(
+  c: ComposerState,
+): Record<string, unknown> | null {
+  const credentials: Record<string, string> = {};
+  for (const field of MICROSOFT_365_AUDIT_CREDENTIAL_FIELDS) {
+    const value = c.parserConfig[field];
+    if (typeof value !== "string" || value.trim() === "") return null;
+    credentials[field] = value.trim();
+  }
+  return {
+    adapter: "microsoft_365_audit",
+    contentType: "Audit.General",
+    tenantId: credentials.tenantId,
+    credentials,
+  };
+}
+
 export function ParserConfigFields({
   sourceType,
   values,
@@ -2605,6 +2679,10 @@ const PULL_CONFIG_OWNED_FIELDS: Partial<Record<SourceType, readonly string[]>> =
     // the merge, the raw form value would persist `warehouseId: ""`, which the
     // adapter reads as a warehouse to go ask the workspace about.
     databricks_genie: ["workspaceUrl", "spaceIds", "warehouseId"],
+    // All three are credentials the builder moves into `credentials`, where
+    // they get encrypted. A copy left at the top level of parserConfig would
+    // sit next to the encrypted one in the clear.
+    microsoft_365_audit: [...MICROSOFT_365_AUDIT_CREDENTIAL_FIELDS],
   };
 
 // Skip sentinel for a parserConfig entry that must not be persisted, kept

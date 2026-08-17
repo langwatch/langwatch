@@ -57,7 +57,7 @@ export const MINUTE_INTERVALS = [5, 10, 15, 30] as const;
  * it is rendered by.
  */
 export const PULL_ADAPTER_FOR_SOURCE: Partial<Record<SourceType, string>> = {
-  copilot_studio: "copilot_studio",
+  microsoft_365_audit: "microsoft_365_audit",
   openai_compliance: "openai_compliance",
   claude_compliance: "claude_compliance",
   anthropic_admin: "anthropic_admin",
@@ -72,7 +72,7 @@ export const PULL_ADAPTER_FOR_SOURCE: Partial<Record<SourceType, string>> = {
  * diverges, update both ends.
  */
 export const PULL_SCHEDULE_DEFAULTS: Record<string, string> = {
-  copilot_studio: "*/15 * * * *",
+  microsoft_365_audit: "*/15 * * * *",
   openai_compliance: "*/15 * * * *",
   claude_compliance: "*/15 * * * *",
   anthropic_admin: "0 * * * *",

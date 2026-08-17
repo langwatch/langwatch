@@ -46,7 +46,8 @@ Feature: microsoft_365_audit ingestion source (Office 365 Management Activity AP
   the stored column an opaque string and give up its queryability for nothing.
 
   Separately, there is no `pullConfig` column at all; config lives in the one
-  `parserConfig` JSONB (ingestionSource.service.ts:343-346).
+  `parserConfig` JSONB
+  (activity-monitor/ingestionSource.service.ts:342-357).
 
   phase ∈ { listing, draining }. The restart guarantee in pullerAdapter.ts:93-95
   is the hard requirement: a worker crash plus restart on the same cursor must
@@ -65,10 +66,16 @@ Feature: microsoft_365_audit ingestion source (Office 365 Management Activity AP
   assumed.
 
   This feature has no @e2e tier, deliberately. The external dependency is a
-  Microsoft tenant that CI cannot reach, so the highest level achievable is
-  @integration against a fixture server. Read the missing tier as a stated
+  Microsoft tenant that CI cannot reach. Read the missing tier as a stated
   limit, not an oversight: these tests prove our state machine is restart-safe
   and prove nothing about whether the vendor API behaves as documented.
+
+  The drain scenarios are @unit rather than @integration, following
+  httpPollingPullerAdapter.unit.test.ts: they drive the whole adapter against
+  a fixture with `ssrfSafeFetch` mocked, and touch no datastore. This repo's
+  @integration lane is specifically a datastore lane that boots real Redis and
+  ClickHouse, which these need and use none of. The remaining @integration
+  scenarios are the ones that genuinely cross into the database.
 
   Background:
     Given an IngestionSource of type `pull` with adapter `microsoft_365_audit`
@@ -173,7 +180,7 @@ Feature: microsoft_365_audit ingestion source (Office 365 Management Activity AP
     And the run reports an error
     And the run does not report a successful empty pull
 
-  @integration
+  @unit
   Scenario: Existing adapters gain 429 handling without losing their failure signal
     Given `http_custom` and `claude_compliance`, which today fail fast on 429
     When they adopt the shared retry helper
@@ -239,14 +246,14 @@ Feature: microsoft_365_audit ingestion source (Office 365 Management Activity AP
   # Subscription lifecycle + drain
   # ---------------------------------------------------------------------------
 
-  @integration @doc-derived
+  @unit @doc-derived
   Scenario: Subscription is started once and not restarted while active
     Given the tenant has no active Audit.General subscription
     When the adapter runs
     Then it calls subscriptions/start exactly once
     And on the following run, with the subscription already active, it does not call start again
 
-  @integration @doc-derived
+  @unit @doc-derived
   Scenario: A subscription that lapsed is restarted rather than assumed active
     Given the adapter previously observed an active subscription
     And the subscription has since been stopped outside this system
@@ -271,7 +278,7 @@ Feature: microsoft_365_audit ingestion source (Office 365 Management Activity AP
     And it is distinguishable from an error, which `errorCount` already covers
     And the operator is told the source is configured but has produced nothing
 
-  @integration @doc-derived
+  @unit @doc-derived
   Scenario: Happy-path drain over one window
     Given the content listing for the window returns three blob URIs
     And each blob contains Copilot interaction records
@@ -280,7 +287,7 @@ Feature: microsoft_365_audit ingestion source (Office 365 Management Activity AP
     And every record in them is emitted as a normalized event
     And the returned cursor carries a watermark at the window end
 
-  @integration
+  @unit
   Scenario: Run cut off mid-queue resumes without skipping or duplicating
     Given the listing for the window returns five blob URIs
     And the job deadline expires after the second blob is drained
@@ -298,7 +305,7 @@ Feature: microsoft_365_audit ingestion source (Office 365 Management Activity AP
     And the key is derived from no run id, ingestion timestamp, or generated uuid
     And the two rows collapse rather than double-count
 
-  @integration
+  @unit
   Scenario: Hard crash before the cursor persists re-drains rather than skips
     Given run 1 drains two of five blobs and is killed before returning a cursor
     And the persisted cursor is therefore still the one run 1 started from
@@ -307,7 +314,7 @@ Feature: microsoft_365_audit ingestion source (Office 365 Management Activity AP
     And the records from the first two blobs arrive twice
     And those duplicates collapse on their content-derived dedup key
 
-  @integration
+  @unit
   Scenario: Blob queue carried in the cursor is bounded
     Given a window whose listing yields more blobs than the queue cap
     When the cursor is written
@@ -315,7 +322,7 @@ Feature: microsoft_365_audit ingestion source (Office 365 Management Activity AP
     And the remainder is recoverable via the recorded listing position
     And the cursor does not grow unboundedly with tenant volume
 
-  @integration
+  @unit
   Scenario: Page cap is a resume point, not silent truncation
     Given the content listing pages past MAX_PAGES_PER_RUN
     When the cap is reached
@@ -323,7 +330,7 @@ Feature: microsoft_365_audit ingestion source (Office 365 Management Activity AP
     And the following run continues from that page
     And the run does not report the window as complete
 
-  @integration
+  @unit
   Scenario: Deadline is checked between blobs, not only between pages
     Given a queue of blobs where one blob's fetch consumes most of the remaining budget
     When the deadline passes mid-queue
@@ -406,7 +413,7 @@ Feature: microsoft_365_audit ingestion source (Office 365 Management Activity AP
     Then the re-enabled source is left as the admin set it
     And no source is disabled twice or stamped with a duplicate reason
 
-  @integration
+  @unit
   Scenario: copilot_studio can no longer be selected in the picker
     When an operator opens the ingestion-source picker
     Then `copilot_studio` is not offered

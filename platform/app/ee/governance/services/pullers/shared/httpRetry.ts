@@ -160,9 +160,7 @@ export async function fetchWithRetry({
         // back next run" instruction, and the deadline check below turns it
         // into exactly that.
         waitMs =
-          retryAfter == null
-            ? null
-            : Math.min(retryAfter, MAX_RETRY_AFTER_MS);
+          retryAfter == null ? null : Math.min(retryAfter, MAX_RETRY_AFTER_MS);
         lastError = new Error(`HTTP 429 ${response.statusText} (${url})`);
       } else if (response.status >= 500) {
         lastError = new Error(`HTTP ${response.status} ${response.statusText}`);

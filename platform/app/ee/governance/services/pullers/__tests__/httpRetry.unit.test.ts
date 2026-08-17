@@ -35,7 +35,10 @@ beforeEach(() => {
       if (!next) throw new Error("test bug: no queued response");
       return new Response(JSON.stringify(next.body ?? {}), {
         status: next.status,
-        headers: { "content-type": "application/json", ...(next.headers ?? {}) },
+        headers: {
+          "content-type": "application/json",
+          ...(next.headers ?? {}),
+        },
       });
     },
   }));
@@ -159,7 +162,9 @@ describe("fetchWithRetry", () => {
     expect(parseRetryAfterMs("", now)).toBeNull();
     expect(parseRetryAfterMs("soon", now)).toBeNull();
     expect(parseRetryAfterMs("7", now)).toBe(7000);
-    expect(parseRetryAfterMs("Thu, 01 Jan 2026 00:00:10 GMT", now)).toBe(10_000);
+    expect(parseRetryAfterMs("Thu, 01 Jan 2026 00:00:10 GMT", now)).toBe(
+      10_000,
+    );
     // A date already past means retry now, not travel backwards.
     expect(parseRetryAfterMs("Thu, 01 Jan 2025 00:00:00 GMT", now)).toBe(0);
   });
@@ -188,5 +193,59 @@ describe("fetchWithRetry", () => {
     const response = await fetchWithRetry({ url: URL_UNDER_TEST, sleep });
     expect(response.status).toBe(200);
     expect(capturedUrls).toHaveLength(2);
+  });
+});
+
+describe("existing adapters after the 429 change", () => {
+  /** @scenario Existing adapters gain 429 handling without losing their failure signal */
+  it("retries a resolvable 429 but still ends the run visibly when it does not resolve", async () => {
+    // `http_custom` (http_polling) and `claude_compliance` both route their
+    // fetches through this helper now. Before the extraction a 429 fell into
+    // the fail-fast 4xx branch and ended the run immediately.
+    const { HttpPollingPullerAdapter } = await import(
+      "../httpPollingPullerAdapter"
+    );
+    const adapter = new HttpPollingPullerAdapter();
+
+    const config = {
+      adapter: "http_polling" as const,
+      url: "https://api.example.test/v1/audit-log",
+      method: "GET" as const,
+      headers: {},
+      authMode: "header_template" as const,
+      cursorJsonPath: "$.next_cursor",
+      cursorQueryParam: "cursor",
+      eventsJsonPath: "$.events",
+      schedule: "*/5 * * * *",
+      eventMapping: {
+        source_event_id: "$.id",
+        event_timestamp: "$.created_at",
+        actor: "$.user.email",
+        action: "$.event_type",
+        target: "$.model",
+      },
+    };
+
+    // A 429 that resolves inside the budget now succeeds rather than failing.
+    responseQueue = [
+      { status: 429, headers: { "retry-after": "0" } },
+      { status: 200, body: { events: [], next_cursor: null } },
+    ];
+    const recovered = await adapter.runOnce({ cursor: null }, config);
+    expect(recovered.errorCount).toBe(0);
+
+    // A 429 that never resolves still ends the run with a visible error —
+    // the change must not trade a loud failure for a silent one.
+    capturedUrls = [];
+    responseQueue = [
+      { status: 429, headers: { "retry-after": "0" } },
+      { status: 429, headers: { "retry-after": "0" } },
+      { status: 429, headers: { "retry-after": "0" } },
+    ];
+    const exhausted = await adapter.runOnce({ cursor: null }, config);
+    expect(exhausted.errorCount).toBe(1);
+    expect(exhausted.events).toEqual([]);
+    // Cursor is left untouched so the next run retries the same page.
+    expect(exhausted.cursor).toBeNull();
   });
 });

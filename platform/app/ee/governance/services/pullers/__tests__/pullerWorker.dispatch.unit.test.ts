@@ -241,7 +241,7 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
       sourceFindUnique.mockResolvedValueOnce({
         id: "src-idem",
         organizationId: "org-x",
-        sourceType: "copilot_studio",
+        sourceType: "microsoft_365_audit",
         status: "active",
         parserConfig: HTTP_POLLING_CONFIG,
         pollerCursor: null,
@@ -269,8 +269,10 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
       await runIngestionPull({ sourceId: "src-idem", cursor: null });
 
       const row = ocsfInsert.mock.calls[0]![0];
-      expect(row.eventId).toBe("copilot_studio:src-idem:uuid-deadbeef");
-      expect(row.traceId).toBe("pull:copilot_studio:src-idem:uuid-deadbeef");
+      expect(row.eventId).toBe("microsoft_365_audit:src-idem:uuid-deadbeef");
+      expect(row.traceId).toBe(
+        "pull:microsoft_365_audit:src-idem:uuid-deadbeef",
+      );
     });
   });
 });
