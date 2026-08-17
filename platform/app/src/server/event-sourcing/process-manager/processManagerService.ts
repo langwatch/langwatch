@@ -19,6 +19,7 @@ import { ensureJsonSafe } from "./json";
 import type {
   ProcessDefinition,
   ProcessEventEnvelope,
+  ProcessIntent,
   ProcessRef,
 } from "./processManager.types";
 import type {
@@ -133,39 +134,40 @@ export class ProcessManagerService<State> {
         ...(envelope.userId ? { "user.id": envelope.userId } : {}),
       },
       run: async () => {
-        const input = { kind: "event" as const, event: envelope, now };
-
-        if (this.definition.transient) {
-          // Speculate on the initial state. A handler that needed anything
-          // it did not have returns non-initial state (it stashes), so an
-          // evolution that comes back initial-and-wakeless provably did not
-          // read the store — which is what makes skipping the read sound.
-          const speculative = this.definition.evolve({
-            previousState: this.definition.initialState,
-            input,
-            ref,
-          });
-          if (this.isTransientEvolution(speculative)) {
-            return await this.appendIntents({
-              ref,
-              tenantId: envelope.tenantId,
-              userId: envelope.userId,
-              sourceEventId: envelope.eventId,
-              evolution: speculative,
-              now,
-            });
-          }
-          // It kept something, so fall through and redo the evolution
-          // against the real previous state. `evolve` is pure, so the
-          // discarded speculation costs nothing but the call.
-        }
-
         const existing = await this.store.findByRef<State>({ ref });
         const evolution = this.definition.evolve({
           previousState: existing?.state ?? this.definition.initialState,
-          input,
+          input: { kind: "event", event: envelope, now },
           ref,
         });
+
+        // The transient path is decided AFTER the evolution has run against
+        // the real previous state, never speculated on the initial one.
+        //
+        // Speculating looked cheaper — it skips this read — but it is not
+        // sound: a handler may preserve its state while deriving its INTENT
+        // from that state, which comes back looking initial-and-wakeless
+        // while producing the wrong intents. Whether that shape exists today
+        // is not the point; nothing stops the next author writing it, and it
+        // would fail silently by dropping work.
+        //
+        // Reading first costs one indexed lookup. The savings that motivated
+        // this path — no transaction, no advisory lock, no compare-and-swap,
+        // no instance row, no inbox row — are all still here.
+        if (
+          this.definition.transient &&
+          existing === null &&
+          this.isTransientEvolution(evolution)
+        ) {
+          return await this.appendIntents({
+            ref,
+            tenantId: envelope.tenantId,
+            userId: envelope.userId,
+            sourceEventId: envelope.eventId,
+            evolution,
+            now,
+          });
+        }
 
         return await this.commitEvolution({
           ref,
@@ -256,19 +258,10 @@ export class ProcessManagerService<State> {
     evolution: ReturnType<ProcessDefinition<State>["evolve"]>;
     now: number;
   }): Promise<HandleResult> {
-    const traceCarrier = this.captureTraceCarrier();
-    const messages: NewOutboxMessage[] = params.evolution.intents.map(
-      (intent) => {
-        ensureJsonSafe(intent.payload);
-        return {
-          messageKey: intent.messageKey,
-          intentType: intent.intentType,
-          payload: intent.payload,
-          traceCarrier,
-          ...(params.userId ? { userId: params.userId } : {}),
-        };
-      },
-    );
+    const messages = this.outboxMessagesFor({
+      intents: params.evolution.intents,
+      userId: params.userId,
+    });
 
     const result = await this.store.appendIntents({
       ref: params.ref,
@@ -330,16 +323,9 @@ export class ProcessManagerService<State> {
     ensureJsonSafe(evolution.state);
     ensureJsonSafe(evolution.nextWakeAt);
 
-    const traceCarrier = this.captureTraceCarrier();
-    const messages: NewOutboxMessage[] = evolution.intents.map((intent) => {
-      ensureJsonSafe(intent.payload);
-      return {
-        messageKey: intent.messageKey,
-        intentType: intent.intentType,
-        payload: intent.payload,
-        traceCarrier,
-        ...(params.userId ? { userId: params.userId } : {}),
-      };
+    const messages = this.outboxMessagesFor({
+      intents: evolution.intents,
+      userId: params.userId,
     });
 
     const result = await this.store.commit({
@@ -381,6 +367,33 @@ export class ProcessManagerService<State> {
     }
 
     return result;
+  }
+
+  /**
+   * The outbox rows one evolution's intents become, for either commit path.
+   *
+   * Shared rather than written twice: the transient append and the durable
+   * commit build the same row, so a field added to one and not the other is
+   * a message that behaves differently depending on which path minted it.
+   */
+  private outboxMessagesFor({
+    intents,
+    userId,
+  }: {
+    intents: ProcessIntent[];
+    userId?: string;
+  }): NewOutboxMessage[] {
+    const traceCarrier = this.captureTraceCarrier();
+    return intents.map((intent) => {
+      ensureJsonSafe(intent.payload);
+      return {
+        messageKey: intent.messageKey,
+        intentType: intent.intentType,
+        payload: intent.payload,
+        traceCarrier,
+        ...(userId ? { userId } : {}),
+      };
+    });
   }
 
   /**

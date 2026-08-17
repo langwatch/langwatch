@@ -193,6 +193,46 @@ describe("transient process commits", () => {
     });
   });
 
+  describe("when a handler keeps its state but derives intents from it", () => {
+    /**
+     * @scenario A transient process reads its state before deciding the path
+     *
+     * The shape that makes speculating on the initial state unsound: state
+     * unchanged, no wake — so the evolution LOOKS transient — while the
+     * intents it mints depend on what was already persisted. Deciding from a
+     * speculative evolution would skip the read and silently drop the work.
+     */
+    it("uses the persisted state, not the initial one", async () => {
+      const stateDependent = new ProcessManagerService<ProbeState>({
+        store,
+        definition: buildProbe((state, data, ctx) => ({
+          state,
+          intents: state.remembered
+            ? [ctx.intents.act(`act:${state.remembered}`, { id: data.id })]
+            : [],
+        })),
+      });
+
+      // Persist something for this key through the durable path first.
+      await service.handleEvent({
+        envelope: envelope("remember", "endpoint-3"),
+        now: 2_000,
+      });
+
+      await stateDependent.handleEvent({
+        envelope: envelope("note", "endpoint-3"),
+        now: 3_000,
+      });
+
+      const messages = await store.findMessagesByRef({
+        ref: refFor("endpoint-3"),
+      });
+      expect(messages.map((m) => m.messageKey)).toEqual([
+        "process:endpoint-3:act:endpoint-3",
+      ]);
+    });
+  });
+
   describe("when a transient process also declares a schedule", () => {
     /** @scenario A transient process cannot be scheduled */
     it("refuses to build", () => {

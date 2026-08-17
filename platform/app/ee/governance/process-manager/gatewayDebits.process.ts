@@ -466,11 +466,15 @@ function attributionFromOutcome(
  * so a debit always states the figure the spend ledger and the webhook
  * envelope state for the same request.
  */
-function writeDebitsPayload(
-  attribution: DebitAttribution,
-  projectId: string,
-  outcome: SpendOutcome,
-): WriteGatewayDebitsPayload {
+function writeDebitsPayload({
+  attribution,
+  projectId,
+  outcome,
+}: {
+  attribution: DebitAttribution;
+  projectId: string;
+  outcome: SpendOutcome;
+}): WriteGatewayDebitsPayload {
   const { data } = outcome;
   return {
     gateway_request_id: data.gateway_request_id,
@@ -523,17 +527,21 @@ function onOutcome<Intent>(
       intents: [
         ctx.intents.writeDebits(
           `debits:${outcome.status}`,
-          writeDebitsPayload(stated, ctx.projectId, outcome),
+          writeDebitsPayload({
+            attribution: stated,
+            projectId: ctx.projectId,
+            outcome,
+          }),
         ),
       ],
     };
   }
 
-  const payload = writeDebitsPayload(
-    attributionFromState(state),
-    ctx.projectId,
+  const payload = writeDebitsPayload({
+    attribution: attributionFromState(state),
+    projectId: ctx.projectId,
     outcome,
-  );
+  });
   if (!state.admitted) return { state: { ...state, pendingOutcome: payload } };
   return {
     state,
