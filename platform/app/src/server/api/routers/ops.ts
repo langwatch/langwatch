@@ -512,6 +512,31 @@ export const opsRouter = createTRPCRouter({
     return requireOps().managerExplorer.getFleetSummary();
   }),
 
+  /**
+   * Retired messages across every process. Answers "what has permanently
+   * stopped", which `getProcessOutbox` could not: that one needs a full
+   * process ref, so it can only be reached by an operator who already knows
+   * where the failure is.
+   */
+  listDeadLetters: protectedProcedure
+    .use(opsViewPermission)
+    .input(
+      z.object({
+        /** Omit for every process. */
+        processName: z.string().min(1).max(200).optional(),
+        page: z.number().int().min(1).default(1),
+        pageSize: z.number().int().min(1).max(100).default(25),
+      }),
+    )
+    .query(({ input }) => {
+      return requireOps().managerExplorer.getDeadLetters(input);
+    }),
+
+  /** Dead totals per process, for the navigation badge and dashboard card. */
+  listDeadLetterCounts: protectedProcedure.use(opsViewPermission).query(() => {
+    return requireOps().managerExplorer.getDeadLetterCounts();
+  }),
+
   listProcessInstances: protectedProcedure
     .use(opsViewPermission)
     .input(

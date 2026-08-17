@@ -616,7 +616,27 @@ const routes: RouteObject[] = [
   { path: "/ops/scheduler", ...page(() => import("./pages/ops/scheduler")) },
   {
     path: "/ops/event-sourcing",
-    ...page(() => import("./pages/ops/event-sourcing")),
+    ...page(() => import("./pages/ops/event-sourcing/index")),
+  },
+  {
+    path: "/ops/event-sourcing/dead-letters",
+    ...page(() => import("./pages/ops/event-sourcing/dead-letters")),
+  },
+  {
+    path: "/ops/event-sourcing/processes",
+    ...page(() => import("./pages/ops/event-sourcing/processes")),
+  },
+  {
+    path: "/ops/event-sourcing/projections",
+    ...page(() => import("./pages/ops/event-sourcing/projections")),
+  },
+  {
+    path: "/ops/event-sourcing/subscribers",
+    ...page(() => import("./pages/ops/event-sourcing/subscribers")),
+  },
+  {
+    path: "/ops/event-sourcing/schedules",
+    ...page(() => import("./pages/ops/event-sourcing/schedules")),
   },
   { path: "/ops/blobs", ...page(() => import("./pages/ops/blobs")) },
   {
