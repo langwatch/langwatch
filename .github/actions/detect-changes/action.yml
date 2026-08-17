@@ -101,13 +101,23 @@ runs:
     - name: Decide whether heavy jobs should run
       id: draft
       shell: bash
+      # Both PR event names, not just `pull_request`. `pull_request_target`
+      # carries the identical payload — `draft` included — and several callers
+      # here trigger on it, so checking only the one name let a draft
+      # pull_request_target run everything heavy.
       run: |
-        if [ "${{ github.event_name }}" = "pull_request" ] && \
-           [ "${{ github.event.pull_request.draft }}" = "true" ]; then
-          echo "heavy=false" >> "$GITHUB_OUTPUT"
-        else
-          echo "heavy=true" >> "$GITHUB_OUTPUT"
-        fi
+        case "${{ github.event_name }}" in
+          pull_request | pull_request_target)
+            if [ "${{ github.event.pull_request.draft }}" = "true" ]; then
+              echo "heavy=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "heavy=true" >> "$GITHUB_OUTPUT"
+            fi
+            ;;
+          *)
+            echo "heavy=true" >> "$GITHUB_OUTPUT"
+            ;;
+        esac
 
     - name: Detect relevant changes
       if: >-
