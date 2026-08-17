@@ -130,9 +130,8 @@ describe("API discovery", () => {
        * The middleware accepts three credentials and calls X-Auth-Token legacy
        * in its own comments. Leading a new reader with it would teach the
        * header we intend to retire.
-       *
-       * @scenario "The plain-text index leads with the credential we want new callers to send"
        */
+      /** @scenario "The plain-text index leads with the credential we want new callers to send" */
       it("shows the bearer token first and marks X-Auth-Token legacy", async () => {
         const res = await rootApp.request("/llms.txt", { method: "GET" });
         const text = await res.text();
@@ -148,9 +147,8 @@ describe("API discovery", () => {
        * The document is 632 KB minified. An agent that fetches it to answer
        * "what is this service" has spent most of a context window on one
        * sentence, which is the reason this file exists at all.
-       *
-       * @scenario "The plain-text index stays small enough to read speculatively"
        */
+      /** @scenario "The plain-text index stays small enough to read speculatively" */
       it("stays orders of magnitude smaller than the document", async () => {
         const index = await (
           await rootApp.request("/llms.txt", { method: "GET" })
@@ -179,9 +177,8 @@ describe("API discovery", () => {
        * No family has adopted RPC naming yet, so the catalogue is empty and
        * says so honestly. Deriving it from the document rather than a registry
        * is what makes that require no backfill later.
-       *
-       * @scenario "The catalogue reports no operation the document does not carry"
        */
+      /** @scenario "The catalogue reports no operation the document does not carry" */
       it("reports an empty catalogue that still points at the document", async () => {
         const res = await app.request("/api/rpc.discover", { method: "POST" });
         const catalogue = (await res.json()) as {

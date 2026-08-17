@@ -89,9 +89,9 @@ import {
   isMetricsAuthorized,
   normalizeMetricsPath,
 } from "./server/metrics";
+import { isRootDiscoveryPath } from "./server/openapi/discovery-locations";
 import { canonicalOtlpPath } from "./server/otel/otlpPathCanonicalisation";
 import { shutdownPostHog } from "./server/posthog";
-import { isRootDiscoveryPath } from "./server/openapi/discovery-locations";
 import { buildSecurityHeaders } from "./server/securityHeaders";
 import { SHUTDOWN_BUDGET } from "./server/shutdown/budget";
 import { installShutdownHandlers } from "./server/shutdown/runGracefulShutdown";

@@ -76,10 +76,12 @@ secured
   .access(publicEndpoint(WHY_DISCOVERY_IS_PUBLIC))
   .get(WELL_KNOWN_OPENAPI_PATH, (c) => c.json(apiDocument));
 
-secured.access(publicEndpoint(WHY_DISCOVERY_IS_PUBLIC)).get(LLMS_TXT_PATH, (c) =>
-  c.text(LLMS_TXT, 200, {
-    "Content-Type": "text/plain; charset=utf-8",
-  }),
-);
+secured
+  .access(publicEndpoint(WHY_DISCOVERY_IS_PUBLIC))
+  .get(LLMS_TXT_PATH, (c) =>
+    c.text(LLMS_TXT, 200, {
+      "Content-Type": "text/plain; charset=utf-8",
+    }),
+  );
 
 export const app = secured.hono;

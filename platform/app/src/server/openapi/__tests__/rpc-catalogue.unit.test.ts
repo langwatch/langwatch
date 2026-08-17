@@ -172,9 +172,8 @@ describe("the RPC catalogue", () => {
        * The grammar is `@langwatch/api`'s `isRpcPath`, the same one `v.rpc`
        * refuses a registration with — so a name it would have refused is a name
        * the catalogue does not recognise, without a second regex here.
-       *
-       * @scenario "The catalogue recognises names by the same grammar that registers them"
        */
+      /** @scenario "The catalogue recognises names by the same grammar that registers them" */
       it("does not recognise a name v.rpc would have refused", () => {
         const catalogue = build({
           "/api/webhooks/Endpoints.create": { post: { responses: {} } },
