@@ -7,7 +7,9 @@ import {
   completeCutoverCommandDataSchema,
   type ProveMigrationParityCommandData,
   proveMigrationParityCommandDataSchema,
+  type RecordMigrationTenantStateCommandData,
   type RollBackCutoverCommandData,
+  recordMigrationTenantStateCommandDataSchema,
   rollBackCutoverCommandDataSchema,
 } from "../schemas/commands";
 import {
@@ -19,7 +21,9 @@ import {
   CUTOVER_ROLLED_BACK_EVENT_TYPE,
   GRANT_ATTACHED_EVENT_TYPE,
   MIGRATION_PARITY_PROVED_EVENT_TYPE,
+  MIGRATION_TENANT_STATE_CHANGED_EVENT_TYPE,
   PROVE_MIGRATION_PARITY_COMMAND_TYPE,
+  RECORD_MIGRATION_TENANT_STATE_COMMAND_TYPE,
   ROLL_BACK_CUTOVER_COMMAND_TYPE,
 } from "../schemas/constants";
 import type {
@@ -27,6 +31,7 @@ import type {
   CutoverRolledBackEvent,
   GrantAttachedEvent,
   MigrationParityProvedEvent,
+  MigrationTenantStateChangedEvent,
 } from "../schemas/events";
 
 /**
@@ -167,6 +172,40 @@ export class RollBackCutoverCommand
         type: CUTOVER_ROLLED_BACK_EVENT_TYPE,
         version: AUTHZ_GRANTS_EVENT_VERSION_LATEST,
         data: { actor, reason },
+        metadata: {},
+        occurredAt: command.data.occurredAtMs,
+        idempotencyKey: eventIdempotencyKey({ commandId, index: 0 }),
+      }),
+    ];
+  }
+}
+
+export class RecordMigrationTenantStateCommand
+  implements
+    CommandHandler<
+      Command<RecordMigrationTenantStateCommandData>,
+      MigrationTenantStateChangedEvent
+    >
+{
+  static readonly schema = defineCommandSchema(
+    RECORD_MIGRATION_TENANT_STATE_COMMAND_TYPE,
+    recordMigrationTenantStateCommandDataSchema,
+    "Witness one runner lifecycle transition for one organization",
+  );
+
+  async handle(
+    command: Command<RecordMigrationTenantStateCommandData>,
+  ): Promise<MigrationTenantStateChangedEvent[]> {
+    const { organizationId, commandId, migrationName, status, report, actor } =
+      command.data;
+    return [
+      EventUtils.createEvent<MigrationTenantStateChangedEvent>({
+        aggregateType: AUTHZ_GRANTS_AGGREGATE_TYPE,
+        aggregateId: organizationId,
+        tenantId: createTenantId(command.tenantId),
+        type: MIGRATION_TENANT_STATE_CHANGED_EVENT_TYPE,
+        version: AUTHZ_GRANTS_EVENT_VERSION_LATEST,
+        data: { migrationName, status, report, actor },
         metadata: {},
         occurredAt: command.data.occurredAtMs,
         idempotencyKey: eventIdempotencyKey({ commandId, index: 0 }),

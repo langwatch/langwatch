@@ -146,7 +146,29 @@ export type GrantsLedgerEvent =
       reason?: string;
       actor: GrantsLedgerActor;
       occurredAtMs: number;
+    }
+  | {
+      kind: "migration_tenant_state_changed";
+      migrationName: string;
+      status: LedgerMigrationStatus;
+      report?: unknown;
+      actor: GrantsLedgerActor;
+      occurredAtMs: number;
     };
+
+/** The runner's per-(migration, tenant) statuses, mirrored so the reducer
+ *  never imports the runner package. */
+export type LedgerMigrationStatus =
+  | "migrated"
+  | "finalized"
+  | "parked"
+  | "rolled_back";
+
+export interface LedgerMigrationTenantState {
+  status: LedgerMigrationStatus;
+  report?: unknown;
+  occurredAtMs: number;
+}
 
 export interface GrantsLedgerCutover {
   onEngine: boolean;
@@ -159,6 +181,8 @@ export interface GrantsLedgerState {
   grants: Record<string, GrantFact>;
   roles: Record<string, RoleFact>;
   cutover: GrantsLedgerCutover;
+  /** Keyed by migration name: the runner lifecycle's witnessed head. */
+  migrationStates: Record<string, LedgerMigrationTenantState>;
 }
 
 export function emptyGrantsLedgerState({
@@ -171,6 +195,7 @@ export function emptyGrantsLedgerState({
     grants: {},
     roles: {},
     cutover: { onEngine: false, provedAtMs: null, parityDiffs: [] },
+    migrationStates: {},
   };
 }
 
@@ -237,6 +262,18 @@ export function reduceGrantsLedger({
       return { ...state, cutover: { ...state.cutover, onEngine: true } };
     case "cutover_rolled_back":
       return { ...state, cutover: { ...state.cutover, onEngine: false } };
+    case "migration_tenant_state_changed":
+      return {
+        ...state,
+        migrationStates: {
+          ...state.migrationStates,
+          [event.migrationName]: {
+            status: event.status,
+            ...(event.report === undefined ? {} : { report: event.report }),
+            occurredAtMs: event.occurredAtMs,
+          },
+        },
+      };
   }
 }
 

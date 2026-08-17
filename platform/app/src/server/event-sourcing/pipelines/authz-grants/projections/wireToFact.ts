@@ -7,6 +7,7 @@ import {
   GRANT_ROLE_CHANGED_EVENT_TYPE,
   MEMBER_OFFBOARDED_EVENT_TYPE,
   MIGRATION_PARITY_PROVED_EVENT_TYPE,
+  MIGRATION_TENANT_STATE_CHANGED_EVENT_TYPE,
   ROLE_DEFINED_EVENT_TYPE,
   ROLE_DELETED_EVENT_TYPE,
   ROLE_PERMISSIONS_CHANGED_EVENT_TYPE,
@@ -56,6 +57,15 @@ export function wireEventToFact(event: AuthzGrantsEvent): GrantsLedgerEvent {
       return {
         kind: "cutover_rolled_back",
         ...(event.data.reason ? { reason: event.data.reason } : {}),
+        actor: event.data.actor,
+        occurredAtMs: event.occurredAt,
+      };
+    case MIGRATION_TENANT_STATE_CHANGED_EVENT_TYPE:
+      return {
+        kind: "migration_tenant_state_changed",
+        migrationName: event.data.migrationName,
+        status: event.data.status,
+        ...(event.data.report == null ? {} : { report: event.data.report }),
         actor: event.data.actor,
         occurredAtMs: event.occurredAt,
       };

@@ -32,7 +32,7 @@ work already merged (A = the engine #6894, B = the self-migration #7079).
 | 4 | **Build dark → per-org cutover → contract.** All code ships to production gated closed; an org cuts over all at once (never half); every deletion waits for 100 % of tenants finalized. |
 | 5 | **The fork replaces the codemod.** Ten call sites (7 in `rbac.ts`, 3 in `role-binding-resolver.ts`) already carry every legacy decision and already call `authzShadowFor`. They become a per-org fork: engine decides for a cut-over org, legacy for everyone else, the other runs as shadow either way. The `.permission()` codemod is cosmetic cleanup in the contract PR. |
 | 6 | **Grants are event-sourced** on the existing framework (ADR-049 shape). ClickHouse `event_log` is the single source of truth; the append is **always waited on**; authz checks **never read ClickHouse** — Postgres projections only. |
-| 7 | **Dispatch is queued, best-effort FIFO — and revocation is instantly enforced.** Every command appends (waited) and folds through the GroupQueue in per-org FIFO; the ordering authority is the append order, `(acceptedAt, eventId)`. If Redis is down, a circuit breaker scoped to this pipeline (for now) processes commands directly until it returns — degradation, accepted under best-effort FIFO. Independently of Redis health, revoke/offboard/cutover-rollback apply the deny effect synchronously on the calling path before returning (delete the affected `Grant` rows); the fold later applies the same event in order, deleting an absent row is a no-op, so early enforcement and ordered convergence coexist. This is the ONE sanctioned direct projection write (the "one writer" doctrine's named exception), shaped so it can only make deny true early, never grant. Accepted edge: revoking a grant whose attach is still queued deletes nothing; both apply in order and converge to revoked. |
+| 7 | **Dispatch is queued, best-effort FIFO — and revocation is instantly enforced.** Every command appends (waited) and folds through the GroupQueue in per-org FIFO; the ordering authority is the append order, `(acceptedAt, eventId)`. If Redis is down, the breaker guarantees only that the product keeps working: appends still land (they are ClickHouse, waited), revocation-class operations apply their deny effect synchronously, and the fold simply waits — no inline processing, and **no replays run while Redis is down**. Independently of Redis health, revoke/offboard/cutover-rollback apply the deny effect synchronously on the calling path before returning (delete the affected `Grant` rows); the fold later applies the same event in order, deleting an absent row is a no-op, so early enforcement and ordered convergence coexist. This is the ONE sanctioned direct projection write (the "one writer" doctrine's named exception), shaped so it can only make deny true early, never grant. Accepted edge: revoking a grant whose attach is still queued deletes nothing; both apply in order and converge to revoked. |
 | 8 | **Migration uses normal events.** The backfill emits plain `grant_attached` with `source: "backfill-b"` and `occurredAt` carried from the legacy row's `createdAt` (business time survives); `acceptedAt` is ledger time. One reducer path; replay exercises the live code. Only *process* facts get their own events: `migration_parity_proved`, `cutover_completed`, `cutover_rolled_back`. |
 | 9 | **Batched appends.** Migration events append in chunks per org (producer-append-coalescing already exists as a framework concept); efficiency comes from batching appends, not from fattening events. |
 | 10 | **`Grant` and `Role` are born as new, clean tables in PR 1** — never a rename of a live table, never hybrid columns on `RoleBinding`. During the transition the ledger is the single writer with two projections: events project into `Grant`/`Role` (the future) AND into legacy-shaped `RoleBinding`/`CustomRole` rows (the compat view the legacy path keeps reading). Contract deletes the compat projection and the old tables. Alex's mandate, stated 2026-08-17: this is the last rewrite of this flow — correct over expedient, everywhere the two diverge. |
@@ -138,12 +138,16 @@ process family:
  Redis down ⇒ queued folds stall & drain; REVOCATION DOESN'T NOTICE
 ```
 
-No ADR-007 amendment needed — no fold runs inline anywhere; the enforcement
-delete is a plain service write. It is the one sanctioned direct projection
-write (decision 7). The Redis-down circuit breaker is a framework
-primitive scoped per named pipeline (ADR-007's shared amendment): we build
-it in PR 1 for `authz_grants`; the identity programme's D02 productionizes
-the SAME primitive for its pipeline later. No dependency on the identity PR.
+No fold runs inline anywhere, ever — the breaker is a doctrine, not a
+processor (simplified 2026-08-17: an in-memory processing path complicated
+the failure mode for no product benefit). ADR-007's amendment states the
+whole guarantee: appends land, revocation-class operations enforce
+synchronously (the one sanctioned direct projection write, decision 7),
+everything else waits for Redis and no replay runs during an outage.
+Identity's D02 inherits the same doctrine for its pipeline later. No
+dependency on the identity PR, and nothing to build beyond the enforcement
+write itself — which ships as a ready seam in PR 1 and gains its caller
+when PR 2 moves the revoke/offboard write paths.
 
 ## The PR map (4 + 1)
 
@@ -161,8 +165,11 @@ becomes the ledger. Bill of materials:
   `RoleBinding`/`CustomRole` rows (the compat view; the mapping
   roleKey → `(role, customRoleId)` lives only here). One writer, two views —
   never a dual-write from application code.
-- The instant-enforcement revocation path (a service-level write, decision 7)
-  and the pipeline-scoped Redis circuit breaker.
+- The instant-enforcement revocation write (a service-level delete keyed by
+  grant ids, decision 7) as a ready seam — its production caller arrives
+  with PR 2's write-path moves. The breaker is a doctrine, not code
+  (ADR-007 amendment, simplified 2026-08-17): no inline processing, no
+  replays while Redis is down.
 - `AuthzProjectionCursor`.
 - `TeamUserBackfillMigration` refactored: emits batched `grant_attached`
   (source backfill-b, backdated occurredAt) → awaits projection → parity proof
@@ -330,9 +337,10 @@ Remaining for PR 1, in order:
    stays (decision 19); `in-place-authz-migration.feature` passes unchanged.
 2. Runner lifecycle transitions as events; `SystemMigrationTenantState`
    becomes their projection.
-3. The instant-enforcement revocation write + the pipeline-scoped Redis
-   circuit breaker primitive (ADR-007 amendment).
-4. The replay-determinism test and the Redis-down integration tests.
+3. The instant-enforcement revocation write as a ready seam (its caller is
+   PR 2's revoke/offboard move; the breaker is doctrine only).
+4. The replay-determinism test. (The Redis-down revocation test rides with
+   PR 2, where the revoke path it exercises first exists.)
 
 The rollout after PR 1–2 merge is one organization at a time: cut an org
 over in one batch (its whole surface into `Grant`s via the ledger), then
@@ -348,10 +356,12 @@ identity rides the same framework (its own pipeline, aggregate
 precondition it consumes through a service API. Nothing to build for it
 now; these are the seams to keep clean:
 
-- **The circuit breaker is shared.** We build the per-pipeline breaker
-  primitive in PR 1 (ADR-007's "Redis-loss circuit breaker" amendment names
-  `authz_grants`); identity's D02 adds its pipeline to the same amendment
-  with its own volume analysis — one primitive, one amendment, two users.
+- **The circuit breaker is shared doctrine.** ADR-007's "Redis-loss circuit
+  breaker" amendment names `authz_grants` and states the whole guarantee
+  (appends land, revocation-class enforces synchronously, everything else
+  waits, no replays during an outage — no inline processing anywhere);
+  identity's D02 adds its pipeline to the same amendment with its own
+  volume analysis — one doctrine, one amendment, two users.
 - **SCIM converges on `grants.*`.** Identity's D08 moves SCIM tokens
   per-connection and requires "SCIM writes membership only through
   `grants.*`" — exactly the reconciler (decision 18). When connections

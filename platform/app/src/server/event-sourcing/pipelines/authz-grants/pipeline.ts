@@ -5,6 +5,7 @@ import {
   AttachGrantsCommand,
   CompleteCutoverCommand,
   ProveMigrationParityCommand,
+  RecordMigrationTenantStateCommand,
   RollBackCutoverCommand,
 } from "./commands/grantsLedgerCommands";
 import { createAuthzGrantsStateProjection } from "./projections/authzGrantsState.projection";
@@ -40,5 +41,9 @@ export function createAuthzGrantsPipeline(deps: AuthzGrantsPipelineDeps) {
     .withCommand("proveMigrationParity", ProveMigrationParityCommand)
     .withCommand("completeCutover", CompleteCutoverCommand)
     .withCommand("rollBackCutover", RollBackCutoverCommand)
+    .withCommand(
+      "recordMigrationTenantState",
+      RecordMigrationTenantStateCommand,
+    )
     .build();
 }

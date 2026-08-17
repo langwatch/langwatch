@@ -215,6 +215,20 @@ Feature: In-place authorization data migration
   # its transitions become process events in the ledger, and the state
   # table becomes their projection. These scenarios cover only what is new.
 
+  @unit
+  Scenario: Runner lifecycle transitions are witnessed as ledger facts
+    Given the runner records a state transition for "acme"
+    When the state is written
+    Then the write is synchronous and remains the finalized latch
+    And the same transition is recorded as a ledger fact after the write
+
+  @unit
+  Scenario: A lost witness never loses a transition
+    Given recording the ledger fact fails
+    When the runner writes a state transition for "acme"
+    Then the state write holds and the pass continues
+    And the loss costs replay fidelity for one transition, never correctness
+
   @integration @unimplemented
   Scenario: A clean parity proof and the cutover are recorded as facts
     Given the migration verified "acme" with no disagreement

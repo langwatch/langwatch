@@ -136,18 +136,27 @@ Command → CommandHandler → Event[] → EventStore.store()
 ## Amendment: Redis-loss circuit breaker for named pipelines (2026-08-17)
 
 The web-role rule ("only dispatches commands and events to queues") holds in
-normal operation for every pipeline. For **explicitly named low-volume
-pipelines**, a per-process circuit breaker may open when Redis staging is
-unhealthy; while open, that pipeline's commands process through the
-framework's in-memory processor in the calling process, and close-and-drain
-resumes normal queueing when Redis returns. Ordering during an open window
-is best-effort by declaration of the pipelines that opt in.
+normal operation for every pipeline. For **explicitly named pipelines**, a
+Redis outage must not take the product's critical operations down with it —
+and the answer is deliberately NOT inline pipeline processing. When Redis is
+unhealthy, a named pipeline's breaker guarantees exactly this much:
+
+- Appends still land: the event store is ClickHouse, and the append is
+  waited, so the fact is durable whether or not a queue job could be staged.
+- Operations that cannot wait (a named pipeline's revocation class) apply
+  their sanctioned direct projection write on the calling path, so the
+  outcome holds even though the fold has not run.
+- Everything else waits. The fold, the subscribers, and any replay simply do
+  not run while Redis is down — no in-memory processor, no in-process
+  drain. Projections catch up when Redis returns. Replays are never
+  attempted during an outage; they complicate the failure mode for no
+  product benefit.
 
 Named pipelines: `authz_grants` (ADR-092 §13 — grant writes per day, not
-traces per second). The identity pipeline is expected to join under its own
-deliverable (identity programme D02), with its own volume analysis. No other
-pipeline gets this: high-volume pipelines stall and drain, which is the
-correct behavior for them.
+traces per second; its revocation class is defined there). The identity
+pipeline is expected to join under its own deliverable (identity programme
+D02), with its own volume analysis. No other pipeline gets this: high-volume
+pipelines stall and drain, which is the correct behavior for them.
 
 ## References
 

@@ -4,6 +4,7 @@ import {
   grantsLedgerActorSchema,
   ledgerPrincipalSchema,
   ledgerScopeSchema,
+  migrationTenantStatusSchema,
   resourceGrantTermsSchema,
 } from "./events";
 
@@ -71,4 +72,16 @@ export const rollBackCutoverCommandDataSchema = commandIdentitySchema.extend({
 });
 export type RollBackCutoverCommandData = z.infer<
   typeof rollBackCutoverCommandDataSchema
+>;
+
+export const recordMigrationTenantStateCommandDataSchema =
+  commandIdentitySchema.extend({
+    migrationName: z.string().min(1),
+    status: migrationTenantStatusSchema,
+    report: z.unknown().nullish(),
+    actor: grantsLedgerActorSchema,
+    occurredAtMs: z.number().int().nonnegative(),
+  });
+export type RecordMigrationTenantStateCommandData = z.infer<
+  typeof recordMigrationTenantStateCommandDataSchema
 >;

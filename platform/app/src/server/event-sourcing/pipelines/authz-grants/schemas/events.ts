@@ -8,6 +8,7 @@ import {
   GRANT_ROLE_CHANGED_EVENT_TYPE,
   MEMBER_OFFBOARDED_EVENT_TYPE,
   MIGRATION_PARITY_PROVED_EVENT_TYPE,
+  MIGRATION_TENANT_STATE_CHANGED_EVENT_TYPE,
   ROLE_DEFINED_EVENT_TYPE,
   ROLE_DELETED_EVENT_TYPE,
   ROLE_PERMISSIONS_CHANGED_EVENT_TYPE,
@@ -175,6 +176,30 @@ export type CutoverRolledBackEvent = z.infer<
   typeof cutoverRolledBackEventSchema
 >;
 
+/** The runner's per-(migration, tenant) status vocabulary — mirrored from
+ *  @langwatch/system-migrations without importing it (the wire schema must
+ *  not couple to the runner package). */
+export const migrationTenantStatusSchema = z.enum([
+  "migrated",
+  "finalized",
+  "parked",
+  "rolled_back",
+]);
+
+export const migrationTenantStateChangedEventSchema = EventSchema.extend({
+  type: z.literal(MIGRATION_TENANT_STATE_CHANGED_EVENT_TYPE),
+  data: z.object({
+    migrationName: z.string(),
+    status: migrationTenantStatusSchema,
+    /** The runner's report for the transition, JSON as stored. */
+    report: z.unknown().nullish(),
+    actor: grantsLedgerActorSchema,
+  }),
+});
+export type MigrationTenantStateChangedEvent = z.infer<
+  typeof migrationTenantStateChangedEventSchema
+>;
+
 export const authzGrantsEventSchema = z.discriminatedUnion("type", [
   grantAttachedEventSchema,
   grantRoleChangedEventSchema,
@@ -186,5 +211,6 @@ export const authzGrantsEventSchema = z.discriminatedUnion("type", [
   migrationParityProvedEventSchema,
   cutoverCompletedEventSchema,
   cutoverRolledBackEventSchema,
+  migrationTenantStateChangedEventSchema,
 ]);
 export type AuthzGrantsEvent = z.infer<typeof authzGrantsEventSchema>;

@@ -85,6 +85,8 @@ export type {
   GrantsLedgerCutover,
   GrantsLedgerEvent,
   GrantsLedgerState,
+  LedgerMigrationStatus,
+  LedgerMigrationTenantState,
   LedgerPrincipal,
   LedgerPrincipalType,
   LedgerScope,

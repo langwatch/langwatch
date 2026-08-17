@@ -29,11 +29,34 @@ import { cohortIncludes } from "./cohort";
 import { RedisMigrationLeaseRepository } from "./repositories/migration-lease.redis.repository";
 import { PrismaOrganizationTenantSource } from "./repositories/organization-tenant-source.prisma.repository";
 import { PrismaSystemMigrationStateRepository } from "./repositories/system-migration-state.prisma.repository";
+import { WitnessingSystemMigrationStateRepository } from "./repositories/witnessing-migration-state.repository";
 import { SystemMigrationsService } from "./system-migrations.service";
 
-/** The composed state repository. The runner uses it; routes must not - they
- *  go through `systemMigrationsService` below. */
-const systemMigrationState = new PrismaSystemMigrationStateRepository(prisma);
+/**
+ * The composed state repository, wrapped so every lifecycle transition is
+ * witnessed as a ledger fact (best-effort; the synchronous write stays the
+ * latch). The runner and the ops service both write through this instance,
+ * so operator rollbacks are witnessed too. Routes must not touch it - they
+ * go through `systemMigrationsService` below.
+ */
+const systemMigrationState = new WitnessingSystemMigrationStateRepository(
+  new PrismaSystemMigrationStateRepository(prisma),
+  async ({ migrationName, tenantId, status, report, occurredAtMs }) => {
+    await (
+      await grantsLedgerCommands()
+    ).commands.recordMigrationTenantState.send({
+      tenantId,
+      organizationId: tenantId,
+      commandId: `runner:${migrationName}:${tenantId}:${status}:${occurredAtMs}`,
+      migrationName,
+      status,
+      report,
+      actor: { type: "system", id: "system:migration-runner" },
+      occurredAtMs,
+    });
+  },
+  () => Date.now(),
+);
 
 /**
  * What the ops dashboard talks to. The route calls this and never the state
@@ -47,32 +70,42 @@ export const systemMigrationsService = new SystemMigrationsService({
 });
 
 /**
- * The backfill's door into the grants ledger, resolved lazily at send time
- * (the pipeline is being registered while this module loads). A disabled
- * event-sourcing stack throws rather than letting DisabledPipeline swallow
- * the send - the organization then parks with an honest report instead of
- * timing out against a projection that will never run.
+ * The `authz_grants` pipeline's senders, resolved lazily at send time (the
+ * pipeline is being registered while this module loads). The boot pass
+ * starts DURING App composition (`tryGetApp()` is null for its first
+ * seconds), so a null App is waited out rather than refused; an App whose
+ * event-sourcing stack is disabled throws immediately rather than letting
+ * DisabledPipeline swallow the send - the backfill then parks its
+ * organization with an honest report, and the state witness logs and
+ * moves on.
  */
-function grantsLedgerEmitter(): GrantsLedgerEmitter {
-  const commandsFor = () => {
-    const app = tryGetApp();
-    if (!app?.eventSourcing?.isEnabled) {
-      throw new Error(
-        "grants backfill requires the event-sourcing stack; organization parked",
-      );
-    }
-    return app.eventSourcing.getPipeline(
-      AUTHZ_GRANTS_PIPELINE_NAME as never,
-    ) as unknown as {
-      commands: {
-        attachGrants: { send: (data: unknown) => Promise<unknown> };
-        proveMigrationParity: { send: (data: unknown) => Promise<unknown> };
-      };
+async function grantsLedgerCommands() {
+  const deadline = Date.now() + 30_000;
+  let app = tryGetApp();
+  while (!app && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    app = tryGetApp();
+  }
+  if (!app?.eventSourcing?.isEnabled) {
+    throw new Error(
+      "the grants ledger requires the event-sourcing stack; send refused",
+    );
+  }
+  return app.eventSourcing.getPipeline(
+    AUTHZ_GRANTS_PIPELINE_NAME as never,
+  ) as unknown as {
+    commands: {
+      attachGrants: { send: (data: unknown) => Promise<unknown> };
+      proveMigrationParity: { send: (data: unknown) => Promise<unknown> };
+      recordMigrationTenantState: { send: (data: unknown) => Promise<unknown> };
     };
   };
+}
+
+function grantsLedgerEmitter(): GrantsLedgerEmitter {
   return {
     attachGrants: async ({ organizationId, commandId, grants }) => {
-      await commandsFor().commands.attachGrants.send({
+      await (await grantsLedgerCommands()).commands.attachGrants.send({
         tenantId: organizationId,
         organizationId,
         commandId,
@@ -85,7 +118,7 @@ function grantsLedgerEmitter(): GrantsLedgerEmitter {
       diffs,
       occurredAtMs,
     }) => {
-      await commandsFor().commands.proveMigrationParity.send({
+      await (await grantsLedgerCommands()).commands.proveMigrationParity.send({
         tenantId: organizationId,
         organizationId,
         commandId,

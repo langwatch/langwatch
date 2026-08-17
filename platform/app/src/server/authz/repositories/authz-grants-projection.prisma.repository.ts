@@ -3,10 +3,11 @@ import {
   grantFactToCompatBinding,
   grantFactToRow,
   grantRowToFact,
+  type LedgerMigrationStatus,
   roleFactToRow,
   roleRowToFact,
 } from "@langwatch/authz-server";
-import type { PrismaClient } from "~/generated/prisma/client";
+import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
 import type {
   StateProjectionStore,
@@ -14,6 +15,17 @@ import type {
 } from "~/server/event-sourcing/projections/stateProjection.types";
 
 const UPSERT_CHUNK = 25;
+
+const MIGRATION_STATUSES: readonly LedgerMigrationStatus[] = [
+  "migrated",
+  "finalized",
+  "parked",
+  "rolled_back",
+];
+
+function parseMigrationStatus(raw: string): LedgerMigrationStatus | null {
+  return MIGRATION_STATUSES.find((candidate) => candidate === raw) ?? null;
+}
 
 async function inChunks<T>(
   items: T[],
@@ -54,11 +66,14 @@ export class PrismaAuthzGrantsProjectionRepository
     });
     if (!cursor) return null;
 
-    const [grantRows, roleRows, cutover] = await Promise.all([
+    const [grantRows, roleRows, cutover, migrationRows] = await Promise.all([
       this.prisma.grant.findMany({ where: { organizationId } }),
       this.prisma.role.findMany({ where: { organizationId } }),
       this.prisma.authzCutoverProjection.findUnique({
         where: { organizationId },
+      }),
+      this.prisma.systemMigrationTenantState.findMany({
+        where: { tenantId: organizationId },
       }),
     ]);
 
@@ -84,6 +99,22 @@ export class PrismaAuthzGrantsProjectionRepository
         provedAtMs: cutover?.provedAt?.getTime() ?? null,
         parityDiffs: (cutover?.parityDiffs as string[] | null) ?? [],
       },
+      migrationStates: Object.fromEntries(
+        migrationRows.flatMap((row) => {
+          const status = parseMigrationStatus(row.status);
+          if (!status) return [];
+          return [
+            [
+              row.migrationName,
+              {
+                status,
+                ...(row.report === null ? {} : { report: row.report }),
+                occurredAtMs: row.updatedAt.getTime(),
+              },
+            ] as const,
+          ];
+        }),
+      ),
     };
 
     return {
@@ -99,6 +130,34 @@ export class PrismaAuthzGrantsProjectionRepository
     };
   }
 
+  /**
+   * The instant-enforcement revocation write (decision 7; ADR-007
+   * amendment): the ONE sanctioned direct projection write. A revocation's
+   * caller deletes the affected grant heads synchronously after its event
+   * has appended, so the deny holds before the call returns even with the
+   * queue stopped. The fold later applies the same revocation in order;
+   * deleting an absent row is a no-op, so enforcement and convergence
+   * coexist. Shaped so it can only make deny true early, never grant.
+   * Production caller arrives with PR 2's revoke/offboard write paths.
+   */
+  async enforceGrantRevocation({
+    organizationId,
+    grantIds,
+  }: {
+    organizationId: string;
+    grantIds: string[];
+  }): Promise<void> {
+    if (grantIds.length === 0) return;
+    await this.prisma.grant.deleteMany({
+      where: { organizationId, id: { in: grantIds } },
+    });
+    // Compat rows share the grant id, so this can only ever remove rows the
+    // ledger itself authored - never a legacy-authored binding.
+    await this.prisma.roleBinding.deleteMany({
+      where: { organizationId, id: { in: grantIds } },
+    });
+  }
+
   async store(
     projection: StoredProjection<GrantsLedgerState>,
     context: ProjectionStoreContext,
@@ -109,6 +168,7 @@ export class PrismaAuthzGrantsProjectionRepository
     await this.upsertGrantHeads({ organizationId, state });
     await this.upsertRoleHeads({ organizationId, state });
     await this.writeCutover({ organizationId, state });
+    await this.writeMigrationStates({ organizationId, state });
     await this.writeCursor({ organizationId, projection });
   }
 
@@ -250,6 +310,56 @@ export class PrismaAuthzGrantsProjectionRepository
         parityDiffs: state.cutover.parityDiffs,
       },
     });
+  }
+
+  /**
+   * The runner-lifecycle head, monotonically guarded: the state table is
+   * ALSO written synchronously by the runner (its finalized latch must
+   * never wait on a queue), so a lagging fold must never regress a newer
+   * direct write. The guard is the row's own `updatedAt`: a folded
+   * transition applies only when it is at least as new as what the table
+   * already holds. Replay onto a live table therefore converges to no-ops;
+   * replay onto an empty table rebuilds it.
+   */
+  private async writeMigrationStates({
+    organizationId,
+    state,
+  }: {
+    organizationId: string;
+    state: GrantsLedgerState;
+  }): Promise<void> {
+    for (const [migrationName, tenantState] of Object.entries(
+      state.migrationStates,
+    )) {
+      const report =
+        tenantState.report == null
+          ? Prisma.DbNull
+          : (tenantState.report as Prisma.InputJsonValue);
+      const updated = await this.prisma.systemMigrationTenantState.updateMany({
+        where: {
+          migrationName,
+          tenantId: organizationId,
+          updatedAt: { lte: new Date(tenantState.occurredAtMs) },
+        },
+        data: { status: tenantState.status, report },
+      });
+      if (updated.count === 0) {
+        // Either a newer direct write holds the row (the guard did its
+        // job - leave it), or the row does not exist yet (replay onto an
+        // empty table) - create it, race-safe against the runner.
+        await this.prisma.systemMigrationTenantState.createMany({
+          data: [
+            {
+              migrationName,
+              tenantId: organizationId,
+              status: tenantState.status,
+              report,
+            },
+          ],
+          skipDuplicates: true,
+        });
+      }
+    }
   }
 
   // Last write of the cycle: the cursor IS the commit marker. A crash before

@@ -17,12 +17,15 @@ export const COMPLETE_CUTOVER_COMMAND_TYPE =
   "lw.authz_grants.complete_cutover" as const;
 export const ROLL_BACK_CUTOVER_COMMAND_TYPE =
   "lw.authz_grants.roll_back_cutover" as const;
+export const RECORD_MIGRATION_TENANT_STATE_COMMAND_TYPE =
+  "lw.authz_grants.record_migration_tenant_state" as const;
 
 export const AUTHZ_GRANTS_COMMAND_TYPES = [
   ATTACH_GRANTS_COMMAND_TYPE,
   PROVE_MIGRATION_PARITY_COMMAND_TYPE,
   COMPLETE_CUTOVER_COMMAND_TYPE,
   ROLL_BACK_CUTOVER_COMMAND_TYPE,
+  RECORD_MIGRATION_TENANT_STATE_COMMAND_TYPE,
 ] as const;
 
 // Runtime family — one access fact each.
@@ -46,6 +49,11 @@ export const CUTOVER_COMPLETED_EVENT_TYPE =
   "lw.authz.grants.cutover_completed" as const;
 export const CUTOVER_ROLLED_BACK_EVENT_TYPE =
   "lw.authz.grants.cutover_rolled_back" as const;
+/** The runner's lifecycle transitions as witness facts: the state table's
+ *  synchronous write stays the latch; this event makes the transition
+ *  replayable and auditable. */
+export const MIGRATION_TENANT_STATE_CHANGED_EVENT_TYPE =
+  "lw.authz.grants.migration_tenant_state_changed" as const;
 
 export const AUTHZ_GRANTS_EVENT_TYPES = [
   GRANT_ATTACHED_EVENT_TYPE,
@@ -58,6 +66,7 @@ export const AUTHZ_GRANTS_EVENT_TYPES = [
   MIGRATION_PARITY_PROVED_EVENT_TYPE,
   CUTOVER_COMPLETED_EVENT_TYPE,
   CUTOVER_ROLLED_BACK_EVENT_TYPE,
+  MIGRATION_TENANT_STATE_CHANGED_EVENT_TYPE,
 ] as const;
 
 export const AUTHZ_GRANTS_EVENT_VERSION_LATEST = "2026-08-17" as const;

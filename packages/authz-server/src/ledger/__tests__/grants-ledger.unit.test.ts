@@ -268,6 +268,34 @@ describe("grants ledger reducer", () => {
     });
   });
 
+  describe("given the runner's lifecycle witnesses", () => {
+    describe("when transitions arrive in order", () => {
+      it("keeps the latest state per migration, report and all", () => {
+        const state = apply([
+          {
+            kind: "migration_tenant_state_changed",
+            migrationName: "authz-team-user-backfill",
+            status: "parked",
+            report: { kind: "error", message: "boom" },
+            actor: ACTOR,
+            occurredAtMs: 5,
+          },
+          {
+            kind: "migration_tenant_state_changed",
+            migrationName: "authz-team-user-backfill",
+            status: "finalized",
+            actor: ACTOR,
+            occurredAtMs: 6,
+          },
+        ]);
+        expect(state.migrationStates["authz-team-user-backfill"]).toEqual({
+          status: "finalized",
+          occurredAtMs: 6,
+        });
+      });
+    });
+  });
+
   describe("given the same event stream applied twice", () => {
     it("folds to deep-equal states", () => {
       const grant = grantFact();

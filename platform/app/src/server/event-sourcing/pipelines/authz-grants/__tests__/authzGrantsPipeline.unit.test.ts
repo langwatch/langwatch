@@ -3,6 +3,7 @@ import { createTenantId, EventUtils } from "../../..";
 import type { Command } from "../../../commands/command";
 import {
   AttachGrantsCommand,
+  RecordMigrationTenantStateCommand,
   RollBackCutoverCommand,
 } from "../commands/grantsLedgerCommands";
 import { createAuthzGrantsStateProjection } from "../projections/authzGrantsState.projection";
@@ -208,5 +209,33 @@ describe("rollBackCutover command", () => {
     } as never);
     expect(event!.occurredAt).toBe(1_700_000_500_000);
     expect(event!.idempotencyKey).toBe("cmd_rb:0");
+  });
+});
+
+describe("recordMigrationTenantState command", () => {
+  it("witnesses one lifecycle transition with the runner's report attached", async () => {
+    const [event] = await new RecordMigrationTenantStateCommand().handle({
+      tenantId: createTenantId(ORG),
+      aggregateId: ORG,
+      type: "lw.authz_grants.record_migration_tenant_state",
+      data: {
+        tenantId: ORG,
+        organizationId: ORG,
+        commandId: "cmd_witness",
+        migrationName: "authz-team-user-backfill",
+        status: "parked",
+        report: { kind: "error", message: "boom" },
+        actor: { type: "system", id: "system:migration-runner" },
+        occurredAtMs: 1_700_000_600_000,
+      },
+    } as never);
+    expect(event!.type).toBe("lw.authz.grants.migration_tenant_state_changed");
+    expect(event!.data).toMatchObject({
+      migrationName: "authz-team-user-backfill",
+      status: "parked",
+      report: { kind: "error", message: "boom" },
+    });
+    expect(event!.occurredAt).toBe(1_700_000_600_000);
+    expect(event!.idempotencyKey).toBe("cmd_witness:0");
   });
 });
