@@ -180,6 +180,35 @@ Feature: In-place authorization data migration
     Then "acme" is finalized without any manual state change
 
   # ============================================================================
+  # Shadow comparison observability (stage A)
+  # ============================================================================
+  # The rollout's gate is days of shadow logs, so the logs must prove the
+  # comparison is running at all: enabling shadow is announced, every
+  # comparison logs its outcome, and a failed comparison is a warning -
+  # never a debug line invisible at production log level.
+
+  @unit
+  Scenario: Every shadow comparison is visible in the logs
+    Given shadow comparison is enabled
+    When a permission check runs through a legacy resolver
+    Then agreement between the two resolvers is logged as routine
+    And disagreement is logged as a warning carrying both verdicts
+
+  @unit
+  Scenario: Turning shadow comparison on is itself announced
+    Given shadow comparison was off
+    When the sample rate changes
+    Then the new rate is announced once, not on every check
+    And turning it off again is announced too
+
+  @unit
+  Scenario: A shadow comparison that fails is a warning, not silence
+    Given shadow comparison is enabled
+    When the engine's comparison throws
+    Then the failure is logged as a warning naming the caller
+    And the response the customer received is unaffected
+
+  # ============================================================================
   # The cutover as ledger facts (ADR-092 §13 - the grants ledger)
   # ============================================================================
   # The state machine above is unchanged; what changes underneath is that

@@ -1,8 +1,11 @@
 /**
  * ADR-092 stage A4 — shadow mode. Behind the app's shadow flag, every legacy
- * resolver fires an async engine comparison after answering. Mismatches are
- * logged with both verdicts and never affect the response; gate A is seven
- * quiet days of these logs.
+ * resolver fires an async engine comparison after answering. Every comparison
+ * logs its outcome — info when the verdicts agree, warn when they disagree —
+ * and the service announces the sample rate whenever it changes, so the logs
+ * themselves prove shadow mode is on and running rather than silently off.
+ * Nothing here affects the response; gate A is seven days of matches with no
+ * unexplained mismatches.
  *
  * Known-divergence classification: the legacy API-key resolver applies no
  * lite-member cap while the legacy tRPC path does (ADR-092 Context #1/#10).
@@ -38,75 +41,24 @@ export type AuthzShadowOptions = {
   demoProjectId: () => string | undefined;
 };
 
-function logOutcome({
-  caller,
-  legacyAllowed,
-  engineAllowed,
-  permission,
-  scope,
-  principal,
-  denialReason,
-  knownDivergence,
-}: {
-  caller: string;
-  legacyAllowed: boolean;
-  engineAllowed: boolean;
-  permission: string;
-  scope: AuthzScopeRef | null;
-  principal: AuthzPrincipalRef;
-  denialReason?: string;
-  knownDivergence?: string;
-}) {
-  if (legacyAllowed === engineAllowed) return;
-  logger.warn(
-    {
-      caller,
-      permission,
-      scopeType: scope?.type ?? "unresolved",
-      scopeId: scope?.id,
-      principalType: principal.type,
-      legacyAllowed,
-      engineAllowed,
-      denialReason,
-      knownDivergence,
-    },
-    "authz shadow mismatch",
-  );
-}
-
-/** The two documented divergence families (see the module header). */
-function apiKeyKnownDivergence({
-  ownerGrants,
-  legacyAllowed,
-  engineAllowed,
-}: {
-  ownerGrants: CollectedGrants | null;
-  legacyAllowed: boolean;
-  engineAllowed: boolean;
-}): string | undefined {
-  // Direction matters: only legacy-allowed / engine-denied is the missing
-  // lite-member cap surfacing. An engine over-allow for the same owner is a
-  // different bug and must not be filed as known divergence.
-  if (
-    ownerGrants?.organizationRole === "EXTERNAL" &&
-    legacyAllowed &&
-    !engineAllowed
-  ) {
-    return "external-cap";
-  }
-  const hasLegacyRows = (ownerGrants?.legacyTeamMemberships.length ?? 0) > 0;
-  if (legacyAllowed && !engineAllowed && hasLegacyRows) {
-    return "ceiling-legacy-fallback";
-  }
-  return undefined;
-}
-
 /**
  * The legacy resolvers' fire-and-forget engine comparison. The app composes
- * ONE instance in its runtime; calls never throw, never block, never change
- * the response.
+ * an instance per call over the caller's own Prisma handle (see the app's
+ * shadow.ts); calls never throw, never block, never change the response.
  */
 export class AuthzShadowService {
+  /**
+   * The rate announcement latch is static because the app composes a fresh
+   * (stateless) service instance per call — instance state would re-announce
+   * on every check. It is the one piece of shadow state, and it only dedupes
+   * a log line.
+   */
+  private static lastAnnouncedRate: number | undefined;
+
+  static resetRateAnnouncement(): void {
+    AuthzShadowService.lastAnnouncedRate = undefined;
+  }
+
   private readonly engine = new AuthzEngine();
 
   constructor(
@@ -116,9 +68,89 @@ export class AuthzShadowService {
 
   private sampled(): boolean {
     const rate = this.options.sampleRate();
+    this.announceRate(rate);
     if (!(rate > 0)) return false;
     if (rate >= 1) return true;
     return Math.random() < rate;
+  }
+
+  private announceRate(rate: number): void {
+    if (rate === AuthzShadowService.lastAnnouncedRate) return;
+    const wasEnabled = (AuthzShadowService.lastAnnouncedRate ?? 0) > 0;
+    AuthzShadowService.lastAnnouncedRate = rate;
+    if (rate > 0) {
+      logger.info({ sampleRate: rate }, "authz shadow enabled");
+    } else if (wasEnabled) {
+      logger.info({ sampleRate: rate }, "authz shadow disabled");
+    }
+  }
+
+  /**
+   * Every comparison logs — the info line is the proof that both resolvers
+   * ran and agreed, so silence means "not comparing", never "no news".
+   */
+  private logOutcome({
+    caller,
+    legacyAllowed,
+    engineAllowed,
+    permission,
+    scope,
+    principal,
+    denialReason,
+    knownDivergence,
+  }: {
+    caller: string;
+    legacyAllowed: boolean;
+    engineAllowed: boolean;
+    permission: string;
+    scope: AuthzScopeRef | null;
+    principal: AuthzPrincipalRef;
+    denialReason?: string;
+    knownDivergence?: string;
+  }): void {
+    const detail = {
+      caller,
+      permission,
+      scopeType: scope?.type ?? "unresolved",
+      scopeId: scope?.id,
+      principalType: principal.type,
+      legacyAllowed,
+      engineAllowed,
+      denialReason,
+      knownDivergence,
+    };
+    if (legacyAllowed === engineAllowed) {
+      logger.info(detail, "authz shadow match");
+      return;
+    }
+    logger.warn(detail, "authz shadow mismatch");
+  }
+
+  /** The two documented divergence families (see the module header). */
+  private apiKeyKnownDivergence({
+    ownerGrants,
+    legacyAllowed,
+    engineAllowed,
+  }: {
+    ownerGrants: CollectedGrants | null;
+    legacyAllowed: boolean;
+    engineAllowed: boolean;
+  }): string | undefined {
+    // Direction matters: only legacy-allowed / engine-denied is the missing
+    // lite-member cap surfacing. An engine over-allow for the same owner is a
+    // different bug and must not be filed as known divergence.
+    if (
+      ownerGrants?.organizationRole === "EXTERNAL" &&
+      legacyAllowed &&
+      !engineAllowed
+    ) {
+      return "external-cap";
+    }
+    const hasLegacyRows = (ownerGrants?.legacyTeamMemberships.length ?? 0) > 0;
+    if (legacyAllowed && !engineAllowed && hasLegacyRows) {
+      return "ceiling-legacy-fallback";
+    }
+    return undefined;
   }
 
   userPermissionCheck({
@@ -152,7 +184,7 @@ export class AuthzShadowService {
           organizationId,
         });
         if (!scope) {
-          logOutcome({
+          this.logOutcome({
             caller,
             legacyAllowed,
             engineAllowed: false,
@@ -173,7 +205,7 @@ export class AuthzShadowService {
           scope,
           demoProjectId: this.options.demoProjectId(),
         });
-        logOutcome({
+        this.logOutcome({
           caller,
           legacyAllowed,
           engineAllowed: decision.allowed,
@@ -190,7 +222,7 @@ export class AuthzShadowService {
               : undefined,
         });
       } catch (error) {
-        logger.debug({ error, caller }, "authz shadow comparison failed");
+        logger.warn({ error, caller }, "authz shadow comparison failed");
       }
     })();
   }
@@ -262,7 +294,7 @@ export class AuthzShadowService {
           ];
         for (const { scope, legacyAllowed } of scoped) {
           if (!scope) {
-            logOutcome({
+            this.logOutcome({
               caller,
               legacyAllowed,
               engineAllowed: false,
@@ -278,7 +310,7 @@ export class AuthzShadowService {
             scope,
             demoProjectId,
           });
-          logOutcome({
+          this.logOutcome({
             caller,
             legacyAllowed,
             engineAllowed: decision.allowed,
@@ -289,7 +321,7 @@ export class AuthzShadowService {
           });
         }
       } catch (error) {
-        logger.debug({ error, caller }, "authz shadow comparison failed");
+        logger.warn({ error, caller }, "authz shadow comparison failed");
       }
     })();
   }
@@ -325,7 +357,7 @@ export class AuthzShadowService {
           // An id legacy answered on that the engine cannot resolve is
           // itself a divergence worth seeing — the same unresolved outcome
           // the user path logs.
-          logOutcome({
+          this.logOutcome({
             caller,
             legacyAllowed,
             engineAllowed: false,
@@ -354,7 +386,7 @@ export class AuthzShadowService {
           scope,
           demoProjectId: this.options.demoProjectId(),
         });
-        logOutcome({
+        this.logOutcome({
           caller,
           legacyAllowed,
           engineAllowed: decision.allowed,
@@ -362,14 +394,14 @@ export class AuthzShadowService {
           scope,
           principal: { type: "apiKey", id: apiKeyId },
           denialReason: decision.denialReason,
-          knownDivergence: apiKeyKnownDivergence({
+          knownDivergence: this.apiKeyKnownDivergence({
             ownerGrants,
             legacyAllowed,
             engineAllowed: decision.allowed,
           }),
         });
       } catch (error) {
-        logger.debug({ error, caller }, "authz shadow comparison failed");
+        logger.warn({ error, caller }, "authz shadow comparison failed");
       }
     })();
   }

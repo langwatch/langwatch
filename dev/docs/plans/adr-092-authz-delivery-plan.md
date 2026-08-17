@@ -173,10 +173,18 @@ becomes the ledger. Bill of materials:
   becomes their projection (same table, same latch, same ops page, same
   legacy-fallback-gate reads). Runner package stays generic — emitting events
   is the authz migration's behaviour, not the runner's.
-- Shadow instrumentation folded in: failure log debug → warn, comparison +
-  mismatch counters, gcx dashboard. (Today a shadow throwing on every call is
-  indistinguishable from perfect agreement: zero mismatch lines since
-  2026-08-16T23:51Z proves nothing without a denominator.)
+- Shadow instrumentation folded in (**shipped in this PR**): enabling shadow
+  (or changing the sample rate) is announced in the logs; every comparison
+  logs its outcome — info `authz shadow match` on agreement, warn
+  `authz shadow mismatch` on disagreement; a failed comparison is warn, not
+  debug. The info line is the denominator: silence now means "not comparing",
+  never "no news". gcx queries over these lines replace the counters idea.
+  (Before this, a shadow throwing on every call was indistinguishable from
+  perfect agreement.)
+- **Reads do not move in this PR.** Every permission check keeps reading the
+  legacy tables (`RoleBinding`/`CustomRole`/`TeamUser`) exactly as today; the
+  `Grant`/`Role` head is written but read by nothing. The moment reads move
+  is PR 3's, per cut-over org.
 - **Definition of done: the replay test** — replaying an org's stream produces
   byte-identical rows to the imperative M1 writer, and
   `in-place-authz-migration.feature` passes unchanged.
@@ -218,6 +226,12 @@ becomes the ledger. Bill of materials:
 - The fork at the 10 seams reads the cutover projection: engine primary for
   migrated orgs, legacy as reverse-shadow; unmigrated orgs unchanged, legacy
   primary, engine as shadow.
+- **The collector repoint**: for a cut-over org, `AuthzReadRepository`
+  collects from `Grant`/`Role` instead of the compat
+  `RoleBinding`/`CustomRole` rows — so "reading from Grants" is literally
+  true at cutover, not deferred to the contract. Non-cut-over orgs keep
+  collecting from the legacy tables. (Surfaced 2026-08-17: without this the
+  engine would serve cut-over orgs from the compat head indefinitely.)
 - Rollback: `cutover_rolled_back` (instant enforcement), org back on legacy
   within the gate's cache TTL, no deploy.
 - **Our own org first, in production, used end to end. Then widen the cohort
@@ -299,20 +313,31 @@ its 2026-08-17 permission-vs-scope ruling.
 
 ## Next actions
 
-1. Rewrite ADR-092's storage and rollout sections in place (decision 16):
-   the ledger, both disciplines, the subscriber, the doctrines nothing else
-   backs (no-transactions/idempotency, occurredAt/acceptedAt, deterministic
-   event-derived ids, batched appends), and the related-ADR cross-links
-   (021, 015, 098, 022 *event_log*, 093). Add the ADR-007 amendment section.
-2. Spec pass: **extend three bound scenarios** rather than duplicate them —
-   `unified-authorization-engine.feature:242` gains the transport guarantee
-   (Grant row gone before the call returns, Redis stopped), `:340` gains the
-   `member_offboarded` event proof, `:107` already covers the owner ceiling —
-   and **add three genuinely new**: collective grants, floor-as-row, the
-   cutover process events (extending `in-place-authz-migration.feature`'s
-   rollback scenario, not a parallel file). Rewrite
-   `scim-group-mapping.feature` storage-neutral (decision 18).
-3. PR 1.
+Done (on `feat/adr-092-grants-ledger`, 2026-08-17): the ADR rewrites
+(092 §13, the ADR-007 breaker amendment), the spec pass, the pure reducer +
+deterministic grant ids + mapping in `@langwatch/authz-server`, the
+`Grant`/`Role`/cursor/cutover schema, the `authz_grants` pipeline registered
+dark with its four commands and `.withProjection` state projection, the
+two-headed Prisma store, the tenancy-guard entries, the ops rollback
+mutation + UI, and the shadow observability logging (announce / match info /
+mismatch warn / failure warn).
+
+Remaining for PR 1, in order:
+
+1. `TeamUserBackfillMigration` emits batched `attachGrants`
+   (source backfill-b, backdated occurredAt, commandId `backfill-b:<rowId>`)
+   → awaits projection → parity proof → `proveMigrationParity`; epoch bump
+   stays (decision 19); `in-place-authz-migration.feature` passes unchanged.
+2. Runner lifecycle transitions as events; `SystemMigrationTenantState`
+   becomes their projection.
+3. The instant-enforcement revocation write + the pipeline-scoped Redis
+   circuit breaker primitive (ADR-007 amendment).
+4. The replay-determinism test and the Redis-down integration tests.
+
+The rollout after PR 1–2 merge is one organization at a time: cut an org
+over in one batch (its whole surface into `Grant`s via the ledger), then
+that org reads from the engine — the fork, the collector repoint, and the
+batch import are PR 3.
 
 ## The identity platform (the next programme) — doors left open
 
