@@ -70,8 +70,17 @@ export async function resolveTraceWaitTimeoutMs({
   projectId: string;
   clientResolver?: IngestLagClientResolver;
 }): Promise<number> {
+  // Sweep expired entries so the cache shrinks instead of holding a row for
+  // every project that ever resolved. Bounded by project count, so the sweep
+  // is cheap.
+  for (const [key, entry] of budgetCache) {
+    if (entry.expiresAt <= Date.now()) {
+      budgetCache.delete(key);
+    }
+  }
+
   const cached = budgetCache.get(projectId);
-  if (cached && cached.expiresAt > Date.now()) {
+  if (cached) {
     return cached.budgetMs;
   }
 
@@ -117,4 +126,9 @@ function budgetFromSample(sample: IngestLagSample): number {
 /** Drops every cached budget. @internal For tests. */
 export function clearTraceWaitBudgetCache(): void {
   budgetCache.clear();
+}
+
+/** How many budgets the cache holds. @internal For tests. */
+export function traceWaitBudgetCacheSize(): number {
+  return budgetCache.size;
 }

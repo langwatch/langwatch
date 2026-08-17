@@ -48,10 +48,26 @@ export interface TunnelHandle {
   ): unknown;
 }
 
+/**
+ * The platforms that knowingly run without a binary digest: macOS ships a
+ * tarball whose digest covers the archive, not the extracted binary, so
+ * those installs rely on the pinned tag over TLS.
+ */
+const UNVERIFIED_PLATFORMS = new Set(["darwin-x64", "darwin-arm64"]);
+
 /** Verifies the binary about to run against the pinned release digest. */
 function verifyBinary(binPath: string): void {
-  const expected = CLOUDFLARED_SHA256[`${process.platform}-${process.arch}`];
-  if (!expected) return;
+  const platformKey = `${process.platform}-${process.arch}`;
+  const expected = CLOUDFLARED_SHA256[platformKey];
+  if (!expected) {
+    // Fail closed: a platform that is neither listed in the digest table nor
+    // named as a known exception must not run unverified, so a typo in
+    // either table cannot silently skip the check.
+    if (UNVERIFIED_PLATFORMS.has(platformKey)) return;
+    throw new Error(
+      `No pinned cloudflared checksum for ${platformKey}. Refusing to run an unverified binary. Bring your own tunnel with --tunnel-url.`,
+    );
+  }
   const actual = crypto
     .createHash("sha256")
     .update(fs.readFileSync(binPath))

@@ -392,6 +392,25 @@ describe("header template rendering", () => {
     });
   });
 
+  describe("given interpolated content that renders a line break", () => {
+    /** @scenario "A rendered header value cannot carry a line break" */
+    it("rejects the value naming the header, instead of passing it to the HTTP client", () => {
+      const render = () =>
+        renderHeaderTemplate({
+          template: "{{ params.note }}",
+          context: buildTemplateContext({
+            input: inputWith("hi"),
+            parameters: { note: "ok\r\nX-Injected: 1" },
+          }),
+          headerKey: "X-Note",
+        });
+
+      expect(render).toThrow(TemplateRenderError);
+      expect(render).toThrow(/header "X-Note"/);
+      expect(render).toThrow(/line break/);
+    });
+  });
+
   describe("given output that the other engines would encode or escape", () => {
     it("interpolates it as plain text", () => {
       const value = renderHeaderTemplate({

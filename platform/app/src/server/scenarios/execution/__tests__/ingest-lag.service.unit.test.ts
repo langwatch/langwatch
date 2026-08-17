@@ -16,6 +16,7 @@ import {
   clearTraceWaitBudgetCache,
   DEFAULT_TRACE_WAIT_TIMEOUT_MS,
   resolveTraceWaitTimeoutMs,
+  traceWaitBudgetCacheSize,
 } from "../ingest-lag.service";
 
 const { mockLogger } = vi.hoisted(() => ({
@@ -230,6 +231,30 @@ describe("resolveTraceWaitTimeoutMs", () => {
         clientResolver,
       });
       expect(query).toHaveBeenCalledTimes(2);
+    });
+
+    it("evicts other projects' expired entries instead of holding them forever", async () => {
+      vi.useFakeTimers();
+      const { client } = clientReturning([
+        { P95LagMs: 16_000, SampleCount: 100 },
+      ]);
+      const clientResolver = resolverFor(client);
+
+      await resolveTraceWaitTimeoutMs({
+        projectId: "proj_old",
+        clientResolver,
+      });
+      expect(traceWaitBudgetCacheSize()).toBe(1);
+
+      vi.advanceTimersByTime(61 * 60 * 1000);
+
+      // Resolving any project sweeps every expired entry, so a project that
+      // stops running scenarios does not keep a cache row resident.
+      await resolveTraceWaitTimeoutMs({
+        projectId: "proj_new",
+        clientResolver,
+      });
+      expect(traceWaitBudgetCacheSize()).toBe(1);
     });
 
     it("caches per project", async () => {

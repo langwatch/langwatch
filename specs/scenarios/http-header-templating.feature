@@ -48,6 +48,12 @@ Feature: HTTP agent headers render templates and carry trace context
     Then the failure names the "headers" field and the header's key
 
   @unit
+  Scenario: A rendered header value cannot carry a line break
+    Given an http target with a header whose interpolated content renders a line break
+    When the target takes a turn
+    Then the render fails naming the header, before the value reaches the HTTP client
+
+  @unit
   Scenario: The automatic traceparent does not replace one the target configured
     Given an http target that writes its own "traceparent" header from a template
     When the target takes a turn

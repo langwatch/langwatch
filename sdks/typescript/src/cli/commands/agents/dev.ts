@@ -200,9 +200,14 @@ export async function startAgentDevSession(
           );
         }
       } catch {
+        // Do not suggest `agent update --config` here: it replaces the whole
+        // config, so a url-only payload would wipe headers, auth and the
+        // other fields. The UI edits the URL field alone.
         console.error(
           chalk.yellow(
-            `Could not restore the agent URL automatically. Set it back yourself: langwatch agent update ${agent.id} --config '{"url":"${previousUrl ?? "<your agent url>"}"}' (or edit the agent in the UI).`,
+            `Could not restore the agent URL automatically. Edit agent "${agent.name}" in the LangWatch UI and set its URL back${
+              previousUrl ? ` to ${previousUrl}` : ""
+            }.`,
           ),
         );
       }

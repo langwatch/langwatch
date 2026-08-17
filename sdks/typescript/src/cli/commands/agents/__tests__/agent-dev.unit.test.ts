@@ -4,18 +4,28 @@ import * as path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 // The tunnel path verifies the binary it is about to run on every start, and
-// the mock below points at the node executable. Pinning the arch to one the
-// digest table does not list makes verification a no-op, so these tests
-// exercise the session flow rather than the checksum. The checksum has its
-// own coverage in quick-tunnel's digest table.
+// the mock below points at the node executable. Verification fails closed on
+// an unlisted platform, so the tests pin platform and arch to darwin-x64, a
+// named UNVERIFIED_PLATFORMS exception, and verification skips
+// deterministically on any host. These tests exercise the session flow
+// rather than the checksum.
+const realPlatform = process.platform;
 const realArch = process.arch;
 beforeAll(() => {
+  Object.defineProperty(process, "platform", {
+    value: "darwin",
+    configurable: true,
+  });
   Object.defineProperty(process, "arch", {
-    value: "unlisted-arch",
+    value: "x64",
     configurable: true,
   });
 });
 afterAll(() => {
+  Object.defineProperty(process, "platform", {
+    value: realPlatform,
+    configurable: true,
+  });
   Object.defineProperty(process, "arch", {
     value: realArch,
     configurable: true,
@@ -209,7 +219,36 @@ describe("agent dev session", () => {
       expect(console.error).toHaveBeenCalledWith(
         expect.stringContaining("https://staging.example.com/agent"),
       );
+      // The advice points at the UI, which edits the URL field alone. It
+      // must never name `agent update --config`: that command replaces the
+      // whole config, so a url-only payload would wipe headers and auth.
+      expect(console.error).toHaveBeenCalledWith(
+        expect.stringContaining("LangWatch UI"),
+      );
+      expect(console.error).not.toHaveBeenCalledWith(
+        expect.stringContaining("--config"),
+      );
       await expect(session.done).resolves.toBe(0);
+    });
+  });
+
+  describe("when the platform has no pinned cloudflared digest", () => {
+    it("refuses to start rather than running an unverified binary", async () => {
+      Object.defineProperty(process, "platform", {
+        value: "freebsd",
+        configurable: true,
+      });
+      try {
+        await expect(
+          startAgentDevSession({ port: "8000", agent: "agent_abc123" }),
+        ).rejects.toThrow(ProcessExitError);
+        expect(mockUpdate).not.toHaveBeenCalled();
+      } finally {
+        Object.defineProperty(process, "platform", {
+          value: "darwin",
+          configurable: true,
+        });
+      }
     });
   });
 

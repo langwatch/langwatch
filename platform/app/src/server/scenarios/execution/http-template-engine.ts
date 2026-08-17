@@ -232,8 +232,9 @@ export function renderHeaderTemplate({
   context: Record<string, unknown>;
   headerKey: string;
 }): string {
+  let rendered: string;
   try {
-    return headerLiquid.parseAndRenderSync(template, context);
+    rendered = headerLiquid.parseAndRenderSync(template, context);
   } catch (cause) {
     throw new TemplateRenderError({
       field: "headers",
@@ -241,6 +242,20 @@ export function renderHeaderTemplate({
       detail: `header "${headerKey}"`,
     });
   }
+  // The renderer rejects header injection itself instead of relying on the
+  // fetch layer: a conversation turn can carry line breaks, and a rendered
+  // CR, LF or NUL in a header value would otherwise only fail deep in the
+  // HTTP client with a message that names no header.
+  if (/[\r\n\0]/.test(rendered)) {
+    throw new TemplateRenderError({
+      field: "headers",
+      cause: new Error(
+        "the rendered value contains a line break or NUL character, which is not valid in an HTTP header",
+      ),
+      detail: `header "${headerKey}"`,
+    });
+  }
+  return rendered;
 }
 
 /**
