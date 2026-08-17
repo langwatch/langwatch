@@ -97,6 +97,8 @@ export {
   TeamUserBackfillMigration,
 } from "./team-user-backfill.migration";
 export type {
+  BackfillGrantEmission,
+  GrantsLedgerEmitter,
   ParityDiff,
   TeamUserBackfillDeps,
 } from "./team-user-backfill.migration";

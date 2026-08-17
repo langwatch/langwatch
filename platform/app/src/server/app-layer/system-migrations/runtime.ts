@@ -7,8 +7,10 @@
  * Server-only - this graph reaches Prisma, Redis and the EE audit writer.
  */
 import { auditLog } from "@ee/audit-log/auditLog";
-import { TeamUserBackfillMigration } from "@langwatch/authz-server";
-import { generate } from "@langwatch/ksuid";
+import {
+  type GrantsLedgerEmitter,
+  TeamUserBackfillMigration,
+} from "@langwatch/authz-server";
 import {
   type MigrationPassSummary,
   type SystemMigration,
@@ -17,7 +19,7 @@ import {
 import type { Cluster, Redis } from "ioredis";
 import { env } from "~/env.mjs";
 import type { Prisma } from "~/generated/prisma/client";
-import { KSUID_RESOURCES } from "~/utils/constants";
+import { AUTHZ_GRANTS_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/authz-grants/schemas/constants";
 import { bumpAuthzEpoch } from "../../authz/epoch";
 import { PrismaAuthzMigrationRepository } from "../../authz/repositories/authz-migration.prisma.repository";
 import { authzCollector } from "../../authz/runtime";
@@ -44,16 +46,67 @@ export const systemMigrationsService = new SystemMigrationsService({
   runPass: () => runSystemMigrationPass(),
 });
 
+/**
+ * The backfill's door into the grants ledger, resolved lazily at send time
+ * (the pipeline is being registered while this module loads). A disabled
+ * event-sourcing stack throws rather than letting DisabledPipeline swallow
+ * the send - the organization then parks with an honest report instead of
+ * timing out against a projection that will never run.
+ */
+function grantsLedgerEmitter(): GrantsLedgerEmitter {
+  const commandsFor = () => {
+    const app = tryGetApp();
+    if (!app?.eventSourcing?.isEnabled) {
+      throw new Error(
+        "grants backfill requires the event-sourcing stack; organization parked",
+      );
+    }
+    return app.eventSourcing.getPipeline(
+      AUTHZ_GRANTS_PIPELINE_NAME as never,
+    ) as unknown as {
+      commands: {
+        attachGrants: { send: (data: unknown) => Promise<unknown> };
+        proveMigrationParity: { send: (data: unknown) => Promise<unknown> };
+      };
+    };
+  };
+  return {
+    attachGrants: async ({ organizationId, commandId, grants }) => {
+      await commandsFor().commands.attachGrants.send({
+        tenantId: organizationId,
+        organizationId,
+        commandId,
+        grants,
+      });
+    },
+    proveMigrationParity: async ({
+      organizationId,
+      commandId,
+      diffs,
+      occurredAtMs,
+    }) => {
+      await commandsFor().commands.proveMigrationParity.send({
+        tenantId: organizationId,
+        organizationId,
+        commandId,
+        diffs,
+        occurredAtMs,
+      });
+    },
+  };
+}
+
 /** Every registered in-place migration, in the order they run per tenant. */
 export function registeredMigrations(): SystemMigration[] {
   return [
     new TeamUserBackfillMigration({
       repository: new PrismaAuthzMigrationRepository(prisma),
       collectGrants: (args) => authzCollector.collectGrants(args),
+      ledger: grantsLedgerEmitter(),
       audit: (entry) =>
         auditLog({ ...entry, metadata: entry.metadata as Prisma.JsonObject }),
       bumpEpoch: bumpAuthzEpoch,
-      newBindingId: () => generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+      now: () => Date.now(),
     }),
   ];
 }

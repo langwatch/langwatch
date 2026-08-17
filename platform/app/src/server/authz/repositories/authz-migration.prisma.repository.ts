@@ -26,13 +26,20 @@ export class PrismaAuthzMigrationRepository
     // fallback, so parity has to account for them too.
     const rows = await this.prisma.teamUser.findMany({
       where: { team: { organizationId } },
-      select: { userId: true, teamId: true, role: true, assignedRoleId: true },
+      select: {
+        userId: true,
+        teamId: true,
+        role: true,
+        assignedRoleId: true,
+        createdAt: true,
+      },
     });
     return rows.map((row) => ({
       userId: row.userId,
       teamId: row.teamId,
       role: row.role,
       customRoleId: row.assignedRoleId,
+      createdAtMs: row.createdAt.getTime(),
     }));
   }
 
