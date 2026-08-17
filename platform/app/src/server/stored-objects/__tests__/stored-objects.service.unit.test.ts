@@ -257,7 +257,7 @@ describe("storeFromBytes", () => {
       expect(registry.delete).toHaveBeenCalledWith(putUri);
     });
 
-    describe("and the compensating delete fails too", () => {
+    describe("when the compensating delete also fails", () => {
       /**
        * Nothing above this point ever learns the bytes were orphaned: the
        * insert error is what propagates, and the delete failure is swallowed
@@ -280,7 +280,7 @@ describe("storeFromBytes", () => {
         expect(logger.error.mock.calls[0]?.[1]).toContain("orphaned");
       });
 
-      /** @scenario "A layer that rethrows logs below error" */
+      /** @scenario "Work discarded without a throw is logged at error" */
       it("keeps both errors, so neither failure hides the other", async () => {
         logger.error.mockClear();
         const insertError = new Error("ClickHouse insert failed");

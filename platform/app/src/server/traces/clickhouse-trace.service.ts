@@ -18,6 +18,8 @@ import {
 import type { ExtractedIO } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { DataRetentionPolicyRepository } from "~/server/data-retention/policy/dataRetentionPolicy.repository";
+import { RetentionPolicyCache } from "~/server/data-retention/retentionPolicyCache";
 import type { RetentionPolicyResolver } from "~/server/data-retention/retentionPolicyResolver";
 import { prisma as defaultPrisma } from "~/server/db";
 import {
@@ -452,12 +454,25 @@ export class ClickHouseTraceService {
 
   /**
    * Static factory method for creating ClickHouseTraceService with default dependencies.
+   *
+   * The retention resolver defaults to a live cascade over the same Prisma
+   * client, which is what makes the span read's floor actually tenant-aware in
+   * production. Left to the constructor's optional parameter it never was:
+   * every production path reaches the service through here, none of them
+   * passed a resolver, and the floor quietly stayed at the fixed
+   * {@link SPAN_READ_FLOOR_LOOKBACK_MS} for every project — including the ones
+   * on a longer policy that this exists to serve.
+   *
+   * `new ClickHouseTraceService({...})` stays resolver-free, so unit tests keep
+   * the platform default without a database in the graph.
    */
   static create({
     prisma = defaultPrisma,
     resolveTraceSpans,
     resolveTraceSpansBatch,
-    retentionResolver,
+    retentionResolver = new RetentionPolicyCache(
+      new DataRetentionPolicyRepository(prisma),
+    ),
   }: {
     prisma?: PrismaClient;
     resolveTraceSpans?: ResolveTraceSpansFn;

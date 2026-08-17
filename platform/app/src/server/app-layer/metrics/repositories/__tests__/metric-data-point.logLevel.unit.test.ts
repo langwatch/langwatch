@@ -115,10 +115,13 @@ describe("canonical metric point writes", () => {
           refusingRepository().ensureDataPoints({ points: [dataPoint()] }),
         ).rejects.toThrow(REFUSED);
 
+        // The instance itself, not merely some Error: a layer that wrapped or
+        // recreated it would lose the original failure context while still
+        // satisfying `expect.any(Error)`.
         expect(logger.warn.mock.calls[0]?.[0]).toMatchObject({
           tenantId: "project-1",
           pointCount: 1,
-          error: expect.any(Error),
+          error: REFUSED,
         });
       });
     });

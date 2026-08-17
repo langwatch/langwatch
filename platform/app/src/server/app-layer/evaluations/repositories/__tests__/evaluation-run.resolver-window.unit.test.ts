@@ -8,6 +8,10 @@
  * costing whole seconds per lookup for evaluations scheduled minutes earlier.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  PLATFORM_DEFAULT_RETENTION_DAYS,
+  type ResolvedRetention,
+} from "~/server/data-retention/retentionPolicy.schema";
 import { EvaluationRunClickHouseRepository } from "../evaluation-run.clickhouse.repository";
 
 function createCapturingClient(
@@ -168,7 +172,17 @@ describe("EvaluationRunClickHouseRepository ScheduledAt resolver", () => {
       ]);
       const repo = new EvaluationRunClickHouseRepository({
         resolveClient: async () => client as never,
-        retentionResolver: { resolve: async () => ({ traces: 400 }) as never },
+        // `evaluation_runs` is a traces-category table, so `traces` is the
+        // field the floor reads; the other two are named rather than cast away
+        // so a category added to ResolvedRetention breaks this fixture instead
+        // of silently resolving to undefined.
+        retentionResolver: {
+          resolve: async (): Promise<ResolvedRetention> => ({
+            traces: 400,
+            scenarios: PLATFORM_DEFAULT_RETENTION_DAYS,
+            experiments: PLATFORM_DEFAULT_RETENTION_DAYS,
+          }),
+        },
       });
 
       await repo.getByEvaluationId({
