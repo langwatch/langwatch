@@ -19,6 +19,7 @@
  * Spec: specs/ai-governance/puller-framework/microsoft-365-audit.feature
  */
 
+import { readFile } from "node:fs/promises";
 import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
 import { FREE_PLAN } from "@ee/licensing/constants";
 import type { PlanInfo } from "@ee/licensing/planInfo";
@@ -70,29 +71,32 @@ async function makeOrg(): Promise<string> {
   return id;
 }
 
+const MIGRATION_SQL_URL = new URL(
+  "../../../../prisma/migrations/20260817120001_disable_copilot_studio_ingestion_sources/migration.sql",
+  import.meta.url,
+);
+
 /**
- * The migration, expressed as the statement the .sql file runs. Kept in step
- * with prisma/migrations/20260817120001_disable_copilot_studio_ingestion_sources.
+ * Runs the shipped migration, read off disk rather than retyped here.
+ *
+ * These tests exist to prove that statement is safe to re-run against
+ * production rows, so a hand-copied lookalike would prove it about the wrong
+ * text — edit the .sql and the copy keeps passing. Reading the file means the
+ * only way to make these tests agree with a broken migration is to break the
+ * migration.
  *
  * The real migration is applied by `prisma migrate deploy`, which never goes
- * through the app's client and so never meets the tenancy guard. Running the
- * same SQL through `prisma` here does, and the opt-out is honest: retiring a
- * source type is a fleet-wide statement with no tenant to scope it to.
+ * through the app's client and so never meets the tenancy guard. Running it
+ * through `prisma` here does, so the opt-out is prepended at execute time
+ * instead of living in the .sql: the guard is this lane's concern, not the
+ * migration's. It is honest either way — retiring a source type is a
+ * fleet-wide statement with no tenant to scope it to.
  */
 async function runDisableMigration(): Promise<void> {
-  await prisma.$executeRawUnsafe(`
-    -- @tenancy: retires a source type across every tenant (schema migration)
-    UPDATE "IngestionSource"
-       SET "status" = 'disabled',
-           "description" = CASE
-             WHEN "description" IS NULL OR "description" = ''
-               THEN '${RETIRED_REASON} that never returned Copilot interactions. Re-create this source as microsoft_365_audit.'
-               ELSE "description" || E'\\n${RETIRED_REASON} that never returned Copilot interactions. Re-create this source as microsoft_365_audit.'
-           END
-     WHERE "sourceType" = 'copilot_studio'
-       AND "status" <> 'disabled'
-       AND ("description" IS NULL OR "description" NOT LIKE '%${RETIRED_REASON}%');
-  `);
+  const sql = await readFile(MIGRATION_SQL_URL, "utf8");
+  await prisma.$executeRawUnsafe(
+    `-- @tenancy: retires a source type across every tenant (schema migration)\n${sql}`,
+  );
 }
 
 describe("microsoft_365_audit credential seam", () => {
