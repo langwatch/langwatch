@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   LEASE_TTL_SECONDS,
   SNAPSHOT_LEASE_KEY,
@@ -388,6 +388,59 @@ describe("parseSnapshot", () => {
     it("returns null instead of throwing into the read path", () => {
       expect(parseSnapshot(liveSnapshotSchema, "{not json")).toBeNull();
       expect(parseSnapshot(detailSnapshotSchema, "[]")).toBeNull();
+    });
+  });
+
+  /**
+   * The readers poll one fixed key, so the same string arrives repeatedly and
+   * is only validated once. The risk that buys is staleness: a cache that
+   * failed to notice a rewritten snapshot would freeze the dashboard on old
+   * numbers while the platform moved underneath it, and it would look like
+   * nothing was happening rather than like a bug. That is the case below.
+   */
+  describe("given the same stored snapshot read twice", () => {
+    /** @scenario "An unchanged snapshot is validated once and reused" */
+    it("validates once and hands back the identical object", () => {
+      const raw = JSON.stringify(liveSnapshot({ computedAt: 7 }));
+      const spy = vi.spyOn(liveSnapshotSchema, "safeParse");
+
+      try {
+        const first = parseSnapshot(liveSnapshotSchema, raw);
+        const second = parseSnapshot(liveSnapshotSchema, raw);
+
+        expect(first).not.toBeNull();
+        expect(second).toBe(first);
+        expect(spy).toHaveBeenCalledTimes(1);
+      } finally {
+        spy.mockRestore();
+      }
+    });
+  });
+
+  describe("given the stored snapshot changed between reads", () => {
+    /** @scenario "A rewritten snapshot is picked up on the next read" */
+    it("returns the new one rather than the one it validated before", () => {
+      parseSnapshot(
+        liveSnapshotSchema,
+        JSON.stringify(liveSnapshot({ computedAt: 1 })),
+      );
+
+      const next = parseSnapshot(
+        liveSnapshotSchema,
+        JSON.stringify(liveSnapshot({ computedAt: 2 })),
+      );
+
+      expect(next?.computedAt).toBe(2);
+    });
+  });
+
+  describe("given an unreadable snapshot followed by a good one", () => {
+    /** @scenario "A rejected snapshot does not stop a later valid one being read" */
+    it("reads the good one", () => {
+      expect(parseSnapshot(detailSnapshotSchema, "{not json")).toBeNull();
+
+      const raw = JSON.stringify(liveSnapshot({ computedAt: 3 }));
+      expect(parseSnapshot(liveSnapshotSchema, raw)?.computedAt).toBe(3);
     });
   });
 });

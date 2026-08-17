@@ -209,15 +209,46 @@ export type BoundedSection = z.infer<typeof boundedSchema>;
  * snapshot it understands), and distinguishing them at the call site would
  * invite rendering a partial payload.
  */
+/**
+ * The last successful parse, per schema.
+ *
+ * Both readers poll one fixed Redis key on an interval, so between writes they
+ * hand the byte-identical JSON string to the same schema over and over.
+ * Re-validating it every poll was 2.7% of the app's wall time in production,
+ * 84% of that inside zod. Comparing the raw string answers the same question
+ * for a fraction of the cost, and it keeps the validation rather than trading
+ * it away: a string that has not changed cannot have a shape different from
+ * the one already checked.
+ *
+ * Only successful parses are stored. An unreadable snapshot re-parses on every
+ * poll, which is the behaviour it had before and is not worth caching — it is
+ * rare, and caching a rejection would keep rejecting a key that has since been
+ * rewritten correctly.
+ *
+ * Keyed by schema identity, and each schema holds exactly one entry, so this
+ * cannot grow. The schemas are module-level constants.
+ *
+ * The cached value is handed to every caller, so callers must treat it as
+ * read-only. `mergeSnapshots` projects it into a fresh object rather than
+ * mutating it, which is the arrangement this relies on.
+ */
+const lastParse = new WeakMap<object, { raw: string; value: unknown }>();
+
 export function parseSnapshot<T>(
   schema: z.ZodType<T>,
   raw: string | null,
 ): T | null {
   if (!raw) return null;
+
+  const cached = lastParse.get(schema);
+  if (cached?.raw === raw) return cached.value as T;
+
   try {
     const parsed: unknown = JSON.parse(raw);
     const result = schema.safeParse(parsed);
-    return result.success ? result.data : null;
+    if (!result.success) return null;
+    lastParse.set(schema, { raw, value: result.data });
+    return result.data;
   } catch {
     return null;
   }

@@ -232,3 +232,32 @@ Feature: Redacting personal data from traces
     When an admin tries to save a PII exception pattern that matches any value
     Then the request is rejected with a validation error
     And a pattern describing one specific identifier shape is still accepted
+
+  # Detectors that cannot match without a particular character are skipped on
+  # text that does not contain it — an address pattern never runs on text with
+  # no "@" in it. This is a speed change with no behaviour attached: on that
+  # text the detector would have found nothing anyway. It earns its place
+  # because these patterns are scanned from every position, and the address one
+  # alone was a measurable share of ingestion time.
+  #
+  # The risk is a detector claiming a character it does not truly need, which
+  # would stop it finding real personal data. The scenarios below are the ones
+  # that would fail if that happened.
+  #
+  # Bindings: platform/app/src/server/data-privacy/redaction/__tests__/essentialPii.prefilter.unit.test.ts
+  @unit
+  Scenario: Personal data is still redacted when the text holds no address marker
+    When a trace is ingested whose input contains a card number, an IBAN, an IP
+      address and a social security number, and no address marker anywhere
+    Then all four are still redacted
+
+  @unit
+  Scenario: Skipped detectors still find their own kind of personal data
+    When a trace is ingested whose input contains an email address, a wallet
+      address and an IPv6 address
+    Then each one is redacted
+
+  @unit
+  Scenario: A long value holding no personal data is returned unchanged
+    When a trace is ingested whose input is a long opaque token
+    Then the stored input is byte-for-byte what was sent
