@@ -20,7 +20,13 @@ afterEach(() => {
   rmSync(root, { recursive: true, force: true });
 });
 
-function writeFile(relative: string, source: string): void {
+function writeFile({
+  relative,
+  source,
+}: {
+  relative: string;
+  source: string;
+}): void {
   const full = path.join(root, relative);
   mkdirSync(path.dirname(full), { recursive: true });
   writeFileSync(full, source);
@@ -59,9 +65,9 @@ describe("graphLaneForSource", () => {
 describe("partitionByModuleGraph", () => {
   describe("given a mix of files", () => {
     it("splits them without losing or duplicating any", () => {
-      writeFile("a.integration.test.ts", "vi.mock('./x');");
-      writeFile("b.integration.test.ts", "expect(1).toBe(1);");
-      writeFile("c.integration.test.ts", "vi.hoisted(() => ({}));");
+      writeFile({ relative: "a.integration.test.ts", source: "vi.mock('./x');" });
+      writeFile({ relative: "b.integration.test.ts", source: "expect(1).toBe(1);" });
+      writeFile({ relative: "c.integration.test.ts", source: "vi.hoisted(() => ({}));" });
 
       const { mocking, shared } = partitionByModuleGraph({
         root,
@@ -105,8 +111,8 @@ describe("selectedGraphLane", () => {
 
 describe("graphLaneSelection", () => {
   beforeEach(() => {
-    writeFile("mocks.integration.test.ts", "vi.mock('./x');");
-    writeFile("plain.integration.test.ts", "expect(1).toBe(1);");
+    writeFile({ relative: "mocks.integration.test.ts", source: "vi.mock('./x');" });
+    writeFile({ relative: "plain.integration.test.ts", source: "expect(1).toBe(1);" });
   });
 
   const files = ["mocks.integration.test.ts", "plain.integration.test.ts"];
@@ -147,7 +153,7 @@ describe("graphLaneSelection", () => {
     });
   });
 
-  describe("across both lanes", () => {
+  describe("when each lane is selected in turn", () => {
     it("covers every datastore file exactly once", () => {
       const mocking = graphLaneSelection({
         root,

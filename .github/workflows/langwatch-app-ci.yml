@@ -834,7 +834,12 @@ jobs:
         if: always() && needs.changes.outputs.durations == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: shard-durations-integration-${{ matrix.shard }}
+          # The lane is in the name because the two lanes both number their
+          # shards from 1: without it, `shared 1/2` and `mocking 1/2` would both
+          # upload `shard-durations-integration-1`, and upload-artifact rejects
+          # a duplicate name within one run. The merge job below globs
+          # `shard-durations-*`, so it picks both up either way.
+          name: shard-durations-integration-${{ matrix.lane }}-${{ matrix.shard }}
           path: platform/app/vitest.durations.delta.json
           if-no-files-found: ignore
 
