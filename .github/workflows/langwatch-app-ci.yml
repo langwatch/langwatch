@@ -481,6 +481,26 @@ jobs:
       VITEST_MAX_WORKERS: "4" # physical core count on GitHub-hosted ubuntu runners
       BUILD_TIME: "true"
       CI: "true"
+      # This lane inherits the UNIT lane's hard floor and needs a bigger one.
+      #
+      # vitest.component.config.ts spreads `...unitTest`, so it also inherits
+      # `globalSetup: ["./src/test-unit-global-setup.ts"]` and its
+      # DEFAULT_HARD_FLOOR_MS of 4 minutes. That number is sized for a unit
+      # shard, which the file says finishes in ~3 min. A component shard does
+      # not: measured over recent runs the median is 297s — 4.95 min — so the
+      # floor fires on a HEALTHY shard, mid-run, whenever it lands on the slow
+      # side of its own average.
+      #
+      # The failure reads as a hang and is not one. The floor says so itself:
+      # "the shard still had files to start, so the floor cut a run that was
+      # working rather than one that was wedged. Read that as a shard too slow
+      # for the floor, not as a hang." Observed on main (run 32011... shard 2)
+      # as well as on pull requests, so it is intermittent rather than new.
+      #
+      # 12 minutes keeps the floor doing its job — a finalize wedge still gets
+      # cut well before the 25-minute job cap below, which is the outcome the
+      # floor exists to avoid — while leaving a healthy 5-minute shard alone.
+      LANGWATCH_UNIT_HARD_FLOOR_MS: "720000"
     runs-on: ubuntu-latest
     # No services, so nothing here can wedge on a container. The cap matches
     # test-unit's reasoning rather than test-integration's: a vitest finalize
