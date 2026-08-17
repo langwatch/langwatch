@@ -269,7 +269,7 @@ export class Microsoft365AuditPuller
       const events: NormalizedPullEvent[] = [];
       const working: Microsoft365AuditCursor = { ...cursor };
 
-      await this.pumpWindow({
+      const { completed } = await this.pumpWindow({
         config,
         tokens,
         options,
@@ -278,8 +278,15 @@ export class Microsoft365AuditPuller
         stats,
       });
 
+      // `completed` is load-bearing, not belt-and-braces. A run that was out
+      // of time before it listed anything leaves the cursor exactly as it
+      // found it — queue empty, nothing deferred — which is indistinguishable
+      // from a window worked to the end. Advancing on the cursor shape alone
+      // skips that interval permanently: no later run asks for it again.
       const drained =
-        working.blobQueue.length === 0 && working.nextPageUri === undefined;
+        completed &&
+        working.blobQueue.length === 0 &&
+        working.nextPageUri === undefined;
 
       if (drained) {
         // The window is genuinely complete, so the watermark may advance —
@@ -334,6 +341,12 @@ export class Microsoft365AuditPuller
    * returns a stable `nextpageuri` would recurse until the stack gave out. The
    * cap bounds it whether or not a deadline is set, and any remainder rides
    * the cursor to the next run.
+   *
+   * Returns whether the window was actually worked to completion. The caller
+   * cannot infer that from the cursor alone: an empty queue with nothing
+   * deferred is what a finished window looks like AND what an untouched one
+   * looks like, and treating the second as the first advances past an interval
+   * that was never listed.
    */
   private async pumpWindow({
     config,
@@ -349,9 +362,11 @@ export class Microsoft365AuditPuller
     cursor: Microsoft365AuditCursor;
     events: NormalizedPullEvent[];
     stats: Microsoft365AuditRunStats;
-  }): Promise<void> {
+  }): Promise<{ completed: boolean }> {
     for (let round = 0; round < MAX_LIST_DRAIN_ROUNDS_PER_RUN; round += 1) {
-      if (this.outOfTime(options)) return;
+      // Out of time before doing anything this round. Whatever is left of the
+      // window is still ahead of us, so it is emphatically not complete.
+      if (this.outOfTime(options)) return { completed: false };
 
       if (cursor.phase === "listing" || cursor.nextPageUri !== undefined) {
         await this.listContent({ config, tokens, options, cursor });
@@ -363,9 +378,14 @@ export class Microsoft365AuditPuller
       // still queued means the deadline stopped the drain, not the listing —
       // either way, going round again would not help.
       if (cursor.blobQueue.length > 0 || cursor.nextPageUri === undefined) {
-        return;
+        return {
+          completed:
+            cursor.blobQueue.length === 0 && cursor.nextPageUri === undefined,
+        };
       }
     }
+    // Round cap hit with work still deferred.
+    return { completed: false };
   }
 
   /**

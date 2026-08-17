@@ -464,3 +464,13 @@ Feature: microsoft_365_audit ingestion source (Office 365 Management Activity AP
     When the next run fires
     Then the window it claims is no wider than the configured maximum
     And the window is not empty
+
+  # An untouched cursor and a fully-drained one are the same shape: empty
+  # queue, nothing deferred. Advancing on that shape alone skipped the whole
+  # interval, and nothing ever asks for a skipped window again.
+  @unit @regression
+  Scenario: A window the run never listed is not advanced past
+    Given a run whose deadline had already passed when it started
+    When the run finishes without listing anything
+    Then it emits no events
+    And the window it was given is left in place for the next run
