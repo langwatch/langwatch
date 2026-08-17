@@ -6,6 +6,7 @@ import type { PrismaClient } from "~/generated/prisma/client";
 import { LLM_PARAMETER_MAP } from "~/prompts/prompt-playground/llmParameterMap";
 import { AnnotationService } from "~/server/annotations/annotation.service";
 import { annotationSuggestedOutput } from "~/server/annotations/annotationSuggestedOutput";
+import { resolveRetentionLookbackMs } from "~/server/app-layer/clients/clickhouse/retention-floor";
 import {
   DEFAULT_PARTITION_WINDOW_MS,
   queryWindowed,
@@ -17,6 +18,7 @@ import {
 import type { ExtractedIO } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import type { RetentionPolicyResolver } from "~/server/data-retention/retentionPolicyResolver";
 import { prisma as defaultPrisma } from "~/server/db";
 import {
   type ClickHouseEvaluationRunRow,
@@ -406,6 +408,11 @@ export class ClickHouseTraceService {
     private readonly prisma: PrismaClient,
     resolveTraceSpans?: ResolveTraceSpansFn,
     resolveTraceSpansBatch?: ResolveTraceSpansBatchFn,
+    /**
+     * Widens the span read's retention floor to this tenant's own policy.
+     * Optional: without it the floor stays at {@link SPAN_READ_FLOOR_LOOKBACK_MS}.
+     */
+    private readonly retentionResolver?: RetentionPolicyResolver,
   ) {
     this.resolveTraceSpans = resolveTraceSpans;
     this.resolveTraceSpansBatch = resolveTraceSpansBatch;
@@ -3230,7 +3237,19 @@ export class ClickHouseTraceService {
             windowMs: spanWindowMs,
             fallback: spanRange
               ? "none"
-              : { lookbackMs: SPAN_READ_FLOOR_LOOKBACK_MS },
+              : {
+                  // Per tenant, floored at the historical 90-day reach so this
+                  // can only widen. A project on a 400-day policy previously
+                  // got 90 days here and simply could not see its own older
+                  // spans; one on a short policy no longer pays for a reach it
+                  // has no rows in. See {@link resolveRetentionLookbackMs}.
+                  lookbackMs: await resolveRetentionLookbackMs({
+                    table: "stored_spans",
+                    tenantId: projectId,
+                    resolver: this.retentionResolver,
+                    minLookbackMs: SPAN_READ_FLOOR_LOOKBACK_MS,
+                  }),
+                },
             isEmpty: (rows) => rows.length === 0,
             run: async (window) => {
               // Always present now: a hint yields the hinted fragment, and the

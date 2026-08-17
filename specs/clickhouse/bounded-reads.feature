@@ -51,6 +51,14 @@ Feature: A read that cannot be pruned must still be bounded
     But the read is never made unbounded, because that is the failure being fixed
 
   @unit
+  Scenario: Replacing a hand-picked floor can only widen it
+    Given a read that already had a fixed retention floor
+    When that floor is replaced by the tenant-aware one
+    Then a tenant on a longer policy reaches further back than before
+    And a tenant on a shorter policy still reaches at least as far as before
+    So that adopting this cannot make an existing read miss rows it used to find
+
+  @unit
   Scenario: A caller with no resolver wired still gets a bounded read
     Given a repository constructed without a retention resolver
     When a read floor is resolved

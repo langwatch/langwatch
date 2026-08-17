@@ -44,16 +44,50 @@ export async function resolveRetentionFloorMs({
   table,
   tenantId,
   resolver,
+  minLookbackMs = 0,
   nowMs = Date.now(),
 }: {
   table: RetentionManagedTable;
   tenantId: string;
   /** Omit to use the platform default — every caller need not be rewired at once. */
   resolver?: RetentionPolicyResolver;
+  /**
+   * A lookback the floor is never tighter than, whatever retention resolves to.
+   *
+   * For callers replacing an existing hand-picked floor: keeps their previous
+   * reach as a guarantee while letting a longer tenant policy widen it.
+   */
+  minLookbackMs?: number;
   nowMs?: number;
 }): Promise<number> {
+  return (
+    nowMs -
+    (await resolveRetentionLookbackMs({
+      table,
+      tenantId,
+      resolver,
+      minLookbackMs,
+    }))
+  );
+}
+
+/**
+ * The same bound expressed as a duration, for the `{ lookbackMs }` fallback
+ * shape that `queryWindowed` takes.
+ */
+export async function resolveRetentionLookbackMs({
+  table,
+  tenantId,
+  resolver,
+  minLookbackMs = 0,
+}: {
+  table: RetentionManagedTable;
+  tenantId: string;
+  resolver?: RetentionPolicyResolver;
+  minLookbackMs?: number;
+}): Promise<number> {
   const days = await resolveRetentionDays({ table, tenantId, resolver });
-  return nowMs - days * DAY_MS - RETENTION_FLOOR_MARGIN_MS;
+  return Math.max(days * DAY_MS + RETENTION_FLOOR_MARGIN_MS, minLookbackMs);
 }
 
 async function resolveRetentionDays({

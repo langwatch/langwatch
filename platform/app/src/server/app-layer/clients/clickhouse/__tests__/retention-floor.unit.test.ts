@@ -9,6 +9,7 @@ import type { RetentionPolicyResolver } from "~/server/data-retention/retentionP
 import {
   RETENTION_FLOOR_MARGIN_MS,
   resolveRetentionFloorMs,
+  resolveRetentionLookbackMs,
 } from "../retention-floor";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -98,6 +99,34 @@ describe("resolving a retention floor for a read", () => {
       expect(lookbackMs(floor)).toBe(
         PLATFORM_DEFAULT_RETENTION_DAYS * DAY_MS + RETENTION_FLOOR_MARGIN_MS,
       );
+    });
+  });
+
+  describe("given a caller replacing an existing fixed floor", () => {
+    const NINETY_DAYS = 90 * DAY_MS;
+
+    /** @scenario "Replacing a hand-picked floor can only widen it" */
+    it("reaches further back for a tenant on a longer policy", async () => {
+      const lookback = await resolveRetentionLookbackMs({
+        table: "stored_spans",
+        tenantId: "project_long",
+        resolver: resolverReturning(400),
+        minLookbackMs: NINETY_DAYS,
+      });
+
+      expect(lookback).toBeGreaterThan(NINETY_DAYS);
+    });
+
+    /** @scenario "Replacing a hand-picked floor can only widen it" */
+    it("never reaches less far than the floor it replaced", async () => {
+      const lookback = await resolveRetentionLookbackMs({
+        table: "stored_spans",
+        tenantId: "project_short",
+        resolver: resolverReturning(7),
+        minLookbackMs: NINETY_DAYS,
+      });
+
+      expect(lookback).toBe(NINETY_DAYS);
     });
   });
 
