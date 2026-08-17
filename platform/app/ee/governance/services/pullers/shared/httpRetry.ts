@@ -117,19 +117,81 @@ export function parseRetryAfterMs(
   return Math.max(0, parsed - nowMs);
 }
 
-function isClientErrorMessage(error: unknown): boolean {
-  return (
-    error instanceof Error &&
-    /^HTTP 4\d{2}/.test(error.message) &&
-    !/^HTTP 429/.test(error.message)
-  );
+/** Cap on the error body kept for diagnosis. Enough for an API error code. */
+const MAX_ERROR_BODY_CHARS = 2_000;
+
+/**
+ * A non-2xx response, with the status and body kept as data.
+ *
+ * Callers need to tell one 4xx from another — the Management Activity API
+ * answers "subscription already enabled" with a 400 that is success, and
+ * "tenant does not exist" with a 400 that is not. Both are indistinguishable
+ * once flattened into a message string.
+ *
+ * `bodyText` is deliberately absent from `message`: the message travels into
+ * run errors and logs, and an upstream service is free to echo whatever it
+ * was sent back at us.
+ */
+export class HttpResponseError extends Error {
+  readonly status: number;
+  readonly statusText: string;
+  readonly url: string;
+  readonly bodyText: string;
+
+  constructor(args: {
+    status: number;
+    statusText: string;
+    url: string;
+    bodyText: string;
+  }) {
+    super(`HTTP ${args.status} ${args.statusText} (${args.url})`);
+    this.name = "HttpResponseError";
+    this.status = args.status;
+    this.statusText = args.statusText;
+    this.url = args.url;
+    this.bodyText = args.bodyText;
+  }
 }
 
 /**
- * Fetch with retry. Returns the response on success; throws on exhausted
- * retries, on a non-429 4xx, or `RetryDeadlineExceededError` when the
- * required wait would outlive the run.
+ * Read an error body without letting a huge one hurt us, and never fail the
+ * request because reading the explanation failed.
+ *
+ * Reading also settles the socket: an unconsumed body keeps its connection
+ * out of the pool until the GC gets to it, which is how a retry loop
+ * exhausts the pool.
  */
+async function readErrorBody(response: FetchResponse): Promise<string> {
+  try {
+    return (await response.text()).slice(0, MAX_ERROR_BODY_CHARS);
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Release a response we are not handing back. Same socket concern as above;
+ * cancelling is the documented way to say "not reading this".
+ */
+async function discardBody(response: FetchResponse): Promise<void> {
+  try {
+    await response.body?.cancel();
+  } catch {
+    // Already closed, or never had a body. Nothing to release.
+  }
+}
+
+function isFailFast(error: unknown): boolean {
+  // Asked of the error object, not of a message this module formatted a
+  // moment ago. 429 is a wait, every other 4xx is final.
+  return (
+    error instanceof HttpResponseError &&
+    error.status >= 400 &&
+    error.status < 500 &&
+    error.status !== 429
+  );
+}
+
 /**
  * What one response means for the retry loop: hand it back, or wait and try
  * again. A status that must not be retried throws from here rather than
@@ -139,19 +201,25 @@ type AttemptOutcome =
   | { kind: "done"; response: FetchResponse }
   | { kind: "retry"; error: Error; waitMs: number | null };
 
-function classifyResponse(
+async function classifyResponse(
   response: FetchResponse,
   url: string,
   nowMs: number,
-): AttemptOutcome {
+): Promise<AttemptOutcome> {
   if (response.status === 429) {
     const retryAfter = parseRetryAfterMs(
       response.headers.get("retry-after"),
       nowMs,
     );
+    await discardBody(response);
     return {
       kind: "retry",
-      error: new Error(`HTTP 429 ${response.statusText} (${url})`),
+      error: new HttpResponseError({
+        status: 429,
+        statusText: response.statusText,
+        url,
+        bodyText: "",
+      }),
       // Cap a server-supplied wait: an hour-long Retry-After is a "come back
       // next run" instruction, and the caller's deadline check turns it into
       // exactly that.
@@ -160,15 +228,27 @@ function classifyResponse(
     };
   }
   if (response.status >= 500) {
+    await discardBody(response);
     return {
       kind: "retry",
-      error: new Error(`HTTP ${response.status} ${response.statusText}`),
+      error: new HttpResponseError({
+        status: response.status,
+        statusText: response.statusText,
+        url,
+        bodyText: "",
+      }),
       waitMs: null,
     };
   }
   if (response.status >= 400) {
     // Every other 4xx fails fast — retrying a 401 or a 400 just repeats it.
-    throw new Error(`HTTP ${response.status} ${response.statusText} (${url})`);
+    // The body comes along because callers have to tell these apart.
+    throw new HttpResponseError({
+      status: response.status,
+      statusText: response.statusText,
+      url,
+      bodyText: await readErrorBody(response),
+    });
   }
   return { kind: "done", response };
 }
@@ -235,7 +315,7 @@ async function attemptOnce({
     body,
     signal: requestSignal,
   });
-  return classifyResponse(response, url, nowMs);
+  return await classifyResponse(response, url, nowMs);
 }
 
 /**
@@ -249,7 +329,7 @@ async function attemptOrRetry(
   try {
     return await attemptOnce(args);
   } catch (error) {
-    if (isClientErrorMessage(error)) throw error;
+    if (isFailFast(error)) throw error;
     return {
       kind: "retry",
       error: error instanceof Error ? error : new Error(String(error)),
