@@ -133,6 +133,18 @@ Feature: AI Gateway — transparent upstream error forwarding
   # of failure undiagnosable: 49 production occurrences carried a full
   # middleware stacktrace — identical every time, therefore worthless — and
   # nothing at all about what had failed.
+  # A failure we hand back as retryable is one attempt, not a verdict. Every SDK
+  # in front of us retries it, so a single user-visible failure produced three
+  # identical ERROR lines — which is how 49 of these came to say nothing useful
+  # while reading like an outage. The layer that gives up owns the error.
+  @bdd @error-transparency @unit
+  Scenario: A retryable failure is not logged as an error
+    Given a dispatch failure the caller will retry
+    When the failure is logged
+    Then the level is below error
+    And the fault is still attributed to us
+    So that only the layer that exhausts its retries reports a failed operation
+
   @bdd @error-transparency @unit
   Scenario: A failed request logs the reason chain, not just the bucket it fell into
     Given a request fails with an underlying cause the response body must not expose

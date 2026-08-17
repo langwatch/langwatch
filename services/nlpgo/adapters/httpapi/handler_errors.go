@@ -26,8 +26,23 @@ func handlerFault(code herr.Code) (string, zapcore.Level) {
 		domain.ErrUnsupportedNodeKind, domain.ErrUnauthorized, domain.ErrNotFound,
 		domain.ErrCodeBlockTimeout, domain.ErrSSRFBlocked:
 		return "customer", zapcore.InfoLevel
+	case domain.ErrGatewayUnavailable:
+		// Ours, but one attempt among several rather than a verdict: we hand the
+		// caller a retryable status and every SDK in front of us retries it. A
+		// single user-visible failure therefore produced three identical ERROR
+		// lines, which is how 49 of these came to say nothing useful while
+		// reading like an outage. The layer that gives up owns the error — the
+		// scenario runner logs one when it exhausts its retries — so this stays
+		// at WARN.
+		//
+		// Alerting consequence, deliberate: these no longer feed Error Spike,
+		// Error Rate Spike by Service or New Error Signature, and instead count
+		// toward Warning Spike, whose threshold is 300/5m. A genuine sustained
+		// gateway failure is now visible as a warn-rate change plus the callers'
+		// own terminal errors, not as an error spike from this line.
+		return "platform", zapcore.WarnLevel
 	default:
-		// internal_error, idle_timeout, gateway_unavailable, unknown.
+		// internal_error, idle_timeout, unknown.
 		return "platform", zapcore.ErrorLevel
 	}
 }

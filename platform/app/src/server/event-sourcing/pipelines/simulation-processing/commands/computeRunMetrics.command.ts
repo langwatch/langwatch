@@ -20,7 +20,20 @@ const logger = createLogger(
   "langwatch:simulation-processing:compute-run-metrics",
 );
 
-const MAX_RETRIES = 3;
+/**
+ * The pull ladder's total budget must outlast the trace-side publisher's
+ * settle debounce, or it is guaranteed to lose a race it is meant to win.
+ *
+ * The trace side (simulationMetricsSync.subscriber, SIMULATION_METRICS_SYNC_DELAY_MS)
+ * waits 60s of quiet on a trace before publishing its metrics. This ladder used
+ * to give up after 3 × 10s = 30s, i.e. always before the trace side had even
+ * been allowed to fire, and then logged an error saying the run would never
+ * have cost or latency. It usually did, moments later, from the other path — so
+ * the loudest line in this file was, structurally, almost always wrong.
+ *
+ * Kept comfortably past the debounce so a genuine give-up means something.
+ */
+const MAX_RETRIES = 9;
 export const COMPUTE_METRICS_RETRY_DELAY_MS = 10_000;
 
 export interface ComputeRunMetricsDeps {
@@ -112,12 +125,17 @@ export class ComputeRunMetricsCommand
             occurredAt: Date.now(),
           });
         } else {
-          // Error, not warn: giving up here means this run's cost and
-          // latency never exist. No later event repairs it — the retry was
-          // the only path — so a run silently carries no metrics forever.
-          // Logged with everything needed to find it, and with the window
-          // that was actually waited, because "the trace was slower than the
-          // budget" and "the trace never arrived" need different responses.
+          // Still an error, and the only one left in this file: a simulation
+          // run whose trace never produced a summary at all is a genuine
+          // anomaly, distinct from the branch below where the summary exists
+          // and honestly reports no cost. Logged with the window actually
+          // waited, because "the trace was slower than the budget" and "the
+          // trace never arrived" need different responses.
+          //
+          // The trace-side publisher can still repair this if the trace shows
+          // up later (simulationMetricsSync.subscriber dispatches on settle),
+          // so this is not necessarily terminal — but nothing schedules
+          // another attempt from here.
           logger.error(
             {
               tenantId,
@@ -166,20 +184,33 @@ export class ComputeRunMetricsCommand
             retryCount: data.retryCount + 1,
             occurredAt: Date.now(),
           });
-        } else {
-          logger.error(
-            {
-              tenantId,
-              scenarioRunId,
-              traceId,
-              attempts: MAX_RETRIES,
-              waitedMs: MAX_RETRIES * COMPUTE_METRICS_RETRY_DELAY_MS,
-            },
-            "Gave up computing trace metrics: the trace summary stayed empty, so this run has no cost or latency",
-          );
+          return [];
         }
 
-        return [];
+        // Not a failure, and no longer logged as one. A simulation trace can
+        // legitimately carry spans that have no cost and no role timing at all
+        // — an SDK-driven run whose agent executes on the customer's own
+        // infrastructure and never reports LLM spans to us is the common case,
+        // and no amount of waiting will conjure a cost that was never sent.
+        // Retrying to exhaustion and then logging an error taught us nothing
+        // and fired ~122 times a day.
+        //
+        // Falling through emits the event with what the trace actually has,
+        // which for this branch is zero cost and no role timing. That records
+        // "this run has no cost" as a fact instead of leaving the run
+        // indistinguishable from one whose metrics we lost. The fold reports
+        // TotalCost as null when the total is zero, so a costless run still
+        // renders as "no cost" rather than a misleading $0.00.
+        logger.info(
+          {
+            tenantId,
+            scenarioRunId,
+            traceId,
+            attempts: MAX_RETRIES,
+            waitedMs: MAX_RETRIES * COMPUTE_METRICS_RETRY_DELAY_MS,
+          },
+          "Trace reported no cost or role timing; recording the run as costless",
+        );
       }
 
       metrics = {
