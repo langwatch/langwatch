@@ -142,6 +142,19 @@ describe("SCIM group PATCH membership", () => {
         expect(prisma.groupMembership.deleteMany).not.toHaveBeenCalled();
       });
     });
+
+    // An array is an object, so a bare-array value is the one shape where
+    // "does this carry a member list" could quietly answer yes: `"members" in
+    // []` is false, and the operation is correctly read as naming nothing.
+    describe("when its value is a bare array rather than an attribute object", () => {
+      it("leaves the group's membership untouched", async () => {
+        await patchGroup([
+          { op: "replace", value: [{ value: "user-1" }] },
+        ]);
+
+        expect(prisma.groupMembership.deleteMany).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe("given a replace operation that names an empty member list", () => {
