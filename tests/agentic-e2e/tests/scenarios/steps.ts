@@ -206,6 +206,54 @@ export async function thenCriterionAppearsInList(page: Page, criterion: string) 
 }
 
 /**
+ * When I fill in "Maximum turns" with "<value>"
+ * An empty value clears the cap back to the default.
+ * Unlike Name/Situation, this field has a real Field.Label association,
+ * so getByLabel works.
+ */
+export async function whenIFillInMaximumTurnsWith(page: Page, value: string) {
+  await page.getByLabel("Maximum turns").last().fill(value);
+}
+
+/**
+ * Then the "Maximum turns" field shows "<value>"
+ * An empty value means the scenario runs with the default cap.
+ */
+export async function thenMaximumTurnsShows(page: Page, value: string) {
+  await expect(page.getByLabel("Maximum turns").last()).toHaveValue(value);
+}
+
+/**
+ * When I archive "<name>" from the list, when it exists
+ * Guarded so a cleanup block can call it even when the create step never
+ * ran — with nothing to archive it returns without failing.
+ */
+export async function whenIArchiveScenarioFromListIfPresent(
+  page: Page,
+  name: string
+) {
+  const actionsButton = page.getByRole("button", {
+    name: `Actions for ${name}`,
+  });
+  const present = await actionsButton
+    .waitFor({ state: "visible", timeout: 10000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!present) return;
+
+  await actionsButton.click();
+  await page.getByRole("menuitem", { name: "Archive" }).last().click();
+  await page
+    .getByRole("button", { name: "Archive", exact: true })
+    .last()
+    .click();
+  // The confirm dialog renders the scenario name too, so assert on the
+  // table row — a bare getByText(name) resolves two elements and trips
+  // strict mode while the dialog is still mounted.
+  await expect(page.getByRole("row", { name })).toBeHidden();
+}
+
+/**
  * When I click "Save"
  * Handles the "Save and Run" popover by clicking "Save without running"
  */

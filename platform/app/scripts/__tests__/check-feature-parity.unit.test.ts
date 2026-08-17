@@ -34,6 +34,7 @@ import {
   discoverFeatureFiles,
   isEntryModule,
   isInert,
+  TEST_FILE_RE,
 } from "../check-feature-parity";
 
 let root = "";
@@ -289,6 +290,33 @@ describe("isInert", () => {
         // Nothing was claimed, so nothing is being overclaimed.
         expect(isInert({ scenarios: [], totalScenarios: 0 })).toBe(false);
       });
+    });
+  });
+});
+
+describe("TEST_FILE_RE", () => {
+  // Playwright happy-path specs use `.spec.ts`; widening the regex to
+  // accept them is a binding-policy change, so the accepted and rejected
+  // shapes are pinned here.
+  describe("given vitest and playwright test file names", () => {
+    it.each([
+      "foo.test.ts",
+      "foo.test.tsx",
+      "foo.spec.ts",
+      "foo.spec.tsx",
+    ])("matches %s", (name) => {
+      expect(TEST_FILE_RE.test(name)).toBe(true);
+    });
+  });
+
+  describe("given plain source file names", () => {
+    it.each([
+      "foo.ts",
+      "foo.tsx",
+      "foo.spec.ts.bak",
+      "spec.ts",
+    ])("does not match %s", (name) => {
+      expect(TEST_FILE_RE.test(name)).toBe(false);
     });
   });
 });

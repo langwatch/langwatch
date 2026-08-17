@@ -49,3 +49,12 @@ export const CHILD_PROCESS = {
  * only truth — nothing derives STALLED at read time anymore.
  */
 export const STALL_THRESHOLD_MS = CHILD_PROCESS.TIMEOUT_MS * 2;
+
+/**
+ * Turn cap the scenario engine uses when a scenario sets none. Mirrors the
+ * @langwatch/scenario SDK default. Used only in copy and hints, never sent.
+ */
+export const DEFAULT_SCENARIO_MAX_TURNS = 10;
+
+/** Upper bound for a per-scenario turn cap. Keeps run cost bounded. */
+export const MAX_SCENARIO_MAX_TURNS = 50;

@@ -16,6 +16,8 @@
  * @see specs/scenarios/simulation-run-model-resolution.feature
  *   ("A job payload missing every model params field fails at schema
  *   parse", "An older job payload shape still parses and runs")
+ * @see specs/scenarios/scenario-max-turns.feature
+ *   ("A job queued before the turn cap existed still runs")
  */
 import { describe, expect, it } from "vitest";
 
@@ -124,6 +126,53 @@ describe("ChildProcessJobDataSchema", () => {
       const roleModelParams = selectRoleModelParams(result.data);
       expect(roleModelParams.simulator).toEqual(litellmParams);
       expect(roleModelParams.judge).toEqual(litellmParams);
+    });
+  });
+
+  describe("given a job payload serialized before the turn cap existed", () => {
+    // Frozen literal — the scenario shape a worker queued before maxTurns
+    // was introduced. Queued jobs straddle a deploy, so this is the payload
+    // a freshly-deployed child process actually meets.
+    const preTurnCapPayload = {
+      ...basePayload,
+      modelParams: litellmParams,
+    };
+
+    /** @scenario "A job queued before the turn cap existed still runs" */
+    it("parses, with no turn cap so the SDK default applies", () => {
+      const result = ChildProcessJobDataSchema.safeParse(preTurnCapPayload);
+      expect(result.success).toBe(true);
+      if (!result.success) {
+        expect.fail("expected the pre-turn-cap payload to parse");
+        return;
+      }
+      expect(result.data.scenario.maxTurns).toBeUndefined();
+    });
+  });
+
+  describe("given a job payload carrying a turn cap on the scenario", () => {
+    /** @scenario "A scenario's turn cap is carried into the run" */
+    it("parses and keeps the cap on the scenario config", () => {
+      const result = ChildProcessJobDataSchema.safeParse({
+        ...basePayload,
+        scenario: { ...scenario, maxTurns: 2 },
+        modelParams: litellmParams,
+      });
+      expect(result.success).toBe(true);
+      if (!result.success) {
+        expect.fail("expected the payload with a turn cap to parse");
+        return;
+      }
+      expect(result.data.scenario.maxTurns).toBe(2);
+    });
+
+    it("rejects a cap below 1", () => {
+      const result = ChildProcessJobDataSchema.safeParse({
+        ...basePayload,
+        scenario: { ...scenario, maxTurns: 0 },
+        modelParams: litellmParams,
+      });
+      expect(result.success).toBe(false);
     });
   });
 

@@ -706,6 +706,84 @@ describe("prefetchScenarioData", () => {
     });
   });
 
+  describe("turn cap propagation", () => {
+    const httpAgent = {
+      id: "agent_http",
+      type: "http" as const,
+      name: "HTTP Agent",
+      projectId: "proj_123",
+      config: {
+        url: "https://api.example.com/chat",
+        method: "POST",
+        headers: [],
+      },
+      workflowId: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      archivedAt: null,
+    };
+    const httpTarget: TargetConfig = {
+      type: "http",
+      referenceId: "agent_http",
+    };
+
+    describe("given a scenario with a maximum turns value", () => {
+      describe("when prefetching the run data", () => {
+        /** @scenario "A scenario's turn cap is carried into the run" */
+        it("carries the turn cap on the serialized scenario config", async () => {
+          const deps = createMockDeps({
+            scenarioFetcher: {
+              getById: vi.fn().mockResolvedValue({
+                ...defaultScenario,
+                maxTurns: 3,
+              }),
+            },
+            agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
+          });
+
+          const result = await prefetchScenarioData({
+            context: defaultContext,
+            target: httpTarget,
+            deps,
+          });
+
+          expect(result.success).toBe(true);
+          if (result.success) {
+            expect(result.data.scenario.maxTurns).toBe(3);
+          }
+        });
+      });
+    });
+
+    describe("given a scenario with no maximum turns value", () => {
+      describe("when prefetching the run data", () => {
+        /** @scenario "A scenario without a turn cap runs with the engine default" */
+        it("leaves the turn cap undefined so the SDK default applies", async () => {
+          const deps = createMockDeps({
+            scenarioFetcher: {
+              getById: vi.fn().mockResolvedValue({
+                ...defaultScenario,
+                maxTurns: null,
+              }),
+            },
+            agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
+          });
+
+          const result = await prefetchScenarioData({
+            context: defaultContext,
+            target: httpTarget,
+            deps,
+          });
+
+          expect(result.success).toBe(true);
+          if (result.success) {
+            expect(result.data.scenario.maxTurns).toBeUndefined();
+          }
+        });
+      });
+    });
+  });
+
   describe("error handling", () => {
     describe("given scenario does not exist", () => {
       describe("when prefetching scenario data", () => {
