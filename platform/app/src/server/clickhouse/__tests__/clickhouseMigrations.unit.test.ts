@@ -40,7 +40,7 @@ describe("ClickHouse migrations", () => {
       resolve(
         process.cwd(),
         "src/server/clickhouse/migrations",
-        "00077_gateway_budget_scope_totals_exclude_pulled.sql",
+        "00082_gateway_budget_scope_totals_exclude_pulled.sql",
       ),
       "utf8",
     );
