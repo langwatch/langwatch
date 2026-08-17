@@ -15,6 +15,7 @@ import {
   partitionIntegrationFiles,
   toIncludePatterns,
 } from "./src/test-utils/integrationLanes";
+import { INTEGRATION_FILES_SHARE_MODULE_GRAPH } from "./src/test-utils/integrationModuleGraph";
 import WeightBalancedSequencer from "./vitest.sequencer";
 
 config();
@@ -138,6 +139,20 @@ export default defineConfig({
     // between files instead of relying on a fresh module graph to provide one.
     // That is a real change to the test harness and belongs in its own PR,
     // where the failures it causes are the subject rather than collateral.
+    //
+    // That PR was attempted, and it found the paragraph above is only half the
+    // story. The teardown IS a blocker and is now fixed — `setup.ts` is a setup
+    // FILE, so its `afterAll` runs per test file and was disconnecting the very
+    // Prisma and Redis singletons a shared graph exists to keep. With that
+    // corrected the sharing works and the numbers are large (app/api: 138.8s ->
+    // 43.9s, import -84%).
+    //
+    // It is still off, because the remaining blocker is `vi.mock` and no
+    // teardown reaches it: 123 of 414 integration files mock a module, and a
+    // hoisted mock cannot apply to a registry an earlier file already
+    // populated. The full reasoning, the measurements and the partition that
+    // would work are in src/test-utils/integrationModuleGraph.ts.
+    isolate: !INTEGRATION_FILES_SHARE_MODULE_GRAPH,
     // Same weight-balanced split as the unit config: equal file counts are not
     // equal work, and a matrix is only as fast as its slowest leg.
     sequence: { sequencer: WeightBalancedSequencer },
