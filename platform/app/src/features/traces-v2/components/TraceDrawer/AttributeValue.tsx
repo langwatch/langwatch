@@ -1,6 +1,5 @@
 import {
   Box,
-  Button,
   chakra,
   HStack,
   Icon,
@@ -34,6 +33,7 @@ import {
   stringifyForCopy,
   tryParseJson,
 } from "./attributeFormat";
+import { FormatSelect } from "./FormatSelect";
 import { safePrettyJson } from "./JsonHighlight";
 import { ShikiCodeBlock } from "./markdownView";
 
@@ -240,6 +240,10 @@ function FormatToggle({
   active: AttributeFormat;
   onChange: (next: AttributeFormat | null) => void;
 }) {
+  // `json-string` is a detection result, not an option the reader picks: it
+  // renders through the JSON option, so it has to read as JSON here or the
+  // selector would fall through to the first option instead.
+  const value = active === "json-string" ? "json" : active;
   return (
     <HStack gap={1} flexShrink={0}>
       <Text
@@ -251,24 +255,15 @@ function FormatToggle({
       >
         Format
       </Text>
-      {OVERRIDE_OPTIONS.map((opt) => {
-        const selected =
-          active === opt.format ||
-          (opt.format === "json" && active === "json-string");
-        return (
-          <Button
-            key={opt.format}
-            size="2xs"
-            variant={selected ? "solid" : "ghost"}
-            colorPalette={selected ? "blue" : undefined}
-            onClick={() => onChange(opt.format)}
-            paddingX={2}
-            fontWeight="medium"
-          >
-            {opt.label}
-          </Button>
-        );
-      })}
+      <FormatSelect
+        value={value}
+        onChange={(next) => onChange(next as AttributeFormat)}
+        options={OVERRIDE_OPTIONS.map((opt) => ({
+          value: opt.format,
+          label: opt.label,
+        }))}
+        ariaLabel="Attribute value format"
+      />
     </HStack>
   );
 }

@@ -7,8 +7,9 @@ Feature: Trace drawer input and output toolbar
   being cut off.
 
   The same format selector is the one control for view modes wherever the
-  drawer offers several: the conversation view (thread, bubbles, markdown)
-  and the span attributes table (flat, JSON) use it too.
+  drawer offers several: the conversation view (thread, bubbles, markdown),
+  the span attributes table (flat, JSON) and a single attribute value
+  (chat, JSON, text) use it too.
 
   @integration
   Scenario: One selector holds the view formats

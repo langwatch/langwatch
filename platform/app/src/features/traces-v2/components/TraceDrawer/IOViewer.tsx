@@ -272,6 +272,91 @@ type IOAction = {
   render: () => React.ReactNode;
 };
 
+/**
+ * The toolbar actions a panel offers, in render order.
+ *
+ * Each action keeps its real component mounted even while collapsed, so
+ * popover wiring and permission gates live in one place and picking the
+ * action out of the overflow menu clicks the same control.
+ */
+function buildIOActions({
+  translation,
+  traceId,
+  fieldAnchor,
+  originalContent,
+  showComment,
+  showSuggest,
+  playgroundHref,
+}: {
+  translation: ReturnType<typeof useTextTranslation>;
+  traceId: string | undefined;
+  fieldAnchor: TraceAnchor | null;
+  originalContent: string;
+  showComment: boolean;
+  showSuggest: boolean;
+  playgroundHref: string;
+}): IOAction[] {
+  const actions: IOAction[] = [
+    {
+      id: "translate",
+      menuLabel: translation.isLoading
+        ? "Translating…"
+        : translation.isActive
+          ? "Show original"
+          : "Translate",
+      menuIcon: LuLanguages,
+      disabled: translation.isLoading,
+      render: () => (
+        <TranslateButton
+          isActive={translation.isActive}
+          isLoading={translation.isLoading}
+          onToggle={translation.toggle}
+        />
+      ),
+    },
+  ];
+
+  if (traceId && fieldAnchor && showComment) {
+    actions.push({
+      id: "comment",
+      menuLabel: "Comment",
+      menuIcon: LuMessageSquare,
+      render: () => (
+        <FieldCommentButton traceId={traceId} anchor={fieldAnchor} />
+      ),
+    });
+  }
+
+  if (traceId && fieldAnchor && showSuggest) {
+    actions.push({
+      id: "suggest",
+      menuLabel: "Suggest edit",
+      menuIcon: LuLightbulb,
+      // Every field this viewer shows is one a correction can replace, the
+      // trace's own input included. Corrections must be stored against the
+      // REAL text, never the translated variant the viewer happens to show.
+      render: () => (
+        <SuggestCorrectionButton
+          traceId={traceId}
+          output={originalContent}
+          anchor={fieldAnchor}
+        />
+      ),
+    });
+  }
+
+  if (playgroundHref) {
+    actions.push({
+      id: "playground",
+      menuLabel: "Open in Playground",
+      menuIcon: LuPlay,
+      render: () => <PlaygroundButton href={playgroundHref} />,
+    });
+  }
+
+  return actions;
+}
+
 export const IOViewer = memo(function IOViewer({
   label,
   content: originalContent,
@@ -464,80 +549,29 @@ export const IOViewer = memo(function IOViewer({
       ? (buildUrl(spanId)?.toString() ?? "")
       : "";
 
-  // The toolbar actions, in render order. On a narrow drawer the ones that
-  // no longer fit collapse — suffix first — into the three-dot overflow
-  // menu, the same element the span tab strip uses. Each action keeps its
-  // real component mounted (collapsed to zero width) so popover wiring and
-  // permission gates live in one place; picking an action from the menu
-  // clicks the real control.
-  const actions = useMemo<IOAction[]>(() => {
-    const list: IOAction[] = [
-      {
-        id: "translate",
-        menuLabel: translation.isLoading
-          ? "Translating…"
-          : translation.isActive
-            ? "Show original"
-            : "Translate",
-        menuIcon: LuLanguages,
-        disabled: translation.isLoading,
-        render: () => (
-          <TranslateButton
-            isActive={translation.isActive}
-            isLoading={translation.isLoading}
-            onToggle={translation.toggle}
-          />
-        ),
-      },
-    ];
-    if (traceId && fieldAnchor && showComment) {
-      list.push({
-        id: "comment",
-        menuLabel: "Comment",
-        menuIcon: LuMessageSquare,
-        render: () => (
-          <FieldCommentButton traceId={traceId} anchor={fieldAnchor} />
-        ),
-      });
-    }
-    if (traceId && fieldAnchor && showSuggest) {
-      list.push({
-        id: "suggest",
-        menuLabel: "Suggest edit",
-        menuIcon: LuLightbulb,
-        // Every field this viewer shows is one a correction can replace,
-        // the trace's own input included. Corrections must be stored
-        // against the REAL text, never the translated variant the viewer
-        // happens to be showing.
-        render: () => (
-          <SuggestCorrectionButton
-            traceId={traceId}
-            output={originalContent}
-            anchor={fieldAnchor}
-          />
-        ),
-      });
-    }
-    if (playgroundHref) {
-      list.push({
-        id: "playground",
-        menuLabel: "Open in Playground",
-        menuIcon: LuPlay,
-        render: () => <PlaygroundButton href={playgroundHref} />,
-      });
-    }
-    return list;
-  }, [
-    translation.isActive,
-    translation.isLoading,
-    translation.toggle,
-    traceId,
-    fieldAnchor,
-    showComment,
-    showSuggest,
-    originalContent,
-    playgroundHref,
-  ]);
+  // On a narrow drawer the actions that no longer fit collapse into the
+  // three-dot overflow menu, the same element the span tab strip uses.
+  const actions = useMemo(
+    () =>
+      buildIOActions({
+        translation,
+        traceId,
+        fieldAnchor,
+        originalContent,
+        showComment,
+        showSuggest,
+        playgroundHref,
+      }),
+    [
+      translation,
+      traceId,
+      fieldAnchor,
+      originalContent,
+      showComment,
+      showSuggest,
+      playgroundHref,
+    ],
+  );
 
   // Stable by VALUE, not reference: `actions` rebuilds on unrelated renders
   // (translation state identity churns), and `useOverflowVisibility` resets
