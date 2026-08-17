@@ -1,9 +1,17 @@
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import type { ProcessManagerApplier } from "~/server/event-sourcing/pipeline/processBuilder";
-import type { IntentContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
+import type {
+  IntentContext,
+  IntentSpec,
+  WakeHandler,
+} from "~/server/event-sourcing/pipeline/processManagerDefinition";
+// TYPE-only, deliberately. A value import from the repository pulls the
+// ClickHouse client into this module's graph, and this module is reached from
+// the pipeline registry that several suites mock — which turns a
+// `vi.mock` factory into a hoisting failure. Nothing here needs the
+// repository at runtime: the sweep's bounds arrive as deps.
 import type { OpenAdmission } from "../repositories/openAdmissions.clickhouse.repository";
-import { SETTLEMENT_LOOKBACK_MS } from "../repositories/openAdmissions.clickhouse.repository";
 import type { SettleSpendCommandData } from "../schemas/commands";
 import type { GatewaySpendProcessingEvent } from "../schemas/events";
 
@@ -31,6 +39,21 @@ export const SETTLEMENT_GRACE_MS_DEFAULT = 30 * 60 * 1000;
  * grace while keeping each sweep's scan small.
  */
 export const SETTLEMENT_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
+
+/**
+ * How far back a sweep looks.
+ *
+ * `OccurredAt` is the spend table's partition key, so this bound is what keeps
+ * the scan on the two most recent partitions instead of every month in the
+ * 13-month retention, including the cold ones on object storage.
+ *
+ * Seven days is far past any grace an operator can configure, so the only
+ * rows it excludes are ones a sweep already had many chances to settle. An
+ * admission older than this stays visible as `admitted` in the spend record,
+ * which is what already happened to anything the previous per-request timer
+ * missed.
+ */
+export const SETTLEMENT_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** Operator override, epoch-milliseconds. Bounded below so a typo cannot
  *  turn every in-flight request into a settlement storm. */
@@ -76,6 +99,30 @@ export interface SpendSettlementProcessDeps {
 
 const sweepSchema = z.object({
   scheduledFor: z.number().int(),
+});
+
+type SpendSettlementIntents = {
+  sweep: IntentSpec<typeof sweepSchema>;
+};
+
+/**
+ * Arms the next sweep and hands the work to the outbox.
+ *
+ * Declared out here with an explicit intents type rather than inline in the
+ * applier, the same way every other scheduled process does it: the builder
+ * infers a wake handler's intents from the handler itself, so an inline one
+ * types `ctx.intents.sweep` as possibly-undefined and cannot be called.
+ *
+ * Wake handlers must be pure and synchronous — the commit that persists this
+ * evolution is what fences racing workers — so the query and the sends run
+ * behind the outbox lease as an intent instead.
+ */
+export const spendSettlementWake: WakeHandler<
+  SpendSettlementState,
+  SpendSettlementIntents
+> = (state, ctx) => ({
+  state: { ...state, lastSweepAt: ctx.at },
+  intents: [ctx.intents.sweep(`sweep:${ctx.at}`, { scheduledFor: ctx.at })],
 });
 
 /**
@@ -171,15 +218,7 @@ export function spendSettlementPM(
     pm
       .state<SpendSettlementState>(INITIAL_SPEND_SETTLEMENT_STATE)
       .schedule({ everyMs: SETTLEMENT_SWEEP_INTERVAL_MS })
-      // Wake handlers must be pure and synchronous — the commit that
-      // persists this evolution is what fences racing workers — so the query
-      // and the sends run behind the outbox lease as an intent instead.
-      .onWake((state, ctx) => ({
-        state: { ...state, lastSweepAt: ctx.at },
-        intents: [
-          ctx.intents.sweep(`sweep:${ctx.at}`, { scheduledFor: ctx.at }),
-        ],
-      }))
+      .onWake(spendSettlementWake)
       .intent("sweep", sweepSchema, runSweep(deps))
       .outbox({
         maxAttempts: 3,

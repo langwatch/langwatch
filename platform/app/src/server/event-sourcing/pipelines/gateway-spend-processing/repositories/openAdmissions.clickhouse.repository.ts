@@ -15,20 +15,6 @@ const TABLE_NAME = "gateway_spend" as const;
  */
 
 /**
- * How far back a sweep looks. `OccurredAt` is the partition key
- * (`toYYYYMM`), so a bound here is what keeps the scan on the two most
- * recent partitions instead of every month in the 13-month retention,
- * including the cold ones on object storage.
- *
- * Seven days is far past any grace an operator can configure, so the only
- * rows it excludes are ones a sweep already had many chances to settle. An
- * admission older than this stays visible as `admitted` in the spend record,
- * which is the same thing that happened to anything the old per-request
- * timer missed.
- */
-export const SETTLEMENT_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
-
-/**
  * Sanity cap on one sweep. The steady-state population is the handful of
  * requests whose confirmation genuinely never arrived; a result this large
  * means something upstream stopped confirming, and settling a hundred

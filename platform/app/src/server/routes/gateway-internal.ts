@@ -1079,6 +1079,43 @@ async function touchAdmittedVirtualKeys(
  * and an event is immutable once appended, so it propagates to a 500 and the
  * drainer retries the whole batch.
  */
+/**
+ * What the control plane could not resolve for one admission, reported and
+ * never dropped.
+ *
+ * The record is already durable on the gateway's side, and discarding an
+ * admission loses the outcome that follows it, so each of these is a
+ * control-plane inconsistency to chase rather than a reason to lose billing
+ * evidence.
+ */
+function reportAttributionGaps({
+  identity,
+  key,
+  teamId,
+}: {
+  identity: ReturnType<typeof attributedIdentity>;
+  key: AttributionVirtualKey | undefined;
+  teamId: string;
+}): void {
+  if (!key) {
+    logger.error(
+      identity,
+      "spend admission names a virtual key that no longer exists: principal and group budgets will not see this request",
+    );
+  } else if (key.organizationId !== identity.organizationId) {
+    logger.error(
+      { ...identity, keyOrganizationId: key.organizationId },
+      "spend admission names a virtual key from another organization",
+    );
+  }
+  if (!teamId) {
+    logger.error(
+      identity,
+      "spend admission names a project with no team: team budgets will not see this request",
+    );
+  }
+}
+
 async function enrichAttributedCommands({
   admits,
   outcomes,
@@ -1127,27 +1164,7 @@ async function enrichAttributedCommands({
     // Only the admission reports these. An outcome names the same key and
     // the same project, so reporting both would say everything twice.
     if (index < admits.length) {
-      if (!key) {
-        logger.error(
-          identity,
-          "spend admission names a virtual key that no longer exists: principal and group budgets will not see this request",
-        );
-      } else if (key.organizationId !== identity.organizationId) {
-        // Logged, not dropped. The record is already durable on the gateway's
-        // side, and a discarded admission loses the outcome that follows it;
-        // the mismatch is a control-plane inconsistency to chase, not a reason
-        // to lose billing evidence.
-        logger.error(
-          { ...identity, keyOrganizationId: key.organizationId },
-          "spend admission names a virtual key from another organization",
-        );
-      }
-      if (!teamId) {
-        logger.error(
-          identity,
-          "spend admission names a project with no team: team budgets will not see this request",
-        );
-      }
+      reportAttributionGaps({ identity, key, teamId });
     }
     command.principal_user_id = key?.principalUserId ?? "";
     command.team_id = teamId;

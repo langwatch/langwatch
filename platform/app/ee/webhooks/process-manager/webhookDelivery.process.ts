@@ -1034,6 +1034,52 @@ function attributionFromOutcome(
   };
 }
 
+/** What an outcome handler needs from the process context. */
+interface DeliverOutcomeContext<Intent> {
+  projectId: string;
+  intents: { deliver: (key: string, payload: DeliverPayload) => Intent };
+}
+
+/**
+ * One outcome, routed by what it can see. All three route identically, so
+ * they share this rather than repeating it with a different payload builder.
+ *
+ * An outcome that states its own attribution freezes its deliver intent
+ * immediately and leaves the state untouched, so the evolution is transient
+ * and the request costs no durable row. One that does not falls back to the
+ * admission this instance remembered: stashed until admission arrives,
+ * released by it after.
+ */
+function onSpendOutcome<
+  Intent,
+  Data extends
+    | ConfirmSpendCommandData
+    | FailSpendCommandData
+    | SettleSpendCommandData,
+>({
+  state,
+  ctx,
+  status,
+  data,
+  toPayload,
+}: {
+  state: WebhookDeliveryState;
+  ctx: DeliverOutcomeContext<Intent>;
+  status: DeliverPayload["status"];
+  data: Data;
+  toPayload: (data: Data, instance: DeliverInstance) => DeliverPayload;
+}): { state: WebhookDeliveryState; intents?: Intent[] } {
+  const attribution = attributionFromOutcome(data) ?? state.attribution;
+  const payload = toPayload(data, { projectId: ctx.projectId, attribution });
+  if (attribution === null) {
+    return { state: withStashedOutcome(state, payload) };
+  }
+  return {
+    state,
+    intents: [ctx.intents.deliver(`deliver:${status}`, payload)],
+  };
+}
+
 function attributionFrom(data: AdmitSpendCommandData): SpendAttribution {
   return {
     organization_id: data.organization_id,
@@ -1091,53 +1137,33 @@ export function webhookDeliveryPM(
           ],
         };
       })
-      .on(GATEWAY_SPEND_CONFIRMED_EVENT_TYPE, (state, data, ctx) => {
-        const confirmed = data as ConfirmSpendCommandData;
-        const attribution =
-          attributionFromOutcome(confirmed) ?? state.attribution;
-        const payload = confirmedDeliverPayload(confirmed, {
-          projectId: ctx.projectId,
-          attribution,
-        });
-        if (attribution === null) {
-          return { state: withStashedOutcome(state, payload) };
-        }
-        return {
+      .on(GATEWAY_SPEND_CONFIRMED_EVENT_TYPE, (state, data, ctx) =>
+        onSpendOutcome({
           state,
-          intents: [ctx.intents.deliver("deliver:confirmed", payload)],
-        };
-      })
-      .on(GATEWAY_SPEND_FAILED_EVENT_TYPE, (state, data, ctx) => {
-        const failed = data as FailSpendCommandData;
-        const attribution = attributionFromOutcome(failed) ?? state.attribution;
-        const payload = failedDeliverPayload(failed, {
-          projectId: ctx.projectId,
-          attribution,
-        });
-        if (attribution === null) {
-          return { state: withStashedOutcome(state, payload) };
-        }
-        return {
+          ctx,
+          status: "confirmed",
+          data: data as ConfirmSpendCommandData,
+          toPayload: confirmedDeliverPayload,
+        }),
+      )
+      .on(GATEWAY_SPEND_FAILED_EVENT_TYPE, (state, data, ctx) =>
+        onSpendOutcome({
           state,
-          intents: [ctx.intents.deliver("deliver:failed", payload)],
-        };
-      })
-      .on(GATEWAY_SPEND_SETTLED_EVENT_TYPE, (state, data, ctx) => {
-        const settled = data as SettleSpendCommandData;
-        const attribution =
-          attributionFromOutcome(settled) ?? state.attribution;
-        const payload = settledDeliverPayload(settled, {
-          projectId: ctx.projectId,
-          attribution,
-        });
-        if (attribution === null) {
-          return { state: withStashedOutcome(state, payload) };
-        }
-        return {
+          ctx,
+          status: "failed",
+          data: data as FailSpendCommandData,
+          toPayload: failedDeliverPayload,
+        }),
+      )
+      .on(GATEWAY_SPEND_SETTLED_EVENT_TYPE, (state, data, ctx) =>
+        onSpendOutcome({
           state,
-          intents: [ctx.intents.deliver("deliver:settled", payload)],
-        };
-      })
+          ctx,
+          status: "settled",
+          data: data as SettleSpendCommandData,
+          toPayload: settledDeliverPayload,
+        }),
+      )
       // Endpoint streams arm wakes for their coalescing deadlines; the
       // wake hands the flush to the I/O executor.
       .onWake((state, ctx) => {
