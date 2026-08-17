@@ -1,6 +1,6 @@
 {
-  "updatedAt": "2026-08-16T07:52:17.138Z",
-  "modelCount": 436,
+  "updatedAt": "2026-08-17T02:30:49.486Z",
+  "modelCount": 441,
   "models": {
     "qwen/qwen3.8-27b": {
       "id": "qwen/qwen3.8-27b",
@@ -8,7 +8,8 @@
       "provider": "qwen",
       "pricing": {
         "inputCostPerToken": 4.5e-7,
-        "outputCostPerToken": 0.0000032
+        "outputCostPerToken": 0.0000032,
+        "inputCacheReadPerToken": 5e-8
       },
       "contextLength": 262144,
       "maxCompletionTokens": 131072,
@@ -255,9 +256,9 @@
       "name": "DeepSeek: DeepSeek V4 Pro 0813",
       "provider": "deepseek",
       "pricing": {
-        "inputCostPerToken": 4.35e-7,
-        "outputCostPerToken": 8.7e-7,
-        "inputCacheReadPerToken": 3.625e-9
+        "inputCostPerToken": 0.00000132,
+        "outputCostPerToken": 0.00000396,
+        "inputCacheReadPerToken": 4.4e-8
       },
       "contextLength": 1048576,
       "maxCompletionTokens": 384000,
@@ -339,12 +340,12 @@
       "name": "NVIDIA: Nemotron 3.5 Lightning",
       "provider": "nvidia",
       "pricing": {
-        "inputCostPerToken": 1e-7,
-        "outputCostPerToken": 2.5e-7,
-        "inputCacheReadPerToken": 5e-8
+        "inputCostPerToken": 8e-8,
+        "outputCostPerToken": 2e-7,
+        "inputCacheReadPerToken": 4e-8
       },
       "contextLength": 1000000,
-      "maxCompletionTokens": 262144,
+      "maxCompletionTokens": 131072,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -563,12 +564,12 @@
       "name": "DeepSeek V4 Flash Latest",
       "provider": "~deepseek",
       "pricing": {
-        "inputCostPerToken": 6.706e-8,
-        "outputCostPerToken": 1.3412e-7,
-        "inputCacheReadPerToken": 1.3412e-8
+        "inputCostPerToken": 6.03e-8,
+        "outputCostPerToken": 1.206e-7,
+        "inputCacheReadPerToken": 1.206e-8
       },
       "contextLength": 1048576,
-      "maxCompletionTokens": 384000,
+      "maxCompletionTokens": 262144,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -2386,12 +2387,12 @@
       "name": "Z.ai: GLM 5.2",
       "provider": "z-ai",
       "pricing": {
-        "inputCostPerToken": 3.08e-7,
-        "outputCostPerToken": 9.68e-7,
-        "inputCacheReadPerToken": 5.72e-8
+        "inputCostPerToken": 7.6e-7,
+        "outputCostPerToken": 0.00000242,
+        "inputCacheReadPerToken": 1.4e-7
       },
       "contextLength": 1048576,
-      "maxCompletionTokens": 128000,
+      "maxCompletionTokens": 262144,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -3852,12 +3853,12 @@
       "name": "MoonshotAI Kimi Latest",
       "provider": "~moonshotai",
       "pricing": {
-        "inputCostPerToken": 0.0000028,
-        "outputCostPerToken": 0.000014,
+        "inputCostPerToken": 0.0000026,
+        "outputCostPerToken": 0.000013,
         "inputCacheReadPerToken": 2.9e-7
       },
       "contextLength": 1048576,
-      "maxCompletionTokens": 1048576,
+      "maxCompletionTokens": 974842,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -4091,7 +4092,7 @@
       "name": "Qwen: Qwen3.6 35B A3B",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 1.5e-7,
+        "inputCostPerToken": 1.4e-7,
         "outputCostPerToken": 0.000001,
         "inputCacheReadPerToken": 5e-8
       },
@@ -4173,12 +4174,11 @@
       "name": "Qwen: Qwen3.6 27B",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 3e-7,
-        "outputCostPerToken": 0.000002,
-        "inputCacheReadPerToken": 3e-8
+        "inputCostPerToken": 2.89e-7,
+        "outputCostPerToken": 0.0000024
       },
       "contextLength": 262144,
-      "maxCompletionTokens": 65536,
+      "maxCompletionTokens": 131072,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -4358,15 +4358,15 @@
     },
     "deepseek/deepseek-v4-pro": {
       "id": "deepseek/deepseek-v4-pro",
-      "name": "DeepSeek: DeepSeek V4 Pro",
+      "name": "DeepSeek: DeepSeek V4 Pro 0423",
       "provider": "deepseek",
       "pricing": {
-        "inputCostPerToken": 0.000001168,
-        "outputCostPerToken": 0.000002336,
-        "inputCacheReadPerToken": 9.855e-8
+        "inputCostPerToken": 0.00000132,
+        "outputCostPerToken": 0.00000396,
+        "inputCacheReadPerToken": 4.4e-8
       },
       "contextLength": 1048576,
-      "maxCompletionTokens": 393216,
+      "maxCompletionTokens": 384000,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -4407,9 +4407,9 @@
       "name": "DeepSeek: DeepSeek V4 Flash 0423",
       "provider": "deepseek",
       "pricing": {
-        "inputCostPerToken": 6.146e-8,
-        "outputCostPerToken": 1.2292e-7,
-        "inputCacheReadPerToken": 1.2292e-8
+        "inputCostPerToken": 8.386e-8,
+        "outputCostPerToken": 1.6772e-7,
+        "inputCacheReadPerToken": 1.6772e-8
       },
       "contextLength": 1048576,
       "maxCompletionTokens": 384000,
@@ -4764,9 +4764,9 @@
       "name": "MoonshotAI: Kimi K2.6",
       "provider": "moonshotai",
       "pricing": {
-        "inputCostPerToken": 5.415e-7,
-        "outputCostPerToken": 0.00000228,
-        "inputCacheReadPerToken": 9.12e-8
+        "inputCostPerToken": 9.5e-7,
+        "outputCostPerToken": 0.000004,
+        "inputCacheReadPerToken": 1.6e-7
       },
       "contextLength": 262144,
       "maxCompletionTokens": 262144,
@@ -4956,12 +4956,11 @@
       "name": "Google: Gemma 4 26B A4B ",
       "provider": "gemini",
       "pricing": {
-        "inputCostPerToken": 1.2e-7,
-        "outputCostPerToken": 4e-7,
-        "inputCacheReadPerToken": 5e-8
+        "inputCostPerToken": 7e-8,
+        "outputCostPerToken": 3.4e-7
       },
       "contextLength": 262144,
-      "maxCompletionTokens": 262144,
+      "maxCompletionTokens": 16384,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -7611,10 +7610,10 @@
       "pricing": {
         "inputCostPerToken": 5e-8,
         "outputCostPerToken": 2e-7,
-        "inputCacheReadPerToken": 2.5e-8
+        "inputCacheReadPerToken": 3e-8
       },
       "contextLength": 262144,
-      "maxCompletionTokens": 228000,
+      "maxCompletionTokens": 262144,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -9475,9 +9474,9 @@
       "name": "Z.ai: GLM 4.6",
       "provider": "z-ai",
       "pricing": {
-        "inputCostPerToken": 5.5e-7,
-        "outputCostPerToken": 0.0000022,
-        "inputCacheReadPerToken": 1.1e-7
+        "inputCostPerToken": 5e-7,
+        "outputCostPerToken": 0.000002,
+        "inputCacheReadPerToken": 1e-7
       },
       "contextLength": 204800,
       "maxCompletionTokens": 131072,
@@ -9753,8 +9752,9 @@
       "name": "Qwen: Qwen3 VL 235B A22B Instruct",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 2.6e-7,
-        "outputCostPerToken": 0.00000104
+        "inputCostPerToken": 2.1e-7,
+        "outputCostPerToken": 0.0000019,
+        "inputCacheReadPerToken": 1e-7
       },
       "contextLength": 262144,
       "maxCompletionTokens": 32768,
@@ -13543,11 +13543,12 @@
       "name": "Qwen: Qwen2.5 VL 72B Instruct",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 2.5e-7,
-        "outputCostPerToken": 7.5e-7
+        "inputCostPerToken": 8e-7,
+        "outputCostPerToken": 0.000001,
+        "inputCacheReadPerToken": 4e-7
       },
       "contextLength": 128000,
-      "maxCompletionTokens": null,
+      "maxCompletionTokens": 128000,
       "supportedParameters": [
         "frequency_penalty",
         "logit_bias",
@@ -16494,6 +16495,52 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
+    "openai/gpt-4o-mini-realtime-preview": {
+      "id": "openai/gpt-4o-mini-realtime-preview",
+      "name": "gpt-4o-mini-realtime-preview",
+      "provider": "openai",
+      "pricing": {
+        "inputCostPerToken": 6e-7,
+        "outputCostPerToken": 0.0000024,
+        "audioCostPerToken": 0.00001,
+        "audioOutputCostPerToken": 0.00002,
+        "inputCacheReadPerToken": 3e-7
+      },
+      "contextLength": 0,
+      "maxCompletionTokens": null,
+      "supportedParameters": [],
+      "defaultParameters": null,
+      "modality": "audio->audio",
+      "mode": "audio",
+      "description": "Realtime audio, priced per token. Synced from litellm's price registry.",
+      "supportsImageInput": false,
+      "supportsAudioInput": true,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": true
+    },
+    "openai/gpt-4o-realtime-preview": {
+      "id": "openai/gpt-4o-realtime-preview",
+      "name": "gpt-4o-realtime-preview",
+      "provider": "openai",
+      "pricing": {
+        "inputCostPerToken": 0.000005,
+        "outputCostPerToken": 0.00002,
+        "audioCostPerToken": 0.00004,
+        "audioOutputCostPerToken": 0.00008,
+        "inputCacheReadPerToken": 0.0000025
+      },
+      "contextLength": 0,
+      "maxCompletionTokens": null,
+      "supportedParameters": [],
+      "defaultParameters": null,
+      "modality": "audio->audio",
+      "mode": "audio",
+      "description": "Realtime audio, priced per token. Synced from litellm's price registry.",
+      "supportsImageInput": false,
+      "supportsAudioInput": true,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": true
+    },
     "openai/gpt-4o-transcribe-diarize": {
       "id": "openai/gpt-4o-transcribe-diarize",
       "name": "gpt-4o-transcribe-diarize",
@@ -16514,6 +16561,75 @@
       "supportsAudioInput": true,
       "supportsImageOutput": false,
       "supportsAudioOutput": false
+    },
+    "openai/gpt-realtime-1.5": {
+      "id": "openai/gpt-realtime-1.5",
+      "name": "gpt-realtime-1.5",
+      "provider": "openai",
+      "pricing": {
+        "inputCostPerToken": 0.000004,
+        "outputCostPerToken": 0.000016,
+        "audioCostPerToken": 0.000032,
+        "audioOutputCostPerToken": 0.000064,
+        "inputCacheReadPerToken": 4e-7
+      },
+      "contextLength": 0,
+      "maxCompletionTokens": null,
+      "supportedParameters": [],
+      "defaultParameters": null,
+      "modality": "audio->audio",
+      "mode": "audio",
+      "description": "Realtime audio, priced per token. Synced from litellm's price registry.",
+      "supportsImageInput": false,
+      "supportsAudioInput": true,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": true
+    },
+    "openai/gpt-realtime-2.1": {
+      "id": "openai/gpt-realtime-2.1",
+      "name": "gpt-realtime-2.1",
+      "provider": "openai",
+      "pricing": {
+        "inputCostPerToken": 0.000004,
+        "outputCostPerToken": 0.000024,
+        "audioCostPerToken": 0.000032,
+        "audioOutputCostPerToken": 0.000064,
+        "inputCacheReadPerToken": 4e-7
+      },
+      "contextLength": 0,
+      "maxCompletionTokens": null,
+      "supportedParameters": [],
+      "defaultParameters": null,
+      "modality": "audio->audio",
+      "mode": "audio",
+      "description": "Realtime audio, priced per token. Synced from litellm's price registry.",
+      "supportsImageInput": false,
+      "supportsAudioInput": true,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": true
+    },
+    "openai/gpt-realtime-2.1-mini": {
+      "id": "openai/gpt-realtime-2.1-mini",
+      "name": "gpt-realtime-2.1-mini",
+      "provider": "openai",
+      "pricing": {
+        "inputCostPerToken": 6e-7,
+        "outputCostPerToken": 0.0000024,
+        "audioCostPerToken": 0.00001,
+        "audioOutputCostPerToken": 0.00002,
+        "inputCacheReadPerToken": 6e-8
+      },
+      "contextLength": 0,
+      "maxCompletionTokens": null,
+      "supportedParameters": [],
+      "defaultParameters": null,
+      "modality": "audio->audio",
+      "mode": "audio",
+      "description": "Realtime audio, priced per token. Synced from litellm's price registry.",
+      "supportsImageInput": false,
+      "supportsAudioInput": true,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": true
     },
     "openai/gpt-realtime-whisper": {
       "id": "openai/gpt-realtime-whisper",
