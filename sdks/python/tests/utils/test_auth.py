@@ -5,7 +5,6 @@ from __future__ import annotations
 import base64
 
 import pytest
-
 from langwatch.utils.auth import build_auth_headers, is_personal_access_token
 
 
@@ -31,14 +30,32 @@ class TestBuildAuthHeaders:
             "X-Auth-Token": "sk-lw-legacy",
         }
 
+    # @scenario "A configured project accompanies a new-format API key"
+    def test_new_format_key_emits_configured_project(self) -> None:
+        api_key = f"sk-lw-{'a' * 16}_{'b' * 48}"
+
+        headers = build_auth_headers(api_key=api_key, project_id="project_123")
+
+        assert headers == {
+            "Authorization": f"Bearer {api_key}",
+            "X-Auth-Token": api_key,
+            "X-Project-Id": "project_123",
+        }
+
+    # @scenario "A legacy project key remains self-identifying"
+    def test_legacy_key_with_underscore_keeps_legacy_headers(self) -> None:
+        api_key = "sk-lw-legacy_key"
+
+        headers = build_auth_headers(api_key=api_key, project_id="project_123")
+
+        assert "X-Project-Id" not in headers
+
     def test_pat_with_project_id_emits_basic_auth(self) -> None:
         headers = build_auth_headers(
             api_key="pat-lw-abc_secret",
             project_id="project_123",
         )
-        expected = base64.b64encode(
-            b"project_123:pat-lw-abc_secret"
-        ).decode("utf-8")
+        expected = base64.b64encode(b"project_123:pat-lw-abc_secret").decode("utf-8")
         assert headers == {"Authorization": f"Basic {expected}"}
 
     def test_pat_falls_back_to_env_project_id(
