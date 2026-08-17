@@ -352,6 +352,49 @@ func TestFindLayerDivergence(t *testing.T) {
 		})
 	})
 
+	// Excess, not just shortfall. Only shortfalls were reported, so the
+	// duplication this benchmark exists to catch could pass at either layer.
+
+	t.Run("when the event log holds more than the receiver accepted", func(t *testing.T) {
+		t.Run("reports double counting at the ingest layer", func(t *testing.T) {
+			got := FindLayerDivergence(FindLayerDivergenceOptions{
+				TenantId:    "t1",
+				Accepted:    map[string]int{"a": 100},
+				EventLog:    map[string]int{"a": 118},
+				StoredSpans: map[string]int{"a": 118},
+			})
+			if len(got) != 1 {
+				t.Fatalf("got %d violations, want 1", len(got))
+			}
+			if got[0].Kind != ViolationDoubleCounted {
+				t.Errorf("got kind %q, want %q", got[0].Kind, ViolationDoubleCounted)
+			}
+			if !strings.Contains(got[0].Detail, "INGEST layer") {
+				t.Errorf("detail %q does not blame the ingest layer", got[0].Detail)
+			}
+		})
+	})
+
+	t.Run("when more spans were stored than there were events", func(t *testing.T) {
+		t.Run("reports double counting at the projection layer", func(t *testing.T) {
+			got := FindLayerDivergence(FindLayerDivergenceOptions{
+				TenantId:    "t1",
+				Accepted:    map[string]int{"a": 100},
+				EventLog:    map[string]int{"a": 100},
+				StoredSpans: map[string]int{"a": 140},
+			})
+			if len(got) != 1 {
+				t.Fatalf("got %d violations, want 1", len(got))
+			}
+			if got[0].Kind != ViolationDoubleCounted {
+				t.Errorf("got kind %q, want %q", got[0].Kind, ViolationDoubleCounted)
+			}
+			if !strings.Contains(got[0].Detail, "PROJECTION layer") {
+				t.Errorf("detail %q does not blame the projection layer", got[0].Detail)
+			}
+		})
+	})
+
 	t.Run("when a span is lost at the ingest layer", func(t *testing.T) {
 		t.Run("reports one violation, not one per downstream layer", func(t *testing.T) {
 			got := FindLayerDivergence(FindLayerDivergenceOptions{
@@ -415,14 +458,27 @@ func TestFindResendDrift(t *testing.T) {
 	})
 
 	t.Run("when the counter fell after a resend", func(t *testing.T) {
-		t.Run("does not flag drift, since that is a different failure", func(t *testing.T) {
+		// This case used to assert nothing was reported, on the reasoning that a
+		// fall is a different failure and belongs to a different check. Nothing
+		// else catches it: the resend probe runs AFTER verifyStage, so a count
+		// the resend destroyed is never looked at again, and the run would have
+		// gone green on data the probe itself deleted.
+		//
+		// It is still not reported as drift. It is reported as loss.
+		t.Run("reports it as loss rather than as drift", func(t *testing.T) {
 			got := FindResendDrift(FindResendDriftOptions{
 				TenantId: "t1",
 				Before:   map[string]int{"a": 100},
 				After:    map[string]int{"a": 90},
 			})
-			if len(got) != 0 {
-				t.Errorf("got %d violations, want 0", len(got))
+			if len(got) != 1 {
+				t.Fatalf("got %d violations, want 1", len(got))
+			}
+			if got[0].Kind != ViolationLostSpans {
+				t.Errorf("got kind %q, want %q", got[0].Kind, ViolationLostSpans)
+			}
+			if !strings.Contains(got[0].Detail, "FELL") {
+				t.Errorf("detail %q does not say the count fell", got[0].Detail)
 			}
 		})
 	})

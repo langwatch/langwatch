@@ -408,6 +408,10 @@ func FindLayerDivergence(opts FindLayerDivergenceOptions) []Violation {
 		events := opts.EventLog[traceId]
 		spans := opts.StoredSpans[traceId]
 
+		// Both directions, at both layers. A shortfall is loss and an excess is
+		// duplication, and this benchmark exists to catch the second at least as
+		// much as the first — reporting only shortfalls would let the exact
+		// double-count the fold projections can produce pass silently.
 		switch {
 		case events < expected:
 			violations = append(violations, Violation{
@@ -421,6 +425,18 @@ func FindLayerDivergence(opts FindLayerDivergenceOptions) []Violation {
 						"event_log — %d never became an event",
 					expected, events, expected-events),
 			})
+		case events > expected:
+			violations = append(violations, Violation{
+				Kind:     ViolationDoubleCounted,
+				TenantId: opts.TenantId,
+				TraceId:  traceId,
+				Expected: expected,
+				Actual:   events,
+				Detail: fmt.Sprintf(
+					"INGEST layer: event_log holds %d span events but the receiver only "+
+						"accepted %d — %d spans were recorded more than once",
+					events, expected, events-expected),
+			})
 		case spans < events:
 			violations = append(violations, Violation{
 				Kind:     ViolationLostSpans,
@@ -432,6 +448,18 @@ func FindLayerDivergence(opts FindLayerDivergenceOptions) []Violation {
 					"PROJECTION layer: %d events are in event_log but only %d spans were "+
 						"stored — the map projection dropped %d",
 					events, spans, events-spans),
+			})
+		case spans > events:
+			violations = append(violations, Violation{
+				Kind:     ViolationDoubleCounted,
+				TenantId: opts.TenantId,
+				TraceId:  traceId,
+				Expected: events,
+				Actual:   spans,
+				Detail: fmt.Sprintf(
+					"PROJECTION layer: %d spans were stored from only %d events — the map "+
+						"projection applied %d of them twice",
+					spans, events, spans-events),
 			})
 		}
 	}
@@ -456,7 +484,13 @@ func FindResendDrift(opts FindResendDriftOptions) []Violation {
 	for _, traceId := range sortedKeys(opts.Before) {
 		beforeCount := opts.Before[traceId]
 		afterCount := opts.After[traceId]
-		if afterCount > beforeCount {
+
+		// The contract is that the counter DID NOT MOVE, so both directions
+		// fail. A resend that lowers the count, or makes the summary disappear
+		// entirely, is a worse outcome than one that raises it — and checking
+		// only for a rise would have called that a pass.
+		switch {
+		case afterCount > beforeCount:
 			violations = append(violations, Violation{
 				Kind:     ViolationDoubleCounted,
 				TenantId: opts.TenantId,
@@ -466,6 +500,18 @@ func FindResendDrift(opts FindResendDriftOptions) []Violation {
 				Detail: fmt.Sprintf(
 					"SpanCount rose from %d to %d after re-sending spans that "+
 						"were already ingested — the dedup gate did not hold and the fold re-applied them",
+					beforeCount, afterCount),
+			})
+		case afterCount < beforeCount:
+			violations = append(violations, Violation{
+				Kind:     ViolationLostSpans,
+				TenantId: opts.TenantId,
+				TraceId:  traceId,
+				Expected: beforeCount,
+				Actual:   afterCount,
+				Detail: fmt.Sprintf(
+					"SpanCount FELL from %d to %d after re-sending spans that were already "+
+						"ingested — the resend destroyed data that had already landed",
 					beforeCount, afterCount),
 			})
 		}
