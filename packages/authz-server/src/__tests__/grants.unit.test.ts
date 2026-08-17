@@ -59,22 +59,20 @@ function makeRepository(
 
 const actor = { userId: "admin-1" };
 
-function makeService(
-  repository: RepositoryStub,
-  { audit = vi.fn().mockResolvedValue(undefined) } = {},
-) {
+const WRITE_ACTOR = { type: "user", id: "admin-1" };
+
+function makeService(repository: RepositoryStub) {
   const bumpEpoch = vi.fn().mockResolvedValue(undefined);
   const service = new GrantsService(
     repository as unknown as AuthzGrantsRepository,
     {
-      audit,
       newBindingId: () => "rb_test_ksuid",
       bumpEpoch,
       collectorFor: (reader: AuthzReadRepository) =>
         new AuthzCollectorService(reader),
     },
   );
-  return { service, audit, bumpEpoch };
+  return { service, bumpEpoch };
 }
 
 beforeEach(() => {
@@ -85,7 +83,7 @@ describe("GrantsService.attach", () => {
   describe("when attaching a built-in role at team scope", () => {
     it("creates the binding row and bumps the org epoch", async () => {
       const repository = makeRepository();
-      const { service, audit, bumpEpoch } = makeService(repository);
+      const { service, bumpEpoch } = makeService(repository);
 
       const result = await service.attach({
         actor,
@@ -95,19 +93,19 @@ describe("GrantsService.attach", () => {
       });
 
       expect(result.bindingId).toBe("rb_test_ksuid");
-      expect(repository.createBinding).toHaveBeenCalledWith({
-        bindingId: "rb_test_ksuid",
-        organizationId: ORG,
-        scopeType: "TEAM",
-        scopeId: TEAM,
-        role: "VIEWER",
-        customRoleId: null,
-        principal: { userId: "alice" },
-      });
-      expect(bumpEpoch).toHaveBeenCalledWith({ organizationId: ORG });
-      expect(audit).toHaveBeenCalledWith(
-        expect.objectContaining({ action: "authz.grants.attach" }),
+      expect(repository.createBinding).toHaveBeenCalledWith(
+        {
+          bindingId: "rb_test_ksuid",
+          organizationId: ORG,
+          scopeType: "TEAM",
+          scopeId: TEAM,
+          role: "VIEWER",
+          customRoleId: null,
+          principal: { userId: "alice" },
+        },
+        { actor: WRITE_ACTOR },
       );
+      expect(bumpEpoch).toHaveBeenCalledWith({ organizationId: ORG });
     });
   });
 
@@ -199,7 +197,7 @@ describe("GrantsService.attach", () => {
 
   describe("when the scope already holds an identical binding", () => {
     /** @scenario "Attaching a duplicate role binding is rejected with a named error" */
-    it("names the duplicate the repository surfaced", async () => {
+    it("answers the REST contract's own conflict code, not a generic validation failure", async () => {
       const repository = makeRepository({
         createBinding: vi.fn().mockRejectedValue(new DuplicateBindingError()),
       });
@@ -211,7 +209,10 @@ describe("GrantsService.attach", () => {
           role: { builtin: "MEMBER" },
           where: { type: "team", id: TEAM, organizationId: ORG },
         }),
-      ).rejects.toMatchObject({ code: "grant_validation_failed" });
+      ).rejects.toMatchObject({
+        code: "role_binding_already_exists",
+        httpStatus: 409,
+      });
       expect(bumpEpoch).not.toHaveBeenCalled();
     });
   });
@@ -222,15 +223,14 @@ describe("GrantsService.revoke", () => {
     /** @scenario "Revoking a binding takes effect on the caller's next request" */
     it("deletes the row and bumps the epoch so the next check recollects", async () => {
       const repository = makeRepository();
-      const { service, audit, bumpEpoch } = makeService(repository);
+      const { service, bumpEpoch } = makeService(repository);
       await service.revoke({ actor, bindingId: "rb-1", organizationId: ORG });
       expect(repository.deleteBinding).toHaveBeenCalledWith({
         bindingId: "rb-1",
+        organizationId: ORG,
+        actor: WRITE_ACTOR,
       });
       expect(bumpEpoch).toHaveBeenCalledWith({ organizationId: ORG });
-      expect(audit).toHaveBeenCalledWith(
-        expect.objectContaining({ action: "authz.grants.revoke" }),
-      );
     });
   });
 
@@ -270,26 +270,11 @@ describe("GrantsService.revoke", () => {
     });
   });
 
-  describe("when the audit write rejects", () => {
-    it("has already bumped the epoch before the error propagates", async () => {
-      const repository = makeRepository();
-      const { service, bumpEpoch } = makeService(repository, {
-        audit: vi.fn().mockRejectedValue(new Error("audit sink down")),
-      });
-
-      await expect(
-        service.revoke({ actor, bindingId: "rb-1", organizationId: ORG }),
-      ).rejects.toThrow("audit sink down");
-      // The delete is committed; if the epoch had not moved, every cached
-      // caller would keep the revoked grant.
-      expect(bumpEpoch).toHaveBeenCalledWith({ organizationId: ORG });
-    });
-  });
 });
 
 describe("GrantsService.update", () => {
   describe("when the role change collides with a sibling binding", () => {
-    it("names the duplicate the repository surfaced", async () => {
+    it("answers the REST contract's own conflict code", async () => {
       const repository = makeRepository({
         updateBindingRole: vi
           .fn()
@@ -303,7 +288,10 @@ describe("GrantsService.update", () => {
           organizationId: ORG,
           role: { builtin: "MEMBER" },
         }),
-      ).rejects.toMatchObject({ code: "grant_validation_failed" });
+      ).rejects.toMatchObject({
+        code: "role_binding_already_exists",
+        httpStatus: 409,
+      });
       expect(bumpEpoch).not.toHaveBeenCalled();
     });
   });
@@ -381,9 +369,9 @@ describe("GrantsService.update", () => {
 describe("GrantsService.replace", () => {
   describe("when narrowing an org grant to a team grant", () => {
     /** @scenario "Replacing a grant is one atomic swap" */
-    it("hands the repository one atomic swap, with one audit record", async () => {
+    it("hands the repository one swap carrying the actor", async () => {
       const repository = makeRepository();
-      const { service, audit, bumpEpoch } = makeService(repository);
+      const { service, bumpEpoch } = makeService(repository);
       const result = await service.replace({
         actor,
         who: { type: "user", id: "user-1" },
@@ -407,12 +395,9 @@ describe("GrantsService.replace", () => {
           role: "MEMBER",
           principal: { userId: "user-1" },
         }),
+        actor: WRITE_ACTOR,
       });
       expect(repository.createBinding).not.toHaveBeenCalled();
-      expect(audit).toHaveBeenCalledTimes(1);
-      expect(audit).toHaveBeenCalledWith(
-        expect.objectContaining({ action: "authz.grants.replace" }),
-      );
       expect(bumpEpoch).toHaveBeenCalledTimes(1);
     });
   });
@@ -429,7 +414,7 @@ describe("GrantsService.offboard", () => {
           .fn()
           .mockResolvedValue([{ id: "team-p", name: "Dave's workspace" }]),
       });
-      const { service, audit, bumpEpoch } = makeService(repository);
+      const { service, bumpEpoch } = makeService(repository);
 
       const result = await service.offboard({
         actor,
@@ -444,8 +429,12 @@ describe("GrantsService.offboard", () => {
       expect(result.needsHumanDecision.personalTeams).toEqual([
         { id: "team-p", name: "Dave's workspace" },
       ]);
-      expect(audit).toHaveBeenCalledWith(
-        expect.objectContaining({ action: "authz.grants.offboard" }),
+      expect(repository.offboardUser).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: "dave",
+          organizationId: ORG,
+          actor: WRITE_ACTOR,
+        }),
       );
       expect(bumpEpoch).toHaveBeenCalledWith({ organizationId: ORG });
     });

@@ -11,6 +11,16 @@ export const AUTHZ_GRANTS_AGGREGATE_TYPE = "authz_grants" as const;
 
 export const ATTACH_GRANTS_COMMAND_TYPE =
   "lw.authz_grants.attach_grants" as const;
+export const CHANGE_GRANT_ROLE_COMMAND_TYPE =
+  "lw.authz_grants.change_grant_role" as const;
+export const REVOKE_GRANTS_COMMAND_TYPE =
+  "lw.authz_grants.revoke_grants" as const;
+export const DEFINE_ROLES_COMMAND_TYPE =
+  "lw.authz_grants.define_roles" as const;
+export const DELETE_ROLE_COMMAND_TYPE =
+  "lw.authz_grants.delete_role" as const;
+export const OFFBOARD_MEMBER_COMMAND_TYPE =
+  "lw.authz_grants.offboard_member" as const;
 export const PROVE_MIGRATION_PARITY_COMMAND_TYPE =
   "lw.authz_grants.prove_migration_parity" as const;
 export const COMPLETE_CUTOVER_COMMAND_TYPE =
@@ -22,6 +32,11 @@ export const RECORD_MIGRATION_TENANT_STATE_COMMAND_TYPE =
 
 export const AUTHZ_GRANTS_COMMAND_TYPES = [
   ATTACH_GRANTS_COMMAND_TYPE,
+  CHANGE_GRANT_ROLE_COMMAND_TYPE,
+  REVOKE_GRANTS_COMMAND_TYPE,
+  DEFINE_ROLES_COMMAND_TYPE,
+  DELETE_ROLE_COMMAND_TYPE,
+  OFFBOARD_MEMBER_COMMAND_TYPE,
   PROVE_MIGRATION_PARITY_COMMAND_TYPE,
   COMPLETE_CUTOVER_COMMAND_TYPE,
   ROLL_BACK_CUTOVER_COMMAND_TYPE,

@@ -24,6 +24,7 @@ export {
   type BindingPrincipalWhere,
   DuplicateBindingError,
   type AuthzGrantsRepository,
+  type GrantWriteActor,
   type OffboardCounts,
   type RoleBindingWrite,
 } from "./authz-grants.repository";
@@ -48,7 +49,7 @@ export type {
   AuthzEpochReader,
   AuthzServiceOptions,
 } from "./authz.service";
-export { GrantValidationError } from "./grant-validation";
+export { DuplicateGrantError, GrantValidationError } from "./grant-validation";
 export { GrantsService } from "./grants.service";
 export type {
   AuthzAuditWriter,

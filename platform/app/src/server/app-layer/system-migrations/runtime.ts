@@ -8,6 +8,7 @@
  */
 import { auditLog } from "@ee/audit-log/auditLog";
 import {
+  GrantsGenesisImportMigration,
   type GrantsLedgerEmitter,
   TeamUserBackfillMigration,
 } from "@langwatch/authz-server/migration";
@@ -19,17 +20,13 @@ import {
 import type { Cluster, Redis } from "ioredis";
 import { env } from "~/env.mjs";
 import type { Prisma } from "~/generated/prisma/client";
-import type {
-  AttachGrantsCommandData,
-  ProveMigrationParityCommandData,
-  RecordMigrationTenantStateCommandData,
-} from "~/server/event-sourcing/pipelines/authz-grants/schemas/commands";
-import { AUTHZ_GRANTS_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/authz-grants/schemas/constants";
-import { bumpAuthzEpoch } from "../../authz/epoch";
-import { PrismaAuthzMigrationRepository } from "../../authz/repositories/authz-migration.prisma.repository";
-import { authzCollector } from "../../authz/runtime";
 import { prisma } from "../../db";
 import { tryGetApp } from "../app";
+import { bumpAuthzEpoch } from "../authz/epoch";
+import { authzGrantsCommands } from "../authz/ledger";
+import { SYSTEM_ACTORS } from "../authz/ledger-actor";
+import { PrismaAuthzMigrationRepository } from "../authz/repositories/authz-migration.prisma.repository";
+import { authzCollector } from "../authz/runtime";
 import { cohortIncludes } from "./cohort";
 import { RedisMigrationLeaseRepository } from "./repositories/migration-lease.redis.repository";
 import { PrismaOrganizationTenantSource } from "./repositories/organization-tenant-source.prisma.repository";
@@ -54,7 +51,7 @@ const systemMigrationState = new WitnessingSystemMigrationStateRepository({
     occurredAtMs,
   }) => {
     await (
-      await grantsLedgerCommands()
+      await authzGrantsCommands()
     ).commands.recordMigrationTenantState.send({
       tenantId,
       organizationId: tenantId,
@@ -62,7 +59,7 @@ const systemMigrationState = new WitnessingSystemMigrationStateRepository({
       migrationName,
       status,
       report,
-      actor: { type: "system", id: "system:migration-runner" },
+      actor: { type: "system", id: SYSTEM_ACTORS.migrationRunner },
       occurredAtMs,
     });
   },
@@ -81,73 +78,29 @@ export const systemMigrationsService = new SystemMigrationsService({
 });
 
 /**
- * The `authz_grants` pipeline's senders, resolved lazily at send time (the
- * pipeline is being registered while this module loads). The boot pass
- * starts DURING App composition (`tryGetApp()` is null for its first
- * seconds), so a null App is waited out rather than refused; an App whose
- * event-sourcing stack is disabled throws immediately rather than letting
- * DisabledPipeline swallow the send - the backfill then parks its
- * organization with an honest report, and the state witness logs and
- * moves on.
+ * The migrations' door into the ledger, over the shared lazy senders in
+ * `server/app-layer/authz/ledger.ts` (a send while the App is still composing waits;
+ * an App without the event-sourcing stack refuses loudly — the migration
+ * then parks its organization with an honest report, and the state witness
+ * logs and moves on).
  */
-interface GrantsLedgerSenders {
-  commands: {
-    attachGrants: { send: (data: AttachGrantsCommandData) => Promise<unknown> };
-    proveMigrationParity: {
-      send: (data: ProveMigrationParityCommandData) => Promise<unknown>;
-    };
-    recordMigrationTenantState: {
-      send: (data: RecordMigrationTenantStateCommandData) => Promise<unknown>;
-    };
-  };
-}
-
-/**
- * Memoized: the poll below costs up to 30 seconds, and every `attachGrants`
- * chunk, parity proof and witnessed transition would otherwise re-run it.
- * The promise is cleared on failure so a send that arrived before the stack
- * was up does not poison every later one.
- */
-let grantsLedgerHandle: Promise<GrantsLedgerSenders> | null = null;
-
-async function grantsLedgerCommands(): Promise<GrantsLedgerSenders> {
-  grantsLedgerHandle ??= resolveGrantsLedgerCommands().catch((error) => {
-    grantsLedgerHandle = null;
-    throw error;
-  });
-  return grantsLedgerHandle;
-}
-
-async function resolveGrantsLedgerCommands(): Promise<GrantsLedgerSenders> {
-  const deadline = Date.now() + 30_000;
-  let app = tryGetApp();
-  while (!app && Date.now() < deadline) {
-    await new Promise((resolve) => setTimeout(resolve, 250));
-    app = tryGetApp();
-  }
-  if (!app?.eventSourcing?.isEnabled) {
-    throw new Error(
-      "the grants ledger requires the event-sourcing stack; send refused",
-    );
-  }
-  // The pipeline registry is keyed by name and cannot express which command
-  // set a name carries, so the handle itself is untyped. The PAYLOADS are
-  // not: `GrantsLedgerSenders` restates them from the command schemas'
-  // inferred types, so a change to any command's shape breaks here rather
-  // than at runtime inside the fold.
-  return app.eventSourcing.getPipeline(
-    AUTHZ_GRANTS_PIPELINE_NAME as never,
-  ) as unknown as GrantsLedgerSenders;
-}
-
 function grantsLedgerEmitter(): GrantsLedgerEmitter {
   return {
     attachGrants: async ({ organizationId, commandId, grants }) => {
-      await (await grantsLedgerCommands()).commands.attachGrants.send({
+      await (await authzGrantsCommands()).commands.attachGrants.send({
         tenantId: organizationId,
         organizationId,
         commandId,
         grants,
+      });
+    },
+    defineRoles: async ({ organizationId, commandId, roles, actor }) => {
+      await (await authzGrantsCommands()).commands.defineRoles.send({
+        tenantId: organizationId,
+        organizationId,
+        commandId,
+        roles,
+        actor,
       });
     },
     proveMigrationParity: async ({
@@ -156,7 +109,7 @@ function grantsLedgerEmitter(): GrantsLedgerEmitter {
       diffs,
       occurredAtMs,
     }) => {
-      await (await grantsLedgerCommands()).commands.proveMigrationParity.send({
+      await (await authzGrantsCommands()).commands.proveMigrationParity.send({
         tenantId: organizationId,
         organizationId,
         commandId,
@@ -177,6 +130,13 @@ export function registeredMigrations(): SystemMigration[] {
       audit: (entry) =>
         auditLog({ ...entry, metadata: entry.metadata as Prisma.JsonObject }),
       bumpEpoch: bumpAuthzEpoch,
+      now: () => Date.now(),
+    }),
+    // After the backfill on purpose: the backfill's grants are legacy rows
+    // by the time this runs, so the import adopts them like any other.
+    new GrantsGenesisImportMigration({
+      repository: new PrismaAuthzMigrationRepository(prisma),
+      ledger: grantsLedgerEmitter(),
       now: () => Date.now(),
     }),
   ];

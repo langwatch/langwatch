@@ -15,18 +15,17 @@
  * Every environment read the engine's services need is a closure passed from
  * here: the packages read no env of their own.
  */
-import { auditLog } from "@ee/audit-log/auditLog";
 import {
   AuthzCollectorService,
   AuthzService,
   GrantsService,
 } from "@langwatch/authz-server";
 import { generate } from "@langwatch/ksuid";
-import type { Prisma } from "~/generated/prisma/client";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { prisma } from "../db";
 import { bumpAuthzEpoch, getAuthzEpoch } from "./epoch";
-import { PrismaAuthzGrantsRepository } from "./repositories/authz-grants.prisma.repository";
+import { grantsLedgerWriter } from "./ledger";
+import { LedgerAuthzGrantsRepository } from "./repositories/authz-grants.ledger.repository";
 import { PrismaAuthzReadRepository } from "./repositories/authz-read.prisma.repository";
 import { demoProjectId } from "./shadow";
 
@@ -52,15 +51,21 @@ export const authz = new AuthzService(authzCollector, {
   demoProjectId,
 });
 
-/** The grants write surface, composed per call - it holds no state. */
+/**
+ * The grants write surface, composed per call - it holds no state. Since
+ * delivery-plan PR 2 the repository is ledger-backed: every write is a
+ * grants-ledger command, and the audit trail is the pipeline's insert-only
+ * subscriber (decision 17), not a writer dependency here.
+ */
 export function grantsService(): GrantsService {
-  return new GrantsService(new PrismaAuthzGrantsRepository(prisma), {
-    audit: (entry) =>
-      auditLog({ ...entry, metadata: entry.metadata as Prisma.JsonObject }),
-    newBindingId: () => generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-    bumpEpoch: bumpAuthzEpoch,
-    // The offboarding proof re-binds a collector to its own transaction, so
-    // the factory is injected rather than the instance above.
-    collectorFor: (reader) => new AuthzCollectorService(reader),
-  });
+  return new GrantsService(
+    new LedgerAuthzGrantsRepository(prisma, grantsLedgerWriter()),
+    {
+      newBindingId: () => generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+      bumpEpoch: bumpAuthzEpoch,
+      // The offboarding proof re-binds a collector to its own transaction, so
+      // the factory is injected rather than the instance above.
+      collectorFor: (reader) => new AuthzCollectorService(reader),
+    },
+  );
 }

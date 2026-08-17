@@ -1,21 +1,19 @@
 /**
  * ADR-092 §11 (setting) + §10 (offboarding) — the one write surface for
- * grants. Every mutation validates against the registry/tenancy, bumps the
- * org's authz epoch so caches and passports die on the caller's next
- * request, and emits an audit event. Storage is behind
- * AuthzGrantsRepository - the Prisma implementation (and its transactions)
- * lives in the app; ./grant-validation.ts owns what a write must satisfy,
- * and ./offboard.ts owns the offboarding transaction and its proof.
- *
- * Migration note (stage D0): the eight legacy RoleBinding write paths
- * (member add, invites, SCIM, groups, API keys, project creation, role
- * editor, better-auth hooks) route through this service as they migrate;
- * new code starts here.
+ * grants. Every mutation validates against the registry/tenancy and bumps
+ * the org's authz epoch so caches and passports die on the caller's next
+ * request. Storage is behind AuthzGrantsRepository — since delivery-plan
+ * PR 2 the app's implementation emits grants ledger commands (the actor
+ * every write carries is stamped onto the fact), and the audit trail is the
+ * ledger's insert-only subscriber (decision 17), not a direct write here.
+ * ./grant-validation.ts owns what a write must satisfy, and ./offboard.ts
+ * owns the offboarding flow and its proof.
  */
 import { type AuthzScopeRef, scopeOrganizationId } from "@langwatch/authz";
 import type { AuthzCollectorService } from "./authz-collector.service";
 import type {
   AuthzGrantsRepository,
+  GrantWriteActor,
   OffboardCounts,
   RoleBindingWrite,
 } from "./authz-grants.repository";
@@ -33,7 +31,9 @@ import {
 } from "./grant-validation";
 import { offboardUserFromOrganization } from "./offboard";
 
-/** The app's audit writer (EE) - every grant mutation records one event. */
+/** The app's audit writer (EE). Grant mutations no longer write it
+ *  directly (decision 17: the ledger's audit subscriber owns that trail);
+ *  migrations still record their one summary entry through this. */
 export type AuthzAuditWriter = (entry: {
   userId: string;
   organizationId: string;
@@ -66,7 +66,6 @@ type Actor = { userId: string };
  * the collector).
  */
 export type GrantsServiceDeps = {
-  audit: AuthzAuditWriter;
   newBindingId: () => string;
   bumpEpoch: AuthzEpochBumper;
   collectorFor: (reader: AuthzReadRepository) => AuthzCollectorService;
@@ -107,7 +106,7 @@ export class GrantsService {
 
     const row = this.bindingRow({ who, role, where, organizationId });
     try {
-      await repository.createBinding(row);
+      await repository.createBinding(row, { actor: writeActor(actor) });
     } catch (error) {
       rethrowKnownWriteFailure(error, {
         scopeType: where.type,
@@ -115,12 +114,7 @@ export class GrantsService {
       });
     }
 
-    await this.recordAndBump({
-      actor,
-      organizationId,
-      action: "authz.grants.attach",
-      metadata: { bindingId: row.bindingId, who, role, scope: where },
-    });
+    await this.deps.bumpEpoch({ organizationId });
     return { bindingId: row.bindingId };
   }
 
@@ -146,20 +140,17 @@ export class GrantsService {
     try {
       await repository.updateBindingRole({
         bindingId,
+        organizationId,
         role: "customRoleId" in role ? "CUSTOM" : role.builtin,
         customRoleId: "customRoleId" in role ? role.customRoleId : null,
+        actor: writeActor(actor),
       });
     } catch (error) {
       // A role change can collide with a sibling binding the principal
       // already holds at the same scope - same knowable failure as attach.
       rethrowKnownWriteFailure(error, { bindingId });
     }
-    await this.recordAndBump({
-      actor,
-      organizationId,
-      action: "authz.grants.update",
-      metadata: { bindingId, role },
-    });
+    await this.deps.bumpEpoch({ organizationId });
   }
 
   /** DELETE the row — access gone on the next check. */
@@ -179,16 +170,15 @@ export class GrantsService {
       organizationId,
     });
     try {
-      await repository.deleteBinding({ bindingId });
+      await repository.deleteBinding({
+        bindingId,
+        organizationId,
+        actor: writeActor(actor),
+      });
     } catch (error) {
       rethrowKnownWriteFailure(error, { bindingId });
     }
-    await this.recordAndBump({
-      actor,
-      organizationId,
-      action: "authz.grants.revoke",
-      metadata: { bindingId },
-    });
+    await this.deps.bumpEpoch({ organizationId });
   }
 
   /**
@@ -235,6 +225,7 @@ export class GrantsService {
           principal: principalWhere(who),
         },
         create: row,
+        actor: writeActor(actor),
       });
     } catch (error) {
       rethrowKnownWriteFailure(error, {
@@ -242,12 +233,7 @@ export class GrantsService {
         scopeId: to.id,
       });
     }
-    await this.recordAndBump({
-      actor,
-      organizationId,
-      action: "authz.grants.replace",
-      metadata: { who, from, to, role, bindingId: row.bindingId },
-    });
+    await this.deps.bumpEpoch({ organizationId });
     return { bindingId: row.bindingId };
   }
 
@@ -274,25 +260,12 @@ export class GrantsService {
     const result = await offboardUserFromOrganization({
       repository: this.repository,
       collectorFor: this.deps.collectorFor,
+      actor: writeActor(actor),
       userId,
       organizationId,
     });
 
-    await this.recordAndBump({
-      actor,
-      organizationId,
-      action: "authz.grants.offboard",
-      metadata: {
-        offboardedUserId: userId,
-        removed: result.removed,
-        ownedApiKeyIds: result.needsHumanDecision.ownedApiKeys.map(
-          (key) => key.id,
-        ),
-        personalTeamIds: result.needsHumanDecision.personalTeams.map(
-          (team) => team.id,
-        ),
-      },
-    });
+    await this.deps.bumpEpoch({ organizationId });
 
     return result;
   }
@@ -319,29 +292,8 @@ export class GrantsService {
     };
   }
 
-  /**
-   * Epoch first, audit second, and deliberately not one unit of work. The
-   * bump is what makes the write VISIBLE to the next check; a failed audit
-   * must never leave a committed grant change sitting behind a stale cache,
-   * so the audit error propagates only after the bump has happened.
-   */
-  private async recordAndBump({
-    actor,
-    organizationId,
-    action,
-    metadata,
-  }: {
-    actor: Actor;
-    organizationId: string;
-    action: string;
-    metadata: Record<string, unknown>;
-  }): Promise<void> {
-    await this.deps.bumpEpoch({ organizationId });
-    await this.deps.audit({
-      userId: actor.userId,
-      organizationId,
-      action,
-      metadata,
-    });
-  }
+}
+
+function writeActor(actor: Actor): GrantWriteActor {
+  return { type: "user", id: actor.userId };
 }

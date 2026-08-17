@@ -11,6 +11,7 @@ import type {
   AuthzGrantsRepository,
   AuthzReadRepository,
   BindingPrincipalWhere,
+  GrantWriteActor,
   OffboardCounts,
   RoleBindingWrite,
 } from "@langwatch/authz-server";
@@ -72,7 +73,10 @@ function mapDuplicateOrMissing(error: unknown): never {
 export class PrismaAuthzGrantsRepository implements AuthzGrantsRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async createBinding(row: RoleBindingWrite): Promise<void> {
+  async createBinding(
+    row: RoleBindingWrite,
+    _context: { actor: GrantWriteActor },
+  ): Promise<void> {
     try {
       await this.prisma.roleBinding.create({ data: bindingData(row) });
     } catch (error) {
@@ -86,8 +90,10 @@ export class PrismaAuthzGrantsRepository implements AuthzGrantsRepository {
     customRoleId,
   }: {
     bindingId: string;
+    organizationId: string;
     role: RoleBindingWrite["role"];
     customRoleId: string | null;
+    actor: GrantWriteActor;
   }): Promise<void> {
     try {
       await this.prisma.roleBinding.update({
@@ -99,7 +105,13 @@ export class PrismaAuthzGrantsRepository implements AuthzGrantsRepository {
     }
   }
 
-  async deleteBinding({ bindingId }: { bindingId: string }): Promise<void> {
+  async deleteBinding({
+    bindingId,
+  }: {
+    bindingId: string;
+    organizationId: string;
+    actor: GrantWriteActor;
+  }): Promise<void> {
     try {
       await this.prisma.roleBinding.delete({ where: { id: bindingId } });
     } catch (error) {
@@ -167,6 +179,7 @@ export class PrismaAuthzGrantsRepository implements AuthzGrantsRepository {
       principal: BindingPrincipalWhere;
     };
     create: RoleBindingWrite;
+    actor: GrantWriteActor;
   }): Promise<void> {
     try {
       await this.prisma.$transaction(async (tx) => {
@@ -197,6 +210,7 @@ export class PrismaAuthzGrantsRepository implements AuthzGrantsRepository {
   }: {
     userId: string;
     organizationId: string;
+    actor: GrantWriteActor;
     prove: (txReader: AuthzReadRepository) => Promise<void>;
   }): Promise<OffboardCounts> {
     return this.prisma.$transaction(

@@ -2,9 +2,14 @@ import { definePipeline } from "../..";
 import type { StateProjectionStore } from "../../projections/stateProjection.types";
 import {
   AttachGrantsCommand,
+  ChangeGrantRoleCommand,
   CompleteCutoverCommand,
+  DefineRolesCommand,
+  DeleteRoleCommand,
+  OffboardMemberCommand,
   ProveMigrationParityCommand,
   RecordMigrationTenantStateCommand,
+  RevokeGrantsCommand,
   RollBackCutoverCommand,
 } from "./commands/grantsLedgerCommands";
 import {
@@ -40,6 +45,11 @@ export function createAuthzGrantsPipeline(deps: AuthzGrantsPipelineDeps) {
       }),
     )
     .withCommand("attachGrants", AttachGrantsCommand)
+    .withCommand("changeGrantRole", ChangeGrantRoleCommand)
+    .withCommand("revokeGrants", RevokeGrantsCommand)
+    .withCommand("defineRoles", DefineRolesCommand)
+    .withCommand("deleteRole", DeleteRoleCommand)
+    .withCommand("offboardMember", OffboardMemberCommand)
     .withCommand("proveMigrationParity", ProveMigrationParityCommand)
     .withCommand("completeCutover", CompleteCutoverCommand)
     .withCommand("rollBackCutover", RollBackCutoverCommand)

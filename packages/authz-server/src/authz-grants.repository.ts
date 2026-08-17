@@ -62,6 +62,9 @@ export class BindingMissingError extends Error {
   }
 }
 
+/** Who performed a grant write — stamped onto the emitted ledger fact. */
+export type GrantWriteActor = { type: "user" | "system"; id: string | null };
+
 export type OffboardCounts = {
   bindings: number;
   groupMemberships: number;
@@ -72,18 +75,27 @@ export type OffboardCounts = {
 
 export interface AuthzGrantsRepository extends ScopeLineageRepository {
   /** @throws DuplicateBindingError on a unique-index collision. */
-  createBinding(row: RoleBindingWrite): Promise<void>;
+  createBinding(
+    row: RoleBindingWrite,
+    context: { actor: GrantWriteActor },
+  ): Promise<void>;
   /**
    * @throws DuplicateBindingError on a unique-index collision.
    * @throws BindingMissingError when the row is gone.
    */
   updateBindingRole(args: {
     bindingId: string;
+    organizationId: string;
     role: RoleBindingWrite["role"];
     customRoleId: string | null;
+    actor: GrantWriteActor;
   }): Promise<void>;
   /** @throws BindingMissingError when the row is gone. */
-  deleteBinding(args: { bindingId: string }): Promise<void>;
+  deleteBinding(args: {
+    bindingId: string;
+    organizationId: string;
+    actor: GrantWriteActor;
+  }): Promise<void>;
   findBinding(args: {
     bindingId: string;
   }): Promise<{ id: string; organizationId: string } | null>;
@@ -107,6 +119,7 @@ export interface AuthzGrantsRepository extends ScopeLineageRepository {
       principal: BindingPrincipalWhere;
     };
     create: RoleBindingWrite;
+    actor: GrantWriteActor;
   }): Promise<void>;
   /**
    * Delete every grant source for the user in one transaction, call
@@ -122,6 +135,7 @@ export interface AuthzGrantsRepository extends ScopeLineageRepository {
   offboardUser(args: {
     userId: string;
     organizationId: string;
+    actor: GrantWriteActor;
     prove: (txReader: AuthzReadRepository) => Promise<void>;
   }): Promise<OffboardCounts>;
   findOwnedApiKeys(args: {

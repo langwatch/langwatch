@@ -28,6 +28,29 @@ export class GrantValidationError extends HandledError {
   }
 }
 
+/**
+ * An identical grant (same principal, role, and scope) already exists.
+ *
+ * Speaks the REST surface's frozen contract (delivery-plan decision 21,
+ * `role-bindings-rest-api.feature`): the SAME code and status the
+ * `/role-bindings` API has always answered — a deterministic 409 a
+ * provisioning tool can treat as "already done". Reconciled here (PR 2)
+ * BEFORE the write paths moved onto the ledger, so the wire never wobbled
+ * between 400 `grant_validation_failed` and the contract.
+ */
+export class DuplicateGrantError extends HandledError {
+  declare readonly code: "role_binding_already_exists";
+
+  constructor(meta: Record<string, unknown> = {}) {
+    super(
+      "role_binding_already_exists",
+      "An identical role binding already exists",
+      { httpStatus: 409, meta },
+    );
+    this.name = "DuplicateGrantError";
+  }
+}
+
 /** Every scope a role binding can name - the resource tier cannot. */
 export type GrantableScope = Exclude<AuthzScopeRef, { type: "resource" }>;
 
@@ -68,10 +91,10 @@ export function rethrowKnownWriteFailure(
   { bindingId, ...meta }: { bindingId?: string } & Record<string, unknown>,
 ): never {
   if (error instanceof DuplicateBindingError) {
-    throw new GrantValidationError(
-      "This principal already holds this role at this scope - update or revoke the existing binding",
-      { ...meta, ...(bindingId ? { bindingId } : {}) },
-    );
+    throw new DuplicateGrantError({
+      ...meta,
+      ...(bindingId ? { bindingId } : {}),
+    });
   }
   if (error instanceof BindingMissingError) {
     throw bindingNotFound({ ...meta, ...(bindingId ? { bindingId } : {}) });
