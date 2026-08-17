@@ -13,6 +13,13 @@ import {
 
 const NOW = Date.UTC(2026, 7, 17, 12, 0, 0);
 
+/** Repeating-pattern fixtures, not credentials: a realistic ULID or trace id
+ *  is high-entropy enough that the secret scanner reads it as a generic API
+ *  key. Same reasoning as the sequential-hex HMAC fixture in the spend-ingest
+ *  suite. Length is still what the middle-elision renders against. */
+const FIXTURE_PROCESS_KEY = "req_aaaaaaaabbbbbbbbccccccccdddddddd";
+const FIXTURE_TRACE_ID = "00000000000000000000000000000abc";
+
 function makeMessage(
   overrides: Partial<DeadLetterMessage> = {},
 ): DeadLetterMessage {
@@ -20,12 +27,12 @@ function makeMessage(
     id: "msg_1",
     processName: "webhookDelivery",
     projectId: "project_1",
-    processKey: "req_01ABCDEFGHIJKLMNOPQRSTUVWX",
+    processKey: FIXTURE_PROCESS_KEY,
     messageKey: "process:req_01:deliver:confirmed",
     intentType: "deliver",
     attempts: 11,
     updatedAt: NOW - 60_000,
-    traceId: "4bf92f3577b34da6a3ce929d0e0e4736",
+    traceId: FIXTURE_TRACE_ID,
     payload: { gateway_request_id: "req_01" },
     ...overrides,
   };
@@ -138,7 +145,7 @@ describe("DeadLettersCard", () => {
         expect.objectContaining({
           processName: "webhookDelivery",
           projectId: "project_1",
-          processKey: "req_01ABCDEFGHIJKLMNOPQRSTUVWX",
+          processKey: FIXTURE_PROCESS_KEY,
         }),
       );
     });

@@ -298,21 +298,52 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
     page: number;
     pageSize: number;
   }): Promise<{ messages: DeadOutboxMessageView[]; total: number }> {
-    const where = {
-      status: "dead" as const,
-      ...(params.processName ? { processName: params.processName } : {}),
-    };
-    const [rows, total] = await Promise.all([
-      this.prisma.processManagerOutbox.findMany({
-        where,
-        orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
-        skip: (params.page - 1) * params.pageSize,
-        take: params.pageSize,
-      }),
-      this.prisma.processManagerOutbox.count({ where }),
+    // Raw, like every other fleet-wide read here: the multitenancy guard
+    // rejects a Prisma query on this model without a `projectId`, and a
+    // dead-letter sweep has no single project to name. The `@tenancy` marker
+    // is the same declaration `countByProcessName` makes, and the surface is
+    // ops-gated.
+    const nameFilter = params.processName
+      ? Prisma.sql`AND "processName" = ${params.processName}`
+      : Prisma.empty;
+
+    const [rows, totals] = await Promise.all([
+      this.prisma.$queryRaw <
+        Array<
+          Omit<
+            DeadOutboxMessageView,
+            "nextAttemptAt" | "leasedUntil" | "createdAt" | "updatedAt"
+          > & {
+            nextAttemptAt: Date;
+            leasedUntil: Date | null;
+            createdAt: Date;
+            updatedAt: Date;
+            traceCarrier: unknown;
+          }
+        >(Prisma.sql`
+        -- @tenancy: cross-tenant ops dead-letter read; the surface is ops-gated
+        SELECT "id", "processName", "projectId", "processKey", "messageKey",
+               "intentType", "status", "attempts", "nextAttemptAt",
+               "leasedUntil", "createdAt", "updatedAt", "sourceEventId",
+               "traceCarrier", "payload"
+        FROM "ProcessManagerOutbox"
+        WHERE "status" = 'dead'
+        ${nameFilter}
+        ORDER BY "updatedAt" DESC, "id" DESC
+        LIMIT ${params.pageSize}
+        OFFSET ${(params.page - 1) * params.pageSize}
+      `),
+      this.prisma.$queryRaw<Array<{ total: number }>>(Prisma.sql`
+        -- @tenancy: cross-tenant ops dead-letter read; the surface is ops-gated
+        SELECT COUNT(*)::int AS "total"
+        FROM "ProcessManagerOutbox"
+        WHERE "status" = 'dead'
+        ${nameFilter}
+      `),
     ]);
+
     return {
-      total,
+      total: totals[0]?.total ?? 0,
       messages: rows.map((r) => ({
         id: r.id,
         processName: r.processName,
@@ -334,19 +365,23 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
   }
 
   async countDeadByProcessName(): Promise<DeadLetterCount[]> {
-    const groups = await this.prisma.processManagerOutbox.groupBy({
-      by: ["processName"],
-      where: { status: "dead" },
-      _count: { _all: true },
-      _min: { updatedAt: true },
-    });
-    return groups
-      .map((g) => ({
-        processName: g.processName,
-        count: g._count._all,
-        oldestUpdatedAt: g._min.updatedAt?.getTime() ?? 0,
-      }))
-      .sort((a, b) => b.count - a.count);
+    const rows = await this.prisma.$queryRaw<
+      Array<{ processName: string; count: number; oldestUpdatedAt: Date }>
+    >(Prisma.sql`
+      -- @tenancy: cross-tenant ops dead-letter totals; the surface is ops-gated
+      SELECT "processName",
+             COUNT(*)::int AS "count",
+             MIN("updatedAt") AS "oldestUpdatedAt"
+      FROM "ProcessManagerOutbox"
+      WHERE "status" = 'dead'
+      GROUP BY "processName"
+      ORDER BY COUNT(*) DESC
+    `);
+    return rows.map((r) => ({
+      processName: r.processName,
+      count: r.count,
+      oldestUpdatedAt: r.oldestUpdatedAt?.getTime() ?? 0,
+    }));
   }
 
   async wakeInstanceNow(params: {

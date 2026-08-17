@@ -78,6 +78,12 @@ async function seedMessage(params: {
 /** A second process name, so the fleet-wide dead read has more than one. */
 const nsB = `${ns}.b`;
 
+/** Repeating-pattern trace id, not a credential: a realistic one is
+ *  high-entropy enough for the secret scanner to read it as a generic API
+ *  key. Same reasoning as the sequential-hex HMAC fixture in the
+ *  spend-ingest suite. */
+const DEAD_TRACE_ID = "00000000000000000000000000000abc";
+
 /**
  * A dead message under an arbitrary process name, retired at a chosen instant.
  * `updatedAt` is the retirement moment the dead-letter list orders by.
@@ -98,7 +104,7 @@ async function seedDeadMessage(params: {
       intentType: "opstest.intent",
       payload: { messageKey: params.messageKey },
       traceCarrier: {
-        traceparent: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+        traceparent: `00-${DEAD_TRACE_ID}-0000000000000abc-01`,
       },
       status: "dead",
       attempts: 8,
@@ -401,7 +407,7 @@ describe("process ops against a real Postgres", () => {
       expect(other.processName).toBe(nsB);
       expect(other.projectId).toBe(PROJECT);
       expect(other.processKey).toBe("dl-other");
-      expect(other.traceId).toBe("4bf92f3577b34da6a3ce929d0e0e4736");
+      expect(other.traceId).toBe(DEAD_TRACE_ID);
     });
 
     /** @scenario The newest failure is at the top */
