@@ -94,6 +94,7 @@ import { encrypt } from "~/utils/encryption";
 import { getClientIpFromHonoContext } from "~/utils/getClientIp";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
+import { zodErrorMessage } from "~/utils/zodErrorMessage";
 import { bodyLimit } from "./_lib/body-limit";
 import {
   experimentInitBadRequestSchema,
@@ -256,8 +257,7 @@ secured.access(analyticsViewAuth).post(
         .extend(timeseriesSeriesInput.shape)
         .parse(input);
     } catch (error) {
-      const validationError = fromZodError(error as ZodError);
-      return c.json({ error: validationError.message }, 400);
+      return c.json({ error: zodErrorMessage(error) }, 400);
     }
 
     try {
@@ -474,8 +474,7 @@ secured.access(experimentsManageAuth).post(
         "invalid log_steps data received",
       );
       captureException(toError(error), { extra: { projectId: project.id } });
-      const validationError = fromZodError(error as ZodError);
-      return c.json({ error: validationError.message }, 400);
+      return c.json({ error: zodErrorMessage(error) }, 400);
     }
 
     for (const param of params) {
@@ -699,8 +698,7 @@ secured.access(experimentsManageAuth).post(
         "invalid init data received",
       );
       captureException(toError(error), { extra: { projectId: project.id } });
-      const validationError = fromZodError(error as ZodError);
-      return c.json({ error: validationError.message }, 400);
+      return c.json({ error: zodErrorMessage(error) }, 400);
     }
 
     let experiment;
@@ -1155,8 +1153,7 @@ secured.access(tracesCreateAuth).post(
         "invalid event received",
       );
       captureException(toError(error));
-      const validationError = fromZodError(error as ZodError);
-      return c.json({ error: validationError.message }, 400);
+      return c.json({ error: zodErrorMessage(error) }, 400);
     }
 
     if (predefinedEventTypes.includes(rawBody.event_type)) {
@@ -1168,8 +1165,7 @@ secured.access(tracesCreateAuth).post(
           "invalid event received",
         );
         captureException(toError(error));
-        const validationError = fromZodError(error as ZodError);
-        return c.json({ error: validationError.message }, 400);
+        return c.json({ error: zodErrorMessage(error) }, 400);
       }
     }
 

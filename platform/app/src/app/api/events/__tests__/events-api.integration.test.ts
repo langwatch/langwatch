@@ -123,6 +123,7 @@ describe("Events API", () => {
     });
 
     describe("when a predefined event violates its schema", () => {
+      /** @scenario A predefined event that violates its schema is rejected, not errored */
       it("returns 400 with a validation error", async () => {
         const res = await post({
           trace_id: "trace_123",
