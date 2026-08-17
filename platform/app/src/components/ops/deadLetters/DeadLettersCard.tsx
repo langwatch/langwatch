@@ -209,6 +209,10 @@ function DeadLetterRow({
         role="button"
         aria-expanded={isExpanded}
         onKeyDown={(event) => {
+          // Only the row's own key events. Enter or Space on the nested
+          // Redrive button bubbles up here too, and without this the
+          // operator would redrive AND toggle the row in one press.
+          if (event.target !== event.currentTarget) return;
           if (event.key !== "Enter" && event.key !== " ") return;
           event.preventDefault();
           onToggle();

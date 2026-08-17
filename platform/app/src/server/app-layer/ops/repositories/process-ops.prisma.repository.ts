@@ -364,6 +364,22 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
     };
   }
 
+  /**
+   * Indexing, deliberately left to ops.
+   *
+   * The reads below scan `status = 'dead'` and sort by `updatedAt`. The
+   * table's only relevant index leads with `status`, which narrows to the
+   * dead rows; the sort over that subset is what is unindexed. That is
+   * acceptable because the dead population is bounded by operator attention
+   * rather than by traffic — a fleet with enough dead messages for this sort
+   * to matter has a far louder problem than the query plan.
+   *
+   * A Prisma migration is the wrong instrument if it ever does matter: a
+   * deploy-time CREATE INDEX takes a SHARE lock on the highest-volume write
+   * path in the system. The schema says as much for the two indexes the
+   * retention sweep wanted, and the answer there is the same one here —
+   * CREATE INDEX CONCURRENTLY, run from the runbook.
+   */
   async countDeadByProcessName(): Promise<DeadLetterCount[]> {
     const rows = await this.prisma.$queryRaw<
       Array<{ processName: string; count: number; oldestUpdatedAt: Date }>

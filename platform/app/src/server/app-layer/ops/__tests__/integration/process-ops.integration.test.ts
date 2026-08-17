@@ -125,7 +125,7 @@ function ours<T extends { processName: string }>(rows: T[]): T[] {
 
 afterAll(async () => {
   await prisma.processManagerOutbox.deleteMany({
-    where: { processName: { in: [ns, nsB] }, projectId: PROJECT },
+    where: { processName: { startsWith: ns }, projectId: PROJECT },
   });
   await prisma.processManagerInstance.deleteMany({
     where: { processName: ns, projectId: PROJECT },
@@ -460,12 +460,24 @@ describe("process ops against a real Postgres", () => {
     /** @scenario A dead message can be redriven from the list */
     it("redrives a message found without opening its instance", async () => {
       await seedAll();
+      // Its OWN row, under its own process name. Redriving flips a row out of
+      // `dead` and rewrites its `updatedAt`, and `seedAll` never restores it,
+      // so mutating a shared fixture would make the counts and orderings the
+      // other cases assert on depend on declaration order.
+      const nsRedrive = `${ns}.redrive`;
+      const redriveId = await seedDeadMessage({
+        processName: nsRedrive,
+        processKey: "dl-redrive",
+        messageKey: "dead-redrive",
+        retiredAt: new Date(NOW - 30_000),
+      });
 
       const { messages } = await service.getDeadLetters({
-        processName: nsB,
+        processName: nsRedrive,
         page: 1,
         pageSize: 10,
       });
+      expect(messages.map((m) => m.id)).toEqual([redriveId]);
       const target = messages[0]!;
 
       const result = await service.redriveDeadMessage({
