@@ -405,9 +405,34 @@ describe("gateway debits process", () => {
 
     expect(parsed).toMatchObject({
       gateway_request_id: "req_old",
-      team_id: "",
+      // Null rather than "": a row that never carried a team states none.
+      team_id: null,
       principal_user_id: "",
       error_type: "",
     });
+  });
+
+  it("still reads an intent payload whose team was written as an empty string", () => {
+    // The shape earlier builds minted. A durable outbox row outlives the
+    // deploy that changed the field, so this must stay a debit rather than
+    // become a permanent parse failure.
+    const parsed = writeGatewayDebitsSchema.parse({
+      gateway_request_id: "req_older",
+      project_id: "proj_1",
+      organization_id: "org_1",
+      team_id: "",
+      virtual_key_id: "vk_1",
+      end_user_id: "user_9",
+      model: "gpt-x",
+      model_provider_id: "mp_1",
+      usage: usage({ input_tokens: 10, output_tokens: 5 }),
+      cost_nano_usd: 3_500,
+      rate_version: "catalog@2026-07-30",
+      status: "confirmed",
+      duration_ms: 120,
+      occurred_at: 1_753_800_000_000,
+    });
+
+    expect(parsed.team_id).toBe("");
   });
 });

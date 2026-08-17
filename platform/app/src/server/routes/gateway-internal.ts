@@ -1095,7 +1095,7 @@ function reportAttributionGaps({
 }: {
   identity: ReturnType<typeof attributedIdentity>;
   key: AttributionVirtualKey | undefined;
-  teamId: string;
+  teamId: string | null;
 }): void {
   if (!key) {
     logger.error(
@@ -1160,7 +1160,9 @@ async function enrichAttributedCommands({
   commands.forEach((command, index) => {
     const identity = identities[index]!;
     const key = keyById.get(identity.virtualKeyId);
-    const teamId = teamIdByProject.get(identity.projectId) ?? "";
+    // `?? null`, matching the gateway JWT's own `traceProject?.teamId ?? null`:
+    // a project with no team has none, rather than one named "".
+    const teamId = teamIdByProject.get(identity.projectId) ?? null;
     // Only the admission reports these. An outcome names the same key and
     // the same project, so reporting both would say everything twice.
     if (index < admits.length) {
