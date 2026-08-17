@@ -99,6 +99,11 @@ cp "$REPO_ROOT/$HEAD_APP/biome.jsonc" "$BASE_TREE/$BASE_APP/biome.jsonc"
 # of them counted as new. Copy the root, and only from HEAD, for the same reason
 # the app config is copied from HEAD: the base is judged by the rules we are
 # adopting. A merge base from before the root config existed has none to remove.
+if [ ! -f "$REPO_ROOT/biome.jsonc" ]; then
+  echo "::error::no biome.jsonc at the repo root -- $HEAD_APP/biome.jsonc is nested and falls back to Biome's defaults without it, which reports the tree's whole backlog as new" >&2
+  exit 2
+fi
+
 rm -f "$BASE_TREE"/biome.json "$BASE_TREE"/biome.jsonc
 cp "$REPO_ROOT/biome.jsonc" "$BASE_TREE/biome.jsonc"
 
