@@ -10,9 +10,19 @@ import {
   integrationFilesRunInParallel,
   withdrawWorkerCountOverride,
 } from "./src/test-utils/integrationFileConcurrency";
+import {
+  INTEGRATION_SEARCH_DIRS,
+  partitionIntegrationFiles,
+  toIncludePatterns,
+} from "./src/test-utils/integrationLanes";
 import WeightBalancedSequencer from "./vitest.sequencer";
 
 config();
+
+const { datastore } = partitionIntegrationFiles({
+  root: __dirname,
+  searchDirs: [...INTEGRATION_SEARCH_DIRS],
+});
 
 // One switch for the CI-vs-laptop trade-offs below.
 const isCI = !!process.env.CI;
@@ -37,7 +47,12 @@ export default defineConfig({
       "./src/server/event-sourcing/__tests__/integration/setup.ts",
       "./test-setup.ts",
     ],
-    include: ["**/*.integration.{test,spec}.?(c|m)[jt]s?(x)"],
+    // The files that actually need a datastore. The complement — jsdom files
+    // naming no database, queue or cache — runs on the component lane with no
+    // service containers at all (vitest.component.config.ts). Both lanes call
+    // partitionIntegrationFiles, so together they are still every integration
+    // file, exactly once. See specs/ci/integration-test-lanes.feature.
+    include: toIncludePatterns(datastore),
     exclude: [...configDefaults.exclude, ".next/**/*", ".next-saas/**/*"],
     testTimeout: 60_000, // 60 seconds for testcontainers startup and processing
     hookTimeout: 60_000, // 60 seconds for beforeAll/afterAll hooks
@@ -97,6 +112,32 @@ export default defineConfig({
     // and Redis; handing vitest the whole box starved the datastores and
     // suites failed on vi.waitFor timeouts rather than on their assertions.
     maxWorkers: isCI ? 2 : 1,
+    // ISOLATION STAYS ON, and the reason is measured rather than assumed.
+    //
+    // Import is the largest single line item in this suite: across the six CI
+    // shards it was 1,664s against 1,408s of actual test execution — 43% of
+    // integration runner time, roughly 1.8s per file spent rebuilding the same
+    // Prisma client and the same server graph. `isolate: false` reclaims most
+    // of that, and the unit lane runs 1,688 files that way, so it looks like
+    // free money.
+    //
+    // It is not, for this suite. Turned on, three of four CI shards went red
+    // and shard 2 alone failed 30 of its 120 files, with errors that name the
+    // cause: "Cannot resolve ClickHouse client", "App not initialized",
+    // ECONNREFUSED. These files build and tear down an application container
+    // per file, and that container is module-level state. Share the registry
+    // and the first file's teardown takes the next file's client with it.
+    //
+    // That is not the same hazard as `fileParallelism` above — nothing here
+    // runs at once — but it has the same root: this suite keeps real,
+    // per-file lifecycle state in module scope. The unit and component lanes
+    // do not build containers, which is why one of them can share a registry
+    // and this one cannot.
+    //
+    // Reclaiming that 1,664s means giving the app container an explicit reset
+    // between files instead of relying on a fresh module graph to provide one.
+    // That is a real change to the test harness and belongs in its own PR,
+    // where the failures it causes are the subject rather than collateral.
     // Same weight-balanced split as the unit config: equal file counts are not
     // equal work, and a matrix is only as fast as its slowest leg.
     sequence: { sequencer: WeightBalancedSequencer },

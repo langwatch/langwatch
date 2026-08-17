@@ -172,9 +172,25 @@ From the repo root (it proxies these to `@langwatch/web`)
 ```bash
 pnpm typecheck        # Type check (TypeScript 7's native tsc, fast)
 pnpm test:unit        # Unit tests
-pnpm test:integration # Integration tests
+pnpm test:component   # Integration tests that need no datastore (jsdom, parallel)
+pnpm test:integration # Integration tests that do (Postgres/ClickHouse/Redis)
 pnpm test:e2e         # E2E tests
 ```
+
+**`.integration.test.ts` files run in one of two lanes, chosen by their
+dependencies rather than by their name.** The suffix states a test LEVEL —
+renders a component, mocks its boundaries — and that is still the right name for
+such a test. But 540 of the 1017 integration files declare jsdom and name no
+database, queue or cache, and they were running on a shard that booted three
+datastores and migrated two schemas first. A file lands in the **component**
+lane when it declares `@vitest-environment jsdom` **and** mentions no datastore;
+everything else stays in the **datastore** lane. The rule lives in
+`src/test-utils/integrationLanes.ts`, both vitest configs call it, so the lanes
+are exact complements and no file can drop out of CI. Default is the datastore
+lane, so a new test is never silently run without the infrastructure it needs —
+and if you move one across and it turns out to reach a database transitively, it
+fails loudly on the first run rather than passing for the wrong reason. See
+`specs/ci/integration-test-lanes.feature`.
 
 **Whole-repo checks take a machine-wide slot.** A typecheck holds a 2.3 to
 3.5 GiB working set and uses every core — though what you see in Activity
@@ -262,7 +278,9 @@ specs/               # BDD feature specs
 | Shared types in `types.ts` | Colocate unless truly shared |
 | Duplicating Zod + TS types | When you need both validation AND types, use Zod only with `infer`. For internal constants (no external input), `as const` is sufficient |
 | Skipping test run after edits | Always run tests after any code change to catch regressions immediately |
-| Running `npx vitest` / `npm exec vitest` directly | Always go through the package scripts: `pnpm test:unit run <path>`, `pnpm test:integration run <path>`. Only they carry the repo's RAM guardrails (`pool: "vmForks"` + `isolate: false`, `maxWorkers: "50%"`, `vmMemoryLimit: "512MB"`; integration adds `pool: "forks"` + `fileParallelism: false`) |
+| Running `npx vitest` / `npm exec vitest` directly | Always go through the package scripts: `pnpm test:unit run <path>`, `pnpm test:component run <path>`, `pnpm test:integration run <path>`. Only they carry the repo's RAM guardrails (`pool: "vmForks"` + `isolate: false`, `maxWorkers: "50%"`, `vmMemoryLimit: "512MB"`; integration adds `pool: "forks"` + `fileParallelism: false`) |
+| Running a component-lane test with `pnpm test:integration` and finding it "missing" | The two lanes are complements: `test:integration` only includes files that need a datastore, so a jsdom file naming none is not in it. Use `pnpm test:component`. If you meant it to have a database, name the dependency — that is what moves it back |
+| Adding a datastore to an existing jsdom integration test and expecting CI to notice | It does, automatically: the lane is recomputed from the file's source on every run, so mentioning Prisma/ClickHouse/Redis moves it to the datastore lane with no config change. The reverse also holds — removing the last mention moves it out, so check that is what you wanted |
 | Hand-rolling a throwaway `vitest.*.config.ts` (in `/tmp` or a worktree) | Never. A bare config inherits none of the guardrails above, so vitest defaults to the `forks` pool at `availableParallelism - 1` workers (10 on an 11-core laptop) at ~200-500MB each — several GB per run, multiplied by every parallel agent worktree. Use an existing config |
 | Writing a jsdom config because the repo "has no jsdom environment" | It is per-file on purpose — neither config declares a global `environment`; 515 test files set `// @vitest-environment jsdom` in a docblock. Add the docblock to your test file |
 | Reaching for `--maxWorkers=1` to be gentle on RAM | It serializes the run so it stays resident far longer, overlapping every other agent's run. Scope the run down instead — pass a narrower path |

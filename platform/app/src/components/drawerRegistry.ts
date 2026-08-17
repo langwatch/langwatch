@@ -378,7 +378,7 @@ export function preloadDrawer(type: DrawerType): Promise<void> {
  * fails remembers the failure for the life of the page, which would turn a
  * warm-up that lost the network into a drawer that can never open.
  */
-function primeLazyComponent(component: object): Promise<void> {
+export function primeLazyComponent(component: object): Promise<void> {
   const wrapper = component as {
     _init?: (payload: unknown) => unknown;
     _payload?: unknown;
@@ -389,13 +389,38 @@ function primeLazyComponent(component: object): Promise<void> {
     wrapper._init(wrapper._payload);
     return Promise.resolve();
   } catch (pending) {
-    return pending instanceof Promise
-      ? pending.then(
+    // Duck-typed rather than `pending instanceof Promise`. A promise carries
+    // the identity of the realm that created it, and `instanceof` compares
+    // against the `Promise` of the realm running this line — so the moment the
+    // two differ, the check is false for a perfectly good promise and this
+    // returns WITHOUT waiting for the chunk. The drawer is then reported as
+    // primed while still pending, and renders its spinner after all.
+    //
+    // A browser has one realm, so this was invisible in production and stayed
+    // invisible in tests until the suite moved to a pool that runs each file in
+    // a VM context. `then` is what React itself looks for, and what the promise
+    // contract actually specifies; realm identity was never the question being
+    // asked. (Same class of bug as the `dedupe: ["zod"]` note in CLAUDE.md.)
+    // Promise.resolve() adopts the foreign thenable into a real promise of
+    // THIS realm, which is both what the signature asks for and the right
+    // semantics: a bare PromiseLike carries no `catch`/`finally`, and callers
+    // await this like any other promise.
+    return isThenable(pending)
+      ? Promise.resolve(pending).then(
           () => undefined,
           () => undefined,
         )
       : Promise.resolve();
   }
+}
+
+/** Whether a value follows the promise contract, whatever realm made it. */
+function isThenable(value: unknown): value is PromiseLike<unknown> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as PromiseLike<unknown>).then === "function"
+  );
 }
 
 /**

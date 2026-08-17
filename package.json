@@ -72,6 +72,7 @@
     "build:cli": "pnpm --filter @langwatch/server-cli build",
     "test": "pnpm -r --filter \"./packages/*\" test",
     "test:unit": "pnpm --filter @langwatch/web test:unit",
+    "test:component": "pnpm --filter @langwatch/web test:component",
     "test:integration": "pnpm --filter @langwatch/web test:integration",
     "test:e2e": "pnpm --filter @langwatch/web test:e2e",
     "test:cli": "pnpm --filter @langwatch/server-cli test",
