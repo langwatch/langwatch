@@ -119,6 +119,23 @@ def positive_int_or_none(value: Optional[str]) -> Optional[int]:
     return count if count > 0 else None
 
 
+def positive_float_or_none(value: Optional[str]) -> Optional[float]:
+    """Read a duration override, or None when it cannot be used.
+
+    Same contract as `positive_int_or_none`, for knobs that accept fractional
+    values. The float parser also accepts `nan` and `inf`, and both make a
+    timeout meaningless (`nan` compares false with every deadline, `inf`
+    never fires), so they read as unset too.
+    """
+    if value is None or not value.strip():
+        return None
+    try:
+        number = float(value)
+    except ValueError:
+        return None
+    return number if math.isfinite(number) and number > 0 else None
+
+
 def get_cpu_count():
     """CPU budget for sizing the server's worker count.
 

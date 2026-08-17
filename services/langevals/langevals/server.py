@@ -13,6 +13,8 @@ from langevals.utils import (
     get_evaluator_classes,
     get_evaluator_definitions,
     load_evaluator_packages,
+    positive_float_or_none,
+    positive_int_or_none,
 )
 
 dotenv.load_dotenv()
@@ -56,10 +58,14 @@ original_env = os.environ.copy()
 # instead of holding the event loop hostage: with the loop free, /healthcheck
 # always answers and Kubernetes probes stay green while evaluations queue.
 evaluation_lock = threading.Lock()
-EVALUATION_QUEUE_TIMEOUT_SECONDS = float(
-    os.getenv("LANGEVALS_QUEUE_TIMEOUT", "300")
+# Both knobs are read while the server boots: a blank or mistyped value in a
+# manifest falls back to the default instead of stopping the pod.
+EVALUATION_QUEUE_TIMEOUT_SECONDS = (
+    positive_float_or_none(os.getenv("LANGEVALS_QUEUE_TIMEOUT")) or 300.0
 )
-MAX_EVALUATIONS_IN_PARALLEL = int(os.getenv("MAX_EVALUATIONS_IN_PARALLEL", "50"))
+MAX_EVALUATIONS_IN_PARALLEL = (
+    positive_int_or_none(os.getenv("MAX_EVALUATIONS_IN_PARALLEL")) or 50
+)
 
 
 def nest_asyncio_if_running_loop():
