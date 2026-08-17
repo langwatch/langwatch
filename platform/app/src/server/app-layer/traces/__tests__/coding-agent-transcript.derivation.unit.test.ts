@@ -1491,6 +1491,10 @@ describe("given a codex trace whose recovered conversation and prompt event desc
       // distance would take the earlier turn's event and delete the only
       // record of it.
       const prompt = "tell me about the second";
+      // The stub below is the same length on purpose, so what rejects it is
+      // the distance and not the length. A prompt of any other size would
+      // pass this test through the check it is not about.
+      expect(prompt).toHaveLength(24);
 
       const transcript = buildCodingAgentTranscript({
         spans: [

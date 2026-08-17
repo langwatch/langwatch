@@ -121,6 +121,14 @@ Feature: Codex Path B recovers the full request body from the rollout transcript
       When a later turn for trace_id "t-two" completes and the streamer harvests
       Then it posts only "t-two", never re-posting "t-one"
 
+    @unit
+    Scenario: A streaming session posts its repository once across ticks
+      Given a streamer watching a session whose session_meta names a remote
+      When the streamer harvests on two ticks
+      Then one session-context record posts in total
+      # The streamer re-offers every in-window session on every tick, so what
+      # keeps the second tick quiet is the stored fingerprint, not the offer.
+
   Rule: the harvest reports the repository the session worked on
 
     Codex records the session's directory, branch and remote once, in the
@@ -156,6 +164,25 @@ Feature: Codex Path B recovers the full request body from the rollout transcript
       Given a rollout whose session_meta names no remote
       When the completed turn is harvested
       Then the conversation posts and no session-context record does
+
+  Rule: a slow logs endpoint does not hold the conversation back
+
+    The session-context records go out before the turn spans, because the
+    title they carry is first-write and has to reach the server before the
+    spans create the session row. That ordering makes a slow logs endpoint a
+    delay on the conversation itself, and posting the records one at a time
+    made the delay grow with the number of sessions: a backfill reads every
+    rollout on disk, and each one waited the full per-post timeout before the
+    next one started.
+
+    @unit
+    Scenario: A backfill of many sessions does not wait for them one by one
+      Given many recorded sessions and a logs endpoint that never answers
+      When the sessions are backfilled
+      Then the conversations still post, after a wait that does not grow
+        with the session count
+      # A session the batch gives up on keeps no fingerprint, so the next
+      # harvest offers its context again.
 
   Rule: the harvest names the session
 

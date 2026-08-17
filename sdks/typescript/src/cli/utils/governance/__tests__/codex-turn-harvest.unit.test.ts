@@ -16,6 +16,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
 	findRolloutForThread,
+	harvestAndEmitCodexIO,
 	harvestCodexThread,
 } from "../codex-rollout-otlp";
 import { assertCodexTurnHarvest } from "../shell-rc";
@@ -596,6 +597,101 @@ describe("assertCodexTurnHarvest", () => {
 
 			const printed = logSpy.mock.calls.flat().join("\n");
 			expect(printed).toContain("Could not wire the codex turn harvest");
+		});
+	});
+});
+
+describe("harvestAndEmitCodexIO", () => {
+	describe("given a backfill of many sessions and a logs endpoint that never answers", () => {
+		let stateDir: string;
+
+		beforeEach(() => {
+			stateDir = mkdtempSync(join(tmpdir(), "lw-codex-state-"));
+			// Only the timers the harvest itself schedules, so the file reads
+			// below still run on the real event loop and the test does not
+			// depend on when they finish.
+			vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+		});
+
+		afterEach(() => {
+			vi.useRealTimers();
+			rmSync(stateDir, { recursive: true, force: true });
+		});
+
+		/** @scenario "A backfill of many sessions does not wait for them one by one" */
+		it("posts the conversations after a bounded wait, whatever the session count", async () => {
+			const SESSIONS = 60;
+			for (let i = 0; i < SESSIONS; i++) {
+				const thread = `019fc156-02e3-76a1-b462-14c38b45${String(i).padStart(4, "0")}`;
+				writeRollout(thread, [
+					{
+						type: "session_meta",
+						payload: {
+							id: thread,
+							cwd: "/home/dev/acme-app",
+							git: {
+								branch: "feat/pricing",
+								repository_url: "https://github.com/acme/acme-app.git",
+							},
+						},
+					},
+					taskStarted(TRACE),
+					userMessage("hi"),
+					agentFinal("hello"),
+				]);
+			}
+
+			let contextPostsInFlight = 0;
+			let peakInFlight = 0;
+			let tracePostAtMs: number | null = null;
+			const impl = vi.fn((url: string, init?: any) => {
+				if (String(url).endsWith("/v1/logs")) {
+					contextPostsInFlight += 1;
+					peakInFlight = Math.max(peakInFlight, contextPostsInFlight);
+					// Answers only when its own abort fires, which is what a
+					// wedged endpoint looks like to the caller.
+					return new Promise((_resolve, reject) => {
+						init.signal.addEventListener("abort", () => {
+							contextPostsInFlight -= 1;
+							reject(new Error("aborted"));
+						});
+					});
+				}
+				tracePostAtMs = Date.now();
+				return Promise.resolve({ ok: true, status: 200 });
+			}) as unknown as typeof fetch;
+
+			const startedAtMs = Date.now();
+			const harvesting = harvestAndEmitCodexIO({
+				sinceMs: 0,
+				nowMs: 1785654950000,
+				endpoint: "https://e/v1/traces",
+				logsEndpoint: "https://e/v1/logs",
+				token: "sk-lw-test",
+				sessionsRoot: root,
+				stateDir,
+				fetchImpl: impl,
+			});
+			// The rollouts are read off disk, one at a time, before the first
+			// post goes out, and a fake clock does not wait for that. Give the
+			// real event loop its turn first, or the advance below would run
+			// past an empty schedule and the timers those posts create would
+			// never fire.
+			for (let i = 0; i < 20_000 && contextPostsInFlight === 0; i++) {
+				await new Promise((resolve) => setImmediate(resolve));
+			}
+			expect(contextPostsInFlight).toBeGreaterThan(0);
+			// Long enough for the serial shape to finish too, so a regression
+			// fails on the assertion below rather than by timing out.
+			await vi.advanceTimersByTimeAsync(600_000);
+			await harvesting;
+
+			// Posted one at a time, 60 sessions against this endpoint would hold
+			// the conversation back for 60 times the 5 s per-post timeout.
+			expect(peakInFlight).toBeGreaterThan(1);
+			expect((tracePostAtMs ?? Number.NaN) - startedAtMs).toBeLessThanOrEqual(
+				20_000,
+			);
 		});
 	});
 });

@@ -433,6 +433,67 @@ export async function postCodexSessionContext(args: {
   return true;
 }
 
+/** How many context posts are in flight at once. */
+const CONTEXT_POST_CONCURRENCY = 6;
+/** How long the whole batch of context posts may hold the turn spans back. */
+const CONTEXT_POST_BUDGET_MS = 15_000;
+
+/**
+ * POST every session's context record before the turn spans go out.
+ *
+ * The spans wait for these on purpose: the title on the context record is
+ * first-write, so it has to reach the server before the spans create the
+ * session row. That makes a slow logs endpoint a delay on the conversation
+ * itself, and awaiting the posts one at a time turned it into a long one:
+ * `--all` reads every rollout on disk, and against an endpoint that never
+ * answers each of those sessions spent the full 5 s per-post timeout before
+ * the next one started.
+ *
+ * So the posts run together, a few at a time, and the batch stops starting
+ * new ones once the budget is gone. The worst case is the budget plus the one
+ * post still in flight, whatever the session count. Sessions the batch does
+ * not reach keep their state file empty and are offered again on the next
+ * harvest, which is the same path a refused POST already takes.
+ */
+async function postCodexSessionContexts(args: {
+  metas: CodexRolloutMeta[];
+  nowMs: number;
+  logsEndpoint: string | null;
+  token: string;
+  stateDir?: string;
+  fetchImpl?: typeof fetch;
+}): Promise<void> {
+  const { metas, ...post } = args;
+  if (metas.length === 0) return;
+  let next = 0;
+  let outOfBudget = false;
+  const budget = setTimeout(() => {
+    outOfBudget = true;
+  }, CONTEXT_POST_BUDGET_MS);
+  // A CLI must not stay alive for the budget alone: every post can finish
+  // early, and then there is nothing left to wait for.
+  budget.unref?.();
+  try {
+    await Promise.all(
+      Array.from(
+        { length: Math.min(CONTEXT_POST_CONCURRENCY, metas.length) },
+        async () => {
+          while (!outOfBudget && next < metas.length) {
+            // Read and advance in one synchronous step, so two workers never
+            // take the same session.
+            const meta = metas[next++] ?? null;
+            // `postCodexSessionContext` reports failure rather than throwing,
+            // and this guard keeps that true for the caller if it ever stops.
+            await postCodexSessionContext({ meta, ...post }).catch(() => false);
+          }
+        },
+      ),
+    );
+  } finally {
+    clearTimeout(budget);
+  }
+}
+
 /**
  * Recover codex turn I/O from rollouts written during this session and POST it
  * as OTLP spans. Returns the number of turns emitted (0 when nothing was
@@ -463,16 +524,14 @@ export async function harvestAndEmitCodexIO(args: {
     sinceMs,
     sessionsRoot: sessionsRoot ?? defaultCodexSessionsRoot(),
   });
-  for (const meta of metas) {
-    await postCodexSessionContext({
-      meta,
-      nowMs,
-      logsEndpoint,
-      token,
-      stateDir,
-      fetchImpl,
-    });
-  }
+  await postCodexSessionContexts({
+    metas,
+    nowMs,
+    logsEndpoint,
+    token,
+    stateDir,
+    fetchImpl,
+  });
   if (turns.length === 0) return 0;
   await postCodexTurns({ turns, nowMs, endpoint, token, fetchImpl });
   return turns.length;
@@ -507,16 +566,14 @@ export function createCodexIOStreamer(args: {
       });
       // The fingerprint state dedups across ticks (and across the notify
       // seam), so re-offering every in-window session each tick posts once.
-      for (const meta of metas) {
-        await postCodexSessionContext({
-          meta,
-          nowMs,
-          logsEndpoint: args.logsEndpoint,
-          token: args.token,
-          stateDir: args.stateDir,
-          fetchImpl: args.fetchImpl,
-        });
-      }
+      await postCodexSessionContexts({
+        metas,
+        nowMs,
+        logsEndpoint: args.logsEndpoint,
+        token: args.token,
+        stateDir: args.stateDir,
+        fetchImpl: args.fetchImpl,
+      });
       const fresh = turns.filter((t) => t.traceId && !emitted.has(t.traceId));
       if (fresh.length === 0) return 0;
       await postCodexTurns({
