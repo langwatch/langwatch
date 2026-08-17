@@ -64,7 +64,7 @@ afterEach(() => {
   cleanup();
 });
 
-describe("the section rail navigation-v2 seam", () => {
+describe("given the section rail inside a navigation-v2 shell", () => {
   describe("when the product sidebar carries the section's pages", () => {
     /** @scenario The rail stands down when the product sidebar carries the pages */
     it("stands the rail down and gives the content the full width", () => {

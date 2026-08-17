@@ -8,11 +8,13 @@
 
 LangWatch now serves four audiences with four different scopes:
 
-- Me: a developer tracks their own coding assistants. Personal scope.
-- LLM Ops: a team observes, tests and improves its agents. Project scope.
-- Gateway: platform engineers route, meter and bill LLM usage. Organization
+- Me: track your own coding assistants, for example Claude Code or Copilot.
+  Personal scope.
+- LLM Ops: observe, test and improve the agents of one project. Project
   scope.
-- Governance: AI leads see every tool, license, agent and dollar.
+- Gateway: route, meter and bill LLM usage across an organization.
+  Organization scope.
+- Governance: see every tool, license, agent and dollar in an organization.
   Organization scope.
 
 The app shell still has the shape it had when LLM Ops was the whole product.

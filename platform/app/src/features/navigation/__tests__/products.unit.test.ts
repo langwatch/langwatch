@@ -2,26 +2,30 @@ import { describe, expect, it } from "vitest";
 import { PRODUCTS, productById, productFromPathname } from "../products";
 
 describe("product registry", () => {
-  it("declares the four products in their fixed order", () => {
-    expect(PRODUCTS.map((product) => product.id)).toEqual([
-      "me",
-      "llm-ops",
-      "gateway",
-      "governance",
-    ]);
-  });
+  describe("given the four products the registry declares", () => {
+    describe("when the registry is read", () => {
+      it("declares the four products in their fixed order", () => {
+        expect(PRODUCTS.map((product) => product.id)).toEqual([
+          "me",
+          "llm-ops",
+          "gateway",
+          "governance",
+        ]);
+      });
 
-  it("advertises function in every pitch", () => {
-    expect(productById("me").pitch).toBe("Track your coding assistants");
-    expect(productById("llm-ops").pitch).toBe(
-      "Observe, evaluate and test your agents",
-    );
-    expect(productById("gateway").pitch).toBe(
-      "Route, meter and bill LLM usage",
-    );
-    expect(productById("governance").pitch).toBe(
-      "Every AI tool, license, agent and dollar",
-    );
+      it("advertises function in every pitch", () => {
+        expect(productById("me").pitch).toBe("Track your coding assistants");
+        expect(productById("llm-ops").pitch).toBe(
+          "Observe, evaluate and test your agents",
+        );
+        expect(productById("gateway").pitch).toBe(
+          "Route, meter and bill LLM usage",
+        );
+        expect(productById("governance").pitch).toBe(
+          "Every AI tool, license, agent and dollar",
+        );
+      });
+    });
   });
 
   describe("when resolving a product home", () => {

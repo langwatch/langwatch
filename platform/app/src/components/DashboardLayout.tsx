@@ -53,6 +53,7 @@ import { LoadingScreen } from "./LoadingScreen";
 import { MainMenu, MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "./MainMenu";
 import { PersonalSidebar } from "./PersonalSidebar";
 import { ProjectAvatar } from "./ProjectAvatar";
+import { DevBadge } from "./ui/DevBadge";
 import { Link } from "./ui/link";
 import { Menu } from "./ui/menu";
 import { useWorkspaceData } from "./useWorkspaceData";
@@ -663,24 +664,7 @@ export const LegacyDashboardLayout = ({
 
         {/* Right side: Search, integrations, user */}
         <HStack gap={2} justifyContent="flex-end" overflow="hidden">
-          {publicEnv.data?.NODE_ENV === "development" && (
-            <Text
-              fontSize="11px"
-              fontWeight="bold"
-              color="white"
-              backgroundColor="blackAlpha.600"
-              border="1px solid"
-              borderColor="whiteAlpha.300"
-              borderRadius="full"
-              height="32px"
-              paddingX={3}
-              display="flex"
-              alignItems="center"
-              letterSpacing="wider"
-            >
-              DEV
-            </Text>
-          )}
+          {publicEnv.data?.NODE_ENV === "development" && <DevBadge />}
           {user && <ImpersonationBanner user={user} />}
 
           {/* Command bar trigger */}

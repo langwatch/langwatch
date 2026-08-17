@@ -2,6 +2,7 @@ import { Box, HStack, Text } from "@chakra-ui/react";
 import { Settings as SettingsIcon } from "lucide-react";
 import { AppHeaderUserMenu } from "~/components/AppHeaderUserMenu";
 import { LogoIcon } from "~/components/icons/LogoIcon";
+import { DevBadge } from "~/components/ui/DevBadge";
 import { Link } from "~/components/ui/link";
 import { CommandBarTrigger } from "~/features/command-bar";
 import { APP_HEADER_HEIGHT } from "~/features/langy/logic/langyPanelLayout";
@@ -125,26 +126,5 @@ function ProductCluster({
         </HStack>
       )}
     </HStack>
-  );
-}
-
-function DevBadge() {
-  return (
-    <Text
-      fontSize="11px"
-      fontWeight="bold"
-      color="white"
-      backgroundColor="blackAlpha.600"
-      border="1px solid"
-      borderColor="whiteAlpha.300"
-      borderRadius="full"
-      height="32px"
-      paddingX={3}
-      display="flex"
-      alignItems="center"
-      letterSpacing="wider"
-    >
-      DEV
-    </Text>
   );
 }

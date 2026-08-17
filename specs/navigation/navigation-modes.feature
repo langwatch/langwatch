@@ -95,6 +95,13 @@ Feature: Navigation modes behind one flag
     And the ops page is not treated as a product page
 
   @integration
+  Scenario: A page outside the new shells keeps the old navigation
+    Given the navigation flag is on for me
+    And my device is in a new navigation mode
+    When I open a page the new shells do not cover
+    Then the old chrome renders instead of a new shell
+
+  @integration
   Scenario: Legacy mode runs no navigation-v2 queries
     Given my device is on the old navigation
     When I open the home page

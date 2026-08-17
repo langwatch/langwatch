@@ -31,6 +31,11 @@ const NAVIGATION_MODE_LABELS: Record<NavigationMode, string> = {
   "icon-rail": "Icon rail",
 };
 
+/** The order the modes are offered in, oldest first. */
+const NAVIGATION_MODES = Object.keys(
+  NAVIGATION_MODE_LABELS,
+) as NavigationMode[];
+
 /**
  * The avatar button and its dropdown in the top-right of the app header.
  * Shared by the legacy chrome and the navigation-v2 shells so the account
@@ -175,15 +180,11 @@ export function AppHeaderUserMenu({
                         trackEvent("navigation_mode_change", { mode });
                       }}
                     >
-                      <Menu.RadioItem value="legacy">
-                        Old navigation
-                      </Menu.RadioItem>
-                      <Menu.RadioItem value="product-switcher">
-                        Product switcher
-                      </Menu.RadioItem>
-                      <Menu.RadioItem value="icon-rail">
-                        Icon rail
-                      </Menu.RadioItem>
+                      {NAVIGATION_MODES.map((mode) => (
+                        <Menu.RadioItem key={mode} value={mode}>
+                          {NAVIGATION_MODE_LABELS[mode]}
+                        </Menu.RadioItem>
+                      ))}
                     </Menu.RadioItemGroup>
                   </Menu.Content>
                 </Menu.Root>

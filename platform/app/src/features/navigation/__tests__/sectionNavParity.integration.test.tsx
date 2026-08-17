@@ -32,58 +32,66 @@ vi.mock("~/components/ui/layouts/SectionNavigationLayout", () => ({
 import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
 
-describe("gateway section navigation", () => {
-  it("renders the pinned item list from the shared data", () => {
-    render(<AiGatewayLayout>x</AiGatewayLayout>);
+describe("given the gateway section navigation data", () => {
+  describe("when the gateway layout renders", () => {
+    it("renders the pinned item list from the shared data", () => {
+      render(<AiGatewayLayout>x</AiGatewayLayout>);
 
-    expect(
-      capturedItems.map((item) => ({
-        label: item.label,
-        href: item.href,
-        target: item.target,
-      })),
-    ).toEqual([
-      {
-        label: "Virtual Keys",
-        href: "/gateway/virtual-keys",
-        target: undefined,
-      },
-      {
-        label: "Model Providers",
-        href: "/settings/model-providers",
-        target: "_blank",
-      },
-      { label: "Budgets", href: "/gateway/budgets", target: undefined },
-      {
-        label: "Routing Policies",
-        href: "/gateway/routing-policies",
-        target: undefined,
-      },
-      { label: "Cache Rules", href: "/gateway/cache-rules", target: undefined },
-      { label: "Guardrails", href: "/gateway/guardrails", target: undefined },
-      { label: "Usage", href: "/gateway/usage", target: undefined },
-      {
-        label: "Billing Events",
-        href: "/gateway/billing-events",
-        target: undefined,
-      },
-      { label: "Webhooks", href: "/gateway/webhooks", target: undefined },
-    ]);
+      expect(
+        capturedItems.map((item) => ({
+          label: item.label,
+          href: item.href,
+          target: item.target,
+        })),
+      ).toEqual([
+        {
+          label: "Virtual Keys",
+          href: "/gateway/virtual-keys",
+          target: undefined,
+        },
+        {
+          label: "Model Providers",
+          href: "/settings/model-providers",
+          target: "_blank",
+        },
+        { label: "Budgets", href: "/gateway/budgets", target: undefined },
+        {
+          label: "Routing Policies",
+          href: "/gateway/routing-policies",
+          target: undefined,
+        },
+        {
+          label: "Cache Rules",
+          href: "/gateway/cache-rules",
+          target: undefined,
+        },
+        { label: "Guardrails", href: "/gateway/guardrails", target: undefined },
+        { label: "Usage", href: "/gateway/usage", target: undefined },
+        {
+          label: "Billing Events",
+          href: "/gateway/billing-events",
+          target: undefined,
+        },
+        { label: "Webhooks", href: "/gateway/webhooks", target: undefined },
+      ]);
+    });
   });
 });
 
-describe("governance section navigation", () => {
-  it("renders the pinned item list from the shared data", () => {
-    render(<GovernanceLayout>x</GovernanceLayout>);
+describe("given the governance section navigation data", () => {
+  describe("when the governance layout renders", () => {
+    it("renders the pinned item list from the shared data", () => {
+      render(<GovernanceLayout>x</GovernanceLayout>);
 
-    expect(
-      capturedItems.map((item) => ({ label: item.label, href: item.href })),
-    ).toEqual([
-      { label: "Overview", href: "/governance" },
-      { label: "Ingestion Sources", href: "/governance/ingestion-sources" },
-      { label: "Anomaly Rules", href: "/governance/anomaly-rules" },
-      { label: "Tool Catalog", href: "/governance/tool-catalog" },
-      { label: "Departments", href: "/governance/departments" },
-    ]);
+      expect(
+        capturedItems.map((item) => ({ label: item.label, href: item.href })),
+      ).toEqual([
+        { label: "Overview", href: "/governance" },
+        { label: "Ingestion Sources", href: "/governance/ingestion-sources" },
+        { label: "Anomaly Rules", href: "/governance/anomaly-rules" },
+        { label: "Tool Catalog", href: "/governance/tool-catalog" },
+        { label: "Departments", href: "/governance/departments" },
+      ]);
+    });
   });
 });

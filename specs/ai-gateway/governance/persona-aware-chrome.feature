@@ -160,12 +160,14 @@ Feature: AI Gateway Governance — Persona-aware chrome (sidebar + header)
     And the user is on "/governance" with the Govern sub-nav visible in
         the left rail (Overview / Ingestion Sources / Anomaly Rules /
         Tool Catalog / Departments)
-    When the user clicks any of these sub-nav links and lands on:
+    When the user clicks a sub-nav link, or drills into a governance
+        sub-route from the Overview, and lands on:
       | route                                              |
       | /governance/ingestion-sources             |
       | /governance/ingestion-sources/<id>        |
       | /governance/anomaly-rules                 |
       | /governance/tool-catalog                  |
+      | /governance/departments                   |
       | /governance/teams                         |
       | /governance/teams/<id>                    |
       | /governance/users                         |
