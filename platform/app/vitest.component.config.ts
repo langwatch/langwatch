@@ -7,12 +7,13 @@
  * that was simultaneously hosting Postgres, ClickHouse and Redis, after Prisma
  * migrations, a goose install, a ClickHouse schema replay and a Helm setup.
  *
- * Those files want exactly what the UNIT lane already provides: forked VM
- * workers, a reused module registry, concurrent files and no services at all.
- * So this config IS the unit config, with the file selection swapped. Deriving
- * it rather than copying it is the point — pool, worker count, memory limit,
- * sequencer, aliases and the fs allowlist stay defined once, and a future
- * change to the unit lane's memory behaviour cannot silently miss this one.
+ * Those files want most of what the UNIT lane already provides: forked VM
+ * workers, concurrent files and no services at all. So this config IS the unit
+ * config, with the file selection swapped and one setting overridden (`isolate`
+ * — see below). Deriving it rather than copying it is the point: pool, worker
+ * count, memory limit, sequencer, aliases and the fs allowlist stay defined
+ * once, and a future change to the unit lane's memory behaviour cannot silently
+ * miss this one.
  *
  * Which files land here is decided by src/test-utils/integrationLanes.ts, which
  * the datastore config calls too, so the two lanes are complements by
@@ -49,18 +50,39 @@ export default defineConfig({
     exclude: (unitTest.exclude ?? []).filter(
       (pattern) => pattern !== "**/*.integration.test.{ts,tsx}",
     ),
+    // The ONE setting deliberately not inherited from the unit lane.
+    //
+    // The unit lane reuses one module registry across the files in a worker,
+    // and that is load-bearing for its 1,688 files. This lane will not, because
+    // it was measured and the reuse is not free here:
+    //
+    //   isolate: false -> 545 of 546 files pass, and a DIFFERENT file fails
+    //                     each run (GlobalUpgradeModal and
+    //                     LangyComposerRecordedTurn one run; SavedChartsToolbar
+    //                     the next). Every one of them passes in isolation.
+    //   isolate: true  -> 546 of 546, 3,987 tests, twice running.
+    //
+    // The files that move are React component suites, and a shared registry
+    // makes "has this lazy chunk loaded yet" and "what is in this zustand
+    // store" into GLOBAL state that the file order decides. That is a rotating
+    // one-file flake, which is the most expensive kind of red: it blames an
+    // innocent file and it does not reproduce.
+    //
+    // Nothing about the lane's purpose needs the reuse. The win is not paying
+    // for a Postgres, a ClickHouse, a Redis, two migrations and a Helm setup to
+    // render a button, and running the files concurrently instead of one at a
+    // time — both of which stand. Registry reuse was inherited, not chosen; a
+    // deterministic suite is worth more than the import time it saves.
+    isolate: true,
   },
 });
 
-// A note on the pool, which is inherited from the unit lane and must stay that
-// way. The obvious-looking alternative is `pool: "forks"`, on the reasoning
-// that these files ran on forks under the integration config for their whole
-// history and a move should not change the environment. Measured, that is
-// backwards: forks + isolate:false failed 87 of 236 files in src/components,
-// against 4 under vmForks.
+// A note on the pool, which is inherited from the unit lane. `pool: "forks"`
+// looks like the conservative choice — these files ran on forks under the
+// integration config for their whole history — but it was measured and it is
+// worse: forks + a shared registry failed 87 of 236 files in src/components,
+// against 4 under vmForks. They had run on forks with isolation ON, and reusing
+// a registry inside a plain process is what leaks module state between files.
 //
-// The reason is that they ran on forks with isolate:TRUE — a fresh module
-// registry per file. Reusing one registry inside a plain process is what leaks
-// module state between files; a VM context is what makes reuse survivable, and
-// it is why the unit lane runs 1,688 files this way. The two settings are a
-// pair, not independent knobs.
+// That measurement is why the pool stays as inherited. It is also what pointed
+// at `isolate` above being the setting that actually mattered here.
