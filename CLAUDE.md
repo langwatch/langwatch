@@ -310,7 +310,7 @@ specs/               # BDD feature specs
 
 | Common Mistake | Correct Behavior |
 |----------------|------------------|
-| Using npm tsc to compile | Use `pnpm typecheck` instead — it names the right project and the right compiler. A `tsc` reached any other way still queues (the bin shim sees to that, see "Going around the scripts" above), so the reason is correctness, not the queue |
+| Using npm tsc to compile | Use `pnpm typecheck` instead — it names the right project and the right compiler. Locally, a **whole-tree** `tsc` reached any other way still queues, because the bin shim sees to it; a file-targeted run, a `--watch`/`--lsp` session and CI do not (see "Going around the scripts" above). So the reason to go through the script is correctness, not the queue |
 | Importing the TypeScript compiler API from `typescript` | TypeScript 7's root export is a version constant; the compiler lives behind `typescript/unstable/*`, and nothing parses a string in-process any more. Static scans go through `src/test-utils/tsAst.ts`, which owns the one API session. See ADR-099 |
 | Creating shared types for single-use interfaces | Colocate interfaces with their usage; only extract to `types.ts` when shared across multiple files |
 | Using -- on pnpm tasks, pnpm adds the -- automatically | Using e.g. `pnpm test:unit path/to/file` directly |

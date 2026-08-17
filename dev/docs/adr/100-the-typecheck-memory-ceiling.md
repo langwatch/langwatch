@@ -31,12 +31,7 @@ ceilings spent conspicuously more system than user time — the signature of a
 runtime collecting against a limit rather than working.
 
 So the ceiling is too generous, and the floor people would reach for is too
-tight. The program is also fatter than it needs to be: 52 MB of first-party
-source reaches the compiler, of which 11 MB is generated Prisma types and 7.7 MB
-is a single generated Ajv validator on 19 lines. That validator carries
-`@ts-nocheck` and has a sibling `.d.ts`, so it was parsed and bound for no
-benefit at all — `allowJs` plus an `./src/**/*` include swept it in as a root
-file.
+tight.
 
 ## Decision
 
@@ -44,9 +39,6 @@ file.
 lives in Go (`tools/thuishaven/domain/checkslots.go`) with the JS queue
 (`dev/scripts/check-queue.mjs`) mirroring it for machines without haven, so both
 move together.
-
-**The generated Ajv validator is excluded from the app's tsconfig**, where it
-was a seventh of everything parsed and none of it checked.
 
 ## Rationale / Trade-offs
 
@@ -66,22 +58,15 @@ failure of the two: the runtime cannot collect its way under it, so it pays the
 collection cost continuously and misses the target anyway, which is what the
 3 GiB sample's 6.13 GB footprint is.
 
-Excluding the validator is separable from the clamp and cheaper to justify: it
-has a sibling `.d.ts` that the import resolves to either way, so nothing is lost
-by keeping the `.js` out of the program.
-
 ## Consequences
 
 A typecheck should footprint around 6 GB rather than 9 GB on a 16-plus GiB
-machine, at no measured cost in wall clock, and the compiler stops parsing
-7.7 MB it never checked.
+machine, **with the wall-clock impact not established** — the sampling machine
+was too loaded for its timings to carry any, which is the same reason the table
+above has no wall-clock column.
 
 A locally built haven binary keeps the old clamp until `make haven install`, so
 the change reaches developers on their next reinstall rather than immediately.
-
-The remaining bulk in the program is generated Prisma types, at 11 MB across 111
-files. Nothing here addresses that, and it is the obvious next place to look if
-the working set ever becomes the binding constraint rather than the ceiling.
 
 ## References
 

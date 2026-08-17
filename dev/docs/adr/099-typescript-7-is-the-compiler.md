@@ -53,6 +53,13 @@ predicates from `typescript/unstable/ast`. The `unstable` name is about API
 stability guarantees, not maturity: it is the surface the language server itself
 runs on.
 
+**A generated Ajv validator leaves the app's program.** 52 MB of first-party
+source reaches the compiler, and 7.7 MB of it — a seventh of everything parsed —
+is one generated validator on 19 lines, swept in as a root file by `allowJs`
+plus an `./src/**/*` include. It carries `@ts-nocheck` and has a sibling `.d.ts`
+that the import resolves to either way, so it was parsed and bound for no
+benefit at all. Excluded from `tsconfig.tsgo.json`.
+
 Two constraints in that seam were found by its tests rather than reasoned out,
 and both are the kind that would otherwise be discovered as a mysterious CI
 timeout. Opening a file makes the compiler search its ancestors for a tsconfig
@@ -77,6 +84,10 @@ publishes in the same change that moves a compiler, which mixes a build concern
 with a packaging one and would be discovered by consumers rather than by us. A
 pinned major in two leaf packages is visible and reversible; a broken `.d.ts` in
 a published tarball is neither.
+
+Dropping the validator is the cheapest call in this ADR and is recorded only
+because it is invisible otherwise: the exclusion is one line of tsconfig, and
+the file it drops is the single largest thing the compiler was reading.
 
 A Go tool was the obvious alternative to the parse seam, and it is closed rather
 than unexplored: `github.com/microsoft/typescript-go` is a real go-gettable
@@ -113,12 +124,20 @@ Even batched, the walk over every tracked test file costs appreciably more than
 in-process parsing did — around 15s, past vitest's 10s default for a hook — so
 that hook declares its own timeout and says why.
 
+The compiler stops parsing 7.7 MB it never checked. The remaining bulk in the
+program is generated Prisma types, at 11 MB across 111 files; nothing here
+addresses that, and it is the obvious next place to look if the program's size
+ever becomes the binding constraint.
+
 The two packages on `typescript@6` are a standing item, not a resting state.
 
 ## References
 
 - Related ADRs: [ADR-100](100-the-typecheck-memory-ceiling.md) (the memory
   ceiling the same investigation turned up), [ADR-076](076-single-pnpm-workspace.md)
-  (why one root install governs every package's compiler version)
+  (why one root install governs every package's compiler version),
+  [ADR-085](085-governed-chart-runtime-without-eval.md) (which generated the
+  validator, and whose "`checkJs` parses it without checking it" consequence
+  this supersedes — it is not parsed at all now)
 - Specs: `specs/setup/typescript-7.feature`
 - TypeScript 7.0.2 on npm; the `typescript/unstable/*` export map
