@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { generate } from "@langwatch/ksuid";
+import { createLogger } from "@langwatch/observability";
 import type { Group, PrismaClient } from "~/generated/prisma/client";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { slugify } from "~/utils/slugify";
@@ -12,6 +13,8 @@ import type {
   ScimPatchRequest,
   ScimReplaceGroupRequest,
 } from "./scim.types";
+
+const logger = createLogger("langwatch:scim:group");
 
 /**
  * Handles SCIM 2.0 Group resources backed by the Group / GroupMembership tables.
@@ -357,8 +360,20 @@ export class ScimGroupService {
       // Full member replace (path="members" or no path with members in value).
       // Only when the operation actually carries a member list: an operation
       // that never mentions members carries no membership instruction at all.
-      const members = this.extractMemberList(operation);
-      if (!members) return;
+      const members = this.extractRequestedMemberIds(operation);
+      // `null` is "said nothing about members", `[]` is "said: no members".
+      // Checked explicitly because `[]` is falsy and must not be read as silence.
+      if (members === null) {
+        // Doing nothing is the safe answer, but it is also a silent one: an IdP
+        // sending a shape we do not parse would otherwise look like a success
+        // forever. Logged so a misconfigured sync is findable without an
+        // access-loss incident pointing at it.
+        logger.warn(
+          { groupId: group.id, path: operation.path },
+          "SCIM group replace matched no known attribute; leaving the group unchanged",
+        );
+        return;
+      }
 
       const current = await this.prisma.groupMembership.findMany({
         where: { groupId: group.id },
@@ -451,10 +466,18 @@ export class ScimGroupService {
    * list at all — collapsing that to `[]` reads it as "this group should have
    * no members" and revokes access for everyone in it. An explicit `members: []`
    * genuinely does mean clear the group, so the two have to stay distinguishable.
+   *
+   * Naming `members` is not enough on its own: the value has to actually be a
+   * list. A missing or malformed one (`{"op":"replace","path":"members"}`, or a
+   * string where an array belongs) states no membership we can act on, and
+   * reading it as "clear the group" turns a malformed payload into revoked
+   * access. Only `null` is honoured as a written-out empty list.
    */
-  private extractMemberList(operation: ScimPatchOperation): string[] | null {
+  private extractRequestedMemberIds(
+    operation: ScimPatchOperation,
+  ): string[] | null {
     if (operation.path === "members")
-      return this.extractMemberIds(operation.value);
+      return this.readMemberList(operation.value);
 
     if (
       !operation.path &&
@@ -462,12 +485,19 @@ export class ScimGroupService {
       operation.value !== null &&
       "members" in operation.value
     ) {
-      return this.extractMemberIds(
+      return this.readMemberList(
         (operation.value as Record<string, unknown>).members,
       );
     }
 
     return null;
+  }
+
+  /** A written-out member list, or `null` when the value is not one. */
+  private readMemberList(value: unknown): string[] | null {
+    if (value === null) return [];
+    if (!Array.isArray(value)) return null;
+    return this.extractMemberIds(value);
   }
 
   private extractMemberIdsFromPath(path: string, value: unknown): string[] {

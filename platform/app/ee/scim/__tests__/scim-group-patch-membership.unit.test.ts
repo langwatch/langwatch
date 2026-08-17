@@ -157,7 +157,47 @@ describe("SCIM group PATCH membership", () => {
     });
   });
 
+  describe("given a replace operation whose member list is missing or malformed", () => {
+    describe("when a members path carries no value at all", () => {
+      it("leaves the group's membership untouched", async () => {
+        await patchGroup([{ op: "replace", path: "members" }]);
+
+        expect(prisma.groupMembership.deleteMany).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when a members path carries something that is not a list", () => {
+      it("leaves the group's membership untouched", async () => {
+        await patchGroup([
+          { op: "replace", path: "members", value: "user-1" },
+        ]);
+
+        expect(prisma.groupMembership.deleteMany).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when a no-path value object holds a members key that is not a list", () => {
+      it("leaves the group's membership untouched", async () => {
+        await patchGroup([
+          { op: "replace", value: { members: "user-1" } },
+        ]);
+
+        expect(prisma.groupMembership.deleteMany).not.toHaveBeenCalled();
+      });
+    });
+  });
+
   describe("given a replace operation that names an empty member list", () => {
+    describe("when the list is written out as null", () => {
+      it("clears the group", async () => {
+        await patchGroup([{ op: "replace", path: "members", value: null }]);
+
+        expect(prisma.groupMembership.deleteMany).toHaveBeenCalledWith({
+          where: { groupId: "group-1", userId: { in: ["user-1", "user-2"] } },
+        });
+      });
+    });
+
     describe("when the list is under a members path", () => {
       it("clears the group", async () => {
         await patchGroup([{ op: "replace", path: "members", value: [] }]);
@@ -195,6 +235,23 @@ describe("SCIM group PATCH membership", () => {
             create: { userId: "user-3", groupId: "group-1" },
           }),
         );
+        expect(prisma.groupMembership.deleteMany).toHaveBeenCalledWith({
+          where: { groupId: "group-1", userId: { in: ["user-1"] } },
+        });
+      });
+    });
+
+    describe("when an operation that names no members comes first", () => {
+      it("still applies the member list from the later operation", async () => {
+        await patchGroup([
+          { op: "replace", path: "externalId", value: "abc-123" },
+          {
+            op: "replace",
+            path: "members",
+            value: [{ value: "user-2" }, { value: "user-3" }],
+          },
+        ]);
+
         expect(prisma.groupMembership.deleteMany).toHaveBeenCalledWith({
           where: { groupId: "group-1", userId: { in: ["user-1"] } },
         });
