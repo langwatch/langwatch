@@ -137,8 +137,11 @@ import type { ExperimentIdLookup } from "./pipelines/experiment-run-processing/r
 import type { ExperimentRunStateRepository } from "./pipelines/experiment-run-processing/repositories/experimentRunState.repository";
 import type { ComputeExperimentRunMetricsCommandData } from "./pipelines/experiment-run-processing/schemas/commands";
 import { createGatewaySpendProcessingPipeline } from "./pipelines/gateway-spend-processing/pipeline";
+import { MAX_OPEN_ADMISSIONS_PER_SWEEP } from "./pipelines/gateway-spend-processing/process-manager/spendSettlement.process";
 import type { GatewaySpendState } from "./pipelines/gateway-spend-processing/projections/gatewaySpend.foldProjection";
 import { GatewaySpendStore } from "./pipelines/gateway-spend-processing/projections/gatewaySpend.store";
+import type { OpenAdmission } from "./pipelines/gateway-spend-processing/repositories/openAdmissions.clickhouse.repository";
+import { getOpenAdmissionFindersByInstance } from "./pipelines/gateway-spend-processing/repositories/openAdmissions.clickhouse.repository";
 import { GATEWAY_SPEND_PIPELINE_NAME } from "./pipelines/gateway-spend-processing/schemas/constants";
 import { createGithubMaintenancePipeline } from "./pipelines/github-maintenance/pipeline";
 import { createGovernanceEventsPipeline } from "./pipelines/governance-events/pipeline";
@@ -903,6 +906,49 @@ export class PipelineRegistry {
               };
             };
             await pipeline.commands.settleSpend.send(data);
+          },
+          // Every configured instance, shared and private alike: one sweeper
+          // settles the whole install, so it cannot hold a single client.
+          //
+          // Settled per instance, never all-or-nothing. `Promise.all` is
+          // fail-fast, so one unreachable private ClickHouse would reject the
+          // whole read, fail the sweep intent, burn its attempts and keep
+          // failing every wake while that instance was down — taking the
+          // SHARED instance's open admissions with it. That contradicts the
+          // rule the sweep already states for a single tenant's failure, so
+          // it applies at the instance level too: the reachable instances
+          // settle, the unreachable one is reported and retried next sweep.
+          findOpenAdmissions: async (params) => {
+            const finders = await getOpenAdmissionFindersByInstance();
+            const results = await Promise.allSettled(
+              finders.map(({ finder }) => finder.findOpenAdmissions(params)),
+            );
+            const open: OpenAdmission[] = [];
+            results.forEach((result, index) => {
+              if (result.status === "fulfilled") {
+                open.push(...result.value);
+                return;
+              }
+              logger.warn(
+                {
+                  target: finders[index]?.target,
+                  error: result.reason,
+                },
+                "settlement sweep could not read one ClickHouse instance; its open admissions wait for the next sweep",
+              );
+            });
+            // The cap bounds ONE SWEEP, and each instance applies it to its own
+            // query — so N instances would hand the sweeper N times the cap.
+            // Re-applying it here is what makes the documented bound true of
+            // the number the sweeper actually settles.
+            //
+            // Oldest first, across instances, so the cap sheds the newest rows
+            // rather than whichever instance happened to answer last. Each
+            // query already returns its own rows oldest-first; this is what
+            // extends that ordering to the merge, and it keeps the sweep
+            // draining a backlog from the end that has waited longest.
+            open.sort((a, b) => a.admittedAtMs - b.admittedAtMs);
+            return open.slice(0, MAX_OPEN_ADMISSIONS_PER_SWEEP);
           },
         },
       }),

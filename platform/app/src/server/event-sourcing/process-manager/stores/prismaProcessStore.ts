@@ -10,9 +10,11 @@ import type { JsonValue } from "../json";
 import type { ProcessRef } from "../processManager.types";
 import { deriveInboxKey } from "./inboxKey";
 import type {
+  AppendIntentsResult,
   CommitResult,
   DueWake,
   LeasedOutboxMessageRecord,
+  NewOutboxMessage,
   OutboxMessageIdentity,
   OutboxMessageRecord,
   PersistedProcessInstance,
@@ -302,6 +304,79 @@ export class PrismaProcessStore implements ProcessStore {
       }
       throw error;
     }
+  }
+
+  /**
+   * The transient path: one idempotent multi-row insert, no transaction, no
+   * advisory lock, no instance row and no inbox row. See
+   * {@link AppendIntentsResult} for the reasoning.
+   *
+   * `skipDuplicates` is what makes the absent transaction safe. It compiles to
+   * ON CONFLICT DO NOTHING against the (processName, projectId, messageKey)
+   * unique index, so a redelivery, a crash midway through an earlier attempt,
+   * and two workers racing the same event all converge on the same row set.
+   */
+  async appendIntents(params: {
+    ref: ProcessRef;
+    tenantId: string;
+    userId?: string;
+    sourceEventId: string | null;
+    messages: NewOutboxMessage[];
+    now: number;
+  }): Promise<AppendIntentsResult> {
+    if (params.messages.length === 0) {
+      return { insertedMessageKeys: [], duplicateMessageKeys: [] };
+    }
+    const at = asDate(params.now);
+    const inserted = await this.prisma.processManagerOutbox.createMany({
+      data: params.messages.map((message) => ({
+        id: generate(KSUID_RESOURCES.PROCESS_MANAGER_OUTBOX).toString(),
+        ...refWhere(params.ref),
+        tenantId: params.tenantId,
+        userId: message.userId ?? params.userId ?? null,
+        messageKey: message.messageKey,
+        intentType: message.intentType,
+        payload: toJsonInput(message.payload),
+        traceCarrier: message.traceCarrier,
+        sourceEventId: params.sourceEventId,
+        status: "pending" as const,
+        attempts: 0,
+        nextAttemptAt: at,
+        leasedUntil: null,
+        leaseToken: null,
+        dispatchedAt: null,
+        createdAt: at,
+        updatedAt: at,
+      })),
+      skipDuplicates: true,
+    });
+
+    const keys = params.messages.map((message) => message.messageKey);
+    // The overwhelmingly common case is a clean insert, and it costs no
+    // second read. Only a partial insert has to ask which keys were already
+    // there, and only to REPORT them — the rows themselves are already right
+    // either way, so this read is diagnostic and never load-bearing. Rows this
+    // call wrote carry exactly `at`, which is what separates them from earlier
+    // ones; a concurrent insert landing in the same millisecond would be
+    // reported as inserted rather than duplicate, and misattributing a log
+    // line is the whole cost of that.
+    if (inserted.count === keys.length) {
+      return { insertedMessageKeys: keys, duplicateMessageKeys: [] };
+    }
+    const preexisting = await this.prisma.processManagerOutbox.findMany({
+      where: {
+        projectId: params.ref.projectId,
+        processName: params.ref.processName,
+        messageKey: { in: keys },
+        createdAt: { lt: at },
+      },
+      select: { messageKey: true },
+    });
+    const duplicates = new Set(preexisting.map((row) => row.messageKey));
+    return {
+      insertedMessageKeys: keys.filter((key) => !duplicates.has(key)),
+      duplicateMessageKeys: keys.filter((key) => duplicates.has(key)),
+    };
   }
 
   async findMessagesByRef(params: {

@@ -36,6 +36,10 @@ function makeStubStore(overrides: Partial<ProcessStore> = {}): ProcessStore {
     commit: async () => {
       throw new Error("makeStubStore: commit not stubbed");
     },
+    appendIntents: async () => ({
+      insertedMessageKeys: [],
+      duplicateMessageKeys: [],
+    }),
     findMessagesByRef: async () => [],
     leaseDueMessages: async () => [],
     markDispatched: async () => ({ applied: true }),
