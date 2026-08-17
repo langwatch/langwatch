@@ -98,11 +98,15 @@ function filterDlqGroups<T extends DlqRowGroup>(groups: T[], filter: string) {
 }
 
 /** The pending act for a whole queue's shown groups. */
-function bulkActionFor(
-  kind: "redrive" | "discard",
-  queueName: string,
-  shownGroups: ShownDlqGroup[],
-): PendingDlqAction {
+function bulkActionFor({
+  kind,
+  queueName,
+  shownGroups,
+}: {
+  kind: "redrive" | "discard";
+  queueName: string;
+  shownGroups: ShownDlqGroup[];
+}): PendingDlqAction {
   const inQueue = shownGroups.filter((g) => g.queueName === queueName);
   return {
     kind,
@@ -314,7 +318,9 @@ export function DlqCard({ queueNames }: { queueNames: string[] }) {
             canaryCount={canaryCount}
             onCanaryCountChange={setCanaryCount}
             onBulk={(kind, queueName) =>
-              actions.setPending(bulkActionFor(kind, queueName, shownGroups))
+              actions.setPending(
+                bulkActionFor({ kind, queueName, shownGroups }),
+              )
             }
             onCanary={actions.setCanaryTarget}
           />
@@ -373,7 +379,7 @@ function DlqCardHeader({
   onBulk: (kind: "redrive" | "discard", queueName: string) => void;
   onCanary: (queueName: string) => void;
 }) {
-  const filtering = filterText.trim().length > 0;
+  const isFiltering = filterText.trim().length > 0;
   const shownQueueNames = [...new Set(shownGroups.map((g) => g.queueName))];
   const allQueueNames = [...new Set(allGroups.map((g) => g.queueName))];
   return (
@@ -391,7 +397,7 @@ function DlqCardHeader({
       {groupCount > 0 && (
         <>
           <Text textStyle="sm" fontWeight="medium" color="orange.500">
-            Dead Letter Queue — {filtering ? `${shownCount} of ` : ""}
+            Dead Letter Queue — {isFiltering ? `${shownCount} of ` : ""}
             {groupCount} group{groupCount !== 1 ? "s" : ""}
           </Text>
           <Input

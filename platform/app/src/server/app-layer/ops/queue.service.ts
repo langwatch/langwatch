@@ -34,13 +34,12 @@ function summarizeErrorShapes(messages: string[]): string[] {
 }
 
 export class QueueService {
+  readonly repo: QueueRepository;
   private readonly audit: QueueAuditSink;
 
-  constructor(
-    readonly repo: QueueRepository,
-    audit?: QueueAuditSink,
-  ) {
-    this.audit = audit ?? new NullQueueAuditSink();
+  constructor(params: { repo: QueueRepository; audit?: QueueAuditSink }) {
+    this.repo = params.repo;
+    this.audit = params.audit ?? new NullQueueAuditSink();
   }
 
   async getQueues(): Promise<QueueSummaryInfo[]> {

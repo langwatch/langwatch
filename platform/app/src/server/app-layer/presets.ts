@@ -1620,7 +1620,10 @@ export function initializeDefaultApp(options?: {
     : new NullEventExplorerRepository();
 
   const ops = {
-    queues: new QueueService(queueRepo, new QueueAuditRepository(prisma)),
+    queues: new QueueService({
+      repo: queueRepo,
+      audit: new QueueAuditRepository(prisma),
+    }),
     scheduler: new SchedulerOpsService({
       repo: new PrismaScheduledJobRepository(prisma),
       audit: new SchedulerAuditRepository(prisma),
@@ -2140,7 +2143,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     nurturing: undefined,
     usageLimits: UsageLimitService.createNull(),
     ops: {
-      queues: new QueueService(new NullQueueRepository()),
+      queues: new QueueService({ repo: new NullQueueRepository() }),
       scheduler: new SchedulerOpsService({
         repo: new NullScheduledJobRepository(),
       }),
