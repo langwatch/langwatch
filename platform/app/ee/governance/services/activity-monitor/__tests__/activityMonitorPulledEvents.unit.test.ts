@@ -91,6 +91,59 @@ describe("ActivityMonitorService pulled and pushed source events", () => {
     );
   });
 
+  it("reads 0 for usage fields an adapter's extra made non-numeric", async () => {
+    // `mapToOcsfRow` spreads the adapter's `extra` over the three usage fields
+    // it just wrote, and `extra` is typed `z.record(z.unknown())` — so an
+    // adapter can land any JSON where a number belongs. Reading it back with a
+    // bare `Number(...)` yields NaN and puts NaN on the dashboard.
+    const pulledRow = (eventId: string, extension: unknown) => ({
+      eventId,
+      eventType: "anthropic_admin",
+      actorUserId: "",
+      actorEmail: "pulled@example.com",
+      actorEnduserId: "",
+      action: "usage_report",
+      target: "claude-haiku-4-5",
+      occurredMs: "1786619820000",
+      createdMs: "1786619821000",
+      rawPayload: JSON.stringify({ metadata: { extension } }),
+    });
+
+    query.mockImplementation(async ({ query: sql }: { query: string }) => ({
+      json: async () =>
+        sql.includes("governance_ocsf_events")
+          ? [
+              pulledRow("poisoned-fields", {
+                cost_usd: "not-a-number",
+                tokens_input: { nested: true },
+                tokens_output: 5,
+              }),
+              pulledRow("poisoned-extension", "not-an-object"),
+            ]
+          : [],
+    }));
+
+    const prisma = {
+      project: { findFirst: vi.fn(async () => ({ id: "gov-project" })) },
+    };
+    const service = ActivityMonitorService.create(prisma as never);
+
+    const rows = await service.eventsForSource({
+      organizationId: "org",
+      sourceId: "source",
+      limit: 50,
+    });
+
+    const byId = new Map(rows.map((row) => [row.eventId, row]));
+    // The one field that was a number survives; only the bad two fall back.
+    expect(byId.get("poisoned-fields")).toEqual(
+      expect.objectContaining({ costUsd: 0, tokensInput: 0, tokensOutput: 5 }),
+    );
+    expect(byId.get("poisoned-extension")).toEqual(
+      expect.objectContaining({ costUsd: 0, tokensInput: 0, tokensOutput: 0 }),
+    );
+  });
+
   it("includes pulled OCSF events in source health counts and last event", async () => {
     const prisma = {
       project: { findFirst: vi.fn(async () => ({ id: "gov-project" })) },
