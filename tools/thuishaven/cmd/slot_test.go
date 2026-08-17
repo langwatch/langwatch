@@ -35,6 +35,7 @@ func TestParseSlotRun(t *testing.T) {
 }
 
 // @scenario "haven's slot run is transparent to the command"
+// @scenario "Queued whole-tree runs get a soft memory cap at spawn"
 func TestSlotRunIsTransparentToTheCommand(t *testing.T) {
 	sem := semaphore.New(t.TempDir())
 	t.Setenv("CHECK_SLOTS", "1")

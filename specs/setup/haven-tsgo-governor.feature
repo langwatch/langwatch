@@ -87,3 +87,12 @@ Feature: tsgo can never take the machine down
     Given the check queue spawns a whole-tree tsgo run
     Then the Go runtime memory limit is set from the machine's memory
     But an operator's explicit limit is never overridden
+
+  @unit
+  Scenario: The soft cap stays inside what a run can meet
+    Given the machine has more memory than a whole-tree run needs
+    Then the cap is held down to six gibibytes rather than half the machine
+    And a small machine is still given three, never less
+    # A ceiling is one the runtime expands toward, so a generous cap is spent
+    # rather than saved; a cap below the live heap is missed anyway, at the
+    # price of collecting continuously. See ADR-099.
