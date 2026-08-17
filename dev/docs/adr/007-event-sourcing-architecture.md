@@ -133,7 +133,35 @@ Command → CommandHandler → Event[] → EventStore.store()
                                   ProjectionRegistry.dispatch()  (global projections)
 ```
 
+## Amendment: the `immediate` dispatch discipline (2026-08-17, authz grants pipeline only)
+
+The web-role rule above ("only dispatches commands and events to queues")
+gains one scoped exception. The `authz_grants` pipeline (ADR-092 §13) declares
+a dispatch discipline per command:
+
+- **`queued`** (the default, and the rule above unchanged): append →
+  GroupQueue → fold → Postgres.
+- **`immediate`**: after the event append is durably accepted (the append is
+  waited in both disciplines — store-before-dispatch is preserved verbatim,
+  ADR-049), the fold applies **inline on the calling path**, in whatever
+  process role the caller runs, and only then does the normal queue fan-out
+  run. The projection's cursor guard makes the queued second apply a no-op.
+
+Reserved for commands whose effect must hold before the call returns and must
+not depend on Redis even when Redis is healthy: `grants.revoke`,
+`member_offboarded`, `cutover_rolled_back`, SCIM deprovisioning. This is a
+discipline, not degradation — the point is that a revocation has no Redis
+dependency by design, which is a different thing from a queued command
+falling back when Redis is sick.
+
+Why the event-loop-contention rationale doesn't apply here: the web-role rule
+exists for pipelines that process traces per second; grant writes happen a
+few times per day per organization, and the inline apply is one cursor-guarded
+Postgres upsert. The amendment is scoped to the `authz_grants` pipeline —
+every other pipeline keeps the web-role rule exactly as written.
+
 ## References
 
 - [ADR-002](./002-event-sourcing.md) — original event sourcing decision (superseded)
 - [ADR-006](./006-redis-cluster-bullmq-hash-tags.md) — Redis cluster hash tags for BullMQ
+- [ADR-092](./092-unified-authorization-engine.md) §13 — the grants ledger, the one pipeline carrying the `immediate` amendment

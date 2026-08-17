@@ -313,8 +313,10 @@ fix. ADR-001 itself now cites a helper (`checkPermissionOrThrow`) and a file
 This ADR is a consolidation, not a rewrite of the data model. Five things in
 today's design are genuinely good and survive intact:
 
-- the `resource:action` vocabulary and the `RoleBinding` storage model - it
-  *is* a Zanzibar-style tuple store, groups and API keys included;
+- the `resource:action` vocabulary and the tuple *model* behind `RoleBinding`
+  - it *is* a Zanzibar-style tuple store, groups and API keys included. (The
+  model survives; the storage is reborn as the event-sourced `Grant` table in
+  §13, with `RoleBinding` continuing as a derived compat view until contract);
 - the tRPC builder that makes a permission middleware impossible to skip
   (`permissionProcedureBuilder` exposes only `.input`/`.use`, then splices in
   `enforcePermissionCheck` - `trpc.ts:721,238`);
@@ -670,7 +672,7 @@ same job ADR-057's share gates do today, driven by one engine verdict instead
 of a bespoke resolver. ADR-057's share tokens verify possession and then
 resolve to exactly these grants.
 
-**The shim (migration stage A5):** ADR-057's `ShareLink` table is already a
+**The shim (shipped with the stage-A engine):** ADR-057's `ShareLink` table is already a
 resource-grant table in disguise: `(resourceType, resourceId, projectId)` is
 the grant anchor, `visibility` is the audience (PUBLIC is anyone,
 ORGANIZATION the org, PROJECT the project), and the secret `token` is the
@@ -680,11 +682,13 @@ general model from day one, and ADR-057's two invariants survive intact: no
 presented token means no grant (row existence never authorizes, so the
 trace-id-guessing hole stays closed), and expiry and view budgets are
 filtered before the engine ever sees a row. View consumption stays in
-ShareService, which remains the accounting surface. The stage-C migration
-then extends ShareLink into full `ResourceGrant` storage (per-row
-permission, principal audiences - the annotate-only customer share) instead
-of adding a parallel table; nothing is backfilled because the rows are
-already there.
+ShareService, which remains the accounting surface. At an org's cutover (§13) its share
+links are imported as RESOURCE-scope rows in the one `Grant` table - token,
+expiry and view budget carried, possession semantics untouched - and from
+then on ShareService writes are `grants.*` commands like every other
+writer. Per-row permission and principal audiences (the annotate-only
+customer share) fall out of the same columns; no parallel table ever
+exists.
 
 ### 9. Resources users create (API keys, personal VKs)
 
@@ -707,11 +711,14 @@ registry makes ownership a declared fact:
  path shows up in explain() like any other grant
 ```
 
-Restricted API keys keep today's genuinely good storage - their permission
-set *is* a `CustomRole` row (`kind: "system_api_key"`) bound through the same
-tuple table - and keep the owner ceiling, `effective(key) = grants(key) ∩
+Restricted API keys keep today's genuinely good *model* - their permission
+set is a role (`kind: "system_api_key"`, a `Role` row post-ledger, projected
+back into `CustomRole` for the compat view) bound through the same tuple
+table - and keep the owner ceiling, `effective(key) = grants(key) ∩
 grants(owner)`, so a resource created by a user can never outlive or
-out-privilege its creator.
+out-privilege its creator. The ceiling clamps at check time, never at
+creation time, which is why it cannot go stale: a fired owner's grants
+intersect every key they own down to nothing in the same moment.
 
 The intersection also settles "I made a key, then my own access changed"
 precisely, and asymmetrically on purpose:
@@ -759,7 +766,8 @@ one transaction with a postcondition:
  4 REVOKE   personal credentials he owns (API keys, personal VKs) - already
             inert regardless: effective(key) = grants(key) ∩ grants(owner) = ∅
  5 CANCEL   pending invites for his email
- 6 BUMP     the org authz epoch  → caches and passports die immediately (§12)
+ 6 ADVANCE  the org's version (epoch today, the projection cursor advances
+            with the write itself) → caches and passports die immediately (§12)
  7 PROVE    effectivePermissions(dave, acme) == ∅
             the operation FAILS LOUDLY if anything still resolves
  8 REPORT   a manifest: what was removed, plus what needs a human decision
@@ -809,15 +817,18 @@ await grants.attach({ who: user(aliceId),   role: "viewer",           where: pro
 await grants.attach({ who: group(secEngId), role: "member",           where: team(teamAId) });
 await grants.attach({ who: apiKey(keyId),   role: customRole(sreId),  where: org(acmeId) });
 
-await grants.update({ bindingId, role: "member" });
-await grants.revoke({ bindingId });
+await grants.update({ grantId, role: "member" });
+await grants.revoke({ grantId });                 // immediate discipline (§13)
 await grants.replace({ who: user(aliceId), from: org(acmeId),   // the REDUCE
-                       to: team(teamAId), role: "member" });    // verb, atomic
+                       to: team(teamAId), role: "member" });    // verb
 
-// every write: validates against the registry, emits an audit event, bumps
-// the org's authz epoch (§12). The 8 places that write RoleBinding rows
-// today (member add, invites, SCIM, groups, API keys, project creation,
-// role editor, better-auth hooks) all route through grants.*
+// every write: validates against the registry, appends to the ledger
+// (waited), advances the org's projection cursor, and lands an AuditLog row
+// via the insert-only subscriber (§13). The 8 places that write RoleBinding
+// rows today (member add, invites, SCIM, groups, API keys, project creation,
+// role editor, better-auth hooks) all route through grants.* — SCIM as a
+// reconciler: diff the IdP's declared state against the projection, emit
+// only the difference (removals immediate).
 ```
 
 tRPC and Hono sugar stays declarative -
@@ -852,7 +863,7 @@ The registry makes this cheap. It is a fixed ordered list of valid pairs, so
 an effective permission set per scope is a bitset a few dozen bytes wide
 (~40 bytes covers the whole vocabulary, a fully cached principal is under a
 kilobyte), and "does alice hold `prompts:update` here?" is a bit test. The
-latency budget, stated as targets the stage-F shadow comparison must confirm:
+latency budget, stated as targets PR 5's shadow comparison must confirm:
 
 ```
  path                              cost                   when
@@ -879,69 +890,119 @@ what every single check costs today. The precedent is already in-house - the
 gateway's 15-minute HS256 JWT with a `revision` claim
 (`server/gateway/gatewayJwt.ts`) is exactly this pattern for virtual keys,
 and epochs generalise it to every principal. A revoked binding is dead on the
-caller's next request (the epoch bump outruns any TTL), so the
-no-stale-grants property survives, minus the per-check query tax. That
-guarantee has a precondition, and it is the reason the cache ships flagged:
-it holds only once **every** write path that changes a grant bumps the org
-epoch. Until the last one is routed through `grants.*` (delivery-plan step
-M7), a legacy write that skips the bump would leave the cache serving stale
-grants - fail-open - so `AUTHZ_EPOCH_CACHE` stays off and every check
-collects. The
-coarseness is deliberate: one epoch per org means any grant write re-collects
-every cached principal in that org once. Grant writes are rare, and a
-re-collect is the same 1-2 queries the engine already does.
+caller's next request, so the no-stale-grants property survives, minus the
+per-check query tax.
 
-### 13. Migration: six shippable stages
+**2026-08-17: the version integer is the projection cursor, not a bumped
+epoch.** The original design hand-bumped a per-org epoch on every write and
+therefore carried a precondition ("holds only once *every* write path bumps
+it" - the old delivery-plan gate M7) and a flag to hold it closed until then.
+The grants ledger (§13) dissolves the precondition: the per-org version is
+`AuthzProjectionCursor`, advanced by the projection writer itself - the write
+*is* the bump, so no write path can skip it and no runbook gate is needed.
+The Redis epoch store that stage B shipped keeps being bumped unchanged until
+the contract PR retires it in favour of the cursor (delivery-plan decision
+19). The coarseness is deliberate either way: one version per org means any
+grant write re-collects every cached principal in that org once. Grant writes
+are rare, and a re-collect is the same 1-2 queries the engine already does.
+
+### 13. Storage and rollout: the grants ledger (rewritten in place, 2026-08-17)
+
+*This section replaces the original "six shippable stages" (A-F) plan. The
+stage names survive only as labels for work already merged: A = the engine
+(#6894), B = the self-migration (#7079). The full delivery detail - shapes,
+event vocabulary, PR bills of materials, pre-flight facts, testing doctrine
+- lives in `dev/docs/plans/adr-092-authz-delivery-plan.md` (21 dated
+decisions); what follows is the decision itself.*
+
+**Grants are event-sourced.** The ClickHouse `event_log` is the single
+source of truth for every access fact (aggregate `authz_grants`,
+`aggregateId = organizationId`); Postgres holds fold projections that every
+authz check reads. Checks **never** read ClickHouse.
 
 ```
- A  EXTRACT   packages/authz/ registry + engine + AuthzDecision.
-              Characterization tests generated from the registry
-              (role × permission × scope matrix vs today's answers).
-              A5 adds the RESOURCE TIER (§8), collected from ADR-057's
-              ShareLink rows as grants - no schema change.
-              SHADOW MODE flag: run engine alongside legacy on real traffic,
-              log mismatches, fix until silent.                    [no behaviour Δ]
+  command (attach / revoke / offboard / define role / cutover …)
+      │
+      ▼
+  ClickHouse event_log ── append is WAITED (async_insert +
+      │                   wait_for_async_insert, ADR-022 event_log)
+      │
+      ├─► fold projections (Postgres):   Grant / Role      ← the future
+      │                                  RoleBinding /     ← legacy-shaped
+      │                                  CustomRole          compat view
+      │
+      └─► audit subscriber: INSERT-only AuditLog rows
+          (id derived from eventId, ON CONFLICT DO NOTHING, never an
+           update; when-guard skips genesis/backfill/mint sources so
+           cutover cannot flood the audit page; subscribers are excluded
+           from replay per ADR-098 - the existing audit UI is untouched)
 
- B  BACKFILL  TeamUser / OrganizationUser roles → RoleBindings
-              (idempotent script; dual-write already exists for new rows).
-              Delete the legacy fallbacks - only 2 files still read TeamUser
-              for authz (rbac.ts, virtualKey.authz.ts).
-              OrganizationUser.role becomes billing/seat data only; the six
-              `where: { role: "ADMIN" }` readers (notifications, langy
-              attribution, admin-email resolution) move to a binding-aware
-              `findOrgAdmins()` helper.
-
- C  RE-KEY    RoleBinding.role enum → roleKey (admin/member/viewer/
-              lite-member/custom:<id>); delete the org-scope special cases.
-              Backfill legacy API keys to explicit bindings; delete the
-              full-access bypass. Rewrite scoped-role-bindings.feature to
-              union semantics.
-
- D  RE-ATTACH .permission() sugar lands; codemod the 302 project + 76 org
-              + 5 team attach sites (mechanical - same permission strings);
-              collapse the ~15 handlerManagedAuth copies into edge identity
-              resolution; triage 23 skips + 16 resolver-authz sites into the
-              new named escapes; fold imperative second-phase checks into
-              service-level authz.authorize.
-
- E  DERIVE    Roles UI, API-key categories, docs, useCan, and the CI
-              route-coverage test all read the registry; delete
-              permissionsConfig.ts, permission-categories.ts, the client
-              resolver, and the rbac.ts monolith. ADR-001 → Superseded.
-
- F  ACCELERATE org authz epochs + the L1 cache land behind a flag (shadow-
-              compared exactly like stage A), and the flag only turns on
-              once every grant write bumps the epoch (§12's precondition,
-              delivered by D0); signed passports roll out per
-              stateless surface (collector, Go gateway, ADR-057 share
-              links); witness types (§7) become the convention for new
-              repositories.
+  ONE writer, TWO views, ONE subscriber. Application code never writes
+  Grant, Role, RoleBinding, CustomRole, or grant AuditLog rows directly.
 ```
 
-Each stage merges independently and is verifiable - stage A's shadow
-mismatch telemetry is the safety net for B-D, and again for F. No big-bang
-cutover, no downtime, and no customer-visible permission change except
-deliberate, spec'd ones.
+**Two dispatch disciplines, declared per command.** `queued` (the default):
+append → GroupQueue (per-org FIFO) → fold → Postgres. `immediate` (revoke,
+offboard, cutover rollback, SCIM removals): append → apply inline on the
+calling path → Postgres — Redis is never involved, even when healthy; the
+normal queue fan-out still runs and the cursor guard makes the second apply
+a no-op. `immediate` is a scoped amendment to ADR-007's "web only dispatches
+to queues" (inline processing in the web role, this pipeline only; grant
+writes per day, not traces per second). It is a *discipline*, not
+circuit-breaker degradation: a revocation never depends on Redis by design.
+
+**Doctrines** (nothing else backs these; this ADR does):
+
+- **No transactions.** Every step is retryable and idempotent: waited
+  append, deterministic event-derived ids (grant ids and audit row ids are
+  functions of event content), cursor-guarded apply, insert-if-absent audit.
+- **Two timestamps.** `occurredAt` is business time (backfilled facts carry
+  the legacy row's `createdAt`); `acceptedAt` is ledger time; the cursor
+  orders on `(acceptedAt, eventId)` (the house pair).
+- **Migration emits normal events**, distinguished only by `source`
+  (`genesis-import`, `backfill-b`, `read-through-mint`) and backdated
+  `occurredAt` - one reducer path, so replay exercises the live code. Only
+  process facts get their own events (`migration_parity_proved`,
+  `cutover_completed`, `cutover_rolled_back`).
+- **Appends are batched per org** - efficiency comes from batching, not from
+  fattening events.
+- **`Grant` and `Role` are born as new, clean tables** - never a rename of a
+  live table. The compat projection keeps the legacy path reading
+  `RoleBinding`/`CustomRole` until contract. As a new org-scoped
+  `(scopeType, scopeId)` model, `Grant` joins the tenancy-guard regime
+  ADR-021 defines (and flags today's org-scoped models for lacking).
+
+**Rollout: build dark → per-org cutover → contract.** All code ships to
+production gated closed by the migration state itself (the stage-B
+per-tenant state machine, whose lifecycle transitions become ledger events
+with `SystemMigrationTenantState` as their projection - same table, same
+ops page, same legacy-fallback gate). An org cuts over **all at once,
+never half**: import its remaining facts (EXTERNAL → lite-member, legacy
+keys, the org-member floor row, per-user zero-binding legacy ADMIN grants,
+its share links → RESOURCE grants, `ADMIN_EMAILS` → PLATFORM grants) →
+parity proof over every registry permission → `cutover_completed` → the
+fork at the ten existing seams (7 in `rbac.ts`, 3 in
+`role-binding-resolver.ts`) flips that org to engine-primary with legacy as
+reverse-shadow. Any parity diff **holds** the org - behaviour unchanged,
+diffs in the report, re-proved next pass; `held` is a designed steady
+state, not failure. Rollback is `cutover_rolled_back` (immediate), live
+within the gate's cache TTL, no deploy. Our own org first, in production,
+end to end; then the cohort widens self-service-first. Every deletion -
+the legacy resolvers, the quirk branches, the compat projection, the old
+tables, the fork and gate themselves, the epoch store - waits until 100 %
+of tenants are finalized (the contract PR). Public REST names
+(`/role-bindings`, the `bindings` wire shape,
+`role_binding_already_exists`) are customer contracts and stay frozen
+forever; the Grant/Role rename never leaks to the wire.
+
+Delivered as 4+1 PRs (plan doc, "The PR map"): **1** same position
+event-sourced (proof: replaying an org's stream is byte-identical to the
+imperative writer, and `in-place-authz-migration.feature` passes
+unchanged) · **2** the ledger becomes the only writer (genesis import;
+eight write paths become command emitters; SCIM reconciler; audit
+subscriber) · **3** the cutover machine and the fork · **4** the contract ·
+**5** accelerate (passports and the L1 cache keyed on the cursor),
+independent.
 
 Both candidates closed on 2026-08-17, leaving **no customer-visible
 permission change at all**:
@@ -1047,18 +1108,22 @@ deliberately out of scope.
   it no longer computes anything.
 - **Negative:** weeks of staged migration effort; everyone re-learns
   "binding grants role at scope, union, no override" (the diagrams above are
-  the teaching aid); shadow mode is temporary complexity; two behaviour
-  changes need customer comms (legacy keys especially - they are the oldest
-  credentials in the field); an in-repo engine means *we* own performance
-  (mitigated: the engine's collect-once/decide-many shape is strictly fewer
-  queries than today's per-check fan-out, and §12's epoch cache - new
-  machinery we must observe - ships flagged and shadow-compared before it is
-  trusted).
-- **Neutral:** Prisma storage barely changes (backfill plus one role-key
-  column); the Go services keep validating their own tokens and calling back
-  with service principals; ADR-021's tenancy guards are untouched and
-  complementary; grant freshness is preserved via org-level epochs rather
-  than by hitting Postgres on every check.
+  the teaching aid); shadow mode is temporary complexity; no behaviour
+  change needs customer comms (both candidates closed 2026-08-17 - no key
+  sunset, and empty-role-deny measured at zero blast radius); an in-repo
+  engine means *we* own performance (mitigated: the engine's
+  collect-once/decide-many shape is strictly fewer queries than today's
+  per-check fan-out, and §12's version cache - new machinery we must
+  observe - ships shadow-compared before it is trusted).
+- **Neutral:** the Go services keep validating their own tokens and calling
+  back with service principals; ADR-021's tenancy guards are complementary
+  (the new `Grant` table joins them); grant freshness is preserved via the
+  per-org projection cursor rather than by hitting Postgres on every check.
+- **Changed 2026-08-17:** Prisma storage is no longer "barely changed" -
+  `Grant` and `Role` are new tables fed by the event ledger (§13), with the
+  old tables continuing as derived compat views until contract. The cost is
+  deliberate: this is the last rewrite of this flow, and correct beats
+  expedient everywhere the two diverge.
 
 ## References
 
@@ -1069,8 +1134,22 @@ deliberately out of scope.
   (`PermissionDeniedError` as a `HandledError`).
 - Related: [ADR-057](./057-token-gated-trace-sharing.md) (token-gated trace
   sharing, PR #5809) - its `ShareLink` table is the resource tier's storage
-  for stages A5 through C5, and its possession-not-existence invariant is
-  preserved by the collector (§8).
+  until an org's cutover imports the rows into `Grant` (§8, §13); its
+  possession-not-existence invariant is preserved by the collector either way.
+- The ledger's lineage (all §13): [ADR-007](./007-event-sourcing-architecture.md)
+  (the pipeline architecture; `immediate` is a scoped amendment to its
+  web-role rule), [ADR-022](./022-event-log-source-of-truth.md) (*event_log
+  as single source of truth* - cite by title, two files share the number;
+  the waited `async_insert` append is its pattern; `leanForProjection`
+  conformance is a no-op here, no heavy fields),
+  [ADR-015](./015-projection-replay-coordination.md) (the replay protocol
+  the byte-identical replay test rides),
+  [ADR-098](./098-post-event-work-subscribers-and-process-managers.md)
+  (subscriber vocabulary; subscribers excluded from replay - what makes the
+  insert-only audit subscriber safe), [ADR-093](./093-redis-is-an-owned-client.md)
+  (Redis ownership; the `immediate` discipline never touches it),
+  [ADR-049](./049-langy-projection-independent-reactions.md)
+  (store-before-dispatch, preserved verbatim by waiting the append).
 - Related: [ADR-070](./070-modular-package-architecture.md) (bounded-context
   packages). The engine ships as two of them: `@langwatch/authz` is the pure
   vocabulary and decision core - Prisma-free, env-free, browser-safe, so the
@@ -1082,7 +1161,8 @@ deliberately out of scope.
 - Spec: `specs/rbac/unified-authorization-engine.feature` (this ADR);
   supersedes the override scenarios in `specs/rbac/scoped-role-bindings.feature`.
 - Delivery plan: [`dev/docs/plans/adr-092-authz-delivery-plan.md`](../plans/adr-092-authz-delivery-plan.md)
-  (stages sliced into PRs, gates, flags, rollback, the data-migration runbook).
+  (21 dated decisions, the final shapes and event vocabulary, the 4+1 PR
+  map, pre-flight facts, testing doctrine).
 - Evidence: `dev/docs/security/hono-api-rbac-audit.md` (PR #4283); issues
   #1247, #3388, #3429, #3685, #4008; `git log --since=2026-01-01 --
   langwatch/src/server/api/rbac.ts` (28 commits).
