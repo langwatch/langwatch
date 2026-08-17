@@ -466,11 +466,19 @@ Feature: microsoft_365_audit ingestion source (Office 365 Management Activity AP
     And the window is not empty
 
   # An untouched cursor and a fully-drained one are the same shape: empty
-  # queue, nothing deferred. Advancing on that shape alone skipped the whole
-  # interval, and nothing ever asks for a skipped window again.
+  # queue, nothing deferred. Reading completion off that shape is guessing,
+  # and a window guessed complete is never listed again by anyone.
+  #
+  # No caller reaches this today: the worker computes its deadline inline
+  # immediately before the call, so a run is never out of time on entry, and
+  # every mid-run timeout leaves either a queued blob or a deferred page
+  # behind. This pins the invariant rather than a production event — the
+  # adapter must know it finished, not infer it — so that a future caller
+  # (a retry that reuses a deadline, a queue that hands back a stale one)
+  # cannot quietly reintroduce the skip.
   @unit @regression
-  Scenario: A window the run never listed is not advanced past
-    Given a run whose deadline had already passed when it started
-    When the run finishes without listing anything
+  Scenario: Completion is reported by the run, not inferred from cursor shape
+    Given a run that is out of time before it lists anything
+    When the run returns
     Then it emits no events
     And the window it was given is left in place for the next run
