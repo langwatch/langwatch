@@ -190,6 +190,32 @@ describe("given an input panel with JSON content", () => {
   });
 });
 
+describe("given an input panel in the drawer", () => {
+  /** @scenario "The format selector sits with the actions, not with the label" */
+  it("groups the selector with the actions instead of the panel label", () => {
+    renderViewer({});
+
+    const selector = formatTrigger();
+    const label = screen.getByText("Input");
+    const measuredRow = document
+      .querySelector("[data-overflow-id]")
+      ?.closest("div")?.parentElement;
+
+    // That row right-aligns its contents with a leading spacer, so sitting
+    // inside it is what puts the selector on the right rather than beside the
+    // label.
+    expect(measuredRow?.contains(selector)).toBe(true);
+    expect(label.parentElement?.contains(selector)).toBe(false);
+    // First of the group: a longer format name then grows leftwards instead of
+    // pushing the actions around.
+    expect(
+      selector.compareDocumentPosition(
+        screen.getByRole("button", { name: "Translate" }),
+      ) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+});
+
 describe("given a chat-shaped input rendered in the Pretty format", () => {
   const chatContent = JSON.stringify([
     { role: "user", content: "where is my order?" },

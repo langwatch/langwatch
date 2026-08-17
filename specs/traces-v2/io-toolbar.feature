@@ -2,9 +2,11 @@ Feature: Trace drawer input and output toolbar
   The INPUT and OUTPUT panels of the trace drawer show one row of controls:
   a compact format selector, the actions that operate on the field
   (translate, comment, suggest edit, open in playground), and a copy
-  button. The row must stay usable on a narrow drawer, so actions that do
-  not fit collapse into the shared three-dot overflow menu instead of
-  being cut off.
+  button. They are grouped on the right of the row, which leaves the panel
+  label alone on the left: a reader follows the content, not the controls.
+  The row must stay usable on a narrow drawer, so actions that do not fit
+  collapse into the shared three-dot overflow menu instead of being cut
+  off.
 
   The same format selector is the one control for view modes wherever the
   drawer offers several: the conversation view (thread, bubbles, markdown),
@@ -17,6 +19,12 @@ Feature: Trace drawer input and output toolbar
     When the user opens the format selector
     Then the menu lists Pretty, Text, JSON and Markdown
     And picking a format switches the panel to that view
+
+  @integration
+  Scenario: The format selector sits with the actions, not with the label
+    Given an input panel in the drawer
+    Then the format selector is in the right-hand group with the actions
+    And the panel label keeps the left of the row to itself
 
   @integration
   Scenario: The active format keeps its inline layout toggles
