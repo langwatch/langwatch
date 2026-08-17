@@ -349,3 +349,61 @@ describe("Microsoft365AuditPuller drain", () => {
     expect(result.cursor).not.toBeNull();
   });
 });
+
+describe("Microsoft365AuditPuller window advance", () => {
+  /** @scenario A completed window advances so the next run sees new activity */
+  it("asks for the next window rather than re-listing the completed one", async () => {
+    const puller = await loadPuller();
+    const listedWindows: string[] = [];
+
+    // Capture the window each listing asks for.
+    const originalBlobs = fx.blobs;
+    fx.listing = [];
+    void originalBlobs;
+
+    const t0 = Date.parse("2026-05-03T12:00:00.000Z");
+    vi.spyOn(Date, "now").mockImplementation(() => t0);
+    const run1 = await puller.runOnce({ cursor: null }, CONFIG);
+
+    const cursor1 = JSON.parse(run1.cursor!);
+    listedWindows.push(`${cursor1.windowStart}..${cursor1.windowEnd}`);
+
+    // An hour of wall-clock passes and the next scheduled run fires.
+    vi.spyOn(Date, "now").mockImplementation(() => t0 + 3_600_000);
+    const run2 = await puller.runOnce({ cursor: run1.cursor }, CONFIG);
+
+    const cursor2 = JSON.parse(run2.cursor!);
+    listedWindows.push(`${cursor2.windowStart}..${cursor2.windowEnd}`);
+
+    // The regression this pins: advancing only the watermark left the window
+    // pinned at the first hour forever, so every run re-listed it and no new
+    // event was ever ingested — a source that looks healthy and reads nothing.
+    expect(listedWindows[0]).not.toBe(listedWindows[1]);
+    // No gap: the new window starts exactly where the last one ended.
+    expect(cursor2.windowStart).toBe(cursor1.windowEnd);
+    // And the watermark records the boundary that is now fully ingested.
+    expect(cursor2.watermark).toBe(cursor1.windowEnd);
+  });
+
+  /** @scenario Catching up after downtime advances in bounded steps */
+  it("never claims more than MAX_WINDOW_MS in one step when catching up", async () => {
+    const { MAX_WINDOW_MS } = await import("../microsoft365Audit.puller");
+    const puller = await loadPuller();
+    fx.listing = [];
+
+    const t0 = Date.parse("2026-05-03T12:00:00.000Z");
+    vi.spyOn(Date, "now").mockImplementation(() => t0);
+    const run1 = await puller.runOnce({ cursor: null }, CONFIG);
+
+    // The source has been down for a week.
+    vi.spyOn(Date, "now").mockImplementation(() => t0 + 7 * 24 * 3_600_000);
+    const run2 = await puller.runOnce({ cursor: run1.cursor }, CONFIG);
+
+    const cursor2 = JSON.parse(run2.cursor!);
+    const span =
+      Date.parse(cursor2.windowEnd) - Date.parse(cursor2.windowStart);
+    // Bounded steps rather than one listing asking for a week.
+    expect(span).toBeLessThanOrEqual(MAX_WINDOW_MS);
+    expect(span).toBeGreaterThan(0);
+  });
+});
