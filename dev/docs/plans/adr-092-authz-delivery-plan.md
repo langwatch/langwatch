@@ -5,21 +5,41 @@
 **This document:** the how - every stage sliced into PRs, with gates, flags,
 rollback, and the open decisions that block each stage.
 
-The ADR's six stages (A-F) survive here unchanged, with one addition: a stage
-D0 (the `grants.*` write service) pulled forward because stages D, E, and F
-all depend on it. **One PR per stage** (decided 2026-08-17, after stage A
-merged as #6894): the flags and soak gates are what protect the rollout, not
-the PR boundaries, and fewer PRs means less rebase churn and less fragmented
-releases. Each stage's tighten-and-delete tail rides the NEXT stage's PR
-(fallback deletion, `roleKey` NOT NULL, enum special cases all land in E).
-Rollback posture: revert the PR - except stage B's data, which rolls back by
-per-organization state (see below), not by git.
+**Restructured 2026-08-17 (Alex's call), replacing the stage-by-stage
+fleet-wide rollout.** The ADR's stages A-F survive as a description of the
+WORK, but they are no longer the unit of ROLLOUT. Three rules now govern
+delivery:
 
-**Data migrations are in-place** (same decision): the system migrates its own
-data at worker boot - a leased runner (`@langwatch/system-migrations`) walks
-every organization through `pending → migrated → finalized` (parked on
-error), one driver fleet-wide. Self-hosted installations migrate silently in
-the background with no operator action; cloud is paced through
+1. **Everything ships to production dark.** All the code an organization
+   needs to run on the engine lands in production first, gated closed for
+   every tenant. Nothing about anyone's behaviour changes when it deploys.
+2. **An organization cuts over all at once.** There is no partial state. One
+   composite migration rewrites that org's data - TeamUser rows, `roleKey`
+   on every binding, custom roles, lite-member, legacy keys - proves parity,
+   and flips the org onto the engine in a single transition. A tenant is on
+   the old flow or the new one, never half.
+3. **Every deletion waits for 100%.** The `roleKey` NOT NULL tighten, the
+   four `LEGACY-QUIRK(C)` branches, the `.permission()` codemod, deleting
+   `rbac.ts`, dropping `TeamUser` - all of it collects into a final contract
+   phase that only starts once every tenant is finalized. Nothing is deleted
+   while a single organization still reads it.
+
+**The fork replaces the codemod** (same decision). Stage D was going to
+codemod ~380 `.use(...)` call sites onto `.permission()` before enforcement
+could flip. It does not need to: the shadow already instrumented every
+decision point. Ten call sites across `rbac.ts` and `role-binding-resolver.ts`
+carry every legacy permission decision, and each already calls
+`authzShadowFor(...)`. Turning those into a per-organization fork - engine
+decides for a migrated org, legacy decides for everyone else, the other one
+runs as the shadow either way - is a change inside two files. The codemod
+still happens, but it becomes cosmetic cleanup in the contract phase,
+attempted only once the new direction is proven in production.
+
+**Data migrations stay in-place**: the system migrates its own data at worker
+boot - a leased runner (`@langwatch/system-migrations`) walks every
+organization through `pending → migrated → finalized` (parked on error), one
+driver fleet-wide. Self-hosted installations migrate silently in the
+background with no operator action; cloud is paced through
 `SYSTEM_MIGRATIONS_COHORT` (unset = nothing, org list, or `all`). Nothing
 ships as a runnable script. The ops dashboard (Migrations page) shows every
 tenant's state and can kick a pass. The identity-platform program is the
@@ -29,28 +49,43 @@ per-customer migrations).
 ## The shape of the whole thing
 
 ```text
-        A ENGINE           B SELF-MIGRATE     C RE-KEY           D ONE IDIOM
-        registry+roles     in-place runner,   roleKey column     grants service,
-        engine+shadow      TeamUser →         lite-member fix,   .permission(),
-        MERGED #6894  ──►  bindings, per-org  legacy-key    ──►  edge identity,
-        shadow at 100%     parity + switch    sunset             authz.authorize
-        on cloud (soak)    1 PR               1 PR               1 PR
-                                                   │                  │
- union semantics: settled (D1)        product sign-off #1, #2         │
-                                                                      ▼
-        F ACCELERATE                            E DERIVE + DELETE
-        epochs, L1 cache,                       useCan, Access surface,
-        passports, witnesses   ◄──────────────  offboard verb, delete
-        1 PR                                    rbac.ts + stage tails
-                                                1 PR
+ PHASE 1 · BUILD DARK                        everything in prod, gate closed
+ ┌──────────────────────────────────────────────────────────────────────┐
+ │ roleKey column + dual-read      lite-member as a role                │
+ │ legacy-key compatibility        ShareLink permission column          │
+ │ grants.* write service          useCan / effectivePermissions        │
+ │ THE FORK at the 10 shadow seams (per-org, decides which engine)      │
+ └──────────────────────────────────────────────────────────────────────┘
+                                   │  no behaviour change for anyone
+                                   ▼
+ PHASE 2 · CUT OVER, ONE ORG AT A TIME       our org first, in production
+ ┌──────────────────────────────────────────────────────────────────────┐
+ │ ONE composite migration per organization:                            │
+ │   TeamUser → bindings · roleKey on every binding · custom roles       │
+ │   rewritten · EXTERNAL → lite-member · legacy keys → bindings         │
+ │   ─────────── parity proof ───────────                               │
+ │   finalized → that org is on the engine; legacy becomes the shadow    │
+ │ rollback = write `rolled_back`, back on legacy inside 15 min          │
+ └──────────────────────────────────────────────────────────────────────┘
+                                   │  widen the cohort, watch the ops page
+                                   ▼
+ PHASE 3 · CONVERGE                          every tenant finalized
+        held organizations remediated or their diff accepted deliberately
+                                   │
+                                   ▼
+ PHASE 4 · CONTRACT                          only now does anything die
+ ┌──────────────────────────────────────────────────────────────────────┐
+ │ roleKey NOT NULL · delete the 4 LEGACY-QUIRK(C) branches             │
+ │ .permission() codemod · Hono edge identity · delete rbac.ts          │
+ │ drop TeamUser · delete the fork and the gate themselves              │
+ └──────────────────────────────────────────────────────────────────────┘
 
- Total: 5 PRs after stage A · ~9-12 weeks wall clock (soaks dominate)
- Parallelism: inside each stage PR; the soak gates between stages stay serial
+ F ACCELERATE (epochs, L1 cache, passports, witnesses) is independent
+ performance work and does not gate any of the above.
 ```
 
-Every stage ends at a **gate**: a measurable condition, not a vibe. No stage
-starts until the previous gate is green, except where the dependency arrows
-above say otherwise.
+The gates that matter are now per-organization and measurable in one place:
+the tenant's own state record, visible on the ops Migrations page.
 
 ## Flags and kill switches
 
