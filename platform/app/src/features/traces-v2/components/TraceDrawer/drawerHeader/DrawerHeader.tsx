@@ -16,6 +16,7 @@ import {
   LuMaximize2,
   LuMinimize2,
   LuRefreshCw,
+  LuShare2,
   LuX,
 } from "react-icons/lu";
 import { PersonalFeatureGateDialog } from "~/components/me/PersonalFeatureGateDialog";
@@ -528,7 +529,11 @@ export const DrawerHeader = memo(function DrawerHeader({
     useTraceDrawerNavigation();
 
   const statusColor = STATUS_COLORS[trace.status] as string;
-  const { project } = useOrganizationTeamProject();
+  const { project, hasPermission } = useOrganizationTeamProject();
+  // Sharing a trace is how a reviewer hands it to someone without an account,
+  // which is frequent enough that it earns a button rather than a click into
+  // the overflow menu. Gated on the same permission the menu item used.
+  const canShare = hasPermission("traces:share");
   const dejaView = useDejaViewLink({
     aggregateId: trace.traceId,
     tenantId: project?.id,
@@ -1037,6 +1042,18 @@ export const DrawerHeader = memo(function DrawerHeader({
             queries. */}
         {!readOnly && (
           <HStack gap={1} flexShrink={0} marginRight={-2} marginTop={-2}>
+            {canShare && (
+              <Tooltip content="Share" positioning={{ placement: "bottom" }}>
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  onClick={() => setShareOpen(true)}
+                  aria-label="Share trace"
+                >
+                  <Icon as={LuShare2} boxSize={3.5} />
+                </Button>
+              </Tooltip>
+            )}
             <Tooltip
               content={
                 <HStack gap={1}>
@@ -1099,7 +1116,6 @@ export const DrawerHeader = memo(function DrawerHeader({
               dejaViewHref={dejaView.href ?? null}
               onOpenRawJson={() => setRawOpen(true)}
               onShowShortcuts={() => setShortcutsOpen(true)}
-              onShare={() => setShareOpen(true)}
               onAddToAnnotationQueue={handleAddToAnnotationQueue}
               pinned={pinned}
               onTogglePinned={togglePinned}

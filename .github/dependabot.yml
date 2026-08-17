@@ -81,10 +81,10 @@ updates:
           - "react"
           - "react-dom"
           - "react-is"
-      typescript-native-preview:
+      typescript:
         applies-to: version-updates
         patterns:
-          - "@typescript/native-preview"
+          - "typescript"
       types:
         applies-to: version-updates
         patterns:

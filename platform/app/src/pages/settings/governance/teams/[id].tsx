@@ -39,7 +39,7 @@ const fmtRelative = (date: Date | string | null): string => {
 /**
  * Per-team governance detail. Reads the same `spendByTeam` rollup
  * the bird's-eye uses, filters in-memory to the requested team id,
- * surfaces the team's headline metrics + a 'see this team in /messages'
+ * surfaces the team's headline metrics + a 'see this team in /traces'
  * deep-link. Detail-data depth (per-day spend, per-user breakdown,
  * model mix) defers to a follow-up; this page exists today to honor
  * the bird's-eye click-through invariant.

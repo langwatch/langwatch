@@ -1,6 +1,6 @@
 import { definePipeline } from "../../";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
-import type { ReactorDefinition } from "../../reactors/reactor.types";
+import type { AppendStore } from "../../projections/mapProjection.types";
 import {
   CancelRunCommand,
   DeleteRunCommand,
@@ -13,38 +13,49 @@ import {
 } from "./commands";
 import { ComputeRunMetricsCommand } from "./commands/computeRunMetrics.command";
 import {
+  SIMULATION_RUN_EXECUTION_PROCESS_NAME,
+  type SimulationRunExecutionDispatchDeps,
+  simulationRunExecutionPM,
+} from "./process-manager";
+import {
+  SimulationRunMetricsMapProjection,
+  type SimulationRunMetricsProjectionRecord,
+} from "./projections/simulationRunMetrics.mapProjection";
+import {
   type SimulationRunStateData,
   SimulationRunStateFoldProjection,
 } from "./projections/simulationRunState.foldProjection";
 import type { SimulationProcessingEvent } from "./schemas/events";
+import {
+  type CustomerIoSimulationSyncSubscriberDeps,
+  createCustomerIoSimulationSyncSubscriber,
+} from "./subscribers/customerIoSimulationSync.subscriber";
+import {
+  createSnapshotUpdateBroadcastSubscriber,
+  type SnapshotUpdateBroadcastSubscriberDeps,
+} from "./subscribers/snapshotUpdateBroadcast.subscriber";
+import {
+  createSuiteRunSyncSubscriber,
+  type SuiteRunSyncSubscriberDeps,
+} from "./subscribers/suiteRunSync.subscriber";
+import {
+  createTraceMetricsSyncSubscriber,
+  type TraceMetricsSyncSubscriberDeps,
+} from "./subscribers/traceMetricsSync.subscriber";
 
 export interface SimulationProcessingPipelineDeps {
   simulationRunStore: FoldProjectionStore<SimulationRunStateData>;
-  snapshotUpdateBroadcastReactor: ReactorDefinition<
-    SimulationProcessingEvent,
-    SimulationRunStateData
-  >;
-  cancellationBroadcastReactor: ReactorDefinition<
-    SimulationProcessingEvent,
-    SimulationRunStateData
-  >;
-  scenarioExecutionReactor: ReactorDefinition<
-    SimulationProcessingEvent,
-    SimulationRunStateData
-  >;
-  suiteRunSyncReactor: ReactorDefinition<
-    SimulationProcessingEvent,
-    SimulationRunStateData
-  >;
-  traceMetricsSyncReactor: ReactorDefinition<
-    SimulationProcessingEvent,
-    SimulationRunStateData
-  >;
+  /** Append store backing the simulationRunMetrics map projection. */
+  simulationRunMetricsStore: AppendStore<SimulationRunMetricsProjectionRecord>;
+  /** Pre-constructed with `loadPriorEvents` for ECST backfill. */
+  finishRunCommand: FinishRunCommand;
   computeRunMetricsCommand: ComputeRunMetricsCommand;
-  customerIoSimulationSyncReactor?: ReactorDefinition<
-    SimulationProcessingEvent,
-    SimulationRunStateData
-  >;
+  /** Dispatch deps for the simulationRunExecution process manager (ADR-052). */
+  simulationRunExecution: SimulationRunExecutionDispatchDeps;
+  snapshotUpdateBroadcast: SnapshotUpdateBroadcastSubscriberDeps;
+  suiteRunSync: SuiteRunSyncSubscriberDeps;
+  traceMetricsSync: TraceMetricsSyncSubscriberDeps;
+  customerIoSimulationSync?: CustomerIoSimulationSyncSubscriberDeps;
 }
 
 /**
@@ -52,13 +63,24 @@ export interface SimulationProcessingPipelineDeps {
  *
  * This pipeline uses simulation_run aggregates (aggregateId = scenarioRunId).
  * It tracks the lifecycle of simulation runs:
- * - started -> message snapshots -> finished (or deleted)
+ * - queued -> started -> message snapshots -> finished (or deleted)
  *
- * Fold Projection: simulationRunState
- * - Tracks simulation run state (status, messages, verdict, etc.)
- * - Stored in simulation_runs ClickHouse table
+ * Architecture (event-carried state, ADR-052):
+ * - Commands append facts to the ClickHouse event_log; FinishRunCommand
+ *   backfills ECST identity/traceIds from the run's prior events.
+ * - Fold projection simulationRunState tracks run state (status, messages,
+ *   verdict, etc.) in the simulation_runs ClickHouse table.
+ * - Map projection simulationRunMetrics appends one row per
+ *   metrics_computed event (metrics are computed upstream by
+ *   ComputeRunMetricsCommand and carried on the event).
+ * - Subscribers own side effects (SSE broadcast, suite-run sync, trace
+ *   metrics pull, Customer.io sync) from event payloads only.
+ * - The simulationRunExecution process manager owns the execution
+ *   lifecycle: dispatch to the worker pool, cancellation broadcast with a
+ *   force-terminal backstop, and the stall watchdog.
  *
  * Commands:
+ * - queueRun: Emits SimulationRunQueuedEvent when a run is scheduled
  * - startRun: Emits SimulationRunStartedEvent when run begins
  * - messageSnapshot: Emits SimulationMessageSnapshotEvent for message updates
  * - finishRun: Emits SimulationRunFinishedEvent when run completes
@@ -77,33 +99,33 @@ export function createSimulationProcessingPipeline(
         store: deps.simulationRunStore,
       }),
     )
-    .withReactor(
-      "simulationRunState",
+    .withMapProjection(
+      "simulationRunMetrics",
+      new SimulationRunMetricsMapProjection({
+        store: deps.simulationRunMetricsStore,
+      }),
+    )
+    .withSubscriber(
       "snapshotUpdateBroadcast",
-      deps.snapshotUpdateBroadcastReactor,
+      createSnapshotUpdateBroadcastSubscriber(deps.snapshotUpdateBroadcast),
     )
-    .withReactor(
-      "simulationRunState",
-      "cancellationBroadcast",
-      deps.cancellationBroadcastReactor,
+    .withSubscriber(
+      "suiteRunSync",
+      createSuiteRunSyncSubscriber(deps.suiteRunSync),
     )
-    .withReactor("simulationRunState", "suiteRunSync", deps.suiteRunSyncReactor)
-    .withReactor(
-      "simulationRunState",
+    .withSubscriber(
       "traceMetricsSync",
-      deps.traceMetricsSyncReactor,
+      createTraceMetricsSyncSubscriber(deps.traceMetricsSync),
     )
-    .withReactor(
-      "simulationRunState",
-      "scenarioExecution",
-      deps.scenarioExecutionReactor,
+    .withProcessManager(
+      SIMULATION_RUN_EXECUTION_PROCESS_NAME,
+      simulationRunExecutionPM(deps.simulationRunExecution),
     );
 
-  if (deps.customerIoSimulationSyncReactor) {
-    builder = builder.withReactor(
-      "simulationRunState",
+  if (deps.customerIoSimulationSync) {
+    builder = builder.withSubscriber(
       "customerIoSimulationSync",
-      deps.customerIoSimulationSyncReactor,
+      createCustomerIoSimulationSyncSubscriber(deps.customerIoSimulationSync),
     );
   }
 
@@ -113,7 +135,7 @@ export function createSimulationProcessingPipeline(
     .withCommand("messageSnapshot", MessageSnapshotCommand)
     .withCommand("textMessageStart", TextMessageStartCommand)
     .withCommand("textMessageEnd", TextMessageEndCommand)
-    .withCommand("finishRun", FinishRunCommand)
+    .withCommandInstance("finishRun", FinishRunCommand, deps.finishRunCommand)
     .withCommand("cancelRun", CancelRunCommand)
     .withCommand("deleteRun", DeleteRunCommand)
     .withCommandInstance(

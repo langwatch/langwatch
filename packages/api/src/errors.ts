@@ -1,9 +1,9 @@
 import {
   HandledError,
-  ValidationError,
   isZodLikeError,
+  ValidationError,
+  type ZodLikeError,
 } from "@langwatch/handled-error";
-import type { ZodLikeError } from "@langwatch/handled-error";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
@@ -41,19 +41,17 @@ class SchemaFailure extends HandledError {
  * `fault`, so it was logged as a 500 `error` while the response went out 422 —
  * validation noise landing in the 5xx error budget.
  *
- * Takes the structural type, not a zod class: the two zod builds in one package
- * each have their own `ZodError`, and a route whose schema came from the other
- * build would answer 500 for a body the caller can fix.
+ * Typed `ZodLikeError`, not `ZodError`: routes mounted on this app validate
+ * with whichever zod their schema was authored against, and the repo now runs
+ * both majors. `issue.code`, `issue.path` and `issue.message` are identical
+ * across them, so the reasons this builds are too.
  */
 function validationErrorFromZod(err: ZodLikeError): ValidationError {
   return new ValidationError("Validation error", {
     reasons: err.issues.map(
       (issue) =>
         new SchemaFailure({
-          // Stringified per segment: a zod 4 path may hold a symbol (a record
-          // key), and Array.join would throw on one, inside the handler whose
-          // job is to stop a throw reaching the client.
-          field: issue.path.map(String).join(".") || "(root)",
+          field: issue.path.join(".") || "(root)",
           type: issue.code,
           message: issue.message,
         }),
@@ -163,7 +161,9 @@ function formatError({
   }
 
   // 2. ZodError -- promoted to a ValidationError so it travels the same path.
-  //    Recognised by shape; see isZodLikeError.
+  //    Matched by shape, so a route whose schema is on `zod/v4` is promoted
+  //    the same as one still on v3; an `instanceof` would see only one major
+  //    and drop the other's rejections through to the unknown-error 500 below.
   if (isZodLikeError(err)) {
     return handledErrorToResponse({
       err: validationErrorFromZod(err),

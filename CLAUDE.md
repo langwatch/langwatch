@@ -170,16 +170,34 @@ make service-watch svc=nlpgo # live reload via air
 From the repo root (it proxies these to `@langwatch/web`)
 
 ```bash
-pnpm typecheck        # Type check (uses tsgo, fast)
+pnpm typecheck        # Type check (TypeScript 7's native tsc, fast)
 pnpm test:unit        # Unit tests
-pnpm test:integration # Integration tests
+pnpm test:component   # Integration tests that need no datastore (jsdom, parallel)
+pnpm test:integration # Integration tests that do (Postgres/ClickHouse/Redis)
 pnpm test:e2e         # E2E tests
 ```
 
-**Whole-repo checks take a machine-wide slot.** A tsgo run peaks around 3 to 4
-GiB and uses every core; a biome run over 6,800 files spends 38 CPU-seconds in 4
+**`.integration.test.ts` files run in one of two lanes, chosen by their
+dependencies rather than by their name.** The suffix states a test LEVEL —
+renders a component, mocks its boundaries — and that is still the right name for
+such a test. But 540 of the 1017 integration files declare jsdom and name no
+database, queue or cache, and they were running on a shard that booted three
+datastores and migrated two schemas first. A file lands in the **component**
+lane when it declares `@vitest-environment jsdom` **and** mentions no datastore;
+everything else stays in the **datastore** lane. The rule lives in
+`src/test-utils/integrationLanes.ts`, both vitest configs call it, so the lanes
+are exact complements and no file can drop out of CI. Default is the datastore
+lane, so a new test is never silently run without the infrastructure it needs —
+and if you move one across and it turns out to reach a database transitively, it
+fails loudly on the first run rather than passing for the wrong reason. See
+`specs/ci/integration-test-lanes.feature`.
+
+**Whole-repo checks take a machine-wide slot.** A typecheck holds a 2.3 to
+3.5 GiB working set and uses every core — though what you see in Activity
+Monitor is its footprint, which expands toward whatever `GOMEMLIMIT` the queue
+gave it (ADR-100); a biome run over 6,800 files spends 38 CPU-seconds in 4
 seconds of wall clock. That is fine once and ruinous four times over, so
-`typecheck`, `typecheck:tests`, `typecheck:legacy`, `lint`, `lint:fix`,
+`typecheck`, `typecheck:tests`, `lint`, `lint:fix`,
 `lint:plugins` and `format` all go through `dev/scripts/check-queue.mjs`. It
 counts the runs live across every worktree, terminal and agent on the machine
 against **one** counter (they compete for the same cores), and a run past the
@@ -198,21 +216,21 @@ own threads instead (`RAYON_NUM_THREADS` does work on biome): it spends the same
 CPU over 5x the wall clock. See `specs/setup/check-slots.feature`.
 
 **Going around the scripts does not go around the queue.** `platform/app`'s
-`node_modules/.bin/{tsgo,tsc,biome}` are shims installed by
-`dev/scripts/install-check-shims.mjs` from postinstall, so `pnpm exec tsgo
+`node_modules/.bin/{tsc,tsgo,biome}` are shims installed by
+`dev/scripts/install-check-shims.mjs` from postinstall, so `pnpm exec tsc
 --noEmit -p tsconfig.tsgo.json` and `./node_modules/.bin/biome check ./src` take
 a slot too. Only whole-tree runs do: a `-p`/`--project`, a directory argument, or
-no path argument at all. Naming files (`tsgo --noEmit src/foo.ts`) stays instant
+no path argument at all. Naming files (`tsc --noEmit src/foo.ts`) stays instant
 and unqueued, and `--watch` / `--lsp` never queue, since they would hold a slot
 for the session. A run that already holds a slot exports `CHECK_SLOTS=0` to
 everything it spawns, so it can't queue behind itself. The installer stands
 down entirely when `NODE_ENV=production` or `CI` is set to anything but `0` or
 `false`, so an image build or a server install keeps pnpm's own bin entries.
 
-One catch on targeted tsgo runs: with a `tsconfig.json` present, `tsgo --noEmit
+One catch on targeted runs: with a `tsconfig.json` present, `tsc --noEmit
 <file>` fails with `TS5112` unless you add `--ignoreConfig`. That error is what
 pushes people to widen the command to `-p tsconfig.tsgo.json`, which is a full
-3 to 4 GiB run. Prefer `pnpm typecheck` for a whole-project check now that it
+whole-tree run. Prefer `pnpm typecheck` for a whole-project check now that it
 queues, and keep `--ignoreConfig` for the single-file case.
 
 When debugging locally, **prefer the observability stack over the log file if it is up** (haven starts it by default; `make haven status` confirms). Query the real logs/traces/metrics by attribute with `gcx` — Grafana's CLI, wired by `make observability-connect` — instead of grepping the giant `platform/app/server.log`: indexed attribute search finds the failure far faster, and with the stack up the console is muted to warn+ anyway so the detail only lives in Grafana. Filter to your own worktree with the `langwatch_worktree` structured-metadata field (a pipe filter, not a stream label), e.g. `gcx logs query '{service_name="langwatch-app"} | langwatch_worktree="<slug>"' --since 15m` and `gcx traces query '{ resource.service.name = "langwatch-service-langyagent" }' --since 15m`. See `dev/docs/best_practices/local-observability.md` ("Reading the data as an agent"). `pnpm dev` still tees to `platform/app/server.log`; grep it as the fallback when the stack is down.
@@ -260,7 +278,9 @@ specs/               # BDD feature specs
 | Shared types in `types.ts` | Colocate unless truly shared |
 | Duplicating Zod + TS types | When you need both validation AND types, use Zod only with `infer`. For internal constants (no external input), `as const` is sufficient |
 | Skipping test run after edits | Always run tests after any code change to catch regressions immediately |
-| Running `npx vitest` / `npm exec vitest` directly | Always go through the package scripts: `pnpm test:unit run <path>`, `pnpm test:integration run <path>`. Only they carry the repo's RAM guardrails (`pool: "vmForks"` + `isolate: false`, `maxWorkers: "50%"`, `vmMemoryLimit: "512MB"`; integration adds `pool: "forks"` + `fileParallelism: false`) |
+| Running `npx vitest` / `npm exec vitest` directly | Always go through the package scripts: `pnpm test:unit run <path>`, `pnpm test:component run <path>`, `pnpm test:integration run <path>`. Only they carry the repo's RAM guardrails (`pool: "vmForks"` + `isolate: false`, `maxWorkers: "50%"`, `vmMemoryLimit: "512MB"`; integration adds `pool: "forks"` + `fileParallelism: false`) |
+| Running a component-lane test with `pnpm test:integration` and finding it "missing" | The two lanes are complements: `test:integration` only includes files that need a datastore, so a jsdom file naming none is not in it. Use `pnpm test:component`. If you meant it to have a database, name the dependency — that is what moves it back |
+| Adding a datastore to an existing jsdom integration test and expecting CI to notice | It does, automatically: the lane is recomputed from the file's source on every run, so mentioning Prisma/ClickHouse/Redis moves it to the datastore lane with no config change. The reverse also holds — removing the last mention moves it out, so check that is what you wanted |
 | Hand-rolling a throwaway `vitest.*.config.ts` (in `/tmp` or a worktree) | Never. A bare config inherits none of the guardrails above, so vitest defaults to the `forks` pool at `availableParallelism - 1` workers (10 on an 11-core laptop) at ~200-500MB each — several GB per run, multiplied by every parallel agent worktree. Use an existing config |
 | Writing a jsdom config because the repo "has no jsdom environment" | It is per-file on purpose — neither config declares a global `environment`; 515 test files set `// @vitest-environment jsdom` in a docblock. Add the docblock to your test file |
 | Reaching for `--maxWorkers=1` to be gentle on RAM | It serializes the run so it stays resident far longer, overlapping every other agent's run. Scope the run down instead — pass a narrower path |
@@ -308,7 +328,8 @@ specs/               # BDD feature specs
 
 | Common Mistake | Correct Behavior |
 |----------------|------------------|
-| Using npm tsc to compile | Use `pnpm typecheck` instead, it uses the new tsgo which is much faster |
+| Using npm tsc to compile | Use `pnpm typecheck` instead — it names the right project and the right compiler. Locally, a **whole-tree** `tsc` reached any other way still queues, because the bin shim sees to it; a file-targeted run, a `--watch`/`--lsp` session and CI do not (see "Going around the scripts" above). So the reason to go through the script is correctness, not the queue |
+| Importing the TypeScript compiler API from `typescript` | TypeScript 7's root export is a version constant; the compiler lives behind `typescript/unstable/*`, and nothing parses a string in-process any more. Static scans go through `src/test-utils/tsAst.ts`, which owns the one API session. See ADR-099 |
 | Creating shared types for single-use interfaces | Colocate interfaces with their usage; only extract to `types.ts` when shared across multiple files |
 | Using -- on pnpm tasks, pnpm adds the -- automatically | Using e.g. `pnpm test:unit path/to/file` directly |
 | Using positional parameters for functions with multiple args | Use named parameters via object destructuring: `fn({ a, b })` not `fn(a, b)` |

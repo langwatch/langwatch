@@ -198,7 +198,7 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
 
   /**
    * Builds a queue whose handler folds its events and then optionally throws —
-   * reproducing a reactor failure after the fold state was already stored,
+   * reproducing a subscriber failure after the fold state was already stored,
    * which is the window `projectionRouter.ts:1570-1581` opens.
    */
   function createFoldQueue({
@@ -280,7 +280,7 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
         failuresLeft--;
         // The fold state is committed at this point. Everything from here to
         // the ack is the redelivery window.
-        throw new Error("reactor dispatch failed after the fold was stored");
+        throw new Error("subscriber dispatch failed after the fold was stored");
       }
     };
 

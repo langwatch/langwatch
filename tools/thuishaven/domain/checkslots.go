@@ -60,15 +60,24 @@ func ResolveCheckSlots(totalRAMBytes uint64, numCPU int, env CheckEnv) (int, str
 }
 
 // CheckGoMemLimit is the soft memory cap set on the Go-runtime tools the queue
-// wraps (tsgo is a Go binary): GOMEMLIMIT makes the runtime collect harder to
-// stay under the limit instead of ballooning, so a whole-tree typecheck
-// degrades to "slower", not "10 GiB resident" (ADR-095). Half the machine,
-// clamped to [4, 10] GiB; an operator's explicit GOMEMLIMIT always wins. The
+// wraps (the TypeScript compiler is a Go binary): GOMEMLIMIT makes the runtime
+// collect harder to stay under the limit instead of ballooning (ADR-095). The
 // daemon's process watch is the hard backstop above this.
+//
+// Half the machine, clamped to [3, 6] GiB; an operator's explicit GOMEMLIMIT
+// always wins. The old cap of 10 was not a limit anything reached by accident:
+// GOMEMLIMIT is a soft ceiling the runtime expands toward, so an 18 GiB laptop
+// resolved to 9 GiB and a typecheck duly footprinted 9.08 GB against a 2.29 GB
+// working set. Measured at four ceilings the working set stayed inside
+// 2.3-3.5 GB every time, so 6 cannot be what constrains it. The floor is 3
+// rather than lower because a ceiling below the live heap is missed anyway, at
+// the price of collecting continuously to miss it. 6 itself is a judgement
+// between measured points and wants a re-measure on an unloaded machine; see
+// ADR-100, which records what the samples do and do not establish.
 func CheckGoMemLimit(totalRAMBytes uint64, existing string) string {
 	if existing != "" {
 		return existing
 	}
 	gib := int(totalRAMBytes / (2 << 30))
-	return fmt.Sprintf("%dGiB", clampInt(gib, 4, 10))
+	return fmt.Sprintf("%dGiB", clampInt(gib, 3, 6))
 }

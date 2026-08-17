@@ -446,7 +446,7 @@ export function TryItOut({
                           <Table.Cell
                             maxWidth="180px"
                             onClick={() =>
-                              openDrawer("traceDetails", {
+                              openDrawer("traceV2Details", {
                                 traceId: trace.trace_id,
                               })
                             }
@@ -468,7 +468,7 @@ export function TryItOut({
                           <Table.Cell
                             maxWidth="225px"
                             onClick={() =>
-                              openDrawer("traceDetails", {
+                              openDrawer("traceV2Details", {
                                 traceId: trace.trace_id,
                               })
                             }
@@ -495,7 +495,7 @@ export function TryItOut({
                             <Table.Cell
                               maxWidth="225px"
                               onClick={() =>
-                                openDrawer("traceDetails", {
+                                openDrawer("traceV2Details", {
                                   traceId: trace.trace_id,
                                 })
                               }
@@ -515,7 +515,7 @@ export function TryItOut({
                             <Table.Cell
                               maxWidth="225px"
                               onClick={() =>
-                                openDrawer("traceDetails", {
+                                openDrawer("traceV2Details", {
                                   traceId: trace.trace_id,
                                 })
                               }

@@ -68,6 +68,52 @@ Feature: Process-manager visibility in ops
     And redriving it again is a no-op
     And the redrive lands in the audit trail
 
+  # ── Dead letters ──────────────────────────────────────────────────────
+
+  # The fleet table reported a dead COUNT and nothing else, and the only read
+  # that returns messages needs a full process ref — process name, project and
+  # process key — so a dead message could only be reached by an operator who
+  # already knew where it was. A number nobody can act on is an unfinished
+  # feature (best_practices/ops-dashboard.md), and dead work is the one state
+  # this substrate reports that never resolves on its own.
+  #
+  # The outbox row does not record WHY a message died: the dispatcher puts the
+  # diagnostic on the span and the log line. Each row carries its trace id
+  # instead, so the reason is one hop away rather than duplicated into
+  # Postgres.
+
+  @integration
+  Scenario: Dead messages are listed across the whole fleet
+    Given dead messages belonging to several process names
+    When the dead letters are listed without naming a process
+    Then every dead message is returned regardless of which process holds it
+    And each one carries the process name, project and process key needed to act on it
+
+  @integration
+  Scenario: The newest failure is at the top
+    Given dead messages retired at different times
+    When the dead letters are listed
+    Then they are ordered by when they were retired, newest first
+
+  @integration
+  Scenario: Dead letters can be narrowed to one process
+    Given dead messages belonging to several process names
+    When the dead letters are listed for one process name
+    Then only that process name's messages are returned
+
+  @integration
+  Scenario: The fleet's dead totals are summarized per process
+    Given dead messages belonging to several process names
+    When the dead totals are counted
+    Then each process name reports its count and its oldest retirement
+    And the processes with the most dead messages sort first
+
+  @integration
+  Scenario: A dead message can be redriven from the list
+    Given a dead message found without opening its instance
+    When the operator redrives it from the list
+    Then it returns to pending with its attempts reset
+
   # ── Signals ───────────────────────────────────────────────────────────
 
   @unit

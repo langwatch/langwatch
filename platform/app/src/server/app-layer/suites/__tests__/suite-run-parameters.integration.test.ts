@@ -11,6 +11,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { createResilientClickHouseClient } from "~/server/clickhouse/managedClient";
 import {
   startTestContainers,
   stopTestContainers,
@@ -24,7 +25,6 @@ import {
 import { SimulationRunStateRepositoryClickHouse } from "~/server/event-sourcing/pipelines/simulation-processing/repositories/simulationRunState.clickhouse.repository";
 import type { QueueRunCommandData } from "~/server/event-sourcing/pipelines/simulation-processing/schemas/commands";
 import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
-import { createResilientClickHouseClient } from "../../clients/clickhouse";
 import { SimulationClickHouseRepository } from "../../simulations/repositories/simulation.clickhouse.repository";
 import { NullSuiteRunReadRepository } from "../repositories/suite-run.repository";
 import { SuiteRunService } from "../suite-run.service";

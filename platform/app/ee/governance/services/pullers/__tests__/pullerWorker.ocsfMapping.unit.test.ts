@@ -87,7 +87,7 @@ describe("PullerWorker — OCSF mapping (semantic contract)", () => {
     });
 
     it("uses the org's hidden internal_governance Project ID as tenantId", () => {
-      // Same key the trace-fold reactor + OCSF export service use, so
+      // Same key the trace-fold subscriber + OCSF export service use, so
       // pull events surface alongside trace-derived events on the SIEM
       // export path.
       const row = mapToOcsfRowSemantic({

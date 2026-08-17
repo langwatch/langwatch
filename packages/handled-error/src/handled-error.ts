@@ -415,16 +415,11 @@ export class NotFoundError extends HandledError {
   }
 }
 
-/**
- * One entry of a zod-like error's `issues`, in the fields zod 3 and zod 4 both
- * carry. The two builds disagree on the rest: zod 4 adds `origin` to a range
- * failure and drops `received` from a type failure, so a caller that reads
- * anything outside these three works on one build only.
- */
+/** One zod issue, in the shape both v3 and v4 agree on. */
 export interface ZodLikeIssue {
-  path: readonly PropertyKey[];
-  message: string;
   code: string;
+  path: PropertyKey[];
+  message: string;
 }
 
 /**
@@ -434,8 +429,9 @@ export interface ZodLikeIssue {
  * error with zod's `flatten()` shape qualifies.
  */
 export interface ZodLikeError {
+  name: string;
   message: string;
-  readonly issues: readonly ZodLikeIssue[];
+  issues: ZodLikeIssue[];
   flatten(): {
     formErrors: string[];
     fieldErrors: Record<string, string[] | undefined>;
@@ -443,27 +439,34 @@ export interface ZodLikeError {
 }
 
 /**
- * Whether an unknown value is a zod validation error, decided on shape rather
- * than on class identity.
+ * Is this a zod error, whichever zod threw it?
  *
- * `err instanceof ZodError` is the obvious test and it is wrong at every
- * boundary in this repo. zod 3.25 ships two builds in one package: the classic
- * export and the `zod/v4` subpath, each with its own `ZodError` class. The app
- * imports the classic one and `@langwatch/langy` compiles against `zod/v4`, so
- * a schema built by one build throws an error the other build's `instanceof`
- * rejects. The check then falls through and a validation failure the customer
- * caused is reported as an unnamed 500.
+ * `err instanceof ZodError` answers "did the zod *I* imported throw this",
+ * which is a different question the moment a repo runs two zod entrypoints —
+ * and this one does: most schemas are authored against the default (v3)
+ * export, a growing set against `zod/v4`. The two ship separate `ZodError`
+ * classes, so a v4 error fails `instanceof` a v3 `ZodError` and vice versa.
  *
- * Deduping the package does not fix it: `zod` and `zod/v4` are one package and
- * two class identities, so there is nothing to dedupe. Both builds set
- * `name` to "ZodError" and expose `issues` and `flatten()`, which is what every
- * caller here reads, so shape is the durable test.
+ * That is not a cosmetic mismatch. Every validation boundary is an
+ * `instanceof` gate deciding whether a failure is the *caller's* fault, so a
+ * missed gate does not merely lose formatting: the error stops being a 422
+ * `validation_error` the customer can act on and becomes an unnamed 500,
+ * logged against the platform's error budget. Moving one leaf schema to
+ * `zod/v4` is enough to do it, with nothing at the seam to say so — the
+ * schema and the gate that catches it are usually different files, and
+ * typecheck sees no disagreement between them.
+ *
+ * So the gates ask about shape instead of identity. `name` plus `issues`
+ * plus `flatten` is the intersection both versions satisfy and the whole of
+ * what the consumers here read.
  */
 export function isZodLikeError(err: unknown): err is ZodLikeError {
-  if (!(err instanceof Error) || err.name !== "ZodError") return false;
-  const candidate = err as unknown as Partial<ZodLikeError>;
+  if (typeof err !== "object" || err === null) return false;
+  const candidate = err as Partial<ZodLikeError>;
   return (
-    Array.isArray(candidate.issues) && typeof candidate.flatten === "function"
+    candidate.name === "ZodError" &&
+    Array.isArray(candidate.issues) &&
+    typeof candidate.flatten === "function"
   );
 }
 

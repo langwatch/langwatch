@@ -1,7 +1,7 @@
 Feature: Append-only event_log durability for governance ingestion
   The compliance posture for SOC2 Type II / ISO 27001 / EU AI Act / GDPR
   / HIPAA-most-uses rests on the existing append-only `event_log`
-  infrastructure (PR #3351 reactor pattern), not on a separate audit
+  infrastructure (PR #3351 subscriber pattern), not on a separate audit
   store. Every span / log_record landing in the unified substrate is
   produced by an event in event_log; folds and read projections are
   derived from those events; the source of truth is the event log.

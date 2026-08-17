@@ -1,6 +1,8 @@
 import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import type { ProcessRef } from "~/server/event-sourcing/process-manager/processManager.types";
 import type {
+  DeadLetterCount,
+  DeadOutboxMessageView,
   ProcessInstanceRow,
   ProcessNameCounts,
   ProcessOpsRepository,
@@ -281,6 +283,122 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
         payload: r.payload,
       })),
     };
+  }
+
+  /**
+   * Every retired message across the fleet, newest retirement first.
+   *
+   * Ordered by `updatedAt` rather than `createdAt`: a dead row's interesting
+   * moment is when it was RETIRED, and a message that spent 68 hours climbing
+   * the Stripe ladder before dying is days newer than its creation suggests.
+   * An operator opening this mid-incident wants what just broke at the top.
+   */
+  async findDeadMessages(params: {
+    processName?: string;
+    page: number;
+    pageSize: number;
+  }): Promise<{ messages: DeadOutboxMessageView[]; total: number }> {
+    // Raw, like every other fleet-wide read here: the multitenancy guard
+    // rejects a Prisma query on this model without a `projectId`, and a
+    // dead-letter sweep has no single project to name. The `@tenancy` marker
+    // is the same declaration `countByProcessName` makes, and the surface is
+    // ops-gated.
+    const nameFilter = params.processName
+      ? Prisma.sql`AND "processName" = ${params.processName}`
+      : Prisma.empty;
+
+    const [rows, totals] = await Promise.all([
+      this.prisma.$queryRaw<
+        Array<
+          Omit<
+            DeadOutboxMessageView,
+            "nextAttemptAt" | "leasedUntil" | "createdAt" | "updatedAt"
+          > & {
+            nextAttemptAt: Date;
+            leasedUntil: Date | null;
+            createdAt: Date;
+            updatedAt: Date;
+            traceCarrier: unknown;
+          }
+        >
+      >(Prisma.sql`
+        -- @tenancy: cross-tenant ops dead-letter read; the surface is ops-gated
+        SELECT "id", "processName", "projectId", "processKey", "messageKey",
+               "intentType", "status", "attempts", "nextAttemptAt",
+               "leasedUntil", "createdAt", "updatedAt", "sourceEventId",
+               "traceCarrier", "payload"
+        FROM "ProcessManagerOutbox"
+        WHERE "status" = 'dead'
+        ${nameFilter}
+        ORDER BY "updatedAt" DESC, "id" DESC
+        LIMIT ${params.pageSize}
+        OFFSET ${(params.page - 1) * params.pageSize}
+      `),
+      this.prisma.$queryRaw<Array<{ total: number }>>(Prisma.sql`
+        -- @tenancy: cross-tenant ops dead-letter read; the surface is ops-gated
+        SELECT COUNT(*)::int AS "total"
+        FROM "ProcessManagerOutbox"
+        WHERE "status" = 'dead'
+        ${nameFilter}
+      `),
+    ]);
+
+    return {
+      total: totals[0]?.total ?? 0,
+      messages: rows.map((r) => ({
+        id: r.id,
+        processName: r.processName,
+        projectId: r.projectId,
+        processKey: r.processKey,
+        messageKey: r.messageKey,
+        intentType: r.intentType,
+        status: r.status,
+        attempts: r.attempts,
+        nextAttemptAt: r.nextAttemptAt.getTime(),
+        leasedUntil: r.leasedUntil?.getTime() ?? null,
+        createdAt: r.createdAt.getTime(),
+        updatedAt: r.updatedAt.getTime(),
+        sourceEventId: r.sourceEventId,
+        traceId: traceIdFromCarrier(r.traceCarrier),
+        payload: r.payload,
+      })),
+    };
+  }
+
+  /**
+   * Indexing, deliberately left to ops.
+   *
+   * The reads below scan `status = 'dead'` and sort by `updatedAt`. The
+   * table's only relevant index leads with `status`, which narrows to the
+   * dead rows; the sort over that subset is what is unindexed. That is
+   * acceptable because the dead population is bounded by operator attention
+   * rather than by traffic — a fleet with enough dead messages for this sort
+   * to matter has a far louder problem than the query plan.
+   *
+   * A Prisma migration is the wrong instrument if it ever does matter: a
+   * deploy-time CREATE INDEX takes a SHARE lock on the highest-volume write
+   * path in the system. The schema says as much for the two indexes the
+   * retention sweep wanted, and the answer there is the same one here —
+   * CREATE INDEX CONCURRENTLY, run from the runbook.
+   */
+  async countDeadByProcessName(): Promise<DeadLetterCount[]> {
+    const rows = await this.prisma.$queryRaw<
+      Array<{ processName: string; count: number; oldestUpdatedAt: Date }>
+    >(Prisma.sql`
+      -- @tenancy: cross-tenant ops dead-letter totals; the surface is ops-gated
+      SELECT "processName",
+             COUNT(*)::int AS "count",
+             MIN("updatedAt") AS "oldestUpdatedAt"
+      FROM "ProcessManagerOutbox"
+      WHERE "status" = 'dead'
+      GROUP BY "processName"
+      ORDER BY COUNT(*) DESC
+    `);
+    return rows.map((r) => ({
+      processName: r.processName,
+      count: r.count,
+      oldestUpdatedAt: r.oldestUpdatedAt?.getTime() ?? 0,
+    }));
   }
 
   async wakeInstanceNow(params: {

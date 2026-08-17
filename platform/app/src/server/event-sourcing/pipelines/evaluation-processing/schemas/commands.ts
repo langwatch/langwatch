@@ -2,7 +2,7 @@ import { z } from "zod";
 
 /**
  * Command data for executing a single evaluation.
- * Sent by the evaluationTrigger reactor — one per monitor.
+ * Sent by the evaluationTrigger subscriber — one per monitor.
  * Does preconditions, sampling, execution, ES write, and emits events.
  */
 export const executeEvaluationCommandDataSchema = z.object({
@@ -16,7 +16,7 @@ export const executeEvaluationCommandDataSchema = z.object({
   occurredAt: z.number(),
   // Thread debouncing: when > 0, traces in the same thread share one dedup key
   threadIdleTimeout: z.number().optional(),
-  // Trace metadata passed from evaluationTrigger reactor
+  // Trace metadata passed from evaluationTrigger subscriber
   threadId: z.string().optional(),
   userId: z.string().optional(),
   customerId: z.string().optional(),
@@ -28,7 +28,7 @@ export const executeEvaluationCommandDataSchema = z.object({
   // Additional fields for expanded precondition matching
   topicId: z.string().optional(),
   subTopicId: z.string().optional(),
-  customMetadata: z.record(z.string()).optional(),
+  customMetadata: z.record(z.string(), z.string()).optional(),
   spanTypes: z.array(z.string()).optional(),
   spanModels: z.array(z.string()).optional(),
   computedInput: z.string().nullable().optional(),
@@ -75,7 +75,7 @@ export const completeEvaluationCommandDataSchema = z.object({
   passed: z.boolean().nullable().optional(),
   label: z.string().nullable().optional(),
   details: z.string().nullable().optional(),
-  inputs: z.record(z.unknown()).nullable().optional(),
+  inputs: z.record(z.string(), z.unknown()).nullable().optional(),
   error: z.string().nullable().optional(),
   errorDetails: z.string().nullable().optional(),
   costId: z.string().nullable().optional(),
@@ -104,7 +104,7 @@ export const reportEvaluationCommandDataSchema = z.object({
   passed: z.boolean().nullable().optional(),
   label: z.string().nullable().optional(),
   details: z.string().nullable().optional(),
-  inputs: z.record(z.unknown()).nullable().optional(),
+  inputs: z.record(z.string(), z.unknown()).nullable().optional(),
   error: z.string().nullable().optional(),
   errorDetails: z.string().nullable().optional(),
   costId: z.string().nullable().optional(),

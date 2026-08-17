@@ -674,6 +674,34 @@ describe("trigger settlement intent handlers integration", () => {
       expect(isDispatchError(thrown)).toBe(false);
     });
 
+    /** @scenario "A retrying page names the failure that caused the retry" */
+    it("names the failing error on the page retry record", async () => {
+      const { deps, raw } = makeDeps(datasetTrigger());
+      raw.addToDataset.mockRejectedValue(
+        new DispatchError({
+          message: "clickhouse read timed out",
+          retryable: true,
+        }),
+      );
+
+      await createPersistMatchHandler(deps)(
+        { triggerId: "trigger-1", traceIds: ["trace-1"] },
+        context("process:trigger-1:persist:page-1"),
+      ).catch(() => undefined);
+
+      expect(loggerWarnMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectId: "project-1",
+          triggerId: "trigger-1",
+          failed: 1,
+          pageSize: 1,
+          errorType: "DispatchError",
+          errorMessage: "clickhouse read timed out",
+        }),
+        "Persist page had retryable failures. Retrying the page; claimed traces no-op on the retry",
+      );
+    });
+
     it("dispatches a repeated trace of a page only once", async () => {
       const { deps, triggers, raw } = makeDeps(datasetTrigger());
 

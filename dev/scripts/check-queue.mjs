@@ -384,16 +384,24 @@ function delegateToHaven(commandArgv, env) {
 }
 
 /**
- * Soft memory cap for the Go-runtime tools this queue wraps (tsgo is a Go
- * binary): GOMEMLIMIT makes the runtime collect harder to stay under the
- * limit instead of ballooning — a whole-tree typecheck degrades to "slower",
- * not "10 GiB resident" (ADR-095). Half the machine, clamped to [4,10] GiB;
- * an operator's explicit GOMEMLIMIT always wins. The haven daemon's process
- * watch is the hard backstop above this.
+ * Soft memory cap for the Go-runtime tools this queue wraps (the TypeScript
+ * compiler is a Go binary): GOMEMLIMIT makes the runtime collect harder to stay
+ * under the limit instead of ballooning (ADR-095). Half the machine, clamped to
+ * [3,6] GiB; an operator's explicit GOMEMLIMIT always wins. The haven daemon's
+ * process watch is the hard backstop above this.
+ *
+ * Both ends of the clamp are measured, not chosen — see ADR-100. GOMEMLIMIT is
+ * a ceiling the runtime expands toward, so the old cap of 10 turned an 18 GiB
+ * laptop into a 9 GiB typecheck against a 2.29 GB working set; and a limit
+ * below the live heap is worse than none, because the runtime collects
+ * continuously and misses it anyway.
+ *
+ * Kept in step with domain.CheckGoMemLimit in tools/thuishaven, which is what
+ * actually runs on a machine with haven installed. This is the fallback.
  */
 function goMemLimit() {
   if (process.env.GOMEMLIMIT) return process.env.GOMEMLIMIT;
-  const gib = Math.max(4, Math.min(10, Math.floor(os.totalmem() / 2 ** 31)));
+  const gib = Math.max(3, Math.min(6, Math.floor(os.totalmem() / 2 ** 31)));
   return `${gib}GiB`;
 }
 

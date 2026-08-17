@@ -10,6 +10,7 @@ import type { ZodType } from "zod";
 
 import { serializeEndpointResult } from "./response.js";
 import { createSSEResponse, type SSEConfig } from "./sse.js";
+import { ENDPOINT_ROUTE } from "./types.js";
 import type {
   BaseApp,
   EndpointConfig,
@@ -89,7 +90,10 @@ export function buildWithdrawnMiddlewareStack({
 }: Omit<StackOptions<unknown>, "ep" | "providers" | "onError"> & {
   ep: ResolvedEndpoint & { withdrawn: true };
 }): MiddlewareHandler[] {
-  const stack = [versionContextMiddleware(options)];
+  // A withdrawn endpoint gets the route too: its 410s are worth grouping by
+  // endpoint like any other answer, and it is the mount most likely to have
+  // someone asking who is still calling it.
+  const stack = [versionContextMiddleware({ ...options, ep })];
   appendAccessMiddleware({
     stack,
     config: ep.config,
@@ -109,14 +113,24 @@ export function buildWithdrawnMiddlewareStack({
 }
 
 function versionContextMiddleware({
+  ep,
   isVersioned,
   status,
   version,
-}: Pick<
-  StackOptions<unknown>,
-  "isVersioned" | "status" | "version"
->): MiddlewareHandler {
+}: Pick<StackOptions<unknown>, "isVersioned" | "status" | "version"> & {
+  // Only what the route identity is built from. A withdrawn endpoint has no
+  // handler, and asking for the whole registration would exclude it from the
+  // one field that says which endpoint its 410s belong to.
+  ep: Pick<EndpointRegistration, "method" | "path">;
+}): MiddlewareHandler {
+  // Built once per endpoint at mount time rather than per request: the
+  // registered path and method cannot change after the app is built.
+  const route = `${(ep.method === "sse" ? "get" : ep.method).toUpperCase()} ${
+    ep.path || "/"
+  }`;
+
   return async (c, next) => {
+    c.set(ENDPOINT_ROUTE, route);
     c.set("isVersionedRequest", isVersioned);
     if (version) c.set("apiVersion", version);
     try {

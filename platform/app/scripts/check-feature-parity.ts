@@ -353,6 +353,10 @@ const LEGACY_INERT: string[] = [
   "specs/auth/sso-wrong-provider-recovery.feature",
   "specs/automations/dispatch-timing.feature",
   "specs/automations/notification-templates.feature",
+  // ADR-093's design contract, every scenario @unimplemented on purpose: the
+  // ADR ships ahead of the implementation, and the reference PR (R0) binds
+  // these as it lands. Remove this entry with the first binding.
+  "specs/automations/source-merge.feature",
   "specs/automations/spam-prevention.feature",
   "specs/automations/webhook-http-action.feature",
   "specs/batch-evaluation-results/experiment-cost-folding.feature",
@@ -393,7 +397,6 @@ const LEGACY_INERT: string[] = [
   "specs/event-sourcing/payload-envelope.feature",
   "specs/event-sourcing/pipeline-model.feature",
   "specs/event-sourcing/process-roles.feature",
-  "specs/event-sourcing/reactors.feature",
   "specs/event-sourcing/redis-fold-cache.feature",
   "specs/event-sourcing/work-conserving-fair-dispatch.feature",
   "specs/experiments-v3/autosave-status.feature",
@@ -540,7 +543,6 @@ const LEGACY_INERT: string[] = [
   "specs/python-sdk/experiment-print-summary.feature",
   "specs/rbac/fetch-org-role-permission-resolution.feature",
   "specs/scenarios/ai-create-modal.feature",
-  "specs/scenarios/event-driven-execution-prep.feature",
   "specs/scenarios/internal-scenario-namespace.feature",
   "specs/scenarios/internal-set-namespace.feature",
   "specs/scenarios/provider-setup-link-from-warnings.feature",
@@ -553,7 +555,6 @@ const LEGACY_INERT: string[] = [
   "specs/scenarios/scenario-editor.feature",
   "specs/scenarios/scenario-execution.feature",
   "specs/scenarios/scenario-library.feature",
-  "specs/scenarios/stalled-scenario-runs.feature",
   "specs/secrets/secrets-manager.feature",
   // Helm chart behaviour, verified by charts/langwatch/tests/e2e-overlays.sh.
   // The checker now scans that directory (DEFAULT_SHELL_TEST_ROOTS), so these

@@ -213,6 +213,18 @@ func (s Stack) observabilityEnv() []string {
 	} else if s.ObservabilityGrafanaPort != 0 {
 		env = append(env, fmt.Sprintf("GRAFANA_BASE_URL=http://127.0.0.1:%d", s.ObservabilityGrafanaPort))
 	}
+	// Continuous profiling. Named only while Pyroscope is actually listening,
+	// because the profiler is a push: with nowhere to push to, a process that
+	// started one would sample itself on a timer, fail every upload, and pay the
+	// native profiler's boot cost for nothing. Absence of this variable is the off
+	// switch, exactly as OTEL_EXPORTER_OTLP_ENDPOINT's absence is for traces.
+	//
+	// The service name and the worktree tag come from the OTel variables above, so
+	// a flame graph is attributable to the same service and worktree as the trace
+	// beside it without a second set of identity variables to keep in step.
+	if s.ObservabilityPyroscopePort != 0 {
+		env = append(env, fmt.Sprintf("PYROSCOPE_SERVER_ADDRESS=http://127.0.0.1:%d", s.ObservabilityPyroscopePort))
+	}
 	// Quiet the console to warn+ (the full stream is in Grafana). Empty = opt-out.
 	if s.ObservabilityConsoleLevel != "" {
 		env = append(env, "LOG_CONSOLE_LEVEL="+s.ObservabilityConsoleLevel)

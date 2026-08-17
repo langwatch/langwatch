@@ -32,7 +32,6 @@ import { runParameterValuesSchema } from "~/server/scenarios/parameters";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
-import { TraceDetails } from "../traces/TraceDetails";
 import { Drawer } from "../ui/drawer";
 import { CopyIdChip } from "./CopyIdChip";
 import { RunCriteriaChip } from "./RunCriteriaChip";
@@ -58,13 +57,10 @@ function formatResultsForCopy(results: unknown): string {
 export function ScenarioRunDetailDrawer({
   open,
 }: ScenarioRunDetailDrawerProps) {
-  const { closeDrawer } = useDrawer();
+  const { closeDrawer, openDrawer } = useDrawer();
   const params = useDrawerParams();
   const { project } = useOrganizationTeamProject();
   const [runModalOpen, setRunModalOpen] = useState(false);
-  const [traceDrawerTraceId, setTraceDrawerTraceId] = useState<string | null>(
-    null,
-  );
   const [scenarioEditorOpen, setScenarioEditorOpen] = useState(false);
 
   const scenarioRunId = params.scenarioRunId;
@@ -369,7 +365,14 @@ export function ScenarioRunDetailDrawer({
                       onEditScenario={() => setScenarioEditorOpen(true)}
                       onOpenThread={
                         firstTraceId && !hasNoResults(scenarioState.status)
-                          ? () => setTraceDrawerTraceId(firstTraceId)
+                          ? () =>
+                              openDrawer("traceV2Details", {
+                                traceId: firstTraceId,
+                                // The thread IS the conversation view; landing
+                                // on the drawer's default mode would show the
+                                // reader spans when they asked for the thread.
+                                mode: "conversation",
+                              })
                           : null
                       }
                       onOpenInTraces={
@@ -589,28 +592,6 @@ export function ScenarioRunDetailDrawer({
         onClose={() => setScenarioEditorOpen(false)}
         scenarioId={scenarioId}
       />
-
-      {/* Child drawer: Trace Details — managed via local state */}
-      <Drawer.Root
-        open={!!traceDrawerTraceId}
-        onOpenChange={() => setTraceDrawerTraceId(null)}
-        placement="end"
-        size="xl"
-        modal={true}
-      >
-        <Drawer.Content bg="bg" paddingX={0} maxWidth="70%">
-          <Drawer.CloseTrigger zIndex={10} />
-          <Drawer.Body paddingY={0} paddingX={0} overflowY="auto">
-            {traceDrawerTraceId && (
-              <TraceDetails
-                traceId={traceDrawerTraceId}
-                selectedTab="messages"
-                showMessages
-              />
-            )}
-          </Drawer.Body>
-        </Drawer.Content>
-      </Drawer.Root>
     </>
   );
 }

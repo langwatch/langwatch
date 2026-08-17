@@ -118,3 +118,7 @@ haven.log
 
 # Local agent dev log tee (pnpm dev), never committed.
 .claude-dev.log
+
+# Per-shard timing delta emitted by durationManifestReporter. The COMMITTED
+# manifest is vitest.durations.json; this is one run's slice of it, merged in CI.
+vitest.durations.delta.json

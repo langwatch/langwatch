@@ -14,7 +14,7 @@
  * left alone for fifteen minutes; a branch nobody has asked about in a week
  * stops being swept at all.
  *
- * It never throws at its callers. The reactor that drives it runs on the fold's
+ * It never throws at its callers. The subscriber that drives it runs on the fold's
  * queue, and a rethrow there would turn one rate-limited read into a retry
  * storm against the same rate limit.
  *

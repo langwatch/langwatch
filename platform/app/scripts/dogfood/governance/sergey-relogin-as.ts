@@ -14,6 +14,7 @@
 import { spawn } from "node:child_process";
 import { setTimeout as wait } from "node:timers/promises";
 import { PersonalVirtualKeyService } from "@ee/governance/services/personalVirtualKey.service";
+import { RedisConnectionService } from "@langwatch/redis-client";
 import { approveDeviceCode } from "~/server/routes/auth-cli";
 import { PrismaClient } from "../../../src/generated/prisma/client";
 import { createPrismaPgAdapter } from "../../../src/server/prismaPgAdapter";
@@ -124,8 +125,14 @@ async function main() {
   }
   console.error(`[relogin] user_code=${userCode}`);
 
-  const Redis = (await import("ioredis")).default;
-  const redis = new Redis(process.env.REDIS_URL ?? "redis://localhost:6379");
+  // This script boots no App, so it owns the connection it needs — built
+  // through the sanctioned service rather than by constructing ioredis here
+  // (ADR-093). It is closed by the `redis.quit()` at the end of main(),
+  // which is also what keeps the process from hanging on an open socket.
+  const redis = new RedisConnectionService().connectStandalone({
+    url: process.env.REDIS_URL ?? "redis://localhost:6379",
+  });
+  if (!redis) throw new Error("REDIS_URL did not resolve to a connection");
   const deviceCode = await redis.get(`lwcli:device:usercode:${userCode}`);
   if (!deviceCode) {
     child.kill();

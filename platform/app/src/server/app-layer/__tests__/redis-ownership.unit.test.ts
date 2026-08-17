@@ -27,7 +27,24 @@ const APP_ROOT = path.resolve(HERE, "../../../..");
 /** Repo root — where the `packages/*` workspace tree lives (ADR-076). */
 const REPO_ROOT = path.resolve(APP_ROOT, "../..");
 
-const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".mts", ".cts"]);
+/**
+ * Every extension a module can be written in, not just the TypeScript ones.
+ *
+ * The JS spellings are here because leaving them out made the guard's answer
+ * depend on a file's extension rather than on what it does (#6948): `src/`
+ * holds `env.mjs`, `env-create.mjs` and `noop-css.cjs` today, and a
+ * `new IORedis(...)` in any of them scanned clean.
+ */
+const SOURCE_EXTENSIONS = new Set([
+  ".ts",
+  ".tsx",
+  ".mts",
+  ".cts",
+  ".js",
+  ".jsx",
+  ".mjs",
+  ".cjs",
+]);
 
 /**
  * Every way an ioredis client gets constructed.
@@ -52,28 +69,47 @@ const IOREDIS_CONSTRUCTION =
  */
 const RETIRED_REDIS_MODULE =
   /["'][^"']*(?:~\/server\/redis|\.\.\/redis|\.\/redis)["']/;
+/**
+ * The only directories the scan is allowed not to see.
+ *
+ * Every entry is something this repository did not write — a dependency tree or
+ * a build artifact. The list is deliberately an exclusion allowlist rather than
+ * an inclusion one: the first version of this guard named the three trees to
+ * walk (`src`, `ee`, `packages`) and therefore never looked at `scripts/`,
+ * `e2e/`, `vite/` or `vendor/`, where two scripts were constructing ioredis
+ * directly with CI green (#6948). Naming what to skip fails safe — a new
+ * top-level directory is scanned by default, and dropping one out of the scan
+ * takes an edit here that a reviewer can see.
+ */
 const SKIP_DIRECTORIES = new Set([
   "node_modules",
   "dist",
   ".next",
   ".next-saas",
+  ".turbo",
+  ".vite",
+  ".cache",
+  ".git",
   "coverage",
 ]);
 
+/**
+ * This list is the ONLY thing that keeps a directory out of the scan.
+ *
+ * There is deliberately no `name.startsWith(".")` rule here. One used to be,
+ * and it was a second exclusion nobody had to write down — a hidden directory
+ * holding real source would have been skipped in silence, which is the same
+ * class of hole as the named-trees walk this test exists to close. The dot
+ * directories above are named because they are build artifacts and a VCS
+ * store; anything else hidden gets scanned like any other directory.
+ */
 function shouldDescend(entry: fs.Dirent): boolean {
-  return (
-    entry.isDirectory() &&
-    !entry.name.startsWith(".") &&
-    !SKIP_DIRECTORIES.has(entry.name)
-  );
+  return entry.isDirectory() && !SKIP_DIRECTORIES.has(entry.name);
 }
 
+/** Extension alone decides, for the same reason `shouldDescend` names its skips. */
 function isSourceFile(entry: fs.Dirent): boolean {
-  return (
-    entry.isFile() &&
-    !entry.name.startsWith(".") &&
-    SOURCE_EXTENSIONS.has(path.extname(entry.name))
-  );
+  return entry.isFile() && SOURCE_EXTENSIONS.has(path.extname(entry.name));
 }
 
 function* walkSourceFiles(root: string): Generator<string> {
@@ -85,11 +121,18 @@ function* walkSourceFiles(root: string): Generator<string> {
   }
 }
 
-/** Every source file in the app tree plus the workspace packages. */
+/**
+ * Every source file in the app, plus the workspace packages.
+ *
+ * The whole of `platform/app` — not `src` and `ee` alone. A script, an E2E
+ * spec, a vite plugin and a Prisma seed run in the same processes and against
+ * the same Redis as everything else, so a connection opened in one of them is
+ * the very thing ADR-093 retired; that they used to be invisible here was an
+ * accident of which trees got named (#6948).
+ */
 function allSourceFiles(): string[] {
   return [
-    ...walkSourceFiles(path.join(APP_ROOT, "src")),
-    ...walkSourceFiles(path.join(APP_ROOT, "ee")),
+    ...walkSourceFiles(APP_ROOT),
     ...walkSourceFiles(path.join(REPO_ROOT, "packages")),
   ];
 }
@@ -262,6 +305,44 @@ describe("Redis ownership", () => {
         );
 
       expect(offenders.map(relative)).toEqual([]);
+    });
+
+    /** @scenario The scan covers every tree and every module extension */
+    it("reaches every tree and every extension the platform is written in", () => {
+      // The two scans above are only as good as the file list they run over,
+      // and a shortfall there is silent in exactly the same way a gap in the
+      // patterns is: fewer files, nothing found, green. This is what noticed
+      // that `scripts/` was never walked and that `.mjs` was never read.
+      const scanned = new Set(allSourceFiles().map(relative));
+
+      const reached = (directory: string) =>
+        [...scanned].some((file) => file.startsWith(directory));
+
+      for (const directory of [
+        "platform/app/src/",
+        "platform/app/ee/",
+        "platform/app/scripts/",
+        "platform/app/e2e/",
+        "platform/app/vite/",
+        "packages/",
+      ]) {
+        expect(reached(directory), `nothing scanned under ${directory}`).toBe(
+          true,
+        );
+      }
+
+      // Concrete non-TypeScript modules, so the extension set cannot quietly
+      // shrink back to the TypeScript four. Both spellings that actually occur
+      // in the tree are anchored; `.js` and `.jsx` have no instance to point
+      // at today, and asserting them against `SOURCE_EXTENSIONS` itself would
+      // only check the constant against a copy of itself.
+      expect(scanned.has("platform/app/src/env.mjs")).toBe(true);
+      expect(scanned.has("platform/app/src/noop-css.cjs")).toBe(true);
+
+      // And the exclusions still hold, or the scan is reading dependencies.
+      for (const file of scanned) {
+        expect(file).not.toContain("/node_modules/");
+      }
     });
 
     it("recognises every spelling of an ioredis construction", () => {

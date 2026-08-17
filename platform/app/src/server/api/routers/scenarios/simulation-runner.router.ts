@@ -158,17 +158,17 @@ export const simulationRunnerRouter = createTRPCRouter({
 
       // Validate early - prefetch data to catch configuration errors before scheduling
       const deps = createDataPrefetcherDependencies();
-      const prefetchResult = await prefetchScenarioData(
-        {
+      const prefetchResult = await prefetchScenarioData({
+        context: {
           projectId: input.projectId,
           scenarioId: input.scenarioId,
           setId,
           batchRunId,
           parameters,
         },
-        input.target,
+        target: input.target,
         deps,
-      );
+      });
 
       if (!prefetchResult.success) {
         logger.warn(
@@ -208,7 +208,7 @@ export const simulationRunnerRouter = createTRPCRouter({
         parameters,
       });
 
-      // No explicit job scheduling — the execution reactor picks up the queued
+      // No explicit job scheduling — the execution subscriber picks up the queued
       // event via the GroupQueue and spawns the child process.
       logger.info(
         { batchRunId, scenarioRunId },

@@ -164,6 +164,80 @@ Feature: Ops dashboard information density
     When the chart renders
     Then the smaller series remains distinguishable from the axis
 
+  # ── One question, one place ───────────────────────────────────────────
+  #
+  # The page grew by accretion, so the same question was answered in several
+  # places at once. "What has permanently stopped?" was on the dashboard, on
+  # the queues page, and on the dead-letters page. "What is switched off?" was
+  # split across parked tenants here, paused schedules on the schedules page
+  # and paused subscribers on the subscribers page — three surfaces that never
+  # sat next to each other, so no reader ever saw the whole answer. And the
+  # queues page rendered five cards that were already on the dashboard,
+  # component for component.
+
+  @integration
+  Scenario: A retired queues link lands on the dashboard
+    Given an operator follows a saved link to the queues page
+    When the page loads
+    Then the operator arrives at the ops dashboard
+
+  @integration
+  Scenario: Everything switched off is reported together
+    Given a tenant is parked at its in-flight cap
+    And a schedule is switched off
+    And a subscriber is paused
+    When the dashboard renders
+    Then all three are reported under one panel
+    And each names the mechanism that switched it off
+
+  @integration
+  Scenario: A mechanism with nothing to report is not drawn at all
+    Given a tenant is parked at its in-flight cap
+    And no schedule is switched off
+    And no subscriber is paused
+    When the paused panel renders
+    Then only the parked tenants are named
+    And no divider is drawn for the mechanisms that are silent
+
+  @integration
+  Scenario: Parking is distinguished from being switched off
+    Given a tenant is parked at its in-flight cap
+    When the paused panel renders
+    Then parking is described as a capacity limit rather than a failure
+
+  @integration
+  Scenario: A switched-off schedule is reported however the fleet is ordered
+    Given the fleet holds more schedules than the panel reads in one page
+    And the schedule that is switched off falls beyond that page
+    When the paused panel renders
+    Then that schedule is still reported
+
+  @integration
+  Scenario: A bounded list says what it left out
+    Given more schedules are switched off than the panel lists
+    When the paused panel renders
+    Then it states how many of the total it is showing
+
+  @integration
+  Scenario: The paused panel is absent when nothing is switched off
+    Given no tenant is parked
+    And no schedule is switched off
+    And no subscriber is paused
+    When the dashboard renders
+    Then no paused panel is shown
+
+  @integration
+  Scenario: Upcoming timed work sits with the schedules it previews
+    Given schedules and process wakes are due
+    When the operator opens the schedules page
+    Then the soonest-due work is listed there
+
+  @integration
+  Scenario: Replay history sits with the projections it replays
+    Given a projection replay has run
+    When the operator opens the projections page
+    Then the most recent replay is reported there
+
   # ── The page as a whole ───────────────────────────────────────────────
 
   @unimplemented

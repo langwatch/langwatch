@@ -514,7 +514,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Detection
 
-- [Anomaly rules](https://langwatch.ai/docs/ai-governance/anomaly-rules.md): Define detection rules that fire AnomalyAlerts when activity-event traffic crosses a threshold, what the reactor evaluates today, what is preview-only, and how to write a working rule.
+- [Anomaly rules](https://langwatch.ai/docs/ai-governance/anomaly-rules.md): Define detection rules that fire AnomalyAlerts when activity-event traffic crosses a threshold, what the detector evaluates today, what is preview-only, and how to write a working rule.
 
 ## Compliance & Architecture
 
