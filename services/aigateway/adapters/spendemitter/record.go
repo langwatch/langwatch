@@ -87,6 +87,34 @@ type AdmittedPayload struct {
 	// wire), matching the ingest schema's string-typed field.
 	Metadata    string `json:"metadata,omitempty"`
 	RequestType string `json:"request_type,omitempty"`
+	// OutcomeCarriesAttribution tells the control plane that this emitter
+	// repeats the attribution on the outcome, so the consumers that join
+	// admission to outcome need not persist anything at admission time.
+	//
+	// The admission is what declares it because the decision has to be made
+	// when the admission is handled, before the outcome exists. Admission
+	// and outcome always come from the same pod and the same build, so the
+	// pair is self-consistent and the two services can roll in either
+	// order. Always true from this build; removable once no build that
+	// omits it is running anywhere.
+	OutcomeCarriesAttribution bool `json:"outcome_carries_attribution"`
+}
+
+// AttributionPayload is who a request is billed against, repeated on each
+// outcome so a consumer can act on one event instead of remembering every
+// open admission. Embedded, so it flattens into the outcome payloads on the
+// wire and matches the ingest schema's flat shape.
+type AttributionPayload struct {
+	OrganizationID string   `json:"organization_id,omitempty"`
+	VirtualKeyID   string   `json:"virtual_key_id,omitempty"`
+	EndUserID      string   `json:"end_user_id,omitempty"`
+	TraceID        string   `json:"trace_id,omitempty"`
+	RequestType    string   `json:"request_type,omitempty"`
+	Labels         []string `json:"labels,omitempty"`
+	// The caller's metadata echo as raw JSON TEXT, as on the admission.
+	Metadata string `json:"metadata,omitempty"`
+	// Unix epoch MILLISECONDS of the admission this outcome closes.
+	AdmittedAtUnixMs int64 `json:"admitted_at,omitempty"`
 }
 
 // ConfirmedPayload records a served request's real quantities. Model and
@@ -101,6 +129,7 @@ type ConfirmedPayload struct {
 	Model            string       `json:"model,omitempty"`
 	ModelProviderID  string       `json:"model_provider_id,omitempty"`
 	DurationMS       int64        `json:"duration_ms"`
+	AttributionPayload
 }
 
 // FailedPayload records a request that did not complete: provider errors,
@@ -115,6 +144,7 @@ type FailedPayload struct {
 	Model            string       `json:"model,omitempty"`
 	ModelProviderID  string       `json:"model_provider_id,omitempty"`
 	DurationMS       int64        `json:"duration_ms"`
+	AttributionPayload
 }
 
 // ErrorPayload carries the full error taxonomy token plus the HTTP status

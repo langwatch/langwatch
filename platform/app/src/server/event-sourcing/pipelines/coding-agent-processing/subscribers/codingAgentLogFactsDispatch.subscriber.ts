@@ -9,8 +9,11 @@ import {
   declaredCodingAgent,
   detectCodingAgent,
   liftCodingAgentLogFacts,
+  normalizeEventName,
   resolveConversationKey,
   SESSION_TITLE_FACT_KEY,
+  SESSION_TITLE_FALLBACK_FACT_KEY,
+  sessionTitleFromPrompt,
 } from "../services/coding-agent-normalization";
 
 /** The event whose body carries the generated conversation title. */
@@ -85,6 +88,7 @@ export function createCodingAgentLogFactsDispatchSubscriber(deps: {
       }
 
       stampSessionTitle({ facts, attributes });
+      stampPromptTitleFallback({ facts, attributes });
 
       const agent = resolveContributionAgent({
         scopeName: record.scopeName,
@@ -158,6 +162,29 @@ function stampSessionTitle({
   }
   const title = extractSessionTitleFromResponseBody(attributes.body);
   if (title !== null) facts[SESSION_TITLE_FACT_KEY] = title;
+}
+
+/**
+ * Stamp a prompt-derived name candidate on every prompt event that carries
+ * the user's words. The fold fills an empty title from it and otherwise
+ * ignores it, so the session ends up named by the FIRST thing the user asked
+ * unless the agent generated a real title. The vocabulary lifts prompt
+ * lengths, never text, so like the generated title this is derived here,
+ * where the full attributes are still in hand.
+ */
+function stampPromptTitleFallback({
+  facts,
+  attributes,
+}: {
+  facts: Record<string, string | number | boolean>;
+  attributes: Record<string, unknown>;
+}): void {
+  const eventName = facts["event.name"];
+  if (typeof eventName !== "string") return;
+  if (normalizeEventName(eventName) !== "user_prompt") return;
+  if (typeof attributes.prompt !== "string") return;
+  const title = sessionTitleFromPrompt(attributes.prompt);
+  if (title !== null) facts[SESSION_TITLE_FALLBACK_FACT_KEY] = title;
 }
 
 /**

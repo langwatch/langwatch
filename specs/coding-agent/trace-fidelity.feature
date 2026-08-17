@@ -18,6 +18,12 @@ Feature: Coding Agent Trace Fidelity (Path B direct OTLP)
     And the per-span detail still shows the usage on each span
 
   @unit
+  Scenario: Codex exec turn tokens are counted once when the rollup repeats the response spans' usage
+    Given a codex exec turn whose turn rollup span repeats the usage its response spans already report per call
+    When the spans are canonicalised
+    Then the rollup defers and the response spans are what the trace totals count
+
+  @unit
   Scenario: Codex reasoning output tokens are captured
     Given a codex Path B turn span reporting reasoning output tokens
     When the span is canonicalised

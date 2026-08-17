@@ -104,6 +104,9 @@ describe("refreshTelemetryWiringForLogin", () => {
 					"utf8",
 				);
 				expect(codexToml).not.toContain(STALE_TOKEN);
+				// The refresh heals the harvest wiring beside the exporters: a
+				// device whose block predates the notify seam gains it here.
+				expect(codexToml).toContain("langwatch codex notify begin");
 
 				const zshrc = fs.readFileSync(rcPath("zsh"), "utf8");
 				expect(zshrc).toContain(CURRENT_ENDPOINT);

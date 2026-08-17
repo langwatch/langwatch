@@ -35,6 +35,22 @@ describe("resolvePathname()", () => {
         "/[project]/online-evaluations",
       );
     });
+
+    // A route missing from the pattern list resolves to the literal path,
+    // which reads as a valid pathname and quietly breaks every caller that
+    // compares against the pattern. The sidebar lost its active state on both
+    // of these that way.
+    it("converts /my-project/sessions to /[project]/sessions", () => {
+      expect(resolvePathname("/my-project/sessions")).toBe(
+        "/[project]/sessions",
+      );
+    });
+
+    it("converts /my-project/pull-requests to /[project]/pull-requests", () => {
+      expect(resolvePathname("/my-project/pull-requests")).toBe(
+        "/[project]/pull-requests",
+      );
+    });
   });
 
   describe("when path matches a nested project route", () => {
@@ -60,7 +76,21 @@ describe("resolvePathname()", () => {
       expect(resolvePathname("/settings")).toBe("/settings");
     });
 
+    // ":project" captures "me", so without their own entries these resolve to
+    // the project pattern, the personal sidebar stops marking what is open,
+    // and the workspace switcher reads a personal page as a project one.
+    it("returns /me/sessions as-is rather than as the project pattern", () => {
+      expect(resolvePathname("/me/sessions")).toBe("/me/sessions");
+    });
+
+    it("returns /me/pull-requests as-is rather than as the project pattern", () => {
+      expect(resolvePathname("/me/pull-requests")).toBe("/me/pull-requests");
+    });
+
     it("returns /gateway/usage as-is so filter self-pushes keep their path", () => {
+      // Without the literal entry the /:project pattern wins, the pathname
+      // resolves to /[project], and a self-push from the usage page's filter
+      // controls loses its path.
       expect(resolvePathname("/gateway/usage")).toBe("/gateway/usage");
     });
 

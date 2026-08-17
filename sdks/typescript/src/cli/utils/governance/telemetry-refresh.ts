@@ -83,6 +83,7 @@ import { resolvePlatformToolPolicy } from "./platform-tool-policy";
 import {
 	buildScopedToolFunction,
 	type DetectedShell,
+	assertCodexTurnHarvest,
 	persistBlockToRc,
 	rcHasLangwatchBlock,
 	rcPath,
@@ -368,6 +369,10 @@ export function refreshCodexOtelBlockTo({
 		ingestionToken: token,
 		environment,
 	});
+	// The exporters carry no conversation; the harvest recovers it, so a
+	// refresh that keeps the exporters healthy heals the harvest wiring too
+	// (idempotent and quiet while the notify block is already in place).
+	assertCodexTurnHarvest();
 	if (result.action === "unchanged") return null;
 	return `codex [otel] block (${displayCodexConfigPath()})`;
 }
@@ -569,12 +574,20 @@ export async function refreshTelemetryWiringForLogin(
 				// wiring; a new login never re-points it at the personal path.
 				continue;
 			}
-			if (!toolWiringNeedsLoginRefresh(tool, expectedEndpoint)) continue;
 			if (!resolvePlatformToolPolicy(tool, cfg.tool_policies).allowOtelDirect) {
 				// The new org forbids direct OTLP for this tool; the wrapper
 				// surfaces that on the next run rather than login guessing.
 				continue;
 			}
+			// codex's notify hook is what recovers the conversation, and it does
+			// not depend on the exporter endpoint. A config already pointing at
+			// this login skips the refresh below, so a device whose [otel] block
+			// predates the hook would never be given one. Idempotent and quiet
+			// when the hook is already in place.
+			if (tool === "codex" && codexHasOtelBlock(defaultCodexConfigPath())) {
+				assertCodexTurnHarvest();
+			}
+			if (!toolWiringNeedsLoginRefresh(tool, expectedEndpoint)) continue;
 			// allowOfflineFallback: false - see resolveLiveIngestionKey's doc.
 			// This caller only gets here because the persisted endpoint
 			// already differs from the new login, so a network hiccup must

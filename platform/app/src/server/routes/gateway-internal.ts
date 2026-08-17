@@ -1039,19 +1039,20 @@ type AttributionVirtualKey = {
   lastUsedAt: Date | null;
 };
 
-/** The ids an admit record was validated with. Every one of them is a
- *  required field on the wire schema, so these reads are total. */
-function admitIdentity(admit: Record<string, unknown>): {
+/** The ids an attributed record was validated with. Required on an
+ *  admission, so those reads are total; an outcome from a build that
+ *  predates attribution-on-outcome carries empty strings instead. */
+function attributedIdentity(command: Record<string, unknown>): {
   gatewayRequestId: string;
   virtualKeyId: string;
   projectId: string;
   organizationId: string;
 } {
   return {
-    gatewayRequestId: String(admit.gateway_request_id ?? ""),
-    virtualKeyId: String(admit.virtual_key_id ?? ""),
-    projectId: String(admit.tenantId ?? ""),
-    organizationId: String(admit.organization_id ?? ""),
+    gatewayRequestId: String(command.gateway_request_id ?? ""),
+    virtualKeyId: String(command.virtual_key_id ?? ""),
+    projectId: String(command.tenantId ?? ""),
+    organizationId: String(command.organization_id ?? ""),
   };
 }
 
@@ -1107,11 +1108,64 @@ async function touchAdmittedVirtualKeys(
  * and an event is immutable once appended, so it propagates to a 500 and the
  * drainer retries the whole batch.
  */
-async function enrichAdmitCommands(
-  admits: Array<Record<string, unknown>>,
-): Promise<void> {
-  if (admits.length === 0) return;
-  const identities = admits.map(admitIdentity);
+/**
+ * What the control plane could not resolve for one admission, reported and
+ * never dropped.
+ *
+ * The record is already durable on the gateway's side, and discarding an
+ * admission loses the outcome that follows it, so each of these is a
+ * control-plane inconsistency to chase rather than a reason to lose billing
+ * evidence.
+ */
+function reportAttributionGaps({
+  identity,
+  key,
+  teamId,
+}: {
+  identity: ReturnType<typeof attributedIdentity>;
+  key: AttributionVirtualKey | undefined;
+  teamId: string;
+}): void {
+  if (!key) {
+    logger.error(
+      identity,
+      "spend admission names a virtual key that no longer exists: principal and group budgets will not see this request",
+    );
+  } else if (key.organizationId !== identity.organizationId) {
+    logger.error(
+      { ...identity, keyOrganizationId: key.organizationId },
+      "spend admission names a virtual key from another organization",
+    );
+  }
+  if (!teamId) {
+    logger.error(
+      identity,
+      "spend admission names a project with no team: team budgets will not see this request",
+    );
+  }
+}
+
+async function enrichAttributedCommands({
+  admits,
+  outcomes,
+}: {
+  admits: Array<Record<string, unknown>>;
+  outcomes: Array<Record<string, unknown>>;
+}): Promise<void> {
+  // An outcome emitted by a build that predates attribution-on-outcome names
+  // no key, so there is nothing to join it against. Those requests keep the
+  // admit-time join in the consuming process managers, which is exactly what
+  // `outcome_carries_attribution` on their admission tells those processes to
+  // do — so skipping here is the correct no-op, not a dropped join. Silent by
+  // design: one line per record through a fleet roll is a log flood that says
+  // nothing an operator can act on.
+  const attributableOutcomes = outcomes.filter(
+    (outcome) => String(outcome.virtual_key_id ?? "") !== "",
+  );
+  const commands = [...admits, ...attributableOutcomes];
+  if (commands.length === 0) return;
+
+  const identities = commands.map(attributedIdentity);
   const [virtualKeys, projects] = await Promise.all([
     prisma.virtualKey.findMany({
       where: {
@@ -1132,36 +1186,29 @@ async function enrichAdmitCommands(
   const keyById = new Map(virtualKeys.map((vk) => [vk.id, vk]));
   const teamIdByProject = new Map(projects.map((p) => [p.id, p.teamId]));
 
-  admits.forEach((admit, index) => {
+  commands.forEach((command, index) => {
     const identity = identities[index]!;
     const key = keyById.get(identity.virtualKeyId);
     const teamId = teamIdByProject.get(identity.projectId) ?? "";
-    if (!key) {
-      logger.error(
-        identity,
-        "spend admission names a virtual key that no longer exists: principal and group budgets will not see this request",
-      );
-    } else if (key.organizationId !== identity.organizationId) {
-      // Logged, not dropped. The record is already durable on the gateway's
-      // side, and a discarded admission loses the outcome that follows it;
-      // the mismatch is a control-plane inconsistency to chase, not a reason
-      // to lose billing evidence.
-      logger.error(
-        { ...identity, keyOrganizationId: key.organizationId },
-        "spend admission names a virtual key from another organization",
-      );
+    // Only the admission reports these. An outcome names the same key and
+    // the same project, so reporting both would say everything twice.
+    if (index < admits.length) {
+      reportAttributionGaps({ identity, key, teamId });
     }
-    if (!teamId) {
-      logger.error(
-        identity,
-        "spend admission names a project with no team: team budgets will not see this request",
-      );
-    }
-    admit.principal_user_id = key?.principalUserId ?? "";
-    admit.team_id = teamId;
+    command.principal_user_id = key?.principalUserId ?? "";
+    command.team_id = teamId;
   });
 
-  await touchAdmittedVirtualKeys(virtualKeys, new Date());
+  // Admission is what marks a key used. An outcome is the same request
+  // arriving a second time, so touching on both would double the writes to
+  // say the same thing.
+  const admittedKeyIds = new Set(
+    identities.slice(0, admits.length).map((i) => i.virtualKeyId),
+  );
+  await touchAdmittedVirtualKeys(
+    virtualKeys.filter((vk) => admittedKeyIds.has(vk.id)),
+    new Date(),
+  );
 }
 
 interface SpendCommandSender {
@@ -1245,7 +1292,10 @@ secured.access(gatewayPolicy()).post("/spend-commands", async (c) => {
 
   const { perCommand, rejected } = groupSpendCommands(parsed.data.records);
 
-  await enrichAdmitCommands(perCommand.admitSpend);
+  await enrichAttributedCommands({
+    admits: perCommand.admitSpend,
+    outcomes: [...perCommand.confirmSpend, ...perCommand.failSpend],
+  });
 
   const unregistered = await sendSpendCommands(pipeline.commands, perCommand);
   if (unregistered) {

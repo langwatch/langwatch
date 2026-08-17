@@ -15,10 +15,11 @@ import {
   observeEsProcessManagerDuration,
 } from "~/server/metrics";
 import { toSafeFailureDiagnostic } from "./failureDiagnostic";
-import { ensureJsonSafe } from "./json";
+import { ensureJsonSafe, isDeepJsonEqual } from "./json";
 import type {
   ProcessDefinition,
   ProcessEventEnvelope,
+  ProcessIntent,
   ProcessRef,
 } from "./processManager.types";
 import type {
@@ -111,6 +112,34 @@ export class ProcessManagerService<State> {
           ref,
         });
 
+        // The transient path is decided AFTER the evolution has run against
+        // the real previous state, never speculated on the initial one.
+        //
+        // Speculating looked cheaper — it skips this read — but it is not
+        // sound: a handler may preserve its state while deriving its INTENT
+        // from that state, which comes back looking initial-and-wakeless
+        // while producing the wrong intents. Whether that shape exists today
+        // is not the point; nothing stops the next author writing it, and it
+        // would fail silently by dropping work.
+        //
+        // Reading first costs one indexed lookup. The savings that motivated
+        // this path — no transaction, no advisory lock, no compare-and-swap,
+        // no instance row, no inbox row — are all still here.
+        if (
+          this.definition.transient &&
+          existing === null &&
+          this.isTransientEvolution(evolution)
+        ) {
+          return await this.appendIntents({
+            ref,
+            tenantId: envelope.tenantId,
+            userId: envelope.userId,
+            sourceEventId: envelope.eventId,
+            evolution,
+            now,
+          });
+        }
+
         return await this.commitEvolution({
           ref,
           tenantId: envelope.tenantId,
@@ -172,6 +201,82 @@ export class ProcessManagerService<State> {
     });
   }
 
+  /**
+   * Whether this evolution left nothing behind worth reading back: still the
+   * initial state, and no wake armed. Such an evolution's only output is its
+   * intents, so it needs neither an instance row nor the transaction that
+   * would keep one consistent with an inbox marker.
+   */
+  private isTransientEvolution(
+    evolution: ReturnType<ProcessDefinition<State>["evolve"]>,
+  ): boolean {
+    return (
+      evolution.nextWakeAt === null &&
+      isDeepJsonEqual(evolution.state, this.definition.initialState)
+    );
+  }
+
+  /**
+   * The transient commit: intents only, no transaction. Mirrors
+   * {@link commitEvolution}'s reporting so callers cannot tell which path a
+   * process took, beyond the revision staying at 0 because nothing persisted.
+   */
+  private async appendIntents(params: {
+    ref: ProcessRef;
+    tenantId: string;
+    userId?: string;
+    sourceEventId: string;
+    evolution: ReturnType<ProcessDefinition<State>["evolve"]>;
+    now: number;
+  }): Promise<HandleResult> {
+    const messages = this.outboxMessagesFor({
+      intents: params.evolution.intents,
+      userId: params.userId,
+    });
+
+    const result = await this.store.appendIntents({
+      ref: params.ref,
+      tenantId: params.tenantId,
+      ...(params.userId ? { userId: params.userId } : {}),
+      sourceEventId: params.sourceEventId,
+      messages,
+      now: params.now,
+    });
+
+    if (result.duplicateMessageKeys.length > 0) {
+      incrementEsProcessIntentsSuppressed({
+        processName: params.ref.processName,
+        count: result.duplicateMessageKeys.length,
+      });
+      // On this path a duplicate is the EXPECTED shape of a redelivery — it
+      // is the suppression standing in for the inbox marker that is not
+      // written. Still logged, for the same reason the durable path logs it:
+      // a process that believes work is in flight while nothing was enqueued
+      // looks identical from the outside.
+      this.logger.info(
+        {
+          processName: params.ref.processName,
+          processKey: params.ref.processKey,
+          projectId: params.ref.projectId,
+          tenantId: params.tenantId,
+          sourceEventId: params.sourceEventId,
+          duplicateMessageKeys: result.duplicateMessageKeys,
+          insertedCount: result.insertedMessageKeys.length,
+        },
+        "Transient process append suppressed already-enqueued intents",
+      );
+    }
+
+    return {
+      outcome: "committed",
+      // Nothing was persisted, so there is no revision to report. Zero is the
+      // same value a first-time reader of this key would compute.
+      revision: 0,
+      insertedMessageKeys: result.insertedMessageKeys,
+      duplicateMessageKeys: result.duplicateMessageKeys,
+    };
+  }
+
   private async commitEvolution(params: {
     ref: ProcessRef;
     tenantId: string;
@@ -189,16 +294,9 @@ export class ProcessManagerService<State> {
     ensureJsonSafe(evolution.state);
     ensureJsonSafe(evolution.nextWakeAt);
 
-    const traceCarrier = this.captureTraceCarrier();
-    const messages: NewOutboxMessage[] = evolution.intents.map((intent) => {
-      ensureJsonSafe(intent.payload);
-      return {
-        messageKey: intent.messageKey,
-        intentType: intent.intentType,
-        payload: intent.payload,
-        traceCarrier,
-        ...(params.userId ? { userId: params.userId } : {}),
-      };
+    const messages = this.outboxMessagesFor({
+      intents: evolution.intents,
+      userId: params.userId,
     });
 
     const result = await this.store.commit({
@@ -240,6 +338,33 @@ export class ProcessManagerService<State> {
     }
 
     return result;
+  }
+
+  /**
+   * The outbox rows one evolution's intents become, for either commit path.
+   *
+   * Shared rather than written twice: the transient append and the durable
+   * commit build the same row, so a field added to one and not the other is
+   * a message that behaves differently depending on which path minted it.
+   */
+  private outboxMessagesFor({
+    intents,
+    userId,
+  }: {
+    intents: ProcessIntent[];
+    userId?: string;
+  }): NewOutboxMessage[] {
+    const traceCarrier = this.captureTraceCarrier();
+    return intents.map((intent) => {
+      ensureJsonSafe(intent.payload);
+      return {
+        messageKey: intent.messageKey,
+        intentType: intent.intentType,
+        payload: intent.payload,
+        traceCarrier,
+        ...(userId ? { userId } : {}),
+      };
+    });
   }
 
   /**
