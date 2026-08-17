@@ -1,6 +1,7 @@
 package ingestionbench
 
 import (
+	"slices"
 	"testing"
 )
 
@@ -39,9 +40,39 @@ func TestStageSeed(t *testing.T) {
 	})
 
 	t.Run("when the same run seed is used twice", func(t *testing.T) {
-		t.Run("replays identically, so a failing run can be reproduced", func(t *testing.T) {
-			if stageSeed(99, StageAdversarial) != stageSeed(99, StageAdversarial) {
-				t.Error("stageSeed is not deterministic")
+		t.Run("replays the same trace ids, so a failing run can be reproduced", func(t *testing.T) {
+			// Asserting stageSeed(99, X) == stageSeed(99, X) would hold for any
+			// implementation including a broken one. The property a replay
+			// actually depends on is that the same -seed regenerates the same
+			// spans, so this drives the generator twice and compares the ids.
+			ids := func() []string {
+				traces, err := generateStage(stageGen{
+					Plan: StagePlan{
+						Stage:           StageAdversarial,
+						Tenants:         1,
+						TracesPerTenant: 3,
+						SpansPerTrace:   2,
+					},
+					Tenants: []Tenant{{ProjectID: "p1", APIKey: "k1"}},
+					Seed:    99,
+					NowMs:   1_800_000_000_000,
+				})
+				if err != nil {
+					t.Fatalf("generateStage failed: %v", err)
+				}
+				out := make([]string, 0, len(traces))
+				for _, trace := range traces {
+					out = append(out, trace.TraceID)
+				}
+				return out
+			}
+
+			first, second := ids(), ids()
+			if len(first) == 0 {
+				t.Fatal("generated no traces")
+			}
+			if !slices.Equal(first, second) {
+				t.Errorf("replay diverged: %v then %v", first, second)
 			}
 		})
 	})
@@ -117,6 +148,94 @@ func TestBuildStageRequestsOrdering(t *testing.T) {
 					t.Fatalf("request %d carries span %s, want %s",
 						i, request.Spans[0].SpanID, spans[i].SpanID)
 				}
+			}
+		})
+	})
+
+	t.Run("when the stage asks for scattering", func(t *testing.T) {
+		t.Run("emits the spans in a different order", func(t *testing.T) {
+			// Without this case, deleting the ScatterAcrossConcurrentArrivals
+			// call would still pass the serial test above — only one half of the
+			// conditional would be pinned.
+			requests, err := buildStageRequests(
+				StagePlan{Stage: StageAdversarial, SpansPerRequest: 1, ScatterAcrossRequests: true},
+				traces,
+				CreateRng(1337),
+			)
+			if err != nil {
+				t.Fatalf("buildStageRequests failed: %v", err)
+			}
+			if len(requests) != len(spans) {
+				t.Fatalf("got %d requests, want %d", len(requests), len(spans))
+			}
+
+			emitted := make([]string, 0, len(requests))
+			for _, request := range requests {
+				emitted = append(emitted, request.Spans[0].SpanID)
+			}
+			generated := make([]string, 0, len(spans))
+			for _, span := range spans {
+				generated = append(generated, span.SpanID)
+			}
+
+			if slices.Equal(emitted, generated) {
+				t.Error("scattering left the order untouched")
+			}
+
+			// Reordered, never lost: the scatter is a permutation.
+			sortedEmitted := slices.Clone(emitted)
+			sortedGenerated := slices.Clone(generated)
+			slices.Sort(sortedEmitted)
+			slices.Sort(sortedGenerated)
+			if !slices.Equal(sortedEmitted, sortedGenerated) {
+				t.Error("scattering changed which spans were emitted, not just their order")
+			}
+		})
+	})
+}
+
+func TestBurstWindows(t *testing.T) {
+	t.Run("when the stage asked for steady arrival", func(t *testing.T) {
+		t.Run("sends everything as one window", func(t *testing.T) {
+			got := burstWindows(10, 0)
+			if len(got) != 1 || got[0] != (window{from: 0, to: 10}) {
+				t.Errorf("got %v, want one window covering all 10", got)
+			}
+		})
+	})
+
+	t.Run("when the stage asked for bursts", func(t *testing.T) {
+		t.Run("splits into windows of the burst size", func(t *testing.T) {
+			got := burstWindows(10, 4)
+			want := []window{{0, 4}, {4, 8}, {8, 10}}
+			if !slices.Equal(got, want) {
+				t.Errorf("got %v, want %v", got, want)
+			}
+		})
+
+		t.Run("covers every request exactly once", func(t *testing.T) {
+			// The windows index into both the request and the result slice, so a
+			// gap would silently skip requests and an overlap would have two
+			// goroutines writing the same result.
+			const total = 23
+			covered := make([]int, total)
+			for _, w := range burstWindows(total, 5) {
+				for i := w.from; i < w.to; i++ {
+					covered[i]++
+				}
+			}
+			for i, n := range covered {
+				if n != 1 {
+					t.Fatalf("request %d covered %d times, want exactly 1", i, n)
+				}
+			}
+		})
+	})
+
+	t.Run("when there is nothing to send", func(t *testing.T) {
+		t.Run("produces no windows", func(t *testing.T) {
+			if got := burstWindows(0, 5); len(got) != 0 {
+				t.Errorf("got %v, want none", got)
 			}
 		})
 	})

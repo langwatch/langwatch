@@ -84,12 +84,19 @@ func runSeedCommand(ctx context.Context, args []string, out streams) int {
 	flags := flag.NewFlagSet("ingestionbench seed", flag.ContinueOnError)
 	flags.SetOutput(out.Err)
 	count := flags.Int("count", 4, "how many projects to seed (minimum 2)")
-	databaseURL := flags.String("database-url", os.Getenv("DATABASE_URL"), "Postgres URL to seed into")
+	// Empty default, resolved from the environment AFTER parsing. A secret must
+	// never be a flag's DefValue: ContinueOnError still runs the usage function
+	// on a parse failure, and that prints every default — so one mistyped flag
+	// would write the Postgres URL, credentials and all, to the workflow log.
+	databaseURL := flags.String("database-url", "", "Postgres URL to seed into (defaults to $DATABASE_URL)")
 	if err := flags.Parse(args); err != nil {
 		return 2
 	}
 
-	resolved := seedArgs{DatabaseURL: *databaseURL, Count: *count}
+	resolved := seedArgs{
+		DatabaseURL: valueOrEnv(*databaseURL, "DATABASE_URL"),
+		Count:       *count,
+	}
 	if err := resolved.validate(); err != nil {
 		fmt.Fprintln(out.Err, err)
 		return 2
@@ -130,8 +137,11 @@ func runBenchmarkCommand(ctx context.Context, args []string, out streams) int {
 	flags.SetOutput(out.Err)
 
 	endpoint := flags.String("endpoint", envOr("LANGWATCH_ENDPOINT", "http://localhost:5560"), "platform base URL to ingest against")
-	clickhouse := flags.String("clickhouse", os.Getenv("CLICKHOUSE_URL"), "ClickHouse URL the correctness checks read from")
-	tenants := flags.String("tenants", os.Getenv("BENCHMARK_TENANTS"), "tenants as JSON, from `ingestionbench seed`")
+	// Both carry secrets — the ClickHouse URL its credentials, the tenants blob
+	// every project's API key — so neither may be a flag default. See the note
+	// in runSeedCommand: a parse failure prints every DefValue.
+	clickhouse := flags.String("clickhouse", "", "ClickHouse URL the correctness checks read from (defaults to $CLICKHOUSE_URL)")
+	tenants := flags.String("tenants", "", "tenants as JSON, from `ingestionbench seed` (defaults to $BENCHMARK_TENANTS)")
 	scale := flags.Float64("scale", 1, "workload multiplier (trace counts only; payload sizes are fixed)")
 	seed := flags.Int64("seed", 1337, "PRNG seed; reuse a failing run's seed to replay it exactly")
 	outDir := flags.String("out", "/tmp/ingestion-benchmark", "directory for results.json, samples.json, and summary.md")
@@ -147,7 +157,7 @@ func runBenchmarkCommand(ctx context.Context, args []string, out streams) int {
 		return 2
 	}
 
-	parsedTenants, err := parseTenants(*tenants)
+	parsedTenants, err := parseTenants(valueOrEnv(*tenants, "BENCHMARK_TENANTS"))
 	if err != nil {
 		fmt.Fprintln(out.Err, err)
 		return 2
@@ -155,7 +165,7 @@ func runBenchmarkCommand(ctx context.Context, args []string, out streams) int {
 
 	resolved := RunArgs{
 		Endpoint:      *endpoint,
-		ClickHouse:    *clickhouse,
+		ClickHouse:    valueOrEnv(*clickhouse, "CLICKHOUSE_URL"),
 		Tenants:       parsedTenants,
 		Scale:         *scale,
 		Seed:          *seed,
@@ -192,4 +202,20 @@ func envOr(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+// valueOrEnv resolves a flag that carries a secret: the explicit flag wins, and
+// the environment fills in when it was not given.
+//
+// The resolution happens AFTER parsing on purpose. Handing the environment
+// value to `flags.String` as its default would put a credential in the flag's
+// DefValue, and `flag.ContinueOnError` still runs the usage function when
+// parsing fails — which prints every default. One mistyped flag would put the
+// Postgres URL, the ClickHouse URL and every tenant's API key into a log the
+// workflow captures and uploads.
+func valueOrEnv(given, key string) string {
+	if given != "" {
+		return given
+	}
+	return os.Getenv(key)
 }

@@ -91,6 +91,15 @@ on:
         required: false
         default: "3m"
         type: string
+      span_event_type:
+        description: >-
+          The event_log type counted in the layer check. Exposed because the
+          exact string is unconfirmed: if it is wrong that layer reads zero for
+          every trace and the run reports total loss at the ingest layer, which
+          is a harness fault wearing a pipeline fault's clothes.
+        required: false
+        default: "span.recorded"
+        type: string
   pull_request:
     # `labeled` is included so adding the label to an open PR triggers a run
     # without needing an empty push.
@@ -203,9 +212,16 @@ jobs:
         # without this. --kubelet-insecure-tls is required because kind's
         # kubelet certs are self-signed. Resource sampling is informational, so
         # this step is allowed to fail without failing the run.
+        #
+        # Pinned, not `releases/latest`. That URL is mutable: an upstream
+        # release can change the manifest, the image it pulls and the cluster
+        # permissions it grants, with no review here — and this manifest is
+        # applied with cluster-admin. Bump it deliberately.
         continue-on-error: true
+        env:
+          METRICS_SERVER_VERSION: v0.7.2
         run: |
-          kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+          kubectl apply -f "https://github.com/kubernetes-sigs/metrics-server/releases/download/${METRICS_SERVER_VERSION}/components.yaml"
           kubectl -n kube-system patch deployment metrics-server --type=json \
             -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
           kubectl -n kube-system rollout status deployment/metrics-server --timeout=180s
@@ -351,6 +367,7 @@ jobs:
           BENCH_SCALE: ${{ inputs.scale || '1' }}
           BENCH_SEED: ${{ inputs.seed || '1337' }}
           BENCH_SETTLE_TIMEOUT: ${{ inputs.settle_timeout || '3m' }}
+          BENCH_SPAN_EVENT_TYPE: ${{ inputs.span_event_type || 'span.recorded' }}
         run: |
           "$BENCH_BIN" run \
             -endpoint http://localhost:5560 \
@@ -359,6 +376,7 @@ jobs:
             -scale "$BENCH_SCALE" \
             -seed "$BENCH_SEED" \
             -settle-timeout "$BENCH_SETTLE_TIMEOUT" \
+            -span-event-type "$BENCH_SPAN_EVENT_TYPE" \
             -runner-label "$RUNNER_LABEL" \
             -out "${GITHUB_WORKSPACE}/benchmark-output"
 

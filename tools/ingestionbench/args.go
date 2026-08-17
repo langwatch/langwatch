@@ -51,10 +51,23 @@ func parseTenants(raw string) ([]Tenant, error) {
 		return nil, fmt.Errorf(
 			"need at least 2 tenants to check cross-tenant isolation, got %d", len(tenants))
 	}
+	// Distinct project ids, not just two of them. Two copies of the same project
+	// satisfy the count above and then defeat the check the count exists for:
+	// the cross-tenant query would compare a project against itself, find
+	// nothing foreign, and report isolation as PASSING. The input is a free-text
+	// JSON box on a dispatch form, so a duplicated entry is the likely typo.
+	seen := make(map[string]int, len(tenants))
 	for i, tenant := range tenants {
 		if tenant.ProjectID == "" || tenant.APIKey == "" {
 			return nil, fmt.Errorf("tenant %d is missing projectId or apiKey", i)
 		}
+		if first, duplicate := seen[tenant.ProjectID]; duplicate {
+			return nil, fmt.Errorf(
+				"tenants %d and %d are both project %s: cross-tenant isolation would compare "+
+					"a project against itself and pass regardless of what the pipeline did",
+				first, i, tenant.ProjectID)
+		}
+		seen[tenant.ProjectID] = i
 	}
 	return tenants, nil
 }

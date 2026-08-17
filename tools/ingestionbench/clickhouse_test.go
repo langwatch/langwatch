@@ -1,6 +1,11 @@
 package ingestionbench
 
 import (
+	"context"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -130,6 +135,118 @@ func TestNewCHClient(t *testing.T) {
 		t.Run("rejects one with no host", func(t *testing.T) {
 			if _, err := newCHClient("not-a-url"); err == nil {
 				t.Error("expected an error for a DSN with no scheme or host")
+			}
+		})
+	})
+}
+
+// queryJSON holds the error contract every verification query reads. A non-2xx
+// that surfaced only its status code would turn a ClickHouse parse error into
+// "the query failed", and the run would be diagnosed from the wrong end.
+func TestQueryJSON(t *testing.T) {
+	t.Run("given a server that answers", func(t *testing.T) {
+		var gotQuery, gotRawQuery string
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			body, _ := io.ReadAll(r.Body)
+			gotQuery = string(body)
+			gotRawQuery = r.URL.RawQuery
+			_, _ = io.WriteString(w, `{"TraceId":"a","SpanCount":"3"}`+"\n"+
+				`{"TraceId":"b","SpanCount":4}`+"\n")
+		}))
+		t.Cleanup(server.Close)
+
+		client, err := newCHClient(server.URL + "/bench")
+		if err != nil {
+			t.Fatalf("could not build client: %v", err)
+		}
+
+		var rows []countRow
+		err = queryJSON(context.Background(), client, chQuery{
+			SQL:    "SELECT 1",
+			Params: map[string]any{"tenantId": "p1", "fromMs": int64(7)},
+			Into:   &rows,
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		t.Run("sends the statement as the request body", func(t *testing.T) {
+			if gotQuery != "SELECT 1" {
+				t.Errorf("body is %q, want the statement", gotQuery)
+			}
+		})
+
+		t.Run("binds every parameter under a param_ name", func(t *testing.T) {
+			for _, want := range []string{"param_tenantId=p1", "param_fromMs=7"} {
+				if !strings.Contains(gotRawQuery, want) {
+					t.Errorf("query string %q is missing %q", gotRawQuery, want)
+				}
+			}
+		})
+
+		t.Run("puts the database on the query string", func(t *testing.T) {
+			if !strings.Contains(gotRawQuery, "database=bench") {
+				t.Errorf("query string %q is missing the database", gotRawQuery)
+			}
+		})
+
+		t.Run("decodes both the quoted and bare integer shapes", func(t *testing.T) {
+			if len(rows) != 2 {
+				t.Fatalf("decoded %d rows, want 2", len(rows))
+			}
+			if rows[0].spans() != 3 || rows[1].spans() != 4 {
+				t.Errorf("counts are %d and %d, want 3 and 4", rows[0].spans(), rows[1].spans())
+			}
+		})
+	})
+
+	t.Run("when ClickHouse refuses the query", func(t *testing.T) {
+		t.Run("surfaces the body, not just the status", func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = io.WriteString(w, "Code: 62. DB::Exception: Syntax error")
+			}))
+			t.Cleanup(server.Close)
+
+			client, err := newCHClient(server.URL + "/bench")
+			if err != nil {
+				t.Fatalf("could not build client: %v", err)
+			}
+
+			var rows []countRow
+			err = queryJSON(context.Background(), client, chQuery{SQL: "SELEC 1", Into: &rows})
+			if err == nil {
+				t.Fatal("expected an error for a 400")
+			}
+			// Without the body every failure would read alike, and a typo in a
+			// query would be indistinguishable from ClickHouse being down.
+			if !strings.Contains(err.Error(), "DB::Exception: Syntax error") {
+				t.Errorf("error %q does not carry the ClickHouse message", err)
+			}
+			if !strings.Contains(err.Error(), "400") {
+				t.Errorf("error %q does not carry the status code", err)
+			}
+		})
+	})
+
+	t.Run("when a count cannot be read as an integer", func(t *testing.T) {
+		t.Run("fails rather than decoding it as zero", func(t *testing.T) {
+			// A swallowed decode error used to become 0, which the violation
+			// rules then reported as spans the projection had dropped.
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				_, _ = io.WriteString(w, `{"TraceId":"a","SpanCount":"not-a-number"}`+"\n")
+			}))
+			t.Cleanup(server.Close)
+
+			client, err := newCHClient(server.URL + "/bench")
+			if err != nil {
+				t.Fatalf("could not build client: %v", err)
+			}
+
+			var rows []countRow
+			err = queryJSON(context.Background(), client, chQuery{SQL: "SELECT 1", Into: &rows})
+			if err == nil {
+				t.Fatal("expected an error for an unreadable count")
 			}
 		})
 	})
