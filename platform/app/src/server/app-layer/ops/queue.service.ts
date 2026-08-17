@@ -11,20 +11,26 @@ import type {
 } from "./repositories/queue.repository";
 import type { GroupInfo, ParkedGroupInfo, QueueSummaryInfo } from "./types";
 
+/** What an error with no recognizable class name is recorded as. */
+const UNTYPED_ERROR_SHAPE = "untyped_error";
+
 /**
- * Reduce raw job errors to something safe to keep: the leading error class or
- * first few words, capped, deduped. Enough for an operator to recognise "these
- * all died the same way" without copying arbitrary thrown text — which can
- * include customer payload — into a durable audit row.
+ * Reduce raw job errors to something safe to keep in a durable audit row.
+ *
+ * Only a leading error CLASS survives — `TimeoutError`, `HttpError`. Anything
+ * else becomes a fixed placeholder, because a job's error text is arbitrary
+ * and its first words are no safer than its last: `"alice@example.com payment
+ * failed"` leads with the address. Enough for an operator to see "these all
+ * died the same way" and no more; the full message stays on the failing job.
  */
 function summarizeErrorShapes(messages: string[]): string[] {
   const shapes = new Set<string>();
   for (const message of messages) {
     const named = /^([A-Za-z][A-Za-z0-9_]*(?:Error|Exception))\b/.exec(message);
-    shapes.add(named?.[1] ?? message.trim().split(/\s+/).slice(0, 3).join(" "));
+    shapes.add(named?.[1]?.slice(0, 80) ?? UNTYPED_ERROR_SHAPE);
     if (shapes.size >= 5) break;
   }
-  return [...shapes].map((shape) => shape.slice(0, 80));
+  return [...shapes];
 }
 
 export class QueueService {

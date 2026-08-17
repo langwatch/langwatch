@@ -34,91 +34,97 @@ afterEach(cleanup);
 
 describe("dead-letter recovery vocabulary", () => {
   describe("given both substrates render their row controls", () => {
-    /** @scenario Recovery verbs are the same on both substrates */
-    it("calls the acts redrive and discard on each, and never replay", () => {
-      const { unmount } = renderWithChakra(
-        <DeadLettersTable
-          messages={[
-            {
-              id: "msg_1",
-              processName: "webhookDelivery",
-              projectId: "project_1",
-              processKey: "req_aaaabbbbccccdddd",
-              messageKey: "process:req_01:deliver",
-              intentType: "deliver",
-              attempts: 11,
-              updatedAt: NOW - 60_000,
-              traceId: null,
-              payload: {},
-            },
-          ]}
-          now={NOW}
-          canManage
-          expandedId={null}
-          redrivingId={null}
-          discardingId={null}
-          onToggle={vi.fn()}
-          onRedrive={vi.fn()}
-          onDiscard={vi.fn()}
-        />,
-      );
+    describe("when the operator can manage", () => {
+      /** @scenario Recovery verbs are the same on both substrates */
+      it("calls the acts redrive and discard on each, and never replay", () => {
+        const { unmount } = renderWithChakra(
+          <DeadLettersTable
+            messages={[
+              {
+                id: "msg_1",
+                processName: "webhookDelivery",
+                projectId: "project_1",
+                processKey: "req_aaaabbbbccccdddd",
+                messageKey: "process:req_01:deliver",
+                intentType: "deliver",
+                attempts: 11,
+                updatedAt: NOW - 60_000,
+                traceId: null,
+                payload: {},
+              },
+            ]}
+            now={NOW}
+            canManage
+            expandedId={null}
+            redrivingId={null}
+            discardingId={null}
+            onToggle={vi.fn()}
+            onRedrive={vi.fn()}
+            onDiscard={vi.fn()}
+          />,
+        );
 
-      const outboxButtons = screen
-        .getAllByRole("button")
-        .map((b) => b.textContent);
-      expect(outboxButtons).toContain("Redrive");
-      expect(outboxButtons).toContain("Discard");
-      expect(outboxButtons.join(" ")).not.toMatch(/Replay/);
-      unmount();
+        const outboxButtons = screen
+          .getAllByRole("button")
+          .map((b) => b.textContent);
+        expect(outboxButtons).toContain("Redrive");
+        expect(outboxButtons).toContain("Discard");
+        expect(outboxButtons.join(" ")).not.toMatch(/Replay/);
+        unmount();
 
-      renderWithChakra(
-        <Table.Root>
-          <Table.Body>
-            <DlqRow
-              group={{
-                queueName: "queue-a",
-                queueDisplayName: "Queue A",
-                groupId: "group-1",
-                pipelineName: "traces",
-                error: "HTTP 500",
-                jobCount: 3,
-              }}
-              canManage
-              onAct={vi.fn()}
-            />
-          </Table.Body>
-        </Table.Root>,
-      );
+        renderWithChakra(
+          <Table.Root>
+            <Table.Body>
+              <DlqRow
+                group={{
+                  queueName: "queue-a",
+                  queueDisplayName: "Queue A",
+                  groupId: "group-1",
+                  pipelineName: "traces",
+                  error: "HTTP 500",
+                  jobCount: 3,
+                }}
+                canManage
+                onAct={vi.fn()}
+              />
+            </Table.Body>
+          </Table.Root>,
+        );
 
-      const queueButtons = screen
-        .getAllByRole("button")
-        .map((b) => b.textContent);
-      expect(queueButtons).toContain("Redrive");
-      expect(queueButtons).toContain("Discard");
-      expect(queueButtons.join(" ")).not.toMatch(/Replay/);
+        const queueButtons = screen
+          .getAllByRole("button")
+          .map((b) => b.textContent);
+        expect(queueButtons).toContain("Redrive");
+        expect(queueButtons).toContain("Discard");
+        expect(queueButtons.join(" ")).not.toMatch(/Replay/);
+      });
     });
 
-    it("withholds both verbs from a view-only operator on each surface", () => {
-      renderWithChakra(
-        <Table.Root>
-          <Table.Body>
-            <DlqRow
-              group={{
-                queueName: "queue-a",
-                queueDisplayName: "Queue A",
-                groupId: "group-1",
-                pipelineName: null,
-                error: null,
-                jobCount: 1,
-              }}
-              canManage={false}
-              onAct={vi.fn()}
-            />
-          </Table.Body>
-        </Table.Root>,
-      );
-      expect(screen.queryAllByRole("button")).toHaveLength(0);
-      expect(within(screen.getByRole("row")).queryByText("Discard")).toBeNull();
+    describe("when the operator is view-only", () => {
+      it("withholds both verbs on each surface", () => {
+        renderWithChakra(
+          <Table.Root>
+            <Table.Body>
+              <DlqRow
+                group={{
+                  queueName: "queue-a",
+                  queueDisplayName: "Queue A",
+                  groupId: "group-1",
+                  pipelineName: null,
+                  error: null,
+                  jobCount: 1,
+                }}
+                canManage={false}
+                onAct={vi.fn()}
+              />
+            </Table.Body>
+          </Table.Root>,
+        );
+        expect(screen.queryAllByRole("button")).toHaveLength(0);
+        expect(
+          within(screen.getByRole("row")).queryByText("Discard"),
+        ).toBeNull();
+      });
     });
   });
 });

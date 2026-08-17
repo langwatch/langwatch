@@ -130,7 +130,13 @@ describe("QueueService", () => {
         discardManyFromDlq: vi.fn().mockResolvedValue({
           discardedCount: 1,
           jobsDiscarded: 1,
-          lastErrors: ["failed for user alice@example.com on card 4111"],
+          lastErrors: [
+            "failed for user alice@example.com on card 4111",
+            // Leading with the address: an error's first words are no safer
+            // than its last, which a "keep the first few words" reduction
+            // would have missed.
+            "bob@example.com could not be charged",
+          ],
         }),
       });
       const append = vi.fn().mockResolvedValue(undefined);
@@ -144,7 +150,9 @@ describe("QueueService", () => {
 
       const recorded = JSON.stringify(append.mock.calls[0]![0].metadata);
       expect(recorded).not.toContain("alice@example.com");
+      expect(recorded).not.toContain("bob@example.com");
       expect(recorded).not.toContain("4111");
+      expect(recorded).toContain("untyped_error");
     });
 
     it("audits a redrive with what moved and skips the audit when nothing did", async () => {
