@@ -261,3 +261,51 @@ Feature: In-place authorization data migration
     And the share link is a resource-scope grant with its token and expiry intact
     And the operator holds a platform-scope grant
     And every imported grant carries the business time of the fact it came from
+
+  # ============================================================================
+  # Read-through minting for legacy keys (ADR-092 decision 1 - no key sunset)
+  # ============================================================================
+  # Old keys keep working with no deadline and no customer action. What moves
+  # is where their access LIVES: a key whose access was implicit states it as
+  # a fact the first time it authenticates, so the same access survives the
+  # day the engine decides. The mint rides authentication and can never fail
+  # it.
+
+  @unit
+  Scenario: A legacy service key states its access the first time it is used
+    Given a service key with no grants of its own
+    When the key authenticates
+    Then the ledger records its organization-scoped admin grant
+    And the fact carries the source "read-through-mint" and the system actor
+    And the grant's business time is the key's own creation time
+
+  @unit
+  Scenario: The mint never holds up the request that triggered it
+    Given a service key with no grants of its own
+    When the key authenticates
+    Then authentication answers without waiting for the projection
+
+  @unit
+  Scenario: A key that already states its access mints nothing
+    Given a key that holds a grant
+    When the key authenticates
+    Then no fact is recorded
+
+  @unit
+  Scenario: A key owned by a user mints nothing it did not already have
+    Given a key owned by a user and holding no grant
+    When the key authenticates
+    Then no fact is recorded
+
+  @unit
+  Scenario: A key that is busy authenticating mints once, not once per request
+    Given a service key with no grants of its own
+    When the key authenticates twice before the projection lands
+    Then exactly one fact is recorded
+
+  @unit
+  Scenario: A mint that fails leaves the credential working
+    Given the ledger refuses the write
+    When a legacy service key authenticates
+    Then the key still resolves
+    And the failure is a warning, retried on the key's next use

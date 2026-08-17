@@ -36,6 +36,7 @@ import {
   ApiKeyReservedNameError,
   ApiKeyScopeViolationError,
 } from "./errors";
+import { mintLegacyKeyGrant } from "./legacy-grant-mint";
 import { HIDDEN_SYSTEM_KEY_NAMES } from "./reserved-names";
 
 const logger = createLogger("langwatch:api-key:service");
@@ -115,19 +116,30 @@ export class ApiKeyService {
   private readonly repo: ApiKeyRepository;
   private readonly roleRepo: RoleRepository;
   private readonly prisma: PrismaClient;
+  private readonly mintLegacyGrant: (args: {
+    apiKey: ApiKeyWithBindings;
+  }) => void;
 
   constructor({
     prisma,
     repo,
     roleRepo,
+    mintLegacyGrant = mintLegacyKeyGrant,
   }: {
     prisma: PrismaClient;
     repo: ApiKeyRepository;
     roleRepo: RoleRepository;
+    /**
+     * The read-through mint a verified legacy key triggers (decision 1).
+     * Injectable so a test can watch the seam without an event-sourcing
+     * stack behind it.
+     */
+    mintLegacyGrant?: (args: { apiKey: ApiKeyWithBindings }) => void;
   }) {
     this.prisma = prisma;
     this.repo = repo;
     this.roleRepo = roleRepo;
+    this.mintLegacyGrant = mintLegacyGrant;
   }
 
   static create(prisma: PrismaClient): ApiKeyService {
@@ -894,6 +906,13 @@ export class ApiKeyService {
           );
         });
     }
+
+    // A key whose access predates the grants ledger writes that access down
+    // the first time it is used (ADR-092 decision 1 — no key sunset, ever).
+    // Fire-and-forget for the same reason the hash upgrade above is: the
+    // answer to "is this credential real" cannot wait on, or be failed by, a
+    // write nobody asked for.
+    this.mintLegacyGrant({ apiKey });
 
     return apiKey;
   }

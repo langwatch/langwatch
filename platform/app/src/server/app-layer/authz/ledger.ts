@@ -59,8 +59,18 @@ const logger = createLogger("langwatch:authz:ledger");
 
 export type LedgerActor = { type: "user" | "system"; id: string | null };
 
-/** Which writer authored a runtime fact — the event's `source` field. */
-export type LedgerWriteSource = "grants-service" | "scim" | "invite";
+/**
+ * Which writer authored a runtime fact — the event's `source` field.
+ *
+ * `read-through-mint` is the compatibility path (decision 1: no legacy-key
+ * sunset): a credential whose access predates the ledger states it the first
+ * time it is used, rather than being asked to be re-issued.
+ */
+export type LedgerWriteSource =
+  | "grants-service"
+  | "scim"
+  | "invite"
+  | "read-through-mint";
 
 type Sender<T> = { send: (data: T) => Promise<unknown> };
 
@@ -183,12 +193,40 @@ export class GrantsLedgerWriter {
     actor,
     source = "grants-service",
     onDuplicate,
+    commandId,
+    occurredAtMs: occurredAtOverrideMs,
+    awaitProjection = true,
   }: {
     organizationId: string;
     bindings: LedgerBindingAttach[];
     actor: LedgerActor;
     source?: LedgerWriteSource;
     onDuplicate: "reject" | "skip";
+    /**
+     * A caller-derived command id, for writes that are not a user action and
+     * therefore have no retry to remember one (decision 23: migration-shaped
+     * writers derive theirs from the source row). Two concurrent emissions of
+     * the same derived fact then carry the same `<commandId>:<index>`
+     * idempotency key and dedupe at the event store. Omitted, a random one is
+     * minted, which is what a genuine repeat action wants.
+     */
+    commandId?: string;
+    /**
+     * The fact's business time. Backdating writers pass the source row's own
+     * timestamp so the grant keeps the time it really started — and so a
+     * content-derived grant id, whose KSUID timestamp IS this value, stays
+     * stable across re-emissions. Defaults to now, which is true of every
+     * fact born from a live action.
+     */
+    occurredAtMs?: number;
+    /**
+     * Whether to hold for the projection to land the rows. On by default:
+     * a caller that just wrote usually reads next. A write that is not on
+     * anybody's read path — the read-through mint, off the auth hot path —
+     * turns it off, because the append is already durable and waiting would
+     * only spend the request's time.
+     */
+    awaitProjection?: boolean;
   }): Promise<AttachOutcome> {
     if (bindings.length === 0) return { attached: [], duplicates: [] };
 
@@ -215,11 +253,11 @@ export class GrantsLedgerWriter {
     }
     if (fresh.length === 0) return { attached: [], duplicates };
 
-    const occurredAtMs = this.now();
+    const occurredAtMs = occurredAtOverrideMs ?? this.now();
     await (await this.commands()).commands.attachGrants.send({
       tenantId: organizationId,
       organizationId,
-      commandId: newLedgerCommandId(),
+      commandId: commandId ?? newLedgerCommandId(),
       grants: fresh.map((binding) => ({
         grantId: binding.bindingId,
         principal: principalForWhere(binding.principal),
@@ -232,16 +270,18 @@ export class GrantsLedgerWriter {
     });
 
     const wanted = fresh.map((binding) => binding.bindingId);
-    await this.awaitProjection({
-      what: `attach of ${wanted.length} binding(s)`,
-      organizationId,
-      check: async () => {
-        const present = await this.prisma.roleBinding.count({
-          where: { organizationId, id: { in: wanted } },
-        });
-        return present === wanted.length;
-      },
-    });
+    if (awaitProjection) {
+      await this.awaitProjection({
+        what: `attach of ${wanted.length} binding(s)`,
+        organizationId,
+        check: async () => {
+          const present = await this.prisma.roleBinding.count({
+            where: { organizationId, id: { in: wanted } },
+          });
+          return present === wanted.length;
+        },
+      });
+    }
     await bumpAuthzEpoch({ organizationId });
     return { attached: wanted, duplicates };
   }
