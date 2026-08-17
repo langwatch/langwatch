@@ -57,8 +57,12 @@ export const normalizedPullEventSchema = z.object({
   action: z.string(),
   /** Target of the action (e.g. model name, tool name, document id). */
   target: z.string(),
-  /** USD cost (0 if the source doesn't expose it). */
-  cost_usd: z.number().nonnegative().default(0),
+  /** USD cost as a decimal string ("0" if the source doesn't expose it).
+   *  Kept as a string so sub-cent amounts survive without float rounding. */
+  cost_usd: z
+    .union([z.string(), z.number()])
+    .transform((v) => String(v))
+    .default("0"),
   /** Input tokens (0 if unknown). */
   tokens_input: z.number().nonnegative().int().default(0),
   /** Output tokens (0 if unknown). */

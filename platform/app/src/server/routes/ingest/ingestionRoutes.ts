@@ -781,10 +781,10 @@ secured
                 ).filter((b) => b.scopeType !== "ATTRIBUTED_USER");
                 if (budgets.length === 0) continue;
 
-                // The reported cost is a float the caller sent, so it is
-                // pinned to an integer once, here, and every total downstream
-                // adds those integers rather than re-deriving from decimals.
-                const nano = usdToNanoUsd(event.costUsd.toFixed(10));
+                // The reported cost is a decimal string, so it is pinned to
+                // an integer once, here, and every total downstream adds
+                // those integers rather than re-deriving from decimals.
+                const nano = usdToNanoUsd(event.costUsd);
                 const rows = budgets.map((b) => ({
                   tenantId: govProject.id,
                   budgetId: b.id,

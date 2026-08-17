@@ -34,7 +34,7 @@ import type {
 } from "@opentelemetry/otlp-transformer";
 
 export interface CanonicalCostEvent {
-  costUsd: number;
+  costUsd: string;
   model: string;
   inputTokens: number;
   outputTokens: number;
@@ -112,7 +112,7 @@ function tryParseEvent(
   const recordAttrs = mergeAttributes(record.attributes ?? []);
   const merged = { ...resourceAttrs, ...recordAttrs };
   const requestId = stringOrNull(merged[F.REQUEST_ID]);
-  const costUsd = numberOrNull(merged[F.COST_USD]);
+  const costUsd = costUsdStringOrNull(merged[F.COST_USD]);
   if (!requestId || costUsd === null) {
     // Without these two, the row can't be inserted idempotently or
     // costed. The receiver still hands the LogRecord to the trace
@@ -152,6 +152,18 @@ function numberOrNull(v: unknown): number | null {
   if (typeof v === "string") {
     const n = Number(v);
     return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+/** Like `numberOrNull`, but returns the value as a decimal string so USD
+ *  amounts are never narrowed to a lossy float. A numeric OTLP value is
+ *  stringified; a string that parses as a finite number is kept verbatim. */
+function costUsdStringOrNull(v: unknown): string | null {
+  if (typeof v === "number" && Number.isFinite(v)) return String(v);
+  if (typeof v === "string") {
+    const n = Number(v);
+    return Number.isFinite(n) ? v : null;
   }
   return null;
 }

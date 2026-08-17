@@ -84,7 +84,7 @@ describe("ActivityMonitorService pulled and pushed source events", () => {
         actor: "pulled@example.com",
         action: "usage_report",
         target: "claude-haiku-4-5",
-        costUsd: 0.0042,
+        costUsd: "0.0042",
         tokensInput: 8,
         tokensOutput: 5,
       }),
@@ -137,10 +137,10 @@ describe("ActivityMonitorService pulled and pushed source events", () => {
     const byId = new Map(rows.map((row) => [row.eventId, row]));
     // The one field that was a number survives; only the bad two fall back.
     expect(byId.get("poisoned-fields")).toEqual(
-      expect.objectContaining({ costUsd: 0, tokensInput: 0, tokensOutput: 5 }),
+      expect.objectContaining({ costUsd: "0", tokensInput: 0, tokensOutput: 5 }),
     );
     expect(byId.get("poisoned-extension")).toEqual(
-      expect.objectContaining({ costUsd: 0, tokensInput: 0, tokensOutput: 0 }),
+      expect.objectContaining({ costUsd: "0", tokensInput: 0, tokensOutput: 0 }),
     );
   });
 
@@ -191,7 +191,7 @@ describe("ActivityMonitorService pulled and pushed source events", () => {
     expect(rows[0]).toEqual(
       expect.objectContaining({
         eventId: "credit-line",
-        costUsd: -12.5,
+        costUsd: "-12.5",
         tokensInput: 8,
         tokensOutput: 5,
       }),

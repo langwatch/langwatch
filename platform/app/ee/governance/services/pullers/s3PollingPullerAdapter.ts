@@ -401,7 +401,7 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
       actor: asString(get(config.eventMapping.actor)),
       action: asString(get(config.eventMapping.action)),
       target: asString(get(config.eventMapping.target)),
-      cost_usd: asNumber(get(config.eventMapping.cost_usd)),
+      cost_usd: String(asNumber(get(config.eventMapping.cost_usd))),
       tokens_input: asInt(get(config.eventMapping.tokens_input)),
       tokens_output: asInt(get(config.eventMapping.tokens_output)),
       raw_payload: JSON.stringify(rawEvent),
