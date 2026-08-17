@@ -1,6 +1,9 @@
 import { randomUUID } from "node:crypto";
+import { createLogger } from "@langwatch/observability";
 import type { MigrationLeaseRepository } from "@langwatch/system-migrations";
 import type { Cluster, Redis } from "ioredis";
+
+const logger = createLogger("langwatch:system-migrations:lease");
 
 const KEY_PREFIX = "system-migrations:lease:";
 
@@ -47,7 +50,15 @@ export class RedisMigrationLeaseRepository implements MigrationLeaseRepository {
         "NX",
       );
       return result === "OK";
-    } catch {
+    } catch (error) {
+      // Standing down is right, but silence is not: the runner logs every
+      // falsy acquire as "another process holds the lease", so an unreachable
+      // Redis would read as ordinary contention and the migration would never
+      // run, on any boot, without a word anywhere.
+      logger.warn(
+        { error, name },
+        "could not acquire the migration lease; treating it as held elsewhere",
+      );
       return false;
     }
   }
@@ -69,7 +80,13 @@ export class RedisMigrationLeaseRepository implements MigrationLeaseRepository {
         String(ttlMs),
       );
       return result === 1;
-    } catch {
+    } catch (error) {
+      // A lost renewal stops the pass mid-flight, so the reason it was lost
+      // is worth having.
+      logger.warn(
+        { error, name },
+        "could not renew the migration lease; treating it as lost",
+      );
       return false;
     }
   }

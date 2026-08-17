@@ -230,15 +230,27 @@ export class SystemMigrationRunnerService {
       // unchanged) and the next pass tries again. One broken tenant must
       // not stop the fleet.
       summary.parked += 1;
-      await state.upsertRecord({
-        migrationName: migration.name,
-        tenantId,
-        status: "parked",
-        report: {
-          kind: "error",
-          message: error instanceof Error ? error.message : String(error),
-        },
-      });
+      try {
+        await state.upsertRecord({
+          migrationName: migration.name,
+          tenantId,
+          status: "parked",
+          report: {
+            kind: "error",
+            message: error instanceof Error ? error.message : String(error),
+          },
+        });
+      } catch (parkError) {
+        // Recording the park is itself a write, so the very failure most
+        // likely to park a tenant - the state store being unreachable - is
+        // the one that would throw here and take the rest of the fleet down
+        // with it. An unrecorded park costs nothing the next pass cannot
+        // rebuild: the tenant is still pending, and it is tried again.
+        logger.error(
+          { error: parkError, migration: migration.name, tenantId },
+          "could not record a parked tenant; continuing the pass",
+        );
+      }
       logger.error(
         { error, migration: migration.name, tenantId },
         "tenant migration parked on error",

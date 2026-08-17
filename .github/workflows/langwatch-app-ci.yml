@@ -366,6 +366,13 @@ jobs:
         if: matrix.shard == 1
         run: pnpm --filter @langwatch/system-migrations run test
 
+      # `pnpm typecheck` at the root checks @langwatch/web alone, so without
+      # this the package's own TypeScript — sources and tests both — is never
+      # compiled by CI at all.
+      - name: Typecheck @langwatch/system-migrations
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/system-migrations run typecheck
+
       - name: Run unit tests (shard ${{ matrix.shard }}/4)
         id: unit-tests
         working-directory: platform/app

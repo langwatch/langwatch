@@ -455,9 +455,9 @@ describe("guardProjectId — SCOPED_MODELS (ModelProvider family)", () => {
 });
 
 describe("guardProjectId — SCOPED_MODELS (SystemMigrationTenantState)", () => {
-  describe("findMany scoped to one migration across tenants", () => {
+  describe("when findMany names only a migration", () => {
     /** @scenario Migration-wide reads are the ops rollup and stay allowed */
-    it("does NOT throw — the ops dashboard lists one migration's tenants", async () => {
+    it("allows the ops dashboard to list one migration's tenants", async () => {
       await expect(
         runGuard({
           model: "SystemMigrationTenantState",
@@ -468,8 +468,8 @@ describe("guardProjectId — SCOPED_MODELS (SystemMigrationTenantState)", () => 
     });
   });
 
-  describe("findUnique by the compound key", () => {
-    it("does NOT throw — one tenant's row", async () => {
+  describe("when findUnique names the compound key", () => {
+    it("allows the read of one tenant's row", async () => {
       await expect(
         runGuard({
           model: "SystemMigrationTenantState",
@@ -487,8 +487,8 @@ describe("guardProjectId — SCOPED_MODELS (SystemMigrationTenantState)", () => 
     });
   });
 
-  describe("findMany with no predicate at all", () => {
-    it("THROWS — would walk every migration's every tenant", async () => {
+  describe("when findMany carries no predicate at all", () => {
+    it("refuses the walk across every migration's every tenant", async () => {
       await expect(
         runGuard({
           model: "SystemMigrationTenantState",
@@ -499,9 +499,9 @@ describe("guardProjectId — SCOPED_MODELS (SystemMigrationTenantState)", () => 
     });
   });
 
-  describe("deleteMany scoped only to a migration", () => {
+  describe("when deleteMany names only a migration", () => {
     /** @scenario A migration-wide bulk write is refused */
-    it("THROWS — dropping every finalized row would silently un-switch every organization", async () => {
+    it("refuses the delete that would silently un-switch every organization", async () => {
       await expect(
         runGuard({
           model: "SystemMigrationTenantState",
@@ -512,8 +512,8 @@ describe("guardProjectId — SCOPED_MODELS (SystemMigrationTenantState)", () => 
     });
   });
 
-  describe("updateMany scoped only to a migration", () => {
-    it("THROWS — would rewrite every tenant's state at once", async () => {
+  describe("when updateMany names only a migration", () => {
+    it("refuses the rewrite of every tenant's state at once", async () => {
       await expect(
         runGuard({
           model: "SystemMigrationTenantState",
@@ -527,8 +527,8 @@ describe("guardProjectId — SCOPED_MODELS (SystemMigrationTenantState)", () => 
     });
   });
 
-  describe("deleteMany naming a tenant", () => {
-    it("does NOT throw — bounded to one organization", async () => {
+  describe("when deleteMany names a tenant", () => {
+    it("allows the delete bounded to one organization", async () => {
       await expect(
         runGuard({
           model: "SystemMigrationTenantState",
@@ -539,8 +539,8 @@ describe("guardProjectId — SCOPED_MODELS (SystemMigrationTenantState)", () => 
     });
   });
 
-  describe("create without both key parts", () => {
-    it("THROWS — a row without a tenant belongs to nobody", async () => {
+  describe("when create omits the tenant", () => {
+    it("refuses a row that would belong to nobody", async () => {
       await expect(
         runGuard({
           model: "SystemMigrationTenantState",

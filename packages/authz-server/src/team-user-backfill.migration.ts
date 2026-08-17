@@ -89,7 +89,7 @@ export class TeamUserBackfillMigration implements SystemMigration {
       // there, and `createTeamBindings` skips duplicates), so without this
       // the bump that publishes them would never happen and every cache
       // would keep serving pre-backfill decisions.
-      resumeInterruptedAttempt: previous?.status === "parked",
+      shouldRepublishEpoch: previous?.status === "parked",
     });
 
     // Only members with legacy rows can decide differently without them -
@@ -119,11 +119,11 @@ export class TeamUserBackfillMigration implements SystemMigration {
   private async backfillMissingBindings({
     organizationId,
     legacyRows,
-    resumeInterruptedAttempt,
+    shouldRepublishEpoch,
   }: {
     organizationId: string;
     legacyRows: LegacyTeamRow[];
-    resumeInterruptedAttempt: boolean;
+    shouldRepublishEpoch: boolean;
   }): Promise<number> {
     if (legacyRows.length === 0) return 0;
 
@@ -164,7 +164,7 @@ export class TeamUserBackfillMigration implements SystemMigration {
     // and passports together (runbook M7 discipline). Bumping is also how a
     // resumed attempt publishes bindings its predecessor committed before
     // dying - cheap, and the alternative is a silently stale fleet.
-    if (created > 0 || resumeInterruptedAttempt) {
+    if (created > 0 || shouldRepublishEpoch) {
       await this.deps.bumpEpoch({ organizationId });
     }
     return created;

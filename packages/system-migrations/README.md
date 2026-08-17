@@ -5,7 +5,7 @@ no script, no downtime. A leased runner hosted in the worker process walks
 every tenant at boot and drives each registered `SystemMigration` through a
 per-tenant state machine:
 
-```
+```text
 pending ──► migrated ──► finalized ──► rolled_back
   │             ▲            │              ▲
   │             │            │              └─ operator only; the runner

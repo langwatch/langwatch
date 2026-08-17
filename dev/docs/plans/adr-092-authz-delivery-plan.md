@@ -28,7 +28,7 @@ per-customer migrations).
 
 ## The shape of the whole thing
 
-```
+```text
         A ENGINE           B SELF-MIGRATE     C RE-KEY           D ONE IDIOM
         registry+roles     in-place runner,   roleKey column     grants service,
         engine+shadow      TeamUser →         lite-member fix,   .permission(),
@@ -54,7 +54,7 @@ above say otherwise.
 
 ## Flags and kill switches
 
-```
+```text
  AUTHZ_V2_SHADOW        stage A    run engine alongside legacy, log mismatches,
                                    never affect responses (sampled, default 100%
                                    in dev/staging, 10% cloud)
@@ -90,7 +90,7 @@ the sign-off; the spec's supersession note over the override scenarios in
 `scoped-role-bindings.feature` activates when ADR-092 is accepted. Stage A
 waits on nothing.
 
-```
+```text
  A1  registry           A2  built-in roles      A3  engine            A4  shadow mode
  packages/authz/src/    packages/authz/src/     packages/authz/src/   wrap the 6 legacy
  registry.ts            roles.ts (viewer/       engine.ts + explain   resolvers, compare,
