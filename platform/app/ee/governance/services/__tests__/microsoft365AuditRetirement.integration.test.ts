@@ -21,14 +21,35 @@
 
 import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
 import { nanoid } from "nanoid";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { getApp, resetApp } from "~/server/app-layer/app";
+import { initializeDefaultApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
 
 const RETIRED_REASON = "[retired] Polled an Entra directory-change feed";
 
 const createdOrgIds: string[] = [];
 
+/**
+ * Only true when THIS file booted the composition root. The datastore lane can
+ * share a module registry across files, so tearing down an app a sibling file
+ * booted would break that sibling rather than this one.
+ */
+let bootedApp = false;
+
+beforeAll(() => {
+  // createSource() resolves the encryptor through getApp(), which throws
+  // unless the composition root has been booted.
+  try {
+    getApp();
+  } catch {
+    initializeDefaultApp();
+    bootedApp = true;
+  }
+});
+
 afterAll(async () => {
+  if (bootedApp) await resetApp();
   if (createdOrgIds.length > 0) {
     await prisma.ingestionSource.deleteMany({
       where: { organizationId: { in: createdOrgIds } },
@@ -51,9 +72,15 @@ async function makeOrg(): Promise<string> {
 /**
  * The migration, expressed as the statement the .sql file runs. Kept in step
  * with prisma/migrations/20260817120001_disable_copilot_studio_ingestion_sources.
+ *
+ * The real migration is applied by `prisma migrate deploy`, which never goes
+ * through the app's client and so never meets the tenancy guard. Running the
+ * same SQL through `prisma` here does, and the opt-out is honest: retiring a
+ * source type is a fleet-wide statement with no tenant to scope it to.
  */
 async function runDisableMigration(): Promise<void> {
   await prisma.$executeRawUnsafe(`
+    -- @tenancy: retires a source type across every tenant (schema migration)
     UPDATE "IngestionSource"
        SET "status" = 'disabled',
            "description" = CASE
