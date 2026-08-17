@@ -170,31 +170,7 @@ function runSweep(deps: SpendSettlementProcessDeps) {
     let failed = 0;
     for (const admission of open) {
       try {
-        await deps.sendSettleSpend({
-          gateway_request_id: admission.gatewayRequestId,
-          tenantId: admission.tenantId,
-          occurred_at: now,
-          reason: "confirmation_deadline_expired",
-          // The fold recorded this at admission, so the settled record and
-          // the envelope it delivers name the same organization and key the
-          // request was admitted against.
-          organization_id: admission.organizationId,
-          virtual_key_id: admission.virtualKeyId,
-          principal_user_id: admission.principalUserId,
-          team_id: "",
-          end_user_id: admission.endUserId,
-          trace_id: admission.traceId,
-          request_type: admission.requestType,
-          labels: admission.labels,
-          metadata: admission.metadata,
-          admitted_at: admission.admittedAtMs,
-          // The identity the request asked for. Settlement resolved none of
-          // its own, but the settled envelope has always named the requested
-          // one, and the delivery process now reads what the outcome states
-          // rather than remembering the admission.
-          model: admission.model,
-          model_provider_id: admission.providerKey,
-        });
+        await deps.sendSettleSpend(settleCommandFor(admission, now));
         settled++;
       } catch (error) {
         failed++;
@@ -209,30 +185,88 @@ function runSweep(deps: SpendSettlementProcessDeps) {
       }
     }
 
-    // A sweep that came back full did not finish: the rest waits for the next
-    // interval, and a run of these means the population is growing faster
-    // than one sweep drains it. The doc block on the cap promised this was
-    // reported; it was not, so an operator would have seen a steady settled
-    // count and no sign of the backlog behind it.
-    const hitCap = open.length >= MAX_OPEN_ADMISSIONS_PER_SWEEP;
-    const report = {
+    reportSweep({
       settled,
       failed,
+      found: open.length,
       graceMs,
-      hitCap,
       attempt: context.attempt,
-    };
-    if (failed > 0 || hitCap) {
-      logger.warn(
-        report,
-        hitCap
-          ? "settlement sweep hit its per-sweep cap; the remainder waits for the next sweep"
-          : "settlement sweep could not settle every admission it found",
-      );
-      return;
-    }
-    logger.info(report, "settled admissions whose confirmation never arrived");
+    });
   };
+}
+
+/**
+ * The settle command for one admission whose confirmation never arrived.
+ *
+ * Every attribution field is copied off the spend record rather than
+ * re-resolved, so the settled record and the envelope it delivers name the
+ * same organization and key the request was admitted against.
+ */
+function settleCommandFor(
+  admission: OpenAdmission,
+  now: number,
+): SettleSpendCommandData {
+  return {
+    gateway_request_id: admission.gatewayRequestId,
+    tenantId: admission.tenantId,
+    occurred_at: now,
+    reason: "confirmation_deadline_expired",
+    organization_id: admission.organizationId,
+    virtual_key_id: admission.virtualKeyId,
+    principal_user_id: admission.principalUserId,
+    // The fold has no TeamId column, so a sweep cannot know the team. The
+    // debits process is the only reader of this field and never sees a
+    // settled event, so nothing reads it here.
+    team_id: "",
+    end_user_id: admission.endUserId,
+    trace_id: admission.traceId,
+    request_type: admission.requestType,
+    labels: admission.labels,
+    metadata: admission.metadata,
+    admitted_at: admission.admittedAtMs,
+    // The identity the request asked for. Settlement resolved none of its
+    // own, but the settled envelope has always named the requested one, and
+    // the delivery process now reads what the outcome states rather than
+    // remembering the admission.
+    model: admission.model,
+    model_provider_id: admission.providerKey,
+  };
+}
+
+/**
+ * What one sweep tells operators.
+ *
+ * A sweep that came back full did not finish: the rest waits for the next
+ * interval, and a run of these means the population is growing faster than
+ * one sweep drains it. The doc block on the cap promised this was reported;
+ * it was not, so an operator would have seen a steady settled count and no
+ * sign of the backlog behind it.
+ */
+function reportSweep({
+  settled,
+  failed,
+  found,
+  graceMs,
+  attempt,
+}: {
+  settled: number;
+  failed: number;
+  found: number;
+  graceMs: number;
+  attempt: number;
+}): void {
+  const hitCap = found >= MAX_OPEN_ADMISSIONS_PER_SWEEP;
+  const report = { settled, failed, graceMs, hitCap, attempt };
+  if (failed > 0 || hitCap) {
+    logger.warn(
+      report,
+      hitCap
+        ? "settlement sweep hit its per-sweep cap; the remainder waits for the next sweep"
+        : "settlement sweep could not settle every admission it found",
+    );
+    return;
+  }
+  logger.info(report, "settled admissions whose confirmation never arrived");
 }
 
 /**
