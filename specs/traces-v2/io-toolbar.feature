@@ -41,3 +41,10 @@ Feature: Trace drawer input and output toolbar
     Given a toolbar too narrow for all action buttons
     Then the copy button stays visible after the overflow menu
     And it is never moved into the menu
+
+  @integration
+  Scenario: Conversation and attribute views use the same format selector
+    Given an attribute value the drawer can render more than one way
+    When the user opens its format selector
+    Then the menu lists chat, JSON and text
+    And a value that holds JSON inside a string reads as JSON
