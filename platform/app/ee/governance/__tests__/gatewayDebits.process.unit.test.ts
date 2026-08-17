@@ -6,6 +6,7 @@ import {
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
   GATEWAY_SPEND_FAILED_EVENT_TYPE,
 } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/constants";
+import type { GatewayDebitsState } from "../process-manager/gatewayDebits.process";
 import {
   gatewayDebitsPM,
   writeGatewayDebitsSchema,
@@ -290,7 +291,8 @@ describe("gateway debits process", () => {
     );
     // Nothing left waiting: this branch is the only thing that could ever
     // clear it, so a stash it dropped would strand the row that holds it.
-    expect(released.state.pendingOutcome).toBeNull();
+    // The harness types handler results as `unknown`, hence the cast.
+    expect((released.state as GatewayDebitsState).pendingOutcome).toBeNull();
   });
 
   it("releases an outrunning outcome even when admission names no end user", () => {
