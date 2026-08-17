@@ -196,7 +196,8 @@ export function createTraceProcessingPipeline(
     // soon as the committed fold shows a resolved origin.
     .withSubscriber("originGate", {
       fold: "traceSummary",
-      when: (event, context) => needsOriginResolution(event, context.state),
+      when: (event, context) =>
+        needsOriginResolution({ event, foldState: context.state }),
       delay: ORIGIN_GATE_DELAY_MS,
       ttl: ORIGIN_GATE_DEDUP_TTL_MS,
       handler: (event, context) => deps.originGateHandler(event, context),

@@ -99,10 +99,9 @@ function createEvent(
 
 function createContext(
   state: TraceSummaryData,
-  tenantId = "project-1",
 ): TriggerContext<TraceSummaryData> {
   return {
-    tenantId,
+    tenantId: "project-1",
     aggregateId: "trace-1",
     state,
   };

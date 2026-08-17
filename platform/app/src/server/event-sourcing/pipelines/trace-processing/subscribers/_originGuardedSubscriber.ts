@@ -1,3 +1,5 @@
+import { createLogger } from "@langwatch/observability";
+
 import type {
   SubscriberSpec,
   TriggerContext,
@@ -8,6 +10,10 @@ import {
   SPAN_RECEIVED_EVENT_TYPE,
 } from "../schemas/constants";
 import type { TraceProcessingEvent } from "../schemas/events";
+
+const logger = createLogger(
+  "langwatch:trace-processing:origin-guarded-subscriber",
+);
 
 const OLD_TRACE_THRESHOLD_MS = 60 * 60 * 1000;
 
@@ -138,7 +144,21 @@ export function defineOriginGuardedTraceSubscriber(opts: {
       ttl: opts.ttl ?? 30_000,
       delay: opts.delay ?? 30_000,
       handler: async (event, context) => {
-        if (!passes(event, context)) return;
+        // Fails open exactly like the router does for `when` (ADR-026): a
+        // throwing guard costs one log line and one redundant run, never a
+        // dropped side effect. Without this the re-check that exists to make
+        // a fail-open `when` safe would itself be the thing that loses the
+        // work it was added to protect.
+        let relevant = true;
+        try {
+          relevant = passes(event, context);
+        } catch (error) {
+          logger.error(
+            { subscriberName: opts.name, eventId: event.id, error },
+            "Origin guard threw during handler revalidation — failing open and running the subscriber",
+          );
+        }
+        if (!relevant) return;
         await opts.handler(event, context);
       },
     },

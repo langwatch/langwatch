@@ -252,7 +252,7 @@ describe("governanceOcsfEventsSync subscriber", () => {
     });
   });
 
-  describe("severity elevation per spec scenario", () => {
+  describe("given a trace whose attributes call for elevated severity", () => {
     it("elevates severity to MEDIUM when langwatch.governance.anomaly_alert_id is set", async () => {
       const { deps, insertEvent } = mockDeps();
       const subscriber = createGovernanceOcsfEventsSyncHandler(deps);
@@ -284,7 +284,7 @@ describe("governanceOcsfEventsSync subscriber", () => {
     });
   });
 
-  describe("TargetName fallback chain", () => {
+  describe("given a target name resolved through the fallback chain", () => {
     it("prefers gen_ai.request.model when present", async () => {
       const { deps, insertEvent } = mockDeps();
       const subscriber = createGovernanceOcsfEventsSyncHandler(deps);
@@ -349,7 +349,7 @@ describe("governanceOcsfEventsSync subscriber", () => {
     });
   });
 
-  describe("pre-enqueue gate", () => {
+  describe("given the pre-enqueue gate", () => {
     describe("when the trace carries no governance origin", () => {
       it("declines before a job is packed", () => {
         expect(isGovernanceOcsfTrace(event, ctx(createFoldState({})))).toBe(

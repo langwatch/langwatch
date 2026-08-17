@@ -455,8 +455,8 @@ export class RecordSpanCommand
    *
    * EXCEPTIONS — system-emitted attributes that ride in on OTLP from
    * trusted internal services (nlpgo, langevals, etc.) and MUST survive
-   * this strip because downstream consumers depend on them — one a
-   * subscriber, one a fold:
+   * this strip because downstream consumers depend on them — one is a
+   * subscriber and one is a fold:
    *
    *   - `langwatch.reserved.causality_depth` — stamped by nlpgo's
    *     `BaggageAttributeProcessor` on every span emitted during an

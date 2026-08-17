@@ -569,10 +569,13 @@ describe("evaluationTrigger relevance check", () => {
       ...overrides,
     });
 
-  const shouldDispatch = (
-    event: TraceProcessingEvent,
-    state: TraceSummaryData,
-  ): boolean => {
+  const shouldDispatch = ({
+    event,
+    state,
+  }: {
+    event: TraceProcessingEvent;
+    state: TraceSummaryData;
+  }): boolean => {
     const subscriber = createEvaluationTriggerSubscriber(createDeps());
     // The subscriber always declares one.
     return subscriber.spec.when!(event, createContext(state));
@@ -581,20 +584,27 @@ describe("evaluationTrigger relevance check", () => {
   describe("given a trace with a resolved origin", () => {
     /** @scenario "The origin guard admits a genuine message event before enqueue" */
     it("agrees to react to a recent span event", () => {
-      expect(shouldDispatch(createSpanEvent(), withOrigin())).toBe(true);
+      expect(
+        shouldDispatch({ event: createSpanEvent(), state: withOrigin() }),
+      ).toBe(true);
     });
 
     /** @scenario "The origin guard filters a non-message event before enqueue" */
     it("declines a topic-assigned event", () => {
-      expect(shouldDispatch(createTopicAssignedEvent(), withOrigin())).toBe(
-        false,
-      );
+      expect(
+        shouldDispatch({
+          event: createTopicAssignedEvent(),
+          state: withOrigin(),
+        }),
+      ).toBe(false);
     });
 
     /** @scenario "The evaluation trigger declines a synthetic span before enqueue" */
     it("declines a synthetic span", () => {
       const synthetic = createSpanEvent({ spanName: TRACK_EVENT_SPAN_NAME });
-      expect(shouldDispatch(synthetic, withOrigin())).toBe(false);
+      expect(shouldDispatch({ event: synthetic, state: withOrigin() })).toBe(
+        false,
+      );
     });
 
     /** @scenario "The evaluation trigger dispatches nothing past the span processing cap" */
@@ -603,7 +613,9 @@ describe("evaluationTrigger relevance check", () => {
       // runs once per event of a coalesced batch and would multiply the
       // once-per-crossing warn by the batch size.
       const atCap = withOrigin({ spanCount: MAX_PROCESSED_SPANS });
-      expect(shouldDispatch(createSpanEvent(), atCap)).toBe(true);
+      expect(shouldDispatch({ event: createSpanEvent(), state: atCap })).toBe(
+        true,
+      );
 
       const deps = createDeps();
       const subscriber = createEvaluationTriggerSubscriber(deps);
@@ -635,7 +647,9 @@ describe("evaluationTrigger relevance check", () => {
   describe("given a trace whose origin is unresolved", () => {
     /** @scenario "The origin guard filters a trace with no resolved origin before enqueue" */
     it("declines a span event", () => {
-      expect(shouldDispatch(createSpanEvent(), createFoldState())).toBe(false);
+      expect(
+        shouldDispatch({ event: createSpanEvent(), state: createFoldState() }),
+      ).toBe(false);
     });
   });
 });

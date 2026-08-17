@@ -78,10 +78,13 @@ function createEvent(
   } as TraceProcessingEvent;
 }
 
-function createContext(
-  state: TraceSummaryData,
-  overrides: Partial<TriggerContext<TraceSummaryData>> = {},
-): TriggerContext<TraceSummaryData> {
+function createContext({
+  state,
+  overrides = {},
+}: {
+  state: TraceSummaryData;
+  overrides?: Partial<TriggerContext<TraceSummaryData>>;
+}): TriggerContext<TraceSummaryData> {
   return {
     tenantId: "tenant-1",
     aggregateId: "trace-1",
@@ -117,7 +120,7 @@ describe("originGate subscriber", () => {
         attributes: { "langwatch.origin": "application" },
       });
 
-      await handler(createEvent(), createContext(state));
+      await handler(createEvent(), createContext({ state }));
 
       expect(deps.scheduleDeferred).not.toHaveBeenCalled();
     });
@@ -135,7 +138,7 @@ describe("originGate subscriber", () => {
           attributes: { "langwatch.origin": origin },
         });
 
-        await handler(createEvent(), createContext(state));
+        await handler(createEvent(), createContext({ state }));
 
         expect(deps.scheduleDeferred).not.toHaveBeenCalled();
       }
@@ -149,7 +152,7 @@ describe("originGate subscriber", () => {
       const handler = createOriginGateHandler(deps);
       const state = createFoldState({ attributes: {} });
 
-      await handler(createEvent(), createContext(state));
+      await handler(createEvent(), createContext({ state }));
 
       expect(deps.scheduleDeferred).toHaveBeenCalledWith({
         id: "trace-1",
@@ -167,7 +170,7 @@ describe("originGate subscriber", () => {
 
       await handler(
         createEvent({ aggregateId: "" }),
-        createContext(state, { aggregateId: "" }),
+        createContext({ state, overrides: { aggregateId: "" } }),
       );
 
       expect(deps.scheduleDeferred).not.toHaveBeenCalled();
@@ -183,7 +186,7 @@ describe("originGate subscriber", () => {
         occurredAt: Date.now() - 2 * 60 * 60 * 1000, // 2 hours ago
       });
 
-      await handler(oldEvent, createContext(state));
+      await handler(oldEvent, createContext({ state }));
 
       expect(deps.scheduleDeferred).not.toHaveBeenCalled();
     });
@@ -194,7 +197,9 @@ describe("originGate subscriber", () => {
       it("returns true", () => {
         const state = createFoldState({ attributes: {} });
 
-        expect(needsOriginResolution(createEvent(), state)).toBe(true);
+        expect(
+          needsOriginResolution({ event: createEvent(), foldState: state }),
+        ).toBe(true);
       });
     });
 
@@ -204,7 +209,9 @@ describe("originGate subscriber", () => {
           attributes: { "langwatch.origin": "application" },
         });
 
-        expect(needsOriginResolution(createEvent(), state)).toBe(false);
+        expect(
+          needsOriginResolution({ event: createEvent(), foldState: state }),
+        ).toBe(false);
       });
     });
 
@@ -215,7 +222,9 @@ describe("originGate subscriber", () => {
           occurredAt: Date.now() - 2 * 60 * 60 * 1000,
         });
 
-        expect(needsOriginResolution(oldEvent, state)).toBe(false);
+        expect(
+          needsOriginResolution({ event: oldEvent, foldState: state }),
+        ).toBe(false);
       });
     });
   });

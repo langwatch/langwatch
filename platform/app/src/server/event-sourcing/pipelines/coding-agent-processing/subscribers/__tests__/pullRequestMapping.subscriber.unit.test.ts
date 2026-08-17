@@ -144,7 +144,7 @@ describe("pullRequestMapping subscriber", () => {
     });
   });
 
-  describe("its queue options on the pipeline registration", () => {
+  describe("given the queue options on its pipeline registration", () => {
     it("keys the job on the project, repository and branch", () => {
       const registration = registrationWith(vi.fn());
 

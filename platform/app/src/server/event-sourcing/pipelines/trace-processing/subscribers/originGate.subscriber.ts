@@ -28,10 +28,13 @@ export interface OriginGateSubscriberDeps {
  * fold state) and the handler (fail-open path): skip stale resync traces and
  * traces whose origin is already resolved.
  */
-export function needsOriginResolution(
-  event: TraceProcessingEvent,
-  foldState: TraceSummaryData,
-): boolean {
+export function needsOriginResolution({
+  event,
+  foldState,
+}: {
+  event: TraceProcessingEvent;
+  foldState: TraceSummaryData;
+}): boolean {
   if (event.occurredAt < Date.now() - STALE_TRACE_THRESHOLD_MS) return false;
   return !foldState.attributes?.["langwatch.origin"];
 }
@@ -56,7 +59,7 @@ export function createOriginGateHandler(
   return async (event, context) => {
     const { tenantId, aggregateId: traceId, state: foldState } = context;
 
-    if (!needsOriginResolution(event, foldState)) return;
+    if (!needsOriginResolution({ event, foldState })) return;
 
     // Defensive: a trace aggregate with an empty ID can't be resolved, and
     // scheduling one produces an OriginResolvedEvent with an empty

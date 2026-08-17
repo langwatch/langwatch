@@ -10,7 +10,6 @@ const logger = createLogger(
 
 export interface TraceUpdateBroadcastSubscriberDeps {
   broadcast: BroadcastService;
-  hasRedis?: boolean;
 }
 
 /**

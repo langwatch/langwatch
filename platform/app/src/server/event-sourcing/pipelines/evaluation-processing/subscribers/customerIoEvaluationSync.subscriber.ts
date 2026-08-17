@@ -74,7 +74,8 @@ export function createCustomerIoEvaluationSyncSubscriber(
         return;
       }
 
-      await syncTerminalEvaluation(deps, {
+      await syncTerminalEvaluation({
+        deps,
         projectId: context.tenantId,
         foldState: context.state,
         occurredAt: event.occurredAt,
@@ -83,14 +84,17 @@ export function createCustomerIoEvaluationSyncSubscriber(
   };
 }
 
-async function syncTerminalEvaluation(
-  deps: CustomerIoEvaluationSyncSubscriberDeps,
-  {
-    projectId,
-    foldState,
-    occurredAt,
-  }: { projectId: string; foldState: EvaluationRunData; occurredAt: number },
-): Promise<void> {
+async function syncTerminalEvaluation({
+  deps,
+  projectId,
+  foldState,
+  occurredAt,
+}: {
+  deps: CustomerIoEvaluationSyncSubscriberDeps;
+  projectId: string;
+  foldState: EvaluationRunData;
+  occurredAt: number;
+}): Promise<void> {
   try {
     const { userId, organizationId } =
       await deps.projects.resolveOrgAdmin(projectId);

@@ -11,7 +11,6 @@ export const SPAN_STORAGE_BROADCAST_DEDUP_TTL_MS = 15_000; // Debounce — notif
 
 export interface SpanStorageBroadcastSubscriberDeps {
   broadcast: BroadcastService;
-  hasRedis?: boolean;
 }
 
 /**

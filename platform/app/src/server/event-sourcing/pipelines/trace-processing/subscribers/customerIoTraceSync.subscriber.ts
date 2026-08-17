@@ -75,14 +75,20 @@ export function createCustomerIoTraceSyncSubscriber(
         const traceOccurredAt = new Date(foldState.occurredAt).toISOString();
 
         if (!firstMessage) {
-          trackFirstTrace(deps, {
+          trackFirstTrace({
+            deps,
             projectId,
             userId,
             traceOccurredAt,
             attrs: foldState.attributes,
           });
         } else {
-          identifySubsequentTrace(deps, { projectId, userId, traceOccurredAt });
+          identifySubsequentTrace({
+            deps,
+            projectId,
+            userId,
+            traceOccurredAt,
+          });
         }
       } catch (error) {
         logger.error(
@@ -96,20 +102,19 @@ export function createCustomerIoTraceSyncSubscriber(
 }
 
 /** First trace — fire immediately, fire-and-forget. */
-function trackFirstTrace(
-  deps: CustomerIoTraceSyncSubscriberDeps,
-  {
-    projectId,
-    userId,
-    traceOccurredAt,
-    attrs,
-  }: {
-    projectId: string;
-    userId: string;
-    traceOccurredAt: string;
-    attrs: Record<string, string>;
-  },
-): void {
+function trackFirstTrace({
+  deps,
+  projectId,
+  userId,
+  traceOccurredAt,
+  attrs,
+}: {
+  deps: CustomerIoTraceSyncSubscriberDeps;
+  projectId: string;
+  userId: string;
+  traceOccurredAt: string;
+  attrs: Record<string, string>;
+}): void {
   const sdkLanguage = attrs["sdk.language"] ?? "unknown";
   const sdkFramework = attrs["langwatch.sdk.framework"] ?? "unknown";
 
@@ -150,14 +155,17 @@ function trackFirstTrace(
 }
 
 /** Subsequent trace — debounced via dedupId, fire-and-forget. */
-function identifySubsequentTrace(
-  deps: CustomerIoTraceSyncSubscriberDeps,
-  {
-    projectId,
-    userId,
-    traceOccurredAt,
-  }: { projectId: string; userId: string; traceOccurredAt: string },
-): void {
+function identifySubsequentTrace({
+  deps,
+  projectId,
+  userId,
+  traceOccurredAt,
+}: {
+  deps: CustomerIoTraceSyncSubscriberDeps;
+  projectId: string;
+  userId: string;
+  traceOccurredAt: string;
+}): void {
   void deps.nurturing
     .identifyUser({
       userId,

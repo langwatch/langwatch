@@ -78,10 +78,9 @@ function createEvent(
 
 function createContext(
   state: EvaluationRunData,
-  tenantId = "project-1",
 ): TriggerContext<EvaluationRunData> {
   return {
-    tenantId,
+    tenantId: "project-1",
     aggregateId: "eval-1",
     state,
   };
