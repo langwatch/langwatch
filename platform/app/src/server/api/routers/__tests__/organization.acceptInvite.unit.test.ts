@@ -52,6 +52,18 @@ vi.mock("@ee/governance/services/personalWorkspace.service", () => ({
   },
 }));
 
+// The invite's grants are ledger commands (ADR-092 delivery-plan PR 2).
+const ledger = vi.hoisted(() => ({
+  attachBindings: vi.fn(),
+  revokeBindings: vi.fn(),
+  revokeBindingsWhere: vi.fn(),
+  defineRole: vi.fn(),
+  deleteRole: vi.fn(),
+}));
+vi.mock("~/server/app-layer/authz/ledger", () => ({
+  grantsLedgerWriter: () => ledger,
+}));
+
 vi.mock("../../../app-layer/app", () => ({
   // Consumers that degrade without Redis read through this one.
   tryGetApp: () => null,
@@ -106,12 +118,16 @@ function makeInvite(overrides: Record<string, unknown> = {}) {
 
 describe("organization.acceptInvite", () => {
   let findUniqueMock: ReturnType<typeof vi.fn>;
-  let transactionMock: ReturnType<typeof vi.fn>;
+  let inviteUpdateMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    ledger.attachBindings.mockResolvedValue({ attached: [], duplicates: [] });
+    ledger.revokeBindingsWhere.mockResolvedValue(0);
     findUniqueMock = vi.fn();
-    transactionMock = vi.fn();
+    inviteUpdateMock = vi
+      .fn()
+      .mockResolvedValue(makeInvite({ status: "ACCEPTED" }));
   });
 
   function createCaller(email = "user@example.com") {
@@ -122,9 +138,13 @@ describe("organization.acceptInvite", () => {
       },
     });
     (ctx as any).prisma = {
-      organizationInvite: { findUnique: findUniqueMock },
+      organizationInvite: {
+        findUnique: findUniqueMock,
+        update: inviteUpdateMock,
+        findFirst: vi.fn().mockResolvedValue(null),
+      },
+      organizationUser: { createMany: vi.fn().mockResolvedValue({ count: 1 }) },
       project: { findFirst: vi.fn().mockResolvedValue(null) },
-      $transaction: transactionMock,
     };
     return organizationRouter.createCaller(ctx);
   }
@@ -132,32 +152,19 @@ describe("organization.acceptInvite", () => {
   describe("when invite status is PENDING", () => {
     it("proceeds to apply the invite", async () => {
       findUniqueMock.mockResolvedValue(makeInvite({ status: "PENDING" }));
-      transactionMock.mockImplementation(async (fn: any) => {
-        // Simulate successful transaction — the actual applyInvite
-        // internals are not under test here
-        await fn({
-          organizationUser: { createMany: vi.fn() },
-          roleBinding: { deleteMany: vi.fn(), create: vi.fn() },
-          organizationInvite: {
-            update: vi
-              .fn()
-              .mockResolvedValue(makeInvite({ status: "ACCEPTED" })),
-            findFirst: vi.fn().mockResolvedValue(null),
-          },
-          project: { findFirst: vi.fn().mockResolvedValue(null) },
-        });
-      });
 
       const caller = createCaller();
       const result = await caller.acceptInvite({ inviteCode: "test-code" });
 
       expect(result.success).toBe(true);
-      // Only ONE $transaction call is observed by the mock — the
-      // invite-apply tx. PersonalWorkspaceService is stubbed at the
-      // module boundary (above) so its internal tx never reaches the
-      // test's $transaction mock; that path is covered by
-      // personalWorkspace.service.integration.test.ts instead.
-      expect(transactionMock).toHaveBeenCalledTimes(1);
+      // The membership row is written and the invite is only marked ACCEPTED
+      // once the grant it carries has been emitted. There is no transaction
+      // around any of it any more: the grant is a ledger command, so the
+      // membership must be committed before it goes.
+      expect(ledger.attachBindings).toHaveBeenCalled();
+      expect(inviteUpdateMock).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { status: "ACCEPTED" } }),
+      );
     });
   });
 
@@ -177,7 +184,7 @@ describe("organization.acceptInvite", () => {
       });
     });
 
-    it("does not call the transaction", async () => {
+    it("applies nothing", async () => {
       findUniqueMock.mockResolvedValue(
         makeInvite({ status: "PAYMENT_PENDING", expiration: null }),
       );
@@ -186,7 +193,8 @@ describe("organization.acceptInvite", () => {
 
       await caller.acceptInvite({ inviteCode: "test-code" }).catch(() => {});
 
-      expect(transactionMock).not.toHaveBeenCalled();
+      expect(ledger.attachBindings).not.toHaveBeenCalled();
+      expect(inviteUpdateMock).not.toHaveBeenCalled();
     });
   });
 
@@ -206,7 +214,7 @@ describe("organization.acceptInvite", () => {
       });
     });
 
-    it("does not call the transaction", async () => {
+    it("applies nothing", async () => {
       findUniqueMock.mockResolvedValue(
         makeInvite({ status: "WAITING_APPROVAL", expiration: null }),
       );
@@ -215,7 +223,8 @@ describe("organization.acceptInvite", () => {
 
       await caller.acceptInvite({ inviteCode: "test-code" }).catch(() => {});
 
-      expect(transactionMock).not.toHaveBeenCalled();
+      expect(ledger.attachBindings).not.toHaveBeenCalled();
+      expect(inviteUpdateMock).not.toHaveBeenCalled();
     });
   });
 

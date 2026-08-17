@@ -17,8 +17,7 @@ export const REVOKE_GRANTS_COMMAND_TYPE =
   "lw.authz_grants.revoke_grants" as const;
 export const DEFINE_ROLES_COMMAND_TYPE =
   "lw.authz_grants.define_roles" as const;
-export const DELETE_ROLE_COMMAND_TYPE =
-  "lw.authz_grants.delete_role" as const;
+export const DELETE_ROLE_COMMAND_TYPE = "lw.authz_grants.delete_role" as const;
 export const OFFBOARD_MEMBER_COMMAND_TYPE =
   "lw.authz_grants.offboard_member" as const;
 export const PROVE_MIGRATION_PARITY_COMMAND_TYPE =

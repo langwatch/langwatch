@@ -23,6 +23,18 @@ const { mockSendInviteEmail } = vi.hoisted(() => ({
   mockSendInviteEmail: vi.fn(),
 }));
 
+// An invite's grants are ledger commands (ADR-092 delivery-plan PR 2).
+const ledger = vi.hoisted(() => ({
+  attachBindings: vi.fn(),
+  revokeBindings: vi.fn(),
+  revokeBindingsWhere: vi.fn(),
+  defineRole: vi.fn(),
+  deleteRole: vi.fn(),
+}));
+vi.mock("~/server/app-layer/authz/ledger", () => ({
+  grantsLedgerWriter: () => ledger,
+}));
+
 vi.mock("../../mailer/inviteEmail", () => ({
   sendInviteEmail: (...args: unknown[]) => mockSendInviteEmail(...args),
 }));
@@ -835,20 +847,21 @@ describe("InviteService", () => {
         });
         mockSendInviteEmail.mockResolvedValue(undefined);
 
-        // Step 3: applyInvite — track RoleBinding creation
+        // Step 3: applyInvite — the grants it carries are ledger commands
+        // now, so the attach is where they can be observed.
         (mockPrisma as any).organizationUser = {
           createMany: vi.fn(),
         };
-        (mockPrisma as any).roleBinding = {
-          deleteMany: vi.fn(),
-          create: vi.fn().mockImplementation(({ data }) => {
-            roleBindingsCreated.push(data);
-            return Promise.resolve(data);
-          }),
-        };
+        ledger.revokeBindingsWhere.mockResolvedValue(0);
+        ledger.attachBindings.mockImplementation(
+          ({ bindings }: { bindings: Array<Record<string, unknown>> }) => {
+            roleBindingsCreated.push(...bindings);
+            return Promise.resolve({ attached: [], duplicates: [] });
+          },
+        );
       });
 
-      it("transitions through PAYMENT_PENDING → PENDING → ACCEPTED and creates RoleBindings", async () => {
+      it("transitions through PAYMENT_PENDING → PENDING → ACCEPTED and attaches the grants", async () => {
         // Step 1: Create PAYMENT_PENDING invite
         const invite = await service.createPaymentPendingInvite({
           email: "sub-user@example.com",
@@ -875,20 +888,19 @@ describe("InviteService", () => {
           invite: approved[0]! as any,
         });
 
-        // Verify: org-scoped RoleBinding was created (MEMBER gets org binding)
+        // Verify: org-scoped grant was attached (MEMBER gets one)
         const orgBinding = roleBindingsCreated.find(
           (rb) => rb.scopeType === "ORGANIZATION",
         );
         expect(orgBinding).toBeDefined();
-        expect(orgBinding!.userId).toBe("user-flow-1");
-        expect(orgBinding!.organizationId).toBe("org-1");
+        expect(orgBinding!.principal).toEqual({ userId: "user-flow-1" });
 
-        // Verify: team-scoped RoleBinding was created
+        // Verify: team-scoped grant was attached
         const teamBinding = roleBindingsCreated.find(
           (rb) => rb.scopeType === "TEAM",
         );
         expect(teamBinding).toBeDefined();
-        expect(teamBinding!.userId).toBe("user-flow-1");
+        expect(teamBinding!.principal).toEqual({ userId: "user-flow-1" });
         expect(teamBinding!.scopeId).toBe("team-1");
 
         // Verify: invite was marked ACCEPTED

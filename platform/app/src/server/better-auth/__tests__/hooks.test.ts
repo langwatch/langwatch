@@ -16,6 +16,19 @@ const { mockTrackServerEvent } = vi.hoisted(() => ({
   mockTrackServerEvent: vi.fn(),
 }));
 
+// The organization grant an SSO auto-join or an applied invite carries is a
+// ledger command (ADR-092 delivery-plan PR 2), so the writer is the seam.
+const ledger = vi.hoisted(() => ({
+  attachBindings: vi.fn(),
+  revokeBindings: vi.fn(),
+  revokeBindingsWhere: vi.fn(),
+  defineRole: vi.fn(),
+  deleteRole: vi.fn(),
+}));
+vi.mock("~/server/app-layer/authz/ledger", () => ({
+  grantsLedgerWriter: () => ledger,
+}));
+
 vi.mock("~/server/posthog", () => ({
   trackServerEvent: mockTrackServerEvent,
 }));
@@ -54,8 +67,7 @@ const makePrismaMock = (overrides: PrismaMockOverrides = {}): PrismaClient => {
       count: vi.fn().mockResolvedValue(0),
     },
     roleBinding: {
-      create: vi.fn().mockResolvedValue(undefined),
-      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+      findMany: vi.fn().mockResolvedValue([]),
     },
     user: {
       findUnique: vi.fn().mockResolvedValue(null),
@@ -108,6 +120,10 @@ describe("beforeUserCreate", () => {
 describe("afterUserCreate", () => {
   beforeEach(() => {
     mockTrackServerEvent.mockClear();
+    ledger.attachBindings.mockClear();
+    ledger.revokeBindingsWhere.mockClear();
+    ledger.attachBindings.mockResolvedValue({ attached: [], duplicates: [] });
+    ledger.revokeBindingsWhere.mockResolvedValue(0);
   });
 
   describe("for every new user", () => {
@@ -237,8 +253,6 @@ describe("afterUserCreate", () => {
 
       const inviteUpdate = vi.fn().mockResolvedValue(undefined);
       const orgUserCreateMany = vi.fn().mockResolvedValue({ count: 1 });
-      const roleBindingCreate = vi.fn().mockResolvedValue(undefined);
-      const roleBindingDeleteMany = vi.fn().mockResolvedValue({ count: 0 });
 
       const prisma = makePrismaMock({
         organization: {
@@ -255,10 +269,6 @@ describe("afterUserCreate", () => {
           create: vi.fn(),
           createMany: orgUserCreateMany,
           count: vi.fn().mockResolvedValue(0),
-        },
-        roleBinding: {
-          create: roleBindingCreate,
-          deleteMany: roleBindingDeleteMany,
         },
       });
 
@@ -282,8 +292,8 @@ describe("afterUserCreate", () => {
         skipDuplicates: true,
       });
 
-      // 3 RoleBinding creates: 1 ORG-scope (ADMIN) + 2 TEAM-scope.
-      expect(roleBindingCreate).toHaveBeenCalledTimes(3);
+      // 3 grants attached: 1 ORG-scope (ADMIN) + 2 TEAM-scope.
+      expect(ledger.attachBindings).toHaveBeenCalledTimes(3);
 
       // Invite flipped to ACCEPTED so the link stops looking outstanding.
       expect(inviteUpdate).toHaveBeenCalledWith({

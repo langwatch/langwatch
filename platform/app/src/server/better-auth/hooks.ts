@@ -10,6 +10,7 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
+import { grantsLedgerWriter } from "~/server/app-layer/authz/ledger";
 import { InviteService } from "~/server/invites/invite.service";
 import { trackServerEvent } from "~/server/posthog";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -166,34 +167,40 @@ export const afterUserCreate = async ({
     });
 
     try {
-      await prisma.$transaction(async (tx) => {
-        if (pendingInvite) {
-          const txInviteService = InviteService.create(tx);
-          await txInviteService.applyInvite({
-            userId: user.id,
-            invite: pendingInvite,
-          });
-          return;
-        }
-
-        await tx.organizationUser.create({
+      if (pendingInvite) {
+        await InviteService.create(prisma).applyInvite({
+          userId: user.id,
+          invite: pendingInvite,
+        });
+      } else {
+        // The membership row is not a grant fact and keeps its imperative
+        // write; the organization-scoped grant that comes with it is a ledger
+        // command, emitted once the membership exists (ADR-092).
+        await prisma.organizationUser.create({
           data: {
             userId: user.id,
             organizationId: org.id,
             role: "MEMBER",
           },
         });
-        await tx.roleBinding.create({
-          data: {
-            id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-            organizationId: org.id,
-            userId: user.id,
-            role: TeamUserRole.MEMBER,
-            scopeType: RoleBindingScopeType.ORGANIZATION,
-            scopeId: org.id,
-          },
+        await grantsLedgerWriter().attachBindings({
+          organizationId: org.id,
+          bindings: [
+            {
+              bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+              principal: { userId: user.id },
+              role: TeamUserRole.MEMBER,
+              customRoleId: null,
+              scopeType: RoleBindingScopeType.ORGANIZATION,
+              scopeId: org.id,
+            },
+          ],
+          // The signup is the product acting on a domain rule, not an
+          // administrator granting access.
+          actor: { type: "system", id: "system:sso-auto-join" },
+          onDuplicate: "skip",
         });
-      });
+      }
 
       logger.info(
         {

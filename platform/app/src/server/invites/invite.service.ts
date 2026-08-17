@@ -10,6 +10,10 @@ import {
   type PrismaClient,
   RoleBindingScopeType,
 } from "~/generated/prisma/client";
+import {
+  grantsLedgerWriter,
+  type LedgerActor,
+} from "~/server/app-layer/authz/ledger";
 import { isRootPrismaClient } from "~/server/db";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { isCustomRole } from "../api/enterprise";
@@ -1235,15 +1239,17 @@ export class InviteService {
 
   /**
    * Applies a PENDING invite to a user: writes OrganizationUser, the
-   * ORGANIZATION-scoped RoleBinding (skipped for EXTERNAL — they get access
-   * via team/project bindings), each team's RoleBinding, and marks the invite
-   * ACCEPTED. All writes are idempotent — OrganizationUser uses
-   * createMany+skipDuplicates, RoleBindings use delete-then-create to tolerate
-   * prior partial state — so callers can safely retry on transient failure.
+   * ORGANIZATION-scoped grant (skipped for EXTERNAL — they get access via
+   * team/project grants), each team's grant, and marks the invite ACCEPTED.
+   * Every step is idempotent — OrganizationUser uses createMany+skipDuplicates
+   * and the grants revoke-then-attach — so a caller can safely retry.
    *
-   * Must be called with a TransactionClient: the four write groups must
-   * commit or roll back together to avoid the "in-org-but-no-RoleBinding"
-   * stuck state that originally motivated this helper.
+   * No longer a transaction, and no longer callable inside one: the grants are
+   * ledger commands (ADR-092 delivery-plan PR 2, source `invite`), so the
+   * membership row must be committed before they are emitted. The invite is
+   * only marked ACCEPTED once everything before it has landed, so the stuck
+   * state the transaction guarded against is now a retry instead: an invite
+   * still PENDING is an invite still to apply.
    */
   async applyInvite({
     userId,
@@ -1267,24 +1273,35 @@ export class InviteService {
       skipDuplicates: true,
     });
 
+    const writer = grantsLedgerWriter();
+    const actor: LedgerActor = { type: "user", id: userId };
+
     if (invite.role !== OrganizationUserRole.EXTERNAL) {
-      await this.prisma.roleBinding.deleteMany({
+      await writer.revokeBindingsWhere({
+        organizationId: invite.organizationId,
         where: {
-          organizationId: invite.organizationId,
           userId,
           scopeType: RoleBindingScopeType.ORGANIZATION,
           scopeId: invite.organizationId,
         },
+        actor,
+        reason: "replaced by the invite's organization role",
       });
-      await this.prisma.roleBinding.create({
-        data: {
-          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-          organizationId: invite.organizationId,
-          userId,
-          role: invite.role as unknown as TeamUserRole,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
-          scopeId: invite.organizationId,
-        },
+      await writer.attachBindings({
+        organizationId: invite.organizationId,
+        bindings: [
+          {
+            bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+            principal: { userId },
+            role: invite.role as unknown as TeamUserRole,
+            customRoleId: null,
+            scopeType: RoleBindingScopeType.ORGANIZATION,
+            scopeId: invite.organizationId,
+          },
+        ],
+        actor,
+        source: "invite",
+        onDuplicate: "skip",
       });
     }
 
@@ -1320,24 +1337,31 @@ export class InviteService {
     }
 
     for (const member of teamMembershipData) {
-      await this.prisma.roleBinding.deleteMany({
+      await writer.revokeBindingsWhere({
+        organizationId: invite.organizationId,
         where: {
-          organizationId: invite.organizationId,
           userId,
           scopeType: RoleBindingScopeType.TEAM,
           scopeId: member.teamId,
         },
+        actor,
+        reason: "replaced by the invite's team role",
       });
-      await this.prisma.roleBinding.create({
-        data: {
-          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-          organizationId: invite.organizationId,
-          userId,
-          role: member.role,
-          customRoleId: member.customRoleId ?? null,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: member.teamId,
-        },
+      await writer.attachBindings({
+        organizationId: invite.organizationId,
+        bindings: [
+          {
+            bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+            principal: { userId },
+            role: member.role,
+            customRoleId: member.customRoleId ?? null,
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: member.teamId,
+          },
+        ],
+        actor,
+        source: "invite",
+        onDuplicate: "skip",
       });
     }
 

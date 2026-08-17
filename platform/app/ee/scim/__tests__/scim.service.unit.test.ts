@@ -12,10 +12,23 @@ vi.mock("~/server/app-layer/app", () => ({
   tryGetApp: () => ({ redis: null }),
 }));
 
+// A directory push is reconciled against the projection and emitted as
+// grants-ledger commands (ADR-092 decision 18), so the writer is the seam.
+const ledger = vi.hoisted(() => ({
+  attachBindings: vi.fn(),
+  revokeBindings: vi.fn(),
+  revokeBindingsWhere: vi.fn(),
+  defineRole: vi.fn(),
+  deleteRole: vi.fn(),
+}));
+vi.mock("~/server/app-layer/authz/ledger", () => ({
+  grantsLedgerWriter: () => ledger,
+}));
+
 function createMockPrisma() {
+  // The reconciler reads the grants this push is authoritative over.
   const roleBinding = {
-    create: vi.fn().mockResolvedValue({}),
-    deleteMany: vi.fn().mockResolvedValue({}),
+    findMany: vi.fn().mockResolvedValue([]),
   };
   const organizationUser = {
     findUnique: vi.fn(),
@@ -68,6 +81,9 @@ describe("ScimService", () => {
   let service: ScimService;
 
   beforeEach(() => {
+    vi.clearAllMocks();
+    ledger.attachBindings.mockResolvedValue({ attached: [], duplicates: [] });
+    ledger.revokeBindings.mockResolvedValue(undefined);
     prisma = createMockPrisma();
     service = ScimService.create(prisma);
   });

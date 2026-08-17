@@ -31,6 +31,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { grantsLedgerWriter } from "~/server/app-layer/authz/ledger";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
 type TxClient = Prisma.TransactionClient;
@@ -116,7 +117,13 @@ export class PersonalWorkspaceService {
     displayName?: string | null;
     displayEmail?: string | null;
   }): Promise<PersonalWorkspace> {
-    return await this.prisma.$transaction(async (tx) => {
+    // The team, the project and the legacy TeamUser row are not grant facts
+    // and keep their transaction; the owner's ADMIN grant on the workspace is
+    // a ledger command (ADR-092 delivery-plan PR 2), so the team it points at
+    // is collected here and the grant is emitted once the team exists.
+    let grantOnTeamId: string | null = null;
+
+    const workspace = await this.prisma.$transaction(async (tx) => {
       const existing = await this.findInTx(tx, { userId, organizationId });
       if (existing) {
         return { ...existing, created: false };
@@ -125,6 +132,9 @@ export class PersonalWorkspaceService {
       const reactivated = await this.reactivateInTx(tx, {
         userId,
         organizationId,
+        onGrantNeeded: (teamId) => {
+          grantOnTeamId = teamId;
+        },
       });
       if (reactivated) {
         return { ...reactivated, created: false };
@@ -167,19 +177,10 @@ export class PersonalWorkspaceService {
         },
       });
 
-      // ADMIN role binding so the user can manage their own personal team.
-      // No team-level RoleBinding for anyone else — personal teams are
-      // single-member by definition.
-      await tx.roleBinding.create({
-        data: {
-          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-          organizationId,
-          userId,
-          role: TeamUserRole.ADMIN,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: team.id,
-        },
-      });
+      // ADMIN grant so the user can manage their own personal team. Nobody
+      // else is ever granted this scope — personal teams are single-member by
+      // definition — and it is emitted after this transaction commits.
+      grantOnTeamId = team.id;
 
       // Legacy TeamUser row too — many existing read paths still join via
       // TeamUser. Keeps the personal team visible to any code that pre-
@@ -209,6 +210,28 @@ export class PersonalWorkspaceService {
         created: true,
       };
     });
+
+    if (grantOnTeamId) {
+      await grantsLedgerWriter().attachBindings({
+        organizationId,
+        bindings: [
+          {
+            bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+            principal: { userId },
+            role: TeamUserRole.ADMIN,
+            customRoleId: null,
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: grantOnTeamId,
+          },
+        ],
+        // Nobody decided this: the workspace is the product's own, and its
+        // owner administers it by construction.
+        actor: { type: "system", id: "system:personal-workspace" },
+        onDuplicate: "skip",
+      });
+    }
+
+    return workspace;
   }
 
   /**
@@ -230,7 +253,15 @@ export class PersonalWorkspaceService {
    */
   private async reactivateInTx(
     tx: TxClient,
-    { userId, organizationId }: { userId: string; organizationId: string },
+    {
+      userId,
+      organizationId,
+      onGrantNeeded,
+    }: {
+      userId: string;
+      organizationId: string;
+      onGrantNeeded: (teamId: string) => void;
+    },
   ): Promise<Omit<PersonalWorkspace, "created"> | null> {
     const archived = await tx.team.findFirst({
       where: {
@@ -264,27 +295,10 @@ export class PersonalWorkspaceService {
       data: { archivedAt: null },
     });
 
-    const existingBinding = await tx.roleBinding.findFirst({
-      where: {
-        organizationId,
-        userId,
-        scopeType: RoleBindingScopeType.TEAM,
-        scopeId: archived.id,
-      },
-      select: { id: true },
-    });
-    if (!existingBinding) {
-      await tx.roleBinding.create({
-        data: {
-          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-          organizationId,
-          userId,
-          role: TeamUserRole.ADMIN,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: archived.id,
-        },
-      });
-    }
+    // The grant is re-asserted rather than checked for: the attach that
+    // follows the transaction skips a grant the owner already holds, so a
+    // workspace revived twice emits the fact once.
+    onGrantNeeded(archived.id);
 
     return await this.findInTx(tx, { userId, organizationId });
   }

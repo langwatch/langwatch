@@ -1005,12 +1005,13 @@ export const organizationRouter = createTRPCRouter({
         });
       }
 
-      await prisma.$transaction(async (tx) => {
-        const txInviteService = InviteService.create(tx);
-        await txInviteService.applyInvite({
-          userId: session.user.id,
-          invite,
-        });
+      // No transaction: the invite's grants are ledger commands, so the
+      // membership row has to be committed before they are emitted, and the
+      // invite is only marked ACCEPTED once everything before it has landed
+      // (a still-PENDING invite is one still to apply).
+      await InviteService.create(prisma).applyInvite({
+        userId: session.user.id,
+        invite,
       });
 
       // Provision the user's Personal Workspace (Team.isPersonal +

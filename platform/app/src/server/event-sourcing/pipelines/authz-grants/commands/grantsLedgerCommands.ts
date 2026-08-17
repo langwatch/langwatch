@@ -4,8 +4,8 @@ import {
   type AttachGrantsCommandData,
   attachGrantsCommandDataSchema,
   type ChangeGrantRoleCommandData,
-  changeGrantRoleCommandDataSchema,
   type CompleteCutoverCommandData,
+  changeGrantRoleCommandDataSchema,
   completeCutoverCommandDataSchema,
   type DefineRolesCommandData,
   type DeleteRoleCommandData,
@@ -152,8 +152,7 @@ export class ChangeGrantRoleCommand
 }
 
 export class RevokeGrantsCommand
-  implements
-    CommandHandler<Command<RevokeGrantsCommandData>, GrantRevokedEvent>
+  implements CommandHandler<Command<RevokeGrantsCommandData>, GrantRevokedEvent>
 {
   static readonly schema = defineCommandSchema(
     REVOKE_GRANTS_COMMAND_TYPE,

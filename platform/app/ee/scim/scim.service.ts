@@ -8,6 +8,10 @@ import {
   TeamUserRole,
   type User,
 } from "~/generated/prisma/client";
+import {
+  type GrantsLedgerWriter,
+  grantsLedgerWriter,
+} from "~/server/app-layer/authz/ledger";
 import { UserService } from "~/server/users/user.service";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
@@ -19,6 +23,7 @@ import {
   type ScimPatchRequest,
   type ScimUser,
 } from "./scim.types";
+import { reconcileScimGrants } from "./scim-grants.reconciler";
 
 /**
  * Maps between SCIM 2.0 User resources and LangWatch User/OrganizationUser models.
@@ -28,9 +33,56 @@ export class ScimService {
   private readonly userService: UserService;
   private readonly departmentService: DepartmentService;
 
-  constructor(private readonly prisma: PrismaClient) {
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
+  ) {
     this.userService = UserService.create(prisma);
     this.departmentService = DepartmentService.create(prisma);
+  }
+
+  /**
+   * The directory acts as itself, not as whoever happens to hold the SCIM
+   * token. When identity connections exist this becomes the connection id
+   * (ADR-092's identity-platform seam); the event shape already takes it.
+   */
+  private static readonly ACTOR = {
+    type: "system",
+    id: "system:scim",
+  } as const;
+
+  /**
+   * The organization-scoped membership grant a directory push asserts,
+   * reconciled rather than written: re-pushing the same state emits nothing.
+   */
+  private async reconcileOrganizationMembership({
+    userId,
+    organizationId,
+  }: {
+    userId: string;
+    organizationId: string;
+  }): Promise<void> {
+    await reconcileScimGrants({
+      prisma: this.prisma,
+      writer: this.writer,
+      organizationId,
+      where: {
+        userId,
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeId: organizationId,
+      },
+      desired: [
+        {
+          principal: { userId },
+          role: TeamUserRole.MEMBER,
+          customRoleId: null,
+          scopeType: RoleBindingScopeType.ORGANIZATION,
+          scopeId: organizationId,
+        },
+      ],
+      actor: ScimService.ACTOR,
+      mintBindingId: () => generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+    });
   }
 
   static create(prisma: PrismaClient): ScimService {
@@ -158,22 +210,17 @@ export class ScimService {
             role: "MEMBER",
           },
         });
-        await this.prisma.roleBinding.create({
-          data: {
-            id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-            organizationId,
-            userId: existingUser.id,
-            role: TeamUserRole.MEMBER,
-            scopeType: RoleBindingScopeType.ORGANIZATION,
-            scopeId: organizationId,
-          },
-        });
       } catch (e) {
         if (e instanceof PrismaClientKnownRequestError && e.code === "P2002") {
           return this.toScimUser(existingUser);
         }
         throw e;
       }
+
+      await this.reconcileOrganizationMembership({
+        userId: existingUser.id,
+        organizationId,
+      });
 
       if (existingUser.deactivatedAt) {
         await this.userService.reactivate({ id: existingUser.id });
@@ -204,15 +251,6 @@ export class ScimService {
           role: "MEMBER",
         },
       });
-      await this.prisma.roleBinding.create({
-        data: {
-          organizationId,
-          userId: newUser.id,
-          role: TeamUserRole.MEMBER,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
-          scopeId: organizationId,
-        },
-      });
     } catch (e) {
       if (e instanceof PrismaClientKnownRequestError && e.code === "P2002") {
         return this.scimError({
@@ -222,6 +260,11 @@ export class ScimService {
       }
       throw e;
     }
+
+    await this.reconcileOrganizationMembership({
+      userId: newUser.id,
+      organizationId,
+    });
 
     await this.syncCostCenterFromScim({
       userId: newUser.id,
@@ -467,14 +510,22 @@ export class ScimService {
       return this.scimError({ status: "404", detail: "User not found" });
     }
 
-    await this.prisma.$transaction([
-      this.prisma.organizationUser.delete({
-        where: { userId_organizationId: { userId: id, organizationId } },
-      }),
-      this.prisma.roleBinding.deleteMany({
-        where: { userId: id, organizationId },
-      }),
-    ]);
+    // A deprovision is the fired-employee case: the grants go first and carry
+    // instant enforcement (ADR-092 decision 7), so the deny holds before this
+    // returns rather than whenever the queue next drains. Reconciled to the
+    // empty set, so a repeated delete emits nothing.
+    await reconcileScimGrants({
+      prisma: this.prisma,
+      writer: this.writer,
+      organizationId,
+      where: { userId: id },
+      desired: [],
+      actor: ScimService.ACTOR,
+      mintBindingId: () => generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+    });
+    await this.prisma.organizationUser.delete({
+      where: { userId_organizationId: { userId: id, organizationId } },
+    });
     await this.userService.deactivate({ id });
     return null;
   }
