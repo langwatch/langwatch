@@ -843,7 +843,14 @@ class DSPyTracer:
                     params=span_params,
                 )
 
-            result = self.__class__.__original_call__(self, prompt, messages, **kwargs)  # type: ignore
+            # Both go by name. DSPy made `prompt` and `messages` keyword-only
+            # and put positional arguments into `*items`, so `(self, prompt,
+            # messages)` sent two items and the call ended with a TypeError
+            # about legacy BaseLM calls. By name the call reads the same on
+            # every version in the supported range.
+            result = self.__class__.__original_call__(  # type: ignore
+                self, prompt=prompt, messages=messages, **kwargs
+            )
 
             history = self.history[-1] if len(self.history) > 0 else None
 

@@ -38,7 +38,7 @@ const callerFor = (userId: string) =>
     createInnerTRPCContext({ session: { user: { id: userId }, expires: "1" } }),
   );
 
-const projectApiKeyFor = async (
+const projectInPayload = async (
   caller: ReturnType<typeof callerFor>,
   projectId: string,
 ) => {
@@ -46,14 +46,34 @@ const projectApiKeyFor = async (
   const projects = organizations.flatMap((organization) =>
     organization.teams.flatMap((team) => team.projects),
   );
-  return projects.find((project) => project.id === projectId)?.apiKey;
+  const project = projects.find((candidate) => candidate.id === projectId);
+  // Every claim below is about what a field CONTAINS, and every one of them is
+  // satisfied by a project that is not in the payload at all.
+  if (!project) {
+    throw new Error(
+      "the project is missing from the payload — the redaction assertions would be vacuous",
+    );
+  }
+  return project;
 };
+
+const projectApiKeyFor = async (
+  caller: ReturnType<typeof callerFor>,
+  projectId: string,
+) => (await projectInPayload(caller, projectId)).apiKey;
+
+const projectGovernedSqlKeyFor = async (
+  caller: ReturnType<typeof callerFor>,
+  projectId: string,
+) => (await projectInPayload(caller, projectId)).governedSqlKey;
 
 describe("Feature: base key in the organizations payload", () => {
   let organizationId: string;
   let teamId: string;
   let projectId: string;
   let baseApiKey: string;
+  /** Database-minted, so the control below is the real stored value. */
+  let storedGovernedSqlKey: string;
 
   let updaterCaller: ReturnType<typeof callerFor>;
   let viewerCaller: ReturnType<typeof callerFor>;
@@ -154,6 +174,7 @@ describe("Feature: base key in the organizations payload", () => {
       },
     });
     projectId = project.id;
+    storedGovernedSqlKey = project.governedSqlKey;
 
     const updaterId = await makeUser("updater", TeamUserRole.MEMBER);
     const viewerId = await makeUser("viewer", TeamUserRole.VIEWER);
@@ -192,6 +213,36 @@ describe("Feature: base key in the organizations payload", () => {
 
       expect(apiKey).toBe("");
       expect(apiKey).not.toBe(baseApiKey);
+    });
+  });
+
+  /**
+   * The governed SQL key is a control-plane secret, not a credential any client
+   * surface renders: it is the input to the tenant capability the governed
+   * analytics API presents to ClickHouse. So unlike the base key it is withheld
+   * from *everyone*, and the caller who CAN change the project is the case that
+   * matters — a redaction gated on permission would hand it to them.
+   */
+  describe("given the governed SQL key on the project", () => {
+    it.each([
+      ["a caller who can change the project", () => updaterCaller],
+      ["a caller who can only view the project", () => viewerCaller],
+    ])("withholds it from the payload for %s", async (_label, caller) => {
+      const governedSqlKey = await projectGovernedSqlKeyFor(
+        caller(),
+        projectId,
+      );
+
+      expect(governedSqlKey).toBe("");
+      expect(governedSqlKey).not.toBe(storedGovernedSqlKey);
+    });
+
+    /**
+     * The control: without it, "the payload does not carry the stored key" is
+     * satisfied by a column that was never populated.
+     */
+    it("has a stored value to withhold", () => {
+      expect(storedGovernedSqlKey.length).toBeGreaterThan(0);
     });
   });
 });

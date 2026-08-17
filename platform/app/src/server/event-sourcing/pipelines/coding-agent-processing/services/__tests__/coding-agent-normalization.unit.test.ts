@@ -18,6 +18,7 @@ import {
   normalizeTokenType,
   parseMcpToolName,
   resolveConversationKey,
+  resolveSpanConversationKey,
   resolveToolName,
   SESSION_CONTEXT_EVENT_NAME,
 } from "../coding-agent-normalization";
@@ -129,6 +130,50 @@ describe("resolveConversationKey", () => {
   });
 });
 
+describe("resolveSpanConversationKey", () => {
+  /**
+   * Live-verified on codex 0.147: the turn span's `gen_ai.conversation.id`
+   * is the id of the TURN, and the session rides `thread.id` — the exact
+   * value every codex log event carries as `conversation.id`. Reading the
+   * shared candidate order here split each turn into its own session.
+   */
+  it("keys a codex turn span on its thread id, not the per-turn id", () => {
+    expect(
+      resolveSpanConversationKey({
+        agent: "codex",
+        name: "session_task.turn",
+        attrs: {
+          "gen_ai.conversation.id": "01a00987-1926-74b1-b765-turn",
+          "thread.id": "01a00987-187a-7b23-b6d8-session",
+        },
+      }),
+    ).toBe("01a00987-187a-7b23-b6d8-session");
+  });
+
+  it("falls back to the shared order when the thread id is a tokio worker id", () => {
+    expect(
+      resolveSpanConversationKey({
+        agent: "codex",
+        name: "session_task.turn",
+        attrs: {
+          "gen_ai.conversation.id": "01a00987-1926-74b1-b765-turn",
+          "thread.id": "10",
+        },
+      }),
+    ).toBe("01a00987-1926-74b1-b765-turn");
+  });
+
+  it("leaves every other agent on the shared order", () => {
+    expect(
+      resolveSpanConversationKey({
+        agent: "claude_code",
+        name: "claude_code.llm_request",
+        attrs: { "gen_ai.conversation.id": "s-1", "thread.id": "t-1" },
+      }),
+    ).toBe("s-1");
+  });
+});
+
 describe("normalizeEventName", () => {
   describe("given the same event from three agents", () => {
     // Two namespace it, one does not. That inconsistency is the whole reason
@@ -155,7 +200,11 @@ describe("normalizeEventName", () => {
      * broken registry merge would silently stop mapping a real event.
      */
     it("still lands them on the shared facts through the registry merge", () => {
-      expect(normalizeEventName("codex.sandbox_outcome")).toBe("tool_result");
+      expect(normalizeEventName("codex.turn_ttft")).toBe("turn_ttft");
+      // codex fires sandbox_outcome IN ADDITION to tool_result for a
+      // sandboxed shell command, so mapping it onto tool_result would count
+      // that command twice — it deliberately maps to nothing.
+      expect(normalizeEventName("codex.sandbox_outcome")).toBeNull();
       expect(
         normalizeEventName("github.copilot.session_compaction_complete"),
       ).toBe("compaction");

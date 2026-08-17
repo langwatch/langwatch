@@ -71,7 +71,7 @@ export const StatusCell: CellDef<ConversationGroup> = {
 };
 
 const CONTEXT_SIZE_EXPLANATION =
-  "Largest context carried into a model call across the session.";
+  "Largest context carried into a model call across the conversation.";
 
 /**
  * Peak context size for the session: the coding-agent fold's peak when the

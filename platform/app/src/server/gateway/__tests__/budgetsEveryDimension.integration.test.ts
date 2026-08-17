@@ -993,6 +993,49 @@ describe("budgets on every dimension (real PG + real CH)", () => {
       ).rejects.toThrow(/providers_allowed_empty/);
     });
 
+    /** @scenario A scope-reachable provider can be allowed on a key even when the routing policy omits it */
+    it("allows a scope-reachable provider the routing policy omits", async () => {
+      const policyId = `rp-nxn-omit-${suffix}`;
+      await prisma.routingPolicy.create({
+        data: {
+          id: policyId,
+          organizationId: ORG_ID,
+          name: `omit-policy-${suffix}`,
+          // Lists only OpenAI: Anthropic is reachable from the project scope
+          // but this policy omits it.
+          modelProviderIds: [MP_OPENAI_ID],
+          scopes: { create: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }] },
+        },
+      });
+      const service = VirtualKeyService.create(prisma);
+      try {
+        // Anthropic is scope-reachable but omitted by the policy. The save must
+        // succeed: the policy blocks it at dispatch, not at save.
+        const { virtualKey } = await service.create({
+          organizationId: ORG_ID,
+          name: `policy-omit-key-${suffix}`,
+          actorUserId: USER_ID,
+          scopes: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }],
+          routingMode: "POLICY",
+          routingPolicyId: policyId,
+          config: { providersAllowed: [MP_ANTHROPIC_ID] },
+        });
+        createdVirtualKeyIds.push(virtualKey.id);
+        const stored = await prisma.virtualKey.findUnique({
+          where: { id: virtualKey.id },
+        });
+        expect(
+          (stored?.config as { providersAllowed?: string[] } | null)
+            ?.providersAllowed,
+        ).toContain(MP_ANTHROPIC_ID);
+      } finally {
+        await prisma.routingPolicyScope.deleteMany({
+          where: { routingPolicyId: policyId },
+        });
+        await prisma.routingPolicy.deleteMany({ where: { id: policyId } });
+      }
+    });
+
     /** @scenario "A new key defaults to no fallback" */
     it("defaults a newly created key to routing mode NONE", async () => {
       const service = VirtualKeyService.create(prisma);

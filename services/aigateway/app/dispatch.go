@@ -119,8 +119,11 @@ func translateWalkError(ctx context.Context, err error) error {
 // candidateChain assembles the credentials this request may be dispatched to,
 // in fallback order, or the error that explains why there are none:
 //
-//  1. Model-aware trim: providers that cannot serve the resolved model are
-//     skipped (eligibleCredentials, with its keep-something safety net).
+//  1. Routability trim (routableChain): the inbound route's own providers
+//     first, then the providers that can serve the resolved model. A vendor
+//     the request named, by route or by model prefix, that the key cannot
+//     reach refuses here rather than dispatching to whichever vendor
+//     happens to be left.
 //  2. Provider allowlist: a key narrowed to specific providers cannot
 //     dispatch outside them even if the bundle's credential chain is stale
 //     or hand-crafted. The control plane already materializes the chain
@@ -133,7 +136,10 @@ func translateWalkError(ctx context.Context, err error) error {
 //     iterated; with several simultaneous exclusions any of them is an
 //     accurate answer to "why was nothing dispatchable").
 func (a *App) candidateChain(ctx context.Context, call *pipeline.Call) ([]domain.Credential, error) {
-	creds := eligibleCredentials(call.Bundle.Credentials, call.Request.Resolved)
+	creds, err := routableChain(ctx, call.Bundle, call.Request)
+	if err != nil {
+		return nil, err
+	}
 	if len(creds) == 0 {
 		return nil, errNoProviderConfigured(ctx)
 	}

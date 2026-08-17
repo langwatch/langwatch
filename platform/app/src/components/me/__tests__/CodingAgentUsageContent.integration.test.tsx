@@ -101,7 +101,7 @@ describe("CodingAgentUsageContent", () => {
       // Produced line summarises the outcome.
       expect(screen.getByText(/1,200 added \/ 300 removed/)).toBeTruthy();
       expect(screen.getByText(/4 commits/)).toBeTruthy();
-      expect(screen.getByText(/1 PR/)).toBeTruthy();
+      expect(screen.getByText(/1 pull request/)).toBeTruthy();
     });
   });
 

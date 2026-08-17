@@ -177,6 +177,20 @@ Feature: Redis is an owned client, never a module singleton
       When every construction of an ioredis client is located
       Then each one is inside the Redis client package or a test fixture
 
+    # The guard is only as good as the file list it runs over, and a shortfall
+    # there is silent: fewer files scanned, nothing found, green. Naming three
+    # trees to walk left scripts, end-to-end specs and build tooling unscanned,
+    # and reading only the TypeScript extensions left the JavaScript modules in
+    # the scanned trees unread — two scripts constructed ioredis directly with
+    # CI passing. Scanning is therefore a claim the suite makes about itself.
+    @unit
+    Scenario: The scan covers every tree and every module extension
+      Given the platform source tree
+      When the set of files the guard scans is inspected
+      Then it includes the scripts, end-to-end and build-tooling trees
+      And it includes modules written in JavaScript as well as TypeScript
+      And it excludes installed dependencies
+
   Rule: Consumers reach Redis by injection or from the application
 
     @unit
@@ -198,3 +212,52 @@ Feature: Redis is an owned client, never a module singleton
       Given an application configured without Redis
       When a consumer that needs Redis runs
       Then it takes its documented fallback path rather than throwing
+
+  Rule: A degraded write is allowed, but it is never silent
+
+    # Resolving the connection per call rather than once at import introduced a
+    # state the old singleton did not have: a callback running with no
+    # connection, before the application boots or in a process that never
+    # builds one. Sign-in rate-limit counters live only in this storage, so a
+    # write dropped there is a rate limit that fails OPEN. The degrade is the
+    # right behaviour — failing the request outright would be worse — but a
+    # security control quietly turning itself off is not something an operator
+    # should have to infer.
+
+    @unit
+    Scenario: A read with no connection degrades to a cache miss
+      Given a session store backed by the application's Redis
+      And a process with no application
+      When the store reads a key
+      Then it answers with a miss rather than raising
+      And nothing is reported, because the caller recovers from the database
+
+    @unit
+    Scenario: A dropped write is reported rather than silently discarded
+      Given a session store backed by the application's Redis
+      And a process with no application
+      When the store writes or deletes a key
+      Then the drop is logged with the operation and a running count of drops
+      And the key is absent from the report, because it is a credential
+
+    @unit
+    Scenario: A dropped write does not fail the request that caused it
+      Given a session store backed by the application's Redis
+      And a process with no application
+      When the store writes a key
+      Then the write completes rather than raising
+
+    @unit
+    Scenario: A deployment with no Redis drops writes the same way
+      Given a session store backed by the application's Redis
+      And an application configured without Redis
+      When the store writes a key
+      Then the drop is reported exactly as it is for a missing application
+
+    @unit
+    Scenario: Secondary storage reads and writes the application's connection
+      Given a session store backed by the application's Redis
+      And an application holding a Redis connection
+      When the store reads, writes and deletes a key
+      Then every operation reaches that connection under the store's namespace
+      And no drop is reported

@@ -364,6 +364,12 @@ export function createServiceApp<E extends Env = Env>(args: {
   basePath: string;
   verifySecret?: MiddlewareHandler;
   /**
+   * The error shape this family publishes. New families pass `canonical`;
+   * the default keeps the families that predate the envelope answering
+   * exactly what their consumers already parse.
+   */
+  errorEnvelope?: ApiErrorEnvelope;
+  /**
    * Overrides the credential class the family publishes. Set it only when the
    * secret is one an API client holds and the document declares a scheme for
    * it; leaving it unset keeps the honest default, `internal`, which the spec
@@ -390,6 +396,7 @@ export function createServiceApp<E extends Env = Env>(args: {
   return new SecuredApp<E>({
     basePath: args.basePath,
     strategy,
+    ...(args.errorEnvelope ? { errorEnvelope: args.errorEnvelope } : {}),
     ...(args.credentialClass ? { credentialClass: args.credentialClass } : {}),
   });
 }

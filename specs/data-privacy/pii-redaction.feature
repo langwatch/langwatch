@@ -108,6 +108,72 @@ Feature: Redacting personal data from traces
     Then the stored input has the name redacted
     And the analysis service was called
 
+  # Phone numbers are the one essential identifier with neither a checksum nor a
+  # nearby word to confirm them: any digit run that reads as a dialable number
+  # matches. Machine identifiers hit that by accident, so a datestamped id such
+  # as "hosted-eu-20260812-09" was stored as "hosted-eu-[PHONE_NUMBER]". Two
+  # rules keep such identifiers whole. An attribute value that is exclusively
+  # one identifier-shaped token (letters together with digits, a uuid, a hex
+  # digest) is scanned only for the identifiers that prove themselves, which are
+  # the checksum-validated ones and email addresses. And a phone number that
+  # sits inside a longer token carrying letters is kept everywhere, prose
+  # included. A value of digits and separators alone keeps no exemption, so a
+  # phone number written on its own is still redacted.
+
+  @unit
+  Scenario: A datestamped identifier attribute value is not read as a phone number
+    Given the resolved PII level for "web-app" is essential
+    When a trace is ingested with an attribute whose whole value is the identifier "hosted-eu-20260812-09"
+    Then the stored attribute still reads "hosted-eu-20260812-09"
+
+  @unit
+  Scenario: A digit run that reads as a phone number is still redacted in a sentence
+    Given the resolved PII level for "web-app" is essential
+    When a trace is ingested whose input reads "ref 2026081209 checkpoint"
+    Then the stored input has the digit run redacted as a phone number
+
+  @unit
+  Scenario: An identifier mentioned inside a sentence keeps its digits
+    Given the resolved PII level for "web-app" is essential
+    When a trace is ingested whose input mentions the identifier "hosted-eu-20260812-09" between words
+    Then the stored input still contains the whole identifier
+
+  @unit
+  Scenario: A phone number that is the whole attribute value is still redacted
+    Given the resolved PII level for "web-app" is essential
+    When a trace is ingested with an attribute whose whole value is an international phone number
+    Then the stored attribute has the phone number redacted
+
+  @unit
+  Scenario: A value of digits and separators with no letters is still redacted
+    Given the resolved PII level for "web-app" is essential
+    When a trace is ingested with an attribute whose whole value is a digit run with a separator
+    Then the stored attribute has the digit run redacted as a phone number
+
+  @unit
+  Scenario: A uuid or a digest attribute value is left alone
+    Given the resolved PII level for "web-app" is essential
+    When a trace is ingested with attributes whose whole values are a uuid and a hex digest
+    Then the stored attributes still read as they were sent
+
+  @unit
+  Scenario: A host identifier that embeds an address is left alone
+    Given the resolved PII level for "web-app" is essential
+    When a trace is ingested with an attribute whose whole value is the host identifier "pod-10.0.0.1"
+    Then the stored attribute still reads "pod-10.0.0.1"
+
+  @unit
+  Scenario: A card number inside an identifier-shaped value is still redacted
+    Given the resolved PII level for "web-app" is essential
+    When a trace is ingested with an attribute whose whole value is a reference holding a valid card number
+    Then the stored attribute has the card number redacted
+
+  @unit
+  Scenario: An email address that is the whole attribute value is still redacted
+    Given the resolved PII level for "web-app" is essential
+    When a trace is ingested with an attribute whose whole value is an email address with digits in it
+    Then the stored attribute has the email address redacted
+
   # Detection heuristics over-trigger on business identifiers that merely look
   # like PII: a 14-digit reservation number reads as a credit card, an
   # "orders@acme.internal" queue address reads as a personal email. Exception

@@ -301,6 +301,25 @@ jobs:
         if: matrix.shard == 1
         run: pnpm --filter @langwatch/redis-client run test:unit
 
+      # Same reason again. This one decides the level and the shape of every
+      # request record the fleet emits, so a suite that never runs is the worst
+      # place in the repo to have one — a regression here is invisible until
+      # someone reads a dashboard and finds it empty.
+      - name: Run @langwatch/observability unit tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/observability run test:unit
+
+      # @langwatch/authz is the pure authorization engine (ADR-092) and
+      # @langwatch/authz-server its storage-port runtime — raw TypeScript the
+      # app inlines the same way, same shard-1 arrangement.
+      - name: Run @langwatch/authz unit tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/authz run test
+
+      - name: Run @langwatch/authz-server unit tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/authz-server run test
+
       - name: Run unit tests (shard ${{ matrix.shard }}/4)
         id: unit-tests
         working-directory: platform/app

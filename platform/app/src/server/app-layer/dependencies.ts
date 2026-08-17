@@ -1,4 +1,3 @@
-import type { ClickHouseClient } from "@clickhouse/client";
 import type { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type Stripe from "stripe";
@@ -9,7 +8,6 @@ import type { FilterService } from "~/server/filters/filter.service";
 import type { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import type { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
 import type { GatewayVirtualKeySpendRepository } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
-import type { OrphanedRunFinder } from "~/server/scenarios/orphaned-run-reconciliation";
 import type { StoredObjectOwnerClickHouseRepository } from "~/server/stored-objects/repositories/stored-object-owner.clickhouse.repository";
 import type { NotificationService } from "../../../ee/billing/notifications/notification.service";
 import type { UsageLimitService } from "../../../ee/billing/notifications/usage-limit.service";
@@ -40,6 +38,7 @@ import type {
 } from "./automations/trigger-template.service";
 import type { BroadcastService } from "./broadcast/broadcast.service";
 import type { CodingAgentSessionService } from "./coding-agent/coding-agent-session.service";
+import type { CodingAgentSessionsListService } from "./coding-agent/coding-agent-sessions-list.service";
 import type { PullRequestUsageService } from "./coding-agent/pull-request-usage.service";
 import type { AppConfig } from "./config";
 import type { DspyStepService } from "./dspy-steps/dspy-step.service";
@@ -63,6 +62,7 @@ import type { OpsMetricsCollector } from "./ops/metrics-collector";
 import type { QueueService } from "./ops/queue.service";
 import type { ReplayService } from "./ops/replay.service";
 import type { SchedulerOpsService } from "./ops/scheduler-ops.service";
+import type { OpsSnapshotReader } from "./ops/snapshot/snapshot-reader";
 import type { OrganizationService } from "./organizations/organization.service";
 import type { PresenceService } from "./presence/presence.service";
 import type { ProjectService } from "./projects/project.service";
@@ -103,7 +103,13 @@ export interface OpsDependencies {
   managerExplorer: ManagerExplorerService;
   replay: ReplayService;
   blobStore: BlobStoreService;
+  /**
+   * The lease-elected snapshot writer. Present on every pod that can reach
+   * Redis, but only scans on the pod currently holding the lease (ADR-090).
+   */
   metricsCollector: OpsMetricsCollector | null;
+  /** Serves the shared snapshot to this pod's dashboard subscribers. */
+  snapshotReader: OpsSnapshotReader | null;
 }
 
 export interface AppDependencies {
@@ -239,17 +245,6 @@ export interface AppDependencies {
     instance: InstanceUsageStatsRepository;
   };
   /**
-   * Cross-tenant boot-sweep dependencies for the two orphaned-run
-   * reconciliation sweeps (QUEUED and IN_PROGRESS). Null when ClickHouse is
-   * not configured, in which case both sweeps no-op.
-   */
-  scenarios: {
-    orphanReconciliation: {
-      client: ClickHouseClient | null;
-      finder: OrphanedRunFinder | null;
-    };
-  };
-  /**
    * Governance's OCSF SIEM-export sink (`governance_ocsf_events`). One
    * repository for both directions — the puller worker, the workspace-view
    * audit trail and the reactor sync write through it; the SIEM export
@@ -274,6 +269,8 @@ export interface AppDependencies {
   /** ADR-056: read side of the coding-agent session aggregate. */
   codingAgents: {
     sessions: CodingAgentSessionService;
+    /** The Sessions screen's list, joined to the pull requests each drove. */
+    sessionsList: CodingAgentSessionsListService;
     /** What a pull request cost in assistant usage, RBAC-scoped. */
     pullRequestUsage: PullRequestUsageService;
   };

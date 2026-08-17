@@ -705,6 +705,11 @@ export class ApiKeyService {
           organizationId,
           scope,
           permission: perm as Permission,
+          // One ADR-092 shadow comparison per permission would fan a single
+          // mint out into dozens of detached collects. The mint path's engine
+          // coverage comes from enforceApiKeyCeiling instead, which shadows
+          // the same question on every request the key goes on to make.
+          skipShadow: true,
         })) || legacy.grants(perm as Permission);
       if (!userHas) {
         throw new ApiKeyScopeViolationError(
@@ -748,6 +753,10 @@ export class ApiKeyService {
           organizationId,
           scope,
           permission: perm as Permission,
+          // Same reason as the custom-role loop above: the mint path's engine
+          // coverage comes from the per-request enforceApiKeyCeiling path,
+          // not from one shadow per candidate permission.
+          skipShadow: true,
         })) || legacy.grants(perm as Permission);
 
       if (!userHas) {

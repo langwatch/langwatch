@@ -7,8 +7,11 @@
  *   1. device-session (AI-tools) login works by default (the governance flag
  *      ships on, ADR-038 Decision 7) and is refused for an org whose flag is
  *      switched off, since it would otherwise provision a personal workspace
- *      + VK and capture the user's evaluations (customer report).
- *   2. project-login (project_api_key) refuses a personal project id and only
+ *      and capture the user's evaluations (customer report).
+ *   2. approval mints NO virtual key, however many times the user logs in.
+ *      The org fixture has an eligible ModelProvider, so a mint here would
+ *      succeed if the handler still attempted one.
+ *   3. project-login (project_api_key) refuses a personal project id and only
  *      hands back a shared project's key.
  *
  * The browser normally drives /approve behind a NextAuth session; we stub only
@@ -78,6 +81,7 @@ const SHARED_PROJECT_ID = `proj-shared-${suffix}`;
 const PERSONAL_PROJECT_ID = `proj-personal-${suffix}`;
 const OTHER_PERSONAL_PROJECT_ID = `proj-personal-other-${suffix}`;
 const OTHER_TEAM_PROJECT_ID = `proj-other-${suffix}`;
+const MODEL_PROVIDER_ID = `mp-guard-${suffix}`;
 const SHARED_API_KEY = `sk-lw-shared-${suffix}-${"a".repeat(36)}`;
 const PERSONAL_API_KEY = `sk-lw-personal-${suffix}-${"b".repeat(36)}`;
 const OTHER_PERSONAL_API_KEY = `sk-lw-personal-o-${suffix}-${"d".repeat(34)}`;
@@ -105,6 +109,13 @@ async function approve(body: Record<string, unknown>) {
     status: res.status,
     json: (await res.json()) as Record<string, unknown>,
   };
+}
+
+/** Personal VKs the approve path could have minted for the fixture user. */
+async function personalVkCount(): Promise<number> {
+  return await prisma.virtualKey.count({
+    where: { organizationId: ORG_ID, principalUserId: USER_ID },
+  });
 }
 
 /** The container's connection; /api/auth/cli/* requires one on the App. */
@@ -242,6 +253,19 @@ describe("CLI login personal-project guards", () => {
         isPersonal: false,
       },
     });
+    // An org-scoped provider the user's personal team can reach. Without it a
+    // "no VK was minted" assertion would pass for the wrong reason: the mint
+    // would have refused for lack of a provider rather than never running.
+    await prisma.modelProvider.create({
+      data: {
+        id: MODEL_PROVIDER_ID,
+        name: `guard-mp-${suffix}`,
+        provider: "anthropic",
+        enabled: true,
+        organizationId: ORG_ID,
+        scopes: { create: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }] },
+      },
+    });
   });
 
   // Clear flag overrides before every test: the dev .env may force-enable the
@@ -269,6 +293,12 @@ describe("CLI login personal-project guards", () => {
     // extension on VirtualKey only honours scalar tenancy predicates, and
     // the org id covers every key the approve path can have minted here.
     await prisma.virtualKey.deleteMany({
+      where: { organizationId: ORG_ID },
+    });
+    await prisma.modelProviderScope.deleteMany({
+      where: { modelProviderId: MODEL_PROVIDER_ID },
+    });
+    await prisma.modelProvider.deleteMany({
       where: { organizationId: ORG_ID },
     });
     await prisma.roleBinding.deleteMany({
@@ -313,14 +343,16 @@ describe("CLI login personal-project guards", () => {
   describe("given a default installation with no flag overrides", () => {
     describe("when a device-session approval is requested", () => {
       /** @scenario device-session approval succeeds on a default installation */
-      it("does not refuse it through the governance gate", async () => {
+      it("approves it and mints no virtual key", async () => {
         const userCode = await mintDeviceCode("device_session");
 
-        const { status } = await approve({ user_code: userCode });
+        const { status, json } = await approve({ user_code: userCode });
 
-        // Either a VK is issued (200) or the no-provider graceful fallback (200);
-        // the gate must NOT block it.
-        expect(status).not.toBe(403);
+        expect(status).toBe(200);
+        expect(json.ok).toBe(true);
+        // The org has an eligible provider, so a mint attempt would have
+        // succeeded. Login issues the key it no longer needs to.
+        expect(await personalVkCount()).toBe(0);
       });
     });
   });
@@ -334,9 +366,52 @@ describe("CLI login personal-project guards", () => {
 
         const { status } = await approve({ user_code: userCode });
 
-        // Either a VK is issued (200) or the no-provider graceful fallback (200);
-        // the gate must NOT block it.
-        expect(status).not.toBe(403);
+        expect(status).toBe(200);
+      });
+    });
+
+    describe("when the same user logs in again and again", () => {
+      /** @scenario "Logging in again creates no virtual keys" */
+      it("leaves the user with zero virtual keys after every approval", async () => {
+        process.env.FEATURE_FLAG_FORCE_ENABLE = GOV_FLAG;
+
+        for (let login = 0; login < 3; login++) {
+          const userCode = await mintDeviceCode("device_session");
+          const { status } = await approve({ user_code: userCode });
+          expect(status).toBe(200);
+          expect(await personalVkCount()).toBe(0);
+        }
+      });
+    });
+
+    describe("when the exchange that follows approval is polled", () => {
+      /** @scenario "The personal virtual key is issued on first gateway use, not at login" */
+      it("ships no default_personal_vk to the CLI", async () => {
+        process.env.FEATURE_FLAG_FORCE_ENABLE = GOV_FLAG;
+        const dcRes = await app.request("/api/auth/cli/device-code", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ credential_type: "device_session" }),
+        });
+        const dc = (await dcRes.json()) as {
+          device_code: string;
+          user_code: string;
+        };
+        const { status } = await approve({ user_code: dc.user_code });
+        expect(status).toBe(200);
+
+        const exRes = await app.request("/api/auth/cli/exchange", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ device_code: dc.device_code }),
+        });
+        expect(exRes.status).toBe(200);
+        const ex = (await exRes.json()) as Record<string, unknown>;
+
+        expect(ex.kind).toBe("device_session");
+        expect(ex.access_token).toEqual(expect.stringMatching(/^lw_at_/));
+        expect(ex.default_personal_vk).toBeUndefined();
+        expect(await personalVkCount()).toBe(0);
       });
     });
   });

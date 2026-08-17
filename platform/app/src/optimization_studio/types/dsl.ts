@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import type { LocalPromptConfig } from "~/experiments-v3/types";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
-import { FieldMappingSchema } from "~/server/scenarios/execution/types";
+import { FieldMappingSchema } from "~/server/scenarios/field-mapping";
 import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";
 
 import { datasetColumnTypeSchema } from "../../server/datasets/types";
@@ -108,6 +108,21 @@ export interface ExecutionState {
     total_tokens?: number;
     reasoning_tokens?: number;
     model?: string;
+  };
+  /**
+   * What an HTTP node saw on the wire. Diagnostics for whoever is configuring
+   * the endpoint, not workflow data: nothing downstream binds to it. Present
+   * on a non-2xx as well as a success, since the failure is the case worth
+   * reading. `rendered_body` is the request body after templating, which is
+   * safe to show because the body template is the one field the engine
+   * deliberately does not resolve secrets into.
+   */
+  http?: {
+    status_code?: number;
+    status_text?: string;
+    response_headers?: Record<string, string>;
+    rendered_body?: string;
+    warnings?: string[];
   };
   timestamps?: {
     started_at?: number;

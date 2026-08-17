@@ -24,6 +24,8 @@ export interface SessionGroupPayloadItem {
   errorCount: number;
   warningCount: number;
   totalSpans: number;
+  /** The conversation's most recent trace; null when the rollup named none. */
+  lastTraceId: string | null;
   input: string | null;
   output: string | null;
   codingAgent: {
@@ -74,6 +76,7 @@ export function mapSessionGroupToConversationGroup(
     evalsPassedCount: 0,
     evalsFailedCount: 0,
     worstStatus: worstStatusOf(item),
+    lastTraceId: item.lastTraceId,
     latestTimestamp: item.lastActivityMs,
     earliestTimestamp: item.startedAtMs,
     lastMessage: item.input ?? item.output ?? "",

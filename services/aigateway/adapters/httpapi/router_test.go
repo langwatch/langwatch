@@ -88,6 +88,21 @@ func testBundle() *domain.Bundle {
 	}
 }
 
+// geminiBundle is testBundle plus the Google slot the /v1beta surface needs.
+// That surface hands the caller's body and URL path to Google unchanged, so
+// the gateway refuses it on a key with no Google credential rather than
+// forwarding the body to another vendor. A test whose subject is anything
+// else on that route binds the slot its own scenario implies; leaving it
+// unbound only proved that a mock provider ignores the credential it is
+// handed.
+func geminiBundle() *domain.Bundle {
+	bundle := testBundle()
+	bundle.Credentials = append(bundle.Credentials, domain.Credential{
+		ID: "cred-gemini", ProviderID: domain.ProviderGemini, APIKey: "goog-test",
+	})
+	return bundle
+}
+
 func successResponse() *domain.Response {
 	return &domain.Response{
 		Body:       []byte(`{"choices":[{"message":{"content":"hello"}}]}`),
@@ -602,7 +617,7 @@ func TestGeminiModelFromPath(t *testing.T) {
 func TestRouter_GeminiPassthrough_NonStreaming(t *testing.T) {
 	auth := &mockAuth{
 		resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
-			return testBundle(), nil
+			return geminiBundle(), nil
 		},
 	}
 
@@ -651,7 +666,7 @@ func TestRouter_GeminiPassthrough_NonStreaming(t *testing.T) {
 func TestRouter_GeminiPassthrough_Streaming_PicksStream(t *testing.T) {
 	auth := &mockAuth{
 		resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
-			return testBundle(), nil
+			return geminiBundle(), nil
 		},
 	}
 

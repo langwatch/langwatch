@@ -17,6 +17,22 @@ import type {
 } from "~/generated/prisma/client";
 import { keysetAfter } from "./wirePagination";
 
+/**
+ * The routing-policy columns the materialiser reads off a virtual key.
+ *
+ * One constant rather than a copy per query: this select appears on every
+ * read path, and a site that misses a column does not fail, it silently
+ * materializes a bundle without it. That is how a policy's tier fallthrough
+ * would stop reaching the gateway with nothing to notice it.
+ */
+export const ROUTING_POLICY_SELECT = {
+  id: true,
+  name: true,
+  modelAliases: true,
+  defaultModel: true,
+  policyRules: true,
+} as const;
+
 export type VirtualKeyWithScopes = VirtualKey & {
   scopes: VirtualKeyScope[];
   principalUser?: {
@@ -26,7 +42,9 @@ export type VirtualKeyWithScopes = VirtualKey & {
   } | null;
   routingPolicy?: {
     id: string;
+    name: string;
     modelAliases: Prisma.JsonValue;
+    defaultModel: string | null;
     policyRules: Prisma.JsonValue;
   } | null;
 };
@@ -97,7 +115,7 @@ export class VirtualKeyRepository {
         scopes: true,
         principalUser: { select: { id: true, name: true, email: true } },
         routingPolicy: {
-          select: { id: true, modelAliases: true, policyRules: true },
+          select: ROUTING_POLICY_SELECT,
         },
       },
     });
@@ -114,7 +132,7 @@ export class VirtualKeyRepository {
         scopes: true,
         principalUser: { select: { id: true, name: true, email: true } },
         routingPolicy: {
-          select: { id: true, modelAliases: true, policyRules: true },
+          select: ROUTING_POLICY_SELECT,
         },
       },
     });
@@ -139,7 +157,7 @@ export class VirtualKeyRepository {
         scopes: true,
         principalUser: { select: { id: true, name: true, email: true } },
         routingPolicy: {
-          select: { id: true, modelAliases: true, policyRules: true },
+          select: ROUTING_POLICY_SELECT,
         },
       },
     });
@@ -192,7 +210,7 @@ export class VirtualKeyRepository {
         scopes: true,
         principalUser: { select: { id: true, name: true, email: true } },
         routingPolicy: {
-          select: { id: true, modelAliases: true, policyRules: true },
+          select: ROUTING_POLICY_SELECT,
         },
       },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
@@ -211,7 +229,7 @@ export class VirtualKeyRepository {
         scopes: true,
         principalUser: { select: { id: true, name: true, email: true } },
         routingPolicy: {
-          select: { id: true, modelAliases: true, policyRules: true },
+          select: ROUTING_POLICY_SELECT,
         },
       },
       orderBy: { createdAt: "desc" },
@@ -240,7 +258,7 @@ export class VirtualKeyRepository {
         scopes: true,
         principalUser: { select: { id: true, name: true, email: true } },
         routingPolicy: {
-          select: { id: true, modelAliases: true, policyRules: true },
+          select: ROUTING_POLICY_SELECT,
         },
       },
       orderBy: { createdAt: "desc" },
@@ -281,7 +299,7 @@ export class VirtualKeyRepository {
         scopes: true,
         principalUser: { select: { id: true, name: true, email: true } },
         routingPolicy: {
-          select: { id: true, modelAliases: true, policyRules: true },
+          select: ROUTING_POLICY_SELECT,
         },
       },
     });
@@ -301,7 +319,7 @@ export class VirtualKeyRepository {
         scopes: true,
         principalUser: { select: { id: true, name: true, email: true } },
         routingPolicy: {
-          select: { id: true, modelAliases: true, policyRules: true },
+          select: ROUTING_POLICY_SELECT,
         },
       },
     });
@@ -343,7 +361,7 @@ export class VirtualKeyRepository {
         scopes: true,
         principalUser: { select: { id: true, name: true, email: true } },
         routingPolicy: {
-          select: { id: true, modelAliases: true, policyRules: true },
+          select: ROUTING_POLICY_SELECT,
         },
       },
     });
@@ -372,7 +390,7 @@ export class VirtualKeyRepository {
         scopes: true,
         principalUser: { select: { id: true, name: true, email: true } },
         routingPolicy: {
-          select: { id: true, modelAliases: true, policyRules: true },
+          select: ROUTING_POLICY_SELECT,
         },
       },
     });
@@ -399,7 +417,7 @@ export class VirtualKeyRepository {
         scopes: true,
         principalUser: { select: { id: true, name: true, email: true } },
         routingPolicy: {
-          select: { id: true, modelAliases: true, policyRules: true },
+          select: ROUTING_POLICY_SELECT,
         },
       },
     });
@@ -432,7 +450,7 @@ export class VirtualKeyRepository {
         scopes: true,
         principalUser: { select: { id: true, name: true, email: true } },
         routingPolicy: {
-          select: { id: true, modelAliases: true, policyRules: true },
+          select: ROUTING_POLICY_SELECT,
         },
       },
     });

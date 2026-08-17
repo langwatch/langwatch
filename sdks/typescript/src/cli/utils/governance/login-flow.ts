@@ -158,10 +158,15 @@ export async function runUnifiedLoginFlow(
 						cfg.default_personal_ingest_keys,
 					)) {
 						const lookupId = extractLookupIdFromToken(entry.secret ?? "");
-						if (lookupId && liveSet.has(`${sourceType}:${lookupId}`)) {
+						if (lookupId === undefined) {
+							// Not a personal ik-lw- token: a credential the user placed
+							// here by hand. It cannot be matched against the personal
+							// listing, so it is kept, never dropped as stale.
+							reconciled[sourceType] = entry;
+						} else if (liveSet.has(`${sourceType}:${lookupId}`)) {
 							reconciled[sourceType] = entry;
 						} else {
-							// Entry is stale (revoked or lookupId missing) — omit from reconciled
+							// Revoked on the platform — omit from reconciled.
 							changed = true;
 						}
 					}

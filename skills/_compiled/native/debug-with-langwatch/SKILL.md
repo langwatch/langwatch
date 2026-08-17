@@ -106,4 +106,4 @@ langwatch help-tree            # compact annotated tree (fits in context)
 langwatch <group> --help       # flags for one group
 ```
 
-Pass `--agent` to any command for compact single-line JSON with colour and spinners off (auto-detected under most coding agents).
+Pass `--agent` to any command for compact single-line JSON with colour and spinners off (the CLI sets it by itself under Claude Code, Cursor, Copilot CLI and Amazon Q).

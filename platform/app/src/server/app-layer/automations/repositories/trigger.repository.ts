@@ -92,6 +92,17 @@ export interface TriggerRepository {
     projectId: string;
   }): Promise<boolean>;
 
+  /**
+   * Batched form of `isSendClaimed`: the subset of `traceIds` already
+   * claimed for this trigger, in one read. A paged persist dispatch checks
+   * a whole page at once instead of one query per trace.
+   */
+  findClaimedTraceIds(params: {
+    triggerId: string;
+    traceIds: string[];
+    projectId: string;
+  }): Promise<Set<string>>;
+
   /** Updates the trigger's lastRunAt timestamp. */
   updateLastRunAt(triggerId: string, projectId: string): Promise<void>;
 
@@ -277,6 +288,14 @@ export class NullTriggerRepository implements TriggerRepository {
     projectId: string;
   }): Promise<boolean> {
     return false;
+  }
+
+  async findClaimedTraceIds(_params: {
+    triggerId: string;
+    traceIds: string[];
+    projectId: string;
+  }): Promise<Set<string>> {
+    return new Set();
   }
 
   async updateLastRunAt(_triggerId: string, _projectId: string): Promise<void> {

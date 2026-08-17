@@ -37,6 +37,7 @@ interface CreateNextContextOptions {
 }
 
 import { auditLog } from "@ee/audit-log/auditLog";
+import type { AuthzPermission } from "@langwatch/authz";
 import { HandledError, ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { getLogLevelFromStatusCode } from "@langwatch/observability/request";
@@ -49,8 +50,10 @@ import { prisma } from "~/server/db";
 import { AiCallFailedError } from "~/server/modelProviders/aiCallFailedError";
 import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
 import { ModelProviderDisabledError } from "~/server/modelProviders/modelProviderDisabledError";
+import { createWarnThrottle } from "~/server/observability/warnThrottle";
 import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 import { captureException, toError } from "../../utils/posthogErrorCapture";
+import { checkPermissionV2 } from "../authz/trpc-middleware";
 import type { OpsScope, PermissionMiddleware } from "./rbac";
 
 const logger = createLogger("langwatch:trpc");
@@ -792,7 +795,7 @@ export const tracerMiddleware = t.middleware(
     // so the error span's duration matches the actual call.
     const parentContext = callerTraceContext({ req: ctx.req, type });
 
-    if (isSilencedCall(path, type)) {
+    if (isSilencedCall({ path, type })) {
       const startTime = Date.now();
       const result = await next();
       if (result.ok) return result;
@@ -922,6 +925,42 @@ const handledErrorMiddleware = t.middleware(async ({ next }) => {
   return result;
 });
 
+/**
+ * How long a call may take before its record is raised from info to warning.
+ *
+ * A call that succeeds slowly used to log exactly like one that succeeded
+ * instantly, so the only way to find one was for a customer to say a screen
+ * felt broken. That is how the scenario editor's multi-second load went
+ * unnoticed: every procedure on the path reported success, and the duration
+ * was already on the record but never changed the level.
+ *
+ * One second, because that regression ran at 1.5 to 2.3 seconds per call
+ * and a higher budget would have kept it invisible. Procedures that are
+ * legitimately long (a model generating a draft, an export) still warn,
+ * and the warning for those is still true: it states what the call cost.
+ * The per-path throttle is what keeps the volume down.
+ */
+const DEFAULT_SLOW_CALL_MS = 1000;
+
+const SLOW_CALL_THROTTLE_MS = 60_000;
+
+const slowCallThrottle = createWarnThrottle(SLOW_CALL_THROTTLE_MS);
+
+/** Zero or negative turns the warning off; unset or unparseable keeps the default. */
+export function resolveSlowCallBudgetMs(
+  env: NodeJS.ProcessEnv = process.env,
+): number {
+  const raw = env.TRPC_SLOW_CALL_MS;
+  if (typeof raw !== "string" || raw.trim() === "") return DEFAULT_SLOW_CALL_MS;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : DEFAULT_SLOW_CALL_MS;
+}
+
+/** Test seam: the throttle is process-wide state and must not leak between tests. */
+export function resetSlowCallThrottle(): void {
+  slowCallThrottle.reset();
+}
+
 /** Processes a tRPC call result and logs accordingly. Extracted for testability. */
 export function handleTrpcCallLogging({
   result,
@@ -932,6 +971,8 @@ export function handleTrpcCallLogging({
   statusCode,
   log,
   capture,
+  slowCallBudgetMs = resolveSlowCallBudgetMs(),
+  now = Date.now(),
 }: {
   result: { ok: boolean; error?: unknown };
   path: string;
@@ -941,6 +982,8 @@ export function handleTrpcCallLogging({
   statusCode: number | null;
   log: Pick<ReturnType<typeof createLogger>, "info" | "warn" | "error">;
   capture: (error: Error | string) => void;
+  slowCallBudgetMs?: number;
+  now?: number;
 }): void {
   const logData: Record<string, any> = {
     path,
@@ -996,9 +1039,28 @@ export function handleTrpcCallLogging({
         : "error"
       : getLogLevelFromStatusCode(resolvedStatus);
     log[logLevel](logData, "trpc call");
-  } else {
-    log.info(logData, "trpc call");
+    return;
   }
+
+  // The call succeeded, so this is not a failure and the record carries no
+  // cause. It is raised only because the time it took is worth watching by
+  // rate, which is what warning means here.
+  if (slowCallBudgetMs > 0 && duration > slowCallBudgetMs) {
+    const suppressed = slowCallThrottle.claim({ key: path, now });
+    if (suppressed !== undefined) {
+      log.warn(
+        {
+          ...logData,
+          budgetMs: slowCallBudgetMs,
+          suppressedSincePrevious: suppressed,
+        },
+        "trpc call",
+      );
+      return;
+    }
+  }
+
+  log.info(logData, "trpc call");
 }
 
 /**
@@ -1021,8 +1083,36 @@ function isSilencedPath(path: string): boolean {
   return SILENCED_LOG_PATH_PREFIXES.some((p) => path.startsWith(p));
 }
 
-function isSilencedCall(path: string, type: string): boolean {
+function isSilencedCall({
+  path,
+  type,
+}: {
+  path: string;
+  type: string;
+}): boolean {
   return isSilencedPath(path) || SILENCED_LOG_TYPES.has(type);
+}
+
+/**
+ * Records one finished tRPC call: decides whether it is logged at all, then
+ * how loudly.
+ *
+ * The two halves belong together. Silencing runs first and drops the record
+ * entirely, so "a slow presence heartbeat raises nothing" is a property of the
+ * pair and of neither alone. Asserting it against the classifier proves only
+ * that a boolean is what it is, and asserting it against the logger tests a
+ * call the middleware never makes. This is the seam that can be asked the real
+ * question.
+ */
+export function recordTrpcCall(
+  args: Parameters<typeof handleTrpcCallLogging>[0],
+): void {
+  // Errors are still reported on a silenced path: the volume that earns the
+  // silence is happy-path volume, and a failing heartbeat is worth seeing.
+  if (isSilencedCall({ path: args.path, type: args.type }) && args.result.ok) {
+    return;
+  }
+  handleTrpcCallLogging(args);
 }
 
 export const loggerMiddleware = t.middleware(
@@ -1043,14 +1133,7 @@ export const loggerMiddleware = t.middleware(
       const result = await next();
       const duration = Date.now() - start;
 
-      // Silence happy-path logs for high-frequency, low-signal routes
-      // (presence heartbeats) — still log errors so real failures are
-      // visible.
-      if (isSilencedCall(path, type) && result.ok) {
-        return result;
-      }
-
-      handleTrpcCallLogging({
+      recordTrpcCall({
         result,
         path,
         type,
@@ -1122,6 +1205,23 @@ interface PendingPermissionProcedureBuilder<
     TOutputOut,
     TCaller
   >;
+  /**
+   * ADR-092 §5 sugar: declare the required permission and let the engine
+   * extract the scope (projectId / teamId / organizationId) from the
+   * validated input. New procedures prefer this over `.use(checkXxx…)`.
+   */
+  permission: (
+    permission: AuthzPermission,
+  ) => ProcedureBuilder<
+    TContext,
+    TMeta,
+    TContextOverrides,
+    TInputIn,
+    TInputOut,
+    TOutputIn,
+    TOutputOut,
+    TCaller
+  >;
 }
 
 const permissionProcedureBuilder = <
@@ -1154,6 +1254,22 @@ const permissionProcedureBuilder = <
   TOutputOut,
   TCaller
 > => {
+  /**
+   * The one chain both entry points build: the surrounding middlewares are
+   * identical and only the permission check in the middle differs, so
+   * `.use()` and `.permission()` cannot drift in what wraps them. Order is
+   * behaviour — the check must sit inside the error/tracing middlewares and
+   * before `enforcePermissionCheck`, which is what proves a check ran at all.
+   */
+  const withPermissionCheck = (check: unknown) =>
+    procedure
+      .use(tracerMiddleware as any)
+      .use(loggerMiddleware as any)
+      .use(handledErrorMiddleware as any)
+      .use(check as any)
+      .use(enforcePermissionCheck as any)
+      .use(auditLogMutations as any) as any;
+
   return {
     input: ((input: Parser) => {
       return permissionProcedureBuilder(procedure.input(input as any));
@@ -1167,15 +1283,9 @@ const permissionProcedureBuilder = <
       TOutputOut,
       TCaller
     >["input"],
-    use: (middleware) => {
-      return procedure
-        .use(tracerMiddleware as any)
-        .use(loggerMiddleware as any)
-        .use(handledErrorMiddleware as any)
-        .use(middleware as any)
-        .use(enforcePermissionCheck as any)
-        .use(auditLogMutations as any) as any;
-    },
+    use: (middleware) => withPermissionCheck(middleware),
+    permission: (permission) =>
+      withPermissionCheck(checkPermissionV2(permission)),
   };
 };
 

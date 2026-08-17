@@ -74,7 +74,6 @@ type ActionState =
   | { kind: "submitting" }
   | {
       kind: "success";
-      vkLabel: string;
       organizationName: string;
       credentialType: CredentialType;
       projectName?: string;
@@ -350,7 +349,6 @@ export default function CliAuthPage() {
       });
       const data = (await r.json().catch(() => ({}))) as {
         ok?: boolean;
-        personal_vk_label?: string;
         error_description?: string;
         message?: string;
       };
@@ -372,7 +370,6 @@ export default function CliAuthPage() {
         : undefined;
       setAction({
         kind: "success",
-        vkLabel: data.personal_vk_label ?? "default",
         organizationName: orgName,
         credentialType,
         projectName,
@@ -664,8 +661,7 @@ export default function CliAuthPage() {
                     title="You're signed in!"
                   >
                     LangWatch CLI is now authorized for{" "}
-                    <strong>{action.organizationName}</strong> using the{" "}
-                    <code>{action.vkLabel}</code> personal key. You can close
+                    <strong>{action.organizationName}</strong>. You can close
                     this tab and return to your terminal.
                   </StatusCard>
                   <FirstTraceRedirect />

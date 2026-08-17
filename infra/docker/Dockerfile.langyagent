@@ -17,12 +17,12 @@
 # -----------------------------------------------------------------------------
 # Stage 1: build the Go manager binary.
 # -----------------------------------------------------------------------------
-# Pin an explicit Go toolchain patch (1.26.5) at or above the go.mod language
-# floor (`go 1.26.5`) so every build uses the same compiler. Bump this tag when
+# Pin an explicit Go toolchain patch (1.26.6) at or above the go.mod language
+# floor (`go 1.26.6`) so every build uses the same compiler. Bump this tag when
 # raising the go.mod floor -- the official images set GOTOOLCHAIN=local, so a
 # tag BELOW the floor does not download a newer toolchain, it fails the build
 # with "go.mod requires go >= X (running go Y)".
-FROM --platform=$BUILDPLATFORM golang:1.26.5-bookworm AS builder
+FROM --platform=$BUILDPLATFORM golang:1.26.6-bookworm AS builder
 
 WORKDIR /src
 
@@ -117,6 +117,8 @@ COPY sdks/typescript ./sdks/typescript
 # workspace member it can see, so each member needs at least its package.json.
 COPY platform/app/package.json ./platform/app/
 COPY packages/api/package.json ./packages/api/
+COPY packages/authz/package.json ./packages/authz/
+COPY packages/authz-server/package.json ./packages/authz-server/
 COPY packages/automations/package.json ./packages/automations/
 COPY packages/observability/package.json ./packages/observability/
 COPY packages/react-rum/package.json ./packages/react-rum/

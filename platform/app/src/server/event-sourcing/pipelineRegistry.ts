@@ -86,6 +86,8 @@ import type {
   TopicClusteringOutcomeCommands,
   TopicClusteringRunPort,
 } from "../event-sourcing/pipelines/topic-clustering-processing/process-manager";
+import { publishCancellation } from "../scenarios/cancellation-channel";
+import type { ScenarioExecutionPool } from "../scenarios/execution/execution-pool";
 import { type CommandDispatcher, Deferred } from "./deferred";
 import { createTenantId } from "./domain/tenantId";
 import type { EventSourcing } from "./eventSourcing";
@@ -101,6 +103,7 @@ import { createBlobMaintenancePipeline } from "./pipelines/blob-maintenance/pipe
 import { createCodingAgentProcessingPipeline } from "./pipelines/coding-agent-processing/pipeline";
 import type { CodingAgentSessionState } from "./pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
 import { CodingAgentSessionStore } from "./pipelines/coding-agent-processing/projections/codingAgentSession.store";
+import { createCodingAgentSessionSeenTouch } from "./pipelines/coding-agent-processing/projections/codingAgentSessionSeen.touch";
 import {
   CodingAgentSessionEventsAppendStore,
   CodingAgentTraceSessionAppendStore,
@@ -153,16 +156,15 @@ import {
   COMPUTE_METRICS_RETRY_DELAY_MS,
   ComputeRunMetricsCommand,
 } from "./pipelines/simulation-processing/commands/computeRunMetrics.command";
+import { FinishRunCommand } from "./pipelines/simulation-processing/commands/finishRun.command";
 import { createSimulationProcessingPipeline } from "./pipelines/simulation-processing/pipeline";
+import type { SimulationRunExecutionCommands } from "./pipelines/simulation-processing/process-manager";
+import type { SimulationRunMetricsProjectionRecord } from "./pipelines/simulation-processing/projections/simulationRunMetrics.mapProjection";
 import type { SimulationRunStateData } from "./pipelines/simulation-processing/projections/simulationRunState.foldProjection";
-import { createCancellationBroadcastReactor } from "./pipelines/simulation-processing/reactors/cancellationBroadcast.reactor";
-import { createScenarioExecutionReactor } from "./pipelines/simulation-processing/reactors/scenarioExecution.reactor";
-import { createSnapshotUpdateBroadcastReactor } from "./pipelines/simulation-processing/reactors/snapshotUpdateBroadcast";
-import { createSuiteRunSyncReactor } from "./pipelines/simulation-processing/reactors/suiteRunSync.reactor";
-import { createTraceMetricsSyncReactor } from "./pipelines/simulation-processing/reactors/traceMetricsSync.reactor";
 import type { SimulationRunStateRepository } from "./pipelines/simulation-processing/repositories/simulationRunState.repository";
 import type { ComputeRunMetricsCommandData } from "./pipelines/simulation-processing/schemas/commands";
 import { SIMULATION_PROJECTION_VERSIONS } from "./pipelines/simulation-processing/schemas/constants";
+import type { SimulationProcessingEvent } from "./pipelines/simulation-processing/schemas/events";
 import { createSuiteRunProcessingPipeline } from "./pipelines/suite-run-processing/pipeline";
 import type { SuiteRunStateData } from "./pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
 import type { SuiteRunStateRepository } from "./pipelines/suite-run-processing/repositories/suiteRunState.repository";
@@ -257,6 +259,28 @@ function createInMemoryDeferredFallback<P>({
 }
 
 /**
+ * Late-bound holder for this pod's scenario execution pool. Owned by the
+ * registry; the simulationRunExecution process manager's execute intent reads
+ * it via `getPool`, and worker startup (startWorkers.bootScenarioProcessor)
+ * sets the pool once the ScenarioExecutionPool exists — after the pipeline
+ * registry has been built.
+ */
+export interface ScenarioExecutionPoolHolder {
+  get(): ScenarioExecutionPool | null;
+  set(pool: ScenarioExecutionPool): void;
+}
+
+function createScenarioExecutionPoolHolder(): ScenarioExecutionPoolHolder {
+  let pool: ScenarioExecutionPool | null = null;
+  return {
+    get: () => pool,
+    set: (p) => {
+      pool = p;
+    },
+  };
+}
+
+/**
  * Pre-constructed repositories, resolved at the composition root (presets.ts).
  * The registry consumes these directly — no ClickHouse client resolution here.
  */
@@ -264,6 +288,8 @@ export interface PipelineRepositories {
   suiteRunState: SuiteRunStateRepository;
   /** Primary replica for read-after-write consistency. */
   simulationRunState: SimulationRunStateRepository;
+  /** Write side of the simulationRunMetrics map projection (migration 00078). */
+  simulationRunMetricsStore: AppendStore<SimulationRunMetricsProjectionRecord>;
   /** Primary replica for read-after-write consistency. */
   experimentRunState: ExperimentRunStateRepository;
   /** Primary replica for read-after-write consistency. */
@@ -377,11 +403,8 @@ export interface PipelineRegistryDeps {
   github?: {
     /** One recheck pass; returns how many branches were re-asked about. */
     recheckDueBranches: () => Promise<number>;
-    /** One retention pass over the two linkage tables. */
-    pruneStaleBranchLinkage: () => Promise<{
-      branchChecks: number;
-      pullRequests: number;
-    }>;
+    /** One retention pass over the branch bookkeeping. */
+    pruneStaleBranchLinkage: () => Promise<{ branchChecks: number }>;
   };
 }
 
@@ -415,11 +438,11 @@ export class PipelineRegistry {
   }
 
   registerAll() {
-    // TODO: Customer.io reactors are implemented but not yet registered.
+    // TODO: Customer.io subscribers are implemented but not yet registered.
     // Counting strategy needs to be finalised (per-event ClickHouse queries)
     // before enabling.
     // See: customerIoTraceSyncReactor, customerIoEvaluationSyncReactor,
-    //      customerIoSimulationSyncReactor
+    //      customerIoSimulationSyncSubscriber
 
     const traceSummaryStore = this.cached<TraceSummaryData>(
       new TraceSummaryStore(this.deps.repositories.traceSummaryFold),
@@ -576,7 +599,7 @@ export class PipelineRegistry {
       ],
     });
     const suiteRunPipeline = this.registerSuiteRunPipeline();
-    const { pipeline: simulationPipeline, scenarioExecutionHandle } =
+    const { pipeline: simulationPipeline, scenarioExecutionPool } =
       this.registerSimulationPipeline({
         suiteRunPipeline,
         traceSummaryStore,
@@ -612,8 +635,8 @@ export class PipelineRegistry {
       ...enterprisePipelines.commands,
       billing: mapCommands(billingPipeline.commands),
       automations: automationCommands,
-      /** Late-bind the execution pool for scenario execution reactor. */
-      scenarioExecutionHandle,
+      /** Late-bind the execution pool for the simulationRunExecution process manager. */
+      scenarioExecutionPool,
     };
   }
 
@@ -890,6 +913,14 @@ export class PipelineRegistry {
         codingAgentSessionStore: this.cached<CodingAgentSessionState>(
           new CodingAgentSessionStore(
             this.deps.repositories.codingAgentSession,
+            {
+              // The Sessions-destination stamp, inline at the commit seam with
+              // its own per-process window — a read-model write, not a reactor.
+              onSessionsStored: createCodingAgentSessionSeenTouch({
+                touchCodingAgentSessionSeen: (params) =>
+                  this.deps.projects.touchCodingAgentSessionSeen(params),
+              }),
+            },
           ),
           "coding_agent_sessions",
         ),
@@ -1302,24 +1333,12 @@ export class PipelineRegistry {
       ),
       "simulation_runs",
     );
-    const snapshotUpdateBroadcastReactor = createSnapshotUpdateBroadcastReactor(
-      {
-        broadcast: this.deps.broadcast,
-        hasRedis: !!this.deps.eventSourcing.redisConnection,
-      },
-    );
 
-    const cancellationBroadcastReactor = createCancellationBroadcastReactor({
-      publisher: this.deps.eventSourcing.redisConnection ?? null,
-    });
-
-    const scenarioExecutionHandle = createScenarioExecutionReactor();
+    // Late-bound pool holder — worker startup sets the pool after the
+    // pipeline is built; the process manager's execute intent reads it.
+    const scenarioExecutionPool = createScenarioExecutionPoolHolder();
 
     const suiteRunCommands = mapCommands(suiteRunPipeline.commands);
-    const suiteRunSyncReactor = createSuiteRunSyncReactor({
-      recordSuiteRunItemStarted: suiteRunCommands.recordSuiteRunItemStarted,
-      completeSuiteRunItem: suiteRunCommands.completeSuiteRunItem,
-    });
 
     // Deferred dispatchers — resolved after pipeline registration.
     const selfComputeRunMetrics = new Deferred<
@@ -1328,6 +1347,11 @@ export class PipelineRegistry {
     const scheduleRetry = new Deferred<
       (payload: ComputeRunMetricsCommandData) => Promise<void>
     >("scheduleRetry");
+    // The process manager's finish intent reports through this same
+    // pipeline's commands, which exist only after `.build()`.
+    const selfExecutionCommands = new Deferred<
+      () => SimulationRunExecutionCommands
+    >("selfExecutionCommands");
 
     const traceReadDerivation = new TraceReadDerivationService(
       this.deps.traces.spans,
@@ -1339,25 +1363,64 @@ export class PipelineRegistry {
         traceReadDerivation.deriveScenarioRoleMetrics(params),
     });
 
-    const traceMetricsSyncReactor = createTraceMetricsSyncReactor({
-      computeRunMetrics: selfComputeRunMetrics.fn,
+    // ECST backfill: FinishRunCommand loads the run's prior events straight
+    // from the canonical event store (aggregateType "simulation_run").
+    const finishRunCommand = new FinishRunCommand({
+      loadPriorEvents: async ({ tenantId, scenarioRunId }) => {
+        const eventStore =
+          this.deps.eventSourcing.getEventStore<SimulationProcessingEvent>();
+        if (!eventStore) return [];
+        return eventStore.getEvents(
+          scenarioRunId,
+          { tenantId: createTenantId(tenantId) },
+          "simulation_run",
+        );
+      },
     });
 
     const simulationPipeline = this.deps.eventSourcing.register(
       createSimulationProcessingPipeline({
         simulationRunStore,
-        snapshotUpdateBroadcastReactor,
-        cancellationBroadcastReactor,
-        scenarioExecutionReactor: scenarioExecutionHandle.reactor,
-        suiteRunSyncReactor,
-        traceMetricsSyncReactor,
+        simulationRunMetricsStore:
+          this.deps.repositories.simulationRunMetricsStore,
+        finishRunCommand,
         computeRunMetricsCommand,
+        simulationRunExecution: {
+          getPool: () => scenarioExecutionPool.get(),
+          publishCancellation: async ({ projectId, scenarioRunId }) => {
+            const publisher = this.deps.eventSourcing.redisConnection ?? null;
+            if (!publisher) {
+              logger.warn(
+                { scenarioRunId },
+                "No Redis publisher available, cancellation broadcast skipped",
+              );
+              return;
+            }
+            await publishCancellation({
+              publisher,
+              message: { projectId, scenarioRunId },
+            });
+          },
+          commands: selfExecutionCommands.fn,
+        },
+        snapshotUpdateBroadcast: {
+          broadcast: this.deps.broadcast,
+          hasRedis: !!this.deps.eventSourcing.redisConnection,
+        },
+        suiteRunSync: {
+          recordSuiteRunItemStarted: suiteRunCommands.recordSuiteRunItemStarted,
+          completeSuiteRunItem: suiteRunCommands.completeSuiteRunItem,
+        },
+        traceMetricsSync: {
+          computeRunMetrics: selfComputeRunMetrics.fn,
+        },
       }),
     );
 
     // Resolve self-referencing command
     const simCommands = mapCommands(simulationPipeline.commands);
     selfComputeRunMetrics.resolve(simCommands.computeRunMetrics);
+    selfExecutionCommands.resolve(() => simCommands);
 
     // Resolve cross-pipeline deferred (trace → simulation)
     simComputeRunMetrics.resolve(simCommands.computeRunMetrics);
@@ -1404,7 +1467,7 @@ export class PipelineRegistry {
       );
     }
 
-    return { pipeline: simulationPipeline, scenarioExecutionHandle };
+    return { pipeline: simulationPipeline, scenarioExecutionPool };
   }
 
   private registerBillingReportingPipeline() {

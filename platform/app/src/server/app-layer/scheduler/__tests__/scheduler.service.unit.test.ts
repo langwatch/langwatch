@@ -99,6 +99,10 @@ function makeRepo(job: ScheduledJobRecord): {
     deactivateForTarget: vi.fn(async () => undefined),
     findAllForProject: vi.fn(async () => []),
     listForOps: vi.fn(async () => []),
+    findByIdForOps: vi.fn(async () => null),
+    setActiveForOps: vi.fn(async () => true),
+    releaseSlotForOps: vi.fn(async () => true),
+    requestImmediateRunForOps: vi.fn(async () => true),
   };
   return { repo, settleClaim, claim };
 }
@@ -420,6 +424,10 @@ describe("SchedulerService lease-and-retry (ADR-044 P1)", () => {
         deactivateForTarget: vi.fn(async () => undefined),
         findAllForProject: vi.fn(async () => []),
         listForOps: vi.fn(async () => []),
+        findByIdForOps: vi.fn(async () => null),
+        setActiveForOps: vi.fn(async () => true),
+        releaseSlotForOps: vi.fn(async () => true),
+        requestImmediateRunForOps: vi.fn(async () => true),
       };
       return { repo, getJob: () => job };
     }

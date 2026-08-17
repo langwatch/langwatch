@@ -25,6 +25,7 @@
 
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
+import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
 import {
   type AnalyticsMetricSource,
   getMetricSource,
@@ -513,7 +514,7 @@ export function defaultGraphTriggerHeartbeatDeps({
       // eval-backed series, and reading series 0 for a trigger on series 1
       // probes the wrong slim table's recency, which suppresses the alert.
       const graph = await prisma.customGraph.findFirst({
-        where: { id: customGraphId, projectId },
+        where: { id: customGraphId, projectId, kind: BUILDER_CHART_KIND },
         select: { graph: true },
       });
       if (!graph) return undefined;

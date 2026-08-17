@@ -11,6 +11,7 @@ import { createServiceApp, publicEndpoint } from "~/server/api/security";
 import { app as adminApp } from "../../ee/admin/routes/admin";
 import { app as agentsApp } from "../app/api/agents/[[...route]]/app";
 import { app as analyticsApp } from "../app/api/analytics/[...route]/app";
+import { app as analyticsSqlApp } from "../app/api/analytics-sql/[[...route]]/app";
 import { app as apiKeysApp } from "../app/api/api-keys/[[...route]]/app";
 import { app as codingAgentApp } from "../app/api/coding-agent/[[...route]]/app";
 import { app as copilotKitApp } from "../app/api/copilotkit/[[...route]]/app";
@@ -68,6 +69,7 @@ import { app as githubApp } from "./routes/github";
 import { app as healthApp } from "./routes/health";
 import { app as healthChecksApp } from "./routes/health-checks";
 import { app as ingestionRoutesApp } from "./routes/ingest/ingestionRoutes";
+import { app as langyApiApp } from "./routes/langy-api";
 import { app as langyInternalApp } from "./routes/langy-internal";
 import { app as langyRelayApp } from "./routes/langy-relay";
 import { app as miscApp } from "./routes/misc";
@@ -122,6 +124,7 @@ export function createApiRouter() {
 
   api.route("/", agentsApp);
   api.route("/", analyticsApp);
+  api.route("/", analyticsSqlApp); // /api/v1/projects/:projectId/analytics/* — governed SQL
   api.route("/", copilotKitApp);
   api.route("/", codingAgentApp);
   api.route("/", dashboardsApp);
@@ -191,6 +194,7 @@ export function createApiRouter() {
   api.route("/", otelApp);
   api.route("/", rumApp); // /api/rum/v1/traces — browser telemetry proxy
   api.route("/", playgroundApp);
+  api.route("/", langyApiApp); // /api/langy/conversations — key-authed turns
   api.route("/", langyInternalApp);
   api.route("/", langyRelayApp);
   api.route("/", githubApp);

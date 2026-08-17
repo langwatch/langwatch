@@ -13,7 +13,11 @@
  */
 import { type ComponentProps, type FC, lazy } from "react";
 
+import { warmChunk } from "~/utils/chunkReload";
 import type { TraceV2DrawerShellProps } from "../features/traces-v2/components/TraceDrawer";
+
+/** The import behind each lazy drawer, so a screen can fetch it early. */
+const chunkFactories = new WeakMap<object, () => Promise<unknown>>();
 
 const lazyDefault = <K extends string, T extends { [P in K]: React.FC<any> }>({
   factory,
@@ -27,6 +31,7 @@ const lazyDefault = <K extends string, T extends { [P in K]: React.FC<any> }>({
   // and regression tests (e.g. scenariosIndexNoDoubleDrawer) can still
   // identify the underlying drawer.
   Object.defineProperty(Component, "name", { value: key });
+  chunkFactories.set(Component, factory);
   return Component;
 };
 
@@ -101,6 +106,26 @@ const UploadCSVDrawer = lazyDefault({
 const FeatureFlagsDrawer = lazyDefault({
   factory: () => import("./drawers/FeatureFlagsDrawer"),
   key: "FeatureFlagsDrawer",
+});
+const GroupDetailDrawer = lazyDefault({
+  factory: () => import("./ops/queues/groupDetail/GroupDetailDrawer"),
+  key: "GroupDetailDrawer",
+});
+const ProcessInstanceDrawer = lazyDefault({
+  factory: () => import("./ops/processes/instanceDrawer/ProcessInstanceDrawer"),
+  key: "ProcessInstanceDrawer",
+});
+const ProcessInstancesDrawer = lazyDefault({
+  factory: () => import("./ops/processes/ProcessInstancesDrawer"),
+  key: "ProcessInstancesDrawer",
+});
+const OpsBlobsDrawer = lazyDefault({
+  factory: () => import("./ops/blobs/OpsBlobsDrawer"),
+  key: "OpsBlobsDrawer",
+});
+const OpsReplayDrawer = lazyDefault({
+  factory: () => import("./ops/projections/OpsReplayDrawer"),
+  key: "OpsReplayDrawer",
 });
 const EditModelProviderDrawer = lazyDefault({
   factory: () => import("./EditModelProviderDrawer"),
@@ -189,6 +214,11 @@ const InviteMemberDrawer = lazyDefault({
 const DataPrivacyRuleDrawer = lazyDefault({
   factory: () => import("./settings/DataPrivacyRuleDrawer"),
   key: "DataPrivacyRuleDrawer",
+});
+const RoutingPolicyDrawer = lazyDefault({
+  factory: () =>
+    import("./settings/governance/routingPolicies/RoutingPolicyDrawer"),
+  key: "RoutingPolicyDrawer",
 });
 const DefaultModelOverrideDrawer = lazyDefault({
   factory: () => import("./settings/DefaultModelOverrideDrawer"),
@@ -281,6 +311,8 @@ export const drawers = {
   suiteEditor: SuiteFormDrawer,
   // Data privacy
   dataPrivacyRule: DataPrivacyRuleDrawer,
+  // AI governance
+  routingPolicy: RoutingPolicyDrawer,
   // Project management
   createProject: CreateProjectDrawer,
   editProject: EditProjectDrawer,
@@ -293,6 +325,11 @@ export const drawers = {
   featureFlags: FeatureFlagsDrawer,
   // Ops
   foundry: FoundryDrawer,
+  opsGroupDetail: GroupDetailDrawer,
+  opsProcessInstance: ProcessInstanceDrawer,
+  opsProcessInstances: ProcessInstancesDrawer,
+  opsBlobs: OpsBlobsDrawer,
+  opsReplay: OpsReplayDrawer,
   // Coding agents
   pullRequestDetail: PullRequestDetailDrawer,
 } satisfies Record<string, React.FC<any>>;
@@ -301,6 +338,61 @@ export const drawers = {
  * Union type of all registered drawer names.
  */
 export type DrawerType = keyof typeof drawers;
+
+/**
+ * Fetch a drawer's code before something opens it.
+ *
+ * Each drawer is its own download, so the first open of one waits on the
+ * network with only the Suspense spinner on screen. A screen that knows which
+ * drawer its rows open warms it while the person is still reading, and the
+ * click then opens the drawer straight away. The bundler keeps the module, so
+ * a repeat call costs nothing, and `traceV2Details` has no chunk of its own to
+ * warm because its shell is mounted by the page.
+ */
+export function preloadDrawer(type: DrawerType): Promise<void> {
+  const component = drawers[type];
+  const factory = chunkFactories.get(component);
+  if (!factory) return Promise.resolve();
+
+  return warmChunk(factory).then((loaded) =>
+    loaded ? primeLazyComponent(component) : undefined,
+  );
+}
+
+/**
+ * Tell a `lazy()` wrapper that its module is already here.
+ *
+ * The wrapper keeps its own loaded state, apart from the module cache, so a
+ * warmed drawer still suspends on its first render and paints the spinner for
+ * a moment. Reading the wrapper once outside render settles that state, and
+ * the drawer then renders on the first try. The read throws the promise the
+ * wrapper is waiting on, which is how a `lazy()` reports that it is not ready
+ * yet, so the throw is the expected path and not a failure. Waiting on that
+ * promise is what makes the drawer ready by the time this resolves.
+ *
+ * Called only once the module is in memory: a wrapper that is told to load and
+ * fails remembers the failure for the life of the page, which would turn a
+ * warm-up that lost the network into a drawer that can never open.
+ */
+function primeLazyComponent(component: object): Promise<void> {
+  const wrapper = component as {
+    _init?: (payload: unknown) => unknown;
+    _payload?: unknown;
+  };
+  if (typeof wrapper._init !== "function") return Promise.resolve();
+
+  try {
+    wrapper._init(wrapper._payload);
+    return Promise.resolve();
+  } catch (pending) {
+    return pending instanceof Promise
+      ? pending.then(
+          () => undefined,
+          () => undefined,
+        )
+      : Promise.resolve();
+  }
+}
 
 /**
  * Get the props type for a specific drawer.
