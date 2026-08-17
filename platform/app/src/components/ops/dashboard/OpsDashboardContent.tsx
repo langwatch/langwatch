@@ -10,12 +10,10 @@ import { api } from "~/utils/api";
 import { ActiveOperationsSection } from "./ActiveOperationsSection";
 import { HealthLine } from "./HealthLine";
 import { LatencyWindowsCard } from "./LatencyWindowsCard";
-import { ParkedCard } from "./ParkedCard";
-import { ReplayHistorySection } from "./ReplayHistorySection";
+import { PausedCard } from "./paused/PausedCard";
 import { StatStrip } from "./StatStrip";
 import { ThroughputChart } from "./ThroughputChart";
 import { TopErrorsCard } from "./TopErrorsCard";
-import { UpcomingWorkCard } from "./UpcomingWorkCard";
 
 /**
  * The ops landing page, read top to bottom as strip → health → chart →
@@ -58,9 +56,10 @@ export function OpsDashboardContent({ data }: { data: DashboardData }) {
         anomaliesKnown={anomaliesKnown}
       />
 
-      <ParkedCard
+      <PausedCard
         parkedTenants={data.parkedTenants}
         parkedTenantsBound={data.parkedTenantsBound}
+        pausedKeys={data.pausedKeys}
       />
 
       <Card.Root overflow="hidden">
@@ -79,8 +78,6 @@ export function OpsDashboardContent({ data }: { data: DashboardData }) {
 
       <LatencyWindowsCard windows={data.latencyWindows} />
 
-      <UpcomingWorkCard />
-
       <PipelineTreeCard
         pipelineTree={data.pipelineTree}
         pausedKeys={data.pausedKeys}
@@ -96,8 +93,6 @@ export function OpsDashboardContent({ data }: { data: DashboardData }) {
       <BlockedCard queueNames={queueNames} />
       <DlqCard queueNames={queueNames} />
       <GroupsCard queueNames={queueNames} />
-
-      <ReplayHistorySection />
     </VStack>
   );
 }

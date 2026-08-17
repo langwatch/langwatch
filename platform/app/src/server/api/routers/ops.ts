@@ -197,6 +197,23 @@ export const opsRouter = createTRPCRouter({
       return ops.scheduler.listScheduledJobs({ limit: input.limit });
     }),
 
+  /**
+   * Only the switched-off schedules, for the dashboard's "Switched off" panel.
+   * Its own read because `listScheduledJobs` sorts active first, so a client
+   * filtering that page would miss every paused row on a large fleet.
+   */
+  listPausedSchedules: protectedProcedure
+    .use(opsViewPermission)
+    .input(
+      z.object({
+        limit: z.number().int().min(1).max(200).default(50),
+      }),
+    )
+    .query(async ({ input }) => {
+      const ops = requireOps();
+      return ops.scheduler.listPausedSchedules({ limit: input.limit });
+    }),
+
   /** Recent scheduler operator actions, so the page explains its own history. */
   listSchedulerActions: protectedProcedure
     .use(opsViewPermission)

@@ -1,6 +1,5 @@
 import {
   Box,
-  Card,
   Collapsible,
   HStack,
   IconButton,
@@ -19,19 +18,22 @@ import { api } from "~/utils/api";
  * Which tenants are parked, and how badly.
  *
  * The Parked tile could read 129,091 with nothing anywhere on the page naming a
- * tenant — an alarm with the label torn off. This panel is the label. It also
+ * tenant — an alarm with the label torn off. This section is the label. It also
  * says what parked MEANS, because an orange six-figure number that describes
  * flow control working correctly otherwise reads as an outage.
+ *
+ * One of three sections under the paused panel. It owns no card of its own:
+ * "what is switched off" is one question, and PausedCard is where it is
+ * answered — including the decision to render nothing when nothing is.
  */
-export function ParkedCard({
+export function ParkedTenantsSection({
   parkedTenants,
   parkedTenantsBound,
 }: Pick<DashboardData, "parkedTenants" | "parkedTenantsBound">) {
-  // Nothing parked is not a state worth a card. The tile already says zero.
   if (parkedTenants.length === 0) return null;
 
   return (
-    <Card.Root overflow="hidden">
+    <Box>
       <Box paddingX={4} paddingTop={3} paddingBottom={2}>
         <HStack gap={2}>
           <Text textStyle="xs" fontWeight="medium" color="fg.muted">
@@ -77,7 +79,7 @@ export function ParkedCard({
           </Table.Body>
         </Table.Root>
       </Table.ScrollArea>
-    </Card.Root>
+    </Box>
   );
 }
 
