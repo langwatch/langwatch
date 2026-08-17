@@ -44,9 +44,12 @@ export function deriveGrantId({
     scope.id,
     resourceToken ?? "",
   ];
-  // Unit separator, not a space: no part may smuggle a boundary character.
+  // ASCII unit separator, not a space: no part may smuggle a boundary
+  // character. Written as an escape on purpose - a literal 0x1f byte here is
+  // invisible in a diff, so a reader (or a reviewer) sees `join("")` and
+  // reads an ambiguous pre-image where there is none.
   const digest = createHash("sha256")
-    .update(parts.join(""))
+    .update(parts.join("\u001f"))
     .digest();
   const instance = new Instance(
     Instance.schemes.RANDOM,

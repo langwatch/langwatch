@@ -946,12 +946,24 @@ through the GroupQueue in per-org FIFO. The ordering authority is the append
 itself — `(acceptedAt, eventId)` is the ledger's order, the projection
 follows it, and we accept that order as **best-effort FIFO**: it is the
 order ClickHouse accepted the events, which is the only order the system
-has. In normal operation no fold ever runs inline. If Redis is down, a
-circuit breaker processes this pipeline's commands directly (the framework's
-in-memory processor, in the calling process) until Redis returns —
-degradation, accepted under best-effort FIFO, sanctioned by ADR-007's
-"Redis-loss circuit breaker" amendment, which names this pipeline and
-expects the identity pipeline to join it later (identity programme D02).
+has. **No fold ever runs inline — not in normal operation and not during an
+outage.** If Redis is down, ADR-007's "Redis-loss circuit breaker" amendment
+(which names this pipeline, and expects the identity pipeline to join it
+later — identity programme D02) guarantees exactly three things, and inline
+processing is deliberately not among them:
+
+- **Appends still land.** The event store is ClickHouse and the append is
+  waited, so the fact is durable whether or not a queue job could be staged.
+- **Revocation still bites.** The revocation class applies its sanctioned
+  direct projection write on the calling path (see below), so the outcome
+  holds even though the fold has not run.
+- **Everything else waits.** Folds, subscribers and replays do not run while
+  Redis is down. There is no in-memory processor and no in-process drain;
+  projections catch up when Redis returns, and a replay is never attempted
+  during an outage.
+
+That is what keeps the queue-ordering contract above true: there is one
+order — the append order — and one thing that applies it.
 
 **Revocation is instant anyway — as enforcement, not as a fold.** For
 `grants.revoke`, `member_offboarded`, and `cutover_rolled_back`, after the

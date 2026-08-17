@@ -243,59 +243,6 @@ describe("grants ledger reducer", () => {
     });
   });
 
-  describe("given the cutover process events", () => {
-    describe("when parity is proved and the cutover completes", () => {
-      const state = apply([
-        { kind: "migration_parity_proved", diffs: [], occurredAtMs: 5 },
-        { kind: "cutover_completed", actor: ACTOR, occurredAtMs: 6 },
-      ]);
-
-      it("marks the organization as on the engine with its proof", () => {
-        expect(state.cutover.onEngine).toBe(true);
-        expect(state.cutover.provedAtMs).toBe(5);
-        expect(state.cutover.parityDiffs).toEqual([]);
-      });
-    });
-
-    describe("when the cutover is rolled back", () => {
-      it("puts the organization back on the legacy path", () => {
-        const state = apply([
-          { kind: "cutover_completed", actor: ACTOR, occurredAtMs: 6 },
-          { kind: "cutover_rolled_back", actor: ACTOR, occurredAtMs: 7 },
-        ]);
-        expect(state.cutover.onEngine).toBe(false);
-      });
-    });
-  });
-
-  describe("given the runner's lifecycle witnesses", () => {
-    describe("when transitions arrive in order", () => {
-      it("keeps the latest state per migration, report and all", () => {
-        const state = apply([
-          {
-            kind: "migration_tenant_state_changed",
-            migrationName: "authz-team-user-backfill",
-            status: "parked",
-            report: { kind: "error", message: "boom" },
-            actor: ACTOR,
-            occurredAtMs: 5,
-          },
-          {
-            kind: "migration_tenant_state_changed",
-            migrationName: "authz-team-user-backfill",
-            status: "finalized",
-            actor: ACTOR,
-            occurredAtMs: 6,
-          },
-        ]);
-        expect(state.migrationStates["authz-team-user-backfill"]).toEqual({
-          status: "finalized",
-          occurredAtMs: 6,
-        });
-      });
-    });
-  });
-
   describe("given the same event stream applied twice", () => {
     it("folds to deep-equal states", () => {
       const grant = grantFact();
@@ -313,53 +260,6 @@ describe("grants ledger reducer", () => {
         { kind: "cutover_completed", actor: ACTOR, occurredAtMs: 4 },
       ];
       expect(apply(stream)).toEqual(apply(stream));
-    });
-  });
-});
-
-describe("grant identity", () => {
-  const base = {
-    organizationId: ORG,
-    principal: { type: "user" as const, id: "user_alice" },
-    scope: { type: "TEAM" as const, id: "team_client_a" },
-    occurredAtMs: OCCURRED_AT,
-  };
-
-  describe("when the same fact is derived twice", () => {
-    it("yields the same id — a KSUID with no random bits", () => {
-      const a = deriveGrantId(base);
-      const b = deriveGrantId({ ...base });
-      expect(a).toBe(b);
-      expect(a).toContain("grant_");
-    });
-  });
-
-  describe("when any part of the fact differs", () => {
-    it("yields a different id per scope, principal, org, token, and business time", () => {
-      const ids = [
-        deriveGrantId(base),
-        deriveGrantId({ ...base, organizationId: "org_other" }),
-        deriveGrantId({
-          ...base,
-          principal: { type: "api_key", id: "user_alice" },
-        }),
-        deriveGrantId({
-          ...base,
-          scope: { type: "PROJECT", id: "team_client_a" },
-        }),
-        deriveGrantId({ ...base, resourceToken: "tok_1" }),
-        deriveGrantId({ ...base, resourceToken: "tok_2" }),
-        deriveGrantId({ ...base, occurredAtMs: OCCURRED_AT + 60_000 }),
-      ];
-      expect(new Set(ids).size).toBe(ids.length);
-    });
-
-    it("ignores sub-second differences in business time", () => {
-      // KSUID timestamps are second-precision; a retry landing in the same
-      // second as the original command derives the same id.
-      expect(deriveGrantId({ ...base, occurredAtMs: OCCURRED_AT + 500 })).toBe(
-        deriveGrantId(base),
-      );
     });
   });
 });

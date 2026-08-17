@@ -253,6 +253,7 @@ Feature: Unified authorization engine
   @integration @unimplemented
   Scenario: A revocation holds before the revoke call returns, with Redis stopped
     Given user "alice" has role "member" bound at project "chatbot"
+    And Redis is unavailable
     And the queue infrastructure is stopped
     When an admin revokes that binding
     Then the revoke call succeeds
@@ -372,9 +373,12 @@ Feature: Unified authorization engine
   Scenario: The organization-member floor is itself a grant an admin can edit
     Given organization "acme" holds a floor grant of role "member" at "acme"
     And user "alice" belongs to "acme" with no other grants
-    When alice's permission "analytics:view" is checked at organization "acme"
+    When alice's permission "datasets:manage" is checked at organization "acme"
     Then the check is granted through the floor grant
-    And an admin lowering the floor to "viewer" changes alice's next check
+    # "datasets:manage" on purpose: it separates member from viewer. A
+    # permission both roles carry (analytics:view) would answer the same
+    # either way, and the scenario would pass without the floor moving.
+    And an admin lowering the floor to "viewer" denies alice's next check
 
   @unit
   Scenario: Offboarding a user removes every grant, with proof

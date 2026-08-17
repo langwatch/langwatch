@@ -104,6 +104,7 @@ export class PrismaAuthzGrantsProjectionRepository
         onEngine: cutover?.onEngine ?? false,
         provedAtMs: cutover?.provedAt?.getTime() ?? null,
         parityDiffs: (cutover?.parityDiffs as string[] | null) ?? [],
+        changedAtMs: cutover?.changedAt?.getTime() ?? null,
       },
       migrationStates: Object.fromEntries(
         migrationRows.flatMap((row) => {
@@ -296,25 +297,25 @@ export class PrismaAuthzGrantsProjectionRepository
     organizationId: string;
     state: GrantsLedgerState;
   }): Promise<void> {
+    // `changedAt` carries the reducer's monotonic guard back to storage, so
+    // a reloaded projection keeps refusing stale cutover facts instead of
+    // starting over from "accept anything".
+    const row = {
+      onEngine: state.cutover.onEngine,
+      provedAt:
+        state.cutover.provedAtMs != null
+          ? new Date(state.cutover.provedAtMs)
+          : null,
+      parityDiffs: state.cutover.parityDiffs,
+      changedAt:
+        state.cutover.changedAtMs != null
+          ? new Date(state.cutover.changedAtMs)
+          : null,
+    };
     await this.prisma.authzCutoverProjection.upsert({
       where: { organizationId },
-      create: {
-        organizationId,
-        onEngine: state.cutover.onEngine,
-        provedAt:
-          state.cutover.provedAtMs != null
-            ? new Date(state.cutover.provedAtMs)
-            : null,
-        parityDiffs: state.cutover.parityDiffs,
-      },
-      update: {
-        onEngine: state.cutover.onEngine,
-        provedAt:
-          state.cutover.provedAtMs != null
-            ? new Date(state.cutover.provedAtMs)
-            : null,
-        parityDiffs: state.cutover.parityDiffs,
-      },
+      create: { organizationId, ...row },
+      update: row,
     });
   }
 

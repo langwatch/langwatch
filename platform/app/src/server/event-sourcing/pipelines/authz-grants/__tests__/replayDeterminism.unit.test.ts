@@ -174,9 +174,15 @@ describe("grants ledger replay determinism", () => {
     it("applying the stream twice folds to the same state as once", async () => {
       const emissions = await captureEmissions();
       const once = await replayToRows(emissions);
-      // A crash-retry replays the same events over the folded state; every
-      // apply is an absolute write keyed by deterministic id, so nothing
-      // moves.
+      // What this proves is the REDUCER's idempotency: every apply is an
+      // absolute write keyed by a deterministic grant id, so folding a fact
+      // a second time moves nothing.
+      //
+      // It is deliberately not a claim about store-level dedup. These
+      // entries are re-indexed on the way through the command handler, so
+      // the second copy carries its own `<commandId>:<index>` keys rather
+      // than colliding with the first — the retried-command contract lives
+      // at the event store and is proven where that dedup happens.
       const twice = await replayToRows([...emissions, ...emissions]);
       expect(JSON.stringify(twice.grantRows)).toBe(
         JSON.stringify(once.grantRows),

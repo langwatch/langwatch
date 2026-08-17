@@ -1,3 +1,21 @@
+-- The grants ledger's read side (ADR-092 §13). Every table here is a
+-- PROJECTION: it holds no truth of its own, and a replay of the event stream
+-- rebuilds it from empty. That is what makes the rollback below safe.
+--
+-- To roll back, uncomment and run manually:
+--
+--   DROP TABLE IF EXISTS "AuthzCutoverProjection";
+--   DROP TABLE IF EXISTS "AuthzProjectionCursor";
+--   DROP TABLE IF EXISTS "Role";
+--   DROP TABLE IF EXISTS "Grant";
+--   DROP TYPE  IF EXISTS "GrantPrincipalType";
+--   DROP TYPE  IF EXISTS "GrantScopeType";
+--
+-- Dropping these loses no authorization state: while the engine is behind its
+-- flag the legacy RoleBinding/CustomRole tables remain the source every
+-- permission check answers from, and the compat head this projection also
+-- writes is reconstructed on the next fold.
+
 -- CreateEnum
 CREATE TYPE "GrantScopeType" AS ENUM ('ORGANIZATION', 'TEAM', 'PROJECT', 'RESOURCE', 'PLATFORM');
 
@@ -59,6 +77,10 @@ CREATE TABLE "AuthzCutoverProjection" (
     "onEngine" BOOLEAN NOT NULL DEFAULT false,
     "provedAt" TIMESTAMP(3),
     "parityDiffs" JSONB,
+    -- Business time of the newest cutover fact folded into this row: the
+    -- reducer's monotonic guard, persisted so it survives a reload rather
+    -- than resetting to "accept anything" on the next fold.
+    "changedAt" TIMESTAMP(3),
     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "AuthzCutoverProjection_pkey" PRIMARY KEY ("organizationId")
@@ -67,8 +89,22 @@ CREATE TABLE "AuthzCutoverProjection" (
 -- CreateIndex
 CREATE UNIQUE INDEX "Grant_token_key" ON "Grant"("token");
 
+-- The resource tier's two columns travel together or not at all: `token` IS
+-- the credential and `permission` is the single thing it may do, so a row
+-- holding one without the other names a capability nobody can name back.
+-- Prisma cannot express this, hence the hand-written constraint (same shape
+-- as "RoleBinding_principal_check").
+ALTER TABLE "Grant" ADD CONSTRAINT "Grant_resource_terms_check" CHECK (
+    num_nonnulls("token", "permission") IN (0, 2)
+);
+
 -- CreateIndex
-CREATE INDEX "Grant_organizationId_principalType_principalId_idx" ON "Grant"("organizationId", "principalType", "principalId");
+-- Partial on purpose: this is the collector's principal scan, and the
+-- collector never reaches a RESOURCE grant that way - share links are found
+-- by their token through "Grant_token_key". Share-link volume is unbounded
+-- per resource (ADR-057 dropped one-share-per-resource), so indexing it here
+-- would bloat the authorization hot path with rows it can never return.
+CREATE INDEX "Grant_organizationId_principalType_principalId_idx" ON "Grant"("organizationId", "principalType", "principalId") WHERE "scopeType" <> 'RESOURCE';
 
 -- CreateIndex
 CREATE INDEX "Grant_organizationId_scopeType_scopeId_idx" ON "Grant"("organizationId", "scopeType", "scopeId");

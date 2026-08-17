@@ -19,6 +19,11 @@ import {
 import type { Cluster, Redis } from "ioredis";
 import { env } from "~/env.mjs";
 import type { Prisma } from "~/generated/prisma/client";
+import type {
+  AttachGrantsCommandData,
+  ProveMigrationParityCommandData,
+  RecordMigrationTenantStateCommandData,
+} from "~/server/event-sourcing/pipelines/authz-grants/schemas/commands";
 import { AUTHZ_GRANTS_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/authz-grants/schemas/constants";
 import { bumpAuthzEpoch } from "../../authz/epoch";
 import { PrismaAuthzMigrationRepository } from "../../authz/repositories/authz-migration.prisma.repository";
@@ -39,9 +44,15 @@ import { SystemMigrationsService } from "./system-migrations.service";
  * so operator rollbacks are witnessed too. Routes must not touch it - they
  * go through `systemMigrationsService` below.
  */
-const systemMigrationState = new WitnessingSystemMigrationStateRepository(
-  new PrismaSystemMigrationStateRepository(prisma),
-  async ({ migrationName, tenantId, status, report, occurredAtMs }) => {
+const systemMigrationState = new WitnessingSystemMigrationStateRepository({
+  inner: new PrismaSystemMigrationStateRepository(prisma),
+  witness: async ({
+    migrationName,
+    tenantId,
+    status,
+    report,
+    occurredAtMs,
+  }) => {
     await (
       await grantsLedgerCommands()
     ).commands.recordMigrationTenantState.send({
@@ -55,8 +66,8 @@ const systemMigrationState = new WitnessingSystemMigrationStateRepository(
       occurredAtMs,
     });
   },
-  () => Date.now(),
-);
+  now: () => Date.now(),
+});
 
 /**
  * What the ops dashboard talks to. The route calls this and never the state
@@ -79,7 +90,35 @@ export const systemMigrationsService = new SystemMigrationsService({
  * organization with an honest report, and the state witness logs and
  * moves on.
  */
-async function grantsLedgerCommands() {
+interface GrantsLedgerSenders {
+  commands: {
+    attachGrants: { send: (data: AttachGrantsCommandData) => Promise<unknown> };
+    proveMigrationParity: {
+      send: (data: ProveMigrationParityCommandData) => Promise<unknown>;
+    };
+    recordMigrationTenantState: {
+      send: (data: RecordMigrationTenantStateCommandData) => Promise<unknown>;
+    };
+  };
+}
+
+/**
+ * Memoized: the poll below costs up to 30 seconds, and every `attachGrants`
+ * chunk, parity proof and witnessed transition would otherwise re-run it.
+ * The promise is cleared on failure so a send that arrived before the stack
+ * was up does not poison every later one.
+ */
+let grantsLedgerHandle: Promise<GrantsLedgerSenders> | null = null;
+
+async function grantsLedgerCommands(): Promise<GrantsLedgerSenders> {
+  grantsLedgerHandle ??= resolveGrantsLedgerCommands().catch((error) => {
+    grantsLedgerHandle = null;
+    throw error;
+  });
+  return grantsLedgerHandle;
+}
+
+async function resolveGrantsLedgerCommands(): Promise<GrantsLedgerSenders> {
   const deadline = Date.now() + 30_000;
   let app = tryGetApp();
   while (!app && Date.now() < deadline) {
@@ -91,15 +130,14 @@ async function grantsLedgerCommands() {
       "the grants ledger requires the event-sourcing stack; send refused",
     );
   }
+  // The pipeline registry is keyed by name and cannot express which command
+  // set a name carries, so the handle itself is untyped. The PAYLOADS are
+  // not: `GrantsLedgerSenders` restates them from the command schemas'
+  // inferred types, so a change to any command's shape breaks here rather
+  // than at runtime inside the fold.
   return app.eventSourcing.getPipeline(
     AUTHZ_GRANTS_PIPELINE_NAME as never,
-  ) as unknown as {
-    commands: {
-      attachGrants: { send: (data: unknown) => Promise<unknown> };
-      proveMigrationParity: { send: (data: unknown) => Promise<unknown> };
-      recordMigrationTenantState: { send: (data: unknown) => Promise<unknown> };
-    };
-  };
+  ) as unknown as GrantsLedgerSenders;
 }
 
 function grantsLedgerEmitter(): GrantsLedgerEmitter {

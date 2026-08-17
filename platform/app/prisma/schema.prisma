@@ -2445,9 +2445,14 @@ model Grant {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @default(now()) @updatedAt
 
-  // A partial index excluding RESOURCE rows (the collector's principal-scan
-  // hot path) lands in migration SQL with the engine read path - Prisma has
-  // no partial indexes.
+  // The principal-scan index below is PARTIAL in the database - it carries a
+  // `WHERE "scopeType" <> 'RESOURCE'` the migration SQL spells out, because
+  // Prisma has no partial indexes. Applied while the table is empty rather
+  // than deferred to the engine read path: unbounded share-link volume would
+  // otherwise have to be indexed once and then rebuilt out.
+  //
+  // The same migration adds "Grant_resource_terms_check", a both-or-neither
+  // CHECK over (token, permission) that Prisma also cannot express.
   @@index([organizationId, principalType, principalId])
   @@index([organizationId, scopeType, scopeId])
 }
@@ -2486,11 +2491,14 @@ model AuthzProjectionCursor {
 // Projected from the ledger's cutover_* process events. What the per-org
 // permission fork and the legacy-fallback gate read.
 model AuthzCutoverProjection {
-  organizationId String   @id
-  onEngine       Boolean  @default(false)
+  organizationId String    @id
+  onEngine       Boolean   @default(false)
   provedAt       DateTime?
   parityDiffs    Json?
-  updatedAt      DateTime @default(now()) @updatedAt
+  // Business time of the newest cutover fact folded here - the reducer's
+  // monotonic guard, persisted so a reload does not reset it.
+  changedAt      DateTime?
+  updatedAt      DateTime  @default(now()) @updatedAt
 }
 
 model ApiKey {

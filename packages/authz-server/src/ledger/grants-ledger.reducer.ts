@@ -174,6 +174,15 @@ export interface GrantsLedgerCutover {
   onEngine: boolean;
   provedAtMs: number | null;
   parityDiffs: string[];
+  /**
+   * Business time of the newest cutover fact folded so far, and the reducer's
+   * own monotonic guard. Unlike the grant and role heads — absolute writes
+   * keyed by a deterministic id, where re-applying an old fact is a no-op —
+   * the cutover fields are last-write-wins over a single row, so an
+   * out-of-order `cutover_rolled_back` would silently take an organization
+   * off the engine. Null until the first cutover fact.
+   */
+  changedAtMs: number | null;
 }
 
 export interface GrantsLedgerState {
@@ -194,7 +203,12 @@ export function emptyGrantsLedgerState({
     organizationId,
     grants: {},
     roles: {},
-    cutover: { onEngine: false, provedAtMs: null, parityDiffs: [] },
+    cutover: {
+      onEngine: false,
+      provedAtMs: null,
+      parityDiffs: [],
+      changedAtMs: null,
+    },
     migrationStates: {},
   };
 }
@@ -250,18 +264,36 @@ export function reduceGrantsLedger({
     case "member_offboarded":
       return removeGrants({ state, grantIds: event.revokedGrantIds });
     case "migration_parity_proved":
+      if (isStaleCutoverFact({ state, event })) return state;
       return {
         ...state,
         cutover: {
           ...state.cutover,
           provedAtMs: event.occurredAtMs,
           parityDiffs: event.diffs,
+          changedAtMs: event.occurredAtMs,
         },
       };
     case "cutover_completed":
-      return { ...state, cutover: { ...state.cutover, onEngine: true } };
+      if (isStaleCutoverFact({ state, event })) return state;
+      return {
+        ...state,
+        cutover: {
+          ...state.cutover,
+          onEngine: true,
+          changedAtMs: event.occurredAtMs,
+        },
+      };
     case "cutover_rolled_back":
-      return { ...state, cutover: { ...state.cutover, onEngine: false } };
+      if (isStaleCutoverFact({ state, event })) return state;
+      return {
+        ...state,
+        cutover: {
+          ...state.cutover,
+          onEngine: false,
+          changedAtMs: event.occurredAtMs,
+        },
+      };
     case "migration_tenant_state_changed":
       return {
         ...state,
@@ -275,6 +307,23 @@ export function reduceGrantsLedger({
         },
       };
   }
+}
+
+/**
+ * Whether a cutover-family fact is older than the cutover state already
+ * folded. Strictly older loses; equal timestamps still apply, so a replay of
+ * the same stream converges to the same state rather than dropping the fact
+ * that produced it.
+ */
+function isStaleCutoverFact({
+  state,
+  event,
+}: {
+  state: GrantsLedgerState;
+  event: { occurredAtMs: number };
+}): boolean {
+  const { changedAtMs } = state.cutover;
+  return changedAtMs !== null && event.occurredAtMs < changedAtMs;
 }
 
 function removeGrants({

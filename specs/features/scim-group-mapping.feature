@@ -15,10 +15,12 @@ Feature: SCIM Group Mapping
   # an IdP deprovision is the fired-employee case, so the deny effect
   # holds before the push returns, queue or no queue.
 
-  # Parity status: 4 of 24 scenarios bound to existing tests.
+  # Parity status: 4 of 26 scenarios bound to existing tests.
   # The remaining are tracked under #3458:
-  #   - 20 NO_TEST: behavior shipped + correct, no integration test yet exists
+  #   - 22 NO_TEST: behavior shipped + correct, no integration test yet exists
   # NO_TEST gaps:
+  #   - "A replayed SCIM push changes nothing"
+  #   - "An IdP removal takes effect before the push returns, with the queue stopped"
   #   - "Entra pushes a new group via SCIM"
   #   - "Entra pushes a group that already exists"
   #   - "Entra pushes members for a group with no RoleBindings"

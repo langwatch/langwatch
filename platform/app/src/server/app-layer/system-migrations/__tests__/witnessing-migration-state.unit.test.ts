@@ -30,11 +30,11 @@ describe("WitnessingSystemMigrationStateRepository", () => {
     it("writes the state synchronously and witnesses it with a post-write timestamp", async () => {
       const inner = makeInner();
       const witness = vi.fn(async () => undefined);
-      const repository = new WitnessingSystemMigrationStateRepository(
+      const repository = new WitnessingSystemMigrationStateRepository({
         inner,
         witness,
-        () => 1_700_000_000_123,
-      );
+        now: () => 1_700_000_000_123,
+      });
 
       await repository.upsertRecord(RECORD);
 
@@ -61,14 +61,40 @@ describe("WitnessingSystemMigrationStateRepository", () => {
       const witness = vi.fn(async () => {
         throw new Error("redis is gone");
       });
-      const repository = new WitnessingSystemMigrationStateRepository(
+      const repository = new WitnessingSystemMigrationStateRepository({
         inner,
         witness,
-        () => 1,
-      );
+        now: () => 1,
+      });
 
       await expect(repository.upsertRecord(RECORD)).resolves.toBeUndefined();
       expect(inner.upsertRecord).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when the witness never answers", () => {
+    /** @scenario "A lost witness never loses a transition" */
+    it("gives up on the witness rather than stalling the transition", async () => {
+      vi.useFakeTimers();
+      try {
+        const inner = makeInner();
+        // Never settles - a stalled publish, not a rejected one. Without a
+        // bound this await holds the runner's whole pass.
+        const witness = vi.fn(() => new Promise<void>(() => undefined));
+        const repository = new WitnessingSystemMigrationStateRepository({
+          inner,
+          witness,
+          now: () => 1,
+        });
+
+        const written = repository.upsertRecord(RECORD);
+        await vi.advanceTimersByTimeAsync(5_000);
+
+        await expect(written).resolves.toBeUndefined();
+        expect(inner.upsertRecord).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 });

@@ -34,6 +34,7 @@ import {
   type AuthzScopeRef,
   type CollectedGrants,
   roleKeyForTeamRole,
+  type TeamUserRole,
 } from "@langwatch/authz";
 import type {
   SystemMigration,
@@ -409,14 +410,24 @@ function legacyRowToEmission({
  * Keying on both would call an existing custom binding "missing" whenever its
  * role happened to differ, and the emission that followed would attach a
  * grant for a fact that already has one.
+ *
+ * Built-in rows key on the ROLE KEY, not on the raw enum value, because this
+ * function is asked to compare two populations written in different
+ * vocabularies: legacy rows straight from `TeamUser`, and the compat rows the
+ * projection wrote back. `roleKeyForTeamRole` is lossy — CUSTOM and VIEWER
+ * both map to `viewer` — so a `CUSTOM` row with no custom role projects back
+ * as `VIEWER`. Keyed on the raw enum those two never match: the row is
+ * emitted, its projection is never recognized, and `awaitCompatRows` times
+ * the organization out into `parked` on every pass, forever. Normalizing
+ * both sides through the same mapping is what makes the comparison honest.
  */
 function bindingKey(row: {
   userId: string;
   teamId: string;
-  role: string;
+  role: TeamUserRole;
   customRoleId: string | null;
 }): string {
   return row.customRoleId === null
-    ? `${row.userId}::${row.teamId}::builtin::${row.role}`
+    ? `${row.userId}::${row.teamId}::builtin::${roleKeyForTeamRole(row.role)}`
     : `${row.userId}::${row.teamId}::custom::${row.customRoleId}`;
 }

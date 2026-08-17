@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   grantEventSourceSchema,
+  grantShapeRefinement,
   grantsLedgerActorSchema,
   ledgerPrincipalSchema,
   ledgerScopeSchema,
@@ -27,37 +28,65 @@ const commandIdentitySchema = z.object({
   commandId: z.string().min(1),
 });
 
-export const attachGrantEntrySchema = z.object({
-  grantId: z.string().min(1),
-  principal: ledgerPrincipalSchema,
-  roleKey: z.string().nullable(),
-  scope: ledgerScopeSchema,
-  resource: resourceGrantTermsSchema.optional(),
-  source: grantEventSourceSchema,
-  actor: grantsLedgerActorSchema,
-  /** Business time of the fact — a backfilled grant carries the legacy
-   *  row's createdAt; it becomes the emitted event's `occurredAt`. */
-  occurredAtMs: z.number().int().nonnegative(),
-});
+/**
+ * Every command payload in this ledger carries the identity block AND the
+ * invariant that makes it one ledger: `tenantId === organizationId`.
+ *
+ * The two are not interchangeable downstream — the emitted event takes its
+ * `tenantId` from the command envelope and its `aggregateId` from
+ * `organizationId` — so a caller that wired them to different values would
+ * persist the event under one tenant's stream and fold it into a different
+ * organization's projection. Nothing later in the pipeline can detect that,
+ * which is why it is refused at the wire boundary.
+ */
+function commandDataSchema<Shape extends z.ZodRawShape>(shape: Shape) {
+  return commandIdentitySchema
+    .extend(shape)
+    .refine((data) => data.tenantId === data.organizationId, {
+      message:
+        "tenantId must equal organizationId: one grants ledger per organization",
+      path: ["tenantId"],
+    });
+}
+
+export const attachGrantEntrySchema = z
+  .object({
+    grantId: z.string().min(1),
+    principal: ledgerPrincipalSchema,
+    roleKey: z.string().nullable(),
+    scope: ledgerScopeSchema,
+    resource: resourceGrantTermsSchema.optional(),
+    source: grantEventSourceSchema,
+    actor: grantsLedgerActorSchema,
+    /** Business time of the fact — a backfilled grant carries the legacy
+     *  row's createdAt; it becomes the emitted event's `occurredAt`. */
+    occurredAtMs: z.number().int().nonnegative(),
+  })
+  // Same invariant the emitted event is held to — checked on the way IN so a
+  // malformed batch is refused with the command that sent it, rather than
+  // surfacing later as an event nobody can attribute.
+  .refine(grantShapeRefinement.check, {
+    message: grantShapeRefinement.message,
+    path: [...grantShapeRefinement.path],
+  });
 export type AttachGrantEntry = z.infer<typeof attachGrantEntrySchema>;
 
-export const attachGrantsCommandDataSchema = commandIdentitySchema.extend({
+export const attachGrantsCommandDataSchema = commandDataSchema({
   grants: z.array(attachGrantEntrySchema).min(1),
 });
 export type AttachGrantsCommandData = z.infer<
   typeof attachGrantsCommandDataSchema
 >;
 
-export const proveMigrationParityCommandDataSchema =
-  commandIdentitySchema.extend({
-    diffs: z.array(z.string()),
-    occurredAtMs: z.number().int().nonnegative(),
-  });
+export const proveMigrationParityCommandDataSchema = commandDataSchema({
+  diffs: z.array(z.string()),
+  occurredAtMs: z.number().int().nonnegative(),
+});
 export type ProveMigrationParityCommandData = z.infer<
   typeof proveMigrationParityCommandDataSchema
 >;
 
-export const completeCutoverCommandDataSchema = commandIdentitySchema.extend({
+export const completeCutoverCommandDataSchema = commandDataSchema({
   actor: grantsLedgerActorSchema,
   occurredAtMs: z.number().int().nonnegative(),
 });
@@ -65,7 +94,7 @@ export type CompleteCutoverCommandData = z.infer<
   typeof completeCutoverCommandDataSchema
 >;
 
-export const rollBackCutoverCommandDataSchema = commandIdentitySchema.extend({
+export const rollBackCutoverCommandDataSchema = commandDataSchema({
   actor: grantsLedgerActorSchema,
   reason: z.string().optional(),
   occurredAtMs: z.number().int().nonnegative(),
@@ -74,14 +103,13 @@ export type RollBackCutoverCommandData = z.infer<
   typeof rollBackCutoverCommandDataSchema
 >;
 
-export const recordMigrationTenantStateCommandDataSchema =
-  commandIdentitySchema.extend({
-    migrationName: z.string().min(1),
-    status: migrationTenantStatusSchema,
-    report: z.unknown().nullish(),
-    actor: grantsLedgerActorSchema,
-    occurredAtMs: z.number().int().nonnegative(),
-  });
+export const recordMigrationTenantStateCommandDataSchema = commandDataSchema({
+  migrationName: z.string().min(1),
+  status: migrationTenantStatusSchema,
+  report: z.unknown().nullish(),
+  actor: grantsLedgerActorSchema,
+  occurredAtMs: z.number().int().nonnegative(),
+});
 export type RecordMigrationTenantStateCommandData = z.infer<
   typeof recordMigrationTenantStateCommandDataSchema
 >;

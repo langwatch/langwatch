@@ -112,12 +112,23 @@ describe("compat binding mapping", () => {
       });
       expect(group?.groupId).toBe("grp_1");
       expect(group?.userId).toBeNull();
+      expect(group?.apiKeyId).toBeNull();
       const key = grantFactToCompatBinding({
         grant: fact({ principal: { type: "api_key", id: "key_1" } }),
         organizationId: ORG,
       });
       expect(key?.apiKeyId).toBe("key_1");
       expect(key?.groupId).toBeNull();
+      expect(key?.userId).toBeNull();
+      // The default fixture is a user grant - the third case, and the one
+      // that proves "exactly one" rather than "at least the expected one".
+      const user = grantFactToCompatBinding({
+        grant: fact(),
+        organizationId: ORG,
+      });
+      expect(user?.userId).toBe("user_alice");
+      expect(user?.groupId).toBeNull();
+      expect(user?.apiKeyId).toBeNull();
     });
   });
 

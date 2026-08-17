@@ -68,8 +68,13 @@ Grant                              -- NEW table, born in PR 1; RoleBinding
   -- resource-tier columns (null elsewhere):
   token             possession secret (ShareLink heritage, ADR-057 intact)
   permission        the single permission a resource grant carries
-  expiresAt, maxViews, viewCount
+  expiresAt, maxViews
   createdAt, updatedAt
+
+GrantUsage                         -- view accounting, decision 22: a
+  grantId                          -- different writer (ShareService) and a
+  viewCount                        -- different cadence, so it is NOT a
+  lastViewedAt                     -- column on the fold-owned Grant row
   -- partial unique indexes = idempotency; partial index excluding
   -- RESOURCE rows = the collector's principal-scan hot path
 

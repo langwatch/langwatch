@@ -32,14 +32,37 @@ export type MigrationStateWitness = (args: {
  * package generic: emitting events is this migration's behaviour, not the
  * runner's.
  */
+/**
+ * How long a transition will wait on its own witness before giving up on it.
+ *
+ * "Best-effort" has to cover a witness that never answers, not just one that
+ * rejects: a stalled Redis connection blocks this `await` indefinitely, and
+ * because the runner drives transitions in sequence, one hung publish stalls
+ * every remaining transition in the pass. The timeout turns that into the
+ * warn path the design already has.
+ */
+const WITNESS_TIMEOUT_MS = 5_000;
+
 export class WitnessingSystemMigrationStateRepository
   implements SystemMigrationStateReader
 {
-  constructor(
-    private readonly inner: SystemMigrationStateReader,
-    private readonly witness: MigrationStateWitness,
-    private readonly now: () => number,
-  ) {}
+  private readonly inner: SystemMigrationStateReader;
+  private readonly witness: MigrationStateWitness;
+  private readonly now: () => number;
+
+  constructor({
+    inner,
+    witness,
+    now,
+  }: {
+    inner: SystemMigrationStateReader;
+    witness: MigrationStateWitness;
+    now: () => number;
+  }) {
+    this.inner = inner;
+    this.witness = witness;
+    this.now = now;
+  }
 
   async findRecord(args: {
     migrationName: string;
@@ -64,16 +87,26 @@ export class WitnessingSystemMigrationStateRepository
 
   async upsertRecord(record: TenantMigrationRecord): Promise<void> {
     await this.inner.upsertRecord(record);
+    let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
-      await this.witness({
-        migrationName: record.migrationName,
-        tenantId: record.tenantId,
-        status: record.status,
-        report: record.report ?? null,
-        // Stamped AFTER the direct write, so the projection's monotonic
-        // guard sees this witness as at least as new as the row it wrote.
-        occurredAtMs: this.now(),
-      });
+      await Promise.race([
+        this.witness({
+          migrationName: record.migrationName,
+          tenantId: record.tenantId,
+          status: record.status,
+          report: record.report ?? null,
+          // Stamped AFTER the direct write, so the projection's monotonic
+          // guard sees this witness as at least as new as the row it wrote.
+          occurredAtMs: this.now(),
+        }),
+        new Promise<never>((_, reject) => {
+          timeout = setTimeout(
+            () => reject(new Error("ledger witness timed out")),
+            WITNESS_TIMEOUT_MS,
+          );
+          timeout.unref?.();
+        }),
+      ]);
     } catch (error) {
       logger.warn(
         {
@@ -84,6 +117,10 @@ export class WitnessingSystemMigrationStateRepository
         },
         "migration state transition held but its ledger witness failed",
       );
+    } finally {
+      // A witness that resolved first leaves the timer armed; without this the
+      // process holds a pending timer per transition for the full window.
+      if (timeout) clearTimeout(timeout);
     }
   }
 }

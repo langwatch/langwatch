@@ -68,7 +68,7 @@ class FakeLedger implements GrantsLedgerEmitter {
     occurredAtMs: number;
   }> = [];
   /** Flip off to simulate a projection that never lands its rows. */
-  projectionConverges = true;
+  shouldProjectionConverge = true;
 
   constructor(private readonly repository: FakeMigrationRepository) {}
 
@@ -78,7 +78,7 @@ class FakeLedger implements GrantsLedgerEmitter {
     grants: BackfillGrantEmission[];
   }): Promise<void> {
     this.attachCalls.push(args);
-    if (!this.projectionConverges) return;
+    if (!this.shouldProjectionConverge) return;
     for (const grant of args.grants) {
       const row = grantFactToCompatBinding({
         grant,
@@ -348,6 +348,48 @@ describe("TeamUserBackfillMigration", () => {
       });
     });
 
+    describe("when a legacy row is CUSTOM with no custom role", () => {
+      it("recognises the row the projection wrote back instead of parking", async () => {
+        // `roleKeyForTeamRole` is lossy: CUSTOM and VIEWER both map to
+        // `viewer`, so this row projects back as VIEWER. Compared on the raw
+        // enum the emitted row is never recognised, and the organization
+        // times out into `parked` on this pass and every pass after it.
+        repository.legacyRows = [
+          {
+            userId: SAM,
+            teamId: TEAM,
+            role: "CUSTOM",
+            customRoleId: null,
+            createdAtMs: CREATED_AT_MS,
+          },
+        ];
+        const migration = migrationWith(async ({ principal }) =>
+          grantsFor({
+            repository,
+            userId: principal.id,
+            organizationRole: "ADMIN",
+            orgAdminBinding: true,
+            legacy: [
+              {
+                teamId: TEAM,
+                role: "CUSTOM",
+                customRoleId: null,
+                isPersonal: false,
+              },
+            ],
+          }),
+        );
+
+        const result = await migration.migrateTenant({ tenantId: ORG });
+
+        expect(result.status).toBe("finalized");
+        expect(ledger.attachCalls).toHaveLength(1);
+        // And the retry sees its own work: no second emission.
+        await migration.migrateTenant({ tenantId: ORG });
+        expect(ledger.attachCalls).toHaveLength(1);
+      });
+    });
+
     describe("when the previous attempt appended its events then parked", () => {
       /** @scenario "A migration that died after writing publishes its work on the retry" */
       it("bumps the epoch again so the stranded rows become visible", async () => {
@@ -393,7 +435,7 @@ describe("TeamUserBackfillMigration", () => {
 
     describe("when the projection never lands the emitted rows", () => {
       it("parks the organization instead of sweeping against missing rows", async () => {
-        ledger.projectionConverges = false;
+        ledger.shouldProjectionConverge = false;
         const migration = migrationWith(async () => {
           throw new Error("sweep must not run");
         });

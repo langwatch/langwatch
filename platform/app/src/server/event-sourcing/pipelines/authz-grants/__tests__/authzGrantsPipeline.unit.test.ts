@@ -14,6 +14,7 @@ import {
   CUTOVER_COMPLETED_EVENT_TYPE,
   GRANT_ATTACHED_EVENT_TYPE,
   GRANT_REVOKED_EVENT_TYPE,
+  MIGRATION_TENANT_STATE_CHANGED_EVENT_TYPE,
 } from "../schemas/constants";
 import type { AuthzGrantsEvent } from "../schemas/events";
 
@@ -233,7 +234,7 @@ describe("recordMigrationTenantState command", () => {
         occurredAtMs: 1_700_000_600_000,
       },
     } as never);
-    expect(event!.type).toBe("lw.authz.grants.migration_tenant_state_changed");
+    expect(event!.type).toBe(MIGRATION_TENANT_STATE_CHANGED_EVENT_TYPE);
     expect(event!.data).toMatchObject({
       migrationName: "authz-team-user-backfill",
       status: "parked",

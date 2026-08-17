@@ -36,7 +36,7 @@ import {
 } from "../schemas/events";
 import { wireEventToFact } from "./wireToFact";
 
-export const AUTHZ_GRANTS_PROJECTION_VERSION = "2026-08-17" as const;
+export const AUTHZ_GRANTS_PROJECTION_VERSION = "2026-08-17";
 
 const authzGrantsEvents = [
   grantAttachedEventSchema,

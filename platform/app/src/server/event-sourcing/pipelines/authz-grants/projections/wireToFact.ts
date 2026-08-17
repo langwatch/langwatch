@@ -23,6 +23,24 @@ import type { AuthzGrantsEvent } from "../schemas/events";
  * An event type outside this aggregate throws — the projection must fail
  * loudly rather than silently skip a fact.
  */
+/**
+ * The exhaustive arm. Every switch below is total over `AuthzGrantsEvent`, so
+ * this is unreachable by construction and `never` proves it at compile time —
+ * add a member to the union without an arm and the build fails here.
+ *
+ * It still throws at runtime, because "unreachable by construction" only
+ * holds while the wire schema and this file agree. Falling through instead
+ * would return `undefined`, and the reducer would read `.kind` off it and
+ * raise a TypeError several frames away from the event that caused it.
+ */
+function foreignEventType(event: never): never {
+  throw new Error(
+    `wireEventToFact received a foreign event type: ${
+      (event as { type?: string }).type ?? "unknown"
+    }`,
+  );
+}
+
 export function wireEventToFact(event: AuthzGrantsEvent): GrantsLedgerEvent {
   switch (event.type) {
     case GRANT_ATTACHED_EVENT_TYPE:
@@ -69,6 +87,8 @@ export function wireEventToFact(event: AuthzGrantsEvent): GrantsLedgerEvent {
         actor: event.data.actor,
         occurredAtMs: event.occurredAt,
       };
+    default:
+      return foreignEventType(event);
   }
 }
 
@@ -115,6 +135,8 @@ function grantEventToFact(event: GrantFamilyEvent): GrantsLedgerEvent {
         actor: event.data.actor,
         occurredAtMs: event.occurredAt,
       };
+    default:
+      return foreignEventType(event);
   }
 }
 
@@ -160,5 +182,7 @@ function roleEventToFact(event: RoleFamilyEvent): GrantsLedgerEvent {
         actor: event.data.actor,
         occurredAtMs: event.occurredAt,
       };
+    default:
+      return foreignEventType(event);
   }
 }

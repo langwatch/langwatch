@@ -201,9 +201,19 @@ function RollBackAction({ migrationName }: { migrationName: string }) {
       </Button>
       <ConfirmDialog
         open={open}
-        onClose={() => setOpen(false)}
+        onClose={() => {
+          setOpen(false);
+          // Drop the typed id with the dialog. Reopening for a DIFFERENT
+          // organization must not arrive pre-filled with the last one and
+          // the confirm button already live.
+          setTenantId("");
+        }}
         onConfirm={() =>
-          rollBack.mutate({ migrationName, tenantId: tenantId.trim() })
+          rollBack.mutate({
+            migrationName,
+            tenantId: tenantId.trim(),
+            confirm: "ROLL BACK",
+          })
         }
         title="Roll an organization back to its legacy path"
         description="The organization returns to the behavior it had before this migration finalized, and stays there until an operator intervenes again. Only finalized organizations can be rolled back. Enter the organization id."

@@ -28,18 +28,38 @@ import {
  * and lives nowhere else).
  */
 
-export const ledgerPrincipalSchema = z.object({
-  type: z.enum([
-    "user",
-    "api_key",
-    "group",
-    "team",
-    "organization",
-    "project",
-    "anyone",
-  ]),
-  id: z.string().nullable(),
-});
+/**
+ * `anyone` is the resource tier's public principal and is the ONLY type
+ * whose id is null — it names no subject, possession of the token is the
+ * whole claim. Every other type must carry the id it names.
+ *
+ * Enforced here rather than left to the reducer: a `{ type: "user", id: null }`
+ * event folds into a grant that matches no user and can never be revoked by
+ * one, and an `{ type: "anyone", id: "user_x" }` event is a public grant
+ * wearing a subject's name. Both are unrepresentable states, so the wire
+ * boundary is where they stop.
+ */
+export const ledgerPrincipalSchema = z
+  .object({
+    type: z.enum([
+      "user",
+      "api_key",
+      "group",
+      "team",
+      "organization",
+      "project",
+      "anyone",
+    ]),
+    id: z.string().nullable(),
+  })
+  .refine(
+    (principal) => (principal.type === "anyone") === (principal.id === null),
+    {
+      message:
+        "principal id is null for `anyone` and required for every other principal type",
+      path: ["id"],
+    },
+  );
 
 export const ledgerScopeSchema = z.object({
   type: z.enum(["ORGANIZATION", "TEAM", "PROJECT", "RESOURCE", "PLATFORM"]),
@@ -67,17 +87,53 @@ export const resourceGrantTermsSchema = z.object({
   maxViews: z.number().int().nonnegative().optional(),
 });
 
+/**
+ * The resource tier and every other tier are mutually exclusive shapes, and
+ * the split is total: a RESOURCE grant carries its terms and no role (the
+ * token's single `permission` IS what it may do), while every other grant
+ * carries a role and no terms.
+ *
+ * Both halves matter. A RESOURCE grant that arrived without terms folds into
+ * a row whose `token` is null — an unreachable share link that
+ * `Grant_resource_terms_check` would then have to reject at the database, one
+ * layer too late to name the event that caused it. A non-RESOURCE grant that
+ * arrived WITH terms mints a share token against an organization- or
+ * team-wide grant, which is a public credential for a scope no share link is
+ * ever supposed to reach.
+ */
+export const grantShapeRefinement = {
+  check: (grant: {
+    roleKey: string | null;
+    scope: { type: string };
+    resource?: unknown;
+  }): boolean => {
+    const isResourceScope = grant.scope.type === "RESOURCE";
+    return (
+      isResourceScope === (grant.resource !== undefined) &&
+      isResourceScope === (grant.roleKey === null)
+    );
+  },
+  message:
+    "a RESOURCE grant carries resource terms and a null roleKey; every other scope carries a roleKey and no resource terms",
+  path: ["resource"] as const,
+};
+
 export const grantAttachedEventSchema = EventSchema.extend({
   type: z.literal(GRANT_ATTACHED_EVENT_TYPE),
-  data: z.object({
-    grantId: z.string(),
-    principal: ledgerPrincipalSchema,
-    roleKey: z.string().nullable(),
-    scope: ledgerScopeSchema,
-    resource: resourceGrantTermsSchema.optional(),
-    source: grantEventSourceSchema,
-    actor: grantsLedgerActorSchema,
-  }),
+  data: z
+    .object({
+      grantId: z.string(),
+      principal: ledgerPrincipalSchema,
+      roleKey: z.string().nullable(),
+      scope: ledgerScopeSchema,
+      resource: resourceGrantTermsSchema.optional(),
+      source: grantEventSourceSchema,
+      actor: grantsLedgerActorSchema,
+    })
+    .refine(grantShapeRefinement.check, {
+      message: grantShapeRefinement.message,
+      path: [...grantShapeRefinement.path],
+    }),
 });
 export type GrantAttachedEvent = z.infer<typeof grantAttachedEventSchema>;
 
