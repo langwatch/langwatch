@@ -434,6 +434,52 @@ Feature: Billing spend events, one durable record per gateway request
       Then the settled row carries unknown cost and needs reconciliation
       And the confirmation replaces it with the rated record and the completed envelope
 
+    # WHAT THE QUERY REPLACED. A cleared wake, a wake never armed, and a
+    # duplicate wake used to be three behaviors of the durable per-request
+    # row. They are now one behavior of the open-admission read: a request
+    # the query no longer selects. The fold writes a version per lifecycle
+    # transition, so a request that resolved still has its superseded
+    # `admitted` version on disk, and a read that saw it would settle a live
+    # request and ship a spurious settled envelope. These are stated against
+    # real ClickHouse because that is the only place the collapse to the
+    # latest version is real.
+
+    @integration
+    Scenario: A confirmation stands the sweeper down
+      Given a request past its grace whose confirmation has arrived
+      When the sweeper reads the open admissions
+      Then the request is not among them, its superseded admission notwithstanding
+
+    @integration
+    Scenario: An admission inside its grace is not open yet
+      Given an admission whose grace has not elapsed
+      When the sweeper reads the open admissions
+      Then the request is not among them
+
+    @integration
+    Scenario: A rewritten admission is offered once, not once per version
+      Given an admission the fold rewrote before any outcome arrived
+      When the sweeper reads the open admissions
+      Then the request is offered exactly once
+
+    @integration
+    Scenario: A request that already reached a terminal status is never swept again
+      Given a request that failed and a request already settled
+      When the sweeper reads the open admissions
+      Then neither is among them
+
+    @integration
+    Scenario: An admission older than the lookback is left where it is
+      Given an admission older than the sweep's lookback
+      When the sweeper reads the open admissions
+      Then the request is not among them
+
+    @integration
+    Scenario: The sweep reads the oldest admissions first, up to its cap
+      Given more open admissions than one sweep may settle
+      When the sweeper reads the open admissions
+      Then it receives the cap's worth, oldest first, and the newest is left for the next sweep
+
   Rule: Replay re-delivers, the consumer's dedup decides
 
     @integration
