@@ -242,9 +242,35 @@ describe("SCIM group PATCH membership", () => {
       });
     });
 
-    describe("when the member array contains entries without a string value key", () => {
+    // The narrow shape of the same bug: a list that plainly meant to name
+    // somebody, but whose entries carry no `value`, reduces to zero readable
+    // ids. Reading that as "this group has no members" empties the group over a
+    // typo — the entries that could not be read are exactly the members that
+    // would be removed.
+    describe("when a member list holds entries with no usable id", () => {
       it("leaves the group's membership untouched", async () => {
+        await patchGroup([
+          { op: "replace", path: "members", value: [{ display: "Alice" }] },
+        ]);
+
+        expect(prisma.groupMembership.deleteMany).not.toHaveBeenCalled();
+      });
+
+      it("leaves it untouched for an entry with no keys at all", async () => {
         await patchGroup([{ op: "replace", path: "members", value: [{}] }]);
+
+        expect(prisma.groupMembership.deleteMany).not.toHaveBeenCalled();
+        expect(prisma.groupMembership.upsert).not.toHaveBeenCalled();
+      });
+
+      it("leaves it untouched even when only some entries are readable", async () => {
+        await patchGroup([
+          {
+            op: "replace",
+            path: "members",
+            value: [{ value: "user-3" }, { display: "Alice" }],
+          },
+        ]);
 
         expect(prisma.groupMembership.deleteMany).not.toHaveBeenCalled();
         expect(prisma.groupMembership.upsert).not.toHaveBeenCalled();

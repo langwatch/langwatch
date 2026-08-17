@@ -520,13 +520,15 @@ export class ScimGroupService {
   private readMemberList(value: unknown): MemberInstruction {
     if (value === null) return { kind: "list", ids: [] };
     if (!Array.isArray(value)) return { kind: "malformed" };
+
     const ids = this.extractMemberIds(value);
-    // Every entry in the array must carry a string `value` key. A non-empty
-    // array with malformed entries is not a valid member list — treating it as
-    // one could silently revoke access (if all entries are bad, ids is empty
-    // and the group is cleared) or misrepresent the IdP's intent (if some are
-    // good but others are dropped). Only `[]` and `null` may clear membership.
+    // A list we only partly understood is not a list we can act on. The entries
+    // that fell out are precisely the members that would then be removed, so
+    // reading `[{"display":"Alice"}]` as "this group has no members" empties the
+    // group over a payload that plainly meant to name somebody. Only a list
+    // written out as empty may clear it.
     if (ids.length !== value.length) return { kind: "malformed" };
+
     return { kind: "list", ids };
   }
 
