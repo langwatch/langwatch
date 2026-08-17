@@ -24,12 +24,28 @@
 export const CURSOR_VERSION = 1;
 
 /**
- * Cap on blob URIs carried in one cursor. A busy tenant can publish a lot of
- * content blobs for a window, and this string is written to the database
- * every run. Past the cap the listing position is what resumes, not the
- * queue — the work is deferred, never dropped.
+ * The point at which listing stops asking for another page. A busy tenant can
+ * publish a lot of content blobs for a window, and this string is written to
+ * the database every run, so the listing stops here and the page position is
+ * what resumes.
+ *
+ * This bounds how much MORE gets listed, not what the cursor may carry. It is
+ * checked after a page is appended, so the queue can legitimately sit one page
+ * above this number. Truncating it back down would drop blob URIs that no
+ * later run re-lists — the window would go on to look complete and advance
+ * past them, losing the audit records they point at. Deferred, never dropped:
+ * anything already queued stays queued.
  */
 export const MAX_QUEUED_BLOBS = 200;
+
+/**
+ * Absolute ceiling on a decoded queue. Nothing this module writes can reach
+ * it — `MAX_QUEUED_BLOBS` plus one listing page is far below. A cursor that
+ * arrives above it is corrupt rather than merely large, so it is rejected and
+ * the run resumes from the watermark; silently slicing it would be the same
+ * data loss in a different place.
+ */
+export const MAX_CURSOR_BLOBS = 2_000;
 
 export type CursorPhase = "listing" | "draining";
 
@@ -66,7 +82,9 @@ export function encodeCursor(cursor: Microsoft365AuditCursor): string {
   return JSON.stringify({
     ...cursor,
     version: CURSOR_VERSION,
-    blobQueue: cursor.blobQueue.slice(0, MAX_QUEUED_BLOBS),
+    // Deliberately not truncated. See MAX_QUEUED_BLOBS: a blob URI dropped
+    // here is never re-listed, and the window advances past it.
+    blobQueue: cursor.blobQueue,
   });
 }
 
@@ -111,6 +129,14 @@ function validateCursor(
   if (!isStringArray(candidate.blobQueue)) {
     return { reason: "cursor blobQueue was not a list of strings" };
   }
+  if (candidate.blobQueue.length > MAX_CURSOR_BLOBS) {
+    // Rejected rather than sliced: keeping the first N would silently drop
+    // the rest, and the window would then advance past blobs nobody read.
+    // Resuming from the watermark re-lists the window instead.
+    return {
+      reason: `cursor blobQueue held ${candidate.blobQueue.length} entries, above the ${MAX_CURSOR_BLOBS} ceiling`,
+    };
+  }
   if (!isIsoDate(candidate.watermark)) {
     return { reason: "cursor watermark was not an ISO timestamp" };
   }
@@ -120,7 +146,7 @@ function validateCursor(
       phase: candidate.phase,
       windowStart: candidate.windowStart,
       windowEnd: candidate.windowEnd,
-      blobQueue: candidate.blobQueue.slice(0, MAX_QUEUED_BLOBS),
+      blobQueue: candidate.blobQueue,
       ...(typeof candidate.nextPageUri === "string"
         ? { nextPageUri: candidate.nextPageUri }
         : {}),
