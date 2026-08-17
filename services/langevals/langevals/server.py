@@ -1,7 +1,9 @@
 from contextlib import asynccontextmanager
+import asyncio
 import os
 import signal
 import sys
+import threading
 import dotenv
 from fastapi.responses import RedirectResponse
 
@@ -48,6 +50,31 @@ app.add_middleware(StagedPayloadMiddleware)
 
 original_env = os.environ.copy()
 
+# Evaluations mutate the process environment (the request's `env` becomes env
+# vars for litellm), so only one evaluation may run at a time per process.
+# The lock keeps that invariant now that the endpoint runs in a worker thread
+# instead of holding the event loop hostage: with the loop free, /healthcheck
+# always answers and Kubernetes probes stay green while evaluations queue.
+evaluation_lock = threading.Lock()
+EVALUATION_QUEUE_TIMEOUT_SECONDS = float(
+    os.getenv("LANGEVALS_QUEUE_TIMEOUT", "300")
+)
+MAX_EVALUATIONS_IN_PARALLEL = int(os.getenv("MAX_EVALUATIONS_IN_PARALLEL", "50"))
+
+
+def nest_asyncio_if_running_loop():
+    """Apply nest_asyncio only when the caller is on a running event loop.
+
+    Ragas evaluators drive their own asyncio loops; when this code ran on the
+    server's event loop they could only nest with nest_asyncio. In a worker
+    thread there is no running loop to nest into, and applying would raise.
+    """
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return
+    nest_asyncio_apply()
+
 
 def create_evaluator_routes(evaluator_cls):
     definitions = get_evaluator_definitions(evaluator_cls)
@@ -84,19 +111,33 @@ def create_evaluator_routes(evaluator_cls):
         name=f"{module_name}_{evaluator_name}_evaluate",
         description=description,
     )
-    async def evaluate(
+    def evaluate(
         req: Request,
     ) -> List[result_type | EvaluationResultSkipped | EvaluationResultError]:  # type: ignore
-        if module_name == "ragas":
-            nest_asyncio_apply()
-        os.environ.clear()
-        os.environ.update(
-            original_env
-        )  # always try to set env vars from the original env back again to avoid side effects
-        evaluator = evaluator_cls(settings=(req.settings or {}), env=req.env)  # type: ignore
-        result = evaluator.evaluate_batch(req.data)
-        os.environ.clear()
-        return result
+        # Sync endpoint: FastAPI runs it in a worker thread, so a long
+        # evaluation never blocks the event loop and /healthcheck stays
+        # responsive under load.
+        if not evaluation_lock.acquire(timeout=EVALUATION_QUEUE_TIMEOUT_SECONDS):
+            raise HTTPException(
+                status_code=503,
+                detail="Evaluation queue is full, retry in a moment",
+            )
+        try:
+            if module_name == "ragas":
+                nest_asyncio_if_running_loop()
+            os.environ.clear()
+            os.environ.update(
+                original_env
+            )  # always try to set env vars from the original env back again to avoid side effects
+            evaluator = evaluator_cls(settings=(req.settings or {}), env=req.env)  # type: ignore
+            return evaluator.evaluate_batch(
+                req.data,
+                max_evaluations_in_parallel=MAX_EVALUATIONS_IN_PARALLEL,
+            )
+        finally:
+            os.environ.clear()
+            os.environ.update(original_env)
+            evaluation_lock.release()
 
 
 evaluators = load_evaluator_packages()

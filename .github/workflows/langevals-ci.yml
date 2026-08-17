@@ -140,7 +140,7 @@ jobs:
         # thread-affinity crash that broke every evaluation after the first one
         # on a long-lived server.
         working-directory: services/langevals
-        run: uv run pytest -x -v evaluators/langevals/tests/test_llm_answer_match_threading.py
+        run: uv run pytest -x -v evaluators/langevals/tests/test_llm_answer_match_threading.py tests/deterministic/
 
   docker-build:
     needs: changes

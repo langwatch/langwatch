@@ -104,11 +104,28 @@ def get_evaluator_definitions(evaluator_cls: BaseEvaluator):
 
 
 def get_cpu_count():
-    cpu_count = os.getenv("CPU_COUNT", None)
-    if cpu_count is not None:
-        return int(cpu_count)
+    """CPU budget for sizing the server's worker count.
+
+    Container CPU limits do not shrink `os.cpu_count()` or the scheduler
+    affinity, so on a limited pod those report the host's cores and the
+    server forks one heavy worker per host core. The cgroup files are the
+    only place the actual limit is visible; read them first.
+    """
+    for var in ("CPU_COUNT", "WEB_CONCURRENCY"):
+        value = os.getenv(var)
+        if value is not None:
+            return int(value)
     try:
-        # Kubernetes
+        # cgroup v2 (any current Kubernetes or Docker): "<quota> <period>",
+        # or "max <period>" when the pod has no CPU limit.
+        with open("/sys/fs/cgroup/cpu.max") as f:
+            quota, period = f.read().split()
+        if quota != "max":
+            return max(1, math.ceil(int(quota) / int(period)))
+    except (FileNotFoundError, ValueError):
+        pass
+    try:
+        # cgroup v1
         with open("/sys/fs/cgroup/cpu/cpu.shares") as f:
             cpu_shares = int(f.read().strip())
         return max(1, math.ceil(cpu_shares / 1024))
