@@ -17,6 +17,7 @@ import {
 } from "@ee/governance/subscribers/governanceOcsfEventsSync.subscriber";
 import { createTraceAlertTriggerMatchHandler } from "@ee/governance/subscribers/traceAlertTriggerMatch.subscriber";
 import type { WebhookDeliveryProcessDeps } from "@ee/webhooks/process-manager/webhookDelivery.process";
+import type { GrantsLedgerState } from "@langwatch/authz-server";
 import type {
   LangyConversationStateData,
   LangyConversationTurnData,
@@ -97,6 +98,7 @@ import { createTenantId } from "./domain/tenantId";
 import type { EventSourcing } from "./eventSourcing";
 import { mapCommands } from "./mapCommands";
 import type { StaticPipelineDefinition } from "./pipeline/staticBuilder.types";
+import { createAuthzGrantsPipeline } from "./pipelines/authz-grants/pipeline";
 import { createAutomationsPipeline } from "./pipelines/automations/pipeline";
 import { ReportUsageForMonthCommand } from "./pipelines/billing-reporting/commands/reportUsageForMonth.command";
 import {
@@ -345,6 +347,8 @@ export interface PipelineRepositories {
   topicModel: StateProjectionStore<TopicModelData>;
   /** Postgres-authoritative logical-send receipts and active-turn claims. */
   langyTurnAdmission: LangyTurnAdmissionRepository;
+  /** The grants ledger's two-headed Postgres projection (ADR-092 §13). */
+  authzGrantsProjection: StateProjectionStore<GrantsLedgerState>;
 }
 
 export interface PipelineRegistryDeps {
@@ -627,6 +631,15 @@ export class PipelineRegistry {
       eventSourcing: this.deps.eventSourcing,
     });
     const billingPipeline = this.registerBillingReportingPipeline();
+    // The grants ledger (ADR-092 §13). Ships dark: registered so the
+    // machinery is live, but no production writer calls its commands until
+    // the backfill refactor and PR 2 move the write paths.
+    this.deps.eventSourcing.register(
+      createAuthzGrantsPipeline({
+        authzGrantsProjectionStore:
+          this.deps.repositories.authzGrantsProjection,
+      }),
+    );
 
     logger.info("All pipelines registered");
 

@@ -11,6 +11,7 @@ CREATE TABLE "Grant" (
     "principalType" "GrantPrincipalType" NOT NULL,
     "principalId" TEXT,
     "roleKey" TEXT,
+    "source" TEXT NOT NULL,
     "scopeType" "GrantScopeType" NOT NULL,
     "scopeId" TEXT NOT NULL,
     "token" TEXT,
@@ -46,6 +47,7 @@ CREATE TABLE "AuthzProjectionCursor" (
     "acceptedAt" TIMESTAMP(3) NOT NULL,
     "occurredAt" TIMESTAMP(3) NOT NULL,
     "projectionVersion" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "AuthzProjectionCursor_pkey" PRIMARY KEY ("organizationId")

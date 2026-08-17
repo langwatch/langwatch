@@ -2425,6 +2425,7 @@ model Grant {
   principalId   String? // null only for ANYONE (resource tier)
 
   roleKey String? // admin | member | viewer | lite-member | custom:<id>; null on RESOURCE rows
+  source  String // which writer emitted the fact: grants-service | scim | invite | backfill-b | genesis-import | read-through-mint
 
   scopeType GrantScopeType
   scopeId   String
@@ -2478,6 +2479,7 @@ model AuthzProjectionCursor {
   acceptedAt        DateTime
   occurredAt        DateTime
   projectionVersion String
+  createdAt         DateTime @default(now())
   updatedAt         DateTime @default(now()) @updatedAt
 }
 

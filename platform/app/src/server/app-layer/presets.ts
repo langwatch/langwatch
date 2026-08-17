@@ -80,6 +80,7 @@ import {
 import { createStripeClient } from "../../../ee/billing/stripe/stripeClient";
 import { meters } from "../../../ee/billing/stripe/stripePriceCatalog";
 import { FREE_PLAN } from "../../../ee/licensing/constants";
+import { PrismaAuthzGrantsProjectionRepository } from "../authz/repositories/authz-grants-projection.prisma.repository";
 import { StorageMeterService } from "../data-retention/metering/storageMeter.service";
 import { PinnedTraceRepository } from "../data-retention/pinning/pinnedTrace.repository";
 import { PinnedTraceService } from "../data-retention/pinning/pinnedTrace.service";
@@ -851,6 +852,7 @@ export function initializeDefaultApp(options?: {
         : new NullLangyAnalyticsEventRepository(),
     ),
     processStore: new PrismaProcessStore(prisma),
+    authzGrantsProjection: new PrismaAuthzGrantsProjectionRepository(prisma),
     topicClusteringRunStatus: new PrismaTopicClusteringRunProjectionRepository(
       prisma,
     ),

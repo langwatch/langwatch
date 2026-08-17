@@ -61,6 +61,20 @@ export { OffboardIncompleteError } from "./offboard";
 export type { OffboardResult } from "./offboard";
 export { deriveGrantId } from "./ledger/grant-identity";
 export {
+  grantFactToCompatBinding,
+  grantFactToRow,
+  grantRowToFact,
+  roleFactToRow,
+  roleRowToFact,
+} from "./ledger/projection-mapping";
+export type {
+  CompatBindingRowShape,
+  GrantPrincipalTypeDb,
+  GrantRowShape,
+  GrantScopeTypeDb,
+  RoleRowShape,
+} from "./ledger/projection-mapping";
+export {
   emptyGrantsLedgerState,
   reduceGrantsLedger,
 } from "./ledger/grants-ledger.reducer";
