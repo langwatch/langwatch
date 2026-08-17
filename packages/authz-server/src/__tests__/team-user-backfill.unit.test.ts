@@ -243,6 +243,44 @@ describe("TeamUserBackfillMigration", () => {
       });
     });
 
+    describe("when a custom-role binding already exists under a different role", () => {
+      /** @scenario "A custom role already bound at the team is recognised, whatever its role column says" */
+      it("recognises it instead of attempting an insert the database would drop", async () => {
+        // The custom-role unique index is (userId, customRoleId, scopeType,
+        // scopeId) - `role` is not in it. Treating role as part of identity
+        // would queue a write that skipDuplicates silently discards, and
+        // report it as created.
+        repository.bindings = [
+          {
+            userId: SAM,
+            teamId: TEAM,
+            role: "MEMBER",
+            customRoleId: "cr_1",
+          },
+        ];
+        const migration = migrationWith(async ({ principal }) =>
+          grantsFor({
+            repository,
+            userId: principal.id,
+            organizationRole: "ADMIN",
+            orgAdminBinding: true,
+            legacy: [
+              {
+                teamId: TEAM,
+                role: "ADMIN",
+                customRoleId: "cr_1",
+                isPersonal: false,
+              },
+            ],
+          }),
+        );
+
+        await migration.migrateTenant({ tenantId: ORG });
+
+        expect(repository.createCalls).toHaveLength(0);
+      });
+    });
+
     describe("when the previous attempt committed its bindings then parked", () => {
       /** @scenario "A migration that died after writing publishes its work on the retry" */
       it("bumps the epoch again so the stranded writes become visible", async () => {

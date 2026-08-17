@@ -14,6 +14,7 @@ import {
   type SystemMigration,
   SystemMigrationRunnerService,
 } from "@langwatch/system-migrations";
+import type { Cluster, Redis } from "ioredis";
 import { env } from "~/env.mjs";
 import type { Prisma } from "~/generated/prisma/client";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -54,10 +55,18 @@ export function registeredMigrations(): SystemMigration[] {
  */
 export async function runSystemMigrationPass(args?: {
   signal?: AbortSignal;
+  /**
+   * The process's Redis handle. Pass it when the App is still being composed
+   * - `tryGetApp()` answers null until then, and a null handle makes the
+   * lease unacquirable, which would silently turn every boot pass into a
+   * no-op. Callers that run after startup (the ops action) can omit it.
+   */
+  redis?: Redis | Cluster | null;
 }): Promise<MigrationPassSummary | null> {
+  const redis = args?.redis ?? tryGetApp()?.redis ?? null;
   const runner = new SystemMigrationRunnerService({
     state: systemMigrationState,
-    lease: new RedisMigrationLeaseRepository(tryGetApp()?.redis ?? null),
+    lease: new RedisMigrationLeaseRepository(redis),
     tenants: new PrismaOrganizationTenantSource(prisma),
     cohort: (tenantId) =>
       cohortIncludes({

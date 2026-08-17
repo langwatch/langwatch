@@ -134,17 +134,6 @@ async function bootUsageStatsWorker(
   }
 }
 
-async function bootSystemMigrations(
-  shutdownHandles: ShutdownHandles,
-): Promise<void> {
-  const { startSystemMigrations } = await import(
-    "~/server/app-layer/system-migrations/boot"
-  );
-  const migrations = startSystemMigrations();
-  shutdownHandles.push(() => migrations.stop());
-  logger.info("system migration pass started");
-}
-
 /**
  * The worker's liveness path. Deliberately UNAUTHENTICATED and deliberately
  * not `/metrics`.
@@ -514,9 +503,10 @@ export async function startWorkers(
     await bootAnomalyWorker(shutdownHandles);
     await bootSpendSpikeAnomalyWorker(shutdownHandles);
     await bootUsageStatsWorker(shutdownHandles);
-    // One-time in-place data migrations (ADR-092 stage B and successors):
-    // a background pass under a fleet-wide lease, never blocking boot.
-    await bootSystemMigrations(shutdownHandles);
+    // One-time in-place data migrations (ADR-092 stage B and successors) are
+    // NOT booted here: they are a worker-only background loop like the
+    // scheduler, so the app layer starts them and the App's graceful
+    // closeables stop them (see presets.ts).
     if (shouldStartMetricsServer) {
       await bootMetricsServer(shutdownHandles);
     }

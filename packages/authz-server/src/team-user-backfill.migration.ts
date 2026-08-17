@@ -265,11 +265,25 @@ export class TeamUserBackfillMigration implements SystemMigration {
   }
 }
 
+/**
+ * Identity as the DATABASE defines it - which is two keys, not one. The
+ * partial unique indexes (migration
+ * 20260410120000_fix_role_binding_unique_custom_role) key a built-in binding
+ * on its role and a custom one on its custom role id, so a custom binding's
+ * `role` column is not part of its identity at all.
+ *
+ * Keying on both would call an existing custom binding "missing" whenever its
+ * role happened to differ, and `createMany({ skipDuplicates: true })` would
+ * then drop that insert silently - leaving a `created` count that overstates
+ * what landed.
+ */
 function bindingKey(row: {
   userId: string;
   teamId: string;
   role: string;
   customRoleId: string | null;
 }): string {
-  return `${row.userId}::${row.teamId}::${row.role}::${row.customRoleId ?? ""}`;
+  return row.customRoleId === null
+    ? `${row.userId}::${row.teamId}::builtin::${row.role}`
+    : `${row.userId}::${row.teamId}::custom::${row.customRoleId}`;
 }

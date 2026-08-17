@@ -115,6 +115,15 @@ Feature: In-place authorization data migration
     And an audit event records the backfill with its counts
 
   @unit
+  Scenario: A custom role already bound at the team is recognised, whatever its role column says
+    Given "sam" already holds a binding for custom role "auditor" at team
+      "support"
+    And the legacy row names the same custom role under a different role name
+    When the migration processes "acme"
+    Then no second binding is attempted for that custom role at that team
+    And the backfill count reports only what was actually written
+
+  @unit
   Scenario: A migration that died after writing publishes its work on the retry
     Given an earlier pass wrote "acme"'s bindings and then parked before
       bumping the epoch
