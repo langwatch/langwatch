@@ -63,12 +63,12 @@ import {
   VK_TAGS_FIELD_DESCRIPTION,
 } from "./virtualKeyTagsField";
 
-type VirtualKeyDetail = {
+export type VirtualKeyDetail = {
   id: string;
   organizationId: string;
   name: string;
   description: string | null;
-  status: "active" | "revoked";
+  status: "active" | "disabled" | "revoked";
   scopes: VirtualKeyScopeEntry[];
   routingPolicyId: string | null;
   routingMode?: "NONE" | "FALLBACK_ALL" | "POLICY";

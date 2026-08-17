@@ -51,10 +51,14 @@ export function VirtualKeyExpirationSection({
       resolveExpiresAt({ preset: value.preset, customDate: value.customDate }),
     [value.preset, value.customDate],
   );
-  // Recomputed every render rather than memoised: a drawer left open across
-  // the UTC-day boundary would otherwise keep offering yesterday's minimum,
-  // and the server refuses that date with virtual_key_expiry_in_past. Any
-  // interaction with the form re-renders and brings this current.
+  // Recomputed every render rather than memoised once, so the floor tracks
+  // the clock while the drawer stays open. The floor sits a whole day ahead,
+  // which absorbs a single UTC-day boundary: the stale value then names today,
+  // and today still resolves to 23:59:59.999Z, which the server accepts. It
+  // takes a drawer left open for more than a day before the stale floor names
+  // a date already gone, which the server refuses with
+  // virtual_key_expiry_in_past. Any interaction re-renders and brings it
+  // current.
   const minDate = earliestCustomDate();
 
   return (

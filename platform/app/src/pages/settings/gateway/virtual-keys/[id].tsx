@@ -49,7 +49,10 @@ import {
 } from "~/components/gateway/eligibleModelProviders";
 import { GuardrailAttachmentsSection } from "~/components/gateway/GuardrailAttachmentsSection";
 import { resolveTracesHrefForKey } from "~/components/gateway/tracesHrefForKey";
-import { VirtualKeyEditDrawer } from "~/components/gateway/VirtualKeyEditDrawer";
+import {
+  type VirtualKeyDetail,
+  VirtualKeyEditDrawer,
+} from "~/components/gateway/VirtualKeyEditDrawer";
 import { VirtualKeyOwnershipReadOnly } from "~/components/gateway/VirtualKeyOwnershipSection";
 import { VirtualKeySecretReveal } from "~/components/gateway/VirtualKeySecretReveal";
 import { VirtualKeyUsageSnippet } from "~/components/gateway/VirtualKeyUsageSnippet";
@@ -546,7 +549,7 @@ function VirtualKeyDetailPage() {
                     availableTeams={availableTeams}
                     availableProjects={availableProjects}
                     isLoading={orgProvidersQuery.isLoading}
-                    providers={(orgProvidersQuery.data?.providers ?? []) as any}
+                    providers={orgProvidersQuery.data?.providers ?? []}
                     providersAllowed={providersAllowed}
                   />
                   <Box>
@@ -572,9 +575,7 @@ function VirtualKeyDetailPage() {
                       availableTeams={availableTeams}
                       availableProjects={availableProjects}
                       isLoading={orgProvidersQuery.isLoading}
-                      providers={
-                        (orgProvidersQuery.data?.providers ?? []) as any
-                      }
+                      providers={orgProvidersQuery.data?.providers ?? []}
                       providersAllowed={providersAllowed}
                       routingPolicyProviderIds={routingPolicyProviderIds}
                       selectedModel={snippetModel}
@@ -610,7 +611,11 @@ function VirtualKeyDetailPage() {
       {orgId && vk && (
         <VirtualKeyEditDrawer
           organizationId={orgId}
-          vk={editing ? (vk as any) : null}
+          // The cast stands on one field: VirtualKeyCamelDto types `config`
+          // as `unknown`, while the drawer names the config shape it reads.
+          // Modelling the config JSON on the DTO is what removes this, and it
+          // is a change to the wire type rather than to this call.
+          vk={editing ? (vk as VirtualKeyDetail) : null}
           onOpenChange={(open) => {
             if (!open) setEditing(false);
           }}
