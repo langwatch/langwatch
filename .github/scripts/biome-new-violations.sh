@@ -91,6 +91,22 @@ BASE_APP="$(app_dir "$BASE_TREE")"
 rm -f "$BASE_TREE/$BASE_APP"/biome.json "$BASE_TREE/$BASE_APP"/biome.jsonc
 cp "$REPO_ROOT/$HEAD_APP/biome.jsonc" "$BASE_TREE/$BASE_APP/biome.jsonc"
 
+# The app config is a NESTED config (`"root": false`, `"extends": "//"`), so the
+# repo-root config has to come across with it. A nested config whose root is
+# missing does not fail -- Biome silently falls back to its built-in defaults,
+# which turns every disabled rule back on and reformats to the default style.
+# On the subset used to verify this, that is 179 diagnostics becoming 1232, all
+# of them counted as new. Copy the root, and only from HEAD, for the same reason
+# the app config is copied from HEAD: the base is judged by the rules we are
+# adopting. A merge base from before the root config existed has none to remove.
+if [ ! -f "$REPO_ROOT/biome.jsonc" ]; then
+  echo "::error::no biome.jsonc at the repo root -- $HEAD_APP/biome.jsonc is nested and falls back to Biome's defaults without it, which reports the tree's whole backlog as new" >&2
+  exit 2
+fi
+
+rm -f "$BASE_TREE"/biome.json "$BASE_TREE"/biome.jsonc
+cp "$REPO_ROOT/biome.jsonc" "$BASE_TREE/biome.jsonc"
+
 # Both sides must resolve the same dependencies or the type-aware rules
 # (noFloatingPromises, noMisusedPromises) disagree for reasons that have nothing
 # to do with the diff. Symlinking is enough -- biome only reads them.

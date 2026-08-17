@@ -961,16 +961,18 @@ jobs:
           # run. They must agree: a path linted on one side and not the other
           # reads as that file's whole backlog appearing or vanishing.
           # `./packages` is GONE from this list, and deliberately not replaced
-          # with `../../packages`. The nine workspace packages now live in one
-          # repo-root tree, which is outside biome's project root here (the app
-          # directory, where biome.jsonc lives). Biome reports out-of-root files
+          # with `../../packages`. The nine workspace packages live in one
+          # repo-root tree that this run does not reach: it is started from the
+          # app directory, and /biome.jsonc scopes the workspace to
+          # platform/app/** anyway. Biome reports files outside the project root
           # by ABSOLUTE path, and the gate keys counts on the reported path, so
           # the base tree's temp-dir prefix can never match the head's: all 268
           # of their diagnostics read as brand new every run. Restoring coverage
-          # means giving packages/ its own biome root and its own gate run, which
-          # is a change to the lint setup rather than to this move -- tracked as
-          # a follow-up. The app tree, which is what this job is named for, is
-          # still fully covered.
+          # means giving packages/ a nested config of its own, adding it to the
+          # root config's includes, and giving it its own gate run -- a change to
+          # the lint setup rather than to this list, tracked as a follow-up. The
+          # app tree, which is what this job is named for, is still fully
+          # covered.
           BIOME_PATHS=(./src ./ee ./scripts ./e2e ./prisma ./vite)
 
           # Biome exits non-zero whenever it reports anything; the gate is the
