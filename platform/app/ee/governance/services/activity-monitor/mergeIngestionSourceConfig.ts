@@ -36,6 +36,23 @@ export const PULL_CONFIG_OWNED_FIELDS = [
 
 export type PullConfigOwnedField = (typeof PULL_CONFIG_OWNED_FIELDS)[number];
 
+/**
+ * Transport fields an adapter owns on top of the framework-level ones.
+ *
+ * The framework list is not enough on its own: an adapter's schema validates
+ * the *shape* of what it receives, so a well-formed value from the wrong
+ * source passes. `microsoft_365_audit` reads `tenantId` to pick whose audit
+ * feed to poll and `contentType` to pick which feed, and the composer derives
+ * both. A caller posting them in `parserConfig` would otherwise out-rank the
+ * composer and silently repoint the source, with nothing malformed to catch.
+ *
+ * Keyed by adapter id rather than source type — the merge sees a pullConfig,
+ * not a row.
+ */
+const ADAPTER_OWNED_FIELDS: Record<string, readonly string[]> = {
+  microsoft_365_audit: ["tenantId", "contentType"],
+};
+
 export interface MergeConfigInput {
   pullConfig?: Record<string, unknown> | null;
   parserConfig?: Record<string, unknown> | null;
@@ -47,8 +64,11 @@ export interface MergeConfigResult {
    * Keys dropped from `parserConfig` because pullConfig owns them. Non-empty
    * means the caller sent something that would have silently changed puller
    * behaviour; worth logging, and worth asserting in tests.
+   *
+   * Widened past `PullConfigOwnedField` because the adapter-owned keys are
+   * per-adapter and not knowable as a union here.
    */
-  strippedFromParserConfig: PullConfigOwnedField[];
+  strippedFromParserConfig: string[];
 }
 
 /**
@@ -62,15 +82,20 @@ export function mergeIngestionSourceConfig({
   const pull = pullConfig ?? {};
   const parser = parserConfig ?? {};
 
-  const strippedFromParserConfig: PullConfigOwnedField[] = [];
+  const adapter = typeof pull.adapter === "string" ? pull.adapter : undefined;
+  const ownedFields = new Set<string>([
+    ...PULL_CONFIG_OWNED_FIELDS,
+    ...(adapter === undefined ? [] : (ADAPTER_OWNED_FIELDS[adapter] ?? [])),
+  ]);
+
+  const strippedFromParserConfig: string[] = [];
   const parserWithoutOwned: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(parser)) {
-    const owned = PULL_CONFIG_OWNED_FIELDS.find((field) => field === key);
     // Only a conflict if pullConfig actually supplied the key. A push-mode
     // source with no pullConfig at all keeps whatever it sent.
-    if (owned !== undefined && Object.hasOwn(pull, key)) {
-      strippedFromParserConfig.push(owned);
+    if (ownedFields.has(key) && Object.hasOwn(pull, key)) {
+      strippedFromParserConfig.push(key);
       continue;
     }
     parserWithoutOwned[key] = value;

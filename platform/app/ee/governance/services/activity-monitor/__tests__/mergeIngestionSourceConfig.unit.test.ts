@@ -47,15 +47,19 @@ describe("mergeIngestionSourceConfig", () => {
   });
 
   it("lets parserConfig win for keys pullConfig does not own", () => {
+    // `timestampField` is a parsing concern: it changes how a fetched record
+    // is read, not which feed is fetched. Deliberately not `contentType` —
+    // that one picks the audit feed, so the adapter owns it and this test
+    // used to prove the opposite.
     const { merged, strippedFromParserConfig } = mergeIngestionSourceConfig({
       pullConfig: {
         adapter: "microsoft_365_audit",
-        contentType: "Audit.General",
+        timestampField: "CreationTime",
       },
-      parserConfig: { contentType: "Audit.AzureActiveDirectory" },
+      parserConfig: { timestampField: "RecordCreationTime" },
     });
 
-    expect(merged.contentType).toBe("Audit.AzureActiveDirectory");
+    expect(merged.timestampField).toBe("RecordCreationTime");
     expect(strippedFromParserConfig).toEqual([]);
   });
 
@@ -81,5 +85,45 @@ describe("mergeIngestionSourceConfig", () => {
       merged: {},
       strippedFromParserConfig: [],
     });
+  });
+
+  /** @scenario parserConfig cannot repoint a microsoft_365_audit source */
+  it("keeps the composer's tenant and content type over a caller's parserConfig", () => {
+    // Both are well-formed strings, so the adapter's own schema would accept
+    // either. Precedence is the only thing standing between a caller and a
+    // source that quietly polls a different tenant's audit feed.
+    const { merged, strippedFromParserConfig } = mergeIngestionSourceConfig({
+      pullConfig: {
+        adapter: "microsoft_365_audit",
+        tenantId: "acme-tenant-guid",
+        contentType: "Audit.General",
+      },
+      parserConfig: {
+        tenantId: "someone-elses-tenant-guid",
+        contentType: "Audit.Exchange",
+        stripPrompts: true,
+      },
+    });
+
+    expect(merged.tenantId).toBe("acme-tenant-guid");
+    expect(merged.contentType).toBe("Audit.General");
+    // Parsing hints are still the caller's to set.
+    expect(merged.stripPrompts).toBe(true);
+    expect(strippedFromParserConfig.toSorted()).toEqual([
+      "contentType",
+      "tenantId",
+    ]);
+  });
+
+  it("leaves those keys alone for adapters that do not own them", () => {
+    // The protection is keyed on the adapter, not on the field name, so an
+    // unrelated puller keeps the general parserConfig-wins rule.
+    const { merged, strippedFromParserConfig } = mergeIngestionSourceConfig({
+      pullConfig: { adapter: "http_custom", tenantId: "from-pull" },
+      parserConfig: { tenantId: "from-parser" },
+    });
+
+    expect(merged.tenantId).toBe("from-parser");
+    expect(strippedFromParserConfig).toEqual([]);
   });
 });
