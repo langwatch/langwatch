@@ -664,10 +664,15 @@ describe("process ops against a real Postgres", () => {
         retiredAt: new Date(NOW - 15_000),
       });
 
+      // The jitter window is measured from the redrive itself, not from module
+      // load: a slow suite reaching this test a minute late would otherwise
+      // fail a perfectly good spread.
+      const redrivenAtStart = Date.now();
       const result = await service.redriveDeadLetters({
         processName: nsBulkA,
         actorUserId: ACTOR,
       });
+      const redrivenAtEnd = Date.now();
       expect(result.redriven).toBe(2);
 
       const rows = await prisma.processManagerOutbox.findMany({
@@ -700,8 +705,8 @@ describe("process ops against a real Postgres", () => {
       });
       const dueTimes = redriven.map((row) => row.nextAttemptAt.getTime());
       for (const due of dueTimes) {
-        expect(due).toBeGreaterThanOrEqual(NOW - 1_000);
-        expect(due).toBeLessThanOrEqual(NOW + 61_000);
+        expect(due).toBeGreaterThanOrEqual(redrivenAtStart);
+        expect(due).toBeLessThanOrEqual(redrivenAtEnd + 60_000);
       }
     });
 

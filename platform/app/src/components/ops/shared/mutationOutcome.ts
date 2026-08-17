@@ -26,10 +26,10 @@ export function mutationOutcomeHandlers({
 }) {
   return {
     onSuccess: (data: Record<string, unknown>) => {
-      const ok = Object.values(data).some((value) => value === true);
+      const isApplied = Object.values(data).some((value) => value === true);
       toaster.create({
-        title: ok ? applied : missed,
-        type: ok ? ("success" as const) : ("error" as const),
+        title: isApplied ? applied : missed,
+        type: isApplied ? ("success" as const) : ("error" as const),
       });
     },
     onError: (error: unknown) =>

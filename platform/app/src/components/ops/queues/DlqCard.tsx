@@ -292,7 +292,7 @@ export function DlqCard({ queueNames }: { queueNames: string[] }) {
   );
   const processDead = processDeadQuery.data ?? [];
   const processDeadTotal = processDead.reduce((sum, r) => sum + r.count, 0);
-  const stillLoading = dlqQuery.isLoading || processDeadQuery.isLoading;
+  const isStillLoading = dlqQuery.isLoading || processDeadQuery.isLoading;
 
   // Two mechanisms, one heading: an operator asking "what has stopped?" should
   // not have to know that a GroupQueue job and a process-manager intent retire
@@ -302,7 +302,7 @@ export function DlqCard({ queueNames }: { queueNames: string[] }) {
   // card mounts on the queue answer alone and then flips a red row in a
   // moment later, which on an ops surface reads as a new incident rather than
   // as the same page finishing loading.
-  if (stillLoading || (groups.length === 0 && processDeadTotal === 0)) {
+  if (isStillLoading || (groups.length === 0 && processDeadTotal === 0)) {
     return null;
   }
 
@@ -506,8 +506,8 @@ function DlqConfirms({
   canaryCount: number;
 }) {
   const { pending, canaryTarget } = actions;
-  const one = pending?.groupIds.length === 1;
-  const target = one
+  const isSingleGroup = pending?.groupIds.length === 1;
+  const target = isSingleGroup
     ? `"${pending?.groupIds[0]}"`
     : `${pending?.groupIds.length} shown groups`;
   return (

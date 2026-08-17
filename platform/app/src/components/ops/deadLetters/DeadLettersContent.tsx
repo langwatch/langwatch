@@ -175,8 +175,8 @@ function BulkConfirms({
   // same phrase, which stops a script reaching this breadth by omitting a
   // field; this is what makes the ask a human one too.
   const [typed, setTyped] = useState("");
-  const fleetWide = processName === undefined;
-  const phraseOk = !fleetWide || typed.trim() === FLEET_DISCARD_PHRASE;
+  const isFleetWide = processName === undefined;
+  const isPhraseValid = !isFleetWide || typed.trim() === FLEET_DISCARD_PHRASE;
   return (
     <>
       {/* Discard asks even for one row, because nothing un-discards it: no
@@ -211,9 +211,9 @@ function BulkConfirms({
         title="Discard dead letters"
         description={`Mark all ${shownCount} dead ${plural} for ${shownScope} as never to be sent. The rows are kept as the audit record, the work will not run, and none of it can be redriven afterwards.`}
         isLoading={actions.discardAll.isPending}
-        confirmDisabled={!phraseOk}
+        confirmDisabled={!isPhraseValid}
       >
-        {fleetWide && (
+        {isFleetWide && (
           <Input
             marginTop={3}
             size="sm"
