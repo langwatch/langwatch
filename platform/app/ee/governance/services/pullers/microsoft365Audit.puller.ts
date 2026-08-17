@@ -44,6 +44,7 @@ import {
   RetryDeadlineExceededError,
 } from "./shared/httpRetry";
 import {
+  CURSOR_VERSION,
   decodeCursor,
   encodeCursor,
   MAX_QUEUED_BLOBS,
@@ -442,7 +443,7 @@ export class Microsoft365AuditPuller
     const start = new Date(nowMs - INITIAL_LOOKBACK_MS).toISOString();
     const end = new Date(nowMs).toISOString();
     return {
-      version: 1,
+      version: CURSOR_VERSION,
       phase: "listing",
       windowStart: start,
       windowEnd: end,

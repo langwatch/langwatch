@@ -99,14 +99,6 @@ function isStringArray(value: unknown): value is string[] {
 }
 
 /**
- * Decode a persisted cursor. Never throws.
- *
- * Returns `{ cursor: null }` for a first-ever run. Returns
- * `{ cursor: null, recoveredFrom }` when the input was unusable — the caller
- * treats that the same as a first run except that it should start from the
- * salvaged watermark if there is one.
- */
-/**
  * The candidate as a usable cursor, or the reason it is not one.
  *
  * Split from `decodeCursor` so the rejection ladder stays one flat list of
@@ -177,6 +169,14 @@ function parseCursorObject(
   return { candidate: parsed as Record<string, unknown> };
 }
 
+/**
+ * Decode a persisted cursor. Never throws.
+ *
+ * Returns `{ cursor: null }` for a first-ever run. Returns
+ * `{ cursor: null, recoveredFrom }` when the input was unusable — the caller
+ * treats that the same as a first run except that it should start from the
+ * salvaged watermark if there is one.
+ */
 export function decodeCursor(raw: string | null): DecodeResult {
   if (raw === null || raw.trim() === "") return { cursor: null };
 
