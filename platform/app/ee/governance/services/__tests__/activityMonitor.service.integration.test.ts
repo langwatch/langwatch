@@ -763,7 +763,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
           eventType: "anthropic_admin",
           action: "usage_report",
           target: "claude-haiku-4-5",
-          costUsd: 0.0042,
+          costUsd: "0.0042",
           tokensInput: 8,
           tokensOutput: 5,
         }),
