@@ -444,3 +444,23 @@ Feature: microsoft_365_audit ingestion source (Office 365 Management Activity AP
     When the source tree is checked for those two strings
     Then neither string is present
     And the replacement copy names the API the adapter actually calls
+
+  # Found in review, not in planning. The first cut advanced only the
+  # watermark and left the window pinned, so every run after the first
+  # re-listed the same hour and no new event was ever ingested — the source
+  # would have reproduced, inside its replacement, the exact silence that
+  # retired copilot_studio.
+  @unit @regression
+  Scenario: A completed window advances so the next run sees new activity
+    Given a run that drained its window completely
+    When the next scheduled run fires an hour later
+    Then it lists a window it has not listed before
+    And that window starts exactly where the previous one ended
+    And the watermark records the boundary that is now fully ingested
+
+  @unit @regression
+  Scenario: Catching up after downtime advances in bounded steps
+    Given a source whose last completed window ended a week ago
+    When the next run fires
+    Then the window it claims is no wider than the configured maximum
+    And the window is not empty

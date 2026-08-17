@@ -71,6 +71,13 @@ export const MAX_WINDOW_MS = 24 * 60 * 60 * 1000;
 /** Safety cap so a misconfigured listing cursor cannot page forever. */
 export const MAX_LISTING_PAGES_PER_RUN = 50;
 
+/**
+ * Cap on list→drain rounds in one run. A full blob queue or the page cap
+ * defers part of a listing, so a run may legitimately go round several times.
+ * This bounds it without relying on `deadlineMs`, which is optional.
+ */
+export const MAX_LIST_DRAIN_ROUNDS_PER_RUN = 20;
+
 const credentialsSchema = z.object({
   tenantId: z.string().min(1),
   clientId: z.string().min(1),
@@ -232,26 +239,50 @@ export class Microsoft365AuditPuller
       const events: NormalizedPullEvent[] = [];
       const working: Microsoft365AuditCursor = { ...cursor };
 
-      if (working.phase === "listing") {
-        await this.listContent({ config, tokens, options, cursor: working });
-      }
+      // List then drain, repeatedly, because a full blob queue or the page
+      // cap defers part of the listing rather than dropping it.
+      //
+      // A bounded loop, not mutual recursion between the two: `deadlineMs` is
+      // optional on PullRunOptions, so a run without one facing a server that
+      // returns a stable `nextpageuri` would recurse until the stack gave
+      // out. The cap bounds it whether or not a deadline is set, and any
+      // remainder rides the cursor to the next run.
+      for (let round = 0; round < MAX_LIST_DRAIN_ROUNDS_PER_RUN; round += 1) {
+        if (this.outOfTime(options)) break;
 
-      await this.drainBlobs({
-        config,
-        tokens,
-        options,
-        cursor: working,
-        events,
-        stats,
-      });
+        if (working.phase === "listing" || working.nextPageUri !== undefined) {
+          await this.listContent({ config, tokens, options, cursor: working });
+        }
+
+        await this.drainBlobs({
+          config,
+          tokens,
+          options,
+          cursor: working,
+          events,
+          stats,
+        });
+
+        // Nothing deferred and nothing queued: the window is finished.
+        if (working.blobQueue.length === 0 && working.nextPageUri === undefined)
+          break;
+        // Blobs still queued means the deadline stopped the drain, not the
+        // listing — going round again would not help.
+        if (working.blobQueue.length > 0) break;
+      }
 
       const drained =
         working.blobQueue.length === 0 && working.nextPageUri === undefined;
 
       if (drained) {
-        // The window is genuinely complete, so the watermark may advance.
-        working.watermark = working.windowEnd;
-        working.phase = "listing";
+        // The window is genuinely complete, so the watermark may advance —
+        // and, critically, so must the window itself. Advancing only the
+        // watermark leaves windowStart/windowEnd pinned at the first window
+        // forever: every subsequent run re-lists the same hour, re-emits the
+        // same records (which collapse on the content-derived dedup key) and
+        // never sees a new event. That is a source that looks healthy and
+        // ingests nothing — the exact failure this adapter replaces.
+        this.advanceWindow(working, now);
       } else {
         stats.stoppedEarly = true;
       }
@@ -284,6 +315,29 @@ export class Microsoft365AuditPuller
       }
       throw error;
     }
+  }
+
+  /**
+   * Move to the next window after the current one drained completely.
+   *
+   * The new window starts exactly where the last ended, so no interval is
+   * ever skipped, and reaches no further than now. `MAX_WINDOW_MS` caps how
+   * much a single run may claim, so a source that has been down for a week
+   * catches up in bounded steps instead of asking for a week in one listing.
+   */
+  private advanceWindow(cursor: Microsoft365AuditCursor, nowMs: number): void {
+    const previousEndMs = Date.parse(cursor.windowEnd);
+    const startMs = Number.isNaN(previousEndMs) ? nowMs : previousEndMs;
+    const endMs = Math.min(nowMs, startMs + MAX_WINDOW_MS);
+
+    cursor.watermark = cursor.windowEnd;
+    cursor.windowStart = new Date(startMs).toISOString();
+    // Clamp: if no time has passed since the last run, the window is empty
+    // rather than inverted. The next run picks it up when the clock moves.
+    cursor.windowEnd = new Date(Math.max(startMs, endMs)).toISOString();
+    cursor.blobQueue = [];
+    cursor.nextPageUri = undefined;
+    cursor.phase = "listing";
   }
 
   /** A first-ever run, or one resuming from a salvaged watermark. */
@@ -332,9 +386,24 @@ export class Microsoft365AuditPuller
         deadlineAtMs: options.deadlineMs,
       });
     } catch (error) {
-      // AF20024 is "subscription is already enabled" — the expected answer on
-      // every run after the first.
+      // AF20024 ("subscription is already enabled") is the expected answer on
+      // every run after the first, and it arrives as a 400. The retry helper
+      // does not surface the body, so this cannot distinguish it from a
+      // genuinely malformed request — it swallows both.
+      //
+      // That is tolerable only because it is not the last line of defence: if
+      // no subscription actually exists, the content listing below fails on
+      // its own and the run reports an error. Logging it means a
+      // misconfiguration that only ever manifests here is still visible
+      // rather than silent.
       if (error instanceof Error && /HTTP 400/.test(error.message)) {
+        logger.debug(
+          {
+            ingestionSourceId: options.context?.ingestionSourceId,
+            tenantId: config.tenantId,
+          },
+          "microsoft_365_audit: subscription start returned 400 (expected once the subscription is enabled)",
+        );
         return;
       }
       throw error;
@@ -465,19 +534,6 @@ export class Microsoft365AuditPuller
 
       cursor.blobQueue.shift();
       stats.blobsDrained += 1;
-    }
-
-    // Queue empty but the listing had more pages: go back for them.
-    if (cursor.nextPageUri !== undefined && !this.outOfTime(options)) {
-      await this.listContent({ config, tokens, options, cursor });
-      await this.drainBlobs({
-        config,
-        tokens,
-        options,
-        cursor,
-        events,
-        stats,
-      });
     }
   }
 
