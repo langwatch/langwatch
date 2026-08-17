@@ -51,10 +51,11 @@ describe("FormatSelect", () => {
      * activates the highlighted item by dispatching a real click on it, which
      * is what lets one `onClick` serve both.
      *
-     * The active option is JSON and the keyboard picks the first one, so the
-     * reported value cannot be the one that was already active. Each press is
-     * awaited: the highlight moves through machine state, and an Enter sent
-     * before it commits activates whatever was highlighted before.
+     * ArrowDown on the closed trigger both opens the menu and highlights the
+     * first option, so the highlight is set by the same gesture rather than by
+     * a second press that has to land after the first one settles. The active
+     * option is JSON and the keyboard picks the first one, so the reported
+     * value cannot be the one that was already active.
      */
     it("picks an option from the keyboard", async () => {
       const user = userEvent.setup();
@@ -70,18 +71,22 @@ describe("FormatSelect", () => {
       );
 
       screen.getByRole("button", { name: "Attributes view format" }).focus();
-      await user.keyboard("{Enter}");
-      await screen.findByRole("menuitem", { name: "Flat" });
-
       await user.keyboard("{ArrowDown}");
-      await waitFor(() =>
-        expect(screen.getByRole("menuitem", { name: "Flat" })).toHaveAttribute(
-          "data-highlighted",
-        ),
+      // Opening positions the menu asynchronously and the machine ignores
+      // navigation until it is placed, which on a loaded CI runner takes
+      // longer than the 1s default.
+      await waitFor(
+        () =>
+          expect(
+            screen.getByRole("menuitem", { name: "Flat" }),
+          ).toHaveAttribute("data-highlighted"),
+        { timeout: 5000 },
       );
       await user.keyboard("{Enter}");
 
-      await waitFor(() => expect(onChange).toHaveBeenCalledWith("flat"));
+      await waitFor(() => expect(onChange).toHaveBeenCalledWith("flat"), {
+        timeout: 5000,
+      });
     });
   });
 
